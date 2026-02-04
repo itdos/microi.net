@@ -248,6 +248,11 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
 import { useI18n } from 'vue-i18n';
+
+// 定义组件名称，用于 keep-alive 缓存
+defineOptions({
+    name: 'mobile_profile'
+});
 import { version as appVersion } from '../../../package.json';
 
 const router = useRouter();

@@ -835,7 +835,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
                         url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
-                    } else if (url.startsWith("http")) {
+                    } else if (url.startsWith("http") && !self.diyStore.IsPhoneView) {
                         window.location.href = url;
                         return;
                     }
@@ -1179,6 +1179,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         margin-top: 0 !important;
         transition: all 0.7s ease;
         border-radius: 12px;
+        :deep(.el-checkbox__input.is-checked + .el-checkbox__label){
+            color: #fff !important;
+        }
     }
 
     @media (min-width: 1365px) {

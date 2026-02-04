@@ -341,7 +341,16 @@ import _ from "underscore";
 import { useDiyStore } from "@/pinia";
 import { computed } from "vue";
 import drag from "@/utils/dos.common";
-import { formatMessageContent, renderDataTable, escapeHtml } from "@/utils/chat.common";
+import { 
+    formatMessageContent, 
+    renderDataTable, 
+    escapeHtml,
+    formatTime,
+    initWebSocketEvents,
+    cleanupWebSocketEvents,
+    isDuplicateMessage,
+    clearMessageDuplicateCache
+} from "@/utils/chat.common";
 
 export default {
     name: "diy-chat",
@@ -898,6 +907,15 @@ export default {
         });
 
         self.$nextTick(function () {
+            // 检查设备类型：只有PC端才初始化聊天
+            if (self.diyStore.IsPhoneView) {
+                console.log('[聊天组件] 当前为移动端模式，不初始化PC端聊天');
+                self.FirstConnectWebsocket = false;
+                return;
+            }
+            
+            console.log('[聊天组件] PC端模式，开始初始化聊天');
+            
             // 轮询检查WebSocket连接状态
             let checkCount = 0;
             const maxChecks = 50; // 最多检查50次，共10秒
@@ -944,6 +962,12 @@ export default {
         // 移除事件监听
         document.removeEventListener('mousemove', self.onDrag);
         document.removeEventListener('mouseup', self.stopDrag);
+        
+        // 使用公共模块清理WebSocket事件
+        if (self.websocketEventsRegistered) {
+            cleanupWebSocketEvents(self.$websocket, '[PC聊天]');
+            self.websocketEventsRegistered = false;
+        }
     },
     methods: {
         GetSysUserPublicInfo(isLoadMore = false) {
@@ -1103,6 +1127,19 @@ export default {
             }
             
             console.log("开始初始化消息服务器监听函数...");
+            
+            // 防止重复初始化：如果已经注册过且连接状态正常，直接返回
+            if (self.websocketEventsRegistered) {
+                console.log('[InitSignalROnEvent] 事件监听器已注册，跳过重复初始化');
+                // 只执行必要的请求
+                self.SendLastContacts();
+                self.SendUnreadCountToUser();
+                if (timer != undefined) {
+                    clearInterval(timer);
+                }
+                return;
+            }
+            
             self.InitReceiveEvent();
             console.log("初始化消息服务器监听函数成功！");
             
@@ -1119,197 +1156,167 @@ export default {
         },
         InitReceiveEvent() {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.$websocket) && !self.websocketEventsRegistered) {
-                console.log('[InitReceiveEvent] 开始注册 WebSocket 事件监听器');
+            if (!self.DiyCommon.IsNull(self.$websocket)) {
+                // 设备检测：只在PC端注册
+                if (self.diyStore.IsPhoneView) {
+                    console.log('[PC聊天] 当前为移动端模式，不注册PC端聊天事件');
+                    return;
+                }
                 
-                self.$websocket.on("ReceiveMessage", (message) => {
-                    console.log("ReceiveMessage：", message);
-                });
-                
-                self.$websocket.on("ReceiveConnection", (message) => {
-                    console.log("ReceiveConnection：", message);
-                });
-                
-                self.$websocket.on("ReceiveDisConnection", (message) => {
-                    console.log("ReceiveDisConnection：", message);
-                });
-                
-                self.$websocket.on("ReceiveSendToUser", (message) => {
-                    console.log("ReceiveSendToUser：", message);
-                    // console.log('[调试] CurrentLastContact:', {
-                    //     ContactUserId: self.CurrentLastContact.ContactUserId,
-                    //     Id: self.CurrentLastContact.Id
-                    // });
-                    // console.log('[调试] Message:', {
-                    //     FromUserId: message.FromUserId,
-                    //     ToUserId: message.ToUserId
-                    // });
-                    
-                    // 判断消息是否与当前聊天对象相关
-                    // 情凵1：对方发给我的 (FromUserId 是当前联系人)
-                    // 情凵2：我发给对方的 (ToUserId 是当前联系人)
-                    // 情凵3：自己跟自己聊 (FromUserId 和 ToUserId 都是自己)
-                    const isCurrentContact = 
-                        (self.CurrentLastContact.ContactUserId == message.FromUserId) || 
-                        (self.CurrentLastContact.Id == message.FromUserId) ||
-                        (self.CurrentLastContact.ContactUserId == message.ToUserId) ||
-                        (self.CurrentLastContact.Id == message.ToUserId);
-                    
-                    // console.log('[调试] 是否匹配:', isCurrentContact);
-                    
-                    if (isCurrentContact) {
-                        // 如果是AI助手的消息，直接添加到聊天记录
-                        if (message.FromUserId === 'AI') {
-                            console.log('[AI消息] 收到AI回复，当前长度:', self.ChatRecord.length);
-                            self.ChatRecord.push(message);
-                            console.log('[AI消息] push后长度:', self.ChatRecord.length);
-                            self.$nextTick(function () {
-                                self.wchat_ToBottom();
-                            });
-                        } else {
-                            // 普通用户消息：重新获取聊天记录
-                            self.$websocket.invoke("SendChatRecordToUser", {
-                                FromUserId: self.GetCurrentUser.Id,
-                                ToUserId: self.CurrentLastContact.ContactUserId,
-                                OsClient: self.DiyCommon.GetOsClient()
-                            });
-                            self.$nextTick(function () {
-                                self.wchat_ToBottom();
-                            });
-                        }
-                    } else {
-                        console.log('[调试] 消息不属于当前联系人');
-                    }
-                });
-                
-                // 监听AI流式数据块
-                self.$websocket.on("ReceiveAIChunk", (chunk, fromUserId, toUserId, isComplete) => {
-                    console.log('[AI流式]', { chunk: chunk?.substring(0, 50), fromUserId, toUserId, isComplete });
-                    
-                    // 检查是否是当前聊天对象
-                    const isCurrentContact = 
-                        self.CurrentLastContact.ContactUserId === fromUserId ||
-                        self.CurrentLastContact.Id === fromUserId;
-                    
-                    if (!isCurrentContact) {
-                        console.log('[AI流式] 不是当前联系人，忽略');
-                        return;
-                    }
-                    
-                    if (!self.currentStreamMessage) {
-                        // 第一个数据块 - 创建新消息
-                        console.log('[AI流式] 创建新消息');
-                        self.currentStreamMessage = {
-                            FromUserId: fromUserId,
-                            FromUserName: 'AI助手',
-                            FromUserAvatar: './static/img/icon/personal.png',
-                            ToUserId: toUserId,
-                            ToUserName: self.GetCurrentUser.Name,
-                            ToUserAvatar: self.GetCurrentUser.Avatar,
-                            Content: chunk,
-                            CreateTime: new Date().toISOString(),
-                            Type: 'text',
-                            IsRead: false,
-                            isStreaming: true  // 标记为流式消息
-                        };
+                // 使用公共模块初始化WebSocket事件
+                const success = initWebSocketEvents(self.$websocket, {
+                    // 接收普通消息
+                    onReceiveMessage: (message) => {
+                        console.log('[PC聊天] 收到消息:', message);
                         
-                        // 添加到聊天记录
-                        self.ChatRecord.push(self.currentStreamMessage);
-                    } else {
-                        // 后续数据块 - 追加内容
-                        self.currentStreamMessage.Content += chunk;
-                    }
-                    
-                    // 滚动到底部
-                    self.$nextTick(function () {
-                        self.wchat_ToBottom();
-                    });
-                    
-                    if (isComplete) {
-                        // 流式输出完成
-                        console.log('[AI流式] 完成，最终内容长度:', self.currentStreamMessage?.Content?.length);
-                        if (self.currentStreamMessage) {
-                            self.currentStreamMessage.isStreaming = false;  // 取消流式标记
+                        // 判断消息是否与当前聊天对象相关
+                        const isCurrentContact = 
+                            (self.CurrentLastContact.ContactUserId == message.FromUserId) || 
+                            (self.CurrentLastContact.Id == message.FromUserId) ||
+                            (self.CurrentLastContact.ContactUserId == message.ToUserId) ||
+                            (self.CurrentLastContact.Id == message.ToUserId);
+                        
+                        if (isCurrentContact) {
+                            // 如果是AI助手的消息，直接添加到聊天记录
+                            if (message.FromUserId === 'AI') {
+                                console.log('[AI消息] 收到AI回复');
+                                self.ChatRecord.push(message);
+                                self.$nextTick(() => {
+                                    self.wchat_ToBottom();
+                                });
+                            } else {
+                                // 防止频繁请求聊天记录
+                                if (self._loadingChatRecord) {
+                                    console.log('[防死循环] 正在加载聊天记录，跳过');
+                                    return;
+                                }
+                                
+                                self._loadingChatRecord = true;
+                                // 普通用户消息：重新获取聊天记录
+                                self.$websocket.invoke("SendChatRecordToUser", {
+                                    FromUserId: self.GetCurrentUser.Id,
+                                    ToUserId: self.CurrentLastContact.ContactUserId,
+                                    OsClient: self.DiyCommon.GetOsClient()
+                                }).finally(() => {
+                                    setTimeout(() => {
+                                        self._loadingChatRecord = false;
+                                    }, 500);
+                                });
+                                self.$nextTick(() => {
+                                    self.wchat_ToBottom();
+                                });
+                            }
+                        } else {
+                            console.log('[调试] 消息不属于当前联系人');
                         }
-                        self.currentStreamMessage = null;  // 重置
-                    }
-                });
-                
-                self.$websocket.on("ReceiveSendChatRecordToUser", (message) => {
-                    console.log(`[接收聊天记录] 收到${message?.length || 0}条消息`, self.CurrentLastContact.ContactUserName);
-                    // 使用splice确保响应式更新
-                    self.ChatRecord.splice(0, self.ChatRecord.length, ...message);
-                    self.$nextTick(function () {
-                        self.wchat_ToBottom();
-                    });
-                });
-                
-                self.$websocket.on("ReceiveSendLastContacts", (message) => {
-                    console.log("获取最近联系人列表成功！");
-                    self.FirstConnectWebsocket = false;
-                    self.LastContacts = message;
-                    // if (self.DiyCommon.IsNull(self.CurrentLastContact.ContactUserId)
-                    //     && self.LastContacts.length > 0) {
-                    //     // self.CurrentLastContact = self.LastContacts[0];
-                    //     self.$store.commit('DiyStore/SetDiyChatCurrentLastContact', self.LastContacts[0]);
-                    //     //获取跟这个人的聊天记录
-                    //     self.$websocket.invoke("SendChatRecordToUser", {
-                    //         FromUserId : self.GetCurrentUser.Id,
-                    //         ToUserId : self.LastContacts[0].ContactUserId,
-                    //         OsClient : self.DiyCommon.GetOsClient()
-                    //     })
-                    //     .then((res) => {
-
-                    //     })
-                    //     .catch((err) => {
-                    //         console.error('SendLastContacts：', err.toString())
-                    //     });
-                    // }
-                    // var needPostIds = [];
-                    // message.forEach(element => {
-                    //     if(_.where(self.UserIdsInfo, {Id : element.contactUserId}).length == 0){
-                    //         needPostIds.push(element.contactUserId);
-                    //     }
-                    // });
-                    // if (needPostIds.length > 0) {
-                    //     //这里要根据UserId获取到昵称、头像
-                    //     self.DiyCommon.Post('/api/SysUser/GetsysuserPublicInfo', {Ids : needPostIds}, function(result){
-                    //         if (self.DiyCommon.Result(result)) {
-                    //             result.Data.forEach(element => {
-                    //                 if(_.where(self.UserIdsInfo, {Id : element.Id}).length == 0){
-                    //                     self.UserIdsInfo.push(element);
-                    //                 }else{
-                    //                     self.UserIdsInfo.forEach(userInfo => {
-                    //                         if (userInfo.Id == element.Id) {
-                    //                             userInfo = element;
-                    //                         }
-                    //                     });
-                    //                 }
-                    //             });
-                    //         }
-                    //     });
-                    // }
-                });
-                
-                self.$websocket.on("ReceiveSendUnreadCountToUser", (message) => {
-                    console.log("获取到未读消息条数：", message);
-                    self.$root.UnreadCount = message;
-                    if (message > 0) {
-                        self.DiyCommon.Tips(`您有${message}条未读消息！`, true, null, {
-                            position: "top-right"
+                    },
+                    
+                    // 接收AI流式数据块
+                    onReceiveAIChunk: (chunk, fromUserId, toUserId, isComplete) => {
+                        // 检查是否是当前聊天对象
+                        const isCurrentContact = 
+                            self.CurrentLastContact.ContactUserId === fromUserId ||
+                            self.CurrentLastContact.Id === fromUserId;
+                        
+                        if (!isCurrentContact) {
+                            console.log('[AI流式] 不是当前联系人，忽略');
+                            return;
+                        }
+                        
+                        if (!self.currentStreamMessage) {
+                            // 第一个数据块 - 创建新消息
+                            console.log('[AI流式] 创建新消息');
+                            self.currentStreamMessage = {
+                                FromUserId: fromUserId,
+                                FromUserName: 'AI助手',
+                                FromUserAvatar: './static/img/icon/personal.png',
+                                ToUserId: toUserId,
+                                ToUserName: self.GetCurrentUser.Name,
+                                ToUserAvatar: self.GetCurrentUser.Avatar,
+                                Content: chunk,
+                                CreateTime: new Date().toISOString(),
+                                Type: 'text',
+                                IsRead: false,
+                                isStreaming: true  // 标记为流式消息
+                            };
+                            
+                            // 添加到聊天记录
+                            self.ChatRecord.push(self.currentStreamMessage);
+                        } else {
+                            // 后续数据块 - 追加内容
+                            self.currentStreamMessage.Content += chunk;
+                        }
+                        
+                        // 滚动到底部
+                        self.$nextTick(() => {
+                            self.wchat_ToBottom();
                         });
+                        
+                        if (isComplete) {
+                            // 流式输出完成
+                            console.log('[AI流式] 完成');
+                            if (self.currentStreamMessage) {
+                                self.currentStreamMessage.isStreaming = false;
+                            }
+                            self.currentStreamMessage = null;
+                        }
+                    },
+                    
+                    // 接收聊天记录
+                    onReceiveChatRecord: (message) => {
+                        console.log(`[接收聊天记录] 收到${message?.length || 0}条消息`, self.CurrentLastContact.ContactUserName);
+                        
+                        // 重置加载标志
+                        self._loadingChatRecord = false;
+                        
+                        // 使用splice确保响应式更新
+                        self.ChatRecord.splice(0, self.ChatRecord.length, ...message);
+                        self.$nextTick(() => {
+                            self.wchat_ToBottom();
+                        });
+                    },
+                    
+                    // 接收最近联系人列表
+                    onReceiveLastContacts: (message) => {
+                        self.FirstConnectWebsocket = false;
+                        self.LastContacts = message;
+                    },
+                    
+                    // 接收未读消息数
+                    onReceiveUnreadCount: (message) => {
+                        self.$root.UnreadCount = message;
+                        if (message > 0) {
+                            self.DiyCommon.Tips(`您有${message}条未读消息！`, true, null, {
+                                position: "top-right"
+                            });
+                        }
+                    },
+                    
+                    // 接收连接事件
+                    onConnection: (message) => {
+                        console.log('[PC聊天] 用户上线:', message);
+                    },
+                    
+                    // 接收断开连接事件
+                    onDisconnection: (message) => {
+                        console.log('[PC聊天] 用户下线:', message);
                     }
+                }, {
+                    enableDuplicateCheck: true,
+                    logPrefix: '[PC聊天]'
                 });
                 
-                // 标记事件已注册
-                self.websocketEventsRegistered = true;
-                console.log('[InitReceiveEvent] ✅ WebSocket 事件监听器注册完成');
+                if (success) {
+                    // 标记事件已注册（组件级别，用于清理）
+                    self.websocketEventsRegistered = true;
+                } else {
+                    console.warn('[PC聊天] WebSocket 事件初始化失败');
+                }
             } else {
                 // 只在 WebSocket 不存在时才输出警告
                 if (self.DiyCommon.IsNull(self.$websocket)) {
-                    console.warn('[InitReceiveEvent] ⚠️ WebSocket 未初始化');
+                    console.warn('[PC聊天] ⚠️ WebSocket 未初始化');
                 }
-                // 事件已注册时不再输出日志，避免过多重复信息
             }
         },
         SendLastContacts() {
@@ -1319,6 +1326,14 @@ export default {
                 console.warn('[SendLastContacts] WebSocket 未连接，无法获取最近联系人列表');
                 return;
             }
+            
+            // 防止死循环：添加节流保护（2秒内只允许调用一次）
+            const now = Date.now();
+            if (self._lastContactsRequestTime && (now - self._lastContactsRequestTime < 2000)) {
+                console.log('[防死循环] SendLastContacts 请求过于频繁，跳过');
+                return;
+            }
+            self._lastContactsRequestTime = now;
 
             self.$websocket
                 .invoke("SendLastContacts", {
