@@ -341,6 +341,9 @@
     padding-top: 0px !important;
 }
 .diy-table {
+    :deep(.el-table-fixed-column--right){
+        background-color: #fff !important;
+    }
     max-width: 100%;
     :deep(.el-table .el-table__cell) {
         padding: 0;
@@ -408,7 +411,7 @@
 
         // 当前行高亮
         .el-table__body tr.current-row > td.el-table__cell {
-            background: linear-gradient(90deg, var(--color-primary-10) 0%, var(--color-primary-05) 100%) !important;
+            background: linear-gradient(90deg, var(--color-primary-50) 0%, var(--color-primary-40) 100%);
             // border-left: 3px solid var(--color-primary, #409eff);
         }
 
