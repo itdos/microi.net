@@ -2604,7 +2604,7 @@ var DiyCommon = {
             // }else{
             DiyCommon.Post(
                 DiyApi.GetSysDeptStep,
-                // '/api/FormEngine/getTableDatatree',
+                // '/api/FormEngine/GetTableDatatree',
                 {
                     FormEngineKey: "Sys_Dept"
                 },
@@ -2894,7 +2894,7 @@ var DiyCommon = {
             } else if (field.Component == "Department") {
                 DiyCommon.Post(
                     DiyApi.GetSysDeptStep,
-                    // '/api/FormEngine/getTableDatatree',
+                    // '/api/FormEngine/GetTableDatatree',
                     {
                         FormEngineKey: "Sys_Dept"
                     },

@@ -87,7 +87,7 @@ var DiyOsClient = {
         var href = window.location.href.toLowerCase();
         //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
         var sysConfig = null;
-        var sysConfigResult = await DiyCommon.PostAsync("/api/diyTable/getSysConfig", {
+        var sysConfigResult = await DiyCommon.PostAsync("/api/DiyTable/GetSysConfig", {
             _SearchEqual: {
                 IsEnable: 1
             },

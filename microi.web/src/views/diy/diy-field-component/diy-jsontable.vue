@@ -1450,8 +1450,18 @@ export default {
         align-items: center;
         margin-bottom: 10px;
     }
+    :deep(.el-table--default .el-table__cell){
+        padding: 2px 0;
+        .cell{
+            padding: 0 2px;
+        }
+    }
+    :deep(.el-table__header){
+        height: 35px;
+    }
     
     .json-table-content {
+        
         .drag-handle {
             cursor: move;
             color: #909399;

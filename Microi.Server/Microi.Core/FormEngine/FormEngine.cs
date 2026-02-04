@@ -1925,6 +1925,14 @@ namespace Microi.net
         /// 从缓存中获取
         /// </summary>
         /// <returns></returns>
+        public async Task<DosResult<dynamic>> GetSysMenuModel(string idOrKey, string osClient, string _Lang = "cn")
+        {
+            return await GetSysMenu(idOrKey, osClient, _Lang);
+        }
+        /// <summary>
+        /// 从缓存中获取
+        /// </summary>
+        /// <returns></returns>
         public async Task<DosResult<dynamic>> GetSysMenu(string idOrKey, string osClient, string _Lang = "cn")
         {
             try
@@ -1974,6 +1982,15 @@ namespace Microi.net
                     OsClient = osClient,
                 });
             }
+        }
+        /// <summary>
+        /// idOrName是DiyTable表的Id或者Name值
+        /// 从缓存中获取
+        /// </summary>
+        /// <returns></returns>
+        public async Task<DosResult<dynamic>> GetDiyTableModel(string idOrName, string osClient, string _Lang = "cn")
+        {
+            return await GetDiyTable(idOrName, osClient, _Lang);
         }
         /// <summary>
         /// idOrName是DiyTable表的Id或者Name值

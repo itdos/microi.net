@@ -27,29 +27,8 @@ namespace Microi.net
                 {
                     return returnDefaultOsClient ? OsClientExtend.GetConfigOsClient() : "";
                 }
-                var claims = context.User.Claims;
-                var token = context.Request?.Headers["Authorization"].ToString();
-                if (token.DosIsNullOrWhiteSpace() && context.Request?.HasFormContentType == true)
-                {
-                    token = context.Request?.Form["authorization"].ToString();
-                }
-                token = token.DosTrim().DosReplace("Bearer ", "");
-                if (!token.DosIsNullOrWhiteSpace())
-                {
-                    try
-                    {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
-                    }
-                    catch (System.Exception)
-                    {
-
-                    }
-                }
-                var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                if (osClient.DosIsNullOrWhiteSpace())
-                {
-                    osClient = context.Request?.Headers["osclient"].ToString();
-                }
+                var osClient = "";
+                //先从query、form、headers中获取
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     osClient = context.Request?.Query["osclient"].ToString();
@@ -78,6 +57,45 @@ namespace Microi.net
                         osClient = context.Request?.Form["_osclient"].ToString();
                     }
                 }
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = context.Request?.Headers["osclient"].ToString();
+                }
+
+                //再从Token中获取，如果不对等，可能是B租户在调用A租户的公开接口，此时需要将CurrentUser置空
+                var claims = context.User.Claims;
+                var token = context.Request?.Headers["Authorization"].ToString();
+                if (token.DosIsNullOrWhiteSpace() && context.Request?.HasFormContentType == true)
+                {
+                    token = context.Request?.Form["authorization"].ToString();
+                }
+                token = token.DosTrim().DosReplace("Bearer ", "");
+                if (!token.DosIsNullOrWhiteSpace())
+                {
+                    try
+                    {
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
+                    }
+                    catch (System.Exception)
+                    {
+
+                    }
+                }
+                var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+
+                //如果不对等，可能是B租户在调用A租户的公开接口，此时需要将CurrentUser置空
+                if(!tokenOsClient.DosIsNullOrWhiteSpace() 
+                    && !osClient.DosIsNullOrWhiteSpace() 
+                    && tokenOsClient != osClient)
+                {
+                    
+                }
+
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = tokenOsClient;
+                }
+
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     osClient = OsClientExtend.GetConfigOsClient();
@@ -490,9 +508,21 @@ namespace Microi.net
 
                     }
                 }
+                var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                if(!tokenOsClient.DosIsNullOrWhiteSpace() && tokenOsClient != osClient)
+                {
+                    return new CurrentToken()
+                    {
+                        OsClient = osClient
+                    };
+                }
+
+
                 var attributeList = new List<object>();
-                var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;//Id
-                var clientType = claims?.FirstOrDefault(d => d.Type == "ClientType")?.Value;//Id
+                var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                var clientType = claims?.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+
+
                 clientType = clientType.DosIsNullOrWhiteSpace("Empty");
 
                 if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())

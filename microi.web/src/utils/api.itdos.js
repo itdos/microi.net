@@ -27,7 +27,7 @@ var DiyApi = {
         DelFormDataByWhere: "/api/FormEngine/DelFormDataByWhere"
     },
     GetSysUser: function () {
-        return "/api/SysUser/getSysUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/api/SysUser/GetSysUser"; //' + DiyCommon.GetApiClientUrl() + '
     },
     // GetSysUserFk: function() {
     //   return '/api/sysuserfk/getSysUserfk' //' + DiyCommon.GetApiClientUrl() + '
@@ -58,7 +58,7 @@ var DiyApi = {
     // Login: '/api/' + joinUrl + 'SysUser/Login',
     DiyLogin: "/api/SysUser/diylogin",
     Login: function () {
-        return "/api/SysUser/login"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/api/SysUser/Login"; //' + DiyCommon.GetApiClientUrl() + '
     },
     TokenLogin: function () {
         return "/api/SysUser/tokenlogin"; //' + DiyCommon.GetApiClientUrl() + '
@@ -73,7 +73,7 @@ var DiyApi = {
     // },
     // GetCurrentUser: '/api/' + joinUrl + 'SysUser/GetCurrentUser',
     GetCurrentUser: function () {
-        return "/api/SysUser/getCurrentUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/api/SysUser/GetCurrentUser"; //' + DiyCommon.GetApiClientUrl() + '
     },
 
     /**
@@ -155,10 +155,10 @@ var DiyApi = {
      */
     // GetSysMenuStep: '/api/' + joinUrl + 'SysMenu/GetSysMenuStep',
     GetSysMenuStep: function () {
-        return "/api/SysMenu/getSysMenuStep";
+        return "/api/SysMenu/GetSysMenuStep";
         return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenuStep";
     },
-    GetSysMenuModel: "/api/FormEngine/GetSysMenu",
+    GetSysMenuModel: "/api/FormEngine/GetSysMenuModel",
 
     /**
      * 获取微信编辑器模板
@@ -272,11 +272,11 @@ var DiyApi = {
 
     LoadNotDiyTable: "/api/DiyTable/loadNotDiyTable",
     GetNotDiyTable: "/api/DiyTable/GetNotDiyTable",
-    GetDiyTable: "/api/DiyTable/GetDiyTable",
+    GetDiyTable: "/api/DiyTable/GetDiyTableModel",
     AddDiyTable: "/api/DiyTable/AddDiyTable",
     DelDiyTable: "/api/DiyTable/DelDiyTable",
     UptDiyTable: "/api/DiyTable/UptDiyTable",
-    GetDiyTableModel: "/api/FormEngine/GetDiyTable",
+    GetDiyTableModel: "/api/FormEngine/GetDiyTableModel",
     AddDiyTableRow: "/api/FormEngine/AddFormData",
     AddDiyTableRowBatch: "/api/DiyTable/AddDiyTableRowBatch",
     AddFormDataBatch: "/api/FormEngine/AddFormDataBatch",

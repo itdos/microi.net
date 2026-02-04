@@ -22,12 +22,9 @@ namespace Microi.net.Api
         private async Task DefaultParam(JObject param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            if(currentTokenDynamic != null)
-            {
-                param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
-                param["OsClient"] = currentTokenDynamic?.OsClient;
-                param["_InvokeType"] = "Client";
-            }
+            param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
+            param["OsClient"] = currentTokenDynamic?.OsClient;
+            param["_InvokeType"] = "Client";
         }
 
         /// <summary>
@@ -356,7 +353,25 @@ namespace Microi.net.Api
             {
                 idOrKey = param["Id"].Val<string>();
             }
-            var result = await MicroiEngine.FormEngine.GetSysMenu(idOrKey, param["OsClient"].Val<string>());
+            var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>());
+            return Json(result);
+        }
+        /// <summary>
+        /// 传入Id或ModuleEngineKey
+        /// 获取模块引擎一条数据（菜单）（带缓存）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetSysMenuModel([FromBody] JObject param)
+        {
+            await DefaultParam(param);
+            var idOrKey = param["ModuleEngineKey"].Val<string>();
+            if(idOrKey.DosIsNullOrWhiteSpace())
+            {
+                idOrKey = param["Id"].Val<string>();
+            }
+            var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>());
             return Json(result);
         }
         /// <summary>
@@ -374,7 +389,25 @@ namespace Microi.net.Api
             {
                 idOrKey = param["Id"].Val<string>();
             }
-            var result = await MicroiEngine.FormEngine.GetDiyTable(idOrKey, param["OsClient"].Val<string>());
+            var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>());
+            return Json(result);
+        }
+        /// <summary>
+        /// 传入Id或Name，
+        /// 获取一张表（表单属性）（带缓存）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetDiyTableModel([FromBody] JObject param)
+        {
+            await DefaultParam(param);
+            var idOrKey = param["Name"].Val<string>();
+            if(idOrKey.DosIsNullOrWhiteSpace())
+            {
+                idOrKey = param["Id"].Val<string>();
+            }
+            var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>());
             return Json(result);
         }
     }
