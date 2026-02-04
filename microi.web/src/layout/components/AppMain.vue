@@ -3,7 +3,9 @@
         <router-view v-slot="{ Component }">
             <!-- 移动端不使用动画，PC端保留动画 -->
             <transition :name="isPhoneView ? '' : 'fade-transform'" mode="out-in">
-                <keep-alive :include="cachedViews">
+                <!-- 🔥 移动端移除 include 限制，让所有组件都能被 keep-alive 缓存 -->
+                <!-- PC端仍然使用 include 配合 TagsView 管理缓存 -->
+                <keep-alive :include="isPhoneView ? undefined : cachedViews" :max="20">
                     <component :is="Component" :key="key" />
                 </keep-alive>
             </transition>
