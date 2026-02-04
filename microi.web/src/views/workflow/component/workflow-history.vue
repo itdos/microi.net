@@ -171,7 +171,7 @@ export default {
                             }
                         });
                         //获取头像。也可以改为服务器端处理，但无法使用inner join user表解决问题，因为还有CopyUsers、Receivers等JSON里面的用户头像。
-                        self.DiyCommon.Post("/api/SysUser/getSysUserPublicInfo", { Ids: userIds }, function (result3) {
+                        self.DiyCommon.Post("/api/SysUser/GetSysUserPublicInfo", { Ids: userIds }, function (result3) {
                             if (self.DiyCommon.Result(result3)) {
                                 result2.Data.forEach((history) => {
                                     var searchUser = _.where(result3.Data, {

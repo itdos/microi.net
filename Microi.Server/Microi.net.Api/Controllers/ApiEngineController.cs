@@ -23,29 +23,8 @@ namespace Microi.net.Api
         private static async Task<JObject> DefaultParam(JObject param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            if (currentTokenDynamic != null)
-            {
-                param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
-                param["OsClient"] = currentTokenDynamic.OsClient;
-            }
-            if (currentTokenDynamic == null
-                && param["authorization"] != null
-                && !param["authorization"].ToString().DosIsNullOrWhiteSpace())
-            {
-                var tokenModelJobj = await DiyToken.GetCurrentToken(param["authorization"].ToString());
-                param["OsClient"] = tokenModelJobj.OsClient;
-                param["_CurrentUser"] = JTokenEx.FromObject(tokenModelJobj.CurrentUser);
-            }
-            //2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
-            try
-            {
-                if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
-                {
-                    var osClient = DiyToken.GetCurrentOsClient();
-                    param["OsClient"] = osClient;
-                }
-            }
-            catch (Exception ex) { }
+            param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
+            param["OsClient"] = currentTokenDynamic.OsClient;
             //2024-04-18 往V8.Param中添加Url参数
             try
             {
