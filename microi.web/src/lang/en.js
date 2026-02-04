@@ -226,6 +226,9 @@ export default {
         // DIY Form Related
         TableList: "List",
         SwitchTableDisplay: "Switch Display",
+        Selected: "Selected",
+        Items: "items",
+        SelectAll: "Select All",
         FormDesign: "Form Design",
         ModuleDesign: "Module Design",
         FormPermission: "Form Permission",

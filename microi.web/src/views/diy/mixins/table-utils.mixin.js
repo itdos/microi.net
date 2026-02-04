@@ -52,6 +52,9 @@ export default {
             } else {
                 self.TableDisplayMode = "Table";
             }
+            // 切换显示模式时清空卡片选择
+            self.cardSelection = [];
+            self.TableMultipleSelection = [];
         },
         
         /**
