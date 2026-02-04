@@ -9,7 +9,7 @@
         <div class="welcome-section">
             <div class="welcome-card">
                 <div class="welcome-text">
-                    <h2>👋 {{ welcomePrefix }}，{{ currentUser.NickName || '用户' }}</h2>
+                    <h2>👋 {{ welcomePrefix }}，{{ currentUser.Name || currentUser.Account }}</h2>
                     <p>{{ welcomeMessage }}</p>
                 </div>
                 <div class="welcome-date">
@@ -100,6 +100,11 @@ import {
     Grid, ChatDotRound, User, MoreFilled, Bell, 
     ArrowRight, CircleCheck, DocumentCopy 
 } from '@element-plus/icons-vue';
+
+// 定义组件名称，用于 keep-alive 缓存
+defineOptions({
+    name: 'mobile_home'
+});
 
 const router = useRouter();
 const diyStore = useDiyStore();

@@ -118,8 +118,18 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore } from '@/pinia';
 import { Plus, Search, MuteNotification, ChatDotRound } from '@element-plus/icons-vue';
-import { getLastContacts } from '@/utils/chat.common';
+import { 
+    getLastContacts, 
+    formatTime as chatFormatTime,
+    initWebSocketEvents,
+    cleanupWebSocketEvents
+} from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
+
+// 定义组件名称，用于 keep-alive 缲存
+defineOptions({
+    name: 'mobile_message'
+});
 
 const router = useRouter();
 const diyStore = useDiyStore();
@@ -146,6 +156,7 @@ const dialogContactList = ref([]);
 
 // 获取WebSocket实例
 let websocket = null;
+let wsEventsRegistered = false;
 
 // 过滤消息列表
 const filteredMessageList = computed(() => {
@@ -195,30 +206,9 @@ const searchContacts = () => {
     );
 };
 
-// 格式化时间
+// 格式化时间（使用公共模块的formatTime函数）
 const formatTime = (time) => {
-    if (!time) return '';
-    const now = new Date();
-    const msgTime = new Date(time);
-    const diff = now - msgTime;
-    
-    // 今天
-    if (diff < 24 * 60 * 60 * 1000 && now.getDate() === msgTime.getDate()) {
-        return msgTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    }
-    // 昨天
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (msgTime.getDate() === yesterday.getDate()) {
-        return '昨天';
-    }
-    // 一周内
-    if (diff < 7 * 24 * 60 * 60 * 1000) {
-        const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-        return days[msgTime.getDay()];
-    }
-    // 更早
-    return msgTime.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+    return chatFormatTime(time);
 };
 
 // 打开聊天
@@ -325,74 +315,84 @@ const loadContacts = () => {
     );
 };
 
-// WebSocket事件处理
-const handleReceiveSendToUser = (message) => {
-    console.log('[移动端消息] 收到新消息:', message);
-    // 更新消息列表
-    const existingMsg = messageList.value.find(m => m.ContactUserId === message.FromUserId);
-    if (existingMsg) {
-        existingMsg.LastMessage = message.Content;
-        existingMsg.UpdateTime = new Date().toISOString();
-        existingMsg.UnRead = (existingMsg.UnRead || 0) + 1;
-    } else {
-        messageList.value.unshift({
-            ContactUserId: message.FromUserId,
-            ContactUserName: message.FromUserName || '未知',
-            ContactUserAvatar: message.FromUserAvatar || '',
-            LastMessage: message.Content,
-            UpdateTime: new Date().toISOString(),
-            UnRead: 1,
-            muted: false
-        });
-    }
-};
-
-const handleReceiveSendLastContacts = (contacts) => {
-    console.log('[移动端消息] 收到最近联系人:', contacts);
-    if (contacts && contacts.length > 0) {
-        // 直接使用原始数据，不进行映射
-        messageList.value = contacts;
-        
-        // 确保AI助手在第一位
-        const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
-        if (aiIndex === -1) {
-            messageList.value.unshift({
-                ContactUserId: 'AI',
-                ContactUserName: 'AI助手',
-                ContactUserAvatar: '',
-                LastMessage: '我是您的AI助手，有什么可以帮您？',
-                UpdateTime: new Date().toISOString(),
-                UnRead: 0,
-                muted: false
-            });
-        } else if (aiIndex > 0) {
-            const ai = messageList.value.splice(aiIndex, 1)[0];
-            messageList.value.unshift(ai);
-        }
-    }
-};
-
-// 注册WebSocket事件
+// 注册WebSocket事件（使用公共模块）
 const registerWebSocketEvents = () => {
+    // 检查设备类型：只有移动端才注册
+    if (!diyStore.IsPhoneView) {
+        console.log('[移动端消息] 当前为PC端模式，不注册移动端聊天事件');
+        return;
+    }
+    
     websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
     if (!websocket) {
         console.log('[移动端消息] WebSocket未初始化');
         return;
     }
     
-    // 注册接收消息事件
-    websocket.on('ReceiveSendToUser', handleReceiveSendToUser);
-    websocket.on('ReceiveSendLastContacts', handleReceiveSendLastContacts);
+    // 使用公共模块初始化WebSocket事件
+    const success = initWebSocketEvents(websocket, {
+        // 接收普通消息
+        onReceiveMessage: (message) => {
+            console.log('[移动端消息] 收到新消息:', message);
+            // 更新消息列表
+            const existingMsg = messageList.value.find(m => m.ContactUserId === message.FromUserId);
+            if (existingMsg) {
+                existingMsg.LastMessage = message.Content;
+                existingMsg.UpdateTime = new Date().toISOString();
+                existingMsg.UnRead = (existingMsg.UnRead || 0) + 1;
+            } else {
+                messageList.value.unshift({
+                    ContactUserId: message.FromUserId,
+                    ContactUserName: message.FromUserName || '未知',
+                    ContactUserAvatar: message.FromUserAvatar || '',
+                    LastMessage: message.Content,
+                    UpdateTime: new Date().toISOString(),
+                    UnRead: 1,
+                    muted: false
+                });
+            }
+        },
+        
+        // 接收最近联系人列表
+        onReceiveLastContacts: (contacts) => {
+            console.log('[移动端消息] 收到最近联系人:', contacts);
+            if (contacts && contacts.length > 0) {
+                // 直接使用原始数据
+                messageList.value = contacts;
+                
+                // 确保AI助手在第一位
+                const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
+                if (aiIndex === -1) {
+                    messageList.value.unshift({
+                        ContactUserId: 'AI',
+                        ContactUserName: 'AI助手',
+                        ContactUserAvatar: '',
+                        LastMessage: '我是您的AI助手，有什么可以帮您？',
+                        UpdateTime: new Date().toISOString(),
+                        UnRead: 0,
+                        muted: false
+                    });
+                } else if (aiIndex > 0) {
+                    const ai = messageList.value.splice(aiIndex, 1)[0];
+                    messageList.value.unshift(ai);
+                }
+            }
+        }
+    }, {
+        enableDuplicateCheck: true,
+        logPrefix: '[移动端消息]'
+    });
     
-    console.log('[移动端消息] WebSocket事件已注册');
+    if (success) {
+        wsEventsRegistered = true;
+    }
 };
 
-// 注销WebSocket事件
+// 注销WebSocket事件（使用公共模块）
 const unregisterWebSocketEvents = () => {
-    if (websocket) {
-        websocket.off('ReceiveSendToUser', handleReceiveSendToUser);
-        websocket.off('ReceiveSendLastContacts', handleReceiveSendLastContacts);
-        console.log('[移动端消息] WebSocket事件已注销');
+    if (wsEventsRegistered) {
+        cleanupWebSocketEvents(websocket, '[移动端消息]');
+        wsEventsRegistered = false;
     }
 };
 

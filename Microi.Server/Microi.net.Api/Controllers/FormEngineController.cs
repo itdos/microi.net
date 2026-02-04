@@ -347,14 +347,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetSysMenu([FromBody] JObject param)
         {
-            await DefaultParam(param);
-            var idOrKey = param["ModuleEngineKey"].Val<string>();
-            if(idOrKey.DosIsNullOrWhiteSpace())
-            {
-                idOrKey = param["Id"].Val<string>();
-            }
-            var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>());
-            return Json(result);
+            return await GetSysMenuModel(param);
         }
         /// <summary>
         /// 传入Id或ModuleEngineKey
@@ -383,14 +376,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetDiyTable([FromBody] JObject param)
         {
-            await DefaultParam(param);
-            var idOrKey = param["Name"].Val<string>();
-            if(idOrKey.DosIsNullOrWhiteSpace())
-            {
-                idOrKey = param["Id"].Val<string>();
-            }
-            var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>());
-            return Json(result);
+            return await GetDiyTableModel(param);
         }
         /// <summary>
         /// 传入Id或Name，

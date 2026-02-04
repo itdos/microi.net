@@ -14,7 +14,7 @@
 
 <script>
 import { useTagsViewStore, useDiyStore } from "@/pinia";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 
 export default {
     name: "AppMain",
@@ -26,12 +26,25 @@ export default {
 
         return {
             cachedViews,
-            isPhoneView
+            isPhoneView,
+            tagsViewStore
         };
     },
     computed: {
         key() {
             return this.$route.path;
+        }
+    },
+    watch: {
+        // 监听路由变化，移动端也添加到缓存
+        $route: {
+            handler(route) {
+                // 移动端路由也需要添加到缓存中
+                if (this.isPhoneView && route.name && route.meta?.keepAlive !== false) {
+                    this.tagsViewStore.addView(route);
+                }
+            },
+            immediate: true
         }
     },
     async mounted() {

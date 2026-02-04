@@ -12,6 +12,80 @@ export function formatMessageContent(content) {
 }
 
 /**
+ * 格式化时间
+ */
+export function formatTime(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    
+    // 一分钟内
+    if (diff < 60000) {
+        return '刚刚';
+    }
+    
+    // 一小时内
+    if (diff < 3600000) {
+        return `${Math.floor(diff / 60000)}分钟前`;
+    }
+    
+    // 今天
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (date >= today) {
+        return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // 昨天
+    const yesterday = new Date(today.getTime() - 86400000);
+    if (date >= yesterday) {
+        return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // 今年
+    if (date.getFullYear() === now.getFullYear()) {
+        return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + 
+               date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // 其他
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+/**
+ * 消息去重保护
+ */
+let _lastMessageTime = {};
+
+export function isDuplicateMessage(message, timeout = 1000) {
+    const messageKey = `${message.FromUserId}-${message.ToUserId}-${message.Content?.substring(0, 50)}`;
+    const now = Date.now();
+    
+    if (_lastMessageTime[messageKey] && (now - _lastMessageTime[messageKey] < timeout)) {
+        return true; // 是重复消息
+    }
+    
+    _lastMessageTime[messageKey] = now;
+    
+    // 清理过期的缓存（保留最近100条）
+    const keys = Object.keys(_lastMessageTime);
+    if (keys.length > 100) {
+        const sortedKeys = keys.sort((a, b) => _lastMessageTime[b] - _lastMessageTime[a]);
+        sortedKeys.slice(50).forEach(key => delete _lastMessageTime[key]);
+    }
+    
+    return false; // 不是重复消息
+}
+
+/**
+ * 清理消息去重缓存
+ */
+export function clearMessageDuplicateCache() {
+    _lastMessageTime = {};
+}
+
+/**
  * 渲染数据表格
  */
 export function renderDataTable(content) {
@@ -111,13 +185,47 @@ export function escapeHtml(text) {
 
 /**
  * 初始化WebSocket事件监听（PC和移动端共用）
+ * @param {Object} websocket - WebSocket实例
+ * @param {Object} callbacks - 回调函数对象
+ * @param {Object} options - 配置选项
  */
-export function initWebSocketEvents(websocket, callbacks) {
-    if (!websocket) return;
+export function initWebSocketEvents(websocket, callbacks, options = {}) {
+    if (!websocket) {
+        console.warn('[ChatCommon] WebSocket实例不存在');
+        return false;
+    }
+    
+    // 检查全局标志：防止重复注册
+    if (window._chatEventsRegistered) {
+        console.warn('[ChatCommon] ⚠️ 聊天事件已注册，阻止重复注册');
+        return false;
+    }
+    
+    const {
+        enableDuplicateCheck = true,  // 启用消息去重
+        logPrefix = '[ChatCommon]'     // 日志前缀
+    } = options;
+    
+    console.log(`${logPrefix} 开始注册 WebSocket 事件监听器`);
     
     // 接收普通消息
     websocket.on("ReceiveSendToUser", (message) => {
-        console.log("ReceiveSendToUser：", message);
+        // 调试计数器
+        if (!window._receiveSendToUserCount) window._receiveSendToUserCount = 0;
+        window._receiveSendToUserCount++;
+        
+        if (window._receiveSendToUserCount % 10 === 0) {
+            console.warn(`${logPrefix} ReceiveSendToUser 已被触发 ${window._receiveSendToUserCount} 次`);
+        }
+        
+        console.log(`${logPrefix} ReceiveSendToUser:`, message);
+        
+        // 消息去重检查
+        if (enableDuplicateCheck && isDuplicateMessage(message)) {
+            console.log(`${logPrefix} [防死循环] 忽略重复消息`);
+            return;
+        }
+        
         if (callbacks.onReceiveMessage) {
             callbacks.onReceiveMessage(message);
         }
@@ -125,7 +233,7 @@ export function initWebSocketEvents(websocket, callbacks) {
     
     // 接收AI流式数据块
     websocket.on("ReceiveAIChunk", (chunk, fromUserId, toUserId, isComplete) => {
-        console.log('[AI流式]', { chunk: chunk?.substring(0, 50), fromUserId, toUserId, isComplete });
+        console.log(`${logPrefix} [AI流式]`, { chunk: chunk?.substring(0, 50), fromUserId, toUserId, isComplete });
         if (callbacks.onReceiveAIChunk) {
             callbacks.onReceiveAIChunk(chunk, fromUserId, toUserId, isComplete);
         }
@@ -133,7 +241,7 @@ export function initWebSocketEvents(websocket, callbacks) {
     
     // 接收聊天记录
     websocket.on("ReceiveSendChatRecordToUser", (message) => {
-        console.log(`[接收聊天记录] 收到${message?.length || 0}条消息`);
+        console.log(`${logPrefix} [接收聊天记录] 收到${message?.length || 0}条消息`);
         if (callbacks.onReceiveChatRecord) {
             callbacks.onReceiveChatRecord(message);
         }
@@ -141,7 +249,7 @@ export function initWebSocketEvents(websocket, callbacks) {
     
     // 接收最近联系人列表
     websocket.on("ReceiveSendLastContacts", (message) => {
-        console.log("获取最近联系人列表成功！");
+        console.log(`${logPrefix} 获取最近联系人列表成功！`);
         if (callbacks.onReceiveLastContacts) {
             callbacks.onReceiveLastContacts(message);
         }
@@ -149,10 +257,50 @@ export function initWebSocketEvents(websocket, callbacks) {
     
     // 接收未读消息数
     websocket.on("ReceiveSendUnreadCountToUser", (message) => {
+        console.log(`${logPrefix} 获取到未读消息条数:`, message);
         if (callbacks.onReceiveUnreadCount) {
             callbacks.onReceiveUnreadCount(message);
         }
     });
+    
+    // 接收连接事件
+    websocket.on("ReceiveConnection", (message) => {
+        console.log(`${logPrefix} ReceiveConnection:`, message);
+        if (callbacks.onConnection) {
+            callbacks.onConnection(message);
+        }
+    });
+    
+    // 接收断开连接事件
+    websocket.on("ReceiveDisConnection", (message) => {
+        console.log(`${logPrefix} ReceiveDisConnection:`, message);
+        if (callbacks.onDisconnection) {
+            callbacks.onDisconnection(message);
+        }
+    });
+    
+    // 设置全局标志
+    window._chatEventsRegistered = true;
+    console.log(`${logPrefix} ✅ WebSocket 事件监听器注册完成（全局唯一）`);
+    
+    return true;
+}
+
+/**
+ * 清理WebSocket事件监听
+ */
+export function cleanupWebSocketEvents(websocket, logPrefix = '[ChatCommon]') {
+    if (!websocket) return;
+    
+    // 注意：SignalR的off()无法移除匿名函数，所以只清理全局标志
+    console.log(`${logPrefix} 清理全局聊天事件标志`);
+    
+    if (window._chatEventsRegistered) {
+        window._chatEventsRegistered = false;
+    }
+    
+    // 清理消息去重缓存
+    clearMessageDuplicateCache();
 }
 
 /**
