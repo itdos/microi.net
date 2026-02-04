@@ -63,7 +63,7 @@
                 </div>
                 
                 <!--DIY功能按钮 新版-->
-                <div class="keyword-search" v-if="!diyStore.IsPhoneView">
+                <div class="keyword-search">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
@@ -90,6 +90,17 @@
                             </template>
                         </template>
                         <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                            <el-checkbox
+                                v-if="TableDisplayMode == 'Card' && TableEnableBatch"
+                                v-model="cardSelectAll"
+                                @change="toggleCardSelectAll"
+                                :indeterminate="cardSelection.length > 0 && cardSelection.length < DiyTableRowList.length"
+                                class="card-batch-checkbox"
+                                border
+                                style="margin-right: 10px;margin-left:10px;"
+                            >
+                                {{ cardSelection.length > 0 ? `${$t('Msg.Selected')} ${cardSelection.length} ${$t('Msg.Items')}` : $t('Msg.SelectAll') }}
+                            </el-checkbox>
                             <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
                                 <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
@@ -98,7 +109,7 @@
                             </template>
                         </template>
                         <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
-                        <template v-if="!_IsTableChild || (_IsTableChild && !TableChildField.Readonly)">
+                        <template v-if="!diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
                             <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
                                 v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
@@ -169,7 +180,7 @@
                         </el-button>
                     </div>
 
-                    <div class="search-more-group" v-if="_HasSearchFields && IsPermission('NoSearch')">
+                    <div class="search-more-group" v-if="!diyStore.IsPhoneView && _HasSearchFields && IsPermission('NoSearch')">
                         <!-- 更多搜索 弹出层  【内部】搜索-->
                         <el-popover placement="bottom" width="auto" trigger="click" popper-class="diy-search-popover search-in" v-if="_HasSearchFieldsIn">
                             <DiySearch
@@ -190,11 +201,11 @@
                             >
                         </el-popover>
                     </div>
-                    <el-button type="primary" :icon="List" 
+                    <el-button v-if="!diyStore.IsPhoneView" type="primary" :icon="List" 
                         @click="ShiftTableDisplayMode()">{{  
                         $t('Msg.SwitchTableDisplay')
                     }}</el-button>
-                    <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin">
+                    <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
                         <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
                             $t('Msg.FormDesign')
                         }}</el-button>
@@ -511,12 +522,13 @@
                 </el-table>
 
                 <el-row
-                    v-else-if="TableDisplayMode == 'Card'"
+                    v-if="TableDisplayMode == 'Card'"
+                    v-loading="!diyStore.IsPhoneView && tableLoading && DiyTableRowList.length > 0"
                     class="table-card-el-row"
                     :gutter="10"
                 >
-                    <!-- 🔥 骨架屏：移动端追加模式不显示（避免闪烁），PC端和首次加载都显示 -->
-                    <template v-if="tableLoading && (!diyStore.IsPhoneView || DiyTableRowList.length === 0)">
+                    <!-- 🔥 骨架屏：仅在数据为空时显示 -->
+                    <template v-if="tableLoading && DiyTableRowList.length === 0">
                         <div
                             v-for="item in Array.from(
                                 { length: DiyTableRowPageSize },
@@ -562,8 +574,15 @@
                             <!-- 🔥 性能优化：减少不必要的响应式计算 -->
                             <el-card
                                 class="box-card card-data-animate no-padding"
+                                :class="{ 'card-selected': TableEnableBatch && isCardSelected(model) }"
                                 :style="SysMenuModel.TableCardImgField ? '' : 'border-top: 5px solid var(--color-primary)'"
                             >
+                                <!-- 批量选择复选框 -->
+                                <div v-if="TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(model)">
+                                    <el-checkbox
+                                        :model-value="isCardSelected(model)"
+                                    />
+                                </div>
                                 <div 
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
                                 >
@@ -1621,6 +1640,15 @@ export default {
         _IsTableChild() {
             return !this.DiyCommon.IsNull(this.TableChildTableId);
         },
+        // 卡片全选状态
+        cardSelectAll: {
+            get() {
+                return this.cardSelection.length > 0 && this.cardSelection.length === this.DiyTableRowList.length;
+            },
+            set(val) {
+                // setter由toggleCardSelectAll处理
+            }
+        },
         _RoleLimitModel() {
             var self = this;
             if (!self.GetCurrentUser || !self.GetCurrentUser._RoleLimits) return [];
@@ -1982,6 +2010,8 @@ export default {
             TableSelectedRow: {},
             TableSelectedRowLast: {},
             TableEnableBatch: false,
+            //卡片模式批量选择
+            cardSelection: [],
             // 性能优化V3：全局共享菜单状态
             _moreMenuVisible: false,
             _moreMenuRow: null,
@@ -3917,6 +3947,32 @@ export default {
                 });
             }
         },
+        // 卡片模式批量选择
+        toggleCardSelection(model) {
+            const self = this;
+            const index = self.cardSelection.findIndex(item => item.Id === model.Id);
+            if (index > -1) {
+                self.cardSelection.splice(index, 1);
+            } else {
+                self.cardSelection.push(model);
+            }
+            // 同步到 TableMultipleSelection
+            self.TableMultipleSelection = [...self.cardSelection];
+        },
+        isCardSelected(model) {
+            const self = this;
+            return self.cardSelection.some(item => item.Id === model.Id);
+        },
+        toggleCardSelectAll(checked) {
+            const self = this;
+            if (checked) {
+                self.cardSelection = [...self.DiyTableRowList];
+            } else {
+                self.cardSelection = [];
+            }
+            // 同步到 TableMultipleSelection
+            self.TableMultipleSelection = [...self.cardSelection];
+        },
         CallbackFormValueChange(field, value) {
             var self = this;
             if (self.FormMode !== "View") {
@@ -4498,6 +4554,8 @@ export default {
         DiyTableRowCurrentChange(val) {
             var self = this;
             self.DiyTableRowPageIndex = val;
+            // 翻页时清空卡片选择
+            self.cardSelection = [];
             self.GetDiyTableRow();
             self.$nextTick(function () {
                 $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
@@ -4513,6 +4571,8 @@ export default {
                 localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
             }
             self.DiyTableRowPageIndex = 1;
+            // 切换页大小时清空卡片选择
+            self.cardSelection = [];
             self.GetDiyTableRow({ _PageIndex: 1 });
             self.$nextTick(function () {
                 $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);

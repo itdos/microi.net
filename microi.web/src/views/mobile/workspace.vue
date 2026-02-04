@@ -297,7 +297,7 @@ const getVisibleChildren = (children) => {
         }
         
         .item-name {
-            font-size: 12px;
+            font-size: 14px;
             color: #606266;
             text-align: center;
             line-height: 1.3;
