@@ -916,6 +916,27 @@ export default {
     },
     methods: {
         /**
+         * 安全获取组件 ref 实例（兼容 Vue 2/3）
+         * @param {string} fieldName - 字段名称
+         * @returns {Object|null} - 组件实例或 null
+         */
+        getRefComponent(fieldName) {
+            var self = this;
+            var refKey = 'ref_' + fieldName;
+            var refValue = self.$refs[refKey];
+            
+            if (!refValue) {
+                return null;
+            }
+            
+            // Vue 3 中可能是数组或直接是组件实例
+            if (Array.isArray(refValue)) {
+                return refValue.length > 0 ? refValue[0] : null;
+            }
+            
+            return refValue;
+        },
+        /**
          * 安全的 setTimeout 包装器，组件销毁时自动清理
          * @param {Function} fn - 要执行的函数
          * @param {number} delay - 延迟时间（毫秒）
@@ -1188,10 +1209,9 @@ export default {
          */
         openComponentConfig(field) {
             var self = this;
-            var refName = 'ref_' + field.Name;
-            var refComponent = self.$refs[refName];
-            if (refComponent && refComponent.length > 0 && typeof refComponent[0].openConfig === 'function') {
-                refComponent[0].openConfig();
+            var refComponent = self.getRefComponent(field.Name);
+            if (refComponent && typeof refComponent.openConfig === 'function') {
+                refComponent.openConfig();
             } else {
                 self.DiyCommon.Tips('该组件不支持配置', false);
             }
@@ -1434,8 +1454,9 @@ export default {
             var result = [];
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "TableChild") {
-                    if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
-                        var arr = self.$refs["ref_" + field.Name][0].GetNeedSaveRowList();
+                    var refComponent = self.getRefComponent(field.Name);
+                    if (refComponent && typeof refComponent.GetNeedSaveRowList === 'function') {
+                        var arr = refComponent.GetNeedSaveRowList();
                         //这里除了写主表关联值，其实还要写子表回写列的值  2021-11-02  todo
                         //2021-12-07注释：是因为DiyTable在新增的时候，已经将外键关联、回写值全部处理好了
                         // arr.forEach(formData => {
@@ -1448,7 +1469,9 @@ export default {
                         });
 
                         //2025-10-8liucheng读取所有子表格已编辑数据
-                        for (var item of self.$refs["ref_" + field.Name]) {
+                        var refComponent2 = self.getRefComponent(field.Name);
+                        var refArray = Array.isArray(self.$refs["ref_" + field.Name]) ? self.$refs["ref_" + field.Name] : (refComponent2 ? [refComponent2] : []);
+                        for (var item of refArray) {
                             var list = [];
                             item.DiyTableRowList.forEach((ite) => {
                                 if (ite._DataStatus == "Edit") {
@@ -1471,8 +1494,9 @@ export default {
             //先获取所有子表字段
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "TableChild") {
-                    if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
-                        var arr = self.$refs["ref_" + field.Name][0].ClearNeedSaveRowList();
+                    var refComponent = self.getRefComponent(field.Name);
+                    if (refComponent && typeof refComponent.ClearNeedSaveRowList === 'function') {
+                        var arr = refComponent.ClearNeedSaveRowList();
                     }
                 }
             });
@@ -1483,39 +1507,38 @@ export default {
             var result = [];
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "JoinForm") {
-                    if (self.$refs["ref_" + field.Name]) {
-                        // var arr = self.$refs['ref_' + field.Name][0].GetNeedSaveRowList();
+                    var refComponent = self.getRefComponent(field.Name);
+                    if (refComponent && typeof refComponent.FormSubmit === 'function') {
+                        // var arr = refComponent.GetNeedSaveRowList();
                         // result.push({
                         //     FieldName : field.Name,
                         //     TableId : field.Config.TableChildTableId,
                         //     Rows : arr
                         // });
-                        if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
-                            self.$refs["ref_" + field.Name][0].FormSubmit(
-                                {
-                                    FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
-                                    //这里获取关联表单的Id
-                                    TableRowId: field.Config.JoinForm.Id,
-                                    // SaveLoading: self.SaveDiyTableLoding,
-                                    //这里获取当前表单是保存并关闭还是什么状态
-                                    SavedType: self.SavedType,
-                                    V8Callback: function (formData) {
-                                        // self.GetHourseDetail(self.GetOther);
-                                    }
-                                },
-                                function (success, formData) {
-                                    if (success == true) {
-                                        // self.GetDiyTableRow(true)
-                                        // self.ShowEditModel = false;
-                                        self.$nextTick(function () {
-                                            // self.SaveDiyTableLoding = false;
-                                        });
-                                    } else {
-                                        // self.SaveDiyTableLoding = false;
-                                    }
+                        refComponent.FormSubmit(
+                            {
+                                FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
+                                //这里获取关联表单的Id
+                                TableRowId: field.Config.JoinForm.Id,
+                                // SaveLoading: self.SaveDiyTableLoding,
+                                //这里获取当前表单是保存并关闭还是什么状态
+                                SavedType: self.SavedType,
+                                V8Callback: function (formData) {
+                                    // self.GetHourseDetail(self.GetOther);
                                 }
-                            );
-                        }
+                            },
+                            function (success, formData) {
+                                if (success == true) {
+                                    // self.GetDiyTableRow(true)
+                                    // self.ShowEditModel = false;
+                                    self.$nextTick(function () {
+                                        // self.SaveDiyTableLoding = false;
+                                    });
+                                } else {
+                                    // self.SaveDiyTableLoding = false;
+                                }
+                            }
+                        );
                     }
                 }
             });
@@ -1531,10 +1554,13 @@ export default {
             try {
                 if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.OpenTable) && !self.DiyCommon.IsNull(field.Config.OpenTable.SubmitV8)) {
                     //从弹出的表格中获取已经选中的数据，如果是单选，返回Object
-                    if (field.Config.OpenTable.MultipleSelect === false) {
-                        V8.TableRowSelected = self.$refs["ref_" + field.Name][0].TableSelectedRow;
-                    } else {
-                        V8.TableRowSelected = self.$refs["ref_" + field.Name][0].TableMultipleSelection;
+                    var refComponent = self.getRefComponent(field.Name);
+                    if (refComponent) {
+                        if (field.Config.OpenTable.MultipleSelect === false) {
+                            V8.TableRowSelected = refComponent.TableSelectedRow;
+                        } else {
+                            V8.TableRowSelected = refComponent.TableMultipleSelection;
+                        }
                     }
                     self.SetV8DefaultValue(V8);
                     
@@ -1592,18 +1618,104 @@ export default {
         CallbakRefreshChildTable(fieldModel, parentFormModel, v8) {
             var self = this;
             //2021-12-10:这里传入的父级v8对象，有可能是子表行点击传过来的
-            if (v8) {
-                self.$refs["ref_" + fieldModel.Name][0].Init(parentFormModel, v8);
-            } else {
-                self.$refs["ref_" + fieldModel.Name][0].Init(parentFormModel, self.GetV8());
+            var refComponent = self.getRefComponent(fieldModel.Name);
+            if (refComponent && typeof refComponent.Init === 'function') {
+                if (v8) {
+                    refComponent.Init(parentFormModel, v8);
+                } else {
+                    refComponent.Init(parentFormModel, self.GetV8());
+                }
             }
         },
-        ReloadJoinForm(fieldModel) {
+        ReloadJoinForm(fieldModelOrParams) {
             var self = this;
-            self.$nextTick(function () {
-                if (self.$refs["ref_" + fieldModel.Name]) {
-                    self.$refs["ref_" + fieldModel.Name][0].Init(true);
+            debugger;
+            
+            // 支持两种调用方式：
+            // 1. ReloadJoinForm(fieldModel) - 传入字段对象
+            // 2. ReloadJoinForm({ FieldName, TableId, TableName, Id, FormMode }) - 传入配置对象
+            let fieldModel;
+            
+            if (fieldModelOrParams.Name && fieldModelOrParams.Config) {
+                // 方式1：传入的是字段对象
+                fieldModel = fieldModelOrParams;
+            } else if (fieldModelOrParams.FieldName) {
+                // 方式2：传入的是配置对象
+                const params = fieldModelOrParams;
+                fieldModel = self.DiyFieldList.find(item => item.Name === params.FieldName);
+                
+                if (!fieldModel) {
+                    console.error(`ReloadJoinForm: 字段 ${params.FieldName} 不存在`);
+                    return;
                 }
+                
+                // 更新字段配置
+                if (!fieldModel.Config) {
+                    fieldModel.Config = {};
+                }
+                if (!fieldModel.Config.JoinForm) {
+                    fieldModel.Config.JoinForm = {};
+                }
+                
+                fieldModel.Config.JoinForm.TableId = params.TableId || '';
+                fieldModel.Config.JoinForm.TableName = params.TableName || '';
+                fieldModel.Config.JoinForm.Id = params.Id;
+                fieldModel.Config.JoinForm.FormMode = params.FormMode;
+                
+                // 触发 FieldSet 确保响应式更新
+                self.FieldSet(params.FieldName, 'Config', fieldModel.Config);
+            } else {
+                console.error('ReloadJoinForm: 参数错误', fieldModelOrParams);
+                return;
+            }
+            
+            console.log(`ReloadJoinForm 被调用: ${fieldModel.Name}`, {
+                fieldConfig: fieldModel.Config?.JoinForm,
+                currentTime: new Date().toISOString()
+            });
+            
+            self.$nextTick(function () {
+                // 延迟时间改为 500ms，给组件更多时间初始化
+                setTimeout(async () => {
+                    var refComponent = self.getRefComponent(fieldModel.Name);
+                    if (!refComponent) {
+                        console.error(`ReloadJoinForm: 组件 ${fieldModel.Name} 的 ref 未找到`);
+                        return;
+                    }
+                    
+                    // 调试信息：检查组件状态
+                    var componentState = {
+                        hasInit: typeof refComponent.Init === 'function',
+                        shouldRender: refComponent._shouldRender,
+                        hasInstance: !!refComponent._joinFormInstance,
+                        instanceMethods: refComponent._joinFormInstance ? Object.keys(refComponent._joinFormInstance).filter(k => typeof refComponent._joinFormInstance[k] === 'function') : []
+                    };
+                    
+                    console.log(`ReloadJoinForm: 组件 ${fieldModel.Name}`, componentState);
+                    
+                    // 如果组件未渲染，尝试更新配置触发渲染
+                    if (!componentState.shouldRender) {
+                        console.warn(`ReloadJoinForm: 组件 ${fieldModel.Name} 未满足渲染条件`);
+                        return;
+                    }
+                    
+                    // 调用 Init 方法（内部已经有等待逻辑）
+                    if (typeof refComponent.Init === 'function') {
+                        console.log(`ReloadJoinForm: 正在执行 ${fieldModel.Name}.Init()`);
+                        try {
+                            await refComponent.Init(true);
+                            console.log(`ReloadJoinForm: ${fieldModel.Name}.Init() 执行完成`);
+                        } catch (error) {
+                            console.error(`ReloadJoinForm: 执行 ${fieldModel.Name}.Init() 失败`, error);
+                        }
+                    } else {
+                        console.error(`ReloadJoinForm: 组件 ${fieldModel.Name} 的 Init 方法不存在`, {
+                            componentKeys: Object.keys(refComponent || {}),
+                            fieldConfig: fieldModel.Config?.JoinForm,
+                            componentState
+                        });
+                    }
+                }, 500);
             });
         },
         FormDiyTableModelListen(field) {
@@ -1958,15 +2070,17 @@ export default {
         },
         GetChildTableData(fieldName) {
             var self = this;
-            if (self.$refs["ref_" + fieldName] && self.$refs["ref_" + fieldName].length > 0) {
-                return self.$refs["ref_" + fieldName][0].DiyTableRowList;
+            var refComponent = self.getRefComponent(fieldName);
+            if (refComponent && refComponent.DiyTableRowList) {
+                return refComponent.DiyTableRowList;
             }
             return [];
         },
         ShowTableChildHideField(fieldName, fields) {
             var self = this;
-            if (self.$refs["ref_" + fieldName] && self.$refs["ref_" + fieldName].length > 0) {
-                self.$refs["ref_" + fieldName][0].ShowHideFields(fields);
+            var refComponent = self.getRefComponent(fieldName);
+            if (refComponent && typeof refComponent.ShowHideFields === 'function') {
+                refComponent.ShowHideFields(fields);
             }
         },
         CallbackForm() {
@@ -2485,7 +2599,10 @@ export default {
             var self = this;
             debugger;
             try {
-                self.$refs["ref_" + field.Name][0].RefreshDiyTableRowList(param);
+                var refComponent = self.getRefComponent(field.Name);
+                if (refComponent && typeof refComponent.RefreshDiyTableRowList === 'function') {
+                    refComponent.RefreshDiyTableRowList(param);
+                }
             } catch (error) {
                 // removed debug log
             }
@@ -2498,7 +2615,10 @@ export default {
             });
             allChildTable.forEach((field) => {
                 try {
-                    self.$refs["ref_" + field.Name][0].RefreshDiyTableRowList(param);
+                    var refComponent = self.getRefComponent(field.Name);
+                    if (refComponent && typeof refComponent.RefreshDiyTableRowList === 'function') {
+                        refComponent.RefreshDiyTableRowList(param);
+                    }
                 } catch (error) {
                     // removed debug log
                 }
@@ -2524,7 +2644,10 @@ export default {
         TableSetData(field) {
             var self = this;
             try {
-                self.$refs["ref_" + field.Name][0].TableSetData();
+                var refComponent = self.getRefComponent(field.Name);
+                if (refComponent && typeof refComponent.TableSetData === 'function') {
+                    refComponent.TableSetData();
+                }
             } catch (error) {
                 // removed debug log
             }

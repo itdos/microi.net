@@ -150,7 +150,7 @@ namespace Microi.net
         };
         public static readonly List<string> NoDbFieldComponent = new List<string>()
         {
-            "JoinForm", "OpenTable", "DevComponent", "PhoneSMS", "TableChild", "Button", "Divider"
+            "OpenTable", "DevComponent", "PhoneSMS", "TableChild", "Button", "Divider"
         };
         public static JsonSerializer JsonConfig = new JsonSerializer()
         {

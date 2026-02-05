@@ -7,7 +7,7 @@ export default defineConfig({
 	title: "Microi吾码",
 	lang: "zh-CN",
 	//这里不生效，在zh.ts
-	description: "Microi吾码官方文档，开源低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
+	description: "Microi吾码官方文档，开源 AI 低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		[
@@ -15,7 +15,7 @@ export default defineConfig({
 			{
 				name: "keywords",
 				content:
-					"Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
+					"Microi吾码,低代码,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
 			},
 		],
 		["link", { rel: "icon", href: "/icon.png" }],

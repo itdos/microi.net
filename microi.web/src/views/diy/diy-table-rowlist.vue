@@ -66,7 +66,7 @@
                 <div class="keyword-search">
                     <div class="search-action-group">
                         <el-button
-                            v-if="_LimitAdd && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
+                            v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
                             :loading="BtnLoading"
                             type="primary"
                             :icon="BtnLoading ? '' : CirclePlusFilled"
@@ -503,7 +503,7 @@
                                             scope.row._IsInTableAdd !== true &&
                                             scope.row.IsVisibleEdit == true) ||
                                         (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.length > 0) ||
-                                        (_LimitDel && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
+                                        (_LimitDel && scope.row.IsVisibleDel == true)
                                     "
                                     class="more-action-btn"
                                     @click.stop="showMoreMenu($event, scope.row)"
@@ -778,7 +778,7 @@
                 @click.stop
             >
                 <div
-                    v-if="_LimitEdit && TableChildFormMode != 'View' && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true"
+                    v-if="_LimitEdit && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true"
                     class="global-more-menu-item"
                     @click="handleMoreMenuAction('edit')"
                 >
@@ -794,7 +794,7 @@
                     </template>
                 </template>
                 <div
-                    v-if="_LimitDel && TableChildFormMode != 'View' && _moreMenuRow && _moreMenuRow.IsVisibleDel == true"
+                    v-if="_LimitDel && _moreMenuRow && _moreMenuRow.IsVisibleDel == true"
                     class="global-more-menu-item global-more-menu-item-danger"
                     @click="handleMoreMenuAction('delete')"
                 >

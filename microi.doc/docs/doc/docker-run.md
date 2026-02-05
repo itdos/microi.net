@@ -44,9 +44,9 @@ update microi_job_triggers set TRIGGER_STATE='PAUSED';
 ```shell
 version: '3.8'
 services:
-  mysql5.7:
+  microi-mysql5.7:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
-    container_name: mysql5.7
+    container_name: microi-mysql5.7
     restart: always
     tty: true
     stdin_open: true
@@ -56,8 +56,8 @@ services:
       - MYSQL_ROOT_PASSWORD=password123456
       - MYSQL_TIME_ZONE=Asia/Shanghai
     volumes:
-      - /volume2/ssd/docker/mysql/data:/var/lib/mysql
-      - /volume2/ssd/docker/mysql/config/microi_mysql.cnf:/etc/mysql/conf.d/microi_mysql.cnf
+      - /microi/mysql5.7/data:/var/lib/mysql
+      - /microi/mysql5.7/config/microi_mysql.cnf:/etc/mysql/conf.d/microi_mysql.cnf
     logging:
       options:
         max-size: 10m
@@ -123,9 +123,9 @@ innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需
 ```shell
 version: '3.8'
 services:
-  mysql8.0:
+  microi-mysql8.0:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0
-    container_name: mysql8.0
+    container_name: microi-mysql8.0
     restart: always
     tty: true
     stdin_open: true
@@ -135,8 +135,8 @@ services:
       - MYSQL_ROOT_PASSWORD=password123456
       - MYSQL_TIME_ZONE=Asia/Shanghai
     volumes:
-      - /volume2/ssd/docker/mysql8.0/data:/var/lib/mysql
-      - /volume2/ssd/docker/mysql8.0/config/microi_mysql8.0.cnf:/etc/mysql/conf.d/microi_mysql8.0.cnf
+      - /microi/mysql8.0/data:/var/lib/mysql
+      - /microi/mysql8.0/config/microi_mysql8.0.cnf:/etc/mysql/conf.d/microi_mysql8.0.cnf
     logging:
       options:
         max-size: 10m
@@ -213,13 +213,13 @@ performance_schema = ON
 ```shell
 version: '3.8'
 services:
-  redis:
+  microi-redis:
     image: registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
-    container_name: redis
+    container_name: microi-redis
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
-      - /volume2/ssd/docker/redis/data:/data
+      - /microi/redis/data:/data
     environment:  
       - REDIS_PASSWORD=password123456
     ports:
@@ -312,9 +312,9 @@ services:
 ```shell
 version: '3.8'
 services:
-  mongodb:
+  microi-mongodb:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
-    container_name: mongodb
+    container_name: microi-mongodb
     restart: always
     tty: true
     stdin_open: true
@@ -324,7 +324,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=password123456
     volumes:
-      - /volume1/docker/mongodb/data:/data/db
+      - /microi/mongodb/data:/data/db
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
     logging:
@@ -341,14 +341,14 @@ services:
 ```shell
 version: '3.8'
 services:
-  minio:
+  microi-minio:
     image:  registry.cn-hangzhou.aliyuncs.com/microios/minio:2023-06-09
-    container_name: minio
+    container_name: microi-minio
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
-      - /volume1/docker/minio/data:/data
-      - /volume1/docker/minio/config:/root/.minio
+      - /microi/minio/data:/data
+      - /microi/minio/config:/root/.minio
     environment:  
       - MINIO_ROOT_USER=root
       - MINIO_ROOT_PASSWORD=password123456
@@ -378,7 +378,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
-      - /volume1/docker/microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件
+      - /microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件
     environment:  
       - OsClient=iTdos
       - OsClientType=Product
@@ -475,9 +475,7 @@ services:
 ```
 
 
-
-
-## 常规[docker run]部署（推荐编排）
+## 本地Docker环境
 
 ### 1、本地安装Docker Desktop
 >* 下载地址：[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
@@ -563,152 +561,19 @@ server {
 ```
 > 在cmd处执行publish.sh或publish.bat
 
-### 4、服务器安装Docker环境
->* 可以通过linux命令安装docker环境，也可以通过宝塔、1Panel等面板工具安装docker环境
-```powershell
-curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
-systemctl start docker
-systemctl enable docker.service
-```
+
 
 ### 5、登陆到docker容器镜像服务
 ```powershell
 docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
 
-### 6、服务器安装MySql数据库
->* 可以通过linux命令安装mysql，也可以主从同步模式部署
->* 也可以通过宝塔、1Panel等面板工具安装mysql
->* 以下为centos7.x命令
+## 服务器安装Docker环境
+>* 可以通过linux命令安装docker环境，也可以通过宝塔、1Panel等面板工具安装docker环境
 ```powershell
-MYSQL_PORT=13306
-MYSQL_ROOT_PASSWORD="microi#mysql.pwd"
-MYSQL_DATA_DIR="/microi/mysql/"
-MYSQL_CONF_FILE="/tmp/my_microi.cnf"
-echo '[mysqld]' > ${MYSQL_CONF_FILE}
-echo 'lower_case_table_names = 1' >> ${MYSQL_CONF_FILE}
-echo 'max_connections = 500' >> ${MYSQL_CONF_FILE}
-echo 'key_buffer_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'query_cache_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'tmp_table_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'innodb_buffer_pool_size = 536870912' >> ${MYSQL_CONF_FILE}
-echo 'innodb_log_buffer_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'sort_buffer_size = 1048576' >> ${MYSQL_CONF_FILE}
-echo 'read_buffer_size = 2097152' >> ${MYSQL_CONF_FILE}
-echo 'read_rnd_buffer_size = 1048576' >> ${MYSQL_CONF_FILE}
-echo 'join_buffer_size = 2097152' >> ${MYSQL_CONF_FILE}
-echo 'thread_stack = 393216' >> ${MYSQL_CONF_FILE}
-echo 'binlog_cache_size = 196608' >> ${MYSQL_CONF_FILE}
-echo 'thread_cache_size = 192' >> ${MYSQL_CONF_FILE}
-echo 'table_open_cache = 1024' >> ${MYSQL_CONF_FILE}
-echo 'character_set_server=utf8mb4' >> ${MYSQL_CONF_FILE}
-echo 'collation_server=utf8mb4_unicode_ci' >> ${MYSQL_CONF_FILE}
-echo 'Microi：MySQL 将在端口 '${MYSQL_PORT}' 上安装，root 密码: '${MYSQL_ROOT_PASSWORD}，数据目录: ${MYSQL_DATA_DIR}
-docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
-  --name microi-install-mysql56 -p ${MYSQL_PORT}:3306 \
-  -v ${MYSQL_DATA_DIR}:/var/lib/mysql \
-  -v ${MYSQL_CONF_FILE}:/etc/mysql/conf.d/my_microi.cnf \
-  -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
-  -e MYSQL_TIME_ZONE=Asia/Shanghai \
-  -d registry.cn-hangzhou.aliyuncs.com/microios/mysql5.6:latest
-echo 'Microi：等待MySQL容器启动...'
-sleep 5
-echo 'Microi：检查MySQL是否可以连接...'
-for i in {1..10}; do
-  docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" > /dev/null 2>&1 && break
-  sleep 1
-done
-if [ $i -eq 60 ]; then
-  echo 'Microi：MySQL服务启动失败，脚本退出。'
-  exit 1
-fi
-echo 'Microi：允许root用户从任意主机连接'
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
-```
-
-### 7、服务器安装Redis（也可以哨兵模式部署）
->* 可以通过linux命令安装redis，也可以通过宝塔、1Panel等面板工具安装redis
->* 以下为centos7.x命令
-```powershell
-REDIS_PORT=16379
-REDIS_PASSWORD=microi#redis.pwd
-echo 'Microi：Redis 将在端口 '${REDIS_PORT}' 上安装，密码: '${REDIS_PASSWORD}
-docker pull registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest
-docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
-  --name microi-install-redis -p ${REDIS_PORT}:6379 \
-  -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-  -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
-```
-
-### 8、服务器安装MongoDB数据库（也可以分布式部署）
->* 可以通过linux命令安装mongodb，也可以通过宝塔、1Panel等面板工具安装mongodb
->* 以下为centos7.x命令
-```powershell
-MONGO_PORT=17017
-MONGO_ROOT_PASSWORD=microi#mongodb.pwd
-MONGO_DATA_DIR="/microi/mongodb/"
-echo 'Microi：MongoDB 将在端口 '${MONGO_PORT}' 上安装，root 密码: '${MONGO_ROOT_PASSWORD}，数据目录: ${MONGO_DATA_DIR}
-docker pull registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
-docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
-  --name microi-install-mongodb -p ${MONGO_PORT}:27017 \
-  -v ${MONGO_DATA_DIR}:/data/db \
-  -e MONGO_INITDB_ROOT_USERNAME=root \
-  -e MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD} \
-  -d registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
-```
-
-### 9、服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
->* 可以通过linux命令安装MinIO，也可以通过宝塔、1Panel等面板工具安装MinIO
-```powershell
-docker run -p 1010:9000 -p 1011:9001 --name minio \
---restart=always \
---log-opt max-size=10m --log-opt max-file=10 \
--e "MINIO_ROOT_USER=root" \
--e "MINIO_ROOT_PASSWORD=minio.pwd" \
--v /data/minio/data:/data \
--v /data/minio/config:/root/.minio \
--d minio/minio server /data --console-address ":1011"
-//说明：
-1011为MinIO后台管理系统地址端口，1010为文件访问地址以及接口调用端口。
-通过ip:1011登陆进去，创建2个Bucket，一个私有一个公有，
-可分别取名：microi-public（需界面中配置权限为public）、microi-private
-```
-
-### 10、部署后端api程序
-```powershell
-docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
-docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always \
-    --log-opt max-size=10m --log-opt max-file=10 \
-    -e "OsClient=SaaS引擎Key" \
-    -e "OsClientType=Product" -e "OsClientNetwork=Internal" \
-    -e OsClientDbConn="数据库连接字符串" \
-    -e "OsClientRedisHost=RedisIP" \
-    -e "OsClientRedisPort=Redis端口" \ 
-    -e "OsClientRedisPwd=Redis密码" \
-    -e "AuthServer=https://身份认证系统地址(就是api本身,注意具体情况看是http还是https)" \
-    -v /etc/localtime:/etc/localtime -v /usr/share/fonts:/usr/share/fonts \
-    registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
-```
-
-### 11、部署前端web程序
-```powershell
-docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
-docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
-    --log-opt max-size=10m --log-opt max-file=10 \
-    -e "OsClient=SaaS引擎Key" -e "ApiBase后端接口地址前缀（如：https://192.168.0.1:1000）" \
-    -v /etc/localtime:/etc/localtime -v /usr/share/fonts:/usr/share/fonts \
-    registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
-```
-
-### 12、部署程序自动更新
-> 方式有很多种，大型企业建议使用K8S，中小型企业可使用watchtower，这里介绍watchtower：
-```powershell
-docker run -itd --name watchtower --privileged=true --restart=always \
-    -v /root/.docker/config.json:/config.json -v /var/run/docker.sock:/var/run/docker.sock \
-    containrrr/watchtower \
-    --cleanup --include-stopped --interval 10 \
-    microi-api microi-os
+curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
+systemctl start docker
+systemctl enable docker.service
 ```
 
 ## Docker常用命令
@@ -731,6 +596,30 @@ for logfile in $logfiles
 #apt-get install -y vim
 #vim xxxx.json
 按键i开始编辑，按键ESC后输入:wq保存并退出
+
+cd /
+# 查看空间占用
+du -h --max-depth=1 | sort -h
+# 看哪个目录占用空间大
+du -s * | sort -rn
+# 查找大文件（超过100M）
+find / -size +100M -exec ls -lh {}
+# 根据情况进行移动或者卸载，
+# 软件包可以rpm –e卸载，
+# 文件可以使用rm -rf dir删除；
+# 常用命令
+ls -lh
+# 显示当前目录
+pwd
+# 显示当前目录所有文件的体积，以M为单位，正序排，不显示文件夹
+find . -maxdepth 1 -type f -exec du -m {} \; | sort -n
+# 清理docker悬空镜像
+docker image prune -a -f
+# 清理docker无用的卷
+docker image prune -a -f
+# 清理docker构建缓存
+docker image prune -a -f
+
 ```
 
 ## MySql的一些注意事项

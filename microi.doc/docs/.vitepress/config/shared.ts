@@ -14,7 +14,7 @@ export const shared = defineConfig({
 	/* prettier-ignore */
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
-		["meta", { name: "keywords", content: "Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
+		["meta", { name: "keywords", content: "Microi吾码,低代码,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],

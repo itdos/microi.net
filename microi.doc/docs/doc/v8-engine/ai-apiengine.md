@@ -1562,18 +1562,19 @@ try {
 >* 经博主项目实践，只要描述`足够准确`，`AI`生成的`接口引擎代码`正确率几乎`100%`
 
 ## 本地（服务器）部署 Microi.AI 引擎
+>* Docker会自动创建所需的数据目录，无需手动创建
 >* 通过docker编排部署
 ```shell
 version: '3.8'
 services:
   # Ollama AI 服务（使用阿里云镜像加速）
-  ollama:
+  microi-ollama:
     image: registry.cn-hangzhou.aliyuncs.com/microios/ollama:latest  # 使用阿里云镜像，也可使用日期版本如 :20260129
-    container_name: ollama-deepseek
+    container_name: microi-ollama
     ports:
-      - "1888:11434"  # 如需修改端口，直接改这里，如 "8080:11434"
+      - "1434:11434"  # 如需修改端口，直接改这里，如 "8080:11434"
     volumes:
-      - ollama_data:/root/.ollama  # 持久化模型数据
+      - /microi/ollama/data:/root/.ollama  # 持久化模型数据（统一存储在/microi目录下）
     restart: always  # 开机自动启动
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
@@ -1584,26 +1585,23 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - ollama-network
-volumes:
-  ollama_data:
-    driver: local
+      - microi-ollama-network
 
 networks:
-  ollama-network:
+  microi-ollama-network:
     driver: bridge
 
 # =====================================================
 # Microi.net 专用 Ollama + DeepSeek 部署方案
-# 使用阿里云镜像加速 + 日期版本管理
+# 使用阿里云镜像加速
 # =====================================================
 #
 # 【验证部署】
-#   curl http://localhost:1888/api/tags
-#   docker exec ollama-deepseek ollama list
+#   curl http://localhost:1434/api/tags
+#   docker exec microi-ollama ollama list
 #
 # 【测试AI对话】
-#   curl http://localhost:1888/v1/chat/completions \
+#   curl http://localhost:1434/v1/chat/completions \
 #     -H "Content-Type: application/json" \
 #     -d '{
 #       "model": "deepseek-r1:1.5b",
@@ -1611,34 +1609,33 @@ networks:
 #     }'
 #
 # 【下载其他模型】
-#   docker exec ollama-deepseek ollama pull deepseek-r1:7b # 下载7B模型
-#   docker exec ollama-deepseek ollama pull deepseek-coder:1.3b # 下载Coder模型
-#   docker exec ollama-deepseek ollama pull deepseek-coder:6.7b # 下载Coder 6.7B模型
-#   docker logs -f ollama-deepseek # 查看下载进度
-#   docker exec ollama-deepseek ollama list # 查看已安装模型
+#   docker exec microi-ollama ollama pull deepseek-r1:7b # 下载7B模型
+#   docker exec microi-ollama ollama pull deepseek-coder:1.3b # 下载Coder模型
+#   docker exec microi-ollama ollama pull deepseek-coder:6.7b # 下载Coder 6.7B模型
+#   docker logs -f microi-ollama # 查看下载进度
+#   docker exec microi-ollama ollama list # 查看已安装模型
 # =====================================================
 ```
 
 >* 拉取nomic-embed-text模型（384维，用于中英文文本）
 ```shell
-docker exec ollama-deepseek ollama pull nomic-embed-text
+docker exec microi-ollama ollama pull nomic-embed-text
 ```
 
 >* 测试API
 ```
-curl http://localhost:1888/v1/embeddings \
+curl http://localhost:1434/v1/embeddings \
   -H "Content-Type: application/json" \
   -d '{"model": "nomic-embed-text", "input": "测试"}'
 ```
 
->* 部署Qdrant
+>* 部署Qdrant向量数据库
 ```shell
 version: '3.8'
 services:
   # Qdrant向量数据库服务
-  # 如果拉取失败，配置Docker镜像加速：https://cr.console.aliyun.com/cn-hangzhou/instances/mirrors
-  qdrant:
-    image: qdrant/qdrant:latest
+  microi-qdrant:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest
     container_name: microi-qdrant
     restart: unless-stopped
     
@@ -1649,13 +1646,13 @@ services:
     
     # 环境变量配置（所有优化配置）
     environment:
+      # 安全配置（生产环境建议启用）
+      - QDRANT__SERVICE__API_KEY=password123456         # API密钥（取消注释后启用）
+      - QDRANT__SERVICE__ENABLE_TLS=false               # TLS加密（本地部署可关闭）
+
       # 核心配置
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-
-      # 安全配置（生产环境建议启用）
-      - QDRANT__SERVICE__API_KEY=your-secret-api-key-here         # API密钥（取消注释后启用）
-      - QDRANT__SERVICE__ENABLE_TLS=false                           # TLS加密（本地部署可关闭）
       
       # 性能优化配置
       - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=4          # 搜索线程数
@@ -1687,9 +1684,9 @@ services:
     
     # 数据卷挂载（持久化存储）
     volumes:
-      - ./qdrant_storage:/qdrant/storage          # 主存储目录
-      - ./qdrant_snapshots:/qdrant/snapshots      # 快照目录
-      - ./qdrant_config:/qdrant/config            # 配置文件目录（可选）
+      - /microi/qdrant/storage:/qdrant/storage          # 主存储目录
+      - /microi/qdrant/snapshots:/qdrant/snapshots      # 快照目录
+      - /microi/qdrant/config:/qdrant/config            # 配置文件目录（可选）
     
     # 资源限制（根据服务器实际情况调整）
     #deploy:
@@ -1709,7 +1706,7 @@ services:
     
     # 网络配置
     networks:
-      - microi-ai-network
+      - microi-qdrant-network
     
     # 标签（便于管理）
     labels:
@@ -1719,7 +1716,7 @@ services:
 
 # 网络定义
 networks:
-  microi-ai-network:
+  microi-qdrant-network:
     driver: bridge  # 简单桥接网络，无需固定IP
 
 # http://localhost:1333/healthz # 健康检查接口
@@ -1727,93 +1724,4 @@ networks:
 # 检查向量数据是否已初始化：
 # http://localhost:1333/collections/microi_schema
 # 查看 points_count 是否>0
-```
-
-## 将本地（服务器） Ollama 镜像推送到阿里云
-```shell
-#!/bin/bash
-
-##############################################################################
-# Ollama镜像推送到阿里云容器镜像服务脚本
-# 用途：将ollama/ollama推送到你的阿里云镜像仓库，加速后续拉取
-# 版本策略：使用当天日期作为tag（如：20260129），方便版本管理
-##############################################################################
-
-set -e
-
-# 颜色输出
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${BLUE}=== Ollama镜像推送到阿里云 ===${NC}"
-echo ""
-
-# 你的阿里云镜像仓库配置
-ALI_REGISTRY="registry.cn-hangzhou.aliyuncs.com"
-ALI_NAMESPACE="microios"
-ALI_IMAGE_NAME="ollama"
-
-# 使用当天日期作为版本号
-DATE_TAG=$(date +%Y%m%d)
-echo -e "${BLUE}使用版本号: ${DATE_TAG}${NC}"
-
-# 完整的阿里云镜像地址
-ALI_FULL_IMAGE="${ALI_REGISTRY}/${ALI_NAMESPACE}/${ALI_IMAGE_NAME}:${DATE_TAG}"
-ALI_LATEST_IMAGE="${ALI_REGISTRY}/${ALI_NAMESPACE}/${ALI_IMAGE_NAME}:latest"
-
-echo ""
-echo -e "${YELLOW}步骤1: 拉取官方Ollama镜像${NC}"
-docker pull ollama/ollama:latest
-
-echo ""
-echo -e "${YELLOW}步骤2: 给镜像打标签（日期版本和latest）${NC}"
-docker tag ollama/ollama:latest ${ALI_FULL_IMAGE}
-docker tag ollama/ollama:latest ${ALI_LATEST_IMAGE}
-echo "已创建标签："
-echo "  - ${ALI_FULL_IMAGE}"
-echo "  - ${ALI_LATEST_IMAGE}"
-
-echo ""
-echo -e "${YELLOW}步骤3: 登录阿里云容器镜像服务${NC}"
-echo "请输入你的阿里云账号信息："
-docker login --username=microios ${ALI_REGISTRY}
-
-echo ""
-echo -e "${YELLOW}步骤4: 推送镜像到阿里云（日期版本）${NC}"
-docker push ${ALI_FULL_IMAGE}
-
-echo ""
-echo -e "${YELLOW}步骤5: 推送镜像到阿里云（latest版本）${NC}"
-docker push ${ALI_LATEST_IMAGE}
-
-echo ""
-echo -e "${GREEN}✅ 推送完成！${NC}"
-echo ""
-echo "阿里云镜像地址："
-echo "  - 日期版本: ${ALI_FULL_IMAGE}"
-echo "  - 最新版本: ${ALI_LATEST_IMAGE}"
-echo ""
-echo -e "${BLUE}后续使用：${NC}"
-echo "修改 docker-compose-ollama-microi.yml 中的镜像地址："
-echo "  将 image: ollama/ollama:latest"
-echo "  改为 image: ${ALI_FULL_IMAGE}"
-echo "  或者 image: ${ALI_LATEST_IMAGE}"
-echo ""
-echo -e "${YELLOW}重要说明：${NC}"
-echo "1. Ollama镜像：已推送到阿里云（日期版本：${DATE_TAG}）"
-echo "2. DeepSeek模型：无法推送到阿里云，因为它不是Docker镜像"
-echo "3. DeepSeek模型是通过 'ollama pull' 从Ollama官方仓库下载的数据文件"
-echo "4. 模型文件存储在Docker volume中，大小约1.5GB"
-echo ""
-echo -e "${BLUE}如需加速模型下载，可以：${NC}"
-echo "  方案1: 使用代理服务器"
-echo "  方案2: 在一台服务器下载好后，备份volume并传输到其他服务器"
-echo "  方案3: 使用内网NFS共享ollama_data volume"
-echo ""
-echo -e "${BLUE}Volume备份命令：${NC}"
-echo "  docker run --rm -v ollama_data:/data -v \$(pwd):/backup \\"
-echo "    ubuntu tar czf /backup/ollama-models-${DATE_TAG}.tar.gz -C /data ."
-echo ""
 ```
