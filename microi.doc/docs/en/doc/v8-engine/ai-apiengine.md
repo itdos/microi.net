@@ -7,7 +7,7 @@
 
 ## Let AI start learning.
 ```
-当前项目是开源低代码平台-Microi吾码的官方文档MD源码：
+当前项目是开源 AI 低代码平台-Microi吾码的官方文档MD源码：
 1、我需要你先学习Microi吾码的V8引擎文档：
 	docs/doc/v8-engine/api-engine.md、
 	docs/doc/v8-engine/v8-server.md、
