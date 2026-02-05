@@ -159,6 +159,8 @@ export default {
                 if (field.Component == "CodeEditor"
                     || field.Component == "JsonTable"
                     || field.Component == "RichText"
+                    || field.Component == "JoinTable"
+                    || field.Component == "JoinForm"
                 ) {
                     return "top";
                 }

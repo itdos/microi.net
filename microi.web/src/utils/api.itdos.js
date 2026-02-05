@@ -287,6 +287,7 @@ var DiyApi = {
     DelFormDataBatch: "/api/FormEngine/DelFormDataBatch",
     GetDiyTableRow: "/api/FormEngine/GetTableData",
     GetDiyTableRowTree: "/api/DiyTable/GetDiyTableRowTree",
+    GetTableData: "/api/FormEngine/GetTableData",
     GetTableDataTree: "/api/FormEngine/GetTableDataTree",
     GetDiyTableRowModel: "/api/FormEngine/GetFormData",
     DelDiyTableRow: "/api/FormEngine/DelFormData",
