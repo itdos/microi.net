@@ -1,5 +1,5 @@
 # CSDN文章模板
-## 开源低代码平台-Microi吾码-平台简介
+## 开源 AI 低代码平台-Microi吾码-平台简介
 >* 技术框架：[__<font color="red">**低代码 + AI**</font>__]开发模式，支持`传统开发`，.NET10 + Vue2/3 + Redis + MySql/SqlServer/Oracle + Element-UI/Element-Plus + UniApp
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
 >* 官网：[https://microi.net/](https://microi.net/)
