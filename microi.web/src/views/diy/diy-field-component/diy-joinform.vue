@@ -35,7 +35,7 @@
             :FormMode="getJoinFormMode()"
             :TableId="(internalConfig || field.Config.JoinForm).TableId"
             :TableName="(internalConfig || field.Config.JoinForm).TableName"
-            :TableRowId="(internalConfig || field.Config.JoinForm).Id"
+            :TableRowId="getJoinFormId()"
         />
     </div>
     
@@ -80,7 +80,7 @@
                     style="width: 100%"
                 >
                     <el-option
-                        v-for="field in ParentFieldList"
+                        v-for="field in parentFieldListOptions"
                         :key="field.Name"
                         :label="field.Label || field.Name"
                         :value="field.Name"
@@ -141,6 +141,10 @@ const props = defineProps({
     FormDiyTableModel: {
         type: Object,
         default: () => ({})
+    },
+    ParentFieldList: {
+        type: Array,
+        default: () => []
     }
 });
 
@@ -172,7 +176,7 @@ const internalConfig = ref(null);
 // 配置弹窗相关
 const configDialogVisible = ref(false);
 const DiyTableList = ref([]);
-const ParentFieldList = ref([]);
+const parentFieldListOptions = ref([]);  // 重命名避免与props冲突
 const configForm = ref({
     TableId: '',
     JoinFieldName: '',
@@ -214,6 +218,15 @@ const hasIdOrSearch = computed(() => {
     const config = internalConfig.value || props.field.Config?.JoinForm;
     if (!config) return false;
     
+    // 先检查是否能从JoinFieldName获取ID
+    if (config.JoinFieldName && props.FormDiyTableModel) {
+        const fieldValue = props.FormDiyTableModel[config.JoinFieldName];
+        if (!DiyCommon.IsNull(fieldValue)) {
+            return true;
+        }
+    }
+    
+    // 再检查是否有固定的ID或搜索条件
     return !DiyCommon.IsNull(config.Id) || (config._SearchEqual && Object.keys(config._SearchEqual).length > 0);
 });
 
@@ -233,16 +246,17 @@ const shouldRender = computed(() => {
     // 优先使用内部配置
     const config = internalConfig.value || props.field.Config.JoinForm;
     
-    // 优先检查：如果有 ID，就应该渲染（无论 TableId/TableName 是否配置）
-    if (!DiyCommon.IsNull(config.Id)) {
-        // 有 ID 就渲染，表字段可能在后续动态设置
-        return proxy.GetFieldIsShow ? proxy.GetFieldIsShow(props.field) : (DiyCommon.IsNull(props.field.Visible) ? true : props.field.Visible);
+    // 检查是否配置了表（TableId 或 TableName）
+    if (!isTableDifferent.value) {
+        return false;
     }
     
-    // 如果没有 ID，需要检查是否有搜索条件和表配置
-    const hasSearchCondition = config._SearchEqual && Object.keys(config._SearchEqual).length > 0;
-    
-    if (hasSearchCondition && isTableDifferent.value) {
+    // 使用 hasIdOrSearch 判断是否有足够的数据来渲染
+    // hasIdOrSearch 会检查：
+    // 1. JoinFieldName 对应的字段值
+    // 2. 固定的 Id
+    // 3. 搜索条件 _SearchEqual
+    if (hasIdOrSearch.value) {
         return proxy.GetFieldIsShow ? proxy.GetFieldIsShow(props.field) : (DiyCommon.IsNull(props.field.Visible) ? true : props.field.Visible);
     }
 
@@ -276,44 +290,65 @@ watch(
         () => props.field.Config?.JoinForm?.Id,
         () => props.field.Config?.JoinForm?.TableId,
         () => props.field.Config?.JoinForm?.TableName,
-        () => internalConfig.value
+        () => internalConfig.value,
+        () => props.FormMode  // 新增：监听父表单的 FormMode 变化
     ],
-    async ([newId, newTableId, newTableName, newInternalConfig], [oldId, oldTableId, oldTableName, oldInternalConfig]) => {
+    async ([newId, newTableId, newTableName, newInternalConfig, newFormMode], [oldId, oldTableId, oldTableName, oldInternalConfig, oldFormMode]) => {
         // 检查是否有实质性的变化
         const idChanged = newId && newId !== oldId;
         const tableIdChanged = newTableId && newTableId !== oldTableId;
         const tableNameChanged = newTableName && newTableName !== oldTableName;
         const internalConfigChanged = newInternalConfig !== oldInternalConfig;
+        const formModeChanged = newFormMode !== oldFormMode;  // 新增：检测 FormMode 变化
         
-        if (idChanged || tableIdChanged || tableNameChanged || internalConfigChanged) {
+        // 判断是否只有 FormMode 变化（数据源未变）
+        const onlyFormModeChanged = formModeChanged && !idChanged && !tableIdChanged && !tableNameChanged && !internalConfigChanged;
+        
+        if (idChanged || tableIdChanged || tableNameChanged || internalConfigChanged || formModeChanged) {
             log('配置已更新', { 
                 id: { old: oldId, new: newId },
                 tableId: { old: oldTableId, new: newTableId },
                 tableName: { old: oldTableName, new: newTableName },
-                internalConfigChanged
+                internalConfigChanged,
+                formMode: { old: oldFormMode, new: newFormMode },
+                onlyFormModeChanged
             });
             
-            // 标记组件未就绪
-            isInstanceReady.value = false;
-            
-            // 更新渲染键强制重新渲染
-            renderKey.value = 'refJoinForm_' + props.field.Id + '_' + Date.now();
-            
-            // 标记需要在新实例加载后执行 Init
-            pendingInit.value = true;
-            
-            // 等待新实例渲染完成后自动初始化
-            await nextTick();
-            setTimeout(() => {
+            if (onlyFormModeChanged) {
+                // 只有 FormMode 变化时，不需要重新创建组件，只需要重新初始化
+                // 这样可以保留现有的表单数据和状态
+                log('仅 FormMode 变化，重新初始化表单（保留数据）');
+                await nextTick();
                 if (joinFormInstance.value && typeof joinFormInstance.value.Init === 'function') {
-                    log('新实例已准备，自动执行 Init');
-                    isInstanceReady.value = true;
-                    pendingInit.value = false;
-                    joinFormInstance.value.Init(true);
-                } else {
-                    warn('新实例尚未准备好，等待外部调用');
+                    // 传入 false 表示不清空数据，只是刷新表单状态
+                    joinFormInstance.value.Init(false);
                 }
-            }, 300);
+            } else {
+                // 数据源变化，需要完全重新渲染
+                log('数据源变化，完全重新渲染组件');
+                
+                // 标记组件未就绪
+                isInstanceReady.value = false;
+                
+                // 更新渲染键强制重新渲染
+                renderKey.value = 'refJoinForm_' + props.field.Id + '_' + Date.now();
+                
+                // 标记需要在新实例加载后执行 Init
+                pendingInit.value = true;
+                
+                // 等待新实例渲染完成后自动初始化
+                await nextTick();
+                setTimeout(() => {
+                    if (joinFormInstance.value && typeof joinFormInstance.value.Init === 'function') {
+                        log('新实例已准备，自动执行 Init');
+                        isInstanceReady.value = true;
+                        pendingInit.value = false;
+                        joinFormInstance.value.Init(true);
+                    } else {
+                        warn('新实例尚未准备好，等待外部调用');
+                    }
+                }, 300);
+            }
         }
     },
     { immediate: false }
@@ -326,6 +361,30 @@ const getJoinFormMode = () => {
         return DiyCommon.IsNull(config.FormMode) ? props.FormMode : config.FormMode;
     }
     return props.FormMode;
+};
+
+/**
+ * 获取关联表单的实际ID
+ * 如果配置了JoinFieldName，则从FormDiyTableModel中获取对应字段的值作为ID
+ * 否则使用配置中的固定ID
+ */
+const getJoinFormId = () => {
+    const config = internalConfig.value || props.field.Config?.JoinForm;
+    if (!config) return '';
+    
+    // 如果配置了JoinFieldName，从FormDiyTableModel中获取对应字段的值
+    if (config.JoinFieldName && props.FormDiyTableModel) {
+        const fieldValue = props.FormDiyTableModel[config.JoinFieldName];
+        if (!DiyCommon.IsNull(fieldValue)) {
+            console.log(`[JoinForm] 从 FormDiyTableModel[${config.JoinFieldName}] 获取关联ID: ${fieldValue}`);
+            return fieldValue;
+        } else {
+            console.warn(`[JoinForm] FormDiyTableModel[${config.JoinFieldName}] 为空`);
+        }
+    }
+    
+    // 否则使用配置中的固定ID
+    return config.Id || '';
 };
 
 const toggleDebugPanel = () => {
@@ -409,7 +468,6 @@ watch(
 
 // 获取DIY表格列表
 const GetDiyTableList = () => {
-    debugger;
     DiyCommon.Post(
         proxy.DiyApi.GetTableData,
         {
@@ -425,14 +483,42 @@ const GetDiyTableList = () => {
 
 // 获取父表字段列表（从当前表单的字段列表中获取）
 const GetParentFieldList = () => {
-    // 从 proxy 获取父表的字段列表
-    // 通过 props 可以访问到父表的字段信息
-    if (proxy.$parent && proxy.$parent.DiyFieldList) {
-        ParentFieldList.value = proxy.$parent.DiyFieldList.filter(field => 
+    // 优先使用 props 传递的字段列表
+    if (props.ParentFieldList && props.ParentFieldList.length > 0) {
+        parentFieldListOptions.value = props.ParentFieldList.filter(field => 
             field.Component !== 'JoinForm' && 
             field.Component !== 'JoinTable' && 
             field.Component !== 'TableChild'
         );
+        console.log('[JoinForm] 从 props 获取父表字段列表，数量:', parentFieldListOptions.value.length);
+        return;
+    }
+    
+    // 备用方案：尝试通过 getCurrentInstance 获取
+    const instance = getCurrentInstance();
+    let parentFieldList = null;
+    
+    // 尝试多种方式获取父组件的 DiyFieldList
+    if (instance?.parent?.ctx?.DiyFieldList) {
+        parentFieldList = instance.parent.ctx.DiyFieldList;
+    } else if (instance?.parent?.proxy?.DiyFieldList) {
+        parentFieldList = instance.parent.proxy.DiyFieldList;
+    } else if (instance?.parent?.data?.DiyFieldList) {
+        parentFieldList = instance.parent.data.DiyFieldList;
+    } else if (proxy?.$parent?.DiyFieldList) {
+        parentFieldList = proxy.$parent.DiyFieldList;
+    }
+    
+    if (parentFieldList && Array.isArray(parentFieldList)) {
+        parentFieldListOptions.value = parentFieldList.filter(field => 
+            field.Component !== 'JoinForm' && 
+            field.Component !== 'JoinTable' && 
+            field.Component !== 'TableChild'
+        );
+        console.log('[JoinForm] 通过 instance 获取父表字段列表，数量:', parentFieldListOptions.value.length);
+    } else {
+        console.warn('[JoinForm] 无法获取父表字段列表，请检查 ParentFieldList prop 是否传递');
+        parentFieldListOptions.value = [];
     }
 };
 
@@ -463,6 +549,8 @@ const openConfig = () => {
 };
 
 const saveConfig = () => {
+    console.log('[JoinForm] 准备保存配置，当前 configForm:', JSON.stringify(configForm.value, null, 2));
+    
     if (!configForm.value.TableId) {
         DiyCommon.Tips('请选择关联表格！', false);
         return;
@@ -473,22 +561,32 @@ const saveConfig = () => {
         return;
     }
     
+    // 确保 Config 对象存在
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
     if (!props.field.Config.JoinForm) {
         props.field.Config.JoinForm = {};
     }
     
+    // 保存配置
     props.field.Config.JoinForm.TableId = configForm.value.TableId;
     props.field.Config.JoinForm.TableName = '';  // 使用TableId时清空TableName
     props.field.Config.JoinForm.JoinFieldName = configForm.value.JoinFieldName;
     props.field.Config.JoinForm.FormMode = configForm.value.FormMode;
     
-    // 注意：Id 字段在运行时会从 V8.Form[JoinFieldName] 动态获取
-    // 这里不需要保存固定的 Id 值
+    // 初始化其他必要字段（如果不存在）
+    if (!props.field.Config.JoinForm.Id) {
+        props.field.Config.JoinForm.Id = '';
+    }
+    if (!props.field.Config.JoinForm._SearchEqual) {
+        props.field.Config.JoinForm._SearchEqual = {};
+    }
+    
+    console.log('[JoinForm] 配置已保存到 field.Config.JoinForm:', JSON.stringify(props.field.Config.JoinForm, null, 2));
     
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
-    
-    log('配置已保存', props.field.Config.JoinForm);
 };
 
 // 暴露方法供父组件调用（转发到内部表单组件）
@@ -549,7 +647,15 @@ defineExpose({
     },
     // 暴露属性访问器
     get FormDiyTableModel() {
-        return joinFormInstance.value?.FormDiyTableModel || {};
+        if (!joinFormInstance.value) {
+            console.warn('[JoinForm] 实例未准备好，返回空对象');
+            return {};
+        }
+        if (!joinFormInstance.value.FormDiyTableModel) {
+            console.warn('[JoinForm] FormDiyTableModel 不存在，返回空对象');
+            return {};
+        }
+        return joinFormInstance.value.FormDiyTableModel;
     },
     // 暴露组件实例供调试
     get _joinFormInstance() {

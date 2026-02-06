@@ -17,7 +17,7 @@
         top: 0;
         bottom: 0;
         left: 0;
-        z-index: 10; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
+        z-index: 1; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
         overflow: hidden;
         // reset element-ui css
         .horizontal-collapse-transition {

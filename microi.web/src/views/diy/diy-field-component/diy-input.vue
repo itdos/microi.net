@@ -387,7 +387,7 @@ export default {
             var self = this;
             return new Promise((resolve, reject) => {
                 // 判断需要执行的V8
-                if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
+                if (field.V8Code || (field.Config && (field.Config.V8Code || (v8codeKey && field.Config[v8codeKey])))) {
                     self.$emit("CallbackRunV8Code", {
                         field: field,
                         thisValue: value,
