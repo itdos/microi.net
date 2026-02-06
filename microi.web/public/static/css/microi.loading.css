@@ -5,7 +5,12 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #EDF0F9;
+    /* 漂亮的渐变背景：从深蓝到紫色 */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* 备选方案：青色到蓝色 */
+    /* background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); */
+    /* 备选方案：橙色到粉色 */
+    /* background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); */
     z-index: 9999;
     display: flex;
     align-items: center;
@@ -17,7 +22,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 30px;
+    gap: 8px;
+    min-width: 400px;
 }
 
 .microi-loading {
@@ -32,9 +38,10 @@
 .microi-loading .dot {
     width: 20px;
     height: 20px;
-    background-color: #409EFF;
+    background-color: rgba(255, 255, 255, 0.9);
     border-radius: 50%;
     animation: loading-bounce 1.4s infinite ease-in-out both;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .microi-loading .dot:nth-child(1) {
@@ -59,32 +66,61 @@
 
 #microi_loading_progress {
     text-align: center;
-    font-size: 24px;
+    font-size: 48px;
     font-weight: 700;
-    color: #409EFF;
-    letter-spacing: 2px;
+    color: #FFFFFF;
+    letter-spacing: 4px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     animation: progress-pulse 1.5s ease-in-out infinite;
-    padding: 8px 20px;
-    border-radius: 20px;
-    background-color: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+    min-height: 60px;
+    line-height: 60px;
+    width: 100%;
+}
+
+/* 速度和大小信息样式 */
+#microi_loading_speed,
+#microi_loading_size {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 500;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    min-height: 24px;
+    line-height: 24px;
+    width: 100%;
+}
+
+#microi_loading_speed {
+    font-size: 16px;
+    min-height: 26px;
+    line-height: 26px;
+}
+
+#microi_loading_size {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
 }
 
 @keyframes progress-pulse {
     0%, 100% {
         transform: scale(1);
+        opacity: 1;
     }
     50% {
         transform: scale(1.05);
+        opacity: 0.9;
     }
 }
 
 @keyframes loading-bounce {
     0%, 80%, 100% {
         transform: scale(0);
+        opacity: 0.5;
     }
     40% {
         transform: scale(1);
+        opacity: 1;
     }
 }
 

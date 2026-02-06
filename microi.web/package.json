@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build && open dist/stats.html",
     "preview": "vite preview",
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
     "format": "prettier --write \"**/*.{js,vue,json,md}\""
@@ -60,6 +61,7 @@
     "@vitejs/plugin-vue": "^6.0.3",
     "autoprefixer": "^10.4.24",
     "fast-glob": "^3.3.3",
+    "rollup-plugin-visualizer": "^6.0.5",
     "sass": "^1.83.0",
     "svgo": "^4.0.0",
     "vite": "^7.3.1",
