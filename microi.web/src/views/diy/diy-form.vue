@@ -135,6 +135,7 @@
                                                 :pageLifetimes="pageLifetimes"
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
+                                                :ParentFieldList="DiyFieldList"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackFormValueChange="CallbackFormValueChange"
                                                 @CallbakOnKeyup="FieldOnKeyup"
@@ -201,6 +202,7 @@
                                                 :pageLifetimes="pageLifetimes"
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
+                                                :ParentFieldList="DiyFieldList"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackFormValueChange="CallbackFormValueChange"
                                                 @CallbakOnKeyup="FieldOnKeyup"
@@ -495,6 +497,10 @@ export default {
         },
     },
     props: {
+        // AutoInit: {
+        //     type: Boolean,
+        //     default: true
+        // },
         ShowHideField: {
             type: Boolean,
             default: false
@@ -534,6 +540,12 @@ export default {
         },
         // {FieldName1:value , FieldName2:value}
         DefaultValues: {
+            type: Object,
+            default() {
+                return {};
+            }
+        },
+        FormData: {
             type: Object,
             default() {
                 return {};
@@ -913,6 +925,10 @@ export default {
         });
         // Vue 3 不再需要 $set，此调试代码已跳过
         // 在 Vue 3 中，响应式系统可以自动追踪属性的添加和删除
+        // 2026-02-05 Anderson：没必要让外部每次去调用 Init()，组件实现自动初始化
+        if(!self.TableName || !self.TableId){
+            self.Init();
+        }
     },
     methods: {
         /**
@@ -1508,37 +1524,54 @@ export default {
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "JoinForm") {
                     var refComponent = self.getRefComponent(field.Name);
-                    if (refComponent && typeof refComponent.FormSubmit === 'function') {
-                        // var arr = refComponent.GetNeedSaveRowList();
-                        // result.push({
-                        //     FieldName : field.Name,
-                        //     TableId : field.Config.TableChildTableId,
-                        //     Rows : arr
-                        // });
-                        refComponent.FormSubmit(
-                            {
-                                FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
-                                //这里获取关联表单的Id
-                                TableRowId: field.Config.JoinForm.Id,
-                                // SaveLoading: self.SaveDiyTableLoding,
-                                //这里获取当前表单是保存并关闭还是什么状态
-                                SavedType: self.SavedType,
-                                V8Callback: function (formData) {
-                                    // self.GetHourseDetail(self.GetOther);
-                                }
-                            },
-                            function (success, formData) {
-                                if (success == true) {
-                                    // self.GetDiyTableRow(true)
-                                    // self.ShowEditModel = false;
-                                    self.$nextTick(function () {
-                                        // self.SaveDiyTableLoding = false;
-                                    });
-                                } else {
-                                    // self.SaveDiyTableLoding = false;
-                                }
-                            }
-                        );
+                    if (refComponent && typeof refComponent.GetFormData === 'function') {
+                        var joinFormData = refComponent.GetFormData();
+                        var formMode = self.FormMode;//field.Config.JoinForm.FormMode
+                        if(formMode == "Add" || formMode == "Insert")
+                        {
+                            self.DiyCommon.FormEngine.AddFormData(field.Config.JoinForm.TableId 
+                                || field.Config.JoinForm.TableName, {
+                                ...joinFormData
+                            });
+                        }
+                        else if(formMode == "Edit" 
+                                || formMode == "Update"
+                                || formMode == "Upt"
+                            )
+                        {
+                            self.DiyCommon.FormEngine.UptFormData(field.Config.JoinForm.TableId 
+                                || field.Config.JoinForm.TableName, {
+                                ...joinFormData
+                            });
+                        }
+
+                        // 这里不再调用FormSubmit，因为它是异步
+                        // refComponent.FormSubmit(
+                        //     {
+                        //         FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
+                        //         //这里获取关联表单的Id
+                        //         TableRowId: field.Config.JoinForm.Id 
+                        //             || (field.Config.JoinForm.JoinFieldName 
+                        //                 && self.FormDiyTableModel[field.Config.JoinForm.JoinFieldName]),
+                        //         // SaveLoading: self.SaveDiyTableLoding,
+                        //         //这里获取当前表单是保存并关闭还是什么状态
+                        //         SavedType: self.SavedType,
+                        //         V8Callback: function (formData) {
+                        //             // self.GetHourseDetail(self.GetOther);
+                        //         }
+                        //     },
+                        //     function (success, formData) {
+                        //         if (success == true) {
+                        //             // self.GetDiyTableRow(true)
+                        //             // self.ShowEditModel = false;
+                        //             self.$nextTick(function () {
+                        //                 // self.SaveDiyTableLoding = false;
+                        //             });
+                        //         } else {
+                        //             // self.SaveDiyTableLoding = false;
+                        //         }
+                        //     }
+                        // );
                     }
                 }
             });
@@ -1629,8 +1662,6 @@ export default {
         },
         ReloadJoinForm(fieldModelOrParams) {
             var self = this;
-            debugger;
-            
             // 支持两种调用方式：
             // 1. ReloadJoinForm(fieldModel) - 传入字段对象
             // 2. ReloadJoinForm({ FieldName, TableId, TableName, Id, FormMode }) - 传入配置对象
@@ -1851,9 +1882,10 @@ export default {
         SetFormData(formData) {
             var self = this;
             for (const key in formData) {
-                if (formData[key]) {
+                //2026-02-06 Anderon：注释这个判断 ，否则会导致重新赋空值不会成功
+                // if (formData[key]) {
                     self.FormDiyTableModel[key] = formData[key];
-                }
+                // }
             }
             return self.FormDiyTableModel;
         },
@@ -2231,6 +2263,7 @@ export default {
                     var result1 = results[0];
                     _.sortBy(result1.Data.Tabs, "Sort");
                     self.DiyCommon.DiyTableStrToJson(result1.Data);
+
                     self.DiyCommon.Base64DecodeDiyTable(result1.Data);
 
                     self.DiyTableModel = result1.Data;
@@ -2317,9 +2350,14 @@ export default {
                     // 2020-07-16新增：DefaultValues 父组件传过来的默认值。 取数据值优先还是DefaultValues优先？
                     // 以取到的数据优先
                     for (const key in self.DefaultValues) {
-                        if (self.DiyCommon.IsNull(formData[key])) {
+                        if (self.DiyCommon.IsNull(formData[key])) { //以取到的数据优先
                             formData[key] = self.DefaultValues[key];
                         }
+                    }
+                    // 2026-02-05 Anderson：如果根据【2020-07-16】的说明：【以取到的数据优先】，会有一个问题：
+                    // 用户明明是想以传过来的数据为优先时无法满足，因为新增一个 FormData 属性，优先级更高、
+                    for (const key in self.FormData) {
+                        formData[key] = self.FormData[key];
                     }
 
                     await self.GetAllDataAfter(resultGetDiyField, formData, function (callbackObj) {
@@ -2348,6 +2386,7 @@ export default {
                             self.FieldActiveTab = self.GetShowTabs()[0].Id || self.GetShowTabs()[0].Name;
                         }
                     });
+                    console.log('准备传入表数据 - GetAllData:', self.DiyTableModel );
 
                     self.$emit("CallbackSetDiyTableModel", self.DiyTableModel);
 
@@ -2532,13 +2571,21 @@ export default {
         },
         CommonV8CodeChange(item, field, v8codeKey) {
             var self = this;
-            if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
+            if (field.Config 
+                && (field.V8Code
+                    ||field.Config.V8Code 
+                    || (v8codeKey && field.Config[v8codeKey])
+                    )
+                ) {
                 self.RunV8Code({ field: field, thisValue: item, v8codeKey: v8codeKey });
             }
         },
         SelectChange(item, field) {
             var self = this;
-            if ((field.Component == "Select" || field.Component == "SelectTree" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if ((field.Component == "Select" 
+                    || field.Component == "SelectTree" 
+                    || field.Component == "MultipleSelect") 
+                && (field.V8Code || field.Config.V8Code)) {
                 self.RunV8Code({ field: field, thisValue: item });
             }
         },
@@ -2550,7 +2597,7 @@ export default {
                 if (!self.DiyCommon.IsNull(tObj)) {
                     // self.CurrentSysUserModel.DeptName = tObj.Name;
                     // self.CurrentSysUserModel.DeptCode = tObj.Code;
-                    if (!self.DiyCommon.IsNull(field.Config.V8Code)) {
+                    if (field.V8Code || field.Config.V8Code) {
                         self.RunV8Code({ field: field, thisValue: tObj });
                     }
                 }
@@ -2561,7 +2608,7 @@ export default {
             if (!v8codeKey) {
                 v8codeKey = "V8Code";
             }
-            var v8Code = field.Config[v8codeKey];
+            var v8Code = v8codeKey == 'V8Code' ? (field.V8Code || field.Config.V8Code) : field.Config[v8codeKey];
 
             if (_v8Code) {
                 v8Code = _v8Code;
@@ -2597,7 +2644,6 @@ export default {
         //_PageIndex从1开始计数，传入-1表示跳到最后一页。
         TableRefresh(field, param) {
             var self = this;
-            debugger;
             try {
                 var refComponent = self.getRefComponent(field.Name);
                 if (refComponent && typeof refComponent.RefreshDiyTableRowList === 'function') {
@@ -2706,7 +2752,7 @@ export default {
         },
         NumberTextChange(currentValue, oldValue, field) {
             var self = this;
-            if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.Component == "NumberText" && (field.V8Code || field.Config.V8Code)) {
                 self.RunV8Code({
                     field: field,
                     thisValue: {
@@ -2810,6 +2856,7 @@ export default {
             self.DiyCommon.DiyTableStrToJson(data);
             self.DiyCommon.Base64DecodeDiyTable(data);
             self.DiyTableModel = data;
+            console.log('准备传入表数据 - SetDiyTableModel:', self.DiyTableModel );
             self.$emit("CallbackSetDiyTableModel", self.DiyTableModel);
         },
         GetDiyTableModel() {
@@ -3160,11 +3207,20 @@ export default {
             
             console.log('[diy-form] ========== AddDiyFieldArr 结束 ==========');
         },
+        // 外部可能需要更新内部的字段对象
         UptDiyFieldArr(field) {
             var self = this;
             self.DiyFieldList.forEach((element) => {
                 if (element.Id == field.Id) {
                     element = field;
+                }
+            });
+        },
+        UptDiyFieldDataSource(fieldName, dataSource) {
+            var self = this;
+            self.DiyFieldList.forEach((element) => {
+                if (element.Name == fieldName) {
+                    element.Data = dataSource;
                 }
             });
         },
@@ -3660,7 +3716,7 @@ export default {
                     var batchEditParams = [];
                     var needSubmit = false;
                     needSaveRowLis.forEach((element) => {
-                        if (element.Rows.length == 0) {
+                        if (!element.Rows || element.Rows.length == 0) {
                             return;
                         }
                         element.Rows.forEach((row) => {
@@ -3733,7 +3789,7 @@ export default {
                     var batchAddParams = [];
                     var needSubmit = false;
                     needSaveRowLis.forEach((element) => {
-                        if (element.Rows.length == 0) {
+                        if (!element.Rows || element.Rows.length == 0) {
                             return;
                         }
                         element.Rows.forEach((row) => {

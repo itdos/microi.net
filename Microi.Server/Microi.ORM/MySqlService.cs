@@ -20,19 +20,19 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() ||
-                param.OldTableName.DosIsNullOrWhiteSpace() ||
-                (param.DbSession == null && _trans == null))
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
-                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
-
-            var sql = $"ALTER TABLE `{param.OldTableName}` rename `{param.TableName}`";
-
             try
             {
+                if (param.TableName.DosIsNullOrWhiteSpace() ||
+                    param.OldTableName.DosIsNullOrWhiteSpace() ||
+                    (param.DbSession == null && _trans == null))
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+
+                // SQL注入防护
+                if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
+                    return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
+
+                var sql = $"ALTER TABLE `{param.OldTableName}` rename `{param.TableName}`";
+            
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
@@ -70,14 +70,16 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace())
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+            try
+            {
+                if (param.TableName.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName))
-                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
+                // SQL注入防护
+                if (!IsValidIdentifier(param.TableName))
+                    return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
-            var sql = $@"CREATE TABLE `{param.TableName}` (
+                var sql = $@"CREATE TABLE `{param.TableName}` (
                           `Id` varchar(36) NOT NULL COMMENT 'Id',
                           `CreateTime` datetime NULL COMMENT '创建时间',
                           `UpdateTime` datetime NULL COMMENT '修改时间',
@@ -86,9 +88,7 @@ namespace Microi.net
                           `IsDeleted` int NULL DEFAULT b'0' COMMENT '是否删除',
                           PRIMARY KEY(`Id`)
                         ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4";
-
-            try
-            {
+            
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
@@ -107,25 +107,25 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult AddColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.FieldName.DosIsNullOrWhiteSpace()
-                || param.FieldType.DosIsNullOrWhiteSpace()
-                || (param.DbSession == null && _trans == null)
-                )
-            {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
-
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
-                return new DosResult(0, null, "表名或字段名不合法");
-
-            // 转义注释内容防止SQL注入
-            var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
-            var sql = $"ALTER TABLE `{param.TableName}` ADD COLUMN `{param.FieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
-
             try
             {
+                if (param.TableName.DosIsNullOrWhiteSpace()
+                    || param.FieldName.DosIsNullOrWhiteSpace()
+                    || param.FieldType.DosIsNullOrWhiteSpace()
+                    || (param.DbSession == null && _trans == null)
+                    )
+                {
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                }
+
+                // SQL注入防护
+                if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
+                    return new DosResult(0, null, "表名或字段名不合法");
+
+                // 转义注释内容防止SQL注入
+                var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
+                var sql = $"ALTER TABLE `{param.TableName}` ADD COLUMN `{param.FieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
+
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
@@ -198,25 +198,25 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult ChangeColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() ||
-                param.FieldName.DosIsNullOrWhiteSpace() ||
-                param.NewFieldName.DosIsNullOrWhiteSpace() ||
-                param.FieldType.DosIsNullOrWhiteSpace() ||
-                (param.DbSession == null && _trans == null))
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName) ||
-                !IsValidIdentifier(param.FieldName) ||
-                !IsValidIdentifier(param.NewFieldName))
-                return new DosResult(0, null, "表名或字段名不合法");
-
-            // 转义注释内容
-            var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
-            var sql = $"ALTER TABLE `{param.TableName}` CHANGE `{param.FieldName}` `{param.NewFieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
-
             try
             {
+                if (param.TableName.DosIsNullOrWhiteSpace() ||
+                    param.FieldName.DosIsNullOrWhiteSpace() ||
+                    param.NewFieldName.DosIsNullOrWhiteSpace() ||
+                    param.FieldType.DosIsNullOrWhiteSpace() ||
+                    (param.DbSession == null && _trans == null))
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+
+                // SQL注入防护
+                if (!IsValidIdentifier(param.TableName) ||
+                    !IsValidIdentifier(param.FieldName) ||
+                    !IsValidIdentifier(param.NewFieldName))
+                    return new DosResult(0, null, "表名或字段名不合法");
+
+                // 转义注释内容
+                var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
+                var sql = $"ALTER TABLE `{param.TableName}` CHANGE `{param.FieldName}` `{param.NewFieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
+            
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);

@@ -21,6 +21,7 @@ using System.Text;
 using System.Data.SqlClient;
 using System.Data.Common;
 using System.Data;
+using Dos.Common;
 
 namespace Dos.ORM.SqlServer
 {
@@ -57,6 +58,10 @@ namespace Dos.ORM.SqlServer
         /// <returns></returns>
         public override string BuildParameterName(string name)
         {
+            if (name.DosIsNullOrWhiteSpace())
+            {
+                return name;
+            }
             string nameStr = name.Trim(leftToken, rightToken);
             if (nameStr[0] != paramPrefixToken)
             {

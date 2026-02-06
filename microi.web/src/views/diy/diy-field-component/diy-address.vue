@@ -134,7 +134,7 @@ export default {
             self.ModelValue = item;
 
             self.ModelChangeMethods(item);
-            if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
+            if (self.field.V8Code || self.field.Config.V8Code) {
                 self.$emit("CallbackRunV8Code", { field: self.field, thisValue: item });
             }
             self.$emit("CallbackFormValueChange", self.field, item);

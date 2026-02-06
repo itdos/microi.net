@@ -377,6 +377,11 @@
                 margin-right: 6px;
                 font-size: 14px;
             }
+            span{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
         }
 
         :deep(.el-tabs__active-bar) {

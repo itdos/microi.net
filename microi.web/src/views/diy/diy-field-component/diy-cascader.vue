@@ -342,7 +342,7 @@ export default {
         handleSelect(item, field) {
             var self = this;
             //执行V8
-            if (!self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.V8Code || field.Config.V8Code) {
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
             }
         },
@@ -402,7 +402,7 @@ export default {
         CommonV8CodeChange(item, field) {
             var self = this;
             self.ModelChangeMethods(item);
-            if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
+            if (self.field.V8Code || self.field.Config.V8Code) {
                 // self.RunV8Code(field, item)
                 self.$emit("CallbackRunV8Code", { field: self.field, thisValue: item });
             }
