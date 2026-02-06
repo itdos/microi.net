@@ -1296,7 +1296,11 @@ var DiyCommon = {
 
                 DiyCommon.OpenLogin();
             }
-            if(!(result.Code == 1001 && window.location.href.indexOf("/login") > -1)){
+            debugger;
+            if(!(result.Code == 1001 
+                && (window.location.href.indexOf("#/login") > -1 
+                        || window.location.hash == '#/' 
+                        || window.location.hash == ''))){
                 DiyCommon.Tips(result.Msg || result.Message, false);
             }
             // if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {

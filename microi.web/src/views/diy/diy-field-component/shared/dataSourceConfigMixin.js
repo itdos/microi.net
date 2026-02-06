@@ -159,7 +159,7 @@ export default {
          */
         loadSysDataSourceList() {
             var self = this;
-            if (self.SysDataSourceList.length > 0) return;
+            if (!self.SysDataSourceList || self.SysDataSourceList.length > 0) return;
             self.DiyCommon.GetDiyTableRow(
                 { TableName: "Sys_DataSource" },
                 function (data) {
@@ -175,7 +175,7 @@ export default {
          */
         loadApiEngineList() {
             var self = this;
-            if (self.ApiEngineList.length > 0) return;
+            if (!self.ApiEngineList || self.ApiEngineList.length > 0) return;
             self.DiyCommon.GetDiyTableRow(
                 {
                     TableName: "sys_apiengine",
