@@ -1385,8 +1385,19 @@ a.disabled {
 
 /* 通知 */
 .el-notification--success {
-    background-color: var(--color-primary) !important;
+    // background-color: var(--color-primary) !important;
     border-color: var(--color-primary) !important;
+}
+.el-notification{
+    background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%) !important;
+    color: var(--color-primary-text, #ffffff) !important;
+    box-shadow: 0 2px 18px var(--color-primary-50) !important;
+    .el-notification__title,
+    .el-notification__content,
+    .el-notification__closeBtn,
+    .el-icon{
+        color: var(--color-primary-text, #ffffff) !important;
+    }
 }
 
 /* 加载 */

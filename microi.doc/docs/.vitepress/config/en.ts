@@ -60,7 +60,6 @@ export const en = defineConfig({
 		sidebar: {
 			"/en/doc/": set_sidebar("/en/doc", false),
 			"/en/case/": set_sidebar("/en/case", false),
-			"/en/apiengine/": set_sidebar("/en/apiengine", false),
 		},
 	},
 	vite: {
@@ -72,7 +71,6 @@ function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "Home", link: "/en/" },
 		{ text: "Documentation 🪧", link: "/en/doc/index" },
-		{ text: "API Engine Practical Guide", link: "/en/apiengine/apiengine-index" },
 		{ text: "Success Stories", link: "/en/case/case-index" },
 		{
 			text: "Related Links 🔗",

@@ -1181,15 +1181,15 @@ var DiyCommon = {
 
         if (DiyCommon.IsNull(t)) {
             if (b) {
-                t = 1000;
+                t = 3000;
             } else {
-                t = 5000;
+                t = 10000;
             }
         } else {
             if (b) {
-                t = t * 1000;
+                t = t * 3000;
             } else {
-                t = t * 5000;
+                t = t * 10000;
             }
         }
 
@@ -1296,13 +1296,15 @@ var DiyCommon = {
 
                 DiyCommon.OpenLogin();
             }
-            debugger;
-            if(!(result.Code == 1001 
-                && (window.location.href.indexOf("#/login") > -1 
-                        || window.location.hash == '#/' 
-                        || window.location.hash == ''))){
-                DiyCommon.Tips(result.Msg || result.Message, false);
-            }
+            setTimeout(function () {
+                if(!(result.Code == 1001 
+                    && (window.location.href.indexOf("#/login") > -1 
+                            || window.location.hash == '#/' 
+                            || window.location.hash == ''))){
+                    DiyCommon.Tips(result.Msg || result.Message, false);
+                }
+            }, 500);
+            
             // if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
             //     var msg = (DiyCommon.IsNull(result.Message) ? "" : result.Message) + (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
             //     DiyCommon.Tips(msg, false);
