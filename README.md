@@ -1,4 +1,4 @@
-# 开源低代码平台-Microi吾码
+# 开源 AI 低代码平台-Microi吾码
 
 ## 平台简介
 >* 官方文档：[https://microi.net](https://microi.net)
