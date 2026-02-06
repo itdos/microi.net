@@ -9,7 +9,7 @@
         :clearable="TableInEdit ? false : true"
         :disabled="GetFieldReadOnly(field)"
         :placeholder="GetFieldPlaceholder(field)"
-        :value-key="field.Config.SelectLabel"
+        :value-key="field.Config.DataSource === 'KeyValue' ? 'Value' : (field.Config.SelectLabel || 'value')"
         @focus="SelectField(field)"
         @change="
             (item) => {
@@ -62,7 +62,7 @@
                 v-model:keyValueList="configKeyValueList"
                 :showSaveFormat="false"
                 :showEnableSearch="false"
-                :showKeyValue="false"
+                :showKeyValue="true"
             />
         </el-form>
         <template #footer>
@@ -154,7 +154,17 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = newVal;
+                // KeyValue 模式：将 Key 转换为 Value 显示
+                if (self.field.Config.DataSource === 'KeyValue' && newVal && self.field.Data) {
+                    var matchedItem = self.field.Data.find(item => item.Key === newVal);
+                    if (matchedItem) {
+                        self.ModelValue = matchedItem.Value || '';
+                    } else {
+                        self.ModelValue = newVal;
+                    }
+                } else {
+                    self.ModelValue = newVal;
+                }
             }
         },
         ModelProps: function (newVal, oldVal) {
@@ -176,8 +186,21 @@ export default {
     methods: {
         Init() {
             var self = this;
-            self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            var fieldValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            
+            // KeyValue 模式：将保存的 Key 值转换为 Value 用于显示
+            if (self.field.Config.DataSource === 'KeyValue' && fieldValue && self.field.Data) {
+                var matchedItem = self.field.Data.find(item => item.Key === fieldValue);
+                if (matchedItem) {
+                    self.ModelValue = matchedItem.Value || '';
+                } else {
+                    self.ModelValue = fieldValue; // 回退：找不到就显示原值
+                }
+                self.LastModelValue = fieldValue; // 保存原始 Key 值用于比较
+            } else {
+                self.ModelValue = fieldValue;
+                self.LastModelValue = fieldValue;
+            }
         },
         GetFieldValue(field, form) {
             var self = this;
@@ -194,6 +217,22 @@ export default {
         },
         querySearchAsync(queryString, cb, field) {
             var self = this;
+            // KeyValue 和普通数据模式：使用本地数据过滤，不请求远程
+            if (field.Config.DataSource === 'KeyValue' || field.Config.DataSource === 'Data') {
+                var restaurants = field.Data || [];
+                var labelField = field.Config.SelectLabel || 'value';
+                var results = queryString ? restaurants.filter((state) => {
+                    var labelValue = '';
+                    if (field.Config.DataSource === 'KeyValue') {
+                        labelValue = state.Value || '';
+                    } else {
+                        labelValue = state[labelField] || '';
+                    }
+                    return String(labelValue).toLowerCase().indexOf(queryString.toLowerCase()) === 0;
+                }) : restaurants;
+                cb(results);
+                return;
+            }
             //判断是否从远程数据搜索
             if (field.Config.DataSourceSqlRemote === true) {
                 field.Config.DataSourceSqlRemoteLoading = true;
@@ -257,8 +296,22 @@ export default {
         },
         handleSelect(item, field) {
             var self = this;
+            
+            // KeyValue 模式：保存 Key 值到数据库，但显示 Value
+            if (field.Config.DataSource === 'KeyValue' && item && item.Key !== undefined) {
+                // 保存 Key 到表单模型
+                self.FormDiyTableModel[field.Name] = item.Key;
+                self.LastModelValue = item.Key;
+                // 显示 Value
+                self.ModelValue = item.Value || '';
+                // 触发更新事件（使用 Key 值）
+                self.$emit("ModelChange", item.Key);
+                self.$emit("update:modelValue", item.Key);
+            }
+            
             //执行V8
-            if (field.Component == "Autocomplete" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.Component == "Autocomplete" 
+                && (field.V8Code || field.Config.V8Code)) {
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
                 //如果是表内编辑，失去因为已经失去焦点了，点击后才会执行下面这段
                 if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
@@ -337,7 +390,7 @@ export default {
         },
         CommonV8CodeChange(item, field) {
             var self = this;
-            if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.V8Code || field.Config.V8Code) {
                 // self.RunV8Code(field, item)
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: self.ModelValue }); //item
             }
@@ -404,12 +457,24 @@ export default {
             // 初始化普通数据列表
             if (self.field.Data && Array.isArray(self.field.Data)) {
                 if (self.configForm.DataSource === 'Data') {
-                    // 对于自动完成，普通数据需要转换为对象格式
+                    // 对于自动完成，普通数据是对象格式，提取显示字段的值用于编辑
+                    var labelField = self.configForm.SelectLabel || 'value';
                     self.configDataList = self.field.Data.map(item => {
                         if (typeof item === 'object' && item !== null) {
-                            return item[self.configForm.SelectLabel] || '';
+                            return item[labelField] || '';
                         }
                         return String(item);
+                    });
+                } else if (self.configForm.DataSource === 'KeyValue') {
+                    // KeyValue 模式：从对象数组中提取 Key-Value 对
+                    self.configKeyValueList = self.field.Data.map(item => {
+                        if (typeof item === 'object' && item !== null) {
+                            return {
+                                Key: item.Key || '',
+                                Value: item.Value || ''
+                            };
+                        }
+                        return { Key: '', Value: '' };
                     });
                 } else {
                     self.configDataList = [];
@@ -438,6 +503,12 @@ export default {
                     obj[labelField] = item;
                     return obj;
                 });
+            } else if (self.configForm.DataSource === 'KeyValue') {
+                // KeyValue 模式：保存为对象数组，包含 Key 和 Value
+                self.field.Data = self.configKeyValueList.filter(item => item.Key || item.Value);
+            } else {
+                // 其他数据源（SQL、DataSource、ApiEngine）不修改 field.Data
+                // field.Data 会在运行时动态加载
             }
             
             self.configDialogVisible = false;

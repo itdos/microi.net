@@ -355,9 +355,16 @@ try {
         }
         
         var exists = existsById || existsByName;
-        table.OsClient = V8.OsClient;
+        var modelCopy = {
+            _FormData : {}
+        };
+        for (var key in table) {
+            modelCopy._FormData[key] = table[key];
+        }
+        modelCopy.OsClient = V8.OsClient;
+        modelCopy.Id = table.Id;
         if (exists) {
-            var uptResult = V8.FormEngine.UptFormData('diy_table', table);
+            var uptResult = V8.FormEngine.UptFormData('diy_table', modelCopy);
             if (uptResult.Code == 1) {
                 stats.TableUpdated++;
             } else {
@@ -365,7 +372,7 @@ try {
             }
         } else {
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('diy_table', table);
+            var addResult = V8.FormEngine.AddFormData('diy_table', modelCopy);
             if (addResult.Code == 1) {
                 stats.TableInserted++;
             } else {
@@ -462,9 +469,11 @@ try {
             }
             
             // 创建副本，避免污染原始数据（步骤2.5需要用到TableId）
-            var fieldCopy = {};
+            var fieldCopy = {
+                _FormData : {}
+            };
             for (var key in field) {
-                fieldCopy[key] = field[key];
+                fieldCopy._FormData[key] = field[key];
             }
             fieldCopy._Where = [
                 ['TableId', '=', field.TableId],
@@ -479,9 +488,16 @@ try {
                 debugLog['field_upt_error_' + field.Id] = uptResult.Msg;
             }
         } else {
-            field.OsClient = V8.OsClient;
+            var fieldCopy = {
+                _FormData : {}
+            };
+            for (var key in field) {
+                fieldCopy._FormData[key] = field[key];
+            }
+            fieldCopy.OsClient = V8.OsClient;
+            fieldCopy.Id = field.Id;
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('diy_field', field);
+            var addResult = V8.FormEngine.AddFormData('diy_field', fieldCopy);
             if (addResult.Code == 1) {
                 stats.FieldInserted++;
             } else {
@@ -817,10 +833,17 @@ try {
                 menu.ParentId = '00000000000000000000000000';
             }
         }
-        menu.OsClient = V8.OsClient;
+        var modelCopy = {
+            _FormData : {}
+        };
+        for (var key in menu) {
+            modelCopy._FormData[key] = menu[key];
+        }
+        modelCopy.OsClient = V8.OsClient;
+        modelCopy.Id = menu.Id;
         if (exists) {
             // 存在则修改
-            var uptResult = V8.FormEngine.UptFormData('sys_menu', menu);
+            var uptResult = V8.FormEngine.UptFormData('sys_menu', modelCopy);
             if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
             } else {
@@ -828,7 +851,7 @@ try {
             }
         } else {
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('sys_menu', menu);
+            var addResult = V8.FormEngine.AddFormData('sys_menu', modelCopy);
             if (addResult.Code == 1) {
                 stats.MenuInserted++;
             } else {
@@ -862,9 +885,16 @@ try {
             }
 
             var exists = checkExists('wf_flowdesign', flow.Id);
-            flow.OsClient = V8.OsClient;
+            var modelCopy = {
+                _FormData : {}
+            };
+            for (var key in flow) {
+                modelCopy._FormData[key] = flow[key];
+            }
+            modelCopy.OsClient = V8.OsClient;
+            modelCopy.Id = flow.Id;
             if (exists) {
-                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flow);
+                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.FlowUpdated++;
                 } else {
@@ -872,7 +902,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', flow);
+                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', modelCopy);
                 if (addResult.Code == 1) {
                     stats.FlowInserted++;
                 } else {
@@ -900,9 +930,16 @@ try {
             }
 
             var exists = checkExists('wf_node', node.Id);
-            node.OsClient = V8.OsClient;
+            var modelCopy = {
+                _FormData : {}
+            };
+            for (var key in node) {
+                modelCopy._FormData[key] = node[key];
+            }
+            modelCopy.OsClient = V8.OsClient;
+            modelCopy.Id = node.Id;
             if (exists) {
-                var uptResult = V8.FormEngine.UptFormData('wf_node', node);
+                var uptResult = V8.FormEngine.UptFormData('wf_node', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.NodeUpdated++;
                 } else {
@@ -910,7 +947,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_node', node);
+                var addResult = V8.FormEngine.AddFormData('wf_node', modelCopy);
                 if (addResult.Code == 1) {
                     stats.NodeInserted++;
                 } else {
@@ -938,10 +975,17 @@ try {
             }
 
             var exists = checkExists('wf_line', line.Id);
-            line.OsClient = V8.OsClient;
+            var modelCopy = {
+                _FormData : {}
+            };
+            for (var key in line) {
+                modelCopy._FormData[key] = line[key];
+            }
+            modelCopy.OsClient = V8.OsClient;
+            modelCopy.Id = line.Id;
             if (exists) {
                 // 存在则修改
-                var uptResult = V8.FormEngine.UptFormData('wf_line', line);
+                var uptResult = V8.FormEngine.UptFormData('wf_line', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.LineUpdated++;
                 } else {
@@ -949,7 +993,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_line', line);
+                var addResult = V8.FormEngine.AddFormData('wf_line', modelCopy);
                 if (addResult.Code == 1) {
                     stats.LineInserted++;
                 } else {
@@ -1012,9 +1056,16 @@ try {
             }
             
             var exists = existsById || existsByKey;
-            apiEngine.OsClient = V8.OsClient;
+            var modelCopy = {
+                _FormData : {}
+            };
+            for (var key in apiEngine) {
+                modelCopy._FormData[key] = apiEngine[key];
+            }
+            modelCopy.OsClient = V8.OsClient;
+            modelCopy.Id = apiEngine.Id;
             if (exists) {
-                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngine);
+                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
                 } else {
@@ -1022,7 +1073,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('sys_apiengine', apiEngine);
+                var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
                 } else {

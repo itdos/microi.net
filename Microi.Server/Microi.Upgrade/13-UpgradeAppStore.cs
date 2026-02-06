@@ -14,7 +14,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "4.7.3.0";
+        public static string Version = "4.7.4.0";
         
         /// <summary>
         /// 从嵌入资源读取文件内容
@@ -42,6 +42,8 @@ namespace Microi.net
         public async Task<List<string>> Run(string osClient)
         {
             var msgs = new List<string>();
+            
+            #region 导入数据包V8
             //更新应用商城的导入数据包接口引擎
             var importMicroiStorePackageResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
             {
@@ -54,7 +56,6 @@ namespace Microi.net
                     }
                 },
             });
-            #region 导入数据包V8
             var importV8 = ReadEmbeddedResource("import-package.js");
             if (importMicroiStorePackageResult.Code != 1)
             {
@@ -112,22 +113,34 @@ namespace Microi.net
             #endregion
 
             #region 应用商城 数据包
-            var dataPackage = ReadEmbeddedResource("app.microi.store.json");
+            var appStorePackage = ReadEmbeddedResource("app.microi.store.json");
             //导入数据包
             var installAppStoreResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
                 OsClient = osClient,
-                Package = dataPackage
+                Package = appStorePackage
             });
             if(installAppStoreResult.Code != 1)
             {
                 msgs.Add(installAppStoreResult.Msg);
             }
             #endregion
-            
-            
 
-            //修正sys_menu的DiyTableId关联值
+            #region 表单引擎 数据包
+            var formEnginePackage = ReadEmbeddedResource("app.microi.form-engine.json");
+            //导入数据包
+            var installFormEngineResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
+            {
+                OsClient = osClient,
+                Package = formEnginePackage
+            });
+            if(installFormEngineResult.Code != 1)
+            {
+                msgs.Add(installFormEngineResult.Msg);
+            }
+            #endregion
+
+            #region 修正sys_menu的DiyTableId关联值
             var getStoreTableResult = await MicroiEngine.FormEngine.GetFormDataAsync("diy_table", new {
                 OsClient = osClient,
                 _Where = new List<object>()
@@ -161,10 +174,17 @@ namespace Microi.net
                     }
                 }
             }
+            #endregion
 
             //更新缓存
             MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table:6cf254f1-edd0-4f04-96bc-c9ad08b5a2c");
             MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:6cf254f1-edd0-4f04-96bc-c9ad08b5a2c");
+
+            MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table:39bc4abe-98ee-46a7-b9d1-a7d649691193");
+            MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:39bc4abe-98ee-46a7-b9d1-a7d649691193");
+
+            MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table:diy_table");
+            MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table:diy_field");
             MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table:sys_microistore");
             MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:sys_microistore");
             

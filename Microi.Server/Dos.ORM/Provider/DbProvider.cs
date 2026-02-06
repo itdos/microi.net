@@ -23,6 +23,7 @@ using System.Data.Common;
 using System.Text.RegularExpressions;
 using Dos.ORM;
 using Dos.ORM.Common;
+using Dos.Common;
 
 namespace Dos.ORM
 {
@@ -227,6 +228,10 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual string BuildParameterName(string name)
         {
+            if (name.DosIsNullOrWhiteSpace())
+            {
+                return name;
+            }
             string nameStr = name.Trim(leftToken, rightToken);
             if (nameStr[0] != paramPrefixToken)
             {

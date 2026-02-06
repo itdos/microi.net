@@ -829,7 +829,7 @@ namespace Microi.net
                         //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
                         //修改为不触发后端V8事件
                         param["_InvokeType"] = InvokeType.Server.ToString();
-                        addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
+                        addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
                         if (addResult.Code != 1)
                         {
                             if (_trans == null)

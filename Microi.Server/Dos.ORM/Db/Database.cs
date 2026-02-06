@@ -21,6 +21,7 @@ using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using Dos;
+using Dos.Common;
 using Dos.ORM;
 
 namespace Dos.ORM
@@ -249,8 +250,10 @@ namespace Dos.ORM
         private DbParameter CreateParameter(string name)
         {
             DbParameter param = dbProvider.DbProviderFactory.CreateParameter();
-            param.ParameterName = dbProvider.BuildParameterName(name);
-
+            if (!name.DosIsNullOrWhiteSpace())
+            {
+                param.ParameterName = dbProvider.BuildParameterName(name);
+            }
             return param;
         }
 
@@ -1096,10 +1099,12 @@ namespace Dos.ORM
                 return;
             foreach (DbParameter p in parameters)
             {
-                p.ParameterName = dbProvider.BuildParameterName(p.ParameterName);
-                command.Parameters.Add(p);
+                if (!p.ParameterName.DosIsNullOrWhiteSpace())
+                {
+                    p.ParameterName = dbProvider.BuildParameterName(p.ParameterName);
+                    command.Parameters.Add(p);
+                }
             }
-
         }
 
 
@@ -1116,16 +1121,18 @@ namespace Dos.ORM
             //var i = 0;
             foreach (Parameter p in parameters)
             {
-                DbParameter dbParameter = CreateParameter(p.ParameterName);// + i
-                dbParameter.Value = p.ParameterValue;
-                if (p.ParameterDbType.HasValue)
-                    dbParameter.DbType = p.ParameterDbType.Value;
-                if (p.ParameterSize.HasValue)
-                    dbParameter.Size = p.ParameterSize.Value;
-                command.Parameters.Add(dbParameter);
-                //i++;
+                if (!p.ParameterName.DosIsNullOrWhiteSpace())
+                {
+                    DbParameter dbParameter = CreateParameter(p.ParameterName);// + i
+                    dbParameter.Value = p.ParameterValue;
+                    if (p.ParameterDbType.HasValue)
+                        dbParameter.DbType = p.ParameterDbType.Value;
+                    if (p.ParameterSize.HasValue)
+                        dbParameter.Size = p.ParameterSize.Value;
+                    command.Parameters.Add(dbParameter);
+                    //i++;
+                }
             }
-
             return command;
         }
 

@@ -151,7 +151,7 @@ export default {
             }
             
             self.ModelChangeMethods(item);
-            if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if ((field.V8Code || (field.Config && field.Config.V8Code))) {
                 // self.RunV8Code(field, item)
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
             }

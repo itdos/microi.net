@@ -3378,7 +3378,8 @@ export default {
             var self = this;
             var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
-                if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+                if (field 
+                    && (field.V8Code || field.Config.V8Code)) {
                     var form = { ...row };
                     // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
                     V8.Form = form; // 当前Form表单所有字段值
@@ -3393,7 +3394,7 @@ export default {
                     self.SetV8DefaultValue(V8, field);
                     
                     // eval(btn.V8Code)
-                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
+                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + (field.V8Code || field.Config.V8Code) + " \n})()");
                     if (V8Result !== undefined) {
                         callback && callback(V8.Result || V8Result);
                         return V8Result;

@@ -367,7 +367,7 @@ export default {
         },
         CommonV8CodeChange(item, field) {
             var self = this;
-            if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if ((field.V8Code || (field.Config && field.Config.V8Code))) {
                 self.RunV8Code({ field: field, thisValue: item });
             }
         },
@@ -407,7 +407,7 @@ export default {
             let self = this;
             return new Promise((resolve, reject) => {
                 // 判断需要执行的V8
-                if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+                if ((field.Component == "Select" || field.Component == "MultipleSelect") && (field.V8Code || (field.Config && field.Config.V8Code))) {
                     self.$emit("CallbackRunV8Code", {
                         field: field,
                         thisValue: value,

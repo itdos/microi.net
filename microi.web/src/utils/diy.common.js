@@ -3926,25 +3926,31 @@ var DiyCommon = {
     Base64DecodeDiyTable(diyTableModel) {
         var self = this;
         if (Base64 && Base64.isValid) {
-            if (diyTableModel.InFormV8 && Base64.isValid(diyTableModel.InFormV8)) {
+            // 辅助函数：安全解码，如果结果包含乱码则返回原值
+            const safeDecode = (value) => {
                 try {
-                    diyTableModel.InFormV8 = Base64.decode(diyTableModel.InFormV8);
-                } catch (error) {}
+                    const decoded = Base64.decode(value);
+                    // 检查解码结果是否包含乱码字符（U+FFFD）
+                    if (decoded.includes('�')) {
+                        return value; // 返回原值
+                    }
+                    return decoded;
+                } catch (error) {
+                    return value; // 解码失败，返回原值
+                }
+            };
+
+            if (diyTableModel.InFormV8 && Base64.isValid(diyTableModel.InFormV8)) {
+                diyTableModel.InFormV8 = safeDecode(diyTableModel.InFormV8);
             }
             if (diyTableModel.SubmitFormV8 && Base64.isValid(diyTableModel.SubmitFormV8)) {
-                try {
-                    diyTableModel.SubmitFormV8 = Base64.decode(diyTableModel.SubmitFormV8);
-                } catch (error) {}
+                diyTableModel.SubmitFormV8 = safeDecode(diyTableModel.SubmitFormV8);
             }
             if (diyTableModel.OutFormV8 && Base64.isValid(diyTableModel.OutFormV8)) {
-                try {
-                    diyTableModel.OutFormV8 = Base64.decode(diyTableModel.OutFormV8);
-                } catch (error) {}
+                diyTableModel.OutFormV8 = safeDecode(diyTableModel.OutFormV8);
             }
             if (diyTableModel.ServerDataV8 && Base64.isValid(diyTableModel.ServerDataV8)) {
-                try {
-                    diyTableModel.ServerDataV8 = Base64.decode(diyTableModel.ServerDataV8);
-                } catch (error) {}
+                diyTableModel.ServerDataV8 = safeDecode(diyTableModel.ServerDataV8);
             }
         }
     },
@@ -4288,6 +4294,11 @@ var DiyCommon = {
             ];
         } else {
             var tabs = JSON.parse(data.Tabs);
+            //2026-02-05 Anderspn：修复老的错误数据
+            if(typeof tabs == "string"){
+                debugger;
+                tabs = JSON.parse(tabs);
+            }
             //默认让tabs显示
             tabs.forEach((tab) => {
                 tab.Display = true;
