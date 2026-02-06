@@ -51,6 +51,7 @@
     <EmbeddedResource Include="Resource\import-package.js" />
     <EmbeddedResource Include="Resource\app.microi.store.json" />
     <EmbeddedResource Include="Resource\app.microi.module-engine.json" />
+    <EmbeddedResource Include="Resource\app.microi.form-engine.json" />
   </ItemGroup>
 
 </Project>
