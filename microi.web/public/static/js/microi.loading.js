@@ -2,6 +2,84 @@ var loadingRate = 0;
 var firstLoginCover = true;
 var isNeedLogin = false;
 var rateEl = document.getElementById('microi_loading_progress');
+var speedEl = document.getElementById('microi_loading_speed');
+var sizeEl = document.getElementById('microi_loading_size');
+
+// 资源加载监控
+var resourceMonitor = {
+    totalSize: 0,
+    loadedSize: 0,
+    maxLoadedSize: 0, // 记录最大已加载大小，防止回退
+    startTime: Date.now(),
+    speeds: [], // 最近5次速度记录，用于平滑显示
+    
+    formatSize: function(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+    },
+    
+    formatSpeed: function(bytesPerSec) {
+        if (bytesPerSec === 0) return '0 B/s';
+        var k = 1024;
+        var speeds = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+        var i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+        return (bytesPerSec / Math.pow(k, i)).toFixed(2) + ' ' + speeds[i];
+    },
+    
+    update: function(loaded, total) {
+        // 使用最大值，防止已加载大小回退
+        this.maxLoadedSize = Math.max(this.maxLoadedSize, loaded);
+        this.loadedSize = this.maxLoadedSize;
+        this.totalSize = Math.max(total, this.maxLoadedSize);
+        
+        var elapsed = (Date.now() - this.startTime) / 1000; // 秒
+        var currentSpeed = elapsed > 0 ? this.loadedSize / elapsed : 0;
+        
+        // 平滑速度显示（取最近5次平均值）
+        this.speeds.push(currentSpeed);
+        if (this.speeds.length > 5) this.speeds.shift();
+        var avgSpeed = this.speeds.reduce(function(a, b) { return a + b; }, 0) / this.speeds.length;
+        
+        // 更新显示
+        if (speedEl) {
+            speedEl.innerHTML = '速度: ' + this.formatSpeed(avgSpeed);
+        }
+        if (sizeEl) {
+            sizeEl.innerHTML = this.formatSize(this.loadedSize) + ' / ' + this.formatSize(this.totalSize);
+        }
+    }
+};
+
+// 监听所有资源加载
+if (window.performance && window.PerformanceObserver) {
+    var observer = new PerformanceObserver(function(list) {
+        var entries = list.getEntries();
+        
+        // 获取所有已完成的资源
+        var allResources = window.performance.getEntriesByType('resource');
+        var totalLoaded = 0;
+        
+        allResources.forEach(function(entry) {
+            if (entry.transferSize && entry.responseEnd > 0) {
+                totalLoaded += entry.transferSize;
+            }
+        });
+        
+        // 估算总大小（实际构建后约9MB）
+        var estimatedTotal = Math.max(totalLoaded, 9 * 1024 * 1024);
+        resourceMonitor.update(totalLoaded, estimatedTotal);
+    });
+    
+    try {
+        observer.observe({ entryTypes: ['resource'] });
+    } catch (e) {
+        console.log('PerformanceObserver not supported');
+    }
+}
+
 function LoadRate(step, t) {
     //default 20%、、main.js 80%、wait 0%
     if (loadingRate < 100) {

@@ -1296,7 +1296,9 @@ var DiyCommon = {
 
                 DiyCommon.OpenLogin();
             }
-            DiyCommon.Tips(result.Msg || result.Message, false);
+            if(!(result.Code == 1001 && window.location.href.indexOf("/login") > -1)){
+                DiyCommon.Tips(result.Msg || result.Message, false);
+            }
             // if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
             //     var msg = (DiyCommon.IsNull(result.Message) ? "" : result.Message) + (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
             //     DiyCommon.Tips(msg, false);
