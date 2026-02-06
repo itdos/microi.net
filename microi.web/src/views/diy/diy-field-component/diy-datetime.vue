@@ -198,7 +198,7 @@ export default {
         NumberTextChange(currentValue, oldValue, field) {
             var self = this;
             self.ModelChangeMethods(currentValue);
-            if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.Component == "NumberText" && (field.V8Code || field.Config.V8Code)) {
                 // self.RunV8Code(field, {
                 //     New: currentValue,
                 //     Old: oldValue
@@ -269,7 +269,7 @@ export default {
         CommonV8CodeChange(item, field) {
             var self = this;
             self.ModelChangeMethods(item);
-            if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+            if (field.V8Code || field.Config.V8Code) {
                 // self.RunV8Code(field, item)
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
             }

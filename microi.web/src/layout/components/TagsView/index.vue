@@ -54,7 +54,7 @@
 
         .el-tabs__item {
             position: relative;
-            padding: 6px 0px;
+            padding: 6px 5px;
             // border: 1px solid #e4e7ed;
             border-bottom: none;
             border-radius: 4px 4px 0 0;

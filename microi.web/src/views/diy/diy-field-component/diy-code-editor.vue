@@ -130,7 +130,9 @@ defineOptions({
 const emits = defineEmits(['update:modelValue', 'ModelChange', 'CallbackFormValueChange']);
 const props = defineProps({
     modelValue: {
-        type: String,
+        // 修复：允许接收多种类型，在组件内部转换为字符串
+        type: [String, Object, Number, Array],
+        default: ''
     },
     ModelProps: {},
     ReadonlyFields: {
@@ -167,25 +169,73 @@ const stopFieldWatch = watch(() => props.field, () => {
 
 // 监听modelValue变化，同步到编辑器
 const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
-    if (!monacoEditor) return;
+    // 处理对象类型
+    let nextValue = newValue;
+    if (typeof newValue === 'object' && newValue !== null) {
+        try {
+            nextValue = JSON.stringify(newValue, null, 2);
+        } catch (e) {
+            console.error('[CodeEditor] Failed to stringify object in watch:', e);
+            nextValue = '';
+        }
+    } else {
+        // 修复：正确处理空值，null/undefined 转为空字符串，其他转为字符串
+        nextValue = (newValue === null || newValue === undefined) ? '' : String(newValue);
+    }
 
-    const nextValue = newValue || '';
-    if (nextValue === monacoEditor.getValue()) return;
+    console.log('[CodeEditor] watch modelValue:', {
+        newValue,
+        nextValue,
+        currentEditorValue: monacoEditor ? monacoEditor.getValue() : 'editor not created',
+        isSelfUpdating,
+        hasFocus: monacoEditor && monacoEditor.hasTextFocus ? monacoEditor.hasTextFocus() : false
+    });
 
-    // 如果是编辑器自身触发的更新，跳过回写，避免光标跳动
-    if (isSelfUpdating) {
+    // 先更新内部状态
+    ModelValue.value = nextValue;
+
+    // 如果编辑器还没创建，只更新内部状态即可
+    if (!monacoEditor) {
+        console.log('[CodeEditor] editor not created yet, skip setValue');
+        return;
+    }
+
+    const currentEditorValue = monacoEditor.getValue();
+    
+    if (nextValue === currentEditorValue) {
+        console.log('[CodeEditor] value not changed, skip setValue');
+        // 🔥 值相同时重置标志
         isSelfUpdating = false;
         return;
     }
 
-    // 编辑器聚焦时不强制覆盖内容，避免输入中断
-    if (monacoEditor.hasTextFocus && monacoEditor.hasTextFocus()) {
+    // 🔥 关键修复：只有当新值等于编辑器当前值时，才是真正的自身更新
+    // 如果新值和编辑器当前值不同，即使 isSelfUpdating 为 true，也应该是外部更新
+    const wasSelfUpdating = isSelfUpdating;
+    isSelfUpdating = false; // 总是重置标志
+    
+    // 真正的自身更新判断：标志为true 且 新值等于当前值（这种情况在上面已经return了）
+    // 如果走到这里，说明新值和当前值不同，即使 wasSelfUpdating 为 true，也是外部更新
+    if (wasSelfUpdating && nextValue === currentEditorValue) {
+        console.log('[CodeEditor] self updating, skip setValue');
         return;
     }
 
-    ModelValue.value = nextValue;
+    // 修复：当要设置为空值时，无论编辑器是否有焦点都应该清空
+    // 只有在设置非空值且编辑器有焦点时才阻止更新
+    const shouldPreventUpdate = monacoEditor.hasTextFocus 
+        && monacoEditor.hasTextFocus() 
+        && nextValue !== '' 
+        && currentEditorValue !== '';
+    
+    if (shouldPreventUpdate) {
+        console.log('[CodeEditor] editor has focus and content, skip setValue to prevent interruption');
+        return;
+    }
+
+    console.log('[CodeEditor] updating editor value');
     applyLargeFileOptions(nextValue);
-    monacoEditor.setValue(ModelValue.value);
+    monacoEditor.setValue(nextValue);
 });
 
 // 配置 Monaco Editor 环境
@@ -243,7 +293,24 @@ onBeforeUnmount(() => {
 
 const EditorHeight = ref(props.height || '500px');
 const EditorHeightNum = ref(parseInt(props.height) || 500); // 数值形式的高度，用于拉伸计算
-const ModelValue = ref(props.modelValue || props.ModelProps || '');
+
+// 修复：确保 ModelValue 始终是字符串类型
+const getInitialValue = () => {
+    const value = props.modelValue || props.ModelProps || '';
+    // 如果是对象，尝试转换为 JSON 字符串
+    if (typeof value === 'object' && value !== null) {
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (e) {
+            console.error('[CodeEditor] Failed to stringify object:', e);
+            return '';
+        }
+    }
+    // 确保返回字符串
+    return String(value || '');
+};
+
+const ModelValue = ref(getInitialValue());
 let isSelfUpdating = false;
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
@@ -387,7 +454,8 @@ const openV8Docs = () => {
 const Init = () => {
     EditorHeight.value = props.height || '500px';
     EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
-    EditorOption.value = ModelValue.value;
+    // 修复：EditorOption 是 reactive对象，不需要 .value
+    // EditorOption.value = ModelValue.value;  // 这行是错误的
     EditorOption.readOnly = GetFieldReadOnly(props.field);
     // 从配置中读取语言设置
     if (props.field?.Config?.CodeEditor?.Language) {
@@ -472,6 +540,9 @@ const Init = () => {
     }
 
     if (!monacoEditor) {
+        // 设置初始值到 EditorOption
+        EditorOption.value = ModelValue.value;
+        
         monacoEditor = monaco.editor.create(
             document.getElementById('monaco-editor-' + (props.field && props.field.Id) + '-' + RandomValue.value),
             EditorOption
@@ -567,7 +638,8 @@ const UpdateInit = () => {
             ? props.field.Config.CodeEditor.Height + 'px'
             : '500px');
     EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
-    EditorOption.value = ModelValue.value;
+    // 修复：EditorOption 是 reactive对象，不需要 .value
+    // EditorOption.value = ModelValue.value;  // 这行是错误的
     EditorOption.readOnly = GetFieldReadOnly(props.field);
     // 从配置中读取语言设置
     if (props.field?.Config?.CodeEditor?.Language) {
@@ -748,7 +820,7 @@ defineExpose({
 
     .monaco-toolbar {
         display: flex;
-        height: 40px;
+        height: auto;
         justify-content: space-between;
         align-items: center;
         padding: 8px 10px;
