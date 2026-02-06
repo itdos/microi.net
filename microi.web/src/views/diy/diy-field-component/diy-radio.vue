@@ -172,6 +172,18 @@ export default {
         self.ModelValue = self.FormDiyTableModel[self.field.Name];
         self.LastModelValue = self.FormDiyTableModel[self.field.Name];
         self.$nextTick(function () {
+            // 🔥 修复：SQL数据源首次加载
+            // 单选框需要在挂载时立即加载数据源，而不是等待点击
+            // 如果是SQL/DataSource/ApiEngine数据源，且非远程搜索模式，需要主动加载数据
+            if (self.field && self.field.Config && 
+                (self.field.Config.DataSource === "Sql" || 
+                 self.field.Config.DataSource === "DataSource" || 
+                 self.field.Config.DataSource === "ApiEngine") &&
+                !self.field.Config.DataSourceSqlRemote) {
+                // 调用数据加载方法
+                self.LoadSqlDataSource();
+            }
+            
             self.Initing = false;
         });
     },
@@ -374,6 +386,55 @@ export default {
                     }
                 );
             }
+        },
+        /**
+         * 🔥 新增：加载SQL数据源（单选框需要在挂载时主动加载）
+         * 解决打开表单时单选框没有选项显示的问题
+         */
+        LoadSqlDataSource() {
+            var self = this;
+            var field = self.field;
+            
+            // 如果不是需要加载的数据源类型，直接返回
+            if (!field || !field.Config) return;
+            if (field.Config.DataSource !== "Sql" && 
+                field.Config.DataSource !== "DataSource" && 
+                field.Config.DataSource !== "ApiEngine") {
+                return;
+            }
+            
+            // 如果是远程搜索模式，不在这里加载（由用户交互触发）
+            if (field.Config.DataSourceSqlRemote) return;
+            
+            // 确定API地址和参数
+            var apiUrl = self.DiyApi.GetDiyFieldSqlData;
+            var param = {
+                _FieldId: field.Id,
+                _FormData: self.FormDiyTableModel || {}
+            };
+            
+            if (field.Config.DataSource === "DataSource") {
+                apiUrl = self.DiyApi.GetDataSourceEngine;
+                param.DataSourceKey = field.Config.DataSourceId;
+            } else if (field.Config.DataSource === "ApiEngine") {
+                apiUrl = self.DiyApi.ApiEngineRun;
+                param.ApiEngineKey = field.Config.DataSourceApiEngineKey;
+            }
+            
+            // 检查API替换配置
+            if (self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData && field.Config.DataSource === "Sql") {
+                apiUrl = self.ApiReplace.GetDiyFieldSqlData;
+            }
+            
+            // 发起请求加载数据
+            self.DiyCommon.Post(apiUrl, param, function(result) {
+                if (self.DiyCommon.Result(result)) {
+                    if (self.DiyCommon.IsNull(result.Data)) {
+                        result.Data = [];
+                    }
+                    field.Data = result.Data;
+                }
+            });
         },
         // ==================== 配置弹窗相关方法 ====================
         openConfig() {
