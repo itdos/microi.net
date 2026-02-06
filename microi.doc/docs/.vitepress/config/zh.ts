@@ -5,14 +5,14 @@ export const zh = defineConfig({
 	base: "/",
 	title: "Microi吾码",
 	lang: "zh-CN",
-	description: "Microi吾码官方文档，开源 AI 低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
+	description: "Microi吾码官方文档，开源低代码平台，开源 AI 低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		[
 			"meta",
 			{
 				name: "keywords",
-				content: "Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common",
+				content: "Microi吾码,低代码,开源低代码平台,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
 			},
 		],
 		["link", { rel: "icon", href: "/icon.png" }],
@@ -56,25 +56,8 @@ export const zh = defineConfig({
 		},
 		nav: nav(),
 		sidebar: {
-			// "/guide/introduce/": set_sidebar("/zh/guide/introduce", false),
-			// "/guide/web/": set_sidebar("/zh/guide/web", false),
-			// "/guide/api/": set_sidebar("/zh/guide/api", false),
-			// "/guide/build/": set_sidebar("/zh/guide/build", false),
-			// "/guide/issues/": set_sidebar("/zh/guide/issues", false),
-			// "/doc/": set_sidebar("/zh/doc/", false),
-			// "/case/": set_sidebar("/zh/case", false),
-			// "/apiengine/": set_sidebar("/zh/apiengine", false),
-			// "/faq/": set_sidebar("/zh/faq", false),
-			// 用来兼容旧版
-			// "/guide/introduce/": set_sidebar("/guide/introduce", false),
-			// "/guide/web/": set_sidebar("/guide/web", false),
-			// "/guide/api/": set_sidebar("/guide/api", false),
-			// "/guide/build/": set_sidebar("/guide/build", false),
-			// "/guide/issues/": set_sidebar("/guide/issues", false),
 			"/doc/": set_sidebar("/doc", false),
 			"/case/": set_sidebar("/case", false),
-			"/apiengine/": set_sidebar("/apiengine", false),
-			// "/faq/": set_sidebar("/faq", false),
 		},
 	},
 	vite: {
@@ -86,44 +69,7 @@ function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "首页", link: "/" },
 		{ text: "文档 🪧", link: "/doc/index" },
-		{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
 		{ text: "成功案例", link: "/case/case-index" },
-		// { text: "FAQ", link: "/faq/faq-index" },
-		// {
-		// 	text: "更多", //📋
-		// 	items: [
-		// 		{
-		// 			text: "🪧 指引",
-		// 			link: "/guide/introduce/introduce/introduce",
-		// 			activeMatch: "/guide/introduce/",
-		// 		}, //
-		// 		{
-		// 			text: "📖 前端文档",
-		// 			link: "/guide/web/start_web/intro_web",
-		// 			activeMatch: "/guide/web/",
-		// 		},
-		// 		{
-		// 			text: "📘 后端文档",
-		// 			link: "/guide/api/start_api/intro_api",
-		// 			activeMatch: "/guide/api/",
-		// 		},
-		// 		// {
-		// 		// 	text: "🛠️ 构建部署",
-		// 		// 	link: "/guide/build/cloud/quick_build",
-		// 		// 	activeMatch: "/guide/build/",
-		// 		// },
-		// 		{
-		// 			text: "📝 吾码课堂",
-		// 			link: "/guide/issues/issues_project/issues_project_records",
-		// 			activeMatch: "/guide/issues/",
-		// 		},
-		// 		// {
-		// 		// 	text: "📤 更新升级",
-		// 		// 	link: "/guide/logs/logs_version/logs_version",
-		// 		// 	activeMatch: "/guide/logs/",
-		// 		// },
-		// 	],
-		// },
 		{
 			text: "相关链接 🔗",
 			items: [
@@ -131,10 +77,6 @@ function nav(): DefaultTheme.NavItem[] {
 					text: "Gitee 仓库",
 					link: "https://gitee.com/ITdos/microi.net",
 				},
-				// {
-				// 	text: "GitCode 仓库",
-				// 	link: "https://gitcode.com/microi-net/microi.net",
-				// },
 				{
 					text: "WebOS 试用",
 					link: "https://webos.microi.net/",
@@ -152,7 +94,11 @@ function nav(): DefaultTheme.NavItem[] {
 					link: "https://lisaisai.blog.csdn.net/?type=blog",
 				},
 				{
-					text: "iTdos 官方 Nuget",
+					text: "技术支持大牛 - 毛总",
+					link: "https://gitee.com/mao_js ",
+				},
+				{
+					text: "Nuget iTdos 官方账号",
 					link: "https://www.nuget.org/profiles/ITdos",
 				},
 			],
