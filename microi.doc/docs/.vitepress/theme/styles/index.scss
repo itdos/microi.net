@@ -1,4 +1,6 @@
-.VPDoc.has-aside .content-container{
+.VPDoc.has-aside .content-container,
+.VPDoc.has-aside .container,
+.VPDoc.has-aside .content{
 	max-width: 100% !important;
 }
 
@@ -194,4 +196,51 @@ html:not(.dark) {
  * -------------------------------------------------------------------------- */
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+}
+
+/**
+ * 联系我们页面表格美化
+ * -------------------------------------------------------------------------- */
+.vp-doc table {
+  // 表格居中显示
+  margin: 2rem auto;
+  
+  // 表格单元格样式优化
+  td, th {
+    padding: 1.5rem 1rem !important;
+    vertical-align: middle !important;
+    border: 1px solid var(--vp-c-divider) !important;
+  }
+  
+  // 表头样式
+  thead th {
+    background-color: var(--vp-c-bg-soft);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  
+  // 二维码图片样式优化
+  img {
+    margin: 0.5rem auto !important;
+    display: block !important;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+// 暗色模式下的表格优化
+.dark .vp-doc table {
+  img {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    
+    &:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+  }
 }

@@ -1,6 +1,5 @@
 ﻿{
   "index.md" : "平台介绍",
-  "apiengine-index.md" : "接口引擎实战",
 
   "case-index.md" : "成功案例",
   
@@ -39,6 +38,8 @@
   "form-engine.md" : "FormEngine用法",
   "where.md" : "Where条件",
   "ai-apiengine.md" : "AI 代写V8接口引擎",
+  "apiengine-index.md" : "接口引擎实战",
+
 
   "form-engine":"表单引擎",
   "form-engine-info.md" : "表单引擎介绍",
@@ -73,38 +74,6 @@
   "partner.md" : "成为合伙人",
   "template.md": "CSDN文章模板",
   "update-log.md" : "📤 更新日志",
-
-  "web-plugin-engine" : "插件引擎",
-  "README.md" : "插件系统文档",
-  "user-guide.md" : "插件系统使用指南",
-  "core-principles.md" : "插件系统核心原理",
-  "development-guide.md" : "插件开发指南",
-  "plugin-component-config-examples.md" : "插件组件配置示例",
-  "plugin-component-usage.md" : "选中区域中的使用说明",
-  "plugin-dependency-management.md" : "插件独立依赖管理文档",
-
-  "more" : "更多",
-  "faq-index.md" : "FAQ",
-	"doc.md": "关于文档",
-	"standard.md": "项目规范",
-	"theme.md": "主题配置",
-	"layout.md": "布局模式",
-	"intro_web.md": "前端简介",
-	"catalogue_web.md": "前端目录结构",
-	"catalogue_api.md": "后端目录结构",
-  "page_engine.md": "界面引擎",
-  "print_engine.md": "打印引擎",
-  "report_engine.md": "报表引擎",
-  "aboutus.md": "关于我们",
-
-  "classroom":"吾码课堂",
-  "issues_learn_mobile.md":"uni-app教程",
-  "issues_learn_cloud.md":"运维教程",
-  "issues_learn_front.md":"前端教程",
-  "issues_learn_back.md":"后端教程",
-  "issues_learn_sql.md":"数据库教程",
-  "issues_learn_schema.md":"架构教程",
-  "issues_project_records.md":"开发备忘录",
   
   "export-excel.md":"自定义导出Excel",
   "file-receive-download-upload.md": "文件的接收、下载、上传",

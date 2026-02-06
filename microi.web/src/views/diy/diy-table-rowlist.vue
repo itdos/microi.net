@@ -3176,7 +3176,8 @@ export default {
         },
         ColIsDisplay(fieldName) {
             var self = this;
-            if (self.NotShowFields.indexOf(fieldName) > -1) {
+            if (self.NotShowFields.indexOf(fieldName) > -1
+                || self.NotShowFields.findIndex(item => item.Name == fieldName || item.Id == fieldName) > -1) {
                 return false;
             }
             if (self.TableDiyFieldIds && self.TableDiyFieldIds.find((item) => item == fieldName)) {
@@ -5227,40 +5228,44 @@ export default {
         // 其实这里应该改成Axios去同时请求多个接口，然后再渲染，这样性能更高！
         GetShowDiyFieldList: function () {
             var self = this;
-            // TableDiyFieldIds 是指模块引擎的查询列
-            if (self.TableDiyFieldIds != null) {
-                if (self.TableDiyFieldIds.length > 0 && self.DiyFieldList.length > 0) {
+            // TableDiyFieldIds 是指模块引擎的查询列【被SysMenuModel.SelectFields替代】
+            debugger;
+            if (self.SysMenuModel.SelectFields != null) {
+                if (self.SysMenuModel.SelectFields.length > 0 && self.DiyFieldList.length > 0) {
                     var tempArr = [];
                     var index = 0;
-                    self.TableDiyFieldIds.forEach((element) => {
+                    self.SysMenuModel.SelectFields.forEach((element) => {
                         //这里的element就是FieldId
                         // var search1 = _u.where(self.DiyFieldList, {
                         //   Id: element
                         // });
-                        var search1 = self.DiyFieldList.find((item) => item.Id === element); // || item.Name === element
+                        var search1 = self.DiyFieldList.find((item) => item.Id === element|| item.Id === element.Id); // || item.Name === element
                         if (!search1) {
-                            search1 = self.DiyCommon.SysDefaultField.find((item) => item.Id === element);
+                            search1 = self.DiyCommon.SysDefaultField.find((item) => item.Id === element || item.Id === element.Id);
                         }
-
                         //注意：!(self.FixedNotShowField.indexOf(element.Component) > -1)  这条判断没用，因为element就是Id，取不到element.Component
                         //2021-10-26 新增排序 ShowHideFieldsList
                         if (
                             search1 &&
                             !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-                            (!(self.NotShowFields.indexOf(element) > -1 || self.NotShowFields.indexOf(element.Name) > -1 || self.NotShowFields.indexOf(element.Id) > -1) ||
-                                self.ShowHideFieldsList.indexOf(search1.Name) > -1) &&
+                            (!(self.NotShowFields.indexOf(element) > -1 
+                                || self.NotShowFields.indexOf(element.Name) > -1 
+                                || self.NotShowFields.indexOf(element.Id) > -1
+                                || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
+                            )
+                                || self.ShowHideFieldsList.indexOf(search1.Name) > -1) &&
                             !self.DiyCommon.IsNull(search1.Id)
                         ) {
-                            search1["AsName"] = "";
+                            search1["AsName"] = element.AsName || "";
                             //这里要根据 SelectFields 赋值别名
-                            if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
-                                var search2 = _u.where(self.SysMenuModel.SelectFields, {
-                                    Id: element
-                                });
-                                if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
-                                    search1["AsName"] = search2[0].AsName;
-                                }
-                            }
+                            // if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
+                            //     var search2 = _u.where(self.SysMenuModel.SelectFields, {
+                            //         Id: element
+                            //     });
+                            //     if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
+                            //         search1["AsName"] = search2[0].AsName;
+                            //     }
+                            // }
                             //------end
                             tempArr.push(search1);
                             index++;
@@ -5268,7 +5273,7 @@ export default {
                     });
                     // tempArr.push(_u.where(self.DiyFieldList, {Name : 'CreateTime'})[0]);
                     //调整ShowHideFieldsList排序
-                    self.SortShowHideFieldsList(tempArr);
+                    // self.SortShowHideFieldsList(tempArr);
                     
                     // 🔥 性能优化：分批渲染表格列
                     self._allFieldList = tempArr;
@@ -5322,8 +5327,12 @@ export default {
                         //2021-10-26 新增排序 ShowHideFieldsList
                         if (
                             !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-                            (!(self.NotShowFields.indexOf(element) > -1 || self.NotShowFields.indexOf(element.Name) > -1 || self.NotShowFields.indexOf(element.Id) > -1) ||
-                                self.ShowHideFieldsList.indexOf(element.Name) > -1) &&
+                            (!(self.NotShowFields.indexOf(element) > -1 
+                                || self.NotShowFields.indexOf(element.Name) > -1 
+                                || self.NotShowFields.indexOf(element.Id) > -1
+                                || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
+                                )
+                                || self.ShowHideFieldsList.indexOf(element.Name) > -1) &&
                             !self.DiyCommon.IsNull(element.Id)
                         ) {
                             element["AsName"] = "";
@@ -5345,7 +5354,7 @@ export default {
                         }
                     });
                     //调整ShowHideFieldsList排序
-                    self.SortShowHideFieldsList(tempArr);
+                    // self.SortShowHideFieldsList(tempArr);
                     
                     // 🔥 性能优化：分批渲染表格列（第二个分支 - 无指定查询列）
                     self._allFieldList = tempArr;
@@ -5398,42 +5407,42 @@ export default {
             }
             return [];
         },
-        SortShowHideFieldsList(tempArr) {
-            var self = this;
-            if (self.ShowHideFieldsList.length > 0) {
-                for (let index = 1; index <= self.ShowHideFieldsList.length; index++) {
-                    //先查询到上一个字段所在位置
-                    var firstIndex = _u.findIndex(tempArr, {
-                        Name: self.ShowHideFieldsList[index - 1]
-                    });
-                    if (firstIndex != -1) {
-                        //如果下一个位置的值和现在这个不相等
-                        if (tempArr[firstIndex + 1] && self.ShowHideFieldsList[index] != tempArr[firstIndex + 1].Name) {
-                            //获取老位置
-                            var currentIndex = _u.findIndex(tempArr, {
-                                Name: self.ShowHideFieldsList[index]
-                            });
-                            if (currentIndex != -1) {
-                                //缓存用于替换的值
-                                var currentModel = { ...tempArr[currentIndex] };
-                                //删除老位置
-                                tempArr.splice(currentIndex, 1);
-                                //重新获取老位置
-                                firstIndex = _u.findIndex(tempArr, {
-                                    Name: self.ShowHideFieldsList[index - 1]
-                                });
-                                //插入新位置
-                                tempArr.splice(firstIndex + 1, 0, currentModel);
-                            }
-                        }
-                    }
-                }
-                //
-                //self.ShowHideFieldsList
-                // console.log(self.ShowHideFieldsList);
-                // console.log(tempArr[6].Name + ',' + tempArr[7].Name+ ',' + tempArr[8].Name+ ',' + tempArr[9].Name+ ',' + tempArr[10].Name+ ',' + tempArr[11].Name);
-            }
-        },
+        // SortShowHideFieldsList(tempArr) {
+        //     var self = this;
+        //     if (self.ShowHideFieldsList.length > 0) {
+        //         for (let index = 1; index <= self.ShowHideFieldsList.length; index++) {
+        //             //先查询到上一个字段所在位置
+        //             var firstIndex = _u.findIndex(tempArr, {
+        //                 Name: self.ShowHideFieldsList[index - 1]
+        //             });
+        //             if (firstIndex != -1) {
+        //                 //如果下一个位置的值和现在这个不相等
+        //                 if (tempArr[firstIndex + 1] && self.ShowHideFieldsList[index] != tempArr[firstIndex + 1].Name) {
+        //                     //获取老位置
+        //                     var currentIndex = _u.findIndex(tempArr, {
+        //                         Name: self.ShowHideFieldsList[index]
+        //                     });
+        //                     if (currentIndex != -1) {
+        //                         //缓存用于替换的值
+        //                         var currentModel = { ...tempArr[currentIndex] };
+        //                         //删除老位置
+        //                         tempArr.splice(currentIndex, 1);
+        //                         //重新获取老位置
+        //                         firstIndex = _u.findIndex(tempArr, {
+        //                             Name: self.ShowHideFieldsList[index - 1]
+        //                         });
+        //                         //插入新位置
+        //                         tempArr.splice(firstIndex + 1, 0, currentModel);
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //         //
+        //         //self.ShowHideFieldsList
+        //         // console.log(self.ShowHideFieldsList);
+        //         // console.log(tempArr[6].Name + ',' + tempArr[7].Name+ ',' + tempArr[8].Name+ ',' + tempArr[9].Name+ ',' + tempArr[10].Name+ ',' + tempArr[11].Name);
+        //     }
+        // },
 
         GetDiyTableRow(recParam) {
             let self = this;

@@ -7,20 +7,14 @@ titleTemplate: 开源 AI 低代码平台
 hero:
   name: Micro<span style="-webkit-text-fill-color:red !important;">i</span>吾码
   text: 开源 AI 低代码平台
-  tagline: 低代码 + AI开发模式，支持传统开发。.NET10 + Vue + Redis + 跨数据库 + Element-Plus + UniApp
+  tagline: 低代码 + AI开发模式，支持传统开发。.NET10 + Vue + Redis + 跨数据库 + Element-Plus
   actions:
     - theme: brand
       text: 文档
       link: /doc/index
     - theme: brand
-      text: WebOS试用
-      link: https://webos.microi.net
-    - theme: alt
-      text: 传统界面试用
+      text: 免费试用
       link: https://web.microi.net
-    - theme: alt
-      text: 移动端试用
-      link: https://m-web.microi.net
     - theme: brand
       text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
