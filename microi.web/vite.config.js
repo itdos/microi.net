@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,6 +11,13 @@ export default defineConfig({
         createSvgIconsPlugin({
             iconDirs: [path.resolve(process.cwd(), 'src/icons/svg')],
             symbolId: 'icon-[name]'
+        }),
+        // 构建分析插件 - 生成可视化报告
+        visualizer({
+            open: false, // 构建后不自动打开
+            gzipSize: true, // 显示 gzip 压缩后的大小
+            brotliSize: true, // 显示 brotli 压缩后的大小
+            filename: 'dist/stats.html' // 输出文件路径
         })
     ],
     resolve: {
@@ -97,19 +105,53 @@ export default defineConfig({
                         if (id.includes('wangeditor') || id.includes('@wangeditor')) {
                             return 'vendor-editor';
                         }
-                        // Monaco 编辑器 - 代码编辑器
+                        // Monaco 编辑器 - 代码编辑器（很大，单独拆分）
                         if (id.includes('monaco-editor')) {
                             return 'vendor-monaco';
                         }
-                        // 图表库
+                        // 图表库（echarts 很大，单独拆分）
                         if (id.includes('echarts') || id.includes('zrender')) {
                             return 'vendor-charts';
                         }
-                        // 工具库
-                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment') || id.includes('axios')) {
+                        // FullCalendar 日历组件（比较大）
+                        if (id.includes('@fullcalendar')) {
+                            return 'vendor-calendar';
+                        }
+                        // Three.js 3D库（非常大）
+                        if (id.includes('three')) {
+                            return 'vendor-three';
+                        }
+                        // SignalR 实时通信
+                        if (id.includes('@microsoft/signalr')) {
+                            return 'vendor-signalr';
+                        }
+                        // 加密相关库
+                        if (id.includes('crypto-js') || id.includes('jsencrypt') || id.includes('js-base64')) {
+                            return 'vendor-crypto';
+                        }
+                        // Excel 相关（xlsx 比较大）
+                        if (id.includes('xlsx')) {
+                            return 'vendor-xlsx';
+                        }
+                        // jQuery（如果不是必需的，建议移除）
+                        if (id.includes('jquery')) {
+                            return 'vendor-jquery';
+                        }
+                        // 工具库（lodash、dayjs、moment等）
+                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment') || 
+                            id.includes('underscore') || id.includes('file-saver') || id.includes('pinyin')) {
                             return 'vendor-utils';
                         }
-                        // 其他第三方库
+                        // HTTP 请求库
+                        if (id.includes('axios') || id.includes('qs')) {
+                            return 'vendor-http';
+                        }
+                        // UI 增强库
+                        if (id.includes('sortablejs') || id.includes('vuedraggable') || 
+                            id.includes('swiper') || id.includes('animate.css')) {
+                            return 'vendor-ui-enhance';
+                        }
+                        // 其他第三方库（应该已经很小了）
                         return 'vendor-other';
                     }
                     // 工作流模块 - 按需加载
