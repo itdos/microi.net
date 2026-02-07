@@ -24,8 +24,8 @@ const pathMappings = {
     "/microi.net/workflow/": "/diy/workflow/",
     "/microi/workflow/": "/diy/workflow/",
     // page-engine 相关映射
-    "/microi-pageengine/page-renderer": "/page-engine/renderer",
-    "/microi-pageengine/": "/page-engine/",
+    "/page-engine/page-renderer": "/page-engine/renderer",
+    "/page-engine/": "/page-engine/",
     // form 相关映射
     "/microi.net/diy-form-page": "/diy/diy-form-page",
     // system 相关映射

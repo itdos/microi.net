@@ -97,6 +97,58 @@ namespace Microi.net
     }
 
     /// <summary>
+    /// 自然语言转V8引擎代码参数
+    /// </summary>
+    public class NL2V8Param
+    {
+        /// <summary>
+        /// 用户的自然语言需求描述，如：帮我获取最新的一条生产订单数据
+        /// </summary>
+        public string Question { get; set; }
+
+        /// <summary>
+        /// AI模型名称
+        /// </summary>
+        public string AiModel { get; set; }
+
+        /// <summary>
+        /// 租户标识
+        /// </summary>
+        public string OsClient { get; set; }
+    }
+
+    /// <summary>
+    /// NL2V8Engine返回结果
+    /// </summary>
+    public class NL2V8Result
+    {
+        /// <summary>
+        /// 用户的原始需求描述
+        /// </summary>
+        public string Question { get; set; }
+
+        /// <summary>
+        /// AI生成的V8引擎代码
+        /// </summary>
+        public string GeneratedCode { get; set; }
+
+        /// <summary>
+        /// 检索到的相关V8文档章节
+        /// </summary>
+        public List<string> RelevantDocs { get; set; }
+
+        /// <summary>
+        /// 检索到的相关数据库表
+        /// </summary>
+        public List<string> RelevantTables { get; set; }
+
+        /// <summary>
+        /// 来源信息
+        /// </summary>
+        public string Source { get; set; }
+    }
+
+    /// <summary>
     /// 聊天消息处理结果
     /// </summary>
     public class ChatMessageResult
