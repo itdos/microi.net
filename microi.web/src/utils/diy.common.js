@@ -4193,7 +4193,8 @@ var DiyCommon = {
     },
     AddSysLog(param, callback) {
         DiyCommon.Post("/api/SysLog/AddSysLog", param, function (result) {
-            if (DiyCommon.Result(result)) {
+            // if (DiyCommon.Result(result)) {
+            if (result.Code == 1) {
                 if (callback) {
                     callback(result.Data);
                 }

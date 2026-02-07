@@ -50,7 +50,7 @@
         v-if="configDialogVisible"
         v-model="configDialogVisible"
         title="自动完成配置"
-        width="700px"
+        width="50%"
         :close-on-click-modal="false"
         destroy-on-close
         append-to-body
