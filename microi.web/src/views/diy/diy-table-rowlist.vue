@@ -5229,7 +5229,6 @@ export default {
         GetShowDiyFieldList: function () {
             var self = this;
             // TableDiyFieldIds 是指模块引擎的查询列【被SysMenuModel.SelectFields替代】
-            debugger;
             if (self.SysMenuModel.SelectFields != null) {
                 if (self.SysMenuModel.SelectFields.length > 0 && self.DiyFieldList.length > 0) {
                     var tempArr = [];
