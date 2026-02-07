@@ -6,6 +6,7 @@
         <el-dialog
             v-if="showDialog"
             draggable
+            align-center
             :modal="true"
             :width="'80%'"
             :modal-append-to-body="true"
@@ -18,7 +19,7 @@
             class="dialog-opentable"
         >
             <template #header>
-                <div style="display: flex;">
+                <div style="display: flex;justify-content: space-between;">
                     <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
                         <fa-icon :icon="'fas fa-table'" />
                         {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
@@ -53,12 +54,18 @@
             v-if="configDialogVisible"
             v-model="configDialogVisible"
             title="弹出表格配置"
-            width="600px"
+            width="50%"
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body
+            draggable
+            align-center
         >
-            <el-form label-width="100px" label-position="top" size="small">
+            <el-form label-width="120px" label-position="left" size="small" :inline="true">
+                <el-divider content-position="left">
+                    <i class="el-icon-setting"></i> 基本配置
+                </el-divider>
+                
                 <el-form-item label="关联模块">
                     <el-popover placement="bottom" trigger="click" :width="400">
                         <el-tree 
@@ -83,6 +90,46 @@
                 <el-form-item label="是否多选">
                     <el-switch v-model="configForm.MultipleSelect" active-color="#ff6c04" inactive-color="#ccc" />
                 </el-form-item>
+                
+                <el-divider content-position="left">
+                    <i class="el-icon-s-operation"></i> V8引擎代码
+                </el-divider>
+                
+                <el-form-item class="form-item-top" label-position="top" style="display: block;">
+                    <template #label>
+                        <div style="display: flex; align-items: center;">
+                            <i class="fas fa-code" style="margin-right: 5px;"></i>
+                            <span>弹出前V8引擎代码</span>
+                            <span style="color: red; margin-left: 5px;">(JavaScript)</span>
+                        </div>
+                    </template>
+                    <DiyCodeEditor
+                        v-model="configForm.BeforeOpenV8"
+                        :field="{ Id: 'BeforeOpenV8', Name: 'BeforeOpenV8' }"
+                        :height="'300px'"
+                    />
+                    <div class="form-item-tip">
+                        可用方法：V8.OpenTableSetWhere(字段, 条件) 设置查询条件；V8.AppendSearchChildTable(字段, 条件) 追加搜索条件
+                    </div>
+                </el-form-item>
+                
+                <el-form-item class="form-item-top" label-position="top" style="display: block;">
+                    <template #label>
+                        <div style="display: flex; align-items: center;">
+                            <i class="fas fa-code" style="margin-right: 5px;"></i>
+                            <span>提交事件V8引擎代码</span>
+                            <span style="color: red; margin-left: 5px;">(JavaScript)</span>
+                        </div>
+                    </template>
+                    <DiyCodeEditor
+                        v-model="configForm.SubmitV8"
+                        :field="{ Id: 'SubmitV8', Name: 'SubmitV8' }"
+                        :height="'300px'"
+                    />
+                    <div class="form-item-tip">
+                        提交时可获取选中的数据 V8.TableRowSelected，可通过 V8.Result = false 阻止弹窗关闭
+                    </div>
+                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
@@ -100,6 +147,8 @@ import { useI18n } from "vue-i18n";
 
 // 异步导入 DiyTableChild 组件
 const DiyTableChild = defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"));
+// 异步导入 DiyCodeEditor 组件
+const DiyCodeEditor = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-code-editor.vue"));
 
 // 禁用属性继承
 defineOptions({
@@ -127,6 +176,10 @@ const props = defineProps({
     FormDiyTableModel: {
         type: Object,
         default: () => ({})
+    },
+    ParentV8: {
+        type: Object,
+        default: () => ({})
     }
 });
 
@@ -149,7 +202,9 @@ const configForm = ref({
     TableId: '',
     TableName: '',
     BtnName: '',
-    MultipleSelect: false
+    MultipleSelect: false,
+    BeforeOpenV8: '',
+    SubmitV8: ''
 });
 
 // 获取系统菜单列表
@@ -206,23 +261,6 @@ proxy.$watch(
     }
 );
 
-// 辅助函数：设置 V8 默认值
-const setV8DefaultValue = (V8) => {
-    // 基础信息
-    V8.Form = props.FormDiyTableModel;
-    V8.Field = props.field;
-    V8.FormMode = props.FormMode;
-    
-    // 常用工具方法
-    V8.DiyCommon = DiyCommon;
-    V8.Tips = DiyCommon.Tips;
-    V8.GetApiBase = DiyCommon.GetApiBase;
-    V8.Post = DiyCommon.Post;
-    V8.Get = DiyCommon.Get;
-    
-    return V8;
-};
-
 // 辅助函数：设置 OpenTable 的 Where 条件
 const openTableSetWhere = (fieldModel, where) => {
     if (fieldModel.Config && fieldModel.Config.OpenTable) {
@@ -241,8 +279,8 @@ const appendSearchChildTable = (fieldModel, appendSearch) => {
 const handleOpenTable = async () => {
     const field = props.field;
     
-    // 执行弹出前 V8 代码
-    const V8 = await DiyCommon.InitV8Code({}, proxy.$router);
+    // 使用 ParentV8 作为基础 V8 对象，而不是自己创建
+    const V8 = { ...props.ParentV8 };
     V8.EventName = "OpenTableBefore";
     
     try {
@@ -253,7 +291,7 @@ const handleOpenTable = async () => {
         ) {
             V8.AppendSearchChildTable = appendSearchChildTable;
             V8.OpenTableSetWhere = openTableSetWhere;
-            setV8DefaultValue(V8);
+            // 不需要再调用 setV8DefaultValue，因为 ParentV8 已经包含了所有必要的属性
             
             await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.BeforeOpenV8 + " \n})()");
         }
@@ -273,7 +311,8 @@ const handleSubmit = async () => {
     const field = props.field;
     btnLoading.value = true;
     
-    const V8 = await DiyCommon.InitV8Code({}, proxy.$router);
+    // 使用 ParentV8 作为基础 V8 对象，而不是自己创建
+    const V8 = { ...props.ParentV8 };
     V8.EventName = "OpenTableSubmit";
     
     try {
@@ -294,7 +333,7 @@ const handleSubmit = async () => {
                 }
             }
             
-            setV8DefaultValue(V8);
+            // 不需要再调用 setV8DefaultValue，因为 ParentV8 已经包含了所有必要的属性
             
             await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()");
             
@@ -339,7 +378,9 @@ const openConfig = () => {
         TableId: props.field.Config.OpenTable.TableId || '',
         TableName: props.field.Config.OpenTable.TableName || '',
         BtnName: props.field.Config.OpenTable.BtnName || '',
-        MultipleSelect: props.field.Config.OpenTable.MultipleSelect || false
+        MultipleSelect: props.field.Config.OpenTable.MultipleSelect || false,
+        BeforeOpenV8: props.field.Config.OpenTable.BeforeOpenV8 || '',
+        SubmitV8: props.field.Config.OpenTable.SubmitV8 || ''
     };
     // 加载系统菜单列表
     if (SysMenuList.value.length === 0) {
@@ -358,6 +399,8 @@ const saveConfig = () => {
     props.field.Config.OpenTable.TableName = configForm.value.TableName;
     props.field.Config.OpenTable.BtnName = configForm.value.BtnName;
     props.field.Config.OpenTable.MultipleSelect = configForm.value.MultipleSelect;
+    props.field.Config.OpenTable.BeforeOpenV8 = configForm.value.BeforeOpenV8;
+    props.field.Config.OpenTable.SubmitV8 = configForm.value.SubmitV8;
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
 };
@@ -398,5 +441,16 @@ defineExpose({
     .search-outside {
         padding-left: 0px !important;
     }
+}
+
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 5px;
+}
+
+.form-item-top {
+    margin-bottom: 22px;
 }
 </style>
