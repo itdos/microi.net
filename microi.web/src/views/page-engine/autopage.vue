@@ -1,40 +1,61 @@
 <template>
     <div class="home">
-        <iframe ref="myIframe" @load="onIframeLoad" id="iframe" src="/autopage/" frameborder="0" style="width: 100%; height: calc(100vh - 100px)"></iframe>
+        <formDesigner :remoteObj="remoteObj" :components="newComponents" :widgets="newWidgets" />
     </div>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
+import { formDesigner, EventBus, usePageEngineStore } from "microi-pageengine";
+import "microi-pageengine/style.css";
+import { newComponents, newWidgets } from "@/utils/extendedWidget";
+import { createPinia } from "pinia";
+
 export default {
+    components: {
+        formDesigner
+    },
     data() {
         return {
             pageid: "", //获取页面主键
-            loading: ""
+            remoteObj: {
+                Id: "",
+                Title: "",
+                Number: "",
+                Desc: "",
+                JsonObj: {}
+            },
+            newComponents: newComponents,
+            newWidgets: newWidgets,
+            pageEngineStore: null
         };
     },
-    mounted() {
-        // 监听iframe内部的message事件
-        window.addEventListener("message", this.handleMessage);
+    async mounted() {
+        // 初始化 pinia store
+        const pinia = createPinia();
+        this.pageEngineStore = usePageEngineStore(pinia);
+
+        // 设置token
+        this.pageEngineStore.setToken(DiyCommon.getToken());
+
+        // 注册事件监听
+        this.registerEventListeners();
+
+        // 加载表单数据
+        await this.loadFormData();
     },
     beforeDestroy() {
-        // 组件销毁前移除监听器
-        window.removeEventListener("message", this.handleMessage, false);
+        // 移除所有事件监听
+        this.removeEventListeners();
     },
     created: function () {
         //获取页面参数
         this.pageid = this.$route.query.Id || this.$route.params?.Id;
     },
     methods: {
-        onIframeLoad() {
-            console.log("Iframe 已加载完成");
-            this.loading = false;
-            this.sendMessageToIframe();
-        },
-        async sendMessageToIframe() {
-            const iframe = this.$refs.myIframe;
+        async loadFormData() {
+            if (!this.pageid) return;
 
-            // 使用 postMessage 发送数据给 iframe
             var res = await DiyCommon.FormEngine.GetFormData({
                 FormEngineKey: "mic_page",
                 Id: this.pageid
@@ -43,77 +64,97 @@ export default {
             if (res.Code === 1 && res.Data) {
                 var JsonObj = {};
                 if (res.Data.JsonObj) {
-                    JsonObj = JSON.parse(res.Data.JsonObj);
+                    JsonObj = typeof res.Data.JsonObj === "string" ? JSON.parse(res.Data.JsonObj) : res.Data.JsonObj;
                 }
-                var demoObj = {
+                this.remoteObj = {
                     Id: this.pageid,
                     Title: res.Data.Title || "",
                     Number: res.Data.Number || "",
                     Desc: res.Data.Desc || "",
                     JsonObj: JsonObj
                 };
-                const dataToSend = {
-                    iframeToken: DiyCommon.getToken(),
-                    iframeFormData: JSON.stringify(demoObj)
-                };
-                // 使用 postMessage 发送数据给 iframe
-                iframe.contentWindow.postMessage(dataToSend, "*");
             }
         },
-        // 获取iframe传过来的信息
-        async handleMessage(event) {
-            // event表示iframe传过来的信息
-            if (event.data) {
-                switch (event.data.key) {
-                    //保存页面json
-                    case "saveFormJson":
-                        var obj = JSON.parse(event.data.value);
-                        if (obj.Id == this.pageid) {
-                            var model = {
-                                Title: obj.Title,
-                                Desc: obj.Desc,
-                                JsonObj: JSON.stringify(obj.JsonObj)
-                            };
-                            var res = await DiyCommon.FormEngine.UptFormData({
-                                FormEngineKey: "mic_page",
-                                Id: this.pageid,
-                                _RowModel: model
-                            });
-                        }
-
-                        break;
-                    //监听日历选择日期事件
-                    case "calendarSelDate":
-                        console.log("已接到到来自iframe消息,calendarSelDate", event.data.value);
-                        break;
-                    //卡片更多跳转
-                    case "cartMoreLink":
-                        console.log("已接到到来自iframe消息,cartMoreLink 监听", event.data.value);
-                        break;
-                    //链接组件跳转
-                    case "linkWidget":
-                        console.log("已接到到来自iframe消息,linkWidget", event.data.value);
-                        break;
-                    //鱼骨图跳转
-                    case "fishWidget":
-                        console.log("已接到到来自iframe消息,fishWidget", event.data.value);
-                        break;
-                    //地图marker点击事件
-                    case "mapWidget":
-                        console.log("已接到到来自iframe消息,mapWidget", event.data.value);
-                        break;
-                    //步骤跳转
-                    case "stepsWidget":
-                        console.log("已接到到来自iframe消息,stepsWidget", event.data.value);
-                        break;
-                    //点击区域地图事件
-                    case "areaMapWidget":
-                        console.log("已接到到来自iframe消息,areaMapWidget", event.data.value);
-                        break;
-                    default:
-                        break;
+        registerEventListeners() {
+            //监听保存页面JSON事件
+            EventBus.on("saveFormJson", async (saveFormJson) => {
+                console.log("监听saveFormJson", saveFormJson);
+                if (saveFormJson.Id == this.pageid) {
+                    var model = {
+                        Title: saveFormJson.Title,
+                        Desc: saveFormJson.Desc,
+                        JsonObj: JSON.stringify(saveFormJson.JsonObj)
+                    };
+                    await DiyCommon.FormEngine.UptFormData({
+                        FormEngineKey: "mic_page",
+                        Id: this.pageid,
+                        _RowModel: model
+                    });
                 }
-            }
+            });
+
+            //监听日历选择日期事件
+            EventBus.on("calendarSelDate", (data) => {
+                console.log("监听calendarSelDate", data);
+            });
+
+            //卡片更多跳转
+            EventBus.on("cartMoreLink", (linkurl, linktype) => {
+                console.log("监听cartMoreLink", linkurl, linktype);
+                if (linktype == "router" && linkurl) {
+                    this.$router.push(linkurl);
+                }
+            });
+
+            //链接组件跳转
+            EventBus.on("linkWidget", (linkurl, linktype) => {
+                console.log("监听linkWidget", linkurl, linktype);
+                if (linktype == "router" && linkurl) {
+                    this.$router.push(linkurl);
+                }
+            });
+
+            //鱼骨图跳转
+            EventBus.on("fishWidget", (linkurl) => {
+                console.log("监听fishWidget", linkurl);
+                if (linkurl) {
+                    this.$router.push(linkurl);
+                }
+            });
+
+            //步骤跳转
+            EventBus.on("stepsWidget", (id, linkurl) => {
+                console.log("监听stepsWidget", id, linkurl);
+                if (linkurl) {
+                    this.$router.push(linkurl);
+                }
+            });
+
+            //地图marker点击事件
+            EventBus.on("mapMarkerClick", (item) => {
+                console.log("监听mapMarkerClick", item);
+            });
+
+            //点击区域地图事件
+            EventBus.on("areaMapClick", (item) => {
+                console.log("监听areaMapClick", item);
+            });
+
+            //点击高级日历组件事件
+            EventBus.on("fullCalendarClick", (item) => {
+                console.log("监听fullCalendarClick", item);
+            });
+        },
+        removeEventListeners() {
+            EventBus.off("saveFormJson");
+            EventBus.off("calendarSelDate");
+            EventBus.off("cartMoreLink");
+            EventBus.off("linkWidget");
+            EventBus.off("fishWidget");
+            EventBus.off("stepsWidget");
+            EventBus.off("mapMarkerClick");
+            EventBus.off("areaMapClick");
+            EventBus.off("fullCalendarClick");
         }
     }
 };

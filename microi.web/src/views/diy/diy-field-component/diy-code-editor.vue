@@ -1,5 +1,5 @@
 <template>
-    <div class="monaco-container" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
+    <div class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
         <div class="monaco-toolbar">
             <div class="toolbar-left">
                 <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
@@ -23,17 +23,153 @@
                 <button class="toolbar-btn" @click.prevent="decreaseFontSize" title="缩小">
                     <el-icon><ZoomOut /></el-icon>
                 </button>
+                <button class="toolbar-btn ai-btn" :class="{ active: aiPanelVisible }" @click.prevent="toggleAiPanel" title="AI编程助手">
+                    <el-icon><ChatDotSquare /></el-icon> AI编程
+                </button>
             </div>
             <div class="toolbar-right">
                 <el-icon v-if="isMaximum" title="点击缩小" @click="minEditor"><Close /></el-icon>
                 <el-icon v-else title="点击放大" @click="maxEditor"><FullScreen /></el-icon>
             </div>
         </div>
-        <div
-            :id="'monaco-editor-' + (field && field.Id) + '-' + RandomValue"
-            class="monaco-editor"
-            :style="{ height: EditorHeight }"
-        ></div>
+
+        <div class="editor-body">
+            <!-- 代码编辑器区域 -->
+            <div class="editor-main">
+                <div
+                    :id="'monaco-editor-' + (field && field.Id) + '-' + RandomValue"
+                    class="monaco-editor"
+                    :style="{ height: EditorHeight }"
+                ></div>
+            </div>
+
+            <!-- AI 聊天面板 -->
+            <transition name="ai-slide">
+                <div v-if="aiPanelVisible" class="ai-chat-panel">
+                    <div class="ai-chat-header">
+                        <div class="ai-chat-title">
+                            <svg class="ai-icon-spark" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/>
+                            </svg>
+                            <span>AI 编程助手</span>
+                        </div>
+                        <el-icon class="ai-chat-close" @click="aiPanelVisible = false"><Close /></el-icon>
+                    </div>
+
+                    <div class="ai-chat-messages" ref="chatMessagesRef">
+                        <!-- 欢迎消息 -->
+                        <div v-if="chatMessages.length === 0" class="ai-welcome">
+                            <div class="ai-welcome-icon">
+                                <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
+                                    <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/>
+                                </svg>
+                            </div>
+                            <h3>你好！我是 AI 编程助手</h3>
+                            <p>描述你的业务需求，我将为你生成 V8 引擎代码</p>
+                            <div class="ai-welcome-examples">
+                                <div class="ai-example-item" @click="useExample('帮我获取最新的一条生产订单数据')">
+                                    <el-icon><Promotion /></el-icon>
+                                    <span>获取最新的一条生产订单数据</span>
+                                </div>
+                                <div class="ai-example-item" @click="useExample('批量更新所有已完成的订单状态为已归档')">
+                                    <el-icon><Promotion /></el-icon>
+                                    <span>批量更新已完成的订单状态</span>
+                                </div>
+                                <div class="ai-example-item" @click="useExample('计算本月销售额TOP10的业务员')">
+                                    <el-icon><Promotion /></el-icon>
+                                    <span>计算本月销售额TOP10业务员</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 聊天记录 -->
+                        <template v-for="(msg, idx) in chatMessages" :key="idx">
+                            <!-- 用户消息 -->
+                            <div v-if="msg.role === 'user'" class="ai-msg ai-msg-user">
+                                <div class="ai-msg-avatar user-avatar">
+                                    <el-icon><User /></el-icon>
+                                </div>
+                                <div class="ai-msg-content">
+                                    <div class="ai-msg-text">{{ msg.content }}</div>
+                                    <div class="ai-msg-time">{{ msg.time }}</div>
+                                </div>
+                            </div>
+                            <!-- AI消息 -->
+                            <div v-else class="ai-msg ai-msg-ai">
+                                <div class="ai-msg-avatar ai-avatar">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                        <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"/>
+                                    </svg>
+                                </div>
+                                <div class="ai-msg-content">
+                                    <div class="ai-msg-text">
+                                        <span v-if="msg.status === 'generating'" class="ai-generating-text">
+                                            {{ msg.content }}<span class="ai-cursor-blink">|</span>
+                                        </span>
+                                        <span v-else-if="msg.status === 'error'" class="ai-error-text">
+                                            <el-icon><WarningFilled /></el-icon> {{ msg.content }}
+                                        </span>
+                                        <span v-else>{{ msg.content }}</span>
+                                    </div>
+                                    <!-- 元数据标签 -->
+                                    <div v-if="msg.metadata && msg.metadata.RelevantDocs && msg.metadata.RelevantDocs.length" class="ai-msg-meta">
+                                        <div class="ai-meta-label">参考文档：</div>
+                                        <el-tag v-for="doc in msg.metadata.RelevantDocs" :key="doc" size="small" type="success" class="ai-meta-tag">{{ doc }}</el-tag>
+                                    </div>
+                                    <div v-if="msg.metadata && msg.metadata.RelevantTables && msg.metadata.RelevantTables.length" class="ai-msg-meta">
+                                        <div class="ai-meta-label">相关表：</div>
+                                        <el-tag v-for="table in msg.metadata.RelevantTables" :key="table" size="small" type="warning" class="ai-meta-tag">{{ table }}</el-tag>
+                                    </div>
+                                    <div class="ai-msg-time">{{ msg.time }}</div>
+                                    <!-- 操作按钮 -->
+                                    <div v-if="msg.status === 'done' && msg.code" class="ai-msg-actions">
+                                        <el-button size="small" text type="primary" @click="applyCodeToEditor(msg.code)">
+                                            <el-icon><DocumentChecked /></el-icon> 应用到编辑器
+                                        </el-button>
+                                        <el-button size="small" text @click="copyAiCode(msg.code)">
+                                            <el-icon><CopyDocument /></el-icon> 复制代码
+                                        </el-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- 输入区域 -->
+                    <div class="ai-chat-input">
+                        <div class="ai-input-wrapper">
+                            <el-input
+                                v-model="aiQuestion"
+                                type="textarea"
+                                :rows="2"
+                                :autosize="{ minRows: 2, maxRows: 5 }"
+                                placeholder="描述你的业务需求，如：帮我获取最新的一条生产订单数据"
+                                :disabled="aiGenerating"
+                                @keydown.enter.exact="handleAiSend"
+                                resize="none"
+                            />
+                        </div>
+                        <div class="ai-input-actions">
+                            <span class="ai-input-hint">Enter 发送 / Shift+Enter 换行</span>
+                            <div class="ai-input-btns">
+                                <el-button v-if="aiGenerating" size="small" type="danger" plain @click="cancelAiGeneration">
+                                    <el-icon><VideoPause /></el-icon> 停止
+                                </el-button>
+                                <el-button 
+                                    v-else 
+                                    size="small" 
+                                    type="primary"
+                                    :disabled="!aiQuestion.trim()" 
+                                    @click="sendAiQuestion"
+                                >
+                                    <el-icon><Promotion /></el-icon> 发送
+                                </el-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+        </div>
 
         <!-- 右下角拉伸手柄 -->
         <div 
@@ -107,6 +243,7 @@ import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import * as monaco from 'monaco-editor';
 import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
+import { getToken } from '@/utils/auth.js';
 import { 
     MagicStick, 
     DArrowLeft, 
@@ -117,7 +254,14 @@ import {
     ZoomOut, 
     Close, 
     FullScreen,
-    Rank
+    Rank,
+    ChatDotSquare,
+    Promotion,
+    User,
+    WarningFilled,
+    DocumentChecked,
+    CopyDocument,
+    VideoPause
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
@@ -135,6 +279,10 @@ const props = defineProps({
         default: ''
     },
     ModelProps: {},
+    FormData: {
+        type: Object,
+        default: () => ({})
+    },
     ReadonlyFields: {
         type: Array,
         default: () => []
@@ -280,6 +428,12 @@ onBeforeUnmount(() => {
     if (stopFormModeWatch) stopFormModeWatch();
     if (stopFieldWatch) stopFieldWatch();
     if (stopModelValueWatch) stopModelValueWatch();
+    
+    // 取消 AI 生成
+    if (aiAbortController) {
+        aiAbortController.abort();
+        aiAbortController = null;
+    }
     
     // 清理编辑器实例
     if (monacoEditor) {
@@ -764,6 +918,9 @@ const openConfig = () => {
     configDialogVisible.value = true;
 };
 
+const { proxy } = getCurrentInstance();
+const DiyCommon = proxy.DiyCommon;
+
 const saveConfig = () => {
     if (!props.field.Config.CodeEditor) {
         props.field.Config.CodeEditor = {};
@@ -785,8 +942,352 @@ const saveConfig = () => {
     }
     // 提示保存成功
     const instance = getCurrentInstance();
-    const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
     DiyCommon.Tips('配置已保存', true);
+};
+
+// ==================== AI 编程助手 ====================
+const aiPanelVisible = ref(false);
+const aiQuestion = ref('');
+const aiGenerating = ref(false);
+const chatMessages = ref([]);
+const chatMessagesRef = ref(null);
+let aiAbortController = null;
+
+const toggleAiPanel = () => {
+    aiPanelVisible.value = !aiPanelVisible.value;
+    if (aiPanelVisible.value) {
+        loadChatHistory();
+        nextTick(() => {
+            if (monacoEditor) monacoEditor.layout();
+        });
+    } else {
+        nextTick(() => {
+            if (monacoEditor) monacoEditor.layout();
+        });
+    }
+};
+
+// 监听面板状态变化，重新布局编辑器
+watch(aiPanelVisible, () => {
+    nextTick(() => {
+        if (monacoEditor) monacoEditor.layout();
+    });
+});
+
+const formatTime = () => {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+};
+
+const scrollToBottom = () => {
+    nextTick(() => {
+        if (chatMessagesRef.value) {
+            chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight;
+        }
+    });
+};
+
+const useExample = (text) => {
+    aiQuestion.value = text;
+    sendAiQuestion();
+};
+
+const handleAiSend = (e) => {
+    if (e.shiftKey) return; // Shift+Enter 换行
+    e.preventDefault();
+    sendAiQuestion();
+};
+
+
+
+// 加载聊天历史记录
+const loadChatHistory = async () => {
+    try {
+        const fkId = props.FormData?.Id;
+        if (!fkId) return;
+        
+        const result = await DiyCommon.FormEngine.GetTableData('mic_ai_record', {
+            _Where: `FkId = '${fkId}'`,
+            _OrderBy: 'CreateTime',
+            _OrderByType: 'ASC',
+            _PageSize: 200
+        });
+        
+        if (result && result.Code === 1 && result.Data && result.Data.length > 0) {
+            // 仅在消息列表为空时加载历史记录（避免重复加载）
+            if (chatMessages.value.length === 0) {
+                chatMessages.value = result.Data.map(item => {
+                    try {
+                        const parsed = JSON.parse(item.Content);
+                        return parsed;
+                    } catch {
+                        return {
+                            role: 'user',
+                            content: item.Content,
+                            time: item.CreateTime ? new Date(item.CreateTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '',
+                            status: 'done'
+                        };
+                    }
+                });
+                scrollToBottom();
+            }
+        }
+    } catch (e) {
+        console.error('[AI Chat] 加载历史记录失败:', e);
+    }
+};
+
+// 保存聊天记录到 mic_ai_record
+const saveChatRecord = async (msgObj) => {
+    try {
+        const fkId = props.FormData?.Id;
+        if (!fkId) return;
+        
+        await DiyCommon.FormEngine.AddFormData('mic_ai_record', {
+            FkId: fkId,
+            Content: JSON.stringify(msgObj)
+        });
+    } catch (e) {
+        console.error('[AI Chat] 保存聊天记录失败:', e);
+    }
+};
+
+// 发送 AI 问题
+const sendAiQuestion = async () => {
+    const question = aiQuestion.value.trim();
+    if (!question || aiGenerating.value) return;
+    
+    // 添加用户消息
+    const userMsg = {
+        role: 'user',
+        content: question,
+        time: formatTime(),
+        status: 'done'
+    };
+    chatMessages.value.push(userMsg);
+    saveChatRecord(userMsg);
+    scrollToBottom();
+    
+    // 清空输入
+    aiQuestion.value = '';
+    aiGenerating.value = true;
+    
+    // 添加 AI 消息占位
+    const aiMsg = reactive({
+        role: 'ai',
+        content: '',
+        time: formatTime(),
+        status: 'generating',
+        code: '',
+        metadata: null
+    });
+    chatMessages.value.push(aiMsg);
+    scrollToBottom();
+    
+    try {
+        const apiBase = DiyCommon.GetApiBase();
+        const osClient = DiyCommon.GetOsClient();
+        const token = getToken();
+        
+        aiAbortController = new AbortController();
+        
+        const response = await fetch(`${apiBase}/api/Ai/NL2V8Engine`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': token } : {})
+            },
+            body: JSON.stringify({
+                Question: question,
+                AiModel: 'deepseek-chat',
+                OsClient: osClient
+            }),
+            signal: aiAbortController.signal
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let fullCode = '';
+        let currentEventType = '';
+        let isFirstChunk = true;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // 保留不完整的行
+            
+            for (const line of lines) {
+                if (line.startsWith('event:')) {
+                    currentEventType = line.substring(6).trim();
+                } else if (line.startsWith('data:')) {
+                    const data = line.substring(5);
+                    
+                    switch (currentEventType) {
+                        case 'message':
+                            // 第一个代码片段到达时，清空编辑器
+                            if (isFirstChunk && monacoEditor) {
+                                monacoEditor.setValue('');
+                                isFirstChunk = false;
+                            }
+                            
+                            // 代码片段追加（SSE每条message是一行内容，需补换行符）
+                            const chunk = fullCode.length > 0 ? '\n' + data : data;
+                            fullCode += chunk;
+                            aiMsg.code = fullCode;
+                            aiMsg.content = '代码生成中...';
+                            
+                            // 打字机效果：逐步更新 Monaco Editor
+                            if (monacoEditor) {
+                                const model = monacoEditor.getModel();
+                                if (model) {
+                                    const lineCount = model.getLineCount();
+                                    const lastLineLength = model.getLineLength(lineCount);
+                                    // 使用 executeEdits 追加文本，实现打字机效果
+                                    monacoEditor.executeEdits('ai-generate', [{
+                                        range: new monaco.Range(lineCount, lastLineLength + 1, lineCount, lastLineLength + 1),
+                                        text: chunk,
+                                        forceMoveMarkers: true
+                                    }]);
+                                    // 自动滚动到底部
+                                    const newLineCount = model.getLineCount();
+                                    monacoEditor.revealLine(newLineCount);
+                                }
+                            }
+                            scrollToBottom();
+                            break;
+                            
+                        case 'result':
+                            // 最终元数据
+                            try {
+                                const result = JSON.parse(data);
+                                aiMsg.metadata = {
+                                    RelevantDocs: result.RelevantDocs || [],
+                                    RelevantTables: result.RelevantTables || [],
+                                    Source: result.Source || ''
+                                };
+                            } catch {}
+                            break;
+                            
+                        case 'error':
+                            aiMsg.content = data || '生成失败，请稍后重试';
+                            aiMsg.status = 'error';
+                            aiGenerating.value = false;
+                            scrollToBottom();
+                            return;
+                            
+                        case 'done':
+                            aiMsg.content = '代码生成完成';
+                            aiMsg.status = 'done';
+                            aiGenerating.value = false;
+                            
+                            // 更新 modelValue
+                            if (fullCode) {
+                                isSelfUpdating = true;
+                                ModelValue.value = fullCode;
+                                emits('update:modelValue', fullCode);
+                                emits('ModelChange', fullCode);
+                                emits('CallbackFormValueChange', props.field, fullCode);
+                            }
+                            
+                            // 保存 AI 回复记录
+                            saveChatRecord({
+                                role: 'ai',
+                                content: aiMsg.content,
+                                time: aiMsg.time,
+                                status: 'done',
+                                code: fullCode,
+                                metadata: aiMsg.metadata
+                            });
+                            
+                            scrollToBottom();
+                            DiyCommon.Tips('代码生成完成', true);
+                            return;
+                    }
+                }
+            }
+        }
+        
+        // 如果流正常结束但没收到 done 事件
+        if (aiMsg.status === 'generating') {
+            aiMsg.content = fullCode ? '代码生成完成' : '未收到有效响应';
+            aiMsg.status = fullCode ? 'done' : 'error';
+            aiGenerating.value = false;
+            if (fullCode) {
+                isSelfUpdating = true;
+                ModelValue.value = fullCode;
+                emits('update:modelValue', fullCode);
+                emits('ModelChange', fullCode);
+                emits('CallbackFormValueChange', props.field, fullCode);
+                saveChatRecord({
+                    role: 'ai',
+                    content: aiMsg.content,
+                    time: aiMsg.time,
+                    status: 'done',
+                    code: fullCode,
+                    metadata: aiMsg.metadata
+                });
+            }
+        }
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            aiMsg.content = '已取消生成';
+            aiMsg.status = 'error';
+        } else {
+            aiMsg.content = `生成失败: ${error.message}`;
+            aiMsg.status = 'error';
+        }
+        aiGenerating.value = false;
+        scrollToBottom();
+    }
+};
+
+// 取消 AI 生成
+const cancelAiGeneration = () => {
+    if (aiAbortController) {
+        aiAbortController.abort();
+        aiAbortController = null;
+    }
+    aiGenerating.value = false;
+};
+
+// 应用代码到编辑器
+const applyCodeToEditor = (code) => {
+    if (monacoEditor && code) {
+        monacoEditor.setValue(code);
+        isSelfUpdating = true;
+        ModelValue.value = code;
+        emits('update:modelValue', code);
+        emits('ModelChange', code);
+        emits('CallbackFormValueChange', props.field, code);
+        DiyCommon.Tips('代码已应用到编辑器', true);
+    }
+};
+
+// 复制 AI 生成的代码
+const copyAiCode = (code) => {
+    if (code) {
+        navigator.clipboard.writeText(code).then(() => {
+            DiyCommon.Tips('代码已复制到剪贴板', true);
+        }).catch(() => {
+            // fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            DiyCommon.Tips('代码已复制到剪贴板', true);
+        });
+    }
 };
 
 // 暴露方法供父组件调用
@@ -862,7 +1363,42 @@ defineExpose({
             .el-icon {
                 font-size: 14px;
             }
+
+            // AI 编程按钮特殊样式
+            &.ai-btn {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-color: #7c6bc4;
+                color: #fff;
+                font-weight: 500;
+
+                &:hover {
+                    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+                    border-color: #9b8dd6;
+                    box-shadow: 0 0 12px rgba(102, 126, 234, 0.4);
+                }
+
+                &.active {
+                    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+                    border-color: #a78bfa;
+                    box-shadow: 0 0 12px rgba(102, 126, 234, 0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+                }
+            }
         }
+    }
+
+    // 编辑器主体区域（编辑器 + AI面板 水平排列）
+    .editor-body {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .editor-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     .monaco-editor {
@@ -912,6 +1448,328 @@ defineExpose({
             color: #ffffff;
         }
     }
+
+    // ==================== AI 聊天面板样式 ====================
+    .ai-chat-panel {
+        width: 380px;
+        min-width: 380px;
+        display: flex;
+        flex-direction: column;
+        background: #1a1a2e;
+        border-left: 1px solid #30305a;
+        overflow: hidden;
+
+        .ai-chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #30305a;
+            flex-shrink: 0;
+
+            .ai-chat-title {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                color: #e2e8f0;
+
+                .ai-icon-spark {
+                    color: #a78bfa;
+                    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
+                }
+            }
+
+            .ai-chat-close {
+                font-size: 16px;
+                color: #94a3b8;
+                cursor: pointer;
+                padding: 4px;
+                border-radius: 4px;
+                transition: all 0.2s;
+
+                &:hover {
+                    color: #e2e8f0;
+                    background: rgba(255,255,255,0.1);
+                }
+            }
+        }
+
+        .ai-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            scroll-behavior: smooth;
+
+            &::-webkit-scrollbar {
+                width: 5px;
+            }
+            &::-webkit-scrollbar-thumb {
+                background: rgba(167, 139, 250, 0.3);
+                border-radius: 3px;
+            }
+            &::-webkit-scrollbar-track {
+                background: transparent;
+            }
+        }
+
+        // 欢迎页面
+        .ai-welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 16px;
+            text-align: center;
+
+            .ai-welcome-icon {
+                width: 64px;
+                height: 64px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 16px;
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+                animation: ai-pulse 2s ease-in-out infinite;
+
+                svg {
+                    color: #fff;
+                }
+            }
+
+            h3 {
+                color: #e2e8f0;
+                font-size: 16px;
+                font-weight: 600;
+                margin: 0 0 8px;
+            }
+
+            p {
+                color: #94a3b8;
+                font-size: 13px;
+                margin: 0 0 24px;
+                line-height: 1.5;
+            }
+
+            .ai-welcome-examples {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .ai-example-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 14px;
+                background: rgba(102, 126, 234, 0.08);
+                border: 1px solid rgba(102, 126, 234, 0.15);
+                border-radius: 8px;
+                color: #c4b5fd;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s;
+                text-align: left;
+
+                .el-icon {
+                    font-size: 14px;
+                    color: #a78bfa;
+                    flex-shrink: 0;
+                }
+
+                &:hover {
+                    background: rgba(102, 126, 234, 0.15);
+                    border-color: rgba(102, 126, 234, 0.3);
+                    color: #ddd6fe;
+                    transform: translateX(4px);
+                }
+            }
+        }
+
+        // 消息气泡
+        .ai-msg {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            animation: ai-msg-in 0.3s ease;
+
+            .ai-msg-avatar {
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+
+                &.user-avatar {
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    .el-icon { color: #fff; font-size: 14px; }
+                }
+
+                &.ai-avatar {
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    svg { color: #fff; }
+                    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+                }
+            }
+
+            .ai-msg-content {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .ai-msg-text {
+                padding: 10px 14px;
+                border-radius: 12px;
+                font-size: 13px;
+                line-height: 1.6;
+                word-break: break-all;
+                white-space: pre-wrap;
+            }
+
+            .ai-msg-time {
+                font-size: 11px;
+                color: #64748b;
+                margin-top: 4px;
+                padding-left: 4px;
+            }
+
+            .ai-msg-meta {
+                margin-top: 8px;
+                padding-left: 4px;
+
+                .ai-meta-label {
+                    font-size: 11px;
+                    color: #94a3b8;
+                    margin-bottom: 4px;
+                }
+
+                .ai-meta-tag {
+                    margin: 2px 4px 2px 0;
+                }
+            }
+
+            .ai-msg-actions {
+                display: flex;
+                gap: 4px;
+                margin-top: 8px;
+                padding-left: 4px;
+            }
+
+            // 用户消息
+            &.ai-msg-user {
+                .ai-msg-text {
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    color: #fff;
+                    border-bottom-left-radius: 4px;
+                }
+            }
+
+            // AI消息
+            &.ai-msg-ai {
+                .ai-msg-text {
+                    background: #242445;
+                    color: #e2e8f0;
+                    border: 1px solid #30305a;
+                    border-bottom-left-radius: 4px;
+                }
+            }
+        }
+
+        .ai-generating-text {
+            .ai-cursor-blink {
+                animation: ai-blink 1s step-end infinite;
+                color: #a78bfa;
+                font-weight: bold;
+            }
+        }
+
+        .ai-error-text {
+            color: #f87171 !important;
+            .el-icon {
+                vertical-align: middle;
+                margin-right: 4px;
+            }
+        }
+
+        // 输入区
+        .ai-chat-input {
+            padding: 12px 16px;
+            border-top: 1px solid #30305a;
+            background: #1a1a2e;
+            flex-shrink: 0;
+
+            .ai-input-wrapper {
+                .el-textarea__inner {
+                    background: #242445 !important;
+                    border-color: #30305a !important;
+                    color: #e2e8f0 !important;
+                    border-radius: 10px !important;
+                    padding: 10px 14px !important;
+                    font-size: 13px !important;
+                    resize: none !important;
+
+                    &::placeholder {
+                        color: #64748b !important;
+                    }
+
+                    &:focus {
+                        border-color: #667eea !important;
+                        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15) !important;
+                    }
+                }
+            }
+
+            .ai-input-actions {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-top: 8px;
+
+                .ai-input-hint {
+                    font-size: 11px;
+                    color: #64748b;
+                }
+
+                .ai-input-btns {
+                    display: flex;
+                    gap: 6px;
+                }
+            }
+        }
+    }
+
+    // AI 面板展开/收起动画
+    .ai-slide-enter-active {
+        animation: ai-slide-in 0.3s ease;
+    }
+    .ai-slide-leave-active {
+        animation: ai-slide-in 0.25s ease reverse;
+    }
+}
+
+@keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3); }
+    50% { box-shadow: 0 4px 30px rgba(102, 126, 234, 0.5); }
+}
+
+@keyframes ai-blink {
+    50% { opacity: 0; }
+}
+
+@keyframes ai-msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ai-slide-in {
+    from { width: 0; min-width: 0; opacity: 0; }
+    to { width: 380px; min-width: 380px; opacity: 1; }
 }
 
 .shortcuts-content {

@@ -74,5 +74,20 @@ namespace Microi.net
         /// </summary>
         /// <param name="osClient">租户标识</param>
         Task<DosResult> IncrementalSyncSchemaCache(string osClient);
+
+        /// <summary>
+        /// 自然语言转V8引擎代码（流式输出，打字机效果）
+        /// </summary>
+        /// <param name="param">请求参数</param>
+        /// <param name="onChunkReceived">流式数据块回调函数</param>
+        /// <returns></returns>
+        Task<DosResult> NL2V8Engine(NL2V8Param param, Func<string, Task> onChunkReceived);
+
+        /// <summary>
+        /// 自然语言转V8引擎代码（非流式版本）
+        /// </summary>
+        /// <param name="param">请求参数</param>
+        /// <returns></returns>
+        Task<DosResult> NL2V8Engine(NL2V8Param param);
     }
 }
