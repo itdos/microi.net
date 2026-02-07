@@ -809,6 +809,7 @@
             v-if="ShowFieldForm"
             class="diy-form-container"
             draggable
+            align-center
             :width="GetOpenFormWidth()"
             :modal="true"
             :modal-append-to-body="true"
@@ -1322,6 +1323,7 @@
         <el-dialog
             v-if="ShowAnyTable"
             draggable
+            align-center
             :modal="true"
             :width="'80%'"
             :modal-append-to-body="true"

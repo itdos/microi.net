@@ -4,6 +4,7 @@
         <el-dialog
             class="diy-form-container"
             draggable
+            align-center
             :width="GetOpenFormWidth()"
             :modal="!IsTableChild()"
             :modal-append-to-body="false"

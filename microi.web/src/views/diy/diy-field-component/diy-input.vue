@@ -52,15 +52,17 @@
 
     <!-- 配置弹窗 - 设计模式下可用 -->
     <el-dialog
+        draggable
+        align-center
         v-if="configDialogVisible"
         v-model="configDialogVisible"
         title="单行文本配置"
-        width="600px"
+        width="50%"
         :close-on-click-modal="false"
         destroy-on-close
         append-to-body
     >
-        <el-form label-width="100px" label-position="top" size="small">
+        <el-form label-width="100px" label-position="top" size="small" :inline="true">
             <el-divider content-position="left">显示设置</el-divider>
             
             <el-form-item label="密码输入">

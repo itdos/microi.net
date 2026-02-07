@@ -15,7 +15,7 @@
 
 ## 预览图
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/csdn/Microi20260122.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/e7cc9aee7486409a40a4a0b72cf5d916.jpeg" style="margin: 5px;">
