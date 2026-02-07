@@ -7,9 +7,9 @@
 ```json
 version: '3.8'
 services:
-  documentserver:
+  microi-onlyoffice:
     image: onlyoffice/documentserver
-    container_name: onlyoffice
+    container_name: microi-onlyoffice
     logging:
       driver: "json-file"
       options:
@@ -23,10 +23,10 @@ services:
     environment:
       - JWT_ENABLED=false
     volumes:
-      - /volume1/docker/onlyoffice/DocumentServer/logs:/var/log/onlyoffice
-      - /volume1/docker/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data
-      - /volume1/docker/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
-      - /volume1/docker/onlyoffice/DocumentServer/db:/var/lib/postgresql
+      - /microi/onlyoffice/DocumentServer/logs:/var/log/onlyoffice
+      - /microi/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data
+      - /microi/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
+      - /microi/onlyoffice/DocumentServer/db:/var/lib/postgresql
 ```
 
 ## 设置反向代理、配置平台系统设置

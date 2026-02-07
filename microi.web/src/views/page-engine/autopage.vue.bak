@@ -9,7 +9,6 @@ import { DiyCommon } from "@/utils/diy.common";
 import { formDesigner, EventBus, usePageEngineStore } from "microi-pageengine";
 import "microi-pageengine/style.css";
 import { newComponents, newWidgets } from "@/utils/extendedWidget";
-import { createPinia } from "pinia";
 
 export default {
     components: {
@@ -31,9 +30,8 @@ export default {
         };
     },
     async mounted() {
-        // 初始化 pinia store
-        const pinia = createPinia();
-        this.pageEngineStore = usePageEngineStore(pinia);
+        // 初始化 store
+        this.pageEngineStore = usePageEngineStore();
 
         // 设置token
         this.pageEngineStore.setToken(DiyCommon.getToken());
