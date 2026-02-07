@@ -93,7 +93,6 @@ const Toolbar = defineAsyncComponent(async () => {
 
 // ==================== 定制组件 ====================
 const LoudongTestComponent = defineAsyncComponent(() => import("@/views/test/loudong"));
-const OpenIframe = defineAsyncComponent(() => import("@/views/page-engine/dialogiframe.vue"));
 
 // ==================== 注册组件函数 ====================
 // 参数 app 是 Vue 3 的应用实例（createApp 返回值）
@@ -181,7 +180,6 @@ function RegMicroiComponents(app) {
 
     // 定制组件
     app.component("LoudongTestComponent", LoudongTestComponent);
-    app.component("OpenIframe", OpenIframe);
 }
 
 // ==================== 导出 ====================
