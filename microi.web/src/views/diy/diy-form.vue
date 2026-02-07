@@ -1450,7 +1450,7 @@ export default {
         },
         GetV8(field) {
             var self = this;
-            var v8 = {};
+            var v8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
 
             //2021-12-10新增，有可能用户自定义父级model，如点击A子表一行数据，更新B子表数据
             if (field && !self.DiyCommon.IsNull(field._ParentFormModel)) {
@@ -1579,40 +1579,6 @@ export default {
             });
             return result;
         },
-        async RunOpenTableSubmitV8(field) {
-            var self = this;
-            self.BtnLoading = true;
-            //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
-            // var V8 = v8 ? v8 : {}
-            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
-            V8.EventName = "OpenTableSubmit";
-            try {
-                if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.OpenTable) && !self.DiyCommon.IsNull(field.Config.OpenTable.SubmitV8)) {
-                    //从弹出的表格中获取已经选中的数据，如果是单选，返回Object
-                    var refComponent = self.getRefComponent(field.Name);
-                    if (refComponent) {
-                        if (field.Config.OpenTable.MultipleSelect === false) {
-                            V8.TableRowSelected = refComponent.TableSelectedRow;
-                        } else {
-                            V8.TableRowSelected = refComponent.TableMultipleSelection;
-                        }
-                    }
-                    self.SetV8DefaultValue(V8);
-                    
-                    await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()");
-                    if (V8.Result !== false) {
-                        field.Config.OpenTable.ShowDialog = false;
-                    }
-                }
-                self.BtnLoading = false;
-            } catch (error) {
-                self.DiyCommon.Tips("执行弹出表格提交事件V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
-                self.BtnLoading = false;
-            } finally {
-                
-                
-            }
-        },
         async OpenTableEventByInput(fieldName) {
             var self = this;
             if (fieldName) {
@@ -1643,6 +1609,7 @@ export default {
             });
         },
         OpenTableSetWhere(fieldModel, where) {
+            debugger;
             fieldModel.Config.OpenTable.PropsWhere = where;
         },
         AppendSearchChildTable(fieldModel, appendSearch) {

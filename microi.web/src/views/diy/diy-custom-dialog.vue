@@ -5,6 +5,7 @@
             v-if="OpenType != 'Drawer'"
             class="diy-form-container"
             draggable
+            align-center
             :width="width"
             :modal="true"
             :modal-append-to-body="false"

@@ -51,7 +51,10 @@
                 </template>
             </el-dropdown>
         </div>
-        <el-dialog title="修改密码" v-model="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
+        <el-dialog 
+            draggable
+            align-center
+            title="修改密码" v-model="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
             <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px">
                 <el-form-item label="旧密码" prop="Pwd">
                     <el-input v-show="false" type="text" />

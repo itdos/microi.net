@@ -2,7 +2,7 @@
 
 ## 平台简介
 >* 官方文档：[https://microi.net](https://microi.net)
->* 技术框架：[__<font color="red">**低代码 + AI**</font>__]开发模式，支持`传统开发`，.NET10 + Vue2/3 + Redis + MySql/SqlServer/Oracle + Element-UI/Element-Plus + UniApp
+>* 技术框架：[__<font color="red">**低代码 + AI**</font>__]开发模式，支持`传统开发`，.NET10 + Vue2/3 + Redis + MySql/SqlServer/Oracle + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
 >* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript`编写`后端api接口`，支持 [[AI代写V8引擎代码]](https://microi.net/doc/v8-engine/ai-apiengine.html)，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
 >* WebOS试用地址：[https://webos.microi.net](https://webos.microi.net)
@@ -15,7 +15,7 @@
 
 ## 预览图
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/csdn/Microi20260122.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/e7cc9aee7486409a40a4a0b72cf5d916.jpeg" style="margin: 5px;">

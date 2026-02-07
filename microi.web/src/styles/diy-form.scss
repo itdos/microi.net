@@ -453,6 +453,11 @@
             color: #303133;
             line-height: 32px;
             transition: color 0.3s ease;
+            span{
+                display: flex;
+                align-items: center;
+                gap: 3px;
+            }
 
             // 必填项标记增强
             &.is-required::before {
