@@ -16,7 +16,7 @@
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
-            class="dialog-opentable"
+            :class="'dialog-opentable ' + (diyStore.IsPhoneView ? 'is-phone-view' : '')"
         >
             <template #header>
                 <div style="display: flex;justify-content: space-between;">
@@ -54,7 +54,7 @@
             v-if="configDialogVisible"
             v-model="configDialogVisible"
             title="弹出表格配置"
-            width="50%"
+            width="70%"
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body
@@ -142,6 +142,7 @@
 <script setup>
 import { ref, computed, getCurrentInstance, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
+import { useDiyStore } from "@/pinia";
 // ⚠️ 不再单独引入图标,使用 main.js 中全局注册的图标
 // import { CircleCheck, Close } from "@element-plus/icons-vue";
 
@@ -154,6 +155,8 @@ const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy
 defineOptions({
     inheritAttrs: false
 });
+
+const diyStore = useDiyStore();
 
 const props = defineProps({
     modelValue: {},
@@ -324,7 +327,7 @@ const handleSubmit = async () => {
             // 从弹出的表格中获取已经选中的数据
             const refName = "refOpenTable_" + field.Name;
             const tableChildRef = proxy.$refs[refName];
-            
+            debugger;
             if (tableChildRef) {
                 if (field.Config.OpenTable.MultipleSelect === false) {
                     V8.TableRowSelected = tableChildRef.TableSelectedRow;
@@ -441,8 +444,8 @@ defineExpose({
     .search-outside {
         padding-left: 0px !important;
     }
-}
 
+}
 .form-item-tip {
     font-size: 12px;
     color: #909399;
@@ -452,5 +455,14 @@ defineExpose({
 
 .form-item-top {
     margin-bottom: 22px;
+}
+</style>
+
+<!-- 全局样式：针对 append-to-body 的对话框 -->
+<style lang="scss">
+.dialog-opentable.is-phone-view {
+    width: 100% !important;
+    margin-left: 10px !important;
+    margin-right: 10px !important;
 }
 </style>

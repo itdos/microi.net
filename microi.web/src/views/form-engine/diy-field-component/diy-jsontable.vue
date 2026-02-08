@@ -138,7 +138,7 @@
             v-if="configDialogVisible"
             v-model="configDialogVisible"
             title="JSON表格列配置"
-            width="900px"
+            width="70%"
             draggable
             align-center
             :close-on-click-modal="false"

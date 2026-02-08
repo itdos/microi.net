@@ -28,7 +28,9 @@
         v-if="configDialogVisible"
         v-model="configDialogVisible"
         title="下拉树配置"
-        width="700px"
+        draggable
+        align-center
+        width="70%"
         :close-on-click-modal="false"
         destroy-on-close
         append-to-body

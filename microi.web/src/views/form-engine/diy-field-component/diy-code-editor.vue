@@ -199,7 +199,9 @@
             v-if="configDialogVisible"
             v-model="configDialogVisible"
             title="代码编辑器配置"
-            width="400px"
+            draggable
+            align-center
+            width="70%"
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body

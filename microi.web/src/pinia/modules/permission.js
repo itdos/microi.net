@@ -52,6 +52,7 @@ function normalizeComponentPath(componentPath) {
 
 // 检查是否应该忽略此路径的警告
 function shouldIgnoreWarning(componentPath) {
+    return false;
     return ignoredPaths.some((ignoredPath) => componentPath.includes(ignoredPath));
 }
 
