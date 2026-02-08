@@ -86,10 +86,27 @@ export default defineConfig({
                 entryFileNames: 'static/js/[name]-[hash].js',
                 assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
                 // 手动代码分割，优化首屏加载
+                // 采用保守策略，只分割确实很大且独立的包，避免循环依赖
                 manualChunks(id) {
                     // node_modules 中的库按包分割
                     if (id.includes('node_modules')) {
-                        // Element Plus - UI 框架（必须在 vue 之前检查，因为它依赖 vue）
+                        // Vue 核心必须最先处理，所有 @vue/ 内部包都放在一起
+                        if (id.includes('node_modules/vue/') || 
+                            id.includes('node_modules/@vue/') ||
+                            id.includes('/vue/dist/') ||
+                            id.includes('/@vue/')) {
+                            return 'vendor-vue';
+                        }
+                        
+                        // Vue 生态系统单独分割
+                        if (id.includes('vue-router')) {
+                            return 'vendor-vue-router';
+                        }
+                        if (id.includes('pinia')) {
+                            return 'vendor-pinia';
+                        }
+                        
+                        // Element Plus - UI 框架
                         if (id.includes('element-plus') && !id.includes('@element-plus/icons-vue')) {
                             return 'vendor-element';
                         }
@@ -97,75 +114,39 @@ export default defineConfig({
                         if (id.includes('@element-plus/icons-vue')) {
                             return 'vendor-icons';
                         }
-                        // 核心框架库 - 首屏必需（放在 element-plus 之后，避免循环依赖）
-                        if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia') || id.includes('@vue')) {
-                            return 'vendor-core';
-                        }
-                        // 富文本编辑器 - 很大，需要时才加载
+                        
+                        // 以下是体积大且独立的库，单独拆分
+                        
+                        // 富文本编辑器 - 很大
                         if (id.includes('wangeditor') || id.includes('@wangeditor')) {
                             return 'vendor-editor';
                         }
-                        // Monaco 编辑器 - 代码编辑器（很大，单独拆分）
+                        
+                        // Monaco 编辑器 - 代码编辑器（很大）
                         if (id.includes('monaco-editor')) {
                             return 'vendor-monaco';
                         }
-                        // 图表库（echarts 很大，单独拆分）
+                        
+                        // 图表库（echarts 很大）
                         if (id.includes('echarts') || id.includes('zrender')) {
                             return 'vendor-charts';
                         }
+                        
                         // FullCalendar 日历组件（比较大）
                         if (id.includes('@fullcalendar')) {
                             return 'vendor-calendar';
                         }
+                        
                         // Three.js 3D库（非常大）
                         if (id.includes('three')) {
                             return 'vendor-three';
                         }
-                        // SignalR 实时通信
-                        if (id.includes('@microsoft/signalr')) {
-                            return 'vendor-signalr';
-                        }
-                        // 加密相关库
-                        if (id.includes('crypto-js') || id.includes('jsencrypt') || id.includes('js-base64')) {
-                            return 'vendor-crypto';
-                        }
-                        // Excel 相关（xlsx 比较大）
-                        if (id.includes('xlsx')) {
-                            return 'vendor-xlsx';
-                        }
-                        // jQuery（如果不是必需的，建议移除）
-                        if (id.includes('jquery')) {
-                            return 'vendor-jquery';
-                        }
-                        // 工具库（lodash、dayjs、moment等）
-                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment') || 
-                            id.includes('underscore') || id.includes('file-saver') || id.includes('pinyin')) {
-                            return 'vendor-utils';
-                        }
-                        // HTTP 请求库
-                        if (id.includes('axios') || id.includes('qs')) {
-                            return 'vendor-http';
-                        }
-                        // UI 增强库
-                        if (id.includes('sortablejs') || id.includes('vuedraggable') || 
-                            id.includes('swiper') || id.includes('animate.css')) {
-                            return 'vendor-ui-enhance';
-                        }
-                        // 其他第三方库（应该已经很小了）
-                        return 'vendor-other';
+                        
+                        // 其他所有第三方库统一放到 vendor-libs
+                        // 不再细分，避免循环依赖问题
+                        return 'vendor-libs';
                     }
-                    // 工作流模块 - 按需加载
-                    if (id.includes('/views/workflow/')) {
-                        return 'module-workflow';
-                    }
-                    // 聊天模块 - 按需加载
-                    if (id.includes('/views/chat/')) {
-                        return 'module-chat';
-                    }
-                    // 表单字段组件 - 按需加载
-                    if (id.includes('/diy-field-component/')) {
-                        return 'module-field-components';
-                    }
+                    // 不再对业务模块进行分割，避免循环依赖
                 }
             }
         }
