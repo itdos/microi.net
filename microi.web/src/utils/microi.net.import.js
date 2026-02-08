@@ -11,12 +11,10 @@ import { CodeToText, TextToCode } from "element-china-area-data";
 // 核心视图组件（登录后才需要）
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
 const DiyForm = defineAsyncComponent(() => import("@/views/form-engine/diy-form"));
-const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-dialog"));
+const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full"));
 const DiyDesign = defineAsyncComponent(() => import("@/views/form-engine/diy-design"));
-const DiyModule = defineAsyncComponent(() => import("@/views/form-engine/diy-module"));
-const DiyFormPage = defineAsyncComponent(() => import("@/views/form-engine/diy-form-page"));
+const DiyFormPage = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full"));
 const DiyDesignList = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
-const DiyDocument = defineAsyncComponent(() => import("@/views/form-engine/diy-document"));
 const DiyCustomDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog"));
 const DiySearch = defineAsyncComponent(() => import("@/views/form-engine/diy-search"));
 
@@ -110,10 +108,8 @@ function RegMicroiComponents(app) {
     app.component("DiyTable", DiyTable);
     app.component("DiyForm", DiyForm);
     app.component("DiyFormDialog", DiyFormDialog);
-    app.component("DiyModule", DiyModule);
     app.component("DiyFormPage", DiyFormPage);
     app.component("DiyDesignList", DiyDesignList);
-    app.component("DiyDocument", DiyDocument);
     app.component("DiyCustomDialog", DiyCustomDialog);
     app.component("DiySearch", DiySearch);
 
@@ -194,14 +190,12 @@ export {
     DiyTable,
     DiyForm,
     DiyFormDialog,
-    DiyModule,
     DiyFormPage,
     DiyChat,
     DiyFlowDesign,
     DiyMyWork,
     DiyFlowIndex,
     DiyDesignList,
-    DiyDocument,
     DiyFormWF,
     CustomFormWF,
     WFWorkHandler,

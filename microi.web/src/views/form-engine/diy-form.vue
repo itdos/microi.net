@@ -239,8 +239,8 @@
             :ComponentPath="DiyCustomDialogConfig.ComponentPath"
             ref="refDiyCustomDialog"
         ></DiyCustomDialog>
-        <!--抽屉或弹窗打开完整的Form-->
-        <DiyFormDialog ref="refDiyTable_DiyFormDialog" :ParentV8="GetV8()"></DiyFormDialog>
+        <!--抽屉或弹窗打开完整的Form（延迟渲染，防止 Page 模式下无限嵌套）-->
+        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" ref="refDiyTable_DiyFormDialog" :ParentV8="GetV8()"></DiyFormDialog>
     </div>
 </template>
 
@@ -736,7 +736,10 @@ export default {
             // 宽度调整
             isResizingWidth: false,
             resizeStartX: 0,
-            resizeStartWidth: 0
+            resizeStartWidth: 0,
+            
+            // 延迟渲染 DiyFormDialog，防止 Page 模式下无限嵌套
+            _shouldRenderDiyFormDialog: false
         };
     },
     beforeCreate() {
@@ -1990,7 +1993,18 @@ export default {
         },
         OpenAnyForm(param, callback) {
             var self = this;
-            self.$refs.refDiyTable_DiyFormDialog.Init(param, callback);
+            // 首次调用时才渲染 DiyFormDialog 组件，防止 Page 模式下无限嵌套
+            if (!self._shouldRenderDiyFormDialog) {
+                self._shouldRenderDiyFormDialog = true;
+                self.$nextTick(() => {
+                    // 等待组件渲染完成后再调用 Init
+                    if (self.$refs.refDiyTable_DiyFormDialog) {
+                        self.$refs.refDiyTable_DiyFormDialog.Init(param, callback);
+                    }
+                });
+            } else {
+                self.$refs.refDiyTable_DiyFormDialog.Init(param, callback);
+            }
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
