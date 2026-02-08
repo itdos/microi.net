@@ -36,8 +36,8 @@
 * **IoT物联网MQTT**：集成MQTT服务器，支持485、zigbee、蓝牙、Modbus的物联网设备MQTT网关，接口引擎在线编写业务逻辑代码，使IoT物联网开发效率提升10倍
 * **搜索引擎（ES）**：集成ES搜索引擎，轻松实现大型互联网应用的分词搜索
 * **MongoDB**：集成MongoDB，接口引擎可直接访问MongoDB，日志系统采用MongoDB，亿级数据量毫秒级分页
-* **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)【<span color="red">Tips：此模块暂未开源，功能无限制使用</span>】
-* **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)【<span color="red">Tips：此模块暂未开源，功能无限制使用</span>】
+* **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)
+* **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)
 * **SaaS引擎**：三种SAAS模式，支持数据库级别隔离多租户、TenantId租户隔离、独立组织机构数据隔离
 * **表单引擎**：[支持扩展组件、支持自定义vue组件嵌入表单、支持二次开发调用表单引擎，支持V8引擎事件，灵活实现复杂业务逻辑](https://microi.blog.csdn.net/article/details/143671179)
 

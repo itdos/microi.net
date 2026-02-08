@@ -29,7 +29,8 @@ const pathMappings = {
     // form 相关映射
     "/microi.net/diy-form-page": "/diy/diy-form-page",
     // system 相关映射
-    "/itdos/system/theme-setting": "/itdos/system/system-setting"
+    "/itdos/system/sys-log": "/system/sys-log",
+    "/diy/diy-table-rowlist": "/diy/diy-table"
 };
 
 // 已知不存在的组件路径（静默处理，不打印警告）

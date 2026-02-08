@@ -1,0 +1,82 @@
+/* 字体样式 */
+@import "./assets/css/iconfont.css";
+
+/* 定义全局样式 - 所有样式都基于顶级类 microi-print-engine */
+/* 在 main.js 入库文件引入 */
+
+/* scrollbar - 限定在组件内部 */
+.microi-print-engine ::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+.microi-print-engine ::-webkit-scrollbar-corner {
+  height: 4px;
+  width: 4px;
+}
+.microi-print-engine ::-webkit-scrollbar-thumb {
+  background: #409eff;
+  border-radius: 2px;
+  background-image: -webkit-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+}
+.microi-print-engine ::-webkit-scrollbar-thumb:hover {
+  background: #409eff;
+}
+
+/* flex - 限定在组件内部 */
+.microi-print-engine .mpe-flex-row {
+  display: flex;
+}
+.microi-print-engine .mpe-flex-col {
+  display: flex;
+  flex-direction: column;
+}
+.microi-print-engine .mpe-flex-wrap {
+  flex-wrap: wrap;
+}
+.microi-print-engine .mpe-align-center {
+  align-items: center;
+}
+.microi-print-engine .mpe-justify-center {
+  justify-content: center;
+}
+
+.microi-print-engine .mpe-flex-1 {
+  flex: 1;
+}
+.microi-print-engine .mpe-flex-2 {
+  flex: 2;
+}
+.microi-print-engine .mpe-flex-3 {
+  flex: 3;
+}
+.microi-print-engine .mpe-flex-4 {
+  flex: 4;
+}
+.microi-print-engine .mpe-flex-5 {
+  flex: 5;
+}
+
+.microi-print-engine .mpe-ml-10 {
+  margin-left: 10px;
+}
+.microi-print-engine .mpe-mr-10 {
+  margin-right: 10px;
+}
+.microi-print-engine .mpe-mt-10 {
+  margin-top: 10px;
+}
+.microi-print-engine .mpe-mb-10 {
+  margin-bottom: 10px;
+}
+
+ 
+
