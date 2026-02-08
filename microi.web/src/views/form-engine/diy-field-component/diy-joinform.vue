@@ -46,7 +46,7 @@
         title="关联表单配置"
         draggable
         align-center
-        width="50%"
+        width="70%"
         :close-on-click-modal="false"
         destroy-on-close
         append-to-body

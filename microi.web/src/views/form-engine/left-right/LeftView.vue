@@ -130,7 +130,7 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
-import DiyFormDialog from "@/views/form-engine/diy-form-dialog.vue";
+import DiyFormDialog from "@/views/form-engine/diy-form-full.vue";
 // 移除错误的 fullcalendar internal 导入
 // import { aW } from "@fullcalendar/core/internal-common";
 

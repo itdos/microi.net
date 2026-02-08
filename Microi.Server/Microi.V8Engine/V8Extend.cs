@@ -64,6 +64,8 @@ namespace Microi.net
             /// <summary>阿里 DNS 接口</summary>
             V8ExtensionRegistry.Register("Alidns", () => new Alidns());
 
+            V8ExtensionRegistry.Register("System", () => new SystemInfo());
+
             // ============================================
             // 【用户自定义扩展 - 在此添加你的扩展】
             // ============================================
