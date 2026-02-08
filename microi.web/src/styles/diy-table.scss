@@ -977,13 +977,13 @@
     color: #303133;
     user-select: none;
     
-    ::v-deep .el-checkbox__label {
+    :deep(.el-checkbox__label) {
         font-size: 14px;
         padding-left: 8px;
     }
     
     &.is-checked {
-        ::v-deep .el-checkbox__label {
+        :deep(.el-checkbox__label) {
             color: var(--el-color-primary);
             font-weight: 600;
         }
@@ -1030,7 +1030,7 @@
     .el-checkbox {
         margin: 0;
         
-        ::v-deep .el-checkbox__input {
+        :deep(.el-checkbox__input) {
             .el-checkbox__inner {
                 width: 20px;
                 height: 20px;
@@ -1053,7 +1053,7 @@
             }
         }
         
-        ::v-deep .el-checkbox__label {
+        :deep(.el-checkbox__label) {
             display: none;
         }
     }

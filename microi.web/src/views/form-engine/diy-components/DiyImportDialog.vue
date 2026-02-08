@@ -52,7 +52,7 @@
 
 <script>
 import { Upload } from "@element-plus/icons-vue";
-import { RefreshRight, Warning, Close } from "@element-plus/icons-vue";
+import { RefreshRight } from "@element-plus/icons-vue";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 
@@ -107,8 +107,6 @@ export default {
             importStepList: [],
             _importStepTimer: null,
             RefreshRight,
-            Warning,
-            Close
         };
     },
     computed: {

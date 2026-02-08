@@ -568,6 +568,7 @@
                     <el-col
                         v-for="(model, index) in DiyTableRowList"
                         v-show="!(!diyStore.IsPhoneView && tableLoading)"
+                        @click="DiyTableRowClick(model)"
                         :key="model.Id"
                             :xs="24"
                             :sm="12"
@@ -804,495 +805,9 @@
             </div>
         </teleport>
 
-        <!--以弹窗形式打开Form-->
-        <el-dialog
-            v-if="ShowFieldForm"
-            class="diy-form-container"
-            draggable
-            align-center
-            :width="GetOpenFormWidth()"
-            :modal="true"
-            :modal-append-to-body="true"
-            :model-value="ShowFieldForm"
-            @update:model-value="ShowFieldForm = $event"
-            :close-on-click-modal="CloseFormNeedConfirm == false"
-            :close-on-press-escape="CloseFormNeedConfirm == false"
-            :show-close="false"
-            :append-to-body="true"
-            :destroy-on-close="true"
-            @closed="onDialogClosed"
-        >
-            <template #header>
-                <div class="pull-left">
-                    <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
-                </div>
-                <div class="pull-right"  style="display: flex;gap: 10px;align-items: center;justify-content: center;">
-                    <el-dropdown
-                        v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
-                        split-button
-                        type="primary"
-                        trigger="click"
-                        @click="SaveDiyTableCommon(true, 'Close')"
-                    >
-                        <dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />
-                        <!-- AddClose   UptClose -->
-                        {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.Save") : $t("Msg.Save") }}
-                        <template #dropdown
-                            ><el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item
-                                    v-if="ShowFormBottomBtns.SaveAdd"
-                                    :icon="BtnLoading ? undefined : 's-help'"
-                                    :disabled="BtnLoading"
-                                    @click="SaveDiyTableCommon(false, 'Insert')"
-                                    >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
-                                >
-                                <el-dropdown-item
-                                    v-if="ShowFormBottomBtns.SaveUpdate"
-                                    :icon="BtnLoading ? undefined : 's-help'"
-                                    :disabled="BtnLoading"
-                                    @click="SaveDiyTableCommon(false, 'Update')"
-                                    >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
-                                >
-                            </el-dropdown-menu></template
-                        >
-                    </el-dropdown>
-                    <!-- OpenDetail({ Id: TableRowId }, 'Edit', true) -->
-                    <el-button
-                        v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
-                        :loading="BtnLoading"
-                        :icon="Edit"
-                        type="primary"
-                        @click="FormMode = 'Edit'"
-                        >{{ $t("Msg.Edit") }}</el-button
-                    >
-                    <el-button
-                        v-if="
-                            FormMode == 'Edit' &&
-                            TableChildFormMode !== 'View' &&
-                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-                        "
-                        type="info"
-                        icon="ArrowLeft"
-                        @click="FormMode = 'View'"
-                    >
-                        {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
-                    </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
-                        <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
-                            <el-button
-                                :key="TypeFieldName + 'more_btn_formbtns_' + btnIndex"
-                                v-if="btn.IsVisible"
-                                :type="GetMoreBtnStyle(btn)"
-                                :loading="BtnLoading"
-                                @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
-                            >
-                                <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                {{ btn.Name }}
-                            </el-button>
-                        </template>
-                    </template>
-                    <el-dropdown trigger="click">
-                        <el-button>
-                            {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
-                        </el-button>
-                        <template #dropdown>
-                            <el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item
-                                    v-if="
-                                        _LimitDel &&
-                                        TableChildFormMode !== 'View' &&
-                                        FormMode != 'Add' &&
-                                        !TableChildField.Readonly &&
-                                        ShowDeleteBtn &&
-                                        OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-                                    "
-                                    :loading="BtnLoading"
-                                    :icon="BtnLoading ? undefined : Delete"
-                                    :disabled="BtnLoading"
-                                    type="danger"
-                                    @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
-                                    >{{ $t("Msg.Delete") }}</el-dropdown-item
-                                >
-                                <el-dropdown-item 
-                                    v-if="GetCurrentUser._IsAdmin" 
-                                    :icon="View" 
-                                    @click="ShowHideField = !ShowHideField">
-                                    {{ $t("Msg.ShowHideField") }}
-                                </el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
-                    <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
-                </div>
-            </template>
-            <div class="clear">
-                <div :class="ShowFormRight() ? 'el-col el-col-20' : 'el-col el-col-24'">
-                    <DiyFormChild
-                        ref="fieldForm"
-                        :FormWF="FormWF"
-                        :LoadMode="''"
-                        :FormMode="FormMode"
-                        :TableChildFormMode="TableChildFormMode"
-                        :TableId="TableId"
-                        :TableName="CurrentDiyTableModel.Name"
-                        :TableRowId="TableRowId"
-                        :DefaultValues="FieldFormDefaultValues"
-                        :SelectFields="FieldFormSelectFields"
-                        :FixedTabs="FieldFormFixedTabs"
-                        :HideFields="FieldFormHideFields"
-                        :ParentForm="FatherFormModel"
-                        :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                        :CurrentTableData="DiyTableRowList"
-                        :ActiveDiyTableTab="CurrentTableRowListActiveTab"
-                        :ShowHideField="ShowHideField"
-                        @ParentFormSet="ParentFormSet"
-                        @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                        @CallbackGetDiyField="CallbackGetDiyField"
-                        @CallbackFormSubmit="CallbackFormSubmit"
-                        @CallbackRefreshTable="CallbackRefreshTable"
-                        @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                        @CallbackReloadForm="CallbackReloadForm"
-                        @CallbackHideFormBtn="CallbackHideFormBtn"
-                        @CallbackFormValueChange="CallbackFormValueChange"
-                        @CallbackFormClose="CallbackFormClose"
-                    />
-                </div>
-                <div v-if="ShowFormRight()" class="el-col el-col-4" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
-                    <el-tabs v-model="FormRightType">
-                        <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
-                            <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
-                            <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataLogList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span style="color: red">{{ log.Label }}</span
-                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
-                                            <span style="color: red">{{ log.NVal }}</span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
-                            <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
-                            </div>
-                            <!--提交-->
-                            <div style="margin-top: 10px">
-                                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled">
-                                    {{ $t("Msg.Submit") }}
-                                </el-button>
-                            </div>
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataCommentList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span v-html="item.Content"></span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                    </el-tabs>
-                </div>
-            </div>
-
-            <!-- <template #footer class="dialog-footer">
-
-        </span> -->
-        </el-dialog>
-
-        <!--以抽屉形式打开Form-->
-        <!-- 注意：使用 v-if 控制抽屉的创建/销毁，而不是依赖 destroy-on-close -->
-        <!-- 这样可以确保组件在关闭时被完全销毁，避免内存泄漏 -->
-        <el-drawer
-            v-if="ShowFieldFormDrawer"
-            class="diy-form-container"
-            style=""
-            :modal="true"
-            :size="GetOpenFormWidth()"
-            :modal-append-to-body="true"
-            :model-value="ShowFieldFormDrawer"
-            @update:model-value="ShowFieldFormDrawer = $event"
-            :close-on-press-escape="CloseFormNeedConfirm == false"
-            :close-on-click-modal="CloseFormNeedConfirm == false"
-            :show-close="false"
-            :append-to-body="true"
-            :destroy-on-close="true"
-            @closed="onDrawerClosed"
-            @opened="onDrawerOpened"
-        >
-            <template #header>
-                <div class="pull-left" style="color: #000; font-size: 15px">
-                    <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
-                </div>
-                <div class="pull-right" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
-                    <el-dropdown
-                        v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
-                        split-button
-                        type="primary"
-                        trigger="click"
-                        @click="SaveDiyTableCommon(true, 'Close')"
-                    >
-                        <dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />
-                        <!-- AddClose   UptClose -->
-                        {{
-                            (FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert") && !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.SaveBtnText)
-                                ? SysMenuModel.DiyConfig.SaveBtnText
-                                : $t("Msg.Save")
-                        }}
-                        <!--{{ ((FormMode == 'Add' || FormMode == 'Insert') || FormMode == 'Insert') ? $t('Msg.Save') : $t('Msg.Save') }}-->
-                        <template #dropdown
-                            ><el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item
-                                    v-if="ShowFormBottomBtns.SaveAdd"
-                                    :icon="BtnLoading ? undefined : 's-help'"
-                                    :disabled="BtnLoading"
-                                    @click="SaveDiyTableCommon(false, 'Insert')"
-                                    >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
-                                >
-                                <el-dropdown-item
-                                    v-if="ShowFormBottomBtns.SaveUpdate"
-                                    :icon="BtnLoading ? undefined : 's-help'"
-                                    :disabled="BtnLoading"
-                                    @click="SaveDiyTableCommon(false, 'Update')"
-                                    >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
-                                >
-                                <el-dropdown-item
-                                    v-if="ShowFormBottomBtns.SaveView"
-                                    :icon="BtnLoading ? undefined : 's-help'"
-                                    :disabled="BtnLoading"
-                                    @click="SaveDiyTableCommon(false, 'View')"
-                                    >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
-                                >
-                            </el-dropdown-menu></template
-                        >
-                    </el-dropdown>
-                    <!-- OpenDetail({ Id: TableRowId }, 'Edit', true) -->
-                    <el-button
-                        v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
-                        :loading="BtnLoading"
-                        :icon="Edit"
-                        type="primary"
-                        @click="FormMode = 'Edit'"
-                        >{{ $t("Msg.Edit") }}</el-button
-                    >
-                    <el-button
-                        v-if="
-                            FormMode == 'Edit' &&
-                            TableChildFormMode !== 'View' &&
-                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-                        "
-                        type="info"
-                        icon="ArrowLeft"
-                        @click="FormMode = 'View'"
-                    >
-                        {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
-                    </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
-                        <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
-                            <el-button
-                                :key="TypeFieldName + 'more_btn_formbtns_' + btnIndex"
-                                v-if="btn.IsVisible"
-                                :type="GetMoreBtnStyle(btn)"
-                                :loading="BtnLoading"
-                                @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
-                            >
-                                <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                {{ btn.Name }}
-                            </el-button>
-                        </template>
-                    </template>
-                    <el-dropdown trigger="click">
-                        <el-button>
-                            {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
-                        </el-button>
-                        <template #dropdown>
-                            <el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item
-                                    v-if="
-                                        _LimitDel &&
-                                        TableChildFormMode !== 'View' &&
-                                        FormMode != 'Add' &&
-                                        !TableChildField.Readonly &&
-                                        ShowDeleteBtn &&
-                                        OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-                                    "
-                                    :loading="BtnLoading"
-                                    :icon="BtnLoading ? undefined : Delete"
-                                    :disabled="BtnLoading"
-                                    type="danger"
-                                    @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
-                                    >{{ $t("Msg.Delete") }}</el-dropdown-item
-                                >
-                                <el-dropdown-item 
-                                    v-if="GetCurrentUser._IsAdmin" 
-                                    :icon="View" 
-                                    @click="ShowHideField = !ShowHideField">
-                                    {{ $t("Msg.ShowHideField") }}
-                                </el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
-                    <el-button :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
-                </div>
-            </template>
-
-            <el-row class="clear" :gutter="20">
-                <!-- :class="ShowFormRight() ? 'pull-left' : ''"
-            :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
-                <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
-                    <DiyFormChild
-                        ref="fieldForm"
-                        :FormWF="FormWF"
-                        :LoadMode="''"
-                        :FormMode="FormMode"
-                        :TableChildFormMode="TableChildFormMode"
-                        :TableId="TableId"
-                        :TableName="CurrentDiyTableModel.Name"
-                        :TableRowId="TableRowId"
-                        :DefaultValues="FieldFormDefaultValues"
-                        :SelectFields="FieldFormSelectFields"
-                        :FixedTabs="FieldFormFixedTabs"
-                        :HideFields="FieldFormHideFields"
-                        :ParentForm="FatherFormModel"
-                        :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                        :CurrentTableData="DiyTableRowList"
-                        :ActiveDiyTableTab="CurrentTableRowListActiveTab"
-                        @ParentFormSet="ParentFormSet"
-                        @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                        @CallbackGetDiyField="CallbackGetDiyField"
-                        @CallbackFormSubmit="CallbackFormSubmit"
-                        @CallbackRefreshTable="CallbackRefreshTable"
-                        @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                        @CallbackReloadForm="CallbackReloadForm"
-                        @CallbackHideFormBtn="CallbackHideFormBtn"
-                        @CallbackFormValueChange="CallbackFormValueChange"
-                        @CallbackFormClose="CallbackFormClose"
-                    />
-                </el-col>
-                <!-- class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
-                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
-                    <el-tabs v-model="FormRightType">
-                        <el-tab-pane v-if="OpenDiyFormWorkFlow" :label="$t('Msg.WorkflowInfo')" name="WorkFlow">
-                            <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
-                            <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" :label="$t('Msg.DataLog')" name="DataLog">
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataLogList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <!-- <el-tag> -->
-                                            <span style="color: red">{{ log.Label }}</span
-                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
-                                            <span style="color: red">{{ log.NVal }}</span>
-                                            <!-- </el-tag>     -->
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading" style="height: 50px; line-height: 50px">
-                                    <el-icon><Loading /></el-icon>
-                                    {{ $t("Msg.Loading") }}
-                                </div>
-                                <div v-if="!DataLogListLoading && DataLogList.length == 0" style="height: 50px; line-height: 50px">
-                                    {{ $t("Msg.NoMoreData") }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
-                            <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
-                            </div>
-                            <!--提交-->
-                            <div style="margin-top: 10px">
-                                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled">
-                                    {{ $t("Msg.Submit") }}
-                                </el-button>
-                            </div>
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px; margin-top: 20px">
-                                    <el-timeline-item
-                                        v-for="item in DataCommentList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <!-- v-for="log in item.Content" :key="'datalog_content_' + log.Name"  -->
-                                        <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span v-html="item.Content"></span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                    </el-tabs>
-                </el-col>
-            </el-row>
-            <!-- <span class="demo-drawer__footer">
-
-        </span> -->
-        </el-drawer>
-
+        <!--弹窗/抽屉/全新页面 打开Form（已迁移到 diy-form-full.vue）-->
         <!--抽屉或弹窗打开完整的Form-->
-        <DiyFormDialog @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
+        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
         <!--导入功能-->
         <DiyImportDialog
@@ -1306,10 +821,10 @@
             :tableChildTableRowId="TableChildTableRowId"
             @import-success="GetDiyTableRow({ _PageIndex: 1 })"
         />
-        <DiyModule v-if="ShowDiyModule" :modal="!_IsTableChild" ref="refDiyModule"></DiyModule>
         <!-- :DataAppend="GetDiyCustomDialogDataAppend()" -->
         <!-- :visible="DiyCustomDialogConfig.Visible" -->
         <DiyCustomDialog
+            v-if="_shouldRenderDiyCustomDialog"
             :DataAppend="GetDiyCustomDialogDataAppend()"
             :OpenType="DiyCustomDialogConfig.OpenType"
             :title="DiyCustomDialogConfig.Title"
@@ -1437,7 +952,6 @@ export default {
         DiyImportDialog,
         DiyPermissionDialog,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
-        DiyFormChild: defineAsyncComponent(() => import("@/views/form-engine/diy-form")),
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
     },
     setup(props) {
@@ -1486,26 +1000,12 @@ export default {
         }
 
         // ========== 2. 关闭所有弹窗和抽屉 ==========
-        self.ShowFieldFormDrawer = false;
-        self.ShowFieldForm = false;
         self.ShowImport = false;
         self.ShowAnyTable = false;
         self.ShowMockPermissionDialog = false;
         self.ShowDiyModule = false; // 关闭模块组件
 
         // ========== 3. 清理子组件引用 ==========
-        // 先清理表单子组件
-        if (self.$refs.fieldForm) {
-            try {
-                if (typeof self.$refs.fieldForm.Clear === "function") {
-                    self.$refs.fieldForm.Clear();
-                }
-            } catch (e) {
-                /* ignore */
-            }
-        }
-
-        // ========== 4. 清理大数组和对象（包含内部引用） ==========
         // 表格数据 - 需要先清理内部的对象引用
         if (self.DiyTableRowList && self.DiyTableRowList.length > 0) {
             self.DiyTableRowList.forEach(row => {
@@ -1596,10 +1096,6 @@ export default {
         self.FatherFormModel_Data = null;
         self.ParentV8_Data = null;
 
-        // 日志和评论
-        self.DataLogList = [];
-        self.DataCommentList = [];
-
         // 导入进度
         self.ImportStepList = [];
 
@@ -1631,7 +1127,6 @@ export default {
         // ========== 8. 清理弹窗配置 ==========
         self.DiyCustomDialogConfig = {};
         self.OpenAnyTableParam = {};
-        self.OpenDiyFormWorkFlowType = {};
         self.FormWF = {};
 
         // ========== 9. 清理权限模拟数据 ==========
@@ -1981,25 +1476,16 @@ export default {
             // ========== V8引擎字段缓存 ==========
             _cachedDiyFieldList: null,
             _cachedDiyFieldListVersion: 0,
+            // ========== 延迟渲染控制标志 ==========
+            _shouldRenderDiyCustomDialog: false,
+            _shouldRenderDiyFormDialog: false,
 
-            CommentContent: "",
-            ShowHideField: false,
             ShowAnyTable: false,
             OpenAnyTableParam: {},
             Where: [],
             PageType: "", //=Report时为报表
-            DataLogListLoading: true,
-            DataLogList: [],
-            DataCommentListLoading: true,
-            DataCommentList: [],
-            FormRightType: "WorkFlow",
-            EnableDataLog: false,
             DiyCustomDialogConfig: {},
             // regionData:regionData,
-            StartWorkSubmited: false,
-            //{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:'', FormMode:''}
-            OpenDiyFormWorkFlowType: {},
-            OpenDiyFormWorkFlow: false,
             BtnExportLoading: false,
             NotSaveField: [],
             CurrentTableRowListActiveTab: {},
@@ -2010,13 +1496,8 @@ export default {
             DevComponents: {},
             TempLoading: {},
             Shangquan_Data: [],
-            ShowFormBottomBtns: {
-                SaveClose: true,
-                SaveAdd: true,
-                SaveUpdate: true,
-                SaveView: true
-            },
             TableMultipleSelection: [],
+            // BtnLoading:false,
             TableSelectedRow: {},
             TableSelectedRowLast: {},
             TableEnableBatch: false,
@@ -2038,9 +1519,6 @@ export default {
             FieldFormDefaultValues: {},
             StatisticsFields: null,
             BtnLoading: false,
-            ShowFieldFormHide: true,
-            ShowFieldForm: false,
-            ShowFieldFormDrawer: false,
             tableLoading: true,
             SearchModel: {},
             SearchEqual: {},
@@ -2096,9 +1574,7 @@ export default {
             LastOrderBy: "",
             FormWF: {},
             CurrentSelectedRowModel: {},
-            CloseFormNeedConfirm: false,
             SearchWhere: [],
-            isCheckDataLog: false, //角色是否允许访问日志
             IsVisibleAdd: false, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
             // ========== 内存优化相关 ==========
             _isDestroyed: false, // 组件销毁标志
@@ -2410,79 +1886,6 @@ export default {
             self.Total = 0;
         },
         
-        // ========== 抽屉打开动画完成后初始化表单 ==========
-        onDrawerOpened() {
-            var self = this;
-            // 从临时保存的上下文中恢复参数
-            var isOpenWorkFlowForm = self._pendingDrawerContext?.isOpenWorkFlowForm;
-            var wfParam = self._pendingDrawerContext?.wfParam;
-            var formMode = self._pendingDrawerContext?.formMode;
-            
-            self.CloseFormNeedConfirm = false;
-            
-            // 使用重试机制等待 fieldForm ref 准备好
-            var retryCount = 0;
-            var maxRetries = 20; // 最多重试20次
-            var retryInterval = 50; // 每次间隔50ms
-            
-            var tryInitFieldForm = function() {
-                if (self.$refs.fieldForm) {
-                    self.$refs.fieldForm.Init(true, function (callbackValue) {
-                        if (callbackValue && callbackValue.CurrentRowModel) {
-                            self.CurrentRowModel = callbackValue.CurrentRowModel;
-                            var V8 = callbackValue.V8;
-                            self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
-                        }
-                        self.BtnLoading = false;
-                    });
-                } else {
-                    retryCount++;
-                    if (retryCount < maxRetries) {
-                        setTimeout(tryInitFieldForm, retryInterval);
-                    } else {
-                        self.BtnLoading = false;
-                        console.error('[DiyTableRowlist] Drawer fieldForm ref 在 ' + (maxRetries * retryInterval) + 'ms 后仍不存在');
-                    }
-                }
-            };
-            
-            tryInitFieldForm();
-            
-            if (isOpenWorkFlowForm == true) {
-                if (self.DiyCommon.IsNull(wfParam)) {
-                    wfParam = { WorkType: "ViewWork" };
-                }
-                wfParam.FormMode = formMode;
-                self.InitWorkFlow(wfParam);
-            }
-            
-            // 清理临时上下文
-            self._pendingDrawerContext = null;
-        },
-        
-        // ========== 抽屉关闭动画完成后的清理 ==========
-        onDrawerClosed() {
-            var self = this;
-            // 清理当前行数据引用
-            self.CurrentRowModel = {};
-            self.CloseFormNeedConfirm = false;
-            // 清理临时上下文
-            self._pendingDrawerContext = null;
-            // 强制触发垃圾回收（如果浏览器支持）
-            if (window.gc) {
-                try { window.gc(); } catch(e) {}
-            }
-        },
-        
-        // ========== 弹窗关闭动画完成后的清理 ==========
-        onDialogClosed() {
-            var self = this;
-            console.log('[DiyTableRowlist] 弹窗关闭动画完成，执行额外清理');
-            // 清理当前行数据引用
-            self.CurrentRowModel = {};
-            self.CloseFormNeedConfirm = false;
-        },
-        
         // ========== 性能优化V3：全局共享菜单方法 ==========
         showMoreMenu(event, row) {
             var self = this;
@@ -2543,29 +1946,6 @@ export default {
                 return 150;
             }
             return field.TableWidth;
-        },
-        SubmitComment() {
-            var self = this;
-            self.DiyCommon.FormEngine.AddFormData(
-                "mic_data_comment",
-                {
-                    Title: "",
-                    Content: self.CommentContent,
-                    DataId: self.TableRowId,
-                    TableId: self.CurrentDiyTableModel.Id,
-                    TableName: self.CurrentDiyTableModel.Name,
-                    Avatar: self.GetCurrentUser.Avatar,
-                    Account: self.GetCurrentUser.Account,
-                    AccountUserId: self.GetCurrentUser.Id
-                },
-                function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.DiyCommon.Tips("评论成功！");
-                        self.CommentContent = "";
-                        self.GetCommentList();
-                    }
-                }
-            );
         },
         isMuban(field, scope) {
             // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
@@ -2758,20 +2138,6 @@ export default {
                 console.log('取消搜索');
             }
         },
-        ShowFormRight() {
-            var self = this;
-            //OpenDiyFormWorkFlow == true || CurrentDiyTableModel.EnableDataLog
-            if (self.OpenDiyFormWorkFlow) {
-                return true;
-            }
-            if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog && self.FormMode != "Add") {
-                return true;
-            }
-            if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataComment && self.FormMode != "Add") {
-                return true;
-            }
-            return false;
-        },
         //可传入外键Id值 、父表model
         async Init(parentFormModel, v8) {
             var self = this;
@@ -2936,90 +2302,6 @@ export default {
             var self = this;
             self.$refs.refDiyCustomDialog.CloseDialog();
         },
-        
-        /**
-         * 发起工作前，提交表单
-         * @param {*} param
-         * @param {*} callback  回调函数，表单提交完成后、流程发起后，必须调用，它会将提交按钮重置为可点击。
-         */
-        async CallbackStartWork(param, callback) {
-            var self = this;
-
-            try {
-                //-------第1步：在表单提交前，先执行节点开始v8。
-                //此v8说明：
-                //a、可以终止表单和流程的提交（也就是它是在【表单提前交V8事件】之前执行）
-                //b、可以修改表单中的值
-                //c、获取用户点击的是同意还是拒绝、填写的意见
-                //d、获取用户添加了哪些审批人、选择了哪些审批人
-
-                //先获取表单数据
-                var formData = self.$refs.fieldForm.GetFormData();
-                // 判断需要执行的V8
-                var v8Result = await self.$refs.refWfWorkHandler_2.RunNodeStartV8({
-                    Form: formData
-                });
-                if (v8Result.Result === false) {
-                    if (callback) {
-                        callback();
-                    }
-                    return;
-                }
-                if (v8Result.Form) {
-                    self.$refs.fieldForm.SetFormData(v8Result.Form);
-                } else {
-                    v8Result.Form = formData;
-                }
-                //-------第1步 END
-                //第一次表单提交是Add，但第二次提交一定要是Edit（有可能因为没找到审批人，导致表单提交成功，但流程提交失败，这时候重新提交，表单就需要是修改操作，不然生成重复数据）
-                var formParam = {
-                    FormMode: self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit", //表单加载模式：新增、编辑
-                    SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
-                };
-
-                //-------第2步：提交表单
-                self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData) {
-                    if (success == true) {
-                        self.StartWorkSubmited = true;
-                        //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-                        self.FormMode = "Edit";
-                        self.OpenDiyFormWorkFlowType.FormMode = "Edit";
-
-                        //-------第3步：发起工作
-                        self.$refs.refWfWorkHandler_2.StartWork(
-                            {
-                                FormData: v8Result.Form
-                            },
-                            function (result) {
-                                if (result.Code == 1) {
-                                    // self.$emit('CallbackWFSubmit', {Code : 1});
-                                    //关闭DiyForm弹层
-                                    self.ShowFieldForm = false;
-                                    self.ShowFieldFormDrawer = false;
-                                    self.ShowYanZhen = false;
-                                    self.GetDiyTableRow();
-                                } else {
-                                    // self.$emit('CallbackWFSubmit', {Code : 0});
-                                }
-                                //-------第3步 END
-                                if (callback) {
-                                    callback();
-                                }
-                            }
-                        );
-                    } else {
-                        if (callback) {
-                            callback();
-                        }
-                    }
-                });
-            } catch (error) {
-                if (callback) {
-                    callback();
-                }
-                throw error;
-            }
-        },
         DiyTableLoad(tree, treeNode, resolve) {
             var self = this;
             var param = {
@@ -3109,9 +2391,19 @@ export default {
             if (self.SysMenuModel.Id) {
                 self.BtnLoading = true;
                 
-                // 守卫语句：如果ref不存在，等待下一个tick再试
+                // 守卫语句：延迟渲染DiyFormDialog
                 const tryOpenForm = () => {
-                    if (!self.$refs.refDiyTable_DiyFormDialog) {
+                    if (!self._shouldRenderDiyFormDialog) {
+                        self._shouldRenderDiyFormDialog = true;
+                        self.$nextTick(() => {
+                            if (self.$refs.refDiyTable_DiyFormDialog) {
+                                openForm();
+                            } else {
+                                console.error('refDiyTable_DiyFormDialog ref未找到');
+                                self.BtnLoading = false;
+                            }
+                        });
+                    } else if (!self.$refs.refDiyTable_DiyFormDialog) {
                         self.$nextTick(() => {
                             if (self.$refs.refDiyTable_DiyFormDialog) {
                                 openForm();
@@ -3276,6 +2568,8 @@ export default {
             } finally {
                 
             }
+            // 为了卡片而实现，因为<el-table>有 @current-change="DiyTableCurrentChange"
+            self.DiyTableCurrentChange(row);
         },
         RefreshChildTable(field, parentFormModel, v8) {
             var self = this;
@@ -3368,14 +2662,6 @@ export default {
                     $("#diy-table-" + self.TableId).height(height);
                 }
             }
-        },
-        GetOpenFormWidth() {
-            var self = this;
-            if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
-                return "100%";
-            }
-            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "70%" : self.CurrentDiyTableModel.FormOpenWidth;
-            return result;
         },
         async RunV8Code({ field, thisValue, row, callback }) {
             var self = this;
@@ -3739,16 +3025,26 @@ export default {
             }
         },
         GetFormWF() {
-            var self = this;
+            // 表单工作流状态已迁移到 diy-form-full.vue，此处返回默认值
             return {
-                IsWF: self.OpenDiyFormWorkFlow == true,
-                WorkType: self.OpenDiyFormWorkFlowType.WorkType,
-                FlowDesignId: self.OpenDiyFormWorkFlowType.FlowDesignId
+                IsWF: false,
+                WorkType: "",
+                FlowDesignId: ""
             };
         },
         OpenAnyForm(param) {
             var self = this;
-            self.$refs.refDiyTable_DiyFormDialog.Init(param);
+            // 延迟渲染：首次调用时才渲染组件
+            if (!self._shouldRenderDiyFormDialog) {
+                self._shouldRenderDiyFormDialog = true;
+                self.$nextTick(() => {
+                    if (self.$refs.refDiyTable_DiyFormDialog) {
+                        self.$refs.refDiyTable_DiyFormDialog.Init(param);
+                    }
+                });
+            } else {
+                self.$refs.refDiyTable_DiyFormDialog.Init(param);
+            }
         },
         /**
          * 必传：SysMenuId或ModuleEngineKey、SubmitEvent、可选：MultipleSelect、PropsWhere、
@@ -3887,11 +3183,8 @@ export default {
         },
         CallbackFormClose() {
             var self = this;
-            if (self.ShowFieldForm == true) {
-                self.CloseFieldForm("ShowFieldForm", "Close", self.TableRowId);
-            } else if (self.ShowFieldFormDrawer == true) {
-                self.CloseFieldForm("ShowFieldFormDrawer", "Close", self.TableRowId);
-            }
+            // 已迁移至 diy-form-full.vue，通过 refDiyTable_DiyFormDialog 关闭
+            // V8.FormClose 可能调用此方法
         },
         /**
          * 必传：ComponentName
@@ -3904,7 +3197,17 @@ export default {
             }
             self.DiyCustomDialogConfig = param;
             // self.DiyCustomDialogConfig.Visible = true;
-            self.$refs.refDiyCustomDialog.Show();
+            // 延迟渲染：首次调用时才渲染组件，避免循环依赖
+            if (!self._shouldRenderDiyCustomDialog) {
+                self._shouldRenderDiyCustomDialog = true;
+                self.$nextTick(() => {
+                    if (self.$refs.refDiyCustomDialog) {
+                        self.$refs.refDiyCustomDialog.Show();
+                    }
+                });
+            } else {
+                self.$refs.refDiyCustomDialog.Show();
+            }
         },
         ShowTableChildHideField(fieldName, fields) {
             var self = this;
@@ -3984,54 +3287,6 @@ export default {
             }
             // 同步到 TableMultipleSelection
             self.TableMultipleSelection = [...self.cardSelection];
-        },
-        CallbackFormValueChange(field, value) {
-            var self = this;
-            if (self.FormMode !== "View") {
-                self.CloseFormNeedConfirm = true;
-            }
-        },
-        async CloseFieldForm(dialogId, actionType, tableRowId) {
-            var self = this;
-            if (self.FormMode == "View" || self.CloseFormNeedConfirm == false) {
-                await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
-            } else {
-                self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
-                    await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
-                });
-            }
-        },
-        async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
-            var self = this;
-            //执行离开Form V8。 为什么注释？
-            //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
-            //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
-            if (self.$refs.fieldForm) {
-                await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
-            }
-
-            //清空表单值
-            //2022-07-13：如果在关闭表单弹窗时清空表单值，就会触发上面的watch监控，然后又会请求一次getdiytablerow接口,所以要先标记ParentFormLoadFinish=false
-            //TODO 实际上clear还要考虑到把子表数据清空，不然会一闪而过上一条数据的子表数据
-            if (self.$refs.fieldForm) {
-                self.$refs.fieldForm.SetDiyTableRowModelFinish(false);
-            }
-            self.$nextTick(function () {
-                // 先清理表单数据
-                if (self.$refs.fieldForm) {
-                    self.$refs.fieldForm.Clear();
-                }
-                // 再关闭弹窗
-                if (!self.DiyCommon.IsNull(dialogId)) {
-                    self[dialogId] = false;
-                }
-                // 清理当前行数据引用，帮助垃圾回收
-                self.$nextTick(function () {
-                    self.CurrentRowModel = {};
-                    self.CloseFormNeedConfirm = false;
-                    // 移除 DOM 清理调用，让 Element Plus 自然管理组件生命周期
-                });
-            });
         },
         GetSearchItemCheckLabel(fieldData, field) {
             var self = this;
@@ -4250,42 +3505,6 @@ export default {
         //     }
         //     return false;
         // },
-        GetOpenTitleIcon() {
-            var self = this;
-            return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
-        },
-        GetOpenTitle() {
-            var self = this;
-            var title1 = "";
-            if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
-                title1 = self.$t("Msg.Add");
-            } else {
-                var fieldModel = self.ShowDiyFieldList[0];
-                var firstValue = "";
-                // if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
-                //     try {
-                //         firstValue = JSON.parse(self.CurrentRowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
-                //     } catch (error) {
-                //         firstValue = self.CurrentRowModel[fieldModel.Name];
-                //     }
-                // }else{
-                //     if (fieldModel) {
-                //         firstValue = self.CurrentRowModel[fieldModel.Name];
-                //     }
-                // }
-                if (fieldModel && (fieldModel.Component == "Text" || fieldModel.Component == "NumberText" || fieldModel.Component == "Textarea" || fieldModel.Component == "AutoNumber")) {
-                    firstValue = self.CurrentRowModel[fieldModel.Name];
-                }
-                title1 = self.$t("Msg." + self.FormMode) + (firstValue ? " [" + firstValue.toString().substring(0, 30) + "]" : "");
-            }
-            // var title2 = (self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Name))
-            //             ? '' : self.CurrentDiyTableModel.Name.replace('Diy_', '');
-            var title2 = "";
-            var title3 = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : self.CurrentDiyTableModel.Description;
-
-            //  + ' - ' + title2
-            return title1 + (!self.DiyCommon.IsNull(title3) && title3 != title2 ? " - " + title3 : "");
-        },
         StatisticsFieldsMethod(param) {
             var self = this;
             const { columns, data } = param;
@@ -4684,23 +3903,9 @@ export default {
         //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
         async OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
-            // self.OpenDiyFormWorkFlow = isOpenWorkFlowForm;
-            self.OpenDiyFormWorkFlow = false;
-            self.OpenDiyFormWorkFlowType = {};
-            self.FormWF = self.GetFormWF();
-            if (self.OpenDiyFormWorkFlow || self.CurrentDiyTableModel.EnableDataLog) {
-                if (self.CurrentDiyTableModel.EnableDataLog) {
-                    self.FormRightType = "DataLog";
-                }
-            }
-            //2020-10-23从数据库重新获取，以防止被修改过页面缓存数据
-            // self.DiyCommon.GetDiyTableRowModel();
 
             self.BtnLoading = true;
-
             self.FormMode = formMode;
-            self.OpenDiyFormWorkFlowType.FormMode = formMode;
-            self.StartWorkSubmited = false;
 
             self.ShowUpdateBtn = true;
             self.ShowDeleteBtn = true;
@@ -4712,14 +3917,6 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                //liucheng升级左右导航结构页面判断2025-7-15
-                // 检查是否在左右导航结构页面，且未选中分类
-                // 注意：在 LeftTreeJoinRightForm.vue 中，选中分类时会更新 clickData 包含 Id
-                // if (self.ParentV8 && self.ParentV8.Origin == "BomProject" && self.DiyCommon.IsNull(self.ParentV8.Id)) {
-                //   self.DiyCommon.Tips("请先选择分类后在点击新增按钮!", false);
-                //   self.BtnLoading = false;
-                //   return;
-                // }
                 self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
@@ -4734,86 +3931,7 @@ export default {
                 self.$nextTick(function () {
                     self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                 });
-
-                //2023-10-18获取数据日志,角色才可以访问
-                if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
-                    var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
-                    DataLogRole.forEach((item) => {
-                        if (self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
-                            self.isCheckDataLog = true;
-                        }
-                    });
-                } else {
-                    self.isCheckDataLog = true;
-                }
-
-                if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
-                    self.DataLogListLoading = true;
-                    self.DataLogList = [];
-
-                    self.DiyCommon.FormEngine.GetTableData(
-                        {
-                            FormEngineKey: "microi_datalog",
-                            _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
-                        },
-                        function (result) {
-                            if (result.Code == 1) {
-                                result.Data.forEach((item) => {
-                                    if (item.Content) {
-                                        item.Content = JSON.parse(item.Content);
-                                    } else {
-                                        item.Content = [];
-                                    }
-                                    if (item.Avatar) {
-                                        item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                                    } else {
-                                        item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                    }
-                                });
-                                self.DataLogList = result.Data;
-                            } else {
-                                self.DataLogList = [];
-                            }
-                            self.DataLogListLoading = false;
-                        }
-                    );
-                }
-
-                if (self.CurrentDiyTableModel.EnableDataComment) {
-                    self.GetCommentList();
-                }
             }
-        },
-        GetCommentList() {
-            var self = this;
-            self.DataCommentListLoading = true;
-            self.DataCommentList = [];
-            self.DiyCommon.FormEngine.GetTableData(
-                {
-                    FormEngineKey: "mic_data_comment",
-                    _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
-                },
-                function (result) {
-                    if (result.Code == 1) {
-                        result.Data.forEach((item) => {
-                            // if (item.Content) {
-                            //   item.Content = JSON.parse(item.Content);
-                            // } else {
-                            //   item.Content = [];
-                            // }
-                            if (item.Avatar) {
-                                item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                            } else {
-                                item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                            }
-                        });
-                        self.DataCommentList = result.Data;
-                    } else {
-                        self.DataCommentList = [];
-                    }
-                    self.DataCommentListLoading = false;
-                }
-            );
         },
         async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
@@ -4870,6 +3988,7 @@ export default {
 
             // 移动端模式下，使用路由跳转而非抽屉/弹窗打开表单
             // 因为用户在移动端会使用手机的后退功能返回上一页
+            // 2026-02-08 Anderson：如果是在弹窗中打开了表格，此时不应该跳走！未实现！
             if (self.diyStore.IsPhoneView) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {
@@ -4880,20 +3999,7 @@ export default {
                 self.$router.push(url);
                 return;
             }
-
             if (self.CurrentDiyTableModel.FormOpenType == "Dialog" || self.CurrentDiyTableModel.FormOpenType == "Drawer" || self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)) {
-                //2022-11-08表单更多按钮默认不显示
-                if (self.SysMenuModel.FormBtns && Array.isArray(self.SysMenuModel.FormBtns)) {
-                    self.SysMenuModel.FormBtns.forEach((btn) => {
-                        btn.IsVisible = false;
-                    });
-                }
-
-                if (self.DiyCommon.IsNull(tableRowModel)) {
-                    self.CurrentRowModel = {};
-                }
-                // self.CurrentRowModel = self.DiyCommon.IsNull(tableRowModel) ? {} : tableRowModel;
-                self.ShowFieldFormHide = false;
                 //2021-10-29新增，如果是行内新增
                 if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.AddBtnType == "InTable" && formMode == "Add") {
                     //2022-02-13 提前将Id赋值好，以便删除
@@ -4906,51 +4012,37 @@ export default {
                     defaultModel._RowMoreBtnsIn = [];
                     self.DiyTableRowList.push(defaultModel);
                     self.BtnLoading = false;
-                } else if (self.CurrentDiyTableModel.FormOpenType == "Dialog") {
-                    self.ShowFieldForm = true;
-                    if (window.history && window.history.pushState) {
-                        //TODO：监听浏览器前进后退事件。 后期实现
-                        // $(window).on('popstate', function () {
-                        //     //do something...
-                        // });
-                    }
-                    // Bug3修复：使用双层$nextTick确保Dialog和ref完全创建
-                    self.$nextTick(function () {
-                        self.$nextTick(function () {
-                            self.CloseFormNeedConfirm = false;
-                            if (self.$refs.fieldForm) {
-                                self.$refs.fieldForm.Init(true, async function (callbackValue) {
-                                    if (callbackValue && callbackValue.CurrentRowModel) {
-                                        self.CurrentRowModel = callbackValue.CurrentRowModel;
-                                        var V8 = callbackValue.V8;
-                                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
-                                    }
-                                    self.BtnLoading = false;
-                                });
-                            } else {
-                                self.BtnLoading = false;
-                                console.error('[DiyTableRowlist] Dialog fieldForm ref 不存在');
-                            }
-                            if (isOpenWorkFlowForm == true) {
-                                if (self.DiyCommon.IsNull(wfParam)) {
-                                    wfParam = { WorkType: "ViewWork" };
-                                }
-                                wfParam.FormMode = formMode;
-                                self.InitWorkFlow(wfParam);
-                            }
-                        });
-                    });
                 } else {
-                    // 保存打开表单时的上下文参数，在 @opened 事件中使用
-                    self._pendingDrawerContext = {
-                        isOpenWorkFlowForm: isOpenWorkFlowForm,
-                        wfParam: wfParam,
-                        formMode: formMode
+                    // 已迁移至 diy-form-full.vue，通过 refDiyTable_DiyFormDialog 统一打开
+                    var dialogType = self.CurrentDiyTableModel.FormOpenType || "Drawer";
+                    // 延迟渲染：首次调用时才渲染组件
+                    const initFormDialog = () => {
+                        self.$refs.refDiyTable_DiyFormDialog.Init({
+                            TableId: self.TableId,
+                            TableName: self.CurrentDiyTableModel.Name,
+                            SysMenuId: self.SysMenuId,
+                            Id: self.TableRowId,
+                            FormMode: self.FormMode,
+                            DialogType: dialogType,
+                            SelectFields: self.FieldFormSelectFields,
+                            Width: self.CurrentDiyTableModel.FormOpenWidth || undefined,
+                            IsDefaultOpen: isDefaultOpen
+                        });
+                        self.BtnLoading = false;
                     };
                     
-                    self.ShowFieldFormDrawer = true;
-                    // Bug3修复：使用 @opened 事件确保抽屉完全打开后再初始化
-                    // 初始化逻辑移到 onDrawerOpened 方法中
+                    if (!self._shouldRenderDiyFormDialog) {
+                        self._shouldRenderDiyFormDialog = true;
+                        self.$nextTick(() => {
+                            setTimeout(() => {
+                                if (self.$refs.refDiyTable_DiyFormDialog) {
+                                    initFormDialog();
+                                }
+                            }, 300);
+                        });
+                    } else {
+                        initFormDialog();
+                    }
                 }
             } else {
                 var url = `/diy/form-page/${self.TableId}`;
@@ -4960,63 +4052,6 @@ export default {
                 url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}`;
                 self.BtnLoading = false;
                 self.$router.push(url);
-            }
-        },
-        //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:'', FormMode:''}
-        InitWorkFlow(wfParam) {
-            var self = this;
-            self.OpenDiyFormWorkFlowType = wfParam;
-            self.FormWF = self.GetFormWF();
-            if (wfParam.WorkType == "ViewWork") {
-                //获取此数据对应的最后一个流程
-                if (self.FormMode != "Add" && self.FormMode != "Insert" && !self.DiyCommon.IsNull(self.TableRowId)) {
-                    self.DiyCommon.GetDiyTableRowModel(
-                        {
-                            // TableName: 'WF_Work',//WF_Flow
-                            FormEngineKey: "WF_Work", //WF_Flow
-                            _SearchEqual: {
-                                TableRowId: self.TableRowId
-                            }
-                        },
-                        function (result) {
-                            if (result.Code == 1 && !self.DiyCommon.IsNull(result.Data)) {
-                                self.OpenDiyFormWorkFlow = true;
-                                self.FormRightType = "WorkFlow";
-                                self.FormWF = self.GetFormWF();
-                                self.$nextTick(function () {
-                                    self.$refs.refWFHistory.Init({
-                                        CurrentFlowId: result.Data.FlowId, //result.Data.Id
-                                        CurrentFlowDesignId: result.Data.FlowDesignId,
-                                        CurrentNodeId: result.Data.NodeId
-                                    });
-                                });
-                            }
-                        }
-                    );
-                }
-            } else {
-                if (self.DiyCommon.IsNull(wfParam.FlowDesignId)) {
-                    self.DiyCommon.Tips("未传入FlowDesignId", false);
-                    return;
-                }
-                self.OpenDiyFormWorkFlow = true;
-                self.FormRightType = "WorkFlow";
-                self.FormWF = self.GetFormWF();
-                self.$nextTick(function () {
-                    //需要传入：CurrentFlowDesign、CurrentTableId、OpenFormMode
-                    var param = {
-                        // CurrentFlowDesign:{},
-                        CurrentFlowDesignId: wfParam.FlowDesignId,
-                        OpenFormMode: wfParam.FormMode,
-                        CurrentTableId: self.TableId
-                    };
-                    self.$refs.refWfWorkHandler_2.InitStartWork(param, function (callbackObj) {
-                        // self.CurrentTableRowId = callbackObj.CurrentTableRowId;
-                        // self.CurrentShowFields = callbackObj.CurrentShowFields;
-                        // self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
-                        // self.$refs.diyFormWfWork.Init();
-                    });
-                });
             }
         },
         GetNeedSaveRowList() {
@@ -5139,94 +4174,7 @@ export default {
                 // self.GetDiyTableRow({_PageIndex : 1});
             }
         },
-        CallbackGetDiyField(diyFieldList) {
-            var self = this;
-            // self.DiyFieldList = diyFieldList
-        },
-        CallbackFormSubmit(param) {
-            var self = this;
-            var savedType;
-            if (param && typeof param == "object") {
-                savedType = param.SavedType;
-            }
-            self.SaveDiyTableCommon(param, savedType);
-        },
-        //savedType：离开表单类型，保存后的操作：Insert、Update、View
-        //param:{CloseForm : true}
-        async SaveDiyTableCommon(param, savedType) {
-            var self = this;
-            if (self.BtnLoading == true) {
-                return;
-            }
-            var isClose = false;
-            if (typeof param == "boolean") {
-                isClose = param;
-            } else if (!self.DiyCommon.IsNull(param)) {
-                if (!self.DiyCommon.IsNull(param.CloseForm)) {
-                    isClose = param.CloseForm;
-                }
-                if (!self.DiyCommon.IsNull(param.SavedType)) {
-                    savedType = param.SavedType;
-                }
-            }
 
-            self.BtnLoading = true;
-
-            //必传FormMode、TableRowId
-            var formParam = {
-                FormMode: self.FormMode,
-                TableRowId: self.TableRowId,
-                SavedType: savedType,
-                SaveLoading: self.BtnLoading,
-                Callback: param.Callback
-            };
-            //必传：FormMode、TableRowId、SavedType、SaveLoading
-            self.$refs.fieldForm.FormSubmit(formParam, async function (isSccuess, formData, outFormV8Result) {
-                if (isSccuess === true) {
-                    //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-                    var formModeAfter = formParam.FormMode;
-                    if (formParam.SavedType == "Update" || formParam.SavedType == "Edit") {
-                        formModeAfter = "Edit";
-                    } else if (formParam.SavedType == "Insert" || formParam.SavedType == "Add") {
-                        formModeAfter = "Add";
-                    } else if (formParam.SavedType == "View") {
-                        formModeAfter = "View";
-                    }
-
-                    self.FormMode = formModeAfter;
-                    self.TableRowId = formParam.TableRowId;
-                    self.BtnLoading = formParam.SaveLoading;
-
-                    if (isClose === true && outFormV8Result.Result !== false) {
-                        self.ShowFieldForm = false;
-                        self.ShowFieldFormDrawer = false;
-                        self.ShowYanZhen = false;
-                    } else {
-                        //刷新子表
-                        self.$refs.fieldForm.RefreshAllChildTable();
-                    }
-                    //刷新列表
-                    self.GetDiyTableRow();
-
-                    self.$nextTick(function () {
-                        if (formParam.Callback) {
-                            formParam.Callback();
-                        }
-                    });
-                } else {
-                    // self.BtnLoading = formParam.SaveLoading;
-                    self.BtnLoading = false;
-                }
-            });
-        },
-        CallbackSetDiyTableModel(model) {
-            var self = this;
-            self.CurrentDiyTableModel = model;
-        },
-        CallbackRefreshTable(param) {
-            var self = this;
-            self.GetDiyTableRow(param);
-        },
         // 其实这里应该改成Axios去同时请求多个接口，然后再渲染，这样性能更高！
         GetShowDiyFieldList: function () {
             var self = this;
