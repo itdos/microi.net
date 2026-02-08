@@ -9,16 +9,16 @@ import { CodeToText, TextToCode } from "element-china-area-data";
 
 // ==================== 异步加载的组件定义 ====================
 // 核心视图组件（登录后才需要）
-const DiyTable = defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"));
-const DiyForm = defineAsyncComponent(() => import("@/views/diy/diy-form"));
-const DiyFormDialog = defineAsyncComponent(() => import("@/views/diy/diy-form-dialog"));
-const DiyDesign = defineAsyncComponent(() => import("@/views/diy/diy-design"));
-const DiyModule = defineAsyncComponent(() => import("@/views/diy/diy-module"));
-const DiyFormPage = defineAsyncComponent(() => import("@/views/diy/diy-form-page"));
-const DiyDesignList = defineAsyncComponent(() => import("@/views/diy/diy-table"));
-const DiyDocument = defineAsyncComponent(() => import("@/views/diy/diy-document"));
-const DiyCustomDialog = defineAsyncComponent(() => import("@/views/diy/diy-custom-dialog"));
-const DiySearch = defineAsyncComponent(() => import("@/views/diy/diy-search"));
+const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
+const DiyForm = defineAsyncComponent(() => import("@/views/form-engine/diy-form"));
+const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-dialog"));
+const DiyDesign = defineAsyncComponent(() => import("@/views/form-engine/diy-design"));
+const DiyModule = defineAsyncComponent(() => import("@/views/form-engine/diy-module"));
+const DiyFormPage = defineAsyncComponent(() => import("@/views/form-engine/diy-form-page"));
+const DiyDesignList = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
+const DiyDocument = defineAsyncComponent(() => import("@/views/form-engine/diy-document"));
+const DiyCustomDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog"));
+const DiySearch = defineAsyncComponent(() => import("@/views/form-engine/diy-search"));
 
 // 聊天模块
 const DiyChat = defineAsyncComponent(() => import("@/views/chat/index"));
@@ -35,47 +35,47 @@ const CustomFormWF = defineAsyncComponent(() => import("@/views/workflow/custom-
 const nodeColConfig = defineAsyncComponent(() => import("@/views/workflow/component/node-col-config.vue"));
 
 // ==================== 表单字段组件（使用时才加载）====================
-const DiyInput = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-input"));
-const DiyText = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-input.vue"));
-const DiyGuid = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-input.vue"));
-const DiyAutocomplete = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-autocomplete"));
-const DiyCascader = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-cascader"));
-const DiyAddress = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-address.vue"));
-const DiySelectTree = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-select-tree"));
-const DiyDepartment = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-department"));
-const DiyFontawesome = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-fontawesome"));
-const DiyFontAwesome = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-fontawesome.vue"));
-const DiySwitch = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-switch"));
-const DiySelect = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-select"));
-const DiyMultipleSelect = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-select"));
-const DiyRadio = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-radio"));
-const DiyProgress = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-progress.vue"));
-const DiyCheckbox = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-checkbox.vue"));
-const DiyInputNumber = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-input-number"));
-const DiyNumberText = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-input-number"));
-const DiyDateTime = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-datetime"));
-const DiyTextarea = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-textarea"));
-const DiyRate = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-rate.vue"));
-const DiyColorPicker = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-colorpicker.vue"));
-const DiyAutoNumber = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-autonumber.vue"));
-const DiyButton = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-button.vue"));
-const DiyFileUpload = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-fileupload.vue"));
-const DiyImgUpload = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-imgupload.vue"));
-const DiyDivider = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-divider.vue"));
-const DiyHtml = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-html.vue"));
-const DiyRichText = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-richtext.vue"));
-const DiyOpenTable = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-opentable.vue"));
-const DiyMap = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-map.vue"));
-const DiyQrcode = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-qrcode.vue"));
-const DiyDevComponent = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-devcomponent.vue"));
-const DiyTableChild = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-tablechild.vue"));
-const DiyJoinTable = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-jointable.vue"));
-const DiyJoinForm = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-joinform.vue"));
-const DiyV8TmpEngine = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-v8tmpengine.vue"));
-const DiyJsonTable = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-jsontable.vue"));
-const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-treecheckbox.vue"));
-const Fontawesome = defineAsyncComponent(() => import("@/views/diy/diy-field-component/dos.fontawesome/Fontawesome.vue"));
-const DiyCodeEditor = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-code-editor.vue"));
+const DiyInput = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input"));
+const DiyText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input.vue"));
+const DiyGuid = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input.vue"));
+const DiyAutocomplete = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-autocomplete"));
+const DiyCascader = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-cascader"));
+const DiyAddress = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-address.vue"));
+const DiySelectTree = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-select-tree"));
+const DiyDepartment = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-department"));
+const DiyFontawesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-fontawesome"));
+const DiyFontAwesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-fontawesome.vue"));
+const DiySwitch = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-switch"));
+const DiySelect = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-select"));
+const DiyMultipleSelect = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-select"));
+const DiyRadio = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-radio"));
+const DiyProgress = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-progress.vue"));
+const DiyCheckbox = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-checkbox.vue"));
+const DiyInputNumber = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input-number"));
+const DiyNumberText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input-number"));
+const DiyDateTime = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-datetime"));
+const DiyTextarea = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-textarea"));
+const DiyRate = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-rate.vue"));
+const DiyColorPicker = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-colorpicker.vue"));
+const DiyAutoNumber = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-autonumber.vue"));
+const DiyButton = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-button.vue"));
+const DiyFileUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-fileupload.vue"));
+const DiyImgUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-imgupload.vue"));
+const DiyDivider = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-divider.vue"));
+const DiyHtml = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-html.vue"));
+const DiyRichText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-richtext.vue"));
+const DiyOpenTable = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-opentable.vue"));
+const DiyMap = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-map.vue"));
+const DiyQrcode = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-qrcode.vue"));
+const DiyDevComponent = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-devcomponent.vue"));
+const DiyTableChild = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-tablechild.vue"));
+const DiyJoinTable = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-jointable.vue"));
+const DiyJoinForm = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-joinform.vue"));
+const DiyV8TmpEngine = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-v8tmpengine.vue"));
+const DiyJsonTable = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-jsontable.vue"));
+const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-treecheckbox.vue"));
+const Fontawesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/dos.fontawesome/Fontawesome.vue"));
+const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
 
 // ==================== 富文本编辑器（延迟加载，体积较大）====================
 // wangeditor CSS 单独导入（可考虑在需要时才导入）
@@ -92,7 +92,7 @@ const Toolbar = defineAsyncComponent(async () => {
 });
 
 // ==================== 定制组件 ====================
-const LoudongTestComponent = defineAsyncComponent(() => import("@/views/test/loudong"));
+const LoudongTestComponent = defineAsyncComponent(() => import("@/views/custom/test/loudong"));
 
 // ==================== 注册组件函数 ====================
 // 参数 app 是 Vue 3 的应用实例（createApp 返回值）

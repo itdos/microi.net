@@ -12,7 +12,7 @@
 <script>
 import { computed, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
-// import drag from '@/views/diy/utils/dos.common';
+// import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",

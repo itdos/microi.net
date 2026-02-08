@@ -77,8 +77,6 @@ EndLike、NotEndLike    //%值
 
 ## （旧版写法，仍兼容）V8引擎用法
 ```javascript
-//虽然用法看上去比较繁琐，但需要考虑到前端参数在ORM中的参数化（防止Sql注入），暂时没想到比较好的方法
-//不过有考虑将写法改成：_Where: [{ 'Xingming', '张三', '=' }]//对应Sql：where Xingming='张三'
 //Sys_User为表名或表Id，不区分大小写
 var result = V8.FormEngine.GetTableData('Sys_User', {
     //以下对应sql语句： Account LIKE '%ad%' OR Acount LIKE '%VK%'。AndOR可不传，默认为And
@@ -92,8 +90,6 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
                 { AndOr : 'OR', GroupStart : true, Name : 'Account', Value : 'ad', Type : 'Like' },
                 { AndOr : 'AND', Name : 'Account', Value : 'min1', Type : 'Like', GroupEnd : true }
              ]
-    //备注：后期也有可能会提供以下新写法，严格按照参数顺序传入：Name、Type、Value、AndOr、GroupStart、GroupEnd。【目前暂未开始实现，因为_Where已经满足绝大部分需求】
-    //_WhereList : [ { 'Account', '=', 'cccc' }, { 'Account', 'Like', 'VK', 'OR' } ]
 });
 return result;
 ```
