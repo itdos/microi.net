@@ -142,7 +142,7 @@ import lodash from "lodash";
 // import { getDataB } from '../js/data_B'
 import { ForceDirected } from "../js/force-directed";
 import { cloneDeep } from "lodash";
-import DiyForm from "@/views/diy/diy-form";
+import DiyForm from "@/views/form-engine/diy-form";
 import _ from "underscore";
 export default {
     setup() {

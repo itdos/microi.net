@@ -66,7 +66,7 @@ if(V8.Form.Phone.length != 11){
 >* 按钮组件，支持V8代码
 
 ## HTML
->* 暂未发布
+>* HTML组件，支持自定义HTML代码
 
 ## 自动编号 AutoNumber
 >* 自带分布式锁的自动编号，支持自定义前缀
@@ -90,13 +90,13 @@ if(V8.Form.Phone.length != 11){
 >* 省市区联动
 
 ## 手机验证码 PhoneSMS
->* 暂未发布
+>* 手机验证码组件，支持发送短信验证码
 
 ## 进度条 Progress
 >* 显示进度，数据库存储数字
 
 ## 时间线 Timeline
->* 暂未发布
+>* 时间线组件
 
 ## 图标库 FontAwesome
 >* 集成FontAwesome
@@ -165,4 +165,4 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 >* 这是一个非常强大的组件
 
 ## JSON表格 JsonTable
->* 暂未发布
+>* 支持JSON数据的表格展示与编辑
