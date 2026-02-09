@@ -139,8 +139,9 @@ export default {
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
-            ModelValue: "",
-            LastModelValue: "",
+            // 修复：根据是否多选决定默认值类型
+            ModelValue: (this.field?.Config?.Cascader?.Multiple) ? [] : '',
+            LastModelValue: (this.field?.Config?.Cascader?.Multiple) ? [] : '',
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -172,7 +173,11 @@ export default {
         event: "ModelChange"
     },
     props: {
-        modelValue: {},
+        modelValue: {
+            // 修复：允许接收多种类型，级联选择器可能是字符串或数组
+            type: [String, Number, Array, Object],
+            default: ''
+        },
         ModelProps: {},
         field: {
             type: Object,

@@ -161,6 +161,7 @@ export default {
                     || field.Component == "RichText"
                     || field.Component == "JoinTable"
                     || field.Component == "JoinForm"
+                    || field.Component == "TableChild"
                 ) {
                     return "top";
                 }
