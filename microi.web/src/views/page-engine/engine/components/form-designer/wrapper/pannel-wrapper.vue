@@ -76,17 +76,17 @@
           <span>{{ wrapperObj.wrapperOption.titleOption.title }}</span>
 
           <el-link
-            v-show="wrapperObj.wrapperOption.titleOption.moreOption.hidden"
+            v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden"
             @click="handleMoreClick"
             :style="
-              wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
+              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
             "
             class="linkmore"
             :underline="false"
-            :target="wrapperObj.wrapperOption.titleOption.moreOption.linktype"
-            >{{ wrapperObj.wrapperOption.titleOption.moreOption.text }}
+            :target="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.linktype"
+            >{{ wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.text }}
             <el-icon
-              v-show="wrapperObj.wrapperOption.titleOption.moreOption.iconShow"
+              v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.iconShow"
               :size="20"
             >
               <component :is="dynamicIcon" />
@@ -97,26 +97,26 @@
             :underline="false"
             @click="callGrandchildMethod"
             v-show="
-              wrapperObj.wrapperOption.titleOption.moreOption.refresh != '0'
+              wrapperObj.wrapperOption.titleOption.moreOption &&wrapperObj.wrapperOption.titleOption.moreOption.refresh != '0'
             "
             style="margin-right: 5px"
             :style="
-              wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
+              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
             "
           >
             <span
               v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
+                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
                   '1' ||
-                wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
+                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
               "
               >刷新</span
             >
             <el-icon
               v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
+                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
                   '2' ||
-                wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
+                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
               "
               size="20"
             >
@@ -128,18 +128,18 @@
             class="linkmore"
             :underline="false"
             v-show="
-              wrapperObj.wrapperOption.titleOption.moreOption.datetime == '1' ||
-              wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2'
+              wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.datetime == '1' ||
+              wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2')
             "
             style="margin-right: 5px"
             :style="
-              wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
+              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
             "
           >
             <span style="margin-right: 5px">{{ formattedDate }}</span>
             <span
               v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2'
+                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2'
               "
               >{{ formattedTime }}</span
             >
@@ -240,10 +240,10 @@ const autoHeight = computed(() => {
 
 // 组件挂载时启动定时器
 onMounted(() => {
-  if (props.wrapperObj.wrapperOption.titleOption.moreOption.autotime) {
+  if (props.wrapperObj.wrapperOption.titleOption.moreOption && props.wrapperObj.wrapperOption.titleOption.moreOption.autotime) {
     timer = setInterval(
       updateTime,
-      1000 * props.wrapperObj.wrapperOption.titleOption.moreOption.autotimeval
+      1000 * props.wrapperObj.wrapperOption.titleOption.moreOption && props.wrapperObj.wrapperOption.titleOption.moreOption.autotimeval
     )
   }
 })
@@ -282,7 +282,7 @@ const iconMap = Object.entries(ElementPlusIconsVue).reduce(
 )
 
 const dynamicIcon = computed(() => {
-  return iconMap[props.wrapperObj.wrapperOption.titleOption.moreOption.icon] // 默认图标
+  return iconMap[props.wrapperObj.wrapperOption.titleOption.moreOption && props.wrapperObj.wrapperOption.titleOption.moreOption.icon] // 默认图标
 })
 
 //适配移动端
@@ -344,10 +344,10 @@ const isShowBorderSub = computed(() => {
 
 const handleMoreClick = () => {
   if (formData.value.JsonObj.formConfig.link) {
-    let linkUrl = props.wrapperObj.wrapperOption.titleOption.moreOption.linkurl
+    let linkUrl = props.wrapperObj.wrapperOption.titleOption.moreOption && props.wrapperObj.wrapperOption.titleOption.moreOption.linkurl
 
     let linkType =
-      props.wrapperObj.wrapperOption.titleOption.moreOption.linktype
+      props.wrapperObj.wrapperOption.titleOption.moreOption && props.wrapperObj.wrapperOption.titleOption.moreOption.linktype
 
     //组件通信
     EventBus.emit('cartMoreLink', linkUrl)
