@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <formRenderer :remoteObj="remoteObj" />
+        <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
     </div>
 </template>
 

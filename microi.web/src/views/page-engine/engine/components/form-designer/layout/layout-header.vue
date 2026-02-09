@@ -54,6 +54,15 @@
               >模板3</el-button
             >
           </el-tooltip>
+          <!-- <el-tooltip content="简单排版，供参考学习">
+            <el-button
+              size="small"
+              :loading="btnLoading"
+              :icon="Star"
+              @click="mockClick(3)"
+              >模板4</el-button
+            >
+          </el-tooltip> -->
           <!-- <el-tooltip content="临时保存页面数据到缓存">
             <el-button
               size="small"
