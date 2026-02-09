@@ -1065,7 +1065,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         }
     }
     
-    .bottom-content {
+    :deep(.bottom-content) {
         font-size: 12px;
         line-height: 1.6;
         opacity: 0.85;

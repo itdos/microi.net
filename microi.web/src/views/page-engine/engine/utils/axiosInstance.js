@@ -6,7 +6,6 @@
 import axios from 'axios'
 import { usePageEngineStore } from '../stores/pageEngine'
 import { ElMessage } from 'element-plus'
-
 // 创建 axios 实例
 const axiosInstance = axios.create({
   baseURL: '',
@@ -51,13 +50,15 @@ axiosInstance.interceptors.response.use(
   }
 )
 
+import { DiyCommon } from "@/utils/diy.common.js";
+
 // 封装 get 请求
 export const get = async (url, params) => {
   try {
     //2025-12-20 Anderson：新增支持$ApiBase$、$OsClient$变量替换
     if(url){
-      var apiBase = localStorage.getItem('Microi.ApiBase');
-      var osClient = localStorage.getItem('Microi.OsClient');
+      var apiBase = DiyCommon.GetApiBase();//localStorage.getItem('Microi.ApiBase');
+      var osClient = DiyCommon.GetOsClient();//localStorage.getItem('Microi.OsClient');
       if(apiBase){
           url = url.replace('$ApiBase$', apiBase);
       }
@@ -80,8 +81,8 @@ export const post = async (url, data) => {
   try {
     //2025-12-20 Anderson：新增支持$ApiBase$、$OsClient$变量替换
     if(url){
-      var apiBase = localStorage.getItem('Microi.ApiBase');
-      var osClient = localStorage.getItem('Microi.OsClient');
+      var apiBase = DiyCommon.GetApiBase();//localStorage.getItem('Microi.ApiBase');
+      var osClient = DiyCommon.GetOsClient();//localStorage.getItem('Microi.OsClient');
       if(apiBase){
           url = url.replace('$ApiBase$', apiBase);
       }

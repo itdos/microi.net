@@ -22,7 +22,7 @@ export const temp0 = {
         "rotate": -22
       },
       "dynamicStyle": {
-        "padding": "10px",
+        "padding": "10px 0 0 0",
         "backgroundColor": "",
         "opacity": 1
       }
