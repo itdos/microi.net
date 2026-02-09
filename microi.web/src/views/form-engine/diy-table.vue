@@ -807,7 +807,9 @@
 
         <!--弹窗/抽屉/全新页面 打开Form（已迁移到 diy-form-full.vue）-->
         <!--抽屉或弹窗打开完整的Form-->
-        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
+        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" 
+            @CallbackGetDiyTableRow="GetDiyTableRow" 
+            ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
         <!--导入功能-->
         <DiyImportDialog
@@ -4025,6 +4027,12 @@ export default {
                             FormMode: self.FormMode,
                             DialogType: dialogType,
                             SelectFields: self.FieldFormSelectFields,
+                            DefaultValues: self.FieldFormDefaultValues,
+                            FixedTabs: self.FieldFormFixedTabs,
+                            HideFields: self.FieldFormHideFields,
+                            ApiReplace: self.ApiReplace,
+                            EventReplace: self.EventReplace,
+                            DataAppend: self.DataAppend,
                             Width: self.CurrentDiyTableModel.FormOpenWidth || undefined,
                             IsDefaultOpen: isDefaultOpen
                         });
