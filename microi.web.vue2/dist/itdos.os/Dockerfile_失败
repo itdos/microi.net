@@ -1,5 +1,0 @@
-FROM nginx
-COPY dist/  /usr/share/nginx/html/
-COPY default.conf /etc/nginx/conf.d/default.conf
-RUN sed -i "s/var OsClient = \"\"/var OsClient = \"$OsClient\"/g" /usr/share/nginx/html/index.html
-RUN sed -i "s/var ApiBase = \"\"/var ApiBase = \"$ApiBase\"/g" /usr/share/nginx/html/index.html
