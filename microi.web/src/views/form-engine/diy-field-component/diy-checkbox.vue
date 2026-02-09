@@ -56,8 +56,8 @@ export default {
     },
     data() {
         return {
-            ModelValue: "",
-            LastModelValue: "",
+            ModelValue: [],
+            LastModelValue: [],
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -78,7 +78,11 @@ export default {
         event: "ModelChange"
     },
     props: {
-        modelValue: {},
+        modelValue: {
+            // 修复：允许接收多种类型，在组件内部转换为数组
+            type: [Array, String, Number, Object],
+            default: () => []
+        },
         ModelProps: {},
         field: {
             type: Object,
@@ -143,13 +147,13 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = newVal;
+                self.ModelValue = self.normalizeToArray(newVal);
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = self.ModelProps;
+                self.ModelValue = self.normalizeToArray(self.ModelProps);
             }
         }
     },
@@ -158,8 +162,8 @@ export default {
 
     mounted() {
         var self = this;
-        self.ModelValue = self.FormDiyTableModel[self.field.Name];
-        self.LastModelValue = self.FormDiyTableModel[self.field.Name];
+        self.ModelValue = self.normalizeToArray(self.FormDiyTableModel[self.field.Name]);
+        self.LastModelValue = self.normalizeToArray(self.FormDiyTableModel[self.field.Name]);
         self.$nextTick(function () {
             // 🔥 修复：SQL数据源首次加载
             // 多选框需要在挂载时立即加载数据源，而不是等待点击
@@ -178,10 +182,43 @@ export default {
     },
 
     methods: {
+        // 修复：标准化值为数组类型
+        normalizeToArray(value) {
+            // null 或 undefined 返回空数组
+            if (value === null || value === undefined) {
+                return [];
+            }
+            // 已经是数组，直接返回
+            if (Array.isArray(value)) {
+                return value;
+            }
+            // 空字符串返回空数组
+            if (value === '') {
+                return [];
+            }
+            // 字符串尝试 JSON 解析（数据库可能存储为 JSON 字符串）
+            if (typeof value === 'string') {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (Array.isArray(parsed)) {
+                        return parsed;
+                    }
+                } catch (e) {
+                    // 解析失败，可能是逗号分隔的字符串
+                    if (value.includes(',')) {
+                        return value.split(',').map(v => v.trim()).filter(v => v);
+                    }
+                }
+                // 单个值包装成数组
+                return [value];
+            }
+            // 其他类型（数字、对象等）包装成数组
+            return [value];
+        },
         Init() {
             var self = this;
-            self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            self.ModelValue = self.normalizeToArray(self.GetFieldValue(self.field, self.FormDiyTableModel));
+            self.LastModelValue = self.normalizeToArray(self.GetFieldValue(self.field, self.FormDiyTableModel));
         },
         GetFieldValue(field, form) {
             var self = this;

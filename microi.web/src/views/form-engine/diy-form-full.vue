@@ -638,6 +638,35 @@ export default {
             default() {
                 return {};
             }
+        },
+        // ========== 表单配置参数 ==========
+        // 表单默认值（从外部传入或 Init 方法设置）
+        DefaultValues: {
+            type: Object,
+            default() {
+                return {};
+            }
+        },
+        // 指定显示的字段列表
+        SelectFields: {
+            type: Array,
+            default() {
+                return [];
+            }
+        },
+        // 固定的标签页
+        FixedTabs: {
+            type: Array,
+            default() {
+                return [];
+            }
+        },
+        // 隐藏的字段列表
+        HideFields: {
+            type: Array,
+            default() {
+                return [];
+            }
         }
     },
     watch: {},
@@ -767,6 +796,9 @@ export default {
          * 可传：DialogType（Dialog/Drawer/Page），若不传，则读取表单设计中配置的宽度。
          * 可传：Width宽度
          * 可传：SelectFields：['fieldName']
+         * 可传：DefaultValues：{ fieldName: value } 表单默认值
+         * 可传：FixedTabs：[] 固定标签页
+         * 可传：HideFields：[] 隐藏字段列表
          * 可传：ApiReplace：{ Update : '', Submit : '' }
          * 可传：EventReplace：{ Submit : function, Update : function,  Insert : function}
          * 可传：DataAppend: {}
@@ -778,11 +810,17 @@ export default {
             self.FormMode = param.FormMode;
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
-            self.FieldFormSelectFields = param.SelectFields;
-            self.ApiReplace = param.ApiReplace;
-            self.EventReplace = param.EventReplace;
+            
+            // 设置表单相关参数，优先使用 param 传入的值，其次使用 props，最后使用默认值
+            self.FieldFormSelectFields = param.SelectFields || self.SelectFields || [];
+            self.FieldFormDefaultValues = param.DefaultValues || self.DefaultValues || {};
+            self.FieldFormFixedTabs = param.FixedTabs || self.FixedTabs || [];
+            self.FieldFormHideFields = param.HideFields || self.HideFields || [];
+            
+            self.ApiReplace = param.ApiReplace || {};
+            self.EventReplace = param.EventReplace || {};
             self.Width = param.Width;
-            self.DataAppend = param.DataAppend;
+            self.DataAppend = param.DataAppend || {};
 
             var tableRowModel = {};
             // 支持Id和TableRowId两种参数名

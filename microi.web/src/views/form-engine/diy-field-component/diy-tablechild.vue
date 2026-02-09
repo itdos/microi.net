@@ -32,12 +32,14 @@
         v-if="configDialogVisible"
         v-model="configDialogVisible"
         title="子表配置"
-        width="650px"
+        draggable
+        align-center
+        width="70%"
         :close-on-click-modal="false"
         destroy-on-close
         append-to-body
     >
-        <el-form label-width="180px" label-position="left" size="small">
+        <el-form label-width="180px" label-position="left" size="small" :inline="true">
             <el-form-item label="关联模块">
                 <el-popover placement="bottom" trigger="click" :width="400">
                     <el-tree 
@@ -62,15 +64,7 @@
                 <el-input v-model="configForm.TableChildFkFieldName" placeholder="请输入子表外键列名" />
             </el-form-item>
             
-            <el-form-item label="回写子表列">
-                <el-input 
-                    type="textarea" 
-                    :rows="4"
-                    v-model="configForm.TableChildCallbackField" 
-                    placeholder='[{ "Father" : "FieldName1", "Child" : "FieldName2" }]'
-                />
-                <div class="form-item-tip">格式：[{"Father":"主表列名", "Child":"子表列名"}]</div>
-            </el-form-item>
+            
             
             <el-form-item label="上级模块（选填）">
                 <el-popover placement="bottom" trigger="click" :width="400">
@@ -90,6 +84,14 @@
             
             <el-form-item label="关闭分页">
                 <el-switch v-model="configForm.DisablePagination" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+            <el-form-item label="回写子表列" :label-position="'top'"  style="display: block;">
+                <DiyCodeEditor
+                        v-model="configForm.TableChildCallbackField"
+                        :field="{ Id: 'TableChildCallbackField', Name: 'TableChildCallbackField' }"
+                        :height="'300px'"
+                    />
+                <div class="form-item-tip">格式：[{ "Father" : "FieldName1", "Child" : "FieldName2" }]</div>
             </el-form-item>
         </el-form>
         <template #footer>
@@ -208,6 +210,16 @@ const handleLastModuleSelect = (data) => {
 
 // 检查是否应该渲染子表
 const shouldRender = computed(() => {
+    // 设计模式下，只要配置了子表信息就显示（用于预览）
+    if (props.LoadMode === 'Design') {
+        return (
+            props.field.Component == "TableChild" &&
+            !DiyCommon.IsNull(props.field.Config.TableChildTableId) &&
+            !DiyCommon.IsNull(props.field.Config.TableChildSysMenuId) &&
+            GetFieldIsShow(props.field)
+        );
+    }
+    // 正常模式下，需要有 TableRowId 才能显示
     return (
         props.field.Component == "TableChild" &&
         !DiyCommon.IsNull(props.field.Config.TableChildTableId) &&
@@ -222,6 +234,10 @@ const GetFieldIsShow = (field) => {
 };
 
 const getTableChildTableRowId = () => {
+    // 设计模式下，如果没有真实ID，返回一个模拟ID以便预览
+    if (props.LoadMode === 'Design' && DiyCommon.IsNull(props.TableRowId)) {
+        return 'design-mode-preview';
+    }
     if (props.field.Config.TableChild.PrimaryTableFieldName) {
         return props.FormDiyTableModel[props.field.Config.TableChild.PrimaryTableFieldName];
     }
@@ -289,8 +305,25 @@ const saveConfig = () => {
     // 保存子表外键列名
     props.field.Config.TableChildFkFieldName = configForm.value.TableChildFkFieldName;
     
-    // 保存回写配置
-    props.field.Config.TableChildCallbackField = configForm.value.TableChildCallbackField;
+    // 保存回写配置（验证 JSON 格式）
+    let callbackFieldValue = configForm.value.TableChildCallbackField;
+    if (!DiyCommon.IsNull(callbackFieldValue)) {
+        try {
+            // 验证是否为有效的 JSON
+            const parsed = JSON.parse(callbackFieldValue);
+            if (Array.isArray(parsed)) {
+                props.field.Config.TableChildCallbackField = callbackFieldValue;
+            } else {
+                DiyCommon.Tips('回写配置必须是数组格式', false);
+                return;
+            }
+        } catch (error) {
+            DiyCommon.Tips('回写配置 JSON 格式错误：' + error.message, false);
+            return;
+        }
+    } else {
+        props.field.Config.TableChildCallbackField = '';
+    }
     
     // 保存上级模块信息
     props.field.Config.TableChild.LastSysMenuId = configForm.value.LastSysMenuId;
