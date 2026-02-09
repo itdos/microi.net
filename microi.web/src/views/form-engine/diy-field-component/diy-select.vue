@@ -110,8 +110,9 @@ export default {
     },
     data() {
         return {
-            ModelValue: "",
-            LastModelValue: "",
+            // 修复：根据是否多选决定默认值类型
+            ModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
+            LastModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
             FieldAllData: [],
             NeedResetDataSourse: true,
             // 配置弹窗相关
@@ -136,7 +137,11 @@ export default {
         event: "ModelChange"
     },
     props: {
-        modelValue: {},
+        modelValue: {
+            // 修复：允许接收多种类型，在组件内部标准化
+            type: [String, Number, Object, Array],
+            default: ''
+        },
         ModelProps: {},
         field: { type: Object, default: () => {} },
         DiyTableModel: { type: Object, default: () => {} },
@@ -162,64 +167,70 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
+                // 先标准化值
+                const normalizedVal = self.normalizeSelectValue(newVal);
+                
                 // 普通数据源 Data，值就是字符串
                 if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-                    if (typeof newVal === "object" && newVal !== null) {
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
                         return;
                     }
-                    self.ModelValue = newVal;
+                    self.ModelValue = normalizedVal;
                     return;
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-                    if (typeof newVal === "object" && newVal !== null) {
-                        self.ModelValue = newVal;
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
+                        self.ModelValue = normalizedVal;
                         return;
                     }
                     if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.Key == newVal);
+                        var found = self.field.Data.find(item => item.Key == normalizedVal);
                         if (found) {
                             self.ModelValue = found;
                             return;
                         }
                     }
-                    self.ModelValue = newVal;
+                    self.ModelValue = normalizedVal;
                     return;
                 }
-                self.ModelValue = newVal;
+                self.ModelValue = normalizedVal;
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
+                // 先标准化值
+                const normalizedVal = self.normalizeSelectValue(newVal);
+                
                 // 普通数据源 Data，值就是字符串
                 if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-                    if (typeof newVal === "object" && newVal !== null) {
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
                         return;
                     }
-                    self.ModelValue = newVal;
+                    self.ModelValue = normalizedVal;
                     return;
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-                    if (typeof newVal === "object" && newVal !== null) {
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
                         // 已经是对象，直接使用
-                        self.ModelValue = newVal;
+                        self.ModelValue = normalizedVal;
                         return;
                     }
                     // newVal 是 Key 字符串，需要从 Data 中找到对应对象
                     if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.Key == newVal);
+                        var found = self.field.Data.find(item => item.Key == normalizedVal);
                         if (found) {
                             self.ModelValue = found;
                             return;
                         }
                     }
                     // 找不到对应对象，暂存 key，等 Data 加载后再匹配
-                    self.ModelValue = newVal;
+                    self.ModelValue = normalizedVal;
                     return;
                 }
-                self.ModelValue = self.ModelProps;
+                self.ModelValue = normalizedVal;
             }
         },
         "field.Data": function (newVal, oldVal) {
@@ -336,10 +347,58 @@ export default {
     },
 
     methods: {
+        // 修复：标准化选择框的值，根据单选/多选返回正确类型
+        normalizeSelectValue(value) {
+            const isMultiple = this.field?.Component === 'MultipleSelect';
+            
+            // null 或 undefined
+            if (value === null || value === undefined) {
+                return isMultiple ? [] : '';
+            }
+            
+            // 空字符串
+            if (value === '') {
+                return isMultiple ? [] : '';
+            }
+            
+            // 多选模式
+            if (isMultiple) {
+                // 已经是数组
+                if (Array.isArray(value)) {
+                    return value;
+                }
+                // 字符串尝试 JSON 解析
+                if (typeof value === 'string') {
+                    try {
+                        const parsed = JSON.parse(value);
+                        if (Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                    } catch (e) {
+                        // 解析失败，可能是逗号分隔
+                        if (value.includes(',')) {
+                            return value.split(',').map(v => v.trim()).filter(v => v);
+                        }
+                    }
+                }
+                // 单个值包装成数组
+                return [value];
+            }
+            
+            // 单选模式
+            // 数组取第一个元素
+            if (Array.isArray(value)) {
+                return value.length > 0 ? value[0] : '';
+            }
+            
+            // 直接返回
+            return value;
+        },
         Init() {
             var self = this;
-            self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            const fieldValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            self.ModelValue = self.normalizeSelectValue(fieldValue);
+            self.LastModelValue = self.normalizeSelectValue(fieldValue);
         },
         VisibleChange(visible, field) {
             var self = this;
