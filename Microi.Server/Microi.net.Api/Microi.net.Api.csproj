@@ -16,6 +16,8 @@
     <PreserveCompilationContext>false</PreserveCompilationContext>
     <!-- 禁用运行时发布修剪（重要！） -->
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- 禁用MSB3277程序集版本冲突警告 -->
+    <NoWarn>MSB3277</NoWarn>
     <!-- 确保静态文件被复制 -->
     <CopyRazorGenerateFilesToPublishDirectory>true</CopyRazorGenerateFilesToPublishDirectory>
     <IncludeRazorContentInPack>true</IncludeRazorContentInPack>

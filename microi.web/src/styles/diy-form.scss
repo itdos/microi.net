@@ -453,6 +453,10 @@
             color: #303133;
             line-height: 32px;
             transition: color 0.3s ease;
+
+            display: flex;
+            align-items: center;
+
             span{
                 display: flex;
                 align-items: center;

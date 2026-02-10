@@ -977,10 +977,10 @@ export default {
         var self = this;
         
         // 🔥 添加明显的日志，确认被调用
-        console.log('%c[DiyTableRowlist] ========== beforeUnmount 被触发 ==========', 'color: red; font-size: 16px; font-weight: bold');
-        console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
-        console.log('[DiyTableRowlist] SysMenuId:', self.SysMenuId);
-        console.log('[DiyTableRowlist] TableId:', self.TableId);
+        // console.log('%c[DiyTableRowlist] ========== beforeUnmount 被触发 ==========', 'color: red; font-size: 16px; font-weight: bold');
+        // console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        // console.log('[DiyTableRowlist] SysMenuId:', self.SysMenuId);
+        // console.log('[DiyTableRowlist] TableId:', self.TableId);
         
         // 标记组件已销毁
         self._isDestroyed = true;
@@ -1639,10 +1639,10 @@ export default {
     // 🔥 activated 钩子：组件被 keep-alive 激活时触发
     activated() {
         var self = this;
-        console.log('%c[DiyTableRowlist] ========== activated 被触发 ==========', 'color: green; font-size: 16px; font-weight: bold');
-        console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
-        console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
-        console.log('[DiyTableRowlist] 是否移动端模式:', self.diyStore.IsPhoneView);
+        // console.log('%c[DiyTableRowlist] ========== activated 被触发 ==========', 'color: green; font-size: 16px; font-weight: bold');
+        // console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        // console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
+        // console.log('[DiyTableRowlist] 是否移动端模式:', self.diyStore.IsPhoneView);
         
         // 🔥 移动端特殊处理：从详情页返回列表页时不刷新数据
         // 移动端使用路由跳转方式打开详情页，返回时应保持列表页状态

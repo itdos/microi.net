@@ -15,8 +15,20 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Microi.net.Api.ModelBinders
+namespace Microi.net.Api
 {
+    #region 自定义特性
+
+    /// <summary>
+    /// 标记此特性的 Action 方法将不使用 FormDataOrJsonModelBinder，使用框架默认绑定器
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    public class DisableFormDataOrJsonModelBinderAttribute : Attribute
+    {
+    }
+
+    #endregion
+
     #region JSON 转换器
 
     /// <summary>
@@ -154,13 +166,31 @@ namespace Microi.net.Api.ModelBinders
             if (bindingContext == null)
                 throw new ArgumentNullException(nameof(bindingContext));
 
+            // 检查 Action 是否有 [DisableFormDataOrJsonModelBinder] 特性
+            if (bindingContext.ActionContext.ActionDescriptor is ControllerActionDescriptor actionDescriptor)
+            {
+                if (actionDescriptor.MethodInfo.GetCustomAttributes(typeof(DisableFormDataOrJsonModelBinderAttribute), false).Any())
+                {
+                    bindingContext.Result = ModelBindingResult.Failed();
+                    return;
+                }
+            }
+
             var request = bindingContext.HttpContext.Request;
             var modelType = bindingContext.ModelType;
             var modelName = GetModelName(bindingContext, modelType);
 
-            // 文件上传请求：跳过自定义绑定
-            if (IsFileUploadRequest(request))
+            // 如果是文件上传请求（multipart/form-data），尝试从 Form 中绑定非文件参数
+            if (request.ContentType != null && request.ContentType.Contains("multipart/form-data", StringComparison.OrdinalIgnoreCase))
             {
+                // 对于复杂类型，从 Form 中绑定非文件字段
+                if (!IsSimpleType(modelType) && request.HasFormContentType)
+                {
+                    if (TryBindFromFormForMultipart(bindingContext, request, modelType))
+                        return;
+                }
+                
+                // 其他情况使用默认绑定器
                 bindingContext.Result = ModelBindingResult.Failed();
                 return;
             }
@@ -439,6 +469,25 @@ namespace Microi.net.Api.ModelBinders
                     return false;
                 }
 
+                return BindComplexTypeFromCollection(bindingContext, request.Form, modelType);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 从 multipart/form-data 请求中绑定非文件参数
+        /// </summary>
+        private bool TryBindFromFormForMultipart(
+            ModelBindingContext bindingContext,
+            HttpRequest request,
+            Type modelType)
+        {
+            try
+            {
+                // 直接调用复杂类型绑定方法（会自动跳过 IFormFile 类型的属性）
                 return BindComplexTypeFromCollection(bindingContext, request.Form, modelType);
             }
             catch
@@ -806,20 +855,6 @@ namespace Microi.net.Api.ModelBinders
             return _propertyCache.GetOrAdd(type, t =>
                 t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
         }
-
-        /// <summary>
-        /// 检测是否为文件上传请求
-        /// </summary>
-        private static bool IsFileUploadRequest(HttpRequest request)
-        {
-            if (request.ContentType == null)
-                return false;
-
-            return request.ContentType.Contains("multipart/form-data", StringComparison.OrdinalIgnoreCase) &&
-                   request.HasFormContentType &&
-                   request.Form.Files.Count > 0;
-        }
-
         #endregion
     }
 
@@ -850,6 +885,10 @@ namespace Microi.net.Api.ModelBinders
                 throw new ArgumentNullException(nameof(context));
 
             var modelType = context.Metadata.ModelType;
+
+            // 如果参数有 [FromForm] 或 [FromBody] 等特性，直接返回 null 使用默认绑定器
+            if (context.Metadata.BindingSource != null && context.Metadata.BindingSource != Microsoft.AspNetCore.Mvc.ModelBinding.BindingSource.Custom)
+                return null;
 
             // 排除特殊类型
             if (_excludedTypes.Any(t => t.IsAssignableFrom(modelType)))

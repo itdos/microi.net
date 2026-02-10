@@ -783,7 +783,8 @@ const GetUploadPath = (img) => {
 watch(
     () => props.modelValue,
     (newVal) => {
-        if (props.FormMode == 'View' && !DiyCommon.IsNull(newVal) && !getMultipleFlag.value) {
+        // 移除 FormMode == 'View' 的限制，让编辑模式和查看模式都能正确显示图片
+        if (!DiyCommon.IsNull(newVal) && !getMultipleFlag.value) {
             GetUploadPath(null);
         }
     },
@@ -797,15 +798,43 @@ watch(
         if (newVal) {
             await nextTick();
             initSortable();
+            // 为多图片初始化 RealPath（编辑模式和查看模式都需要）
+            if (Array.isArray(props.modelValue)) {
+                props.modelValue.forEach((img) => {
+                    if (img && img.Id && img.Path) {
+                        const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
+                        // 只在 RealPath 未设置或为 loading.gif 时才设置
+                        if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                            props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
+                            setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
+                        }
+                    }
+                });
+            }
         }
     }
 );
 
 // 组件挂载后初始化
 onMounted(() => {
+    // 初始化多图片的拖拽排序
     if (showMultipleImgList.value) {
         nextTick(() => {
             initSortable();
+        });
+    }
+    
+    // 为已有的多图片初始化 RealPath（编辑模式和查看模式都需要）
+    if (getMultipleFlag.value && Array.isArray(props.modelValue) && props.modelValue.length > 0) {
+        props.modelValue.forEach((img) => {
+            if (img && img.Id && img.Path) {
+                const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
+                // 只在 RealPath 未设置或为 loading.gif 时才设置
+                if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                    props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
+                    setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
+                }
+            }
         });
     }
 });
