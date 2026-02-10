@@ -39,7 +39,14 @@
                 class="preview-image"
             />
             <div class="img-actions">
-                <span class="img-name">{{ GetFileName(modelValue) }}</span>
+                <el-input 
+                    v-if="FormMode == 'Edit' || FormMode == 'Add'"
+                    v-model="singleImageName" 
+                    size="small"
+                    class="img-name-input"
+                    @change="updateSingleImageName"
+                />
+                <span v-else class="img-name">{{ GetFileName(modelValue) }}</span>
                 <span class="img-size">{{ getSingleImgSize() }}</span>
                 <el-button 
                     type="danger" 
@@ -87,6 +94,8 @@
                     :preview-src-list="GetImgUploadImgs()"
                     fit="cover"
                     class="card-image"
+                    @click="openImagePreview(img)"
+                    style="cursor: pointer;"
                 />
                 <div class="card-footer">
                     <div class="img-detail">
@@ -102,8 +111,22 @@
                             <span class="img-size">{{ formatFileSize(img.Size) }}</span>
                             <time v-if="img.CreateTime" class="img-time">{{ img.CreateTime }}</time>
                         </div>
-                        <el-tag v-if="img.State == 0" type="info" size="small">待上传</el-tag>
-                        <el-tag v-else-if="img.State == 1" type="success" size="small">已上传</el-tag>
+                        <el-tag 
+                            v-if="img.State == 0" 
+                            type="info" 
+                            size="small"
+                        >
+                            待上传
+                        </el-tag>
+                        <el-tag 
+                            v-else-if="img.State == 1" 
+                            type="success" 
+                            size="small"
+                            style="cursor: pointer;"
+                            @click="openImagePreview(img)"
+                        >
+                            已上传
+                        </el-tag>
                         <el-tag v-else type="danger" size="small">失败</el-tag>
                     </div>
                     <el-button 
@@ -222,6 +245,9 @@ const DiyApi = instance.appContext.config.globalProperties.DiyApi;
 const uploadRef = ref(null);
 const sortableContainer = ref(null);
 let sortableInstance = null;
+
+// 单图文件名编辑
+const singleImageName = ref('');
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -656,7 +682,31 @@ const DelSingleUpload = () => {
         uploadRef.value.clearFiles();
     }
     
+    // 清空单图文件名
+    singleImageName.value = '';
+    
     emit('update:modelValue', '');
+};
+
+// 更新单图文件名
+const updateSingleImageName = () => {
+    const normalized = normalizeValue(props.modelValue);
+    if (typeof normalized === 'object' && normalized !== null) {
+        // 更新对象中的Name字段
+        normalized.Name = singleImageName.value;
+        // 重新序列化为JSON字符串
+        const jsonString = JSON.stringify(normalized);
+        props.FormDiyTableModel[props.field.Name] = jsonString;
+        emit('update:modelValue', jsonString);
+    }
+};
+
+// 打开图片预览
+const openImagePreview = (img) => {
+    const imagePath = props.FormDiyTableModel[props.field.Name + '_' + img.Id + '_RealPath'];
+    if (!DiyCommon.IsNull(imagePath) && imagePath !== './static/img/loading.gif') {
+        window.open(imagePath, '_blank');
+    }
 };
 
 // 获取文件名
@@ -786,6 +836,13 @@ watch(
         // 移除 FormMode == 'View' 的限制，让编辑模式和查看模式都能正确显示图片
         if (!DiyCommon.IsNull(newVal) && !getMultipleFlag.value) {
             GetUploadPath(null);
+            // 同时初始化单图文件名
+            const normalized = normalizeValue(newVal);
+            if (typeof normalized === 'object' && normalized !== null) {
+                singleImageName.value = normalized.Name || '';
+            } else {
+                singleImageName.value = GetFileName(newVal);
+            }
         }
     },
     { immediate: true }
@@ -876,6 +933,16 @@ onBeforeUnmount(() => {
             align-items: center;
             gap: 8px;
             padding: 4px 8px;
+
+            .img-name-input {
+                flex: 1;
+                :deep(.el-input__wrapper) {
+                    padding: 2px 8px;
+                }
+                :deep(.el-input__inner) {
+                    font-size: 14px;
+                }
+            }
 
             .img-name {
                 flex: 1;

@@ -334,12 +334,9 @@ namespace Microi.net
                             try
                             {
                                 // 重置 Stream Position
-                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - FileName: {file.Key}");
-                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - Stream Position: {file.Value.Position}, Length: {file.Value.Length}");
                                 if (file.Value.CanSeek && file.Value.Position != 0)
                                 {
                                     file.Value.Position = 0;
-                                    Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - Position已重置为: {file.Value.Position}");
                                 }
                                 newImgStream = ImageHelper.MakeThumbnail(new ImageParam()
                                 {
@@ -348,7 +345,6 @@ namespace Microi.net
                                     Image = file.Value,//file.InputStream,
                                     MaxLength = previewMaxLength
                                 });
-                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩后 - newImgStream Position: {newImgStream?.Position}, Length: {newImgStream?.Length}");
                                 //newImgStream = ImageHelper.MakeThumbnailV2(new ImageParam()
                                 //{
                                 //    FileSuffix = fileSuffix,
@@ -363,7 +359,6 @@ namespace Microi.net
                                 newImgStream.Position = 0;
                             }
 
-                            Console.WriteLine($"[MicroiHDFS.Upload] 上传压缩图前 - newImgStream Position: {newImgStream?.Position}, Length: {newImgStream?.Length}");
                             var putYasuoResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
@@ -425,12 +420,9 @@ namespace Microi.net
                 else
                 {
                     // 重置 Stream Position
-                    Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - FileName: {file.Key}");
-                    Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - Stream Position: {file.Value.Position}, Length: {file.Value.Length}");
                     if (file.Value.CanSeek && file.Value.Position != 0)
                     {
                         file.Value.Position = 0;
-                        Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - Position已重置为: {file.Value.Position}");
                     }
                     var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                     {

@@ -109,11 +109,11 @@ var DiyOsClient = {
             store.commit("DiyStore/SetSysConfig", sysConfig);
             //设置cdn相关
             if (!DiyCommon.IsNull(sysConfig.FileServer)) {
-                var fileServer = sysConfig.FileServer;
+                var fileServer = sysConfig.FileServer.TrimEnd('/');
                 //2023-10-31新增：FileServer以环境变量优先
                 try {
                     if (FileServer) {
-                        fileServer = FileServer;
+                        fileServer = FileServer.TrimEnd('/');
                     }
                 } catch (error) {}
                 store.commit("DiyStore/SetState", {
@@ -176,7 +176,7 @@ var DiyOsClient = {
             DiyCommon.SetWebTitle(DiyCommon.IsNull(sysConfig.SysTitle) ? "Loading..." : sysConfig.SysTitle);
             DiyCommon.SetShortTitle(DiyCommon.IsNull(sysConfig.SysShortTitle) ? "Loading..." : sysConfig.SysShortTitle);
             DiyCommon.SetClientCompany(DiyCommon.IsNull(sysConfig.CompanyName) ? "Loading..." : sysConfig.CompanyName);
-            if (!DiyCommon.IsNull(sysConfig.FaviconIco)) {
+            if (sysConfig.FaviconIco) {
                 var link = document.querySelector("link[rel*='icon']") || document.createElement("link");
                 link.type = "image/x-icon";
                 link.rel = "shortcut icon";

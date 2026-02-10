@@ -278,7 +278,7 @@ const currentUser = computed(() => diyStore.GetCurrentUser);
 const userAvatar = computed(() => {
     const avatar = currentUser.value?.Avatar;
     if (avatar) {
-        return avatar.startsWith('http') ? avatar : diyStore.FileServer + avatar;
+        return avatar.startsWith('http') ? avatar : window.DiyCommon.GetServerPath(avatar);
     }
     return './static/img/nohead-girl.png';
 });
@@ -292,8 +292,8 @@ const version = computed(() => {
 const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const systemLogo = computed(() => {
-    const logo = diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg';
-    return logo.startsWith('http') ? logo : diyStore.FileServer + logo;
+    const logo = window.DiyCommon.GetServerPath(diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg');
+    return logo.startsWith('http') ? logo : window.DiyCommon.GetServerPath(logo);
 });
 
 const loginBottomContent = computed(() => {
