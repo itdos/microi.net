@@ -21,19 +21,19 @@ export default {
                 return url;
             }
             if (typeof(url) == 'object') {
-                return self.SysConfig.FileServer + url.Path;
+                return self.SysConfig.FileServer.TrimEnd('/') + url.Path;
             }
             if (url.startsWith('{')) {
                 var urlObj = JSON.parse(url);
-                return self.SysConfig.FileServer + urlObj.Path;
+                return self.SysConfig.FileServer.TrimEnd('/') + urlObj.Path;
             }
             if (url.startsWith('[')) {
                 var urlArr = JSON.parse(url);
                 if (urlArr.length > 0) {
-                    return self.SysConfig.FileServer + urlArr[0].Path;
+                    return self.SysConfig.FileServer.TrimEnd('/') + urlArr[0].Path;
                 }
             }
-            return self.SysConfig.FileServer + url;
+            return self.SysConfig.FileServer.TrimEnd('/') + url;
         },
         
         /**

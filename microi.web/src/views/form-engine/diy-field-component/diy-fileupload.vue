@@ -32,11 +32,22 @@
         <div v-if="FormMode != 'View' && field.Visible && !field.Config.FileUpload.Multiple && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
             class="single-file-display">
             <div class="file-info">
-                <el-icon class="file-icon">
+                <el-icon class="file-icon" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])" style="cursor: pointer;">
                     <component :is="getFileIcon(GetFileName(modelValue))" />
                 </el-icon>
                 <div class="file-detail">
-                    <span class="file-name" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                    <el-input 
+                        v-if="FormMode == 'Edit' || FormMode == 'Add'"
+                        v-model="singleFileName" 
+                        size="small"
+                        class="file-name-input"
+                        @change="updateSingleFileName"
+                    />
+                    <span
+                        v-else
+                        class="file-name" 
+                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])"
+                    >
                         {{ GetFileName(modelValue) }}
                     </span>
                     <span class="file-size">{{ getSingleFileSize() }}</span>
@@ -70,13 +81,17 @@
             <div v-for="(file, index) in fileListComputed" :key="file.Id" class="file-item" :data-id="file.Id">
                 <div class="file-item-content">
                     <el-icon class="drag-handle"><Rank /></el-icon>
-                    <el-icon class="file-icon">
+                    <el-icon 
+                        class="file-icon" 
+                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'])"
+                        style="cursor: pointer;"
+                    >
                         <component :is="getFileIcon(file.Name)" />
                     </el-icon>
                     <div class="file-details">
                         <div class="file-name-wrapper">
                             <el-input 
-                                v-if="FormMode == 'Edit'" 
+                                v-if="FormMode == 'Edit' || FormMode == 'Add'" 
                                 v-model="file.Name" 
                                 size="small"
                                 class="file-name-input"
@@ -90,8 +105,22 @@
                             </span>
                         </div>
                         <span class="file-size">{{ formatFileSize(file.Size) }}</span>
-                        <el-tag v-if="file.State == 0" type="info" size="small">待上传</el-tag>
-                        <el-tag v-else-if="file.State == 1" type="success" size="small">已上传</el-tag>
+                        <el-tag 
+                            v-if="file.State == 0" 
+                            type="info" 
+                            size="small"
+                        >
+                            待上传
+                        </el-tag>
+                        <el-tag 
+                            v-else-if="file.State == 1" 
+                            type="success" 
+                            size="small"
+                            style="cursor: pointer;"
+                            @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'])"
+                        >
+                            已上传
+                        </el-tag>
                         <el-tag v-else type="danger" size="small">失败</el-tag>
                     </div>
                     <el-button 
@@ -205,6 +234,9 @@ const DiyApi = instance.appContext.config.globalProperties.DiyApi;
 const uploadRef = ref(null);
 const sortableContainer = ref(null);
 let sortableInstance = null;
+
+// 单文件文件名编辑
+const singleFileName = ref('');
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -623,7 +655,23 @@ const DelSingleUpload = () => {
         uploadRef.value.clearFiles();
     }
     
+    // 清空单文件文件名
+    singleFileName.value = '';
+    
     emit('update:modelValue', '');
+};
+
+// 更新单文件文件名
+const updateSingleFileName = () => {
+    const normalized = normalizeValue(props.modelValue);
+    if (typeof normalized === 'object' && normalized !== null) {
+        // 更新对象中的Name字段
+        normalized.Name = singleFileName.value;
+        // 重新序列化为JSON字符串
+        const jsonString = JSON.stringify(normalized);
+        props.FormDiyTableModel[props.field.Name] = jsonString;
+        emit('update:modelValue', jsonString);
+    }
 };
 
 // 获取文件列表
@@ -824,8 +872,16 @@ const GetUploadPath = (field, file) => {
 watch(
     () => props.modelValue,
     (newVal) => {
-        if (props.FormMode == 'View' && !DiyCommon.IsNull(newVal) && !getMultipleFlag.value) {
+        // 移除 FormMode == 'View' 的限制，让编辑模式和查看模式都能正确显示文件
+        if (!DiyCommon.IsNull(newVal) && !getMultipleFlag.value) {
             GetUploadPath(props.field, null);
+            // 同时初始化单文件文件名
+            const normalized = normalizeValue(newVal);
+            if (typeof normalized === 'object' && normalized !== null) {
+                singleFileName.value = normalized.Name || '';
+            } else {
+                singleFileName.value = GetFileName(newVal);
+            }
         }
     },
     { immediate: true }
@@ -838,15 +894,43 @@ watch(
         if (newVal) {
             await nextTick();
             initSortable();
+            // 为多文件初始化 RealPath（编辑模式和查看模式都需要）
+            if (Array.isArray(props.modelValue)) {
+                props.modelValue.forEach((file) => {
+                    if (file && file.Id && file.Path) {
+                        const pathKey = props.field.Name + '_' + file.Id + '_RealPath';
+                        // 只在 RealPath 未设置或为 loading.gif 时才设置
+                        if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                            props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
+                            setRealPath(file.Id, file.Path, props.field.Config.FileUpload.Limit);
+                        }
+                    }
+                });
+            }
         }
     }
 );
 
 // 组件挂载后初始化
 onMounted(() => {
+    // 初始化多文件的拖拽排序
     if (showMultipleFileList.value) {
         nextTick(() => {
             initSortable();
+        });
+    }
+    
+    // 为已有的多文件初始化 RealPath（编辑模式和查看模式都需要）
+    if (getMultipleFlag.value && Array.isArray(props.modelValue) && props.modelValue.length > 0) {
+        props.modelValue.forEach((file) => {
+            if (file && file.Id && file.Path) {
+                const pathKey = props.field.Name + '_' + file.Id + '_RealPath';
+                // 只在 RealPath 未设置或为 loading.gif 时才设置
+                if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                    props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
+                    setRealPath(file.Id, file.Path, props.field.Config.FileUpload.Limit);
+                }
+            }
         });
     }
 });
@@ -908,6 +992,16 @@ onBeforeUnmount(() => {
                 flex-direction: row;
                 align-items: center;
                 gap: 8px;
+
+                .file-name-input {
+                    flex: 1;
+                    :deep(.el-input__wrapper) {
+                        padding: 2px 8px;
+                    }
+                    :deep(.el-input__inner) {
+                        font-size: 14px;
+                    }
+                }
 
                 .file-name {
                     color: #409eff;
