@@ -21,6 +21,8 @@ Microi.Server/Microi.net.Api/bin/Release/*
 !/microi.web/bin/Release/default.conf
 !/microi.web/bin/Release/publish-*.sh
 !/microi.web/bin/Release/.gitignore
+microi.web/bin/*
+!/microi.web/bin/Release/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
