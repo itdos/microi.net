@@ -26,3 +26,8 @@ localConfig.json
 .env
 src/config.json
 
+# 允许跟踪 bin/Release 目录下的配置文件
+!bin/Release/Dockerfile
+!bin/Release/default.conf
+!bin/Release/publish-*.sh
+!bin/Release/.gitignore

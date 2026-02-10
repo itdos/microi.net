@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:clean": "rm -rf dist/itdos.os/dist && vite build",
+    "build:clean": "rm -rf bin/Release/dist && vite build",
     "build:analyze": "npm run build:clean && node analyze-build.js && open dist/stats.html",
     "analyze:deps": "./analyze-deps.sh",
     "analyze:build": "node analyze-build.js",

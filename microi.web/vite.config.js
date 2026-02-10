@@ -18,7 +18,7 @@ export default defineConfig({
             open: false, // 构建后不自动打开
             gzipSize: true, // 显示 gzip 压缩后的大小
             brotliSize: true, // 显示 brotli 压缩后的大小
-            filename: 'dist/stats.html' // 输出文件路径
+            filename: 'bin/Release/dist/stats.html' // 输出文件路径
         }),
         // 🔥 Brotli压缩 - 比gzip效果更好
         compression({
@@ -85,7 +85,7 @@ export default defineConfig({
         }
     },
     build: {
-        outDir: 'dist/itdos.os/dist',
+        outDir: 'bin/Release/dist',
         assetsDir: 'static',
         sourcemap: false,
         // 设置 chunk 大小警告阈值
@@ -114,34 +114,9 @@ export default defineConfig({
             output: {
                 chunkFileNames: 'static/js/[name]-[hash].js',
                 entryFileNames: 'static/js/[name]-[hash].js',
-                assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
-                // 🎯 极简分割策略 - 只分割100%独立的大型库
-                // Vue生态全部合并避免循环依赖
-                manualChunks(id) {
-                    if (id.includes('node_modules')) {
-                        // ========== 完全独立的大型库 ==========
-                        
-                        // Monaco编辑器 - 完全独立
-                        if (id.includes('monaco-editor')) {
-                            return 'vendor-monaco';
-                        }
-                        
-                        // Echarts - 完全独立
-                        if (id.includes('echarts') || id.includes('zrender')) {
-                            return 'vendor-echarts';
-                        }
-                        
-                        // Three.js - 完全独立
-                        if (id.includes('three')) {
-                            return 'vendor-three';
-                        }
-                        
-                        // ========== 其余全部合并 ==========
-                        // 包括Vue生态、所有UI库、工具库等
-                        // 避免任何可能的循环依赖
-                        return 'vendor-libs';
-                    }
-                }
+                assetFileNames: 'static/[ext]/[name]-[hash].[ext]'
+                // 🎯 使用 Vite 默认智能分割策略
+                // 自动按依赖关系分割，无循环依赖，压缩效果最佳
             }
         }
     },

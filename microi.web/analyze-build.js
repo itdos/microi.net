@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const distDir = path.join(__dirname, 'dist/itdos.os/dist/static/js');
+const distDir = path.join(__dirname, 'bin/Release/dist/static/js');
 const KB = 1024;
 const MB = KB * 1024;
 
