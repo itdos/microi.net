@@ -75,6 +75,9 @@ const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/form-engine/d
 const Fontawesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/dos.fontawesome/Fontawesome.vue"));
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
 
+// ==================== DIY组件（diy-components）====================
+const DiyLoadNonDiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-components/DiyLoadNonDiyTable.vue"));
+
 // ==================== 富文本编辑器（延迟加载，体积较大）====================
 // wangeditor CSS 单独导入（可考虑在需要时才导入）
 const loadWangEditorStyles = () => import("@wangeditor/editor/dist/css/style.css");
@@ -170,6 +173,9 @@ function RegMicroiComponents(app) {
     app.component("Fontawesome", Fontawesome);
     app.component("DiyCodeEditor", DiyCodeEditor);
 
+    // DIY组件
+    app.component("DiyLoadNonDiyTable", DiyLoadNonDiyTable);
+
     // 富文本编辑器
     app.component("Editor", Editor);
     app.component("Toolbar", Toolbar);
@@ -222,5 +228,6 @@ export {
     DiyTextarea,
     DiyCustomDialog,
     Fontawesome,
-    DiyCodeEditor
+    DiyCodeEditor,
+    DiyLoadNonDiyTable
 };
