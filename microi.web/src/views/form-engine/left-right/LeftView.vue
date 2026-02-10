@@ -128,11 +128,11 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
-import DiyFormDialog from "@/views/form-engine/diy-form-full.vue";
-// 移除错误的 fullcalendar internal 导入
-// import { aW } from "@fullcalendar/core/internal-common";
+
+// 🔥 改为异步导入，避免循环依赖和初始化顺序问题
+const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
 
 export default {
     components: {

@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:analyze": "vite build && open dist/stats.html",
+    "build:clean": "rm -rf dist/itdos.os/dist && vite build",
+    "build:analyze": "npm run build:clean && node analyze-build.js && open dist/stats.html",
+    "analyze:deps": "./analyze-deps.sh",
+    "analyze:build": "node analyze-build.js",
     "preview": "vite preview",
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
     "format": "prettier --write \"**/*.{js,vue,json,md}\""
@@ -82,6 +85,7 @@
     "sass": "^1.83.0",
     "svgo": "^4.0.0",
     "vite": "^7.3.1",
+    "vite-plugin-compression": "^0.5.1",
     "vite-plugin-svg-icons": "^2.0.1"
   },
   "browserslist": [

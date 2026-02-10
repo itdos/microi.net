@@ -30,6 +30,9 @@ const pathMappings = {
     "/microi.net/diy-form-page": "/diy/diy-form-page",
     // system 相关映射
     "/itdos/system/sys-log": "/system/sys-log",
+    "/itdos/system/sysrole-manage": "/system/sysrole-manage",
+    "/itdos/system/sysdept-manage": "/system/sysdept-manage",
+    "/itdos/system/sysuser-manage": "/system/sysuser-manage",
     "/diy/diy-table-rowlist": "/diy/diy-table"
 };
 
