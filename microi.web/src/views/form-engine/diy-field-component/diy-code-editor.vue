@@ -238,13 +238,41 @@
 </template>
 
 <script setup>
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
-import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
-import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import * as monaco from 'monaco-editor';
 import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
+
+// 动态导入 Monaco Editor（延迟加载，减少首屏体积）
+let monaco = null;
+let jsonWorker, cssWorker, htmlWorker, tsWorker, EditorWorker;
+
+// 异步初始化 Monaco
+const initMonaco = async () => {
+    if (monaco) return monaco;
+    
+    const [
+        monacoModule,
+        jsonWorkerModule,
+        cssWorkerModule,
+        htmlWorkerModule,
+        tsWorkerModule,
+        editorWorkerModule
+    ] = await Promise.all([
+        import('monaco-editor'),
+        import('monaco-editor/esm/vs/language/json/json.worker?worker'),
+        import('monaco-editor/esm/vs/language/css/css.worker?worker'),
+        import('monaco-editor/esm/vs/language/html/html.worker?worker'),
+        import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
+        import('monaco-editor/esm/vs/editor/editor.worker?worker')
+    ]);
+    
+    monaco = monacoModule;
+    jsonWorker = jsonWorkerModule.default;
+    cssWorker = cssWorkerModule.default;
+    htmlWorker = htmlWorkerModule.default;
+    tsWorker = tsWorkerModule.default;
+    EditorWorker = editorWorkerModule.default;
+    
+    return monaco;
+};
 import { getToken } from '@/utils/auth.js';
 import { 
     MagicStick, 
@@ -607,7 +635,10 @@ const openV8Docs = () => {
     window.open(docUrl, "_blank");
 };
 
-const Init = () => {
+const Init = async () => {
+    // 动态加载 Monaco
+    await initMonaco();
+    
     EditorHeight.value = props.height || '500px';
     EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
     // 修复：EditorOption 是 reactive对象，不需要 .value
@@ -802,7 +833,7 @@ const UpdateInit = () => {
         EditorOption.language = props.field.Config.CodeEditor.Language;
     }
     
-    if (monacoEditor) {
+    if (monacoEditor && monaco) {
         monacoEditor.updateOptions(EditorOption);
         applyLargeFileOptions(ModelValue.value);
         // 更新语言
@@ -935,7 +966,7 @@ const saveConfig = () => {
     EditorHeight.value = configForm.value.Height + 'px';
     EditorHeightNum.value = parseInt(configForm.value.Height) || 500;
     // 更新编辑器语言
-    if (monacoEditor) {
+    if (monacoEditor && monaco) {
         const model = monacoEditor.getModel();
         if (model) {
             monaco.editor.setModelLanguage(model, configForm.value.Language);

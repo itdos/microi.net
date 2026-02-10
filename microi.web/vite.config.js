@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import { visualizer } from 'rollup-plugin-visualizer';
+import compression from 'vite-plugin-compression';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -18,6 +19,21 @@ export default defineConfig({
             gzipSize: true, // 显示 gzip 压缩后的大小
             brotliSize: true, // 显示 brotli 压缩后的大小
             filename: 'dist/stats.html' // 输出文件路径
+        }),
+        // 🔥 Brotli压缩 - 比gzip效果更好
+        compression({
+            algorithm: 'brotliCompress',
+            ext: '.br',
+            threshold: 10240, // 大于10KB才压缩
+            deleteOriginFile: false,
+            compressionOptions: { level: 11 } // 最高压缩级别
+        }),
+        // 🔥 Gzip压缩 - 兼容旧浏览器
+        compression({
+            algorithm: 'gzip',
+            ext: '.gz',
+            threshold: 10240,
+            deleteOriginFile: false
         })
     ],
     resolve: {
@@ -73,80 +89,58 @@ export default defineConfig({
         assetsDir: 'static',
         sourcemap: false,
         // 设置 chunk 大小警告阈值
-        chunkSizeWarningLimit: 1000,
+        chunkSizeWarningLimit: 800, // 降低到 800KB，促使更好的代码分割
         // CSS 代码分割
         cssCodeSplit: true,
         // CSS 压缩配置 - 使用更温和的压缩选项以保持样式一致性
         cssMinify: 'esbuild',
         // 确保 CSS 导入顺序一致
         assetsInlineLimit: 4096,
+        // 🔥 压缩优化
+        minify: 'terser',
+        terserOptions: {
+            compress: {
+                drop_console: true, // 生产环境移除console
+                drop_debugger: true, // 移除debugger
+                pure_funcs: ['console.log', 'console.info', 'console.debug'], // 移除特定函数调用
+                passes: 2 // 多次压缩以获得更好的结果
+            },
+            format: {
+                comments: false // 移除所有注释
+            }
+        },
         rollupOptions: {
+            // 🔥 确保依赖加载顺序：Vue -> Element Plus -> 其他
             output: {
                 chunkFileNames: 'static/js/[name]-[hash].js',
                 entryFileNames: 'static/js/[name]-[hash].js',
                 assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
-                // 手动代码分割，优化首屏加载
-                // 采用保守策略，只分割确实很大且独立的包，避免循环依赖
+                // 🎯 极简分割策略 - 只分割100%独立的大型库
+                // Vue生态全部合并避免循环依赖
                 manualChunks(id) {
-                    // node_modules 中的库按包分割
                     if (id.includes('node_modules')) {
-                        // Vue 核心必须最先处理，所有 @vue/ 内部包都放在一起
-                        if (id.includes('node_modules/vue/') || 
-                            id.includes('node_modules/@vue/') ||
-                            id.includes('/vue/dist/') ||
-                            id.includes('/@vue/')) {
-                            return 'vendor-vue';
-                        }
+                        // ========== 完全独立的大型库 ==========
                         
-                        // Vue 生态系统单独分割
-                        if (id.includes('vue-router')) {
-                            return 'vendor-vue-router';
-                        }
-                        if (id.includes('pinia')) {
-                            return 'vendor-pinia';
-                        }
-                        
-                        // Element Plus - UI 框架
-                        if (id.includes('element-plus') && !id.includes('@element-plus/icons-vue')) {
-                            return 'vendor-element';
-                        }
-                        // Element Plus 图标 - 延迟加载
-                        if (id.includes('@element-plus/icons-vue')) {
-                            return 'vendor-icons';
-                        }
-                        
-                        // 以下是体积大且独立的库，单独拆分
-                        
-                        // 富文本编辑器 - 很大
-                        if (id.includes('wangeditor') || id.includes('@wangeditor')) {
-                            return 'vendor-editor';
-                        }
-                        
-                        // Monaco 编辑器 - 代码编辑器（很大）
+                        // Monaco编辑器 - 完全独立
                         if (id.includes('monaco-editor')) {
                             return 'vendor-monaco';
                         }
                         
-                        // 图表库（echarts 很大）
+                        // Echarts - 完全独立
                         if (id.includes('echarts') || id.includes('zrender')) {
-                            return 'vendor-charts';
+                            return 'vendor-echarts';
                         }
                         
-                        // FullCalendar 日历组件（比较大）
-                        if (id.includes('@fullcalendar')) {
-                            return 'vendor-calendar';
-                        }
-                        
-                        // Three.js 3D库（非常大）
+                        // Three.js - 完全独立
                         if (id.includes('three')) {
                             return 'vendor-three';
                         }
                         
-                        // 其他所有第三方库统一放到 vendor-libs
-                        // 不再细分，避免循环依赖问题
+                        // ========== 其余全部合并 ==========
+                        // 包括Vue生态、所有UI库、工具库等
+                        // 避免任何可能的循环依赖
                         return 'vendor-libs';
                     }
-                    // 不再对业务模块进行分割，避免循环依赖
                 }
             }
         }
