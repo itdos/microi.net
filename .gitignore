@@ -14,13 +14,14 @@ x86/
 Microi.Server/Microi.net.Api/bin/Release/*
 !Microi.Server/Microi.net.Api/bin/Release/Dockerfile
 !Microi.Server/Microi.net.Api/bin/Release/publish-demo.sh
-# 允许跟踪 microi.web/bin/Release 下的配置文件
+# 允许跟踪 microi.web/bin/Release 下的特定配置文件
 !/microi.web/bin/
 !/microi.web/bin/Release/
 !/microi.web/bin/Release/Dockerfile
 !/microi.web/bin/Release/default.conf
-!/microi.web/bin/Release/publish-*.sh
 !/microi.web/bin/Release/.gitignore
+!/microi.web/bin/Release/itdos-heart
+!/microi.web/bin/Release/publish-demo.sh
 microi.web/bin/*
 !/microi.web/bin/Release/
 [Bb]in/
