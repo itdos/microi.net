@@ -114,15 +114,31 @@ namespace Microi.net
             OssClient ossClientPrivate = null;
             OssClient ossClient = null;
 
+            // 创建配置对象，使用合理的超时时间
+            var configPrivate = new ClientConfiguration
+            {
+                ConnectionTimeout = 60000, // 60秒超时
+                MaxErrorRetry = 3,
+                EnableCrcCheck = false // 禁用CRC校验，可能影响某些上传
+            };
+            var configPublic = new ClientConfiguration
+            {
+                ConnectionTimeout = 60000,
+                MaxErrorRetry = 3,
+                EnableCrcCheck = false
+            };
+
             bucketNamePrivate = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
             //这里无需再判断是走内网、还是走外网，因为clientModel.AliOssPrivateEndpoint已经是根据OsClientNetwork=Internet/Internal存储的内网或外网地址
             ossClientPrivate = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
                                 clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                configPrivate);
             bucketName = clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
             ossClient = new OssClient(clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
                                 clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>());
+                                clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>(),
+                                configPublic);
             try
             {
                 if (param.Preview == true && !param.FileFullPathOrigin.DosIsNullOrWhiteSpace())
@@ -132,35 +148,48 @@ namespace Microi.net
                     //注意：这里要传入压缩前的图片路径，因为此时压缩后的图片还未上传
                     //2023-09-02：注意压缩前的文件是放在私有的，因此使用ossClientPrivate
                     var ossObject = ossClientPrivate.GetObject(new GetObjectRequest(bucketNamePrivate, param.FileFullPathOrigin.TrimStart('/'), process));
-                    //上传
-                    if (param.Limit == true)
+                    
+                    // 将 ResponseStream 复制到 MemoryStream，避免 Content-Length 问题
+                    using (var memoryStream = new MemoryStream())
                     {
-                        var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, param.FileFullPath.TrimStart('/'), ossObject.ResponseStream);
-                        return new DosResult(1, ossResult);
-                    }
-                    else
-                    {
-                        var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.TrimStart('/'), ossObject.ResponseStream);
-                        return new DosResult(1, ossResult);
+                        await ossObject.ResponseStream.CopyToAsync(memoryStream);
+                        memoryStream.Position = 0;
+                        
+                        //上传（Preview压缩场景）
+                        if (param.Limit == true)
+                        {
+                            var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, param.FileFullPath.TrimStart('/'), memoryStream);
+                            return new DosResult(1, ossResult);
+                        }
+                        else
+                        {
+                            var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.TrimStart('/'), memoryStream);
+                            return new DosResult(1, ossResult);
+                        }
                     }
                 }
                 else//如果不压缩
                 {
-                    // 上传文件。
+                    // 确保 Stream Position 为 0
+                    if (param.FileStream.CanSeek)
+                    {
+                        param.FileStream.Position = 0;
+                    }
+                    
+                    var objectKey = param.FileFullPath.DosTrimStart('/');
+                    
+                    // 直接上传，让SDK自动处理
                     if (param.Limit == true)
                     {
-                        var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, param.FileFullPath.DosTrimStart('/'), param.FileStream);
-                        //ossResult.HttpStatusCode.ToString() == "OK"表示成功。
+                        var ossResult = ossClientPrivate.PutObject(bucketNamePrivate, objectKey, param.FileStream);
                         return new DosResult(1, ossResult);
                     }
                     else
                     {
-                        var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.DosTrimStart('/'), param.FileStream);
-                        //ossResult.HttpStatusCode.ToString() == "OK"表示成功。
+                        var ossResult = ossClient.PutObject(bucketName, objectKey, param.FileStream);
                         return new DosResult(1, ossResult);
                     }
                 }
-
             }
             catch (Exception ex)
             {
