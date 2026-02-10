@@ -22,11 +22,13 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
 import LeftView from "@/views/form-engine/left-right/LeftView.vue";
 import RightView from "@/views/form-engine/left-right/RightView.vue";
-import DiyTableRowlist from "@/views/form-engine/diy-table.vue";
+
+// 🔥 改为异步导入，避免循环依赖和初始化顺序问题
+const DiyTableRowlist = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
 
 export default {
     components: {
