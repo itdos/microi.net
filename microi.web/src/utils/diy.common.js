@@ -190,19 +190,19 @@ var DiyCommon = {
     GetFileServer: function () {
         try {
             if (FileServer) {
-                return FileServer;
+                return FileServer.TrimEnd('/');
             }
         } catch (error) {}
         var result = store.state.DiyStore.FileServer;
         if (!DiyCommon.IsNull(result)) {
-            return result;
+            return result.TrimEnd('/');
         }
         return "https://static.itdos.com";
     },
     GetMediaServer: function () {
         var result = store.state.DiyStore.MediaServer;
         if (!DiyCommon.IsNull(result)) {
-            return result;
+            return result.TrimEnd('/');
         }
         var osClient = DiyCommon.GetOsClient();
         return "https://static.itdos.com";
@@ -210,24 +210,29 @@ var DiyCommon = {
     //如果是"."开头，会直接返回
     GetServerPath: function (path, returnNoImg) {
         var self = this;
-        if (DiyCommon.IsNull(path)) {
+
+        if (!path) {
             if (returnNoImg === false) {
                 return "";
             }
             return "./static/img/nohead-girl.png";
         }
-        if (path.length >= 4 && path.substr(0, 4).toLowerCase() == "http") {
+        if (path.toLowerCase().startsWith("http")) {
             return path;
         }
-        if (path.length >= 1) {
-            if (path.substr(0, 1) == ".") {
-                return path;
-                path = path.substr(1, path.length - 1);
-            }
-            if (path.substr(0, 1) != "/" && path.substr(0, 1) != "\\") {
-                path = "/" + path;
+        if (path.startsWith("{")) {
+            var pathObj = JSON.parse(path);
+            if(pathObj.Path){
+                return DiyCommon.GetServerPath(pathObj.Path, returnNoImg);
             }
         }
+        if (path.startsWith(".")) {
+            return path;
+            path = path.substr(1, path.length - 1);
+        }
+        // if (path.startsWith("/") && !path.startsWith("\\")) {
+        //     path = "/" + path;
+        // }
         // 取文件格式，如果是视频、音频文件，则使用mediaServer
         // var format = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
         // if (
@@ -3117,7 +3122,7 @@ var DiyCommon = {
                             // 如果是存 Json，保持对象数组不变
                         }
                     }
-                    // 处理单图/单文件控件：优先使用上传临时值或已生成的 RealPath，防止把有效路径变为空字符串
+                    // 处理单图/单文件控件：确保保存的是 JSON 字符串格式
                     else if (fieldModel.Component == "ImgUpload" || fieldModel.Component == "FileUpload") {
                         try {
                             var cfg = fieldModel.Config && (fieldModel.Component == "ImgUpload" ? fieldModel.Config.ImgUpload : fieldModel.Config.FileUpload);
@@ -3125,106 +3130,91 @@ var DiyCommon = {
                             // 仅处理单文件/单图场景
                             if (!isMultiple) {
                                 var val = formDiyTableModel[formField];
-
-                                // 优先使用上传期望值（如果存在）
-                                var uploadValKey = formField + "_UploadValue";
-                                var uploadVal = formDiyTableModel[uploadValKey];
-                                if (uploadVal && typeof uploadVal === "string" && uploadVal.trim() !== "") {
-                                    formDiyTableModel[formField] = uploadVal;
+                                
+                                // 如果值为空或正在上传中，设置为空字符串
+                                if (DiyCommon.IsNull(val) || val === '正在上传中...') {
+                                    formDiyTableModel[formField] = '';
                                     continue;
                                 }
-
-                                // 然后尝试使用已经计算出的 RealPath
-                                var realPathKey = formField + "_" + formField + "_RealPath";
-                                var realPath = formDiyTableModel[realPathKey];
-                                if (realPath && typeof realPath === "string" && realPath.trim() !== "" && realPath !== "./static/img/loading.gif") {
-                                    formDiyTableModel[formField] = realPath;
-                                    continue;
+                                
+                                // 如果已经是 JSON 字符串格式（正确格式），保持不变
+                                if (typeof val === "string" && val.startsWith('{')) {
+                                    try {
+                                        // 验证是否是有效的 JSON
+                                        var testParse = JSON.parse(val);
+                                        // 如果是有效的 JSON 对象，保持不变
+                                        continue;
+                                    } catch (e) {
+                                        // JSON 解析失败，继续后续处理
+                                    }
                                 }
-
+                                
+                                // 如果是对象（新上传的文件），序列化为 JSON 字符串
+                                if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+                                    // 确保对象包含必要字段：Id, Name, Size, CreateTime, Path, State
+                                    if (val.Path || val.path || val.Url || val.url) {
+                                        var jsonObj = {
+                                            Id: val.Id || val.id || '',
+                                            Name: val.Name || val.name || '',
+                                            Size: val.Size || val.size || '',
+                                            CreateTime: val.CreateTime || val.createTime || '',
+                                            Path: val.Path || val.path || val.Url || val.url || '',
+                                            State: val.State !== undefined ? val.State : 1
+                                        };
+                                        formDiyTableModel[formField] = JSON.stringify(jsonObj);
+                                        continue;
+                                    }
+                                }
+                                
+                                // 如果是数组，取第一个元素并处理
                                 if (Array.isArray(val)) {
                                     if (val.length === 0) {
                                         formDiyTableModel[formField] = "";
                                     } else {
                                         var first = val[0];
-                                        if (typeof first === "string") {
-                                            formDiyTableModel[formField] = first;
-                                        } else if (first && (first.Path || first.path || first.Url || first.url)) {
-                                            formDiyTableModel[formField] = first.Path || first.path || first.Url || first.url;
-                                        } else if (first && first.PathName) {
-                                            formDiyTableModel[formField] = first.PathName;
-                                        } else {
-                                            formDiyTableModel[formField] = "";
+                                        if (typeof first === "object" && first !== null) {
+                                            var jsonObj = {
+                                                Id: first.Id || first.id || '',
+                                                Name: first.Name || first.name || '',
+                                                Size: first.Size || first.size || '',
+                                                CreateTime: first.CreateTime || first.createTime || '',
+                                                Path: first.Path || first.path || first.Url || first.url || '',
+                                                State: first.State !== undefined ? first.State : 1
+                                            };
+                                            formDiyTableModel[formField] = JSON.stringify(jsonObj);
+                                        } else if (typeof first === "string") {
+                                            // 如果是字符串路径，包装成对象
+                                            var fileName = first.split('/').pop();
+                                            var jsonObj = {
+                                                Id: 'legacy_' + new Date().getTime(),
+                                                Name: fileName,
+                                                Size: '',
+                                                CreateTime: '',
+                                                Path: first,
+                                                State: 1
+                                            };
+                                            formDiyTableModel[formField] = JSON.stringify(jsonObj);
                                         }
                                     }
-                                } else if (typeof val === "object" && val !== null) {
-                                    // 如果是对象，尝试提取路径字段
-                                    var p = val.Path || val.path || val.Url || val.url || val.PathName;
-                                    if (p) {
-                                        formDiyTableModel[formField] = p;
-                                    }
+                                    continue;
+                                }
+                                
+                                // 如果是普通字符串路径（老数据格式），包装成 JSON 对象
+                                if (typeof val === "string" && val.trim() !== "") {
+                                    var fileName = val.split('/').pop();
+                                    var jsonObj = {
+                                        Id: 'legacy_' + new Date().getTime(),
+                                        Name: fileName,
+                                        Size: '',
+                                        CreateTime: '',
+                                        Path: val,
+                                        State: 1
+                                    };
+                                    formDiyTableModel[formField] = JSON.stringify(jsonObj);
                                 }
                             }
-                            // 如果是多文件场景，确保每个文件有对应的 _RealPath 占位或真实地址
-                            else {
-                                try {
-                                    var arr = formDiyTableModel[formField];
-                                    if (Array.isArray(arr)) {
-                                        arr.forEach(function (fileObj) {
-                                            try {
-                                                var fileId = fileObj && (fileObj.Id || fileObj.id || fileObj.uid);
-                                                if (!fileId) return;
-                                                var realKey = formField + "_" + fileId + "_RealPath";
-                                                // 如果已经存在直接跳过
-                                                if (!DiyCommon.IsNull(formDiyTableModel[realKey])) return;
-                                                var path = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
-                                                // 判断是否私有（默认公共）
-                                                var cfgInner = cfg || {};
-                                                var limitFlag = cfgInner.Limit === true || cfgInner.Limit === "true";
-                                                if (!DiyCommon.IsNull(path)) {
-                                                    if (!limitFlag) {
-                                                        // 公共直接生成
-                                                        formDiyTableModel[realKey] = DiyCommon.GetServerPath(path);
-                                                    } else {
-                                                        // 私有先放 loading，然后异步获取临时 URL 并替换
-                                                        formDiyTableModel[realKey] = "./static/img/loading.gif";
-                                                        try {
-                                                            DiyCommon.Post(
-                                                                "/api/HDFS/GetPrivateFileUrl",
-                                                                {
-                                                                    FilePathName: path,
-                                                                    HDFS: (DiyCommon.SysConfig && DiyCommon.SysConfig.HDFS) || "Aliyun",
-                                                                    FormEngineKey: "",
-                                                                    FormDataId: "",
-                                                                    FieldId: ""
-                                                                },
-                                                                function (res) {
-                                                                    try {
-                                                                        if (DiyCommon.Result(res)) {
-                                                                            formDiyTableModel[realKey] = res.Data;
-                                                                        } else {
-                                                                            formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                                                        }
-                                                                    } catch (e) {}
-                                                                },
-                                                                function (err) {
-                                                                    try {
-                                                                        formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                                                    } catch (e) {}
-                                                                }
-                                                            );
-                                                        } catch (e) {
-                                                            formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                                        }
-                                                    }
-                                                } else {
-                                                    formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                                }
-                                            } catch (e) {}
-                                        });
-                                    }
-                                } catch (e) {}
-                            }
+                            // 多文件场景：保持数组格式不变，不需要处理 RealPath（RealPath 只用于前端显示）
+                            // 数组中的每个对象应该保持 {Id, Name, Size, CreateTime, Path, State} 格式
                         } catch (e) {
                             // 容错：不要阻塞其它字段处理
                             console.log("ForRowModelHandler - 处理单图/单文件字段出错:", formField, e);
