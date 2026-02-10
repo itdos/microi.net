@@ -124,7 +124,7 @@ services.AddUEditorService("ueditor.json", true, AppContext.BaseDirectory + "/ww
 services.AddControllersWithViews(options =>
 {
     // 添加自定义 ModelBinder，支持同时接收 form-data 和 JSON
-    options.ModelBinderProviders.Insert(0, new Microi.net.Api.ModelBinders.FormDataOrJsonModelBinderProvider());
+    options.ModelBinderProviders.Insert(0, new FormDataOrJsonModelBinderProvider());
 }).AddRazorRuntimeCompilation().AddNewtonsoftJson(options =>
 {
     //取消json首字母小写

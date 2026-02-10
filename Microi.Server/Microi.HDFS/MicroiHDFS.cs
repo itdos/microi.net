@@ -206,26 +206,37 @@ namespace Microi.net
                     var previewMaxLength = param.CompressMaxSize ?? 500;
                     var previewMaxWidth = param.CompressMaxWidth ?? 1920;
 
-                    #region 裁剪压缩之前，先将原图保存。值得注意的是，原图只存私有，不存公有。
-                    var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                    try
                     {
-                        ClientModel = clientModel,
-                        Limit = true,//param.Limit,
-                        FileFullPath = pathOrigin,
-                        FileStream = file.Value
-                    });
-                    if (putResult.Code != 1)
-                    {
-                        return putResult;
-                    }
-                    #endregion
+                        #region 裁剪压缩之前，先将原图保存。值得注意的是，原图只存私有，不存公有。
+                        // 重置 Stream Position，避免多次读取导致问题
+                        if (file.Value.CanSeek && file.Value.Position != 0)
+                        {
+                            file.Value.Position = 0;
+                        }
+                        var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                        {
+                            ClientModel = clientModel,
+                            Limit = true,//param.Limit,
+                            FileFullPath = pathOrigin,
+                            FileStream = file.Value
+                        });
+                        if (putResult.Code != 1)
+                        {
+                            return putResult;
+                        }
+                        #endregion
 
                     //判断是否裁剪。OSS暂时还没有处理裁剪。
-                    if (DiyHttpContext.Current.Request.HasFormContentType &&
-                        !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["pw"]) &&
-                        !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["ph"]) &&
-                        !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["px"]) &&
-                        !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["py"]))
+                    var needCrop = false;
+                    needCrop = DiyHttpContext.Current != null 
+                        && DiyHttpContext.Current.Request.HasFormContentType
+                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["pw"])
+                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["ph"])
+                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["px"])
+                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["py"]);
+                    
+                    if (needCrop)
                     {
                         #region 裁剪。 裁剪目前在docker环境下有点问题，每次更新后要安装一个包，不安装会报错，所以处理方式为即使裁剪失败也不管。
                         try
@@ -322,6 +333,14 @@ namespace Microi.net
                             Stream newImgStream = null;
                             try
                             {
+                                // 重置 Stream Position
+                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - FileName: {file.Key}");
+                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - Stream Position: {file.Value.Position}, Length: {file.Value.Length}");
+                                if (file.Value.CanSeek && file.Value.Position != 0)
+                                {
+                                    file.Value.Position = 0;
+                                    Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩前 - Position已重置为: {file.Value.Position}");
+                                }
                                 newImgStream = ImageHelper.MakeThumbnail(new ImageParam()
                                 {
                                     Mode = EnumHelper.ImageMode.W,
@@ -329,6 +348,7 @@ namespace Microi.net
                                     Image = file.Value,//file.InputStream,
                                     MaxLength = previewMaxLength
                                 });
+                                Console.WriteLine($"[MicroiHDFS.Upload] 服务器压缩后 - newImgStream Position: {newImgStream?.Position}, Length: {newImgStream?.Length}");
                                 //newImgStream = ImageHelper.MakeThumbnailV2(new ImageParam()
                                 //{
                                 //    FileSuffix = fileSuffix,
@@ -343,6 +363,7 @@ namespace Microi.net
                                 newImgStream.Position = 0;
                             }
 
+                            Console.WriteLine($"[MicroiHDFS.Upload] 上传压缩图前 - newImgStream Position: {newImgStream?.Position}, Length: {newImgStream?.Length}");
                             var putYasuoResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
@@ -358,12 +379,59 @@ namespace Microi.net
                         }
                         #endregion
                     }
+                    }
+                    catch (NotSupportedException notSupportEx)
+                    {
+                        // 降级：直接上传不压缩
+                        if (file.Value.CanSeek)
+                        {
+                            file.Value.Position = 0;
+                        }
+                        var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                        {
+                            ClientModel = clientModel,
+                            Limit = param.Limit,
+                            FileFullPath = resultPath,
+                            FileStream = file.Value
+                        });
+                        if (putFallbackResult.Code != 1)
+                        {
+                            return putFallbackResult;
+                        }
+                    }
+                    catch (Exception generalEx)
+                    {
+                        // 降级：直接上传不压缩
+                        if (file.Value.CanSeek)
+                        {
+                            file.Value.Position = 0;
+                        }
+                        var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                        {
+                            ClientModel = clientModel,
+                            Limit = param.Limit,
+                            FileFullPath = resultPath,
+                            FileStream = file.Value
+                        });
+                        if (putFallbackResult.Code != 1)
+                        {
+                            return putFallbackResult;
+                        }
+                    }
                 }
                 #endregion
 
                 #region 如果不压缩
                 else
                 {
+                    // 重置 Stream Position
+                    Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - FileName: {file.Key}");
+                    Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - Stream Position: {file.Value.Position}, Length: {file.Value.Length}");
+                    if (file.Value.CanSeek && file.Value.Position != 0)
+                    {
+                        file.Value.Position = 0;
+                        Console.WriteLine($"[MicroiHDFS.Upload] 不压缩上传前 - Position已重置为: {file.Value.Position}");
+                    }
                     var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                     {
                         ClientModel = clientModel,
