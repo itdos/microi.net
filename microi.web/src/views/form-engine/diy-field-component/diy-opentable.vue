@@ -327,7 +327,6 @@ const handleSubmit = async () => {
             // 从弹出的表格中获取已经选中的数据
             const refName = "refOpenTable_" + field.Name;
             const tableChildRef = proxy.$refs[refName];
-            debugger;
             if (tableChildRef) {
                 if (field.Config.OpenTable.MultipleSelect === false) {
                     V8.TableRowSelected = tableChildRef.TableSelectedRow;

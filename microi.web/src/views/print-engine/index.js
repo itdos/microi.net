@@ -1,6 +1,7 @@
 // 打印引擎本地入口文件（替代 npm 包 microi-printengine）
 import printDesigner from './engine/components/print-designer.vue'
 import printDoprint from './engine/components/print-doprint.vue'
+import printPreview from './engine/components/print-doprint.vue'
 import { EventBus } from './engine/utils/eventBus.js'
 import { usePrintEngineStore } from './engine/stores/printEngine.js'
 
@@ -11,4 +12,4 @@ import './engine/style.css'
 import { hiPrintPlugin } from 'vue-plugin-hiprint'
 hiPrintPlugin.disAutoConnect()
 
-export { printDesigner, printDoprint, EventBus, usePrintEngineStore }
+export { printDesigner, printDoprint, printPreview, EventBus, usePrintEngineStore }
