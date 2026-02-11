@@ -1612,7 +1612,6 @@ export default {
             });
         },
         OpenTableSetWhere(fieldModel, where) {
-            debugger;
             fieldModel.Config.OpenTable.PropsWhere = where;
         },
         AppendSearchChildTable(fieldModel, appendSearch) {

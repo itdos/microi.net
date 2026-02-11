@@ -483,6 +483,7 @@
     }
     .el-drawer {
         // overflow-y: scroll;
+        max-width: 100%;
     }
     .el-drawer__body {
         padding: 15px;

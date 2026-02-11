@@ -2003,9 +2003,6 @@ var DiyCommon = {
             tempConfigObj.Button.Loading = false;
             tempConfigObj.ImgUpload.ShowFileList = false;
             tempConfigObj.FileUpload.ShowFileList = false;
-            // if(field.Name == 'DeptId'){
-            // debugger;
-            // }
             field.Config = tempConfigObj;
         }
     },
@@ -2940,7 +2937,6 @@ var DiyCommon = {
         // _.find(arr, function(item){
         //     if (item.Id == idValue) {
         //         result = item;
-        //         debugger;
         //         return true;
         //     }
         //     else if (!DiyCommon.IsNull(item[childName]) && item[childName].length > 0) {
@@ -4295,7 +4291,6 @@ var DiyCommon = {
             var tabs = JSON.parse(data.Tabs);
             //2026-02-05 Anderspn：修复老的错误数据
             if(typeof tabs == "string"){
-                debugger;
                 tabs = JSON.parse(tabs);
             }
             //默认让tabs显示
