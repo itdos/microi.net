@@ -46,7 +46,7 @@
             <div>
                 <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
                     style="margin-bottom: 10px;">
-                    <div class="pull-left" style="font-size: 15px; line-height: 32px;" v-show="!diyStore.IsPhoneView">
+                    <div class="pull-left" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
                     </div>
@@ -361,7 +361,7 @@
             @opened="onDrawerOpened"
         >
             <template #header>
-                <div class="pull-left" style="color: #000; font-size: 15px">
+                <div class="pull-left" style="color: #000; font-size: 15px;min-width: 200px;">
                     <fa-icon :class="GetOpenTitleIcon()" />
                     {{ GetOpenTitle() }}
                 </div>
@@ -669,12 +669,59 @@ export default {
             }
         }
     },
-    watch: {},
+    watch: {
+        // 监听路由变化，在页面模式下重新初始化表单
+        $route: {
+            handler(newRoute, oldRoute) {
+                var self = this;
+                
+                // 检查是否为表单页面路由
+                var isFormPageRoute = newRoute && newRoute.params && newRoute.params.TableId && newRoute.path.indexOf('/diy/form-page') > -1;
+                
+                // 只在直接页面模式下处理路由变化
+                if (!self._isDirectPageMode || !isFormPageRoute) return;
+                
+                // 确保已经 mounted 过
+                if (!self._isMounted) return;
+                
+                // 路由确实发生了变化（防止初始化时触发）
+                if (oldRoute && newRoute.path !== oldRoute.path) {
+                    self.$nextTick(() => {
+                        // 重置状态
+                        self._isMounted = false;
+                        self.CallbackSetFormDataFinish = false;
+                        self.CallbackSetDiyTableModelFinish = false;
+                        
+                        // 重新从路由参数初始化
+                        self.TableId = newRoute.params.TableId;
+                        self.TableRowId = newRoute.params.TableRowId;
+                        self.FormMode = newRoute.query.FormMode;
+                        self.SysMenuId = newRoute.query.SysMenuId;
+                        
+                        // 标记为已 mounted
+                        self._isMounted = true;
+                        
+                        // 如果需要生成新 GUID
+                        if (!self.TableRowId && self.FormMode === 'Add') {
+                            self.DiyCommon.PostAsync("/api/DiyTable/NewGuid").then(guidResult => {
+                                if (guidResult.Code == 1) {
+                                    self.TableRowId = guidResult.Data;
+                                }
+                            });
+                        }
+                    });
+                }
+            },
+            immediate: false
+        }
+    },
     computed: {
-        // 判断是否为页面模式（通过路由参数判断）
+        // 判断是否为页面模式（通过路由参数判断 + 必须是直接访问，非嵌套子表）
         IsPageMode() {
             var self = this;
-            return self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
+            // 必须同时满足：1. 路由是 form-page 路径  2. 是直接页面访问（非弹窗内的子表）
+            var isFormPageRoute = self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
+            return isFormPageRoute && self._isDirectPageMode;
         },
         // 判断移动端是否有可用操作
         HasMobileActions() {
@@ -755,6 +802,7 @@ export default {
             CallbackSetDiyTableModelFinish: false,
             _isReloadingForm: false, // 防止 ReloadForm 死循环
             _isMounted: false, // 防止 mounted 重复执行
+            _isDirectPageMode: false, // 标识是否为直接通过路由访问的页面模式（非嵌套的子表弹窗）
 
             // ========== 抽屉打开上下文 ==========
             _pendingDrawerContext: null
@@ -769,8 +817,12 @@ export default {
         }
         self._isMounted = true;
         
-        // 如果是页面模式（通过路由访问），则从路由参数初始化
-        if (self.IsPageMode) {
+        // 判断是否为直接通过路由访问的页面模式
+        var isFormPageRoute = self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
+        if (isFormPageRoute) {
+            // 标记为直接页面访问模式
+            self._isDirectPageMode = true;
+            
             self.TableId = self.$route.params.TableId;
             self.TableRowId = self.$route.params.TableRowId;
             if (!self.TableRowId) {
@@ -805,6 +857,10 @@ export default {
          */
         Init(param) {
             var self = this;
+            
+            // 通过 Init 方法打开的表单，明确标记为非直接页面模式（即使在页面路由下也是弹窗/抽屉）
+            self._isDirectPageMode = false;
+            
             self.TableId = param.TableId;
             self.TableName = param.TableName;
             self.FormMode = param.FormMode;
@@ -1030,12 +1086,13 @@ export default {
         // ========== 获取表单宽度 ==========
         GetOpenFormWidth() {
             var self = this;
+            if (self.diyStore.IsPhoneView) {//self.DiyCommon.GetPageBodyClientWH().Width < 768
+                return "95%";
+            }
             if (self.Width) {
                 return self.Width;
             }
-            if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
-                return "100%";
-            }
+            
             var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
@@ -1836,7 +1893,7 @@ export default {
     padding: 8px 12px;
     border: 1px solid #e4e7ed;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    height: 32px;
+    height: 50px;
 }
 
 .form-actions {

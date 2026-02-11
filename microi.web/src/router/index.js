@@ -100,7 +100,8 @@ export const asyncRoutes = [
             {
                 path: "/diy/form-page",
                 name: "diy_form_page",
-                component: () => import("@/views/form-engine/diy-form-full.vue")
+                component: () => import("@/views/form-engine/diy-form-full.vue"),
+                // meta: { keepAlive: false }
             }
         ]
     },
@@ -111,7 +112,8 @@ export const asyncRoutes = [
             {
                 path: "/diy/form-page/:TableId",
                 name: "diy_form_page_add",
-                component: () => import("@/views/form-engine/diy-form-full.vue")
+                component: () => import("@/views/form-engine/diy-form-full.vue"),
+                // meta: { keepAlive: false }
             }
         ]
     },
@@ -122,7 +124,8 @@ export const asyncRoutes = [
             {
                 path: "/diy/form-page/:TableId/:TableRowId",
                 name: "diy_form_page_edit",
-                component: () => import("@/views/form-engine/diy-form-full.vue")
+                component: () => import("@/views/form-engine/diy-form-full.vue"),
+                // meta: { keepAlive: false }
             }
         ]
     },

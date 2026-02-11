@@ -3990,13 +3990,20 @@ export default {
 
             // 移动端模式下，使用路由跳转而非抽屉/弹窗打开表单
             // 因为用户在移动端会使用手机的后退功能返回上一页
-            // 2026-02-08 Anderson：如果是在弹窗中打开了表格，此时不应该跳走！未实现！
-            if (self.diyStore.IsPhoneView) {
+            // 2026-02-08 Anderson：如果是在弹窗中打开了表格，此时不应该跳走！
+            var isOpenPage = false;
+            if(self.diyStore.IsPhoneView){
+                isOpenPage = true;
+            }
+            if(self.$route.path.startsWith('/diy/form-page/')){
+                isOpenPage = false;
+            }
+            if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {
                     url += `/${tableRowModel.Id}`;
                 }
-                url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}`;
+                url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}&time=${new Date().getTime()}`;
                 self.BtnLoading = false;
                 self.$router.push(url);
                 return;

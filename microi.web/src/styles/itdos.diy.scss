@@ -475,8 +475,10 @@
         border-top: solid 5px #5473e8;
         // border-top: solid 5px #242B49;
         box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
-        min-height: 52px;
+        // min-height: 52px;
         line-height: 30px;
+        flex-wrap: wrap;
+        row-gap: 10px;
     }
     .el-dialog__header {
         border-top: solid 5px #5473e8;
