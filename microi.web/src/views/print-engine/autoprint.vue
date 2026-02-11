@@ -6,12 +6,14 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { printDesigner, EventBus, usePrintEngineStore } from "./index.js";
+import { printDesigner, printDoprint, printPreview, EventBus, usePrintEngineStore } from "./index.js";
 import { createPinia } from "pinia";
 
 export default {
     components: {
-        printDesigner
+        printDesigner,
+        printDoprint,
+        printPreview
     },
     data() {
         return {
@@ -27,6 +29,12 @@ export default {
             },
             printEngineStore: null
         };
+    },
+    props: {
+        DataAppend: {
+            type: Object,
+            default: () => {}
+        }
     },
     async mounted() {
         // 初始化 pinia store
@@ -52,13 +60,17 @@ export default {
     },
     methods: {
         async loadFormData() {
+            var self = this;
+            var appendPageId = this.DataAppend && this.DataAppend.PrintId;
+            if(appendPageId){
+                self.pageid = appendPageId;
+            }
             if (!this.pageid) return;
 
             var res = await DiyCommon.FormEngine.GetFormData({
                 FormEngineKey: "mic_print",
                 Id: this.pageid
             });
-
             if (res.Code === 1 && res.Data) {
                 var PageObj = {};
                 var PrintObj = {};
@@ -73,7 +85,7 @@ export default {
                     Title: res.Data.Title || "",
                     Number: res.Data.Number || "",
                     Desc: res.Data.Desc || "",
-                    DataApi: res.Data.DataApi || "",
+                    DataApi: (this.DataAppend && this.DataAppend.DataApi) || res.Data.DataApi || "",
                     PageObj: PageObj,
                     PrintObj: PrintObj
                 };

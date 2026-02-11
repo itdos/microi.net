@@ -74,6 +74,7 @@ const DiyJsonTable = defineAsyncComponent(() => import("@/views/form-engine/diy-
 const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-treecheckbox.vue"));
 const Fontawesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/dos.fontawesome/Fontawesome.vue"));
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
+const PrintEngineView = defineAsyncComponent(() => import("@/views/print-engine/renderer.vue"));
 
 // ==================== DIY组件（diy-components）====================
 const DiyLoadNonDiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-components/DiyLoadNonDiyTable.vue"));
@@ -172,6 +173,7 @@ function RegMicroiComponents(app) {
     app.component('DiyTreeCheckbox', DiyTreeCheckbox);
     app.component("Fontawesome", Fontawesome);
     app.component("DiyCodeEditor", DiyCodeEditor);
+    app.component("PrintEngineView", PrintEngineView);
 
     // DIY组件
     app.component("DiyLoadNonDiyTable", DiyLoadNonDiyTable);
