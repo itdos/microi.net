@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <printDesigner v-if="remoteObj.Id" :remoteObj="remoteObj" />
+        <printDoprint v-if="remoteObj.Id" :remoteObj="remoteObj" />
     </div>
 </template>
 

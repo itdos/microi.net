@@ -132,7 +132,6 @@ export default {
                 return this.basePath;
             }
             if (routePath.indexOf("http") > -1) {
-                // debugger;
             }
             if (isExternal(routePath)) {
                 var urlParam = typeof routeModel === "object" ? routeModel.UrlParam : "";
