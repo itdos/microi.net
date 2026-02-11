@@ -330,7 +330,6 @@ export default {
             if (self.field && (self.field.Config.DataSource == "Data" || self.field.Config.DataSource == "KeyValue")) {
                 self.FieldAllData = [...self.field.Data];
             }
-            
             // 🔥 修复：SQL数据源首次加载
             // 如果是SQL/DataSource/ApiEngine数据源，且非远程搜索模式，需要主动加载数据
             if (self.field && self.field.Config && 
@@ -586,7 +585,8 @@ export default {
         },
         SelectRemoteMethod(query, field) {
             var self = this;
-            if (field.Config.DataSourceSqlRemote == true) {
+            if (field.Config.DataSourceSqlRemote == true) 
+            {
                 field.Config.DataSourceSqlRemoteLoading = true;
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
