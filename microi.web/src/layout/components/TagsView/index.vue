@@ -9,9 +9,16 @@
             </el-tab-pane>
         </el-tabs>
 
-        <!-- 🔥 使用 keep-alive 保持所有页面状态 -->
+        <!-- 🔥 使用 keep-alive 保持页面状态，支持通过 meta.keepAlive 配置是否缓存 -->
         <router-view v-slot="{ Component }">
-            <keep-alive :max="5">
+            <template v-if="$route.meta?.keepAlive === false">
+                <component 
+                    v-if="Component" 
+                    :is="Component" 
+                    :key="$route.fullPath" 
+                />
+            </template>
+            <keep-alive v-else :max="5">
                 <component 
                     v-if="Component" 
                     :is="Component" 
