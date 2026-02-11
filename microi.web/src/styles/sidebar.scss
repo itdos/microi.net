@@ -97,6 +97,9 @@
     }
 
     .hideSidebar {
+        .menu-item-wrapper{
+            
+        }
         .sidebar-container-microi {
             width: 54px !important;
             .el-menu {
@@ -109,7 +112,7 @@
         }
 
         .submenu-title-noDropdown-microi {
-            padding: 0 !important;
+            padding: 12px !important;
             position: relative;
 
             .el-tooltip {
