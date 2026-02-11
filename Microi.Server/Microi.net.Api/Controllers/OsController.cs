@@ -95,13 +95,6 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
 
-            //指定条件
-            //param._SearchEqual = new Dictionary<string, string>() {
-            //    { "DomainName", Domain},
-            //    { "IsDeleted", "0"},
-            //    { "IsEnable", "1"},
-            //};
-
             Domain = Domain.ToLower();
 
             //2025-12-01 Anderson：增加支持http、https
@@ -129,21 +122,7 @@ namespace Microi.net.Api
                     OsClient = cacheResult.Value.OsClient
                 }));
             }
-            return Json(new DosResult(1, new
-            {
-                OsClient = OsClient.GetConfigOsClient(),
-            }));
 
-
-            //先用等号查询，性能更高
-            //旧版写法，仍支持
-            // param._Where = new List<DiyWhere>() {
-            //     new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = Domain, Type = "=" },
-            //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "http://" + Domain, Type = "=" },
-            //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "https://" + Domain, Type = "=", GroupEnd = true },
-            //     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
-            // };
-            //新版写法
             param._Where = new List<List<object>>() {
                 new List<object>{ "(", "DomainName", "=", Domain },
                 new List<object>{ "OR", "DomainName", "=", "http://" + Domain },
@@ -156,21 +135,11 @@ namespace Microi.net.Api
             if (result.Code != 1)
             {
                 //等号查询没有数据时，再用like查询
-                //旧版写法，仍支持
-                // param._Where = new List<DiyWhere>() {
-                //     new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = "$" + Domain + "$", Type = "Like" },
-                //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "http://" + Domain + "$", Type = "Like" },
-                //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "https://" + Domain + "$", Type = "Like", GroupEnd = true  },
-                //     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
-                // };
-                //新版写法
                 param._Where = new List<List<object>>() {
                     new List<object>{ "(", "DomainName", "Like", "$" + Domain + "$" },
-                    new List<object>{ "OR", "DomainName", "Like", "," + Domain },
-                    new List<object>{ "OR", "DomainName", "Like", ";" + "http://" + Domain },
-                    new List<object>{ "OR", "DomainName", "Like", ";" + "https://" + Domain },
-                    new List<object>{ "OR", "DomainName", "Like", "http://" + Domain + ";" },
-                    new List<object>{ "OR", "DomainName", "Like", "https://" + Domain + ";" },
+                    new List<object>{ "OR", "DomainName", "Like", ";" + Domain + ";" },
+                    new List<object>{ "OR", "DomainName", "Like", ";" + "http://" + Domain + ";" },
+                    new List<object>{ "OR", "DomainName", "Like", ";" + "https://" + Domain + ";" },
                     new List<object>{ "OR", "DomainName", "Like", "$" + "http://" + Domain + "$" },
                     new List<object>{ "OR", "DomainName", "Like", "$" + "https://" + Domain + "$", ")" },
                     new List<object>{ "IsEnable", "=", 1 },
