@@ -1,13 +1,13 @@
 <template>
     <div class="forklift-management">
-        <el-row :gutter="20" class="main-container" v-if="ShowRowView">
+        <el-row :gutter="10" class="main-container" v-if="ShowRowView">
             <el-col :span="colData.Left">
                 <el-card class="box-card" style="height: 85vh">
                     <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick"></LeftView>
                 </el-card>
             </el-col>
             <el-col :span="colData.Right">
-                <el-card class="products-card" style="height: 85vh; overflow-y: auto">
+                <el-card class="products-card" style="height: 85vh; overflow-y: auto; padding:0px;">
                     <RightView ref="ref_RightView" style="height: 200px" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
                     <DiyTableRowlist
                         ref="ref_RightDiyTable"
@@ -58,7 +58,8 @@ export default {
             LeftViewType: "",
             RightViewType: "",
             WhereType: "",
-            ShowRightView: true
+            ShowRightView: true,
+            LastClickNode : {},
         };
     },
     computed: {},
@@ -131,6 +132,11 @@ export default {
             }
         },
         async LeftViewClick(data) {
+            var self = this;
+            if(self.LastClickNode.Id == data.Id){
+                return;
+            }
+            self.LastClickNode = data;
             if (this.LeftTreeData.YincangBSF) {
                 if (data[this.LeftTreeData.YincangBSF]) {
                     this.ShowRightClick(false);
@@ -202,7 +208,11 @@ export default {
 
 <style scoped>
 .forklift-management {
-    padding: 5px;
+    padding: 0px;
+    margin-top: 10px;
+    :deep(.el-card__body){
+        padding: 10px;
+    }
 }
 
 .main-container {

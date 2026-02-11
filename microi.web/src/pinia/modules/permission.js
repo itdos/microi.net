@@ -25,7 +25,6 @@ const pathMappings = {
     "/microi/workflow/": "/diy/workflow/",
     // page-engine 相关映射
     "/page-engine/page-renderer": "/page-engine/renderer",
-    "/page-engine/": "/page-engine/",
     // form 相关映射
     "/microi.net/diy-form-page": "/diy/diy-form-page",
     // system 相关映射
@@ -33,7 +32,8 @@ const pathMappings = {
     "/itdos/system/sysrole-manage": "/system/sysrole-manage",
     "/itdos/system/sysdept-manage": "/system/sysdept-manage",
     "/itdos/system/sysuser-manage": "/system/sysuser-manage",
-    "/diy/diy-table-rowlist": "/diy/diy-table"
+    "/diy/diy-table-rowlist": "/diy/diy-table",
+    "/diy/left-right/LeftTreeJoinRightForm" : "/form-engine/left-right/LeftTreeJoinRightForm"
 };
 
 // 已知不存在的组件路径（静默处理，不打印警告）

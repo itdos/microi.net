@@ -53,7 +53,10 @@
         </el-dialog>
 
         <!-- 分类标题和操作按钮 -->
-        <span style="font-size:"><el-icon class="mr-2"><Operation /></el-icon>{{ LeftTreeData.ShubiaoT || "分类" }}</span>
+        <div style="font-size:14px;height: 32px;float: left;line-height: 32px;display: flex;align-items: center;">
+            <el-icon class="mr-2"><Operation /></el-icon>
+            {{ LeftTreeData.ShubiaoT || "分类" }}
+        </div>
         <div style="float: right">
             <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level === 999">页面配置 </el-button>
             <el-button type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
@@ -85,7 +88,7 @@
                         :filter-node-method="filterNode"
                         :default-expanded-keys="TreeData.ExpandedKeys"
                         :default-checked-keys="TreeData.CheckedKeys"
-                        :expand-on-click-node="true"
+                        :expand-on-click-node="false"
                         :load="lazy ? loadNode : null"
                         @node-click="handleCategoryClick"
                         :lazy="lazy"
@@ -154,7 +157,7 @@ export default {
     computed: {},
     data() {
         return {
-            lazy: true,
+            lazy: false,
             TreeData: {
                 SearchFormData: {
                     inputText: "",
@@ -463,6 +466,7 @@ export default {
     height: calc(100vh - 150px);
     display: flex;
     flex-direction: column;
+    width: 100%;
 }
 
 /* 自定义树形控件包装器 */
@@ -541,6 +545,7 @@ export default {
 
 .tree-actions .el-button {
     padding: 0 2px;
+    border:none;
 }
 
 /* 输入框样式 */

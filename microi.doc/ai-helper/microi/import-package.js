@@ -147,6 +147,7 @@ try {
             return String(diyType);
         }
         
+        if (typeStr.indexOf('mediumtext') == 0) return String(diyType);
         if (typeStr.indexOf('varchar') == 0) return String(diyType);
         if (typeStr.indexOf('decimal') == 0) return String(diyType);
         
