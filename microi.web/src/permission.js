@@ -16,7 +16,7 @@ router.beforeEach(async (to, from, next) => {
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
     var lastSsoToken = sessionStorage.getItem("LastSsoToken");
     if (!diySsoArray) {
-        var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/getTableDataAnonymous", {
+        var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/GetTableDataAnonymous", {
             FormEngineKey: "Diy_Sso",
             _SearchEqual: { IsEnable: true },
             OsClient: DiyCommon.GetOsClient()
