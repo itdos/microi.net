@@ -2380,6 +2380,9 @@ export default {
                         //赋值前，重载地图控件,非常重要
                         self.LoadMap = true;
                         self.DiyFieldList = resultGetDiyField.Data;
+
+                        // 字段数据源新位置
+                        self.DiyCommon.SetFieldsData(self.DiyFieldList, formData);
                         
                         // 初始化每个字段的属性（从计算属性移到这里，避免副作用）
                         self.DiyFieldList.forEach((field) => {
@@ -2461,7 +2464,8 @@ export default {
                 self.DiyCommon.DiyFieldConfigStrToJson(field);
                 self.DiyCommon.Base64DecodeDiyField(field);
             });
-            self.DiyCommon.SetFieldsData(resultGetDiyField.Data, formData);
+            // 字段数据源移动位置
+            // self.DiyCommon.SetFieldsData(resultGetDiyField.Data, formData);
 
             await resultGetDiyField.Data.forEach(async (field) => {
                 self.DiyFieldStrToJson(field, formData, null); //, isPostSql

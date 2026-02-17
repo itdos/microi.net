@@ -30,7 +30,7 @@ const tabbarItems = [
         name: 'home',
         label: '首页',
         icon: HomeFilled,
-        path: '/mobile/home'
+        path: '/'
     },
     {
         name: 'workspace',

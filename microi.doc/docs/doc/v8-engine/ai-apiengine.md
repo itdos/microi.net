@@ -1643,7 +1643,13 @@ services:
     ports:
       - "1333:6333"      # HTTP API端口
       - "1334:6334"      # gRPC端口（可选，高性能场景）
-    
+      
+    # 数据卷挂载（持久化存储）
+    volumes:
+      - /microi/qdrant/storage:/qdrant/storage          # 主存储目录
+      - /microi/qdrant/snapshots:/qdrant/snapshots      # 快照目录
+      - /microi/qdrant/config:/qdrant/config            # 配置文件目录（可选）
+
     # 环境变量配置（所有优化配置）
     environment:
       # 安全配置（生产环境建议启用）
@@ -1681,13 +1687,7 @@ services:
       # 资源限制（防止OOM）
       - QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB=102400     # mmap阈值
       - QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB=20480    # 索引阈值（20MB）
-    
-    # 数据卷挂载（持久化存储）
-    volumes:
-      - /microi/qdrant/storage:/qdrant/storage          # 主存储目录
-      - /microi/qdrant/snapshots:/qdrant/snapshots      # 快照目录
-      - /microi/qdrant/config:/qdrant/config            # 配置文件目录（可选）
-    
+        
     # 资源限制（根据服务器实际情况调整）
     #deploy:
     #  resources:
