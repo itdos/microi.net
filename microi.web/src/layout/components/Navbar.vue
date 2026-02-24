@@ -25,6 +25,38 @@
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
+            <!-- 切换界面风格 -->
+            <el-dropdown v-if="hasWebOS" trigger="click">
+                <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
+                    <font-awesome-icon icon="fa-solid fa-display" style="color: #333;font-size:18px;" />
+                </a>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item @click="switchStyle('Classic')">
+                            <span style="display:flex;align-items:center;gap:8px;width:100%;">
+                                <el-icon><Monitor /></el-icon>
+                                <span style="flex:1;">经典传统</span>
+                                <el-icon v-if="SystemStyle === 'Classic'" style="color:var(--el-color-primary);"><Check /></el-icon>
+                            </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="switchStyle('macOS')">
+                            <span style="display:flex;align-items:center;gap:8px;width:100%;">
+                                <font-awesome-icon icon="fa-brands fa-apple" style="font-size:16px;width:16px;" />
+                                <span style="flex:1;">macOS 风格</span>
+                                <el-icon v-if="SystemStyle === 'macOS'" style="color:var(--el-color-primary);"><Check /></el-icon>
+                            </span>
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="switchStyle('Windows')">
+                            <span style="display:flex;align-items:center;gap:8px;width:100%;">
+                                <font-awesome-icon icon="fa-brands fa-windows" style="font-size:16px;width:16px;" />
+                                <span style="flex:1;">Windows 风格</span>
+                                <el-icon v-if="SystemStyle === 'Windows'" style="color:var(--el-color-primary);"><Check /></el-icon>
+                            </span>
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
+
             <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
                 <div class="avatar-wrapper">
                     <img :src="GetCurrentUserAvatar()" class="user-avatar" />
@@ -41,6 +73,12 @@
                                 {{ "修改密码" }}</span
                             >
                         </el-dropdown-item>
+                        <!-- <el-dropdown-item v-if="hasWebOS" @click="GotoWebOSDesktop">
+                            <span style="display: block">
+                                <el-icon><Grid /></el-icon>
+                                切换到桌面模式</span
+                            >
+                        </el-dropdown-item> -->
                         <el-dropdown-item divided @click="logout">
                             <span style="display: block">
                                 <el-icon><Back /></el-icon>
@@ -93,6 +131,7 @@ import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
 import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
+import { hasWebOS } from "@/utils/webos-detect.js";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -127,6 +166,7 @@ export default {
             diyStore,
             appStore,
             userStore,
+            hasWebOS,
             sidebar,
             device,
             avatar,
@@ -368,6 +408,23 @@ export default {
         },
         GotoDesktop() {
             this.diyStore.setState("ShowGotoWebOS", true);
+        },
+        switchStyle(style) {
+            const current = this.diyStore.SystemStyle;
+            if (current === style) return;
+            this.diyStore.setState('SystemStyle', style);
+            if (style === 'macOS' || style === 'Windows') {
+                // 切换到 WebOS 桌面
+                this.$router.push('/os');
+            } else {
+                // 切换到经典传统界面（如果当前在 /os 则跳回首页）
+                if (this.$route.path === '/os') {
+                    this.$router.push('/');
+                }
+            }
+        },
+        GotoWebOSDesktop() {
+            this.switchStyle('macOS');
         },
         toggleSideBar() {
             this.appStore.toggleSideBar();

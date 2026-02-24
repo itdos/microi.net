@@ -453,7 +453,20 @@ const handleLogout = (showConfirm = true) => {
             LocalStorageManager.remove('CurrentUser');
             // 清除标签页视图
             tagsViewStore.delAllViews();
-            // 跳转到登录页
+            
+            // 检测是否在小程序 WebView 环境中
+            if (isMiniProgram()) {
+                // 在小程序中：通知小程序跳转回登录页
+                try {
+                    window.wx.miniProgram.reLaunch({ url: '/pages/login/index?logout=1' });
+                    return; // 小程序会接管页面跳转
+                } catch (wxErr) {
+                    console.warn('wx.miniProgram.reLaunch 失败:', wxErr);
+                    // 降级到 H5 内部跳转
+                }
+            }
+            
+            // 非小程序环境：正常 H5 路由跳转
             router.push('/login');
             ElMessage.success('已退出登录');
         } catch (error) {
@@ -461,6 +474,13 @@ const handleLogout = (showConfirm = true) => {
             // 即使出错也要确保清除本地数据并跳转
             removeToken();
             LocalStorageManager.remove('CurrentUser');
+            
+            if (isMiniProgram()) {
+                try {
+                    window.wx.miniProgram.reLaunch({ url: '/pages/login/index?logout=1' });
+                    return;
+                } catch (e) { /* 降级 */ }
+            }
             router.push('/login');
         }
     };
@@ -475,6 +495,19 @@ const handleLogout = (showConfirm = true) => {
         doLogout();
     }
 };
+
+/**
+ * 检测当前是否在小程序 WebView 环境中
+ */
+function isMiniProgram() {
+    // 方式1：微信注入的环境变量
+    if (window.__wxjs_environment === 'miniprogram') return true;
+    // 方式2：URL 参数标识（小程序 webview 传入 source=miniprogram）
+    if (/source=miniprogram/.test(location.search)) return true;
+    // 方式3：检查 wx.miniProgram API 是否存在
+    if (window.wx && window.wx.miniProgram) return true;
+    return false;
+}
 </script>
 
 <style lang="scss" scoped>
