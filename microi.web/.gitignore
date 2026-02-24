@@ -25,6 +25,7 @@ yarn.lock
 localConfig.json
 .env
 src/config.json
+src/webos/
 
 # 允许跟踪 bin/Release 目录下的配置文件
 !bin/Release/Dockerfile
