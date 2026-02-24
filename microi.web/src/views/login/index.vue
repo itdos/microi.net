@@ -77,6 +77,46 @@
                     </el-input>
                 </div>
 
+                <!-- 界面风格选择 -->
+                <div class="style-selector-wrapper" v-if="hasWebOS">
+                    <div class="style-selector-label">选择界面风格</div>
+                    <div class="style-selector-options">
+                        <div 
+                            class="style-option" 
+                            :class="{ active: SystemStyle === 'Classic' }" 
+                            @click="SystemStyle = 'Classic'"
+                        >
+                            <div class="style-option-icon">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 3h18v12H3V3zm0 14h18v2H3v-2zm4 3h10v1H7v-1z"/></svg>
+                            </div>
+                            <div class="style-option-text">经典传统</div>
+                            <div class="style-option-check" v-if="SystemStyle === 'Classic'">✓</div>
+                        </div>
+                        <div 
+                            class="style-option" 
+                            :class="{ active: SystemStyle === 'macOS' }" 
+                            @click="SystemStyle = 'macOS'"
+                        >
+                            <div class="style-option-icon">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                            </div>
+                            <div class="style-option-text">macOS 风格</div>
+                            <div class="style-option-check" v-if="SystemStyle === 'macOS'">✓</div>
+                        </div>
+                        <div 
+                            class="style-option" 
+                            :class="{ active: SystemStyle === 'Windows' }" 
+                            @click="SystemStyle = 'Windows'"
+                        >
+                            <div class="style-option-icon">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .08V5.67L20 3zm-10 9.04l10-.08V21l-10-1.39V12.04zM3 12.5l6 .09v6.73l-6-1.07V12.5z"/></svg>
+                            </div>
+                            <div class="style-option-text">Windows 风格</div>
+                            <div class="style-option-check" v-if="SystemStyle === 'Windows'">✓</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 登录按钮 -->
                 <div v-if="PageType != 'BindWeChat'" class="login-button-wrapper">
                     <el-button
@@ -125,25 +165,6 @@
                     </p>
                 </div>
             </div>
-            <el-dialog width="800px" :append-to-body="true" v-model="ShowChooseOS" :title="$t('Msg.ChooseOSType')" :close-on-click-modal="false" draggable>
-                <div style="width: 100%">
-                    <div class="float-left" @click="SystemStyle = 'WebOS'">
-                        <img :class="'imgSystemPreview ' + (SystemStyle == 'WebOS' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-os.jpg')" />
-                        <el-radio v-model="SystemStyle" value="WebOS">Web操作系统</el-radio>
-                    </div>
-                    <div class="pull-right" @click="SystemStyle = 'Classic'">
-                        <img :class="'imgSystemPreview ' + (SystemStyle == 'Classic' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-old.jpg')" />
-                        <el-radio v-model="SystemStyle" value="Classic">经典系统界面</el-radio>
-                    </div>
-                </div>
-                <div class="clear marginTop10 marginBottom10" />
-                <template #footer>
-                    <span class="dialog-footer">
-                        <el-button type="primary" @click="GotoSystem">立即进入</el-button>
-                        <el-button @click="diyStore.setShowGotoWebOS(false)">取 消</el-button>
-                    </span>
-                </template>
-            </el-dialog>
 
             <el-dialog width="800px" :append-to-body="true" v-model="ShowPrivacyPolicy" :title="SysConfig.PrivacyPolicyName || '同意隐私协议'" :close-on-click-modal="false" draggable>
                 <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
@@ -238,6 +259,7 @@ import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 // 使用 Pinia 替代 Vuex
 import { useDiyStore, useSettingsStore, useUserStore, usePermissionStore } from "@/pinia";
+import { hasWebOS } from "@/utils/webos-detect.js";
 import { storeToRefs } from "pinia";
 // 浏览器原生支持 setInterval，不需要导入 Node.js 的 timers 模块
 import Cookies from "js-cookie";
@@ -304,7 +326,8 @@ export default {
             SystemStyle,
             // 工具函数
             DiyCommon,
-            DiyApi
+            DiyApi,
+            hasWebOS
         };
     },
     computed: {
@@ -339,7 +362,6 @@ export default {
             ShowPrivacyPolicy: false,
             CheckPrivacyPolicy: true,
             ShowCaptcha: false,
-            ShowChooseOS: false,
             Account: "",
             Pwd: "",
             tipId: "",
@@ -403,6 +425,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
         if (self.DiyCommon && self.DiyApi) {
             self.TokenLogin();
+        }
+
+        // 默认选中经典传统界面
+        if (self.DiyCommon.IsNull(self.SystemStyle)) {
+            self.diyStore.setState("SystemStyle", "Classic");
         }
         $("#divLogin").css({
             opacity: 1
@@ -751,12 +778,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         }
 
                         if (self.DiyCommon.IsNull(self.SystemStyle)) {
-                            // self.ShowChooseOS = true;
                             self.diyStore.setState("SystemStyle", "Classic");
-                            self.GotoSystem();
-                        } else {
-                            self.GotoSystem();
                         }
+                        self.GotoSystem();
                     }
                 } else {
                     self.GetCaptcha();
@@ -772,11 +796,12 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.DiyCommon.Tips(self.$t("Msg.ChooseOSType"));
                 return;
             }
-            self.ShowChooseOS = false;
             self.diyStore.setState("SystemStyle", self.SystemStyle);
 
             document.body.classList.remove("Classic");
             document.body.classList.remove("WebOS");
+            document.body.classList.remove("macOS");
+            document.body.classList.remove("Windows");
             document.body.classList.add(self.SystemStyle);
 
             // $('#divLogin').css({
@@ -821,7 +846,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             // 短暂等待确保路由完全注册（50ms足够，因为已经在登录时加载）
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            if (self.SystemStyle == "WebOS") {
+            if (self.SystemStyle == "WebOS" || self.SystemStyle == "macOS" || self.SystemStyle == "Windows") {
                 self.$router.push({
                     path: "/os",
                     replace: true
@@ -890,7 +915,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 /* ==================== 登录输入框样式 ==================== */
 .login-input-param.captcha{
     :deep(.el-input .el-input__wrapper){
-        border-radius: 0px;
+        border-radius: 6px 0 0 6px;
     }
 }
 .login-input-param {
@@ -936,7 +961,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: -11px;
+    margin-left: 0px;
     margin-right: 10px;
     border-radius: 6px 0 0 6px;
     transition: all 0.3s ease;
@@ -961,6 +986,90 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         
         &:hover {
             opacity: 0.8;
+        }
+    }
+}
+
+/* ==================== 界面风格选择器样式 ==================== */
+.style-selector-wrapper {
+    margin-bottom: 8px;
+    margin-top: 4px;
+
+    .style-selector-label {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 10px;
+        text-align: left;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+
+    .style-selector-options {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .style-option {
+        flex: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 5px;
+        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        color: rgba(255, 255, 255, 0.8);
+
+        &:hover {
+            border-color: rgba(255, 255, 255, 0.45);
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            color: #fff;
+        }
+
+        &.active {
+            border-color: var(--el-color-primary);
+            background: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.2);
+            color: #fff;
+            box-shadow: 0 0 16px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.3);
+
+            .style-option-icon {
+                color: var(--el-color-primary-light-3);
+            }
+        }
+
+        .style-option-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .style-option-text {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .style-option-check {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            font-size: 11px;
+            color: var(--el-color-primary-light-3);
+            font-weight: bold;
         }
     }
 }

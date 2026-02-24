@@ -148,6 +148,23 @@ import { getIconComponent, convertIconName } from "./utils/icon-compat.js";
 // 全局方法：将旧版 el-icon-xxx 转换为图标组件
 app.config.globalProperties.$getIcon = getIconComponent;
 app.config.globalProperties.$convertIconName = convertIconName;
+// ======== WebOS 依赖注册 ========
+// FontAwesome 图标库（WebOS 桌面使用）
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { fas } from '@fortawesome/free-solid-svg-icons';
+import { far } from '@fortawesome/free-regular-svg-icons';
+import { fab } from '@fortawesome/free-brands-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+library.add(fas, far, fab);
+app.component('font-awesome-icon', FontAwesomeIcon);
+// ve-plus（WebOS 桌面弹层/上下文菜单）
+import VePlus from 've-plus';
+import 've-plus/dist/ve-plus.css';
+app.use(VePlus);
+// WebOS 样式（使用 glob 动态加载，webos 目录不存在时静默跳过）
+import.meta.glob('@/webos/styles/*.scss', { eager: true });
+// ======== WebOS 依赖注册结束 ========
+
 // 使用 router 和 i18n
 app.use(router);
 app.use(i18n);

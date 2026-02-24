@@ -2,6 +2,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 // 只导入轻量级的工具函数，不导入组件
 import { DiyCommon } from "@/utils/diy.common";
+import { hasWebOS, loadDesktop } from "@/utils/webos-detect.js";
 /* Layout */
 import Layout from "@/layout";
 export const constantRoutes = [
@@ -21,6 +22,13 @@ export const constantRoutes = [
         component: () => import("@/views/login/index.vue"),
         hidden: true
     },
+    // WebOS 桌面路由（全屏，无经典传统 Layout 包裹，仅在 webos 模块存在时注册）
+    ...(hasWebOS ? [{
+        path: "/os",
+        name: "webos_desktop",
+        component: loadDesktop,
+        hidden: true
+    }] : []),
     // 移动端路由
     {
         path: "/mobile/home",

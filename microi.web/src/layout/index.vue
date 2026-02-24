@@ -1,5 +1,8 @@
 <template>
-    <div :class="classObj" class="app-wrapper-microi">
+    <!-- WebOS 模式：如果 webos 模块存在且当前为 macOS/Windows 风格，渲染 WebOS 应用容器 -->
+    <component :is="WebOSAppContainer" v-if="isWebOS && WebOSAppContainer" />
+    <!-- 经典传统模式（仅当非 WebOS 时渲染，避免 WebOS 异步加载期间闪烁经典传统布局） -->
+    <div v-else-if="!isWebOS" :class="classObj" class="app-wrapper-microi">
         <!-- 遮罩层：仅在移动端且菜单展开时显示 -->
         <div v-if="diyStore.IsPhoneView && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
         <!-- 左边菜单区域（移动端不显示） -->
@@ -34,7 +37,8 @@ import MobileTabBar from "@/components/MobileTabBar";
 import { AppMain, Navbar, Sidebar, TagsView } from "./components";
 import ResizeMixin from "./mixin/ResizeHandler";
 import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/pinia";
-import { computed } from "vue";
+import { computed, shallowRef, markRaw } from "vue";
+import { loadAppContainer, getAppContainerSync } from "@/utils/webos-detect.js";
 
 export default {
     name: "Layout",
@@ -54,6 +58,17 @@ export default {
         const settingsStore = useSettingsStore();
         const permissionStore = usePermissionStore();
 
+        // WebOS 自适应：检测 webos 模块并在 macOS/Windows 模式时切换布局
+        // 优先使用同步缓存（后续导航无延迟），首次加载走异步
+        const cachedMod = getAppContainerSync();
+        const WebOSAppContainer = shallowRef(cachedMod ? markRaw(cachedMod.default) : null);
+        const isWebOS = computed(() => ['macOS', 'Windows'].includes(diyStore.SystemStyle));
+        if (loadAppContainer && !WebOSAppContainer.value) {
+            loadAppContainer().then(m => {
+                WebOSAppContainer.value = markRaw(m.default);
+            });
+        }
+
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
         const showSettings = computed(() => settingsStore.showSettings);
@@ -69,6 +84,8 @@ export default {
             appStore,
             settingsStore,
             permissionStore,
+            WebOSAppContainer,
+            isWebOS,
             sidebar,
             device,
             showSettings,
