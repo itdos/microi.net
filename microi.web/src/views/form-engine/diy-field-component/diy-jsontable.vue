@@ -905,8 +905,8 @@ export default {
             });
             
             syncToParent();
-            dataSourceSelected.value = [];
             DiyCommon.Tips('已添加 ' + dataSourceSelected.value.length + ' 条数据', true);
+            dataSourceSelected.value = [];
         };
 
         // ==================== 复杂组件编辑 ====================
