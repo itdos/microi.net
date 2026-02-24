@@ -1,0 +1,25 @@
+{
+  "name": "microi-uniapp-webview",
+  "appid": "__UNI__MICROI_WV",
+  "description": "Microi.net 低代码平台小程序端",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "app-plus": {},
+  "h5": {},
+  "mp-weixin": {
+    "appid": "wx0e661a2fc4f52530",
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "enhance": true,
+      "postcss": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    },
+    "requiredPrivateInfos": []
+  }
+}

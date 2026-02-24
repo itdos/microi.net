@@ -362,7 +362,7 @@
         .el-table__header-wrapper {
             .el-table__header {
                 th {
-                    background-color: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+                    background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
                     border-bottom: 1px solid #e4e7ed;
                     
                     &:first-child {
