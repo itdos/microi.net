@@ -359,9 +359,19 @@ export default {
 
     // 分享
     handleShare() {
-      // #ifdef MP-WEIXIN
+      // #ifdef MP
       // 小程序中无法主动触发分享，提示用户使用右上角分享
       uni.showToast({ title: this.t('mall.shareHint'), icon: 'none' })
+      // #endif
+      // #ifdef APP-PLUS
+      // App 端可以调用系统分享
+      uni.share && uni.share({
+        provider: 'system',
+        type: 0,
+        title: this.product ? this.product.ShangpinMC : '商品详情',
+        summary: '查看商品详情',
+        href: appConfig.webviewUrl + '/#/pages/mall/detail?id=' + this.productId
+      })
       // #endif
     },
 

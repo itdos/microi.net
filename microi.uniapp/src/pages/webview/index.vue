@@ -39,6 +39,7 @@
 import appConfig from '@/utils/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser, removeToken } from '@/utils/request.js'
+import { getSourceTag } from '@/utils/platform.js'
 
 export default {
   mixins: [themeMixin],
@@ -100,7 +101,7 @@ export default {
       const separator = url.includes('?') ? '&' : '?'
       // 传递 token 和来源标识
       url += separator + 'token=' + encodeURIComponent(token)
-      url += '&source=miniprogram'
+      url += '&source=' + getSourceTag()
       url += '&OsClient=' + encodeURIComponent(appConfig.osClient)
       this.webviewUrl = url
     },

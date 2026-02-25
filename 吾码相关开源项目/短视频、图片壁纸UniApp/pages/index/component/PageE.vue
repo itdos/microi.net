@@ -517,7 +517,7 @@
 			Power by jsnzk.com
 		</view>
 		<view style="line-height: 50rpx;text-align: center;color: #d5d5d5;font-size:24rpx;">
-			Copyright © 2009-2025
+			Copyright © 2009-2026
 		</view>
 		<!-- <view @tap="GotoBeian()" style="line-height: 50rpx;text-align: center;color: #d5d5d5;font-size:24rpx;color:#3D7EFF;text-decoration: underline;margin-bottom:50rpx;">
 			蜀ICP备2023012232号-6A

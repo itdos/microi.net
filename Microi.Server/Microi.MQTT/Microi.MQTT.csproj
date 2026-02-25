@@ -7,7 +7,7 @@
     <Authors>Microi</Authors>
     <Company>www.microi.net</Company>
     <Description>开源低代码平台-Microi吾码，IoT物联网MQTT相关功能依赖注入。此类库开源，官网：https://microi.net</Description>
-    <Copyright>Copyright 2009-2025 microi.net</Copyright>
+    <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
