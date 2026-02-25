@@ -1340,7 +1340,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     left: 5%;
     bottom: 7.5%;
     width: 400px;
-    height: 200px;
+    height: auto;
     position: fixed;
     transition: all 0.7s ease;
     

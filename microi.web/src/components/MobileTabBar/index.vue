@@ -1,5 +1,5 @@
 <template>
-    <div v-if="diyStore.IsPhoneView" class="mobile-tabbar">
+    <div v-if="diyStore.IsPhoneView && !hideTabBar" class="mobile-tabbar">
         <div 
             v-for="item in tabbarItems" 
             :key="item.name"
@@ -24,6 +24,20 @@ import { HomeFilled, Grid, ChatDotRound, User } from '@element-plus/icons-vue';
 const router = useRouter();
 const route = useRoute();
 const diyStore = useDiyStore();
+
+// 支持 URL 参数 hideTabBar=1 隐藏底部菜单（小程序 webview 跳转场景）
+const hideTabBar = computed(() => {
+    // 1. 检查 vue-router query 参数
+    if (route.query.hideTabBar === '1' || route.query.hideTabBar === 'true') return true;
+    // 2. 检查 URL hash 中的参数（hash 路由模式下参数可能在 hash 里）
+    try {
+        const hash = window.location.hash;
+        if (hash && hash.includes('hideTabBar=1')) return true;
+        const search = window.location.search;
+        if (search && search.includes('hideTabBar=1')) return true;
+    } catch (e) {}
+    return false;
+});
 
 const tabbarItems = [
     {

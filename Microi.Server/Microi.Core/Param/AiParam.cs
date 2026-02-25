@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+#nullable enable
+
 namespace Microi.net
 {
     public class AiParam
@@ -104,17 +106,17 @@ namespace Microi.net
         /// <summary>
         /// 用户的自然语言需求描述，如：帮我获取最新的一条生产订单数据
         /// </summary>
-        public string Question { get; set; }
+        public string? Question { get; set; }
 
         /// <summary>
         /// AI模型名称
         /// </summary>
-        public string AiModel { get; set; }
+        public string? AiModel { get; set; }
 
         /// <summary>
         /// 租户标识
         /// </summary>
-        public string OsClient { get; set; }
+        public string? OsClient { get; set; }
     }
 
     /// <summary>
