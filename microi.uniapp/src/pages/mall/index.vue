@@ -189,6 +189,7 @@
 import { getProductList, getProductCategories, getProductTypes, parseImages, getImageUrl } from '@/utils/api.js'
 import appConfig from '@/utils/config.js'
 import { themeMixin } from '@/utils/theme.js'
+import { getMenuButtonRect } from '@/utils/platform.js'
 
 export default {
   mixins: [themeMixin],
@@ -238,15 +239,14 @@ export default {
         this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
       } catch (e2) {}
     }
-    // 计算微信胶囊按钮占用的右侧宽度
-    // #ifdef MP-WEIXIN
+    // 计算小程序胶囊按钮占用的右侧宽度（跨平台）
     try {
-      const menuBtn = wx.getMenuButtonBoundingClientRect()
-      const sysInfo = uni.getWindowInfo ? uni.getWindowInfo() : uni.getSystemInfoSync()
-      // 胶囊右边距 = 屏幕宽度 - 胶囊右边界，搜索栏右沿需避开
-      this.capsuleWidth = sysInfo.windowWidth - menuBtn.left + 8
+      const menuBtn = getMenuButtonRect()
+      if (menuBtn) {
+        const sysInfo = uni.getWindowInfo ? uni.getWindowInfo() : uni.getSystemInfoSync()
+        this.capsuleWidth = sysInfo.windowWidth - menuBtn.left + 8
+      }
     } catch (e) {}
-    // #endif
     this.loadCategoryTree()
     this.loadTypes()
     this.loadProducts()

@@ -58,7 +58,7 @@ const messages = {
 
     // ── 登录页 ──
     login: {
-      wechatLogin: '小程序授权登录',
+      authLogin: '小程序授权登录',
       accountLogin: '账号密码登录',
       enterAccount: '请输入账号',
       enterPassword: '请输入密码',
@@ -67,14 +67,19 @@ const messages = {
       loginBtn: '登 录',
       agreePre: '我已阅读并同意',
       privacyPolicy: '《隐私政策》',
-      wechatLoginFailed: '微信登录失败',
+      authLoginFailed: '授权登录失败',
+      authNotSupported: '当前平台不支持授权登录',
       pleaseUseAccount: '请使用账号密码登录',
       loginFailed: '登录失败，请稍后再试',
-      unboundWechat: '该微信尚未绑定账号，请使用账号密码登录',
+      unboundAuth: '该账号尚未绑定，请使用账号密码登录',
       encryptionFailed: '密码加密失败',
       loginFailedMsg: '登录失败',
       pleaseAgree: '请先阅读并同意',
       welcomeBack: '欢迎回来',
+      // 兼容旧key
+      wechatLogin: '小程序授权登录',
+      wechatLoginFailed: '授权登录失败',
+      unboundWechat: '该账号尚未绑定，请使用账号密码登录',
     },
 
     // ── 商城 ──
@@ -308,7 +313,7 @@ const messages = {
     },
 
     login: {
-      wechatLogin: 'WeChat Login',
+      authLogin: 'Authorize Login',
       accountLogin: 'Account Login',
       enterAccount: 'Enter account',
       enterPassword: 'Enter password',
@@ -317,14 +322,19 @@ const messages = {
       loginBtn: 'Login',
       agreePre: 'I have read and agree to the ',
       privacyPolicy: 'Privacy Policy',
-      wechatLoginFailed: 'WeChat login failed',
+      authLoginFailed: 'Authorization login failed',
+      authNotSupported: 'Auth login not supported on this platform',
       pleaseUseAccount: 'Please use account & password to login',
       loginFailed: 'Login failed, please try again',
-      unboundWechat: 'WeChat not bound, please use account & password',
+      unboundAuth: 'Account not bound, please use account & password',
       encryptionFailed: 'Password encryption failed',
       loginFailedMsg: 'Login failed',
       pleaseAgree: 'Please read and agree to the',
       welcomeBack: 'Welcome back',
+      // backward-compatible keys
+      wechatLogin: 'Authorize Login',
+      wechatLoginFailed: 'Authorization login failed',
+      unboundWechat: 'Account not bound, please use account & password',
     },
 
     mall: {

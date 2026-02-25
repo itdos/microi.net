@@ -63,9 +63,9 @@
 * **腾讯IM**: 集成腾讯IM，只需要简单的配置，便可以使用丰富的 UI 组件快速集成社交聊天、客服会话、直播弹幕等能力。
 
 ## 开源版、个人版、企业版区别
->* **开源版**：PC传统界面100%完整源码、移动端100%完整源码、后端99%源代码，可商用，随意修改。<font color="red">只能设计、保存流程，无法发起工作流。</font>
->* **个人版**：￥999；额外包含<font color="red">【WebOS 100%完整源码】</font>，功能、开源程度与`企业版`完全一致；后端永久开发者License 1个，后端永久运行时License不限。<font color="red">可发起工作流，无任何限制</font>
->* **企业版**：￥10w（首付￥2.5w）；提供更多的培训、咨询等售后服务；优先响应平台升级需求；后端永久开发者License 10个，后端永久运行时License不限
+>* **开源版**：PC传统界面100%完整源码、移动端100%完整源码、后端99%源代码；可商用、随意修改、无限分发部署，<font color="red">仅无法使用在线AI相关功能</font>
+>* **个人版**：￥999；额外包含<font color="red">【WebOS 100%完整源码】</font>，功能、开源程度与`企业版`完全一致，<font color="red">无任何限制、无限分发部署</font>
+>* **企业版**：￥10w（首付￥2.5w）；提供更多的培训、咨询等售后服务；<font color="red">优先响应平台升级需求</font>
 
 ## 成功案例
 * 2018~2025基于Microi吾码平台已交付的软件200+套，已应用客户500+
@@ -82,7 +82,7 @@
 ## 源码目录说明
 * **__<font color="red">Microi.Server</font>__**：后端99%源码（`长期升级`，.NET10，`自 2014 年由 .net framework/core2/3/5.../10 一路升级上来`）
 * **__<font color="red">microi.web</font>__**：PC传统界面100%完整源码（`长期升级`，`vue3 + element-plus + vite + pinia`，自适应移动端，支持动态嵌入个人版WebOS界面）
-* **__<font color="red">microi.uniapp</font>__**：UniApp小程序端100%完整源码（`长期升级`，微信小程序端的数据表格、表单功能以WebView方式加载microi.web移动端H5界面）
+* **__<font color="red">microi.uniapp</font>__**：UniApp小程序端100%完整源码（`长期升级`，小程序端的数据表格、表单功能以WebView方式加载microi.web自适应移动端H5界面）
 * **__<font color="red">microi.doc</font>__**：官网源码（基于 `VitePress` 的官方文档）
 
 ## Microi吾码 - 相关文档

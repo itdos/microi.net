@@ -24,15 +24,15 @@
         <text class="app-subtitle">{{ appSubTitle }}</text>
       </view>
 
-      <!-- 小程序授权登录（默认显示） -->
-      <view class="auth-section" v-if="!showAccountLogin">
+      <!-- 小程序授权登录（默认显示，仅支持授权登录的平台显示） -->
+      <view class="auth-section" v-if="!showAccountLogin && hasAuthLogin">
         <button
           class="mp-login-btn"
           :loading="wxLoginLoading"
-          @tap="handleWxLogin"
+          @tap="handleAuthLogin"
         >
           <text class="mp-login-icon">🔐</text>
-          <text>{{ t('login.wechatLogin') }}</text>
+          <text>{{ t('login.authLogin') }}</text>
         </button>
 
         <view class="switch-login" @tap="showAccountLogin = true">
@@ -120,10 +120,10 @@
           <text>{{ t('login.loginBtn') }}</text>
         </button>
 
-        <!-- 切换回授权登录 -->
-        <view class="switch-login" @tap="showAccountLogin = false">
+        <!-- 切换回授权登录（仅支持授权登录的平台显示） -->
+        <view class="switch-login" v-if="hasAuthLogin" @tap="showAccountLogin = false">
           <text class="arrow-icon">←</text>
-          <text>{{ t('login.wechatLogin') }}</text>
+          <text>{{ t('login.authLogin') }}</text>
         </view>
       </view>
 
@@ -157,6 +157,7 @@ import appConfig from '@/utils/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.js'
 import { encryptPassword } from '@/utils/crypto.js'
+import { getLoginProvider, getAuthLoginApi, getClientType, supportsAuthLogin, getPlatformName, getPlatformNameEn } from '@/utils/platform.js'
 
 export default {
   mixins: [themeMixin],
@@ -182,6 +183,8 @@ export default {
       // 加载状态
       wxLoginLoading: false,
       accountLoginLoading: false,
+      // 是否支持平台授权登录
+      hasAuthLogin: supportsAuthLogin(),
       // 隐私协议
       privacyChecked: false,
       currentYear: new Date().getFullYear(),
@@ -213,6 +216,11 @@ export default {
     if (options && options.logout === '1') {
       console.log('[Login] 从 H5 退出登录，清除本地 Token')
       removeToken()
+    }
+
+    // 不支持授权登录的平台，默认显示账号密码登录
+    if (!this.hasAuthLogin) {
+      this.showAccountLogin = true
     }
 
     // 如果已登录，直接跳转
@@ -333,34 +341,42 @@ export default {
     },
 
     /**
-     * 微信授权登录
+     * 平台授权登录（跨平台：微信/支付宝/飞书/抖音等）
      */
-    async handleWxLogin() {
+    async handleAuthLogin() {
       if (!this.checkPrivacy()) return
+
+      const provider = getLoginProvider()
+      if (!provider) {
+        uni.showToast({ title: this.t('login.authNotSupported'), icon: 'none' })
+        this.showAccountLogin = true
+        return
+      }
 
       this.wxLoginLoading = true
       try {
-        // 1. 调用微信登录获取 code
+        // 1. 调用平台登录获取 code
         let loginRes
         try {
-          loginRes = await uni.login({ provider: 'weixin' })
+          loginRes = await uni.login({ provider })
         } catch (loginErr) {
           console.error('uni.login 调用失败:', loginErr)
-          uni.showToast({ title: this.t('login.wechatLoginFailed'), icon: 'none' })
+          uni.showToast({ title: this.t('login.authLoginFailed'), icon: 'none' })
           this.wxLoginLoading = false
           return
         }
         if (!loginRes || !loginRes.code) {
           console.error('uni.login 返回数据异常:', loginRes)
-          uni.showToast({ title: this.t('login.wechatLoginFailed'), icon: 'none' })
+          uni.showToast({ title: this.t('login.authLoginFailed'), icon: 'none' })
           this.wxLoginLoading = false
           return
         }
 
         const code = loginRes.code
 
-        // 2. 将 code 发送给后端换取 Token
-        const result = await post(appConfig.wxLoginApi, {
+        // 2. 将 code 发送给对应平台的后端接口换取 Token
+        const authApi = getAuthLoginApi(appConfig)
+        const result = await post(authApi, {
           Code: code,
           OsClient: appConfig.osClient
         }, false)
@@ -391,8 +407,7 @@ export default {
           if (result.Code === 1001 || msg.includes('未绑定') || msg.includes('未注册')) {
             uni.showModal({
               title: '提示',
-              content: this.t('login.unboundWechat'),
-
+              content: this.t('login.unboundAuth'),
               showCancel: false,
               success: () => {
                 this.showAccountLogin = true
@@ -403,7 +418,7 @@ export default {
           }
         }
       } catch (e) {
-        console.error('微信登录异常:', e)
+        console.error('授权登录异常:', e)
         uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
       } finally {
         this.wxLoginLoading = false
@@ -443,7 +458,7 @@ export default {
           Account: this.account.trim(),
           Pwd: encryptedPwd,
           OsClient: appConfig.osClient,
-          _ClientType: 'MiniProgram'
+          _ClientType: getClientType()
         }
 
         // 添加验证码参数
