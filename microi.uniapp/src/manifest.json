@@ -5,7 +5,15 @@
   "versionName": "1.0.0",
   "versionCode": "100",
   "transformPx": false,
-  "app-plus": {},
+  "app-plus": {
+    "distribute": {
+      "android": {
+        "permissions": ["<uses-permission android:name=\"android.permission.INTERNET\"/>"]
+      },
+      "ios": {}
+    },
+    "modules": {}
+  },
   "h5": {},
   "mp-weixin": {
     "appid": "wx0e661a2fc4f52530",
@@ -21,5 +29,32 @@
       "subPackages": true
     },
     "requiredPrivateInfos": []
+  },
+  "mp-alipay": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-toutiao": {
+    "appid": "",
+    "setting": {
+      "es6": true,
+      "minified": true,
+      "postcss": true
+    },
+    "usingComponents": true
+  },
+  "mp-lark": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true
+  },
+  "mp-xhs": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true
   }
 }

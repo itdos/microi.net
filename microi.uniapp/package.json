@@ -5,7 +5,17 @@
   "main": "main.js",
   "scripts": {
     "dev:mp-weixin": "uni -p mp-weixin",
-    "build:mp-weixin": "uni build -p mp-weixin"
+    "dev:mp-alipay": "uni -p mp-alipay",
+    "dev:mp-toutiao": "uni -p mp-toutiao",
+    "dev:mp-lark": "uni -p mp-lark",
+    "dev:mp-xhs": "uni -p mp-xhs",
+    "dev:app": "uni -p app",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "build:mp-alipay": "uni build -p mp-alipay",
+    "build:mp-toutiao": "uni build -p mp-toutiao",
+    "build:mp-lark": "uni build -p mp-lark",
+    "build:mp-xhs": "uni build -p mp-xhs",
+    "build:app": "uni build -p app"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080720251210001",
