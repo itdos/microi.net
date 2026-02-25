@@ -133,11 +133,11 @@
             @closed="onDialogClosed"
         >
             <template #header>
-                <div class="pull-left">
+                <div>
                     <fa-icon :class="GetOpenTitleIcon()" />
                     {{ GetOpenTitle() }}
                 </div>
-                <div class="pull-right" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                <div style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button
@@ -361,11 +361,11 @@
             @opened="onDrawerOpened"
         >
             <template #header>
-                <div class="pull-left" style="color: #000; font-size: 15px;min-width: 200px;">
+                <div style="color: #000; font-size: 15px;min-width: 200px;">
                     <fa-icon :class="GetOpenTitleIcon()" />
                     {{ GetOpenTitle() }}
                 </div>
-                <div class="pull-right" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                <div style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button

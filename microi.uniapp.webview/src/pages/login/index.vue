@@ -1,7 +1,12 @@
 <template>
-  <view class="login-container">
-    <!-- 状态栏占位 -->
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+  <view class="login-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient + ';background:' + themeGradient">
+    <!-- 顶部导航：返回按钮 -->
+    <view class="login-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
+      <view class="login-nav-back" @tap="goBack">
+        <text class="login-nav-back-icon">‹</text>
+        <text class="login-nav-back-text">{{ t('common.back') }}</text>
+      </view>
+    </view>
 
     <!-- 背景装饰 -->
     <view class="bg-decoration">
@@ -27,11 +32,11 @@
           @tap="handleWxLogin"
         >
           <text class="mp-login-icon">🔐</text>
-          <text>小程序授权登录</text>
+          <text>{{ t('login.wechatLogin') }}</text>
         </button>
 
         <view class="switch-login" @tap="showAccountLogin = true">
-          <text>账号密码登录</text>
+          <text>{{ t('login.accountLogin') }}</text>
           <text class="arrow-icon">→</text>
         </view>
       </view>
@@ -48,7 +53,7 @@
               class="login-input"
               type="text"
               v-model="account"
-              placeholder="请输入账号"
+              :placeholder="t('login.enterAccount')"
               placeholder-style="color:#ffffff;font-size:28rpx;"
               maxlength="50"
             />
@@ -66,7 +71,7 @@
               type="text"
               :password="!showPassword"
               v-model="password"
-              placeholder="请输入密码"
+              :placeholder="t('login.enterPassword')"
               placeholder-style="color:#ffffff;font-size:28rpx;"
               maxlength="50"
               @confirm="handleAccountLogin"
@@ -87,7 +92,7 @@
               class="login-input captcha-input"
               type="text"
               v-model="captchaValue"
-              placeholder="请输入验证码"
+              :placeholder="t('login.enterCaptcha')"
               placeholder-style="color:#ffffff;font-size:28rpx;"
               maxlength="6"
               @confirm="handleAccountLogin"
@@ -99,7 +104,7 @@
                 :src="captchaImgSrc"
                 mode="aspectFit"
               />
-              <text v-else class="captcha-loading">获取中...</text>
+              <text v-else class="captcha-loading">{{ t('login.gettingCaptcha') }}</text>
             </view>
           </view>
         </view>
@@ -112,13 +117,13 @@
           @tap="handleAccountLogin"
         >
           <text class="login-btn-icon">➡️</text>
-          <text>登 录</text>
+          <text>{{ t('login.loginBtn') }}</text>
         </button>
 
         <!-- 切换回授权登录 -->
         <view class="switch-login" @tap="showAccountLogin = false">
           <text class="arrow-icon">←</text>
-          <text>小程序授权登录</text>
+          <text>{{ t('login.wechatLogin') }}</text>
         </view>
       </view>
 
@@ -131,7 +136,7 @@
           >
             <text v-if="privacyChecked" class="check-icon">✓</text>
           </view>
-          <text class="privacy-text">我已阅读并同意</text>
+          <text class="privacy-text">{{ t('login.agreePre') }}</text>
           <text
             class="privacy-link"
             @tap.stop="navigateToPrivacy"
@@ -149,10 +154,12 @@
 
 <script>
 import appConfig from '@/utils/config.js'
+import { themeMixin } from '@/utils/theme.js'
 import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.js'
 import { encryptPassword } from '@/utils/crypto.js'
 
 export default {
+  mixins: [themeMixin],
   data() {
     return {
       // 平台信息（从 config 解构，避免整个模块对象被 reactive 化导致小程序报错）
@@ -177,7 +184,9 @@ export default {
       accountLoginLoading: false,
       // 隐私协议
       privacyChecked: false,
-      currentYear: new Date().getFullYear()
+      currentYear: new Date().getFullYear(),
+      // 登录后重定向地址（从商品详情等页面跳过来时用）
+      redirectUrl: ''
     }
   },
 
@@ -193,6 +202,11 @@ export default {
       } catch (e2) {
         this.statusBarHeight = 44
       }
+    }
+
+    // 保存登录后的重定向地址
+    if (options && options.redirect) {
+      this.redirectUrl = decodeURIComponent(options.redirect)
     }
 
     // 如果是从 webview H5 退出登录跳回来的，先清除 token
@@ -332,13 +346,13 @@ export default {
           loginRes = await uni.login({ provider: 'weixin' })
         } catch (loginErr) {
           console.error('uni.login 调用失败:', loginErr)
-          uni.showToast({ title: '微信登录失败', icon: 'none' })
+          uni.showToast({ title: this.t('login.wechatLoginFailed'), icon: 'none' })
           this.wxLoginLoading = false
           return
         }
         if (!loginRes || !loginRes.code) {
           console.error('uni.login 返回数据异常:', loginRes)
-          uni.showToast({ title: '微信登录失败', icon: 'none' })
+          uni.showToast({ title: this.t('login.wechatLoginFailed'), icon: 'none' })
           this.wxLoginLoading = false
           return
         }
@@ -367,17 +381,17 @@ export default {
               this.showLoginSuccess(result.Data)
               this.navigateToWebview()
             } else {
-              uni.showToast({ title: '请使用账号密码登录', icon: 'none' })
+              uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
               this.showAccountLogin = true
             }
           }
         } else {
-          const msg = result.Msg || '登录失败，请稍后再试'
+          const msg = result.Msg || this.t('login.loginFailed')
           // 如果后端提示未绑定，则切换到账号密码登录
           if (result.Code === 1001 || msg.includes('未绑定') || msg.includes('未注册')) {
             uni.showModal({
               title: '提示',
-              content: '该微信尚未绑定账号，请使用账号密码登录',
+              content: this.t('login.unboundWechat'),
 
               showCancel: false,
               success: () => {
@@ -420,7 +434,7 @@ export default {
         // RSA 加密密码
         const encryptedPwd = encryptPassword(this.password)
         if (!encryptedPwd) {
-          uni.showToast({ title: '密码加密失败', icon: 'none' })
+          uni.showToast({ title: this.t('login.encryptionFailed'), icon: 'none' })
           this.accountLoginLoading = false
           return
         }
@@ -456,7 +470,7 @@ export default {
           this.showLoginSuccess(result.Data)
           this.navigateToWebview()
         } else {
-          const msg = result.Msg || '登录失败'
+          const msg = result.Msg || this.t('login.loginFailedMsg')
           uni.showToast({ title: msg, icon: 'none', duration: 2500 })
           // 刷新验证码
           if (this.enableCaptcha) {
@@ -500,27 +514,43 @@ export default {
     },
 
     /**
-     * 跳转到 WebView 页面
+     * 跳转到 WebView 页面（或重定向到指定页面）
      */
     navigateToWebview() {
       setTimeout(() => {
-        console.log('[Login] navigateToWebview: 正在跳转...')
-        uni.reLaunch({
-          url: '/pages/webview/index',
-          success: () => {
-            console.log('[Login] reLaunch 跳转成功')
-          },
-          fail: (err) => {
-            console.error('[Login] reLaunch 跳转失败:', err)
-            // 降级使用 switchTab 或 redirectTo
-            uni.redirectTo({
-              url: '/pages/webview/index',
-              fail: (err2) => {
-                console.error('[Login] redirectTo 也失败:', err2)
-              }
-            })
-          }
-        })
+        // 如果有重定向地址（从其他页面跳转来的），回到该页面
+        if (this.redirectUrl) {
+          console.log('[Login] redirectTo:', this.redirectUrl)
+          uni.redirectTo({
+            url: this.redirectUrl,
+            fail: () => {
+              // 可能是 tabBar 页面，用 switchTab
+              uni.switchTab({ url: this.redirectUrl })
+            }
+          })
+          return
+        }
+
+        // 默认返回上一页（用户从哪来就回到哪）
+        console.log('[Login] navigateBack: 返回上一页...')
+        const pages = getCurrentPages()
+        if (pages.length > 1) {
+          uni.navigateBack({
+            fail: () => {
+              // 如果返回失败，跳首页
+              uni.switchTab({ url: '/pages/mall/index' })
+            }
+          })
+        } else {
+          // 没有上一页（直接打开的登录页），跳到首页 Tab
+          uni.switchTab({
+            url: '/pages/mall/index',
+            fail: (err) => {
+              console.error('[Login] switchTab 失败:', err)
+              uni.reLaunch({ url: '/pages/mall/index' })
+            }
+          })
+        }
       }, 1500)
     },
 
@@ -531,6 +561,18 @@ export default {
       uni.navigateTo({
         url: '/pages/privacy/index'
       })
+    },
+
+    /**
+     * 返回上一页或商城首页
+     */
+    goBack() {
+      const pages = getCurrentPages()
+      if (pages.length > 1) {
+        uni.navigateBack({ delta: 1 })
+      } else {
+        uni.switchTab({ url: '/pages/mall/index' })
+      }
     }
   }
 }
@@ -539,16 +581,39 @@ export default {
 <style lang="scss" scoped>
 .login-container {
   min-height: 100vh;
-  background: linear-gradient(145deg, #667eea 0%, #764ba2 100%);
+  /* bg: themeGradient inline */
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.status-bar {
+/* 顶部返回导航 */
+.login-nav {
   width: 100%;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.login-nav-back {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  width: fit-content;
+}
+
+.login-nav-back-icon {
+  font-size: 48rpx;
+  color: rgba(255,255,255,0.9);
+  font-weight: 300;
+  line-height: 1;
+  margin-right: 4rpx;
+}
+
+.login-nav-back-text {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.9);
 }
 
 /* 背景装饰圆 */
@@ -642,6 +707,13 @@ export default {
 }
 
 .mp-login-btn {
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.15);
+  transition: transform 0.15s ease;
+
+  &:active {
+    transform: scale(0.97);
+  }
+
   width: 100%;
   height: 96rpx;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
@@ -790,6 +862,13 @@ export default {
 
 /* 账号登录按钮 */
 .account-login-btn {
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.15);
+  transition: transform 0.15s ease;
+
+  &:active {
+    transform: scale(0.97);
+  }
+
   width: 100%;
   height: 96rpx;
   background: rgba(255, 255, 255, 0.95);

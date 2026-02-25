@@ -13,6 +13,9 @@ export default {
   // apiBase: 'https://localhost:7266',
   apiBase: 'https://api.jifulii.com',
 
+  // ============ 静态资源服务器 ============
+  fileServer: 'https://static.jifulii.com',
+
   // ============ WebView 地址 ============
   // webviewUrl: 'http://localhost:1988/?OsClient=xjy',
   webviewUrl: 'https://saas.jifulii.com',

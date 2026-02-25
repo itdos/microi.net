@@ -29,7 +29,7 @@
     <view class="loading-overlay" v-if="loading">
       <view class="loading-content">
         <view class="loading-spinner"></view>
-        <text class="loading-text">正在加载...</text>
+        <text class="loading-text">{{ t('webview.loading') }}</text>
       </view>
     </view>
   </view>
@@ -37,9 +37,11 @@
 
 <script>
 import appConfig from '@/utils/config.js'
+import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 
 export default {
+  mixins: [themeMixin],
   data() {
     return {
       appName: appConfig.appName,
@@ -49,7 +51,7 @@ export default {
     }
   },
 
-  onLoad() {
+  onLoad(options) {
     // 获取状态栏高度（优先使用新 API）
     try {
       const windowInfo = uni.getWindowInfo()
@@ -67,14 +69,20 @@ export default {
     const token = getToken()
     console.log('[WebView] onLoad - token:', token ? ('存在，长度=' + token.length) : '不存在')
     if (!token) {
-      console.log('[WebView] 无 Token，跳转回登录页')
-      uni.reLaunch({ url: '/pages/login/index' })
+      console.log('[WebView] 无 Token，返回工作台页面')
+      uni.switchTab({ url: '/pages/workspace/index' })
       return
     }
 
-    // 构建 WebView URL，将 Token 带入
-    this.buildWebviewUrl(token)
-    console.log('[WebView] webviewUrl:', this.webviewUrl)
+    // 如果从工作台菜单跳转过来，则使用传入的 url 参数
+    if (options && options.url) {
+      this.webviewUrl = decodeURIComponent(options.url)
+      console.log('[WebView] 使用传入URL:', this.webviewUrl)
+    } else {
+      // 默认构建 WebView URL（tabBar 首页场景）
+      this.buildWebviewUrl(token)
+      console.log('[WebView] webviewUrl:', this.webviewUrl)
+    }
 
     // 延迟隐藏 Loading（等待 webview 加载）
     setTimeout(() => {
@@ -123,16 +131,16 @@ export default {
       this.loading = false
       // 不自动退出登录，仅提示重试
       uni.showModal({
-        title: '加载提示',
+        title: this.t('webview.loadError'),
         content: 'WebView 页面加载异常，请确认服务端地址是否正确且可访问。\n当前地址：' + appConfig.webviewUrl,
-        confirmText: '重试',
-        cancelText: '返回登录',
+        confirmText: this.t('common.retry'),
+        cancelText: this.t('webview.backHome'),
         success: (res) => {
           if (res.confirm) {
             this.handleRefresh()
           } else {
             removeToken()
-            uni.reLaunch({ url: '/pages/login/index' })
+            uni.switchTab({ url: '/pages/mall/index' })
           }
         }
       })
@@ -160,12 +168,19 @@ export default {
      */
     handleLogout() {
       uni.showModal({
-        title: '提示',
-        content: '确定要退出登录吗？',
+        title: this.t('common.tip'),
+        content: this.t('webview.logoutConfirm'),
         success: (res) => {
           if (res.confirm) {
             removeToken()
-            uni.reLaunch({ url: '/pages/login/index' })
+            // 返回 tabBar 商城首页（关闭所有非 tabBar 页面）
+            uni.switchTab({
+              url: '/pages/mall/index',
+              fail: () => {
+                // 降级使用 reLaunch
+                uni.reLaunch({ url: '/pages/mall/index' })
+              }
+            })
           }
         }
       })
@@ -256,7 +271,7 @@ export default {
   width: 64rpx;
   height: 64rpx;
   border: 4rpx solid #eeeeee;
-  border-top-color: #667eea;
+  border-top-color: var(--theme, #4e6ef2);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 24rpx;
