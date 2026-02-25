@@ -102,7 +102,7 @@ export function request(options = {}) {
           // 统一处理 Token 过期
           if (result.Code === 401 || result.Code === -1) {
             removeToken()
-            uni.reLaunch({ url: '/pages/login/index' })
+            uni.switchTab({ url: '/pages/mall/index' })
             reject(new Error('登录已过期'))
             return
           }

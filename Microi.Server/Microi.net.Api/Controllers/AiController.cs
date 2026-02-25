@@ -64,7 +64,7 @@ namespace Microi.net.Api
         /// 响应格式：SSE（text/event-stream），逐字输出AI生成的代码
         /// </summary>
         [HttpPost, HttpGet]
-        public async Task NL2V8Engine([FromQuery] string Question, [FromQuery] string AiModel, [FromQuery] string OsClient, [FromBody] NL2V8Param bodyParam)
+        public async Task NL2V8Engine([FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2V8Param bodyParam, [FromQuery] string Question = null, [FromQuery] string AiModel = null, [FromQuery] string OsClient = null)
         {
             // 支持GET参数和POST Body两种传参方式
             var param = bodyParam ?? new NL2V8Param();
