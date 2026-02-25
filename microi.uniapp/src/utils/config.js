@@ -26,7 +26,17 @@ export default {
   logoUrl: '/static/logo.png',
 
   // ============ 小程序授权登录 ============
+  // 微信登录接口（兼容旧配置）
   wxLoginApi: '/apiengine/wx-miniprogram-login-reg-bind',
+
+  // 各平台授权登录接口（优先使用，如未配置则由 platform.js 自动回退默认路径）
+  platformLoginApis: {
+    weixin: '/apiengine/wx-miniprogram-login-reg-bind',
+    alipay: '/apiengine/alipay-miniprogram-login-reg-bind',
+    toutiao: '/apiengine/tt-miniprogram-login-reg-bind',
+    lark: '/apiengine/lark-miniprogram-login-reg-bind',
+    xhs: '/apiengine/xhs-miniprogram-login-reg-bind',
+  },
 
   // ============ 隐私协议 ============
   enablePrivacyPolicy: true,
