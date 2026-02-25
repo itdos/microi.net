@@ -82,10 +82,8 @@
 ## 源码目录说明
 * **__<font color="red">Microi.Server</font>__**：后端99%源码（`长期升级`，.NET10，`自 2014 年由 .net framework/core2/3/5.../10 一路升级上来`）
 * **__<font color="red">microi.web</font>__**：PC传统界面100%完整源码（`长期升级`，`vue3 + element-plus + vite + pinia`，自适应移动端，支持动态嵌入个人版WebOS界面）
-* **__<font color="red">microi.uniapp.webview</font>__**：UniApp小程序端100%完整源码（`长期升级`，微信小程序端以WebView方式加载microi.web移动端H5界面）
+* **__<font color="red">microi.uniapp</font>__**：UniApp小程序端100%完整源码（`长期升级`，微信小程序端的数据表格、表单功能以WebView方式加载microi.web移动端H5界面）
 * **__<font color="red">microi.doc</font>__**：官网源码（基于 `VitePress` 的官方文档）
-* microi.web.vue2：PC传统界面100%完整源码（`2018年开始采用vue2重构，至2026年已维护8年，现停止维护`，vue2 + element-ui + webpack + vuex）
-* microi.uniapp.uni-ui：移动端100%完整源码（`由于microi.web已完全兼容移动端，此项目停止维护`，uniapp + uni-ui + vue3）
 
 ## Microi吾码 - 相关文档
 >* **官方文档**：[https://microi.net](https://microi.net)
