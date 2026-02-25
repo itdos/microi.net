@@ -1,4 +1,4 @@
-# microi.uniapp.webview
+# microi.uniapp
 
 Microi.net 低代码平台 - 微信小程序端（WebView 模式）
 
@@ -19,7 +19,7 @@ Microi.net 低代码平台 - 微信小程序端（WebView 模式）
 ## 项目结构
 
 ```
-microi.uniapp.webview/
+microi.uniapp/
 ├── pages/
 │   ├── login/index.vue      # 登录页面（授权登录 + 账号密码）
 │   ├── webview/index.vue     # WebView 工作台页面
@@ -44,7 +44,7 @@ microi.uniapp.webview/
 ### 1. 安装依赖
 
 ```bash
-cd microi.uniapp.webview
+cd microi.uniapp
 npm install
 ```
 
