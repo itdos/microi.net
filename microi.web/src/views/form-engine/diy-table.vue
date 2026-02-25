@@ -4203,9 +4203,9 @@ export default {
                         // var search1 = _u.where(self.DiyFieldList, {
                         //   Id: element
                         // });
-                        var search1 = self.DiyFieldList.find((item) => item.Id === element|| item.Id === element.Id); // || item.Name === element
+                        var search1 = self.DiyFieldList.find((item) => item.Id === element || item.Id === element.Id || (!self.DiyCommon.IsNull(element.Name) && item.Name === element.Name)); // || item.Name === element
                         if (!search1) {
-                            search1 = self.DiyCommon.SysDefaultField.find((item) => item.Id === element || item.Id === element.Id);
+                            search1 = self.DiyCommon.SysDefaultField.find((item) => item.Id === element || item.Id === element.Id || (!self.DiyCommon.IsNull(element.Name) && item.Name === element.Name));
                         }
                         //注意：!(self.FixedNotShowField.indexOf(element.Component) > -1)  这条判断没用，因为element就是Id，取不到element.Component
                         //2021-10-26 新增排序 ShowHideFieldsList

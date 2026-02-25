@@ -55,6 +55,24 @@
                         </div>
                         <el-icon class="ai-chat-close" @click="aiPanelVisible = false"><Close /></el-icon>
                     </div>
+                    <!-- AI 模型选择 -->
+                    <div class="ai-model-selector">
+                        <span class="ai-model-label">模型：</span>
+                        <el-select
+                            v-model="selectedAiModel"
+                            size="small"
+                            placeholder="选择AI模型"
+                            :loading="aiModelLoading"
+                            class="ai-model-select"
+                        >
+                            <el-option
+                                v-for="model in aiModelList"
+                                :key="model.Id"
+                                :label="model.Name"
+                                :value="model"
+                            />
+                        </el-select>
+                    </div>
 
                     <div class="ai-chat-messages" ref="chatMessagesRef">
                         <!-- 欢迎消息 -->
@@ -986,9 +1004,38 @@ const chatMessages = ref([]);
 const chatMessagesRef = ref(null);
 let aiAbortController = null;
 
+// AI 模型选择
+const aiModelList = ref([]);
+const selectedAiModel = ref(null);
+const aiModelLoading = ref(false);
+
+// 加载 AI 模型列表（从 mic_ai 表获取）
+const loadAiModelList = async () => {
+    try {
+        aiModelLoading.value = true;
+        const result = await DiyCommon.FormEngine.GetTableData('mic_ai', {
+            _OrderBy: 'CreateTime',
+            _OrderByType: 'DESC',
+            _PageSize: 100
+        });
+        if (result && result.Code === 1 && result.Data && result.Data.length > 0) {
+            aiModelList.value = result.Data;
+            // 默认选中第一条模型
+            if (!selectedAiModel.value) {
+                selectedAiModel.value = result.Data[0];
+            }
+        }
+    } catch (e) {
+        console.error('[AI Chat] 加载模型列表失败:', e);
+    } finally {
+        aiModelLoading.value = false;
+    }
+};
+
 const toggleAiPanel = () => {
     aiPanelVisible.value = !aiPanelVisible.value;
     if (aiPanelVisible.value) {
+        loadAiModelList();
         loadChatHistory();
         nextTick(() => {
             if (monacoEditor) monacoEditor.layout();
@@ -1031,16 +1078,51 @@ const handleAiSend = (e) => {
     sendAiQuestion();
 };
 
+// 从AI完整响应中分离自然语言和代码
+const parseAiResponse = (text) => {
+    if (!text) return { explanation: '', code: '' };
+    
+    // 匹配所有 ```xxx ... ``` 代码块
+    const codeBlockRegex = /```(?:\w*)?\n?([\s\S]*?)```/g;
+    let code = '';
+    let match;
+    
+    // 提取所有代码块内容（如有多个则合并）
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+        if (code) code += '\n\n';
+        code += match[1].trim();
+    }
+    
+    // 提取自然语言部分：移除代码块后的剩余内容
+    let explanation = text.replace(/```(?:\w*)?\n?[\s\S]*?```/g, '').trim();
+    // 收拢多余空行
+    explanation = explanation.replace(/\n{3,}/g, '\n\n').trim();
+    
+    // 如果没找到代码块，可能AI没用围栏，整段当作代码
+    if (!code) {
+        code = text.trim();
+        explanation = '';
+    }
+    
+    // 去除代码中所有空行，保持紧凑
+    code = code.replace(/\n{2,}/g, '\n').trim();
+    
+    return { explanation, code };
+};
+
 
 
 // 加载聊天历史记录
 const loadChatHistory = async () => {
     try {
-        const fkId = props.FormData?.Id;
-        if (!fkId) return;
-        
+        const formDataId = props.FormData?.Id;
+        const fieldId = props.field?.Id;
+        if (!formDataId || !fieldId) return;
         const result = await DiyCommon.FormEngine.GetTableData('mic_ai_record', {
-            _Where: `FkId = '${fkId}'`,
+            _Where: [
+                ['FormDataId', '=', formDataId],
+                ['FieldId', '=', fieldId]
+            ],
             _OrderBy: 'CreateTime',
             _OrderByType: 'ASC',
             _PageSize: 200
@@ -1073,11 +1155,15 @@ const loadChatHistory = async () => {
 // 保存聊天记录到 mic_ai_record
 const saveChatRecord = async (msgObj) => {
     try {
-        const fkId = props.FormData?.Id;
-        if (!fkId) return;
+        const formDataId = props.FormData?.Id;
+        const fieldId = props.field?.Id;
+        if (!formDataId || !fieldId) return;
         
         await DiyCommon.FormEngine.AddFormData('mic_ai_record', {
-            FkId: fkId,
+            FormDataId: formDataId,
+            FieldId: fieldId,
+            AiModelId: selectedAiModel.value?.Id || '',
+            AiModel: selectedAiModel.value?.AiModel || '',
             Content: JSON.stringify(msgObj)
         });
     } catch (e) {
@@ -1132,7 +1218,8 @@ const sendAiQuestion = async () => {
             },
             body: JSON.stringify({
                 Question: question,
-                AiModel: 'deepseek-chat',
+                AiModelId: selectedAiModel.value?.Id || '',
+                AiModel: selectedAiModel.value?.AiModel || '',
                 OsClient: osClient
             }),
             signal: aiAbortController.signal
@@ -1147,7 +1234,6 @@ const sendAiQuestion = async () => {
         let buffer = '';
         let fullCode = '';
         let currentEventType = '';
-        let isFirstChunk = true;
         
         while (true) {
             const { done, value } = await reader.read();
@@ -1161,39 +1247,20 @@ const sendAiQuestion = async () => {
                 if (line.startsWith('event:')) {
                     currentEventType = line.substring(6).trim();
                 } else if (line.startsWith('data:')) {
-                    const data = line.substring(5);
+                    // SSE规范：data:后的第一个空格应被忽略
+                    const rawData = line.substring(5);
+                    const data = rawData.startsWith(' ') ? rawData.substring(1) : rawData;
                     
                     switch (currentEventType) {
                         case 'message':
-                            // 第一个代码片段到达时，清空编辑器
-                            if (isFirstChunk && monacoEditor) {
-                                monacoEditor.setValue('');
-                                isFirstChunk = false;
-                            }
-                            
-                            // 代码片段追加（SSE每条message是一行内容，需补换行符）
-                            const chunk = fullCode.length > 0 ? '\n' + data : data;
+                            // 后端SSE每条message是一个token
+                            // 当token是换行符\n时，它会被buffer.split('\n')消费，
+                            // 导致data为空字符串，因此空data应还原为\n
+                            const chunk = data === '' ? '\n' : data;
                             fullCode += chunk;
-                            aiMsg.code = fullCode;
-                            aiMsg.content = '代码生成中...';
                             
-                            // 打字机效果：逐步更新 Monaco Editor
-                            if (monacoEditor) {
-                                const model = monacoEditor.getModel();
-                                if (model) {
-                                    const lineCount = model.getLineCount();
-                                    const lastLineLength = model.getLineLength(lineCount);
-                                    // 使用 executeEdits 追加文本，实现打字机效果
-                                    monacoEditor.executeEdits('ai-generate', [{
-                                        range: new monaco.Range(lineCount, lastLineLength + 1, lineCount, lastLineLength + 1),
-                                        text: chunk,
-                                        forceMoveMarkers: true
-                                    }]);
-                                    // 自动滚动到底部
-                                    const newLineCount = model.getLineCount();
-                                    monacoEditor.revealLine(newLineCount);
-                                }
-                            }
+                            // 在聊天面板实时显示AI响应（打字机效果）
+                            aiMsg.content = fullCode;
                             scrollToBottom();
                             break;
                             
@@ -1217,17 +1284,26 @@ const sendAiQuestion = async () => {
                             return;
                             
                         case 'done':
-                            aiMsg.content = '代码生成完成';
                             aiMsg.status = 'done';
                             aiGenerating.value = false;
                             
-                            // 更新 modelValue
-                            if (fullCode) {
+                            // 分离自然语言和代码
+                            const parsed = parseAiResponse(fullCode);
+                            const cleanCode = parsed.code;
+                            const explanation = parsed.explanation;
+                            
+                            // 聊天面板显示自然语言说明（如果有的话）
+                            aiMsg.content = explanation || '代码生成完成';
+                            aiMsg.code = cleanCode;
+                            
+                            // 纯代码写入编辑器
+                            if (cleanCode && monacoEditor) {
                                 isSelfUpdating = true;
-                                ModelValue.value = fullCode;
-                                emits('update:modelValue', fullCode);
-                                emits('ModelChange', fullCode);
-                                emits('CallbackFormValueChange', props.field, fullCode);
+                                monacoEditor.setValue(cleanCode);
+                                ModelValue.value = cleanCode;
+                                emits('update:modelValue', cleanCode);
+                                emits('ModelChange', cleanCode);
+                                emits('CallbackFormValueChange', props.field, cleanCode);
                             }
                             
                             // 保存 AI 回复记录
@@ -1236,7 +1312,7 @@ const sendAiQuestion = async () => {
                                 content: aiMsg.content,
                                 time: aiMsg.time,
                                 status: 'done',
-                                code: fullCode,
+                                code: cleanCode,
                                 metadata: aiMsg.metadata
                             });
                             
@@ -1250,21 +1326,28 @@ const sendAiQuestion = async () => {
         
         // 如果流正常结束但没收到 done 事件
         if (aiMsg.status === 'generating') {
-            aiMsg.content = fullCode ? '代码生成完成' : '未收到有效响应';
-            aiMsg.status = fullCode ? 'done' : 'error';
+            const parsed = parseAiResponse(fullCode);
+            const cleanCode = parsed.code;
+            const explanation = parsed.explanation;
+            aiMsg.content = cleanCode ? (explanation || '代码生成完成') : '未收到有效响应';
+            aiMsg.status = cleanCode ? 'done' : 'error';
+            aiMsg.code = cleanCode;
             aiGenerating.value = false;
-            if (fullCode) {
+            if (cleanCode) {
+                if (monacoEditor) {
+                    monacoEditor.setValue(cleanCode);
+                }
                 isSelfUpdating = true;
-                ModelValue.value = fullCode;
-                emits('update:modelValue', fullCode);
-                emits('ModelChange', fullCode);
-                emits('CallbackFormValueChange', props.field, fullCode);
+                ModelValue.value = cleanCode;
+                emits('update:modelValue', cleanCode);
+                emits('ModelChange', cleanCode);
+                emits('CallbackFormValueChange', props.field, cleanCode);
                 saveChatRecord({
                     role: 'ai',
                     content: aiMsg.content,
                     time: aiMsg.time,
                     status: 'done',
-                    code: fullCode,
+                    code: cleanCode,
                     metadata: aiMsg.metadata
                 });
             }
@@ -1526,6 +1609,46 @@ defineExpose({
                 &:hover {
                     color: #e2e8f0;
                     background: rgba(255,255,255,0.1);
+                }
+            }
+        }
+
+        .ai-model-selector {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid #30305a;
+            flex-shrink: 0;
+
+            .ai-model-label {
+                font-size: 12px;
+                color: #94a3b8;
+                margin-right: 8px;
+                white-space: nowrap;
+            }
+
+            .ai-model-select {
+                flex: 1;
+
+                .el-input__wrapper {
+                    background: #242445 !important;
+                    border-color: #30305a !important;
+                    box-shadow: none !important;
+                    border-radius: 6px !important;
+                }
+
+                .el-input__inner {
+                    color: #e2e8f0 !important;
+                    font-size: 12px !important;
+                }
+
+                .el-select__caret {
+                    color: #94a3b8 !important;
+                }
+
+                &:hover .el-input__wrapper {
+                    border-color: #667eea !important;
                 }
             }
         }

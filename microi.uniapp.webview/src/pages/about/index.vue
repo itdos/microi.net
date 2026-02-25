@@ -1,47 +1,69 @@
 <template>
-  <view class="about-page">
+  <view class="about-page" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
     <view class="about-header">
       <image class="about-logo" :src="logoUrl" mode="aspectFit" />
       <text class="about-name">{{ appName }}</text>
-      <text class="about-version">版本 1.0.0</text>
+      <text class="about-version">{{ t('about.version') }} 1.0.0</text>
     </view>
 
     <view class="about-content">
       <view class="info-group">
         <view class="info-item" @tap="navigateToPrivacy">
-          <text class="info-label">隐私政策</text>
+          <text class="info-label">{{ t('about.privacy') }}</text>
           <text class="info-arrow">›</text>
         </view>
       </view>
 
       <view class="about-desc">
         <text class="desc-text">
-          {{ appName }}是一款基于 Microi.net 低代码平台构建的企业级应用，
-          提供高效便捷的移动办公体验。
+          {{ appName }}{{ t('about.desc') }}
         </text>
       </view>
     </view>
 
     <view class="about-footer">
-      <text class="footer-text">© {{ currentYear }} {{ appName }}</text>
-      <text class="footer-text">Powered by Microi.net</text>
+      <text class="footer-text">© {{ currentYear }} {{ companyName || appName }}</text>
+      <text class="footer-text">Powered by {{ companyName || 'Microi.net' }}</text>
     </view>
   </view>
 </template>
 
 <script>
 import appConfig from '@/utils/config.js'
+import { themeMixin } from '@/utils/theme.js'
+import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 
 export default {
+  mixins: [themeMixin],
   data() {
     return {
       appName: appConfig.appName,
-      logoUrl: appConfig.logoUrl,
+      logoUrl: appConfig.logoUrl || '/static/microi-blue-256.png',
+      companyName: '',
       currentYear: new Date().getFullYear()
     }
   },
 
+  onLoad() {
+    this.loadSysConfig()
+  },
+
   methods: {
+    async loadSysConfig() {
+      try {
+        const cfg = await getSysConfig()
+        if (cfg) {
+          if (cfg.SysTitle) this.appName = cfg.SysTitle
+          if (cfg.CompanyName) this.companyName = cfg.CompanyName
+          if (cfg.SysLogo) {
+            this.logoUrl = getServerPath(cfg.SysLogo)
+          }
+        }
+      } catch (e) {
+        console.log('[About] loadSysConfig:', e.message)
+      }
+    },
+
     navigateToPrivacy() {
       uni.navigateTo({
         url: '/pages/privacy/index'
