@@ -351,6 +351,16 @@
     :deep(.el-table .el-table__cell) {
         padding: 0;
     }
+
+    // 横向滚动条高度减半，避免遮挡最后一行操作按钮
+    :deep(.el-table) {
+        .el-scrollbar__bar.is-horizontal {
+            height: 5px;
+        }
+        .el-scrollbar__thumb {
+            border-radius: 2px;
+        }
+    }
     
     // 现代化表格样式
     :deep(.el-table) {
@@ -1078,4 +1088,47 @@
 /* 未启用批量选择时，复选框容器隐藏 */
 .box-card.card-data-animate:not(:hover) .card-checkbox-wrapper {
     opacity: 0.7;
+}
+
+/* 卡片模式表内编辑样式 */
+.card-inline-edit-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+
+    .card-inline-edit-label {
+        white-space: nowrap;
+        flex-shrink: 0;
+        color: #606266;
+        font-size: 13px;
+    }
+
+    .card-inline-edit-control {
+        flex: 1;
+        min-width: 0;
+
+        :deep(.el-input),
+        :deep(.el-select),
+        :deep(.el-date-editor),
+        :deep(.el-input-number),
+        :deep(.el-cascader),
+        :deep(.el-switch) {
+            width: 100% !important;
+        }
+
+        :deep(.el-input__inner) {
+            height: 28px;
+            line-height: 28px;
+            font-size: 13px;
+        }
+
+        :deep(.el-input__wrapper) {
+            padding: 0 8px;
+        }
+
+        :deep(.el-select .el-input__inner) {
+            height: 28px;
+        }
+    }
 }

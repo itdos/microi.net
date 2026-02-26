@@ -355,6 +355,77 @@ export const V8ApiDefinitions = {
                         snippet: 'StartWork({\n\tFlowDesignId: "${1:flowId}",\n\tTableRowId: ${2:V8.Form.Id}\n}, function(result) {\n\t${3:// 处理结果}\n})'
                     }
                 }
+            },
+
+            // ========== 扫码功能 ==========
+            Method: {
+                label: "Method",
+                kind: "Module",
+                documentation: "V8扩展方法对象\n\n包含平台提供的扩展功能方法，如扫码等",
+                insertText: "Method",
+                methods: {
+                    ScanCode: {
+                        label: "ScanCode",
+                        kind: "Method",
+                        documentation: '扫一扫 — 调用摄像头扫描二维码/条形码\n\n异步方法，扫码结果存入 V8.ScanCodeRes\n支持：摄像头扫码、手动输入条码、图片上传识别\n\n示例:\nif (V8.Method?.ScanCode) {\n    await V8.Method.ScanCode();\n    if (V8.ScanCodeRes) {\n        V8.FormSet("Saoma", V8.ScanCodeRes);\n    }\n}',
+                        insertText: "ScanCode",
+                        snippet: "ScanCode()"
+                    }
+                }
+            },
+            ScanCodeRes: {
+                label: "ScanCodeRes",
+                kind: "Property",
+                documentation: "扫码结果\n\n调用 V8.Method.ScanCode() 后，扫码结果存入此属性\n\n示例:\nawait V8.Method.ScanCode();\nvar code = V8.ScanCodeRes;\nV8.FormSet(\"BarcodeField\", code);",
+                insertText: "ScanCodeRes"
+            },
+            Print: {
+                label: "Print",
+                kind: "Module",
+                documentation: "蓝牙打印模块\n\n提供蓝牙 BLE 打印能力，支持 TSC(TSPL) 标签打印和 ESC/POS 票据打印。\n基于 Web Bluetooth API 实现，需要 Chrome/Edge 浏览器。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- V8.Print.OpenBluetoothPage() — 打开蓝牙连接页面\n- V8.Print.prepareSend(data) — 发送打印数据\n- V8.Print.isConnected() — 检测蓝牙是否连接\n- V8.Print.disconnect() — 断开蓝牙连接\n- V8.Print.BLEInformation — 蓝牙连接信息对象",
+                insertText: "Print",
+                methods: {
+                    createNew: {
+                        label: "createNew()",
+                        documentation: '创建 TSC(TSPL) 标签打印指令构建器\n\n返回一个指令对象，可链式调用以下方法：\n- setSize(w, h) 设置标签尺寸(mm)\n- setGap(gap) 设置间隙(mm)\n- setCls() 清除缓存\n- setText(x, y, font, xM, yM, str) 打印文字\n- setQR(x, y, level, width, mode, content) 打印二维码\n- setBarCode(x, y, type, h, readable, narrow, wide, content) 打印条形码\n- setBar(x, y, w, h) 画线\n- setBox(x1, y1, x2, y2, thickness) 画框\n- setBitmap(x, y, mode, canvas) 打印图片\n- setPagePrint() 打印页面\n- getData() 获取指令字节数组\n\n示例:\nvar cmd = V8.Print.createNew();\ncmd.setSize(75, 65);\ncmd.setGap(2);\ncmd.setCls();\ncmd.setText(10, 10, "TSS24.BF2", 1, 1, "Hello");\ncmd.setQR(100, 100, "L", 5, "A", "https://microi.net");\ncmd.setPagePrint();\nV8.Print.prepareSend(cmd.getData());',
+                        snippet: 'createNew()'
+                    },
+                    createNewESC: {
+                        label: "createNewESC()",
+                        documentation: '创建 ESC/POS 票据打印指令构建器\n\n返回一个指令对象，可调用以下方法：\n- init() 初始化\n- setText(content) 设置文本\n- bold(n) 加粗\n- setFontSize(n) 字号\n- setSelectJustification(n) 对齐(0左/1中/2右)\n- setAbsolutePrintPosition(pos) 绝对位置\n- rowSpace(n) 行间距\n- setPrint() 打印并换行\n- setPrintAndFeed(feed) 打印并走纸\n- getData() 获取指令字节数组\n\n示例:\nvar cmd = V8.Print.createNewESC();\ncmd.init();\ncmd.bold(1);\ncmd.setFontSize(16);\ncmd.setSelectJustification(1);\ncmd.setText("标题");\ncmd.setPrint();\nV8.Print.prepareSend(cmd.getData());',
+                        snippet: 'createNewESC()'
+                    },
+                    OpenBluetoothPage: {
+                        label: "OpenBluetoothPage()",
+                        documentation: '打开蓝牙连接页面\n\n弹出蓝牙设备搜索/连接对话框，用户选择并连接打印机后关闭。\n\n示例:\nif (!V8.Print.BLEInformation.deviceId) {\n    await V8.Print.OpenBluetoothPage();\n}',
+                        snippet: 'OpenBluetoothPage()'
+                    },
+                    prepareSend: {
+                        label: "prepareSend(data)",
+                        documentation: '发送打印数据到蓝牙打印机\n\n自动分包发送，支持大数据量。如果蓝牙未连接会自动弹出连接页面。\n\n参数：data — 指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
+                        snippet: 'prepareSend(${1:data})'
+                    },
+                    isConnected: {
+                        label: "isConnected()",
+                        documentation: '检测蓝牙是否已连接\n\n返回 boolean\n\n示例:\nif (V8.Print.isConnected()) {\n    // 已连接，可以打印\n}',
+                        snippet: 'isConnected()'
+                    },
+                    disconnect: {
+                        label: "disconnect()",
+                        documentation: '断开蓝牙连接\n\n示例:\nV8.Print.disconnect();',
+                        snippet: 'disconnect()'
+                    },
+                    setOneTimeData: {
+                        label: "setOneTimeData(bytes)",
+                        documentation: '设置每次发送的字节数\n\n参数：bytes — 每次发送字节数（建议20-200，默认20）\n\n示例:\nV8.Print.setOneTimeData(100);',
+                        snippet: 'setOneTimeData(${1:100})'
+                    },
+                    setPrinterNum: {
+                        label: "setPrinterNum(num)",
+                        documentation: '设置打印份数\n\n参数：num — 打印份数（默认1）\n\n示例:\nV8.Print.setPrinterNum(3); // 打印3份',
+                        snippet: 'setPrinterNum(${1:1})'
+                    }
+                }
             }
         }
     }

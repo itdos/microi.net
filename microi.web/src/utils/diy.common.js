@@ -15,6 +15,8 @@ import { DiyApi } from "./api.itdos";
 import $ from "jquery";
 import _ from "underscore";
 import LocalStorageManager from "./localStorage-manager.js";
+import { initV8ScanCode } from "./v8-scan-code.js";
+import { initV8Print } from "./v8-print.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -3823,8 +3825,16 @@ var DiyCommon = {
                 
                 SysConfig : store.state.DiyStore.SysConfig
             };
+            // 注册 V8.Method（含 ScanCode 扫码功能）
+            initV8ScanCode(DiyCommon._V8BaseInstance);
+            // 注册 V8.Print 蓝牙打印功能
+            initV8Print(DiyCommon._V8BaseInstance);
         }
         Object.assign(V8, DiyCommon._V8BaseInstance);
+        // 确保每个 V8 实例的 Method.ScanCode 闭包引用正确的 V8 对象
+        initV8ScanCode(V8);
+        // 确保每个 V8 实例的 Print 引用正确的 V8 对象
+        initV8Print(V8);
         // 性能优化：全局V8代码只在第一次调用时执行（通常包含外部库加载，第一次需要585ms）
         // 后续调用直接跳过，避免重复执行
         if (!DiyCommon._globalV8CodeExecuted && execGlobalV8Code) {
