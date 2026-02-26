@@ -252,6 +252,8 @@ import { useDiyStore } from "@/pinia";
 
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
+import { initV8ScanCode } from "@/utils/v8-scan-code.js";
+import { initV8Print } from "@/utils/v8-print.js";
 
 // Mixins
 import { diyCommonMixin, formUtilsMixin } from "./mixins";
@@ -2049,6 +2051,11 @@ export default {
                 // 复制所有通用函数到当前 V8 对象
                 Object.assign(V8, self._V8BaseInstance);
             // }
+            
+            // 注册 V8.Method.ScanCode 扫码功能（闭包绑定当前 V8 实例）
+            initV8ScanCode(V8);
+            // 注册 V8.Print 蓝牙打印功能（闭包绑定当前 V8 实例）
+            initV8Print(V8);
             
             // 设置动态属性（每次调用都可能变化的数据）
             V8.DataAppend = self.DataAppend;

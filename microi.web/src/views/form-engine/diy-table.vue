@@ -614,13 +614,50 @@
                                     />
                                     <div class="body" style="padding-top: 10px; flex: 1;">
                                         <div
-                                            v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 4)"
+                                            v-for="(field, fieldIndex) in CardShowDiyFieldList"
                                             :key="field.Id"
-                                            class="item no-br over-hide"
+                                            class="item no-br"
+                                            :class="{ 'over-hide': !(SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1) }"
                                             :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
                                             style="padding: 5px 10px; font-size: 14px"
                                         >
-                                            {{ field.Label }}：{{ model[field.Name] }}
+                                            <!--如果是表内编辑（卡片模式）-->
+                                            <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1 && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
+                                                <div class="card-inline-edit-item" @click.stop>
+                                                    <span class="card-inline-edit-label">{{ field.Label }}：</span>
+                                                    <div class="card-inline-edit-control">
+                                                        <component
+                                                            v-model="model[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                                            :TableInEdit="true"
+                                                            :field="field"
+                                                            :FormDiyTableModel="model"
+                                                            :FormMode="TableChildFormMode"
+                                                            :TableId="TableId"
+                                                            :TableName="TableName"
+                                                            :DiyConfig="SysMenuModel.DiyConfig"
+                                                            :FieldReadonly="GetFieldIsReadOnly(field)"
+                                                            :DiyTableModel="CurrentDiyTableModel"
+                                                            :DiyFieldList="DiyFieldList"
+                                                            :LoadType="'Table'"
+                                                            @CallbackRunV8Code="
+                                                                ({ field, thisValue, callback }) => {
+                                                                    return RunV8Code({ field: field, thisValue: thisValue, row: model, callback: callback });
+                                                                }
+                                                            "
+                                                            @CallbakOnKeyup="
+                                                                (event, field) => {
+                                                                    return FieldOnKeyup(event, field, { $index: index, row: model });
+                                                                }
+                                                            "
+                                                            :is="'Diy' + field.Component"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <!--如果不是表内编辑（卡片模式）-->
+                                            <template v-else>
+                                                {{ field.Label }}：{{ GetColValue({ row: model }, field) }}
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
@@ -938,6 +975,8 @@ import PanThumb from "@/components/PanThumb";
 import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/form-engine/diy-card-select.vue";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
+import { initV8ScanCode } from "@/utils/v8-scan-code.js";
+import { initV8Print } from "@/utils/v8-print.js";
 import bodyBgSvg from "@/assets/img/body-bg.svg";
 // Mixins
 import { tableUtilsMixin, diyCommonMixin } from "./mixins";
@@ -1146,6 +1185,28 @@ export default {
         // 性能优化：将频繁调用的方法转换为计算属性
         _IsTableChild() {
             return !this.DiyCommon.IsNull(this.TableChildTableId);
+        },
+        // 卡片模式显示的字段列表：优先使用MobileListFields（移动端显示列），否则回退到ShowDiyFieldList前4个
+        CardShowDiyFieldList() {
+            var self = this;
+            if (self.MobileListFields && self.MobileListFields.length > 0 && self.DiyFieldList && self.DiyFieldList.length > 0) {
+                var result = [];
+                self.MobileListFields.forEach(function (element) {
+                    var found = self.DiyFieldList.find(function (item) {
+                        return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
+                    });
+                    if (found && !self.DiyCommon.IsNull(found.Id)) {
+                        // 保留别名
+                        if (element && element.AsName) {
+                            found = Object.assign({}, found, { AsName: element.AsName });
+                        }
+                        result.push(found);
+                    }
+                });
+                if (result.length > 0) return result;
+            }
+            // 回退：使用ShowDiyFieldList前4个字段
+            return self.ShowDiyFieldList ? self.ShowDiyFieldList.slice(0, 4) : [];
         },
         // 卡片全选状态
         cardSelectAll: {
@@ -3181,6 +3242,10 @@ export default {
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
             V8.FormClose = self.CallbackFormClose;
+            // 注册 V8.Method.ScanCode 扫码功能
+            initV8ScanCode(V8);
+            // 注册 V8.Print 蓝牙打印功能
+            initV8Print(V8);
             return V8;
         },
         CallbackFormClose() {
