@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "4.7.6",
+  "version": "4.7.7",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -57,6 +57,7 @@
     "file-saver": "^2.0.5",
     "fuse.js": "^7.0.0",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "jquery": "^4.0.0",
     "js-base64": "^3.7.7",
     "js-beautify": "^1.15.4",
