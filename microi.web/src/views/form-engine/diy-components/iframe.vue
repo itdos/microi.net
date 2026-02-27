@@ -7,6 +7,7 @@
         name="mainIFrame"
         frameBorder="0"
         allowtransparency="true"
+        allow="camera; microphone; geolocation; clipboard-read; clipboard-write"
         style="background-color: transparent; height: calc(100vh - 100px); overflow: auto"
         scrolling="yes"
         width="100%"

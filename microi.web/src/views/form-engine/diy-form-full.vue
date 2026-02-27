@@ -1912,6 +1912,8 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+    padding-top: calc(12px + constant(safe-area-inset-top));
+    padding-top: calc(12px + env(safe-area-inset-top));
     background: #fff;
     border-bottom: 1px solid #f0f0f0;
     position: fixed;

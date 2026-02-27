@@ -423,7 +423,10 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 50px;
+    height: calc(50px + constant(safe-area-inset-top));
+    height: calc(50px + env(safe-area-inset-top));
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
     background: #fff;
     border-bottom: 1px solid #ebeef5;
     
