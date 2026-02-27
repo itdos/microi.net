@@ -586,12 +586,6 @@
                                 :class="{ 'card-selected': TableEnableBatch && isCardSelected(model) }"
                                 :style="SysMenuModel.TableCardImgField ? '' : 'border-top: 5px solid var(--color-primary)'"
                             >
-                                <!-- 批量选择复选框 -->
-                                <div v-if="TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(model)">
-                                    <el-checkbox
-                                        :model-value="isCardSelected(model)"
-                                    />
-                                </div>
                                 <div 
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
                                 >
@@ -617,10 +611,19 @@
                                             v-for="(field, fieldIndex) in CardShowDiyFieldList"
                                             :key="field.Id"
                                             class="item no-br"
-                                            :class="{ 'over-hide': !(SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1) }"
+                                            :class="{
+                                                'over-hide': !(SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1),
+                                                'card-first-field': fieldIndex === 0 && TableEnableBatch
+                                            }"
                                             :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
                                             style="padding: 5px 10px; font-size: 14px"
                                         >
+                                            <!-- 批量选择复选框 - 放在第一个字段左侧 -->
+                                            <div v-if="fieldIndex === 0 && TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(model)">
+                                                <el-checkbox
+                                                    :model-value="isCardSelected(model)"
+                                                />
+                                            </div>
                                             <!--如果是表内编辑（卡片模式）-->
                                             <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1 && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
                                                 <div class="card-inline-edit-item" @click.stop>
