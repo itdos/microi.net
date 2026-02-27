@@ -18,14 +18,13 @@
             "waiting" : true,
             "delay" : 0
         },
-        "popGesture" : "close",
+        "popGesture" : "none",
         "launchwebview" : {
             "render" : "always",
             "plusrequire" : "ahead",
             "titleNView" : false,
-            "dock" : "bottom",
             "bounce" : "none",
-            "webviewBGTransparent" : true
+            "webviewBGTransparent" : false
         },
         "statusbar" : {
             "immersed" : "supportedDevice",
