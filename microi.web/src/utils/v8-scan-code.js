@@ -33,6 +33,7 @@ let _mediaStream = null
 let _currentFacingMode = 'environment' // 当前摄像头方向
 let _barcodeDetector = null // BarcodeDetector 实例（如浏览器支持）
 let _isScanning = false
+let _cameraFailed = false // 标记摄像头是否已确认不可用（用于控制拍照失败后是否重启摄像头）
 
 /**
  * 创建扫码弹窗 DOM 结构
@@ -71,8 +72,10 @@ function createScanDialog() {
                     <button class="microi-scan-confirm-btn" id="microiScanConfirmBtn">确定</button>
                 </div>
                 <div class="microi-scan-actions">
+                    <button class="microi-scan-capture-btn" id="microiScanCaptureBtn">📸 拍照识别</button>
                     <button class="microi-scan-upload-btn" id="microiScanUploadBtn">📁 从图片识别</button>
                     <input type="file" id="microiScanFileInput" accept="image/*" style="display:none" />
+                    <input type="file" id="microiScanCaptureInput" accept="image/*" capture="environment" style="display:none" />
                 </div>
             </div>
         </div>
@@ -249,6 +252,7 @@ function createScanDialog() {
             .microi-scan-actions {
                 display: flex;
                 justify-content: center;
+                gap: 10px;
             }
             .microi-scan-upload-btn {
                 padding: 6px 16px;
@@ -263,6 +267,19 @@ function createScanDialog() {
             .microi-scan-upload-btn:hover {
                 border-color: var(--el-color-primary, #409eff);
                 color: var(--el-color-primary, #409eff);
+            }
+            .microi-scan-capture-btn {
+                padding: 6px 16px;
+                border: 1px solid var(--el-color-primary, #409eff);
+                background: var(--el-color-primary, #409eff);
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+                color: #fff;
+                transition: all 0.2s;
+            }
+            .microi-scan-capture-btn:hover {
+                opacity: 0.85;
             }
             /* 移动端自适应：全屏模式 */
             @media (max-width: 600px) {
@@ -538,7 +555,26 @@ async function startUserMedia(statusEl, facingMode) {
         _scanAnimFrameId = requestAnimationFrame(scanTick)
         return true
     } catch (err) {
-        console.error('[ScanCode] getUserMedia 失败:', err.name, err.message)
+        console.error('[ScanCode] getUserMedia 失败 (facingMode=' + facingMode + '):', err.name, err.message)
+        // 移动端尝试最简约束（不指定摄像头方向和分辨率，提高兼容性）
+        if (isMobile() && facingMode === 'environment') {
+            try {
+                console.log('[ScanCode] 尝试最简约束 { video: true }...')
+                if (statusEl) statusEl.textContent = '尝试其他摄像头配置...'
+                _mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true })
+                _videoElement.srcObject = _mediaStream
+                _videoElement.setAttribute('playsinline', 'true')
+                _videoElement.setAttribute('webkit-playsinline', 'true')
+                await _videoElement.play()
+                if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+                initBarcodeDetector()
+                _isScanning = true
+                _scanAnimFrameId = requestAnimationFrame(scanTick)
+                return true
+            } catch (err2) {
+                console.error('[ScanCode] 最简约束也失败:', err2.name, err2.message)
+            }
+        }
         return false
     }
 }
@@ -585,9 +621,8 @@ async function startCameraScanner(statusEl) {
     }
 
     // === 策略3: getUserMedia 直接调用摄像头 + jsQR 逐帧解码 ===
-    // 注意：微信浏览器也支持 getUserMedia（HTTPS 环境下），不再直接放弃
 
-    // 3a: 先尝试后置摄像头
+    // 3a: 先尝试后置摄像头（含移动端最简约束降级）
     var success = await startUserMedia(statusEl, 'environment')
     if (success) return
 
@@ -597,8 +632,28 @@ async function startCameraScanner(statusEl) {
     success = await startUserMedia(statusEl, 'user')
     if (success) return
 
-    // 3c: 全部失败，最终降级提示
+    // 3c: 全部失败
     console.error('[ScanCode] 所有摄像头启动方式均失败')
+    _cameraFailed = true
+
+    // === 策略4: 移动端降级为拍照识别 ===
+    // 使用 <input type="file" capture="environment"> 调起原生相机拍照后识别
+    // 该方式不需要 getUserMedia 权限，在所有移动端浏览器（含微信）中均可用
+    if (isMobile()) {
+        if (statusEl) {
+            statusEl.textContent = '摄像头不可用，请点击下方【📸 拍照识别】按钮拍照'
+        }
+        // 尝试自动弹出拍照（部分浏览器可能拦截非用户手势触发的 click）
+        setTimeout(function () {
+            try {
+                var captureInput = document.getElementById('microiScanCaptureInput')
+                if (captureInput) captureInput.click()
+            } catch (e) { /* 自动触发失败无碍，用户可手动点击按钮 */ }
+        }, 500)
+        return
+    }
+
+    // PC 端：提示检查权限
     if (statusEl) {
         statusEl.textContent = '无法访问摄像头，请检查权限设置后重试，或使用图片识别/手动输入条码'
     }
@@ -673,12 +728,20 @@ async function scanFromFile(file, statusEl) {
 
         // 全部失败
         if (statusEl) statusEl.textContent = '图片中未识别到有效的二维码/条形码，请重试'
-        // 重新启动摄像头
-        setTimeout(function () { startCameraScanner(statusEl) }, 1500)
+        // 仅在摄像头可用时才重新启动；否则提示用户重新拍照
+        if (!_cameraFailed) {
+            setTimeout(function () { startCameraScanner(statusEl) }, 1500)
+        } else if (statusEl) {
+            setTimeout(function () { statusEl.textContent = '请点击【📸 拍照识别】重新拍照，或手动输入条码' }, 1500)
+        }
     } catch (err) {
         console.error('[ScanCode] 图片识别失败:', err)
         if (statusEl) statusEl.textContent = '图片识别出错: ' + (err.message || err)
-        setTimeout(function () { startCameraScanner(statusEl) }, 1500)
+        if (!_cameraFailed) {
+            setTimeout(function () { startCameraScanner(statusEl) }, 1500)
+        } else if (statusEl) {
+            setTimeout(function () { statusEl.textContent = '请点击【📸 拍照识别】重新拍照，或手动输入条码' }, 1500)
+        }
     }
 }
 
@@ -776,6 +839,24 @@ export function createScanCodeMethod(V8) {
                 }
                 fileInput.value = '' // reset
             }
+
+            // 拍照识别（使用 capture="environment" 调起原生相机）
+            const captureBtn = document.getElementById('microiScanCaptureBtn')
+            const captureInput = document.getElementById('microiScanCaptureInput')
+            if (captureBtn && captureInput) {
+                captureBtn.onclick = () => captureInput.click()
+                captureInput.onchange = (e) => {
+                    const file = e.target.files && e.target.files[0]
+                    if (file) {
+                        stopScanner()
+                        scanFromFile(file, statusEl)
+                    }
+                    captureInput.value = '' // reset
+                }
+            }
+
+            // 重置摄像头失败标记
+            _cameraFailed = false
 
             // 启动摄像头
             startCameraScanner(statusEl)
