@@ -1,0 +1,143 @@
+{
+    "@platforms" : [ "android", "iPhone", "iPad" ],
+    "id" : "H5FF6B3AC",
+    "name" : "supOS",
+    "description" : "supOS",
+    "version" : {
+        "name" : "4.7.7",
+        "code" : "477"
+    },
+    "launch_path" : "index.html",
+    "plus" : {
+        "useragent" : {
+            "value" : "MicroiApp",
+            "concatenate" : true
+        },
+        "splashscreen" : {
+            "autoclose" : true,
+            "waiting" : true,
+            "delay" : 0
+        },
+        "popGesture" : "close",
+        "launchwebview" : {
+            "render" : "always",
+            "plusrequire" : "ahead",
+            "titleNView" : false,
+            "dock" : "bottom",
+            "bounce" : "none",
+            "webviewBGTransparent" : true
+        },
+        "statusbar" : {
+            "immersed" : "supportedDevice",
+            "style" : "dark",
+            "background" : "#FFFFFF"
+        },
+        "safearea" : {
+            "background" : "#FFFFFF",
+            "backgroundDark" : "#1a1a1a",
+            "bottom" : {
+                "offset" : "auto"
+            }
+        },
+        "softinput" : {
+            "navBar" : "auto",
+            "mode" : "adjustResize"
+        },
+        "uni-app" : {
+            "control" : "none"
+        },
+        "distribute" : {
+            "icons" : {
+                "android" : {
+                    "hdpi" : "unpackage/res/icons/72x72.png",
+                    "xhdpi" : "unpackage/res/icons/96x96.png",
+                    "xxhdpi" : "unpackage/res/icons/144x144.png",
+                    "xxxhdpi" : "unpackage/res/icons/192x192.png"
+                },
+                "ios" : {
+                    "appstore" : "unpackage/res/icons/1024x1024.png",
+                    "ipad" : {
+                        "app" : "unpackage/res/icons/76x76.png",
+                        "app@2x" : "unpackage/res/icons/152x152.png",
+                        "notification" : "unpackage/res/icons/20x20.png",
+                        "notification@2x" : "unpackage/res/icons/40x40.png",
+                        "proapp@2x" : "unpackage/res/icons/167x167.png",
+                        "settings" : "unpackage/res/icons/29x29.png",
+                        "settings@2x" : "unpackage/res/icons/58x58.png",
+                        "spotlight" : "unpackage/res/icons/40x40.png",
+                        "spotlight@2x" : "unpackage/res/icons/80x80.png"
+                    },
+                    "iphone" : {
+                        "app@2x" : "unpackage/res/icons/120x120.png",
+                        "app@3x" : "unpackage/res/icons/180x180.png",
+                        "notification@2x" : "unpackage/res/icons/40x40.png",
+                        "notification@3x" : "unpackage/res/icons/60x60.png",
+                        "settings@2x" : "unpackage/res/icons/58x58.png",
+                        "settings@3x" : "unpackage/res/icons/87x87.png",
+                        "spotlight@2x" : "unpackage/res/icons/80x80.png",
+                        "spotlight@3x" : "unpackage/res/icons/120x120.png"
+                    }
+                }
+            },
+            "google" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.BLUETOOTH\"/>",
+                    "<uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\"/>",
+                    "<uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\"/>",
+                    "<uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\"/>",
+                    "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+                    "<uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.CHANGE_WIFI_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+                    "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
+                ],
+                "minSdkVersion" : 21,
+                "targetSdkVersion" : 30,
+                "abiFilters" : [ "armeabi-v7a", "arm64-v8a", "x86" ]
+            },
+            "apple" : {
+                "dSYMs" : false,
+                "devices" : "universal",
+                "frameworks" : []
+            },
+            "plugins" : {
+                "bluetooth" : {
+                    "description" : "蓝牙打印功能"
+                },
+                "barcode" : {
+                    "description" : "扫码功能"
+                },
+                "camera" : {
+                    "description" : "摄像头功能"
+                },
+                "maps" : {},
+                "payment" : {},
+                "share" : {}
+            },
+            "orientation" : [ "portrait-primary" ],
+            "ios" : {
+                "dSYMs" : false
+            }
+        }
+    },
+    "screenOrientation" : [
+        "portrait-primary",
+        "portrait-secondary",
+        "landscape-primary",
+        "landscape-secondary"
+    ],
+    "permissions" : {
+        "Barcode" : {},
+        "Camera" : {},
+        "Bluetooth" : {},
+        "FaceID" : {},
+        "Record" : {},
+        "VideoPlayer" : {}
+    }
+}

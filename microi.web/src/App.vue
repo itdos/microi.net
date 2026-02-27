@@ -74,6 +74,9 @@ export default {
         self.WindowResize();
         window.addEventListener('resize', self.WindowResize);
 
+        // 检测是否在小程序 webview 中运行（用于隐藏顶部/底部菜单）
+        self.diyStore.detectMiniProgram();
+
         // 初始化主题色的文字颜色变量
         this.initThemeColorDefaults();
 

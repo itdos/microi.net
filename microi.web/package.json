@@ -63,6 +63,7 @@
     "js-beautify": "^1.15.4",
     "js-cookie": "^3.0.5",
     "jsencrypt": "^3.3.2",
+    "jsqr": "^1.4.0",
     "monaco-editor": "^0.55.1",
     "normalize.css": "^8.0.1",
     "path-to-regexp": "^2.4.0",

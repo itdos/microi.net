@@ -6,6 +6,7 @@ import LocalStorageManager from "@/utils/localStorage-manager.js";
 export const useDiyStore = defineStore("diy", {
     state: () => ({
         IsPhoneView: false, //是否是移动端分辨率访问系统
+        IsMiniProgram: false, //是否在小程序 webview 中运行（由 App.vue 初始化检测）
         OsClient: "",
         ApiBase: "",
         FileServer: "",
@@ -109,6 +110,45 @@ export const useDiyStore = defineStore("diy", {
         
         setIsPhoneView(value) {
             this.IsPhoneView = value;
+        },
+
+        /**
+         * 检测并设置是否在小程序 webview 中运行
+         * 通过 URL 参数 source=xx-miniprogram 或 hideTabBar=1 或微信环境变量判断
+         */
+        detectMiniProgram() {
+            try {
+                // 方式1：微信环境变量
+                if (window.__wxjs_environment === 'miniprogram') {
+                    this.IsMiniProgram = true;
+                    return;
+                }
+                // 方式2：URL 参数检测（hash 路由模式下参数在 hash 中）
+                var href = location.href || '';
+                var hash = location.hash || '';
+                var search = location.search || '';
+                var sourceReg = /source=(wx-miniprogram|alipay-miniprogram|tt-miniprogram|lark-miniprogram|xhs-miniprogram|miniprogram)/;
+                if (sourceReg.test(hash) || sourceReg.test(search) || sourceReg.test(href)) {
+                    this.IsMiniProgram = true;
+                    return;
+                }
+                // 方式3：hideTabBar 参数（小程序 webview 跳转时附加）
+                if (/hideTabBar=1/.test(hash) || /hideTabBar=1/.test(search)) {
+                    this.IsMiniProgram = true;
+                    return;
+                }
+                // 方式4：微信 JSSDK
+                if (window.wx && window.wx.miniProgram) {
+                    this.IsMiniProgram = true;
+                    return;
+                }
+            } catch (e) {
+                console.warn('[diyStore] detectMiniProgram error:', e);
+            }
+        },
+
+        setIsMiniProgram(value) {
+            this.IsMiniProgram = value;
         },
 
         setSysConfig(val) {

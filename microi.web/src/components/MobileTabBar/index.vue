@@ -26,10 +26,13 @@ const route = useRoute();
 const diyStore = useDiyStore();
 
 // 支持 URL 参数 hideTabBar=1 隐藏底部菜单（小程序 webview 跳转场景）
+// 同时支持 diyStore.IsMiniProgram 全局标识（避免路由跳转后 URL 参数丢失）
 const hideTabBar = computed(() => {
-    // 1. 检查 vue-router query 参数
+    // 1. 全局小程序标识（由 App.vue 初始化时检测，路由变化不丢失）
+    if (diyStore.IsMiniProgram) return true;
+    // 2. 检查 vue-router query 参数
     if (route.query.hideTabBar === '1' || route.query.hideTabBar === 'true') return true;
-    // 2. 检查 URL hash 中的参数（hash 路由模式下参数可能在 hash 里）
+    // 3. 检查 URL hash 中的参数（hash 路由模式下参数可能在 hash 里）
     try {
         const hash = window.location.hash;
         if (hash && hash.includes('hideTabBar=1')) return true;

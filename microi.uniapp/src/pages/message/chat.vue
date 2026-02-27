@@ -51,7 +51,11 @@
               <text class="bubble-text">{{ msg.Content }}</text>
               <text class="streaming-cursor" v-if="msg.isStreaming">▌</text>
             </view>
-            <text class="bubble-time">{{ formatBubbleTime(msg.SendTime) }}</text>
+            <view class="bubble-meta">
+              <text class="bubble-time">{{ formatBubbleTime(msg.SendTime) }}</text>
+              <!-- Bug#5: 发送失败指示器 -->
+              <text class="send-failed" v-if="msg.sendStatus === 'failed'" @tap="resendMessage(msg)">⚠ {{ t('message.sendFailed') }}</text>
+            </view>
           </view>
 
           <!-- 自己头像 -->
@@ -61,7 +65,7 @@
         </view>
       </view>
 
-      <view id="msg-bottom"></view>
+      <view :id="scrollToId || 'msg-bottom'"></view>
     </scroll-view>
 
     <!-- 底部输入区域 -->
@@ -198,6 +202,17 @@ export default {
       } catch (e2) {}
     }
 
+    // Bug#13: 登录状态检查
+    const user = getUser()
+    const token = getToken()
+    if (!user || !user.Id || !token) {
+      uni.showToast({ title: this.t('common.loginFirst'), icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/index' })
+      }, 1000)
+      return
+    }
+
     this.loadChatRecord()
   },
 
@@ -217,9 +232,14 @@ export default {
 
     // 加载聊天记录（通过 SignalR）
     async loadChatRecord() {
-      const user = getUser() || {}
       try {
         const client = await connectSignalR()
+
+        // Bug#12: 检查连接是否成功
+        if (!client.isConnected) {
+          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
+          return
+        }
 
         // 清理旧事件
         this.cleanupSignalREvents()
@@ -228,6 +248,7 @@ export default {
         this._onReceiveChatRecord = (records) => {
           console.log('[Chat] ReceiveSendChatRecordToUser:', records?.length || 0)
           if (Array.isArray(records)) {
+            const userId = this.currentUser.Id // Bug#9: 使用computed属性获取最新用户
             this.messages = records.map(r => ({
               id: r.Id || (Date.now().toString() + Math.random()),
               Type: r.Type || 'text',
@@ -235,8 +256,8 @@ export default {
               SendTime: r.CreateTime || r.SendTime,
               FromUserId: r.FromUserId,
               ToUserId: r.ToUserId,
-              isSelf: r.FromUserId === user.Id,
-              senderName: r.FromUserId === user.Id ? '我' : (r.FromUserName || this.chatName),
+              isSelf: r.FromUserId === userId,
+              senderName: r.FromUserId === userId ? this.t('message.me') : (r.FromUserName || this.chatName),
               isStreaming: false
             }))
             this.$nextTick(() => this.scrollToBottom())
@@ -247,15 +268,27 @@ export default {
         // 注册实时消息接收
         this._onReceiveMessage = (message) => {
           if (!message) return
+          const userId = this.currentUser.Id // Bug#9: 使用computed属性
           // 只处理与当前聊天相关的消息
-          const isRelevant = (message.FromUserId === this.chatId && message.ToUserId === user.Id) ||
-                             (message.FromUserId === user.Id && message.ToUserId === this.chatId)
+          const isRelevant = (message.FromUserId === this.chatId && message.ToUserId === userId) ||
+                             (message.FromUserId === userId && message.ToUserId === this.chatId)
           if (!isRelevant) return
 
+          // 如果是自己发送的消息，跳过（已在sendMessage中本地添加过）
+          if (message.FromUserId === userId) return
+
           console.log('[Chat] ReceiveSendToUser (realtime):', message.Content?.substring(0, 30))
-          // 检查是否已存在（避免重复）
-          const exists = this.messages.some(m => m.id === message.Id)
-          if (!exists) {
+          // Bug#7: 优先用消息ID去重，回退到内容+时间窗口
+          const isDuplicate = this.messages.some(m => {
+            // 优先用服务端ID匹配
+            if (message.Id && m.id === message.Id) return true
+            // 回退：内容+发送者+时间窗口
+            if (m.FromUserId !== message.FromUserId) return false
+            if (m.Content !== message.Content) return false
+            const timeDiff = Math.abs(new Date(m.SendTime) - new Date(message.CreateTime || new Date()))
+            return timeDiff < 2000
+          })
+          if (!isDuplicate) {
             this.messages.push({
               id: message.Id || (Date.now().toString() + Math.random()),
               Type: message.Type || 'text',
@@ -263,8 +296,8 @@ export default {
               SendTime: message.CreateTime || new Date().toISOString(),
               FromUserId: message.FromUserId,
               ToUserId: message.ToUserId,
-              isSelf: message.FromUserId === user.Id,
-              senderName: message.FromUserId === user.Id ? '我' : (message.FromUserName || this.chatName),
+              isSelf: message.FromUserId === userId,
+              senderName: message.FromUserId === userId ? this.t('message.me') : (message.FromUserName || this.chatName),
               isStreaming: false
             })
             this.$nextTick(() => this.scrollToBottom())
@@ -274,7 +307,10 @@ export default {
 
         // 注册 AI 流式响应
         this._onReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
-          if (toUserId !== user.Id) return
+          const userId = this.currentUser.Id // Bug#9: 使用computed属性
+          if (toUserId !== userId) return
+          // Bug#1: isComplete类型容错
+          const complete = isComplete === true || isComplete === 'true'
           if (!this.currentStreamMessage) {
             // 创建新的流式消息
             this.currentStreamMessage = {
@@ -290,10 +326,22 @@ export default {
             }
             this.messages.push(this.currentStreamMessage)
           } else {
-            this.currentStreamMessage.Content += chunk || ''
+            // Bug#2: 使用$set确保Vue响应式更新
+            const idx = this.messages.findIndex(m => m.id === this.currentStreamMessage.id)
+            if (idx !== -1) {
+              this.$set(this.messages[idx], 'Content', (this.messages[idx].Content || '') + (chunk || ''))
+              this.currentStreamMessage = this.messages[idx]
+            } else {
+              this.currentStreamMessage.Content += chunk || ''
+            }
           }
-          if (isComplete) {
-            this.currentStreamMessage.isStreaming = false
+          if (complete) {
+            if (this.currentStreamMessage) {
+              const idx = this.messages.findIndex(m => m.id === this.currentStreamMessage.id)
+              if (idx !== -1) {
+                this.$set(this.messages[idx], 'isStreaming', false)
+              }
+            }
             this.currentStreamMessage = null
           }
           this.$nextTick(() => this.scrollToBottom())
@@ -302,8 +350,9 @@ export default {
 
         // 发送请求获取聊天记录
         if (client.isConnected) {
+          const userId = this.currentUser.Id // Bug#9
           client.send('SendChatRecordToUser', {
-            FromUserId: user.Id || '',
+            FromUserId: userId || '',
             ToUserId: this.chatId,
             OsClient: appConfig.osClient
           })
@@ -318,7 +367,7 @@ export default {
       const content = this.inputMessage.trim()
       if (!content) return
 
-      const user = getUser() || {}
+      const user = this.currentUser // Bug#9: 使用computed属性
       const newMsg = {
         id: Date.now().toString(),
         Type: 'text',
@@ -328,7 +377,8 @@ export default {
         ToUserId: this.chatId,
         isSelf: true,
         senderName: this.t('message.me'),
-        isStreaming: false
+        isStreaming: false,
+        sendStatus: 'sending' // Bug#5: 跟踪发送状态
       }
 
       this.messages.push(newMsg)
@@ -337,40 +387,46 @@ export default {
       this.$nextTick(() => this.scrollToBottom())
 
       // 通过 SignalR 发送
+      const msgPayload = {
+        Content: content,
+        OsClient: appConfig.osClient,
+        ToUserId: this.chatId,
+        ToUserName: this.chatName,
+        ToUserAvatar: '',
+        FromUserId: user.Id || '',
+        FromUserName: user.Name || '',
+        FromUserAvatar: user.Avatar || ''
+      }
+
       try {
         const client = getSignalR()
         if (client.isConnected) {
-          client.send('SendToUser', {
-            Content: content,
-            OsClient: appConfig.osClient,
-            ToUserId: this.chatId,
-            ToUserName: this.chatName,
-            ToUserAvatar: '',
-            FromUserId: user.Id || '',
-            FromUserName: user.Name || '',
-            FromUserAvatar: user.Avatar || ''
-          })
+          client.send('SendToUser', msgPayload)
+          // Bug#5: 标记发送成功
+          const idx = this.messages.findIndex(m => m.id === newMsg.id)
+          if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'sent')
         } else {
-          uni.showToast({ title: '连接已断开，正在重连...', icon: 'none' })
+          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
           // 尝试重连并重发
           await connectSignalR()
           const client2 = getSignalR()
           if (client2.isConnected) {
-            client2.send('SendToUser', {
-              Content: content,
-              OsClient: appConfig.osClient,
-              ToUserId: this.chatId,
-              ToUserName: this.chatName,
-              ToUserAvatar: '',
-              FromUserId: user.Id || '',
-              FromUserName: user.Name || '',
-              FromUserAvatar: user.Avatar || ''
-            })
+            client2.send('SendToUser', msgPayload)
+            const idx = this.messages.findIndex(m => m.id === newMsg.id)
+            if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'sent')
+          } else {
+            // Bug#5: 重连后仍然无法发送，标记失败
+            const idx = this.messages.findIndex(m => m.id === newMsg.id)
+            if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'failed')
+            uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
           }
         }
       } catch (e) {
         console.error('[Chat] sendMessage error:', e)
-        uni.showToast({ title: '发送失败', icon: 'none' })
+        // Bug#5: 发送异常，标记失败
+        const idx = this.messages.findIndex(m => m.id === newMsg.id)
+        if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'failed')
+        uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
       }
     },
 
@@ -384,22 +440,32 @@ export default {
 
     // 清理 SignalR 事件
     cleanupSignalREvents() {
-      const client = getSignalR()
-      if (this._onReceiveChatRecord) {
-        client.off('ReceiveSendChatRecordToUser', this._onReceiveChatRecord)
-      }
-      if (this._onReceiveMessage) {
-        client.off('ReceiveSendToUser', this._onReceiveMessage)
-      }
-      if (this._onReceiveAIChunk) {
-        client.off('ReceiveAIChunk', this._onReceiveAIChunk)
+      // Bug#6: 检查是否有需要清理的事件回调
+      if (!this._onReceiveChatRecord && !this._onReceiveMessage && !this._onReceiveAIChunk) return
+      try {
+        const client = getSignalR()
+        if (this._onReceiveChatRecord) {
+          client.off('ReceiveSendChatRecordToUser', this._onReceiveChatRecord)
+          this._onReceiveChatRecord = null
+        }
+        if (this._onReceiveMessage) {
+          client.off('ReceiveSendToUser', this._onReceiveMessage)
+          this._onReceiveMessage = null
+        }
+        if (this._onReceiveAIChunk) {
+          client.off('ReceiveAIChunk', this._onReceiveAIChunk)
+          this._onReceiveAIChunk = null
+        }
+      } catch (e) {
+        console.warn('[Chat] cleanupSignalREvents error:', e)
       }
     },
 
+    // Bug#3: 使用唯一值确保scroll-view每次都能触发滚动
     scrollToBottom() {
       this.scrollToId = ''
       this.$nextTick(() => {
-        this.scrollToId = 'msg-bottom'
+        this.scrollToId = 'msg-bottom-' + Date.now()
       })
     },
 
@@ -408,6 +474,45 @@ export default {
       const prev = this.messages[index - 1]
       const diff = new Date(msg.SendTime) - new Date(prev.SendTime)
       return diff > 5 * 60 * 1000
+    },
+
+    // Bug#5: 重发失败的消息
+    async resendMessage(msg) {
+      const idx = this.messages.findIndex(m => m.id === msg.id)
+      if (idx === -1) return
+
+      this.$set(this.messages[idx], 'sendStatus', 'sending')
+
+      const user = this.currentUser
+      const msgPayload = {
+        Content: msg.Content,
+        OsClient: appConfig.osClient,
+        ToUserId: this.chatId,
+        ToUserName: this.chatName,
+        ToUserAvatar: '',
+        FromUserId: user.Id || '',
+        FromUserName: user.Name || '',
+        FromUserAvatar: user.Avatar || ''
+      }
+
+      try {
+        let client = getSignalR()
+        if (!client.isConnected) {
+          await connectSignalR()
+          client = getSignalR()
+        }
+        if (client.isConnected) {
+          client.send('SendToUser', msgPayload)
+          this.$set(this.messages[idx], 'sendStatus', 'sent')
+        } else {
+          this.$set(this.messages[idx], 'sendStatus', 'failed')
+          uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
+        }
+      } catch (e) {
+        console.error('[Chat] resendMessage error:', e)
+        this.$set(this.messages[idx], 'sendStatus', 'failed')
+        uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
+      }
     },
 
     formatMsgTime(time) {
@@ -427,13 +532,13 @@ export default {
 
     handleAction(type) {
       this.showMorePanel = false
-      uni.showToast({ title: type + ' 功能开发中', icon: 'none' })
+      uni.showToast({ title: type + ' ' + this.t('message.featureDev'), icon: 'none' })
     },
 
     clearHistory() {
       uni.showModal({
-        title: '提示',
-        content: '确定要清空聊天记录吗？',
+        title: this.t('common.tip'),
+        content: this.t('message.clearHistoryConfirm'),
         success: (res) => {
           if (res.confirm) {
             this.messages = []
@@ -479,20 +584,20 @@ export default {
 
 .back-arrow {
   font-size: 44rpx;
-  color: #333;
+  color: #fff;
   margin-right: 4rpx;
   line-height: 1;
 }
 
 .back-text {
   font-size: 28rpx;
-  color: #333;
+  color: #fff;
 }
 
 .header-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #333;
+  color: #fff;
   flex: 1;
   text-align: center;
 }
@@ -505,7 +610,7 @@ export default {
 
 .more-icon {
   font-size: 40rpx;
-  color: #333;
+  color: #fff;
 }
 
 /* 消息区域 */
@@ -544,7 +649,7 @@ export default {
   margin-bottom: 28rpx;
 
   &.is-self {
-    flex-direction: row-reverse;
+    justify-content: flex-end;
 
     .bubble-area {
       align-items: flex-end;
@@ -603,6 +708,7 @@ export default {
   padding: 18rpx 24rpx;
   box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.05);
   word-break: break-word;
+  border-radius: 20rpx; /* Bug#14: 默认圆角 */
 }
 
 .bubble-text {
@@ -624,6 +730,19 @@ export default {
   font-size: 20rpx;
   color: #bbb;
   margin-top: 6rpx;
+}
+
+.bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 6rpx;
+}
+
+.send-failed {
+  font-size: 22rpx;
+  color: #ff4d4f;
+  cursor: pointer;
 }
 
 /* 底部输入区域 */

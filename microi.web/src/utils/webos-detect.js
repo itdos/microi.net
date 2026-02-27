@@ -1,7 +1,7 @@
 /**
  * WebOS 模块检测工具
  * 
- * 使用 Vite 的 import.meta.glob 在构建时探测 @/webos/ 目录是否存在。
+ * 使用 Vite 的 import.meta.glob 在构建时探测 @/views/webos/ 目录是否存在。
  * 如果目录不存在（未开源 / 未安装），glob 返回空对象，不会报错。
  * 
  * 使用方法：
@@ -10,8 +10,8 @@
  */
 
 // 探测 WebOS 关键文件
-const desktopModules = import.meta.glob('@/webos/layouts/desktop.vue');
-const containerModules = import.meta.glob('@/webos/layouts/app-container.vue');
+const desktopModules = import.meta.glob('@/views/webos/layouts/desktop.vue');
+const containerModules = import.meta.glob('@/views/webos/layouts/app-container.vue');
 
 /**
  * 是否安装了 WebOS 模块
