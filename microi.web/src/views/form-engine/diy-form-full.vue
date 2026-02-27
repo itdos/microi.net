@@ -878,6 +878,11 @@ export default {
             self.Width = param.Width;
             self.DataAppend = param.DataAppend || {};
 
+            // 支持通过 Init 传入 ParentV8（如 V8.OpenAnyForm 调用时的上下文传递）
+            if (param.ParentV8) {
+                self.ParentV8_Data = param.ParentV8;
+            }
+
             var tableRowModel = {};
             // 支持Id和TableRowId两种参数名
             if (param.Id) {
