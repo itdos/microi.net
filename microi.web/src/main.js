@@ -162,7 +162,7 @@ import VePlus from 've-plus';
 import 've-plus/dist/ve-plus.css';
 app.use(VePlus);
 // WebOS 样式（使用 glob 动态加载，webos 目录不存在时静默跳过）
-import.meta.glob('@/webos/styles/*.scss', { eager: true });
+import.meta.glob('@/views/webos/styles/*.scss', { eager: true });
 // ======== WebOS 依赖注册结束 ========
 
 // 使用 router 和 i18n

@@ -2018,7 +2018,7 @@ export default {
                     CurrentUser: self.GetCurrentUser,
                     // 通用方法（不依赖具体表单数据的函数）
                     OsClient: self.DiyCommon.GetOsClient(),
-                    ClientType: "PC",
+                    ClientType: self.DiyCommon.GetClientType(),
                     OpenAnyForm: self.OpenAnyForm,
                     OpenDialog: self.OpenDialog,
                     ReloadForm: (row, type) => self.$emit("CallbackReloadForm", row, type),
