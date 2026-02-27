@@ -26,6 +26,8 @@
             justify-content: center;
             height: 100vh;
             color: #666;
+            position: relative;
+            z-index: 9999;
         }
         .loading-spinner {
             width: 40px;
@@ -49,6 +51,19 @@
             background: none;
             -webkit-appearance: none;
         }
+        .loading-retry:active { background: #409EFF; color: #fff; }
+        .loading-log {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            font-size: 10px;
+            color: #bbb;
+            text-align: center;
+            word-break: break-all;
+            max-height: 60px;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -56,9 +71,10 @@
         <div class="loading-spinner" id="loading-spinner"></div>
         <div class="loading-text" id="loading-text">正在加载...</div>
         <div class="loading-error" id="loading-error">
-            <div class="error-text">网络连接失败</div>
+            <div class="error-text" id="error-text">网络连接失败</div>
             <button class="loading-retry" onclick="retryLoad()">点击重试</button>
         </div>
+        <div class="loading-log" id="loading-log"></div>
     </div>
     <script>
         /**
@@ -68,8 +84,13 @@
          *   模式A（推荐）：加载远程服务器地址（在线模式）
          *   模式B：加载本地 dist 目录构建产物（离线模式）
          *
-         * 使用方法：
-         *   修改下方 APP_CONFIG.serverUrl 为你的实际服务器地址
+         * 架构说明：
+         *   多层兜底策略确保不会卡死在 loading 界面：
+         *     Layer 1 - plusready 事件触发正常流程
+         *     Layer 2 - plusready 超时检测，plus 对象可能已就绪但事件未触发
+         *     Layer 3 - WebView loaded 事件 → 显示远程页面
+         *     Layer 4 - WebView 加载超时 → 强制显示
+         *     Layer 5 - 终极兜底 → 直接 location.href 跳转远程地址
          */
         var APP_CONFIG = {
             // ============================================
@@ -85,55 +106,307 @@
             // 本地模式的入口文件路径
             localEntry: 'dist/index.html',
 
-            // 远程加载超时（毫秒），超时后强制显示 WebView 避免无限白屏
-            loadTimeout: 15000
+            // 远程加载超时（毫秒），超时后强制显示 WebView
+            loadTimeout: 12000,
+
+            // plusready 事件等待超时（毫秒），超时后启动备用方案
+            plusReadyTimeout: 5000,
+
+            // 终极兜底超时（毫秒），超时后直接跳转远程地址
+            ultimateTimeout: 20000
         };
 
-        // ===== 全局引用 =====
-        var _mainWebview = null;
-        var _shown = false;
+        // ===== 应用状态 =====
+        var _state = {
+            plusReady: false,       // plusready 是否已触发
+            webviewCreated: false,  // WebView 是否创建成功
+            shown: false,           // 远程内容是否已显示
+            mainWebview: null,      // 远程 WebView 实例引用
+            retryCount: 0           // 重试次数
+        };
+
+        // ===== 诊断日志（显示在 loading 页面底部） =====
+        function _log(msg) {
+            var ts = new Date().toTimeString().substr(0, 8);
+            var full = '[' + ts + '] ' + msg;
+            console.log('[supOS] ' + msg);
+            try {
+                var el = document.getElementById('loading-log');
+                if (el) el.textContent = full;
+            } catch (e) {}
+        }
+
+        // ===== 更新 loading 状态文字 =====
+        function _updateStatus(text) {
+            try {
+                var el = document.getElementById('loading-text');
+                if (el) el.textContent = text;
+            } catch (e) {}
+        }
+
+        // ===== 显示加载错误 =====
+        function _showError(msg) {
+            _state.shown = false;
+            try {
+                document.getElementById('loading-spinner').style.display = 'none';
+                document.getElementById('loading-text').style.display = 'none';
+                document.getElementById('error-text').textContent = msg || '网络连接失败';
+                document.getElementById('loading-error').style.display = 'block';
+            } catch (e) {}
+        }
+
+        // ===== 重置 loading 界面（用于重试） =====
+        function _resetLoadingUI() {
+            try {
+                document.getElementById('loading-error').style.display = 'none';
+                document.getElementById('loading-spinner').style.display = 'block';
+                document.getElementById('loading-text').style.display = 'block';
+                document.getElementById('loading-text').textContent = '正在加载...';
+            } catch (e) {}
+        }
+
+        // ===== 终极兜底：直接跳转远程地址 =====
+        function _fallbackRedirect() {
+            _log('Fallback → 直接跳转: ' + APP_CONFIG.serverUrl);
+            try {
+                // 隐藏 loading
+                var el = document.getElementById('app-loading');
+                if (el) el.style.display = 'none';
+            } catch (e) {}
+            window.location.href = APP_CONFIG.serverUrl;
+        }
+
+        // ===== 检测网络状态 =====
+        function _checkNetwork() {
+            try {
+                if (window.plus && plus.networkinfo) {
+                    var type = plus.networkinfo.getCurrentType();
+                    // CONNECTION_NONE = 0
+                    if (type === 0 || type === plus.networkinfo.CONNECTION_NONE) {
+                        return false;
+                    }
+                }
+            } catch (e) {}
+            return true; // 默认认为有网络（检测失败不应阻止加载）
+        }
+
+        /**
+         * 显示远程 WebView（多重保护，只执行一次）
+         */
+        function showMainWebview() {
+            if (_state.shown) return;
+            _state.shown = true;
+
+            _log('显示远程 WebView');
+
+            if (!_state.mainWebview) {
+                _log('WebView 不存在，回退到直接跳转');
+                _fallbackRedirect();
+                return;
+            }
+
+            try {
+                // 显示远程 WebView 并带到最前面
+                _state.mainWebview.show('fade-in', 300);
+                _log('WebView.show() 调用成功');
+            } catch (e) {
+                _log('WebView.show() 失败: ' + e.message);
+                _fallbackRedirect();
+                return;
+            }
+
+            // 延迟隐藏 loading（给 fade-in 动画让时间）
+            setTimeout(function () {
+                try {
+                    var loading = document.getElementById('app-loading');
+                    if (loading) loading.style.display = 'none';
+
+                    // 同时将 launcher WebView 的背景设为透明
+                    // 防止 launcher 仍遮挡 main WebView
+                    document.body.style.background = 'transparent';
+                    document.documentElement.style.background = 'transparent';
+                } catch (e) {}
+            }, 350);
+
+            // 额外保护：如果 show() 执行了但页面仍然没有显示（某些设备行为异常）
+            // 2秒后检测，如果页面还存在 loading 容器且 body 不透明 → 强制跳转
+            setTimeout(function () {
+                try {
+                    var loading = document.getElementById('app-loading');
+                    if (loading && loading.style.display !== 'none') {
+                        _log('show() 后 loading 仍然可见，强制跳转');
+                        _fallbackRedirect();
+                    }
+                } catch (e) {}
+            }, 2000);
+        }
 
         /**
          * 重试加载远程页面
          */
         function retryLoad() {
-            if (_mainWebview) {
-                _shown = false;
-                document.getElementById('loading-error').style.display = 'none';
-                document.getElementById('loading-spinner').style.display = 'block';
-                document.getElementById('loading-text').textContent = '正在重新加载...';
-                _mainWebview.loadURL(APP_CONFIG.serverUrl);
-                // 重新设置超时兜底
-                setTimeout(function () { showMainWebview(); }, APP_CONFIG.loadTimeout);
+            _state.retryCount++;
+            _log('重试加载 (第' + _state.retryCount + '次)');
+
+            // 超过 3 次重试直接跳转
+            if (_state.retryCount > 3) {
+                _log('重试次数超限，直接跳转');
+                _fallbackRedirect();
+                return;
+            }
+
+            _state.shown = false;
+            _resetLoadingUI();
+            _updateStatus('正在重新加载...');
+
+            // 检查网络
+            if (!_checkNetwork()) {
+                _showError('无网络连接，请检查网络设置');
+                return;
+            }
+
+            if (_state.mainWebview) {
+                try {
+                    _state.mainWebview.loadURL(APP_CONFIG.serverUrl);
+                    // 超时兜底
+                    setTimeout(function () {
+                        if (!_state.shown) showMainWebview();
+                    }, APP_CONFIG.loadTimeout);
+                } catch (e) {
+                    _log('重新加载失败: ' + e.message);
+                    _fallbackRedirect();
+                }
+            } else if (_state.plusReady && window.plus) {
+                // 尝试重新创建 WebView
+                createRemoteWebview();
             } else {
-                window.location.reload();
+                _fallbackRedirect();
             }
         }
 
         /**
-         * 显示远程 WebView（只生效一次，防止重复调用）
+         * 创建远程 WebView
          */
-        function showMainWebview() {
-            if (_shown || !_mainWebview) return;
-            _shown = true;
-            console.log('[supOS] Showing main webview');
+        function createRemoteWebview() {
+            _log('创建远程 WebView → ' + APP_CONFIG.serverUrl);
+            _updateStatus('正在连接服务器...');
 
-            // 先显示远程 WebView
-            _mainWebview.show('fade-in', 200);
+            try {
+                _state.mainWebview = plus.webview.create(
+                    APP_CONFIG.serverUrl,
+                    'main',
+                    {
+                        plusrequire: 'ahead',               // 提前注入 plus API
+                        titleNView: false,                  // 不使用原生标题栏
+                        bounce: 'none',                     // 禁用回弹效果
+                        render: 'always',                   // 始终渲染
+                        webviewBGTransparent: false,        // 白色背景（不透明）
+                        allowsInlineMediaPlayback: true,
+                        mediaPlaybackRequiresUserAction: false,
+                        mixed: true,                        // 允许混合内容
+                        hardwareAccelerated: true,          // 硬件加速
+                        top: '0px',                         // 全屏定位
+                        bottom: '0px',
+                        kernel: 'WKWebview',                // iOS 使用 WKWebview
+                        cachemode: 'default',               // 默认缓存策略
+                        errorPage: 'none',                  // 不显示默认错误页
+                        backButtonAutoControl: 'none'       // 禁止默认返回行为，由我们注入的 JS 处理
+                    }
+                );
 
-            // 稍延迟隐藏 loading，让 fade-in 动画先开始
+                _state.webviewCreated = true;
+                _log('WebView 创建成功');
+            } catch (e) {
+                _log('WebView 创建失败: ' + e.message);
+                _fallbackRedirect();
+                return;
+            }
+
+            // 远程页面加载完成 → 显示 + 注入返回键处理
+            _state.mainWebview.addEventListener('loaded', function () {
+                _log('远程页面 loaded 事件触发');
+                _updateStatus('页面加载完成');
+
+                // 注入 Android 返回键处理到远程页面
+                try {
+                    _state.mainWebview.evalJS(
+                        '(function(){' +
+                        '  if(window.__microiBackInited) return;' +
+                        '  window.__microiBackInited = true;' +
+                        '  var _bp = false;' +
+                        '  document.addEventListener("backbutton", function(){' +
+                        '    try {' +
+                        '      var r = window.__VUE_ROUTER__;' +
+                        '      if (!r && window.__VUE_APP__ && window.__VUE_APP__.config && window.__VUE_APP__.config.globalProperties) {' +
+                        '        r = window.__VUE_APP__.config.globalProperties.$router;' +
+                        '      }' +
+                        '      if (r && r.currentRoute && r.currentRoute.value) {' +
+                        '        var path = r.currentRoute.value.fullPath || r.currentRoute.value.path;' +
+                        '        var isHome = (path === "/" || path === "/mobile" || path === "/mobile/home" || path === "/home" || path === "/index" || /^\\/mobile\\/?$/.test(path));' +
+                        '        if (!isHome) {' +
+                        '          r.back();' +
+                        '          return;' +
+                        '        }' +
+                        '      } else if (window.history && window.history.length > 1) {' +
+                        '        window.history.back();' +
+                        '        return;' +
+                        '      }' +
+                        '    } catch(e) {' +
+                        '      if (window.history && window.history.length > 1) {' +
+                        '        window.history.back();' +
+                        '        return;' +
+                        '      }' +
+                        '    }' +
+                        '    if (!_bp) {' +
+                        '      _bp = true;' +
+                        '      try { plus.nativeUI.toast("再按一次退出应用"); } catch(ex) {}' +
+                        '      setTimeout(function(){ _bp = false; }, 2000);' +
+                        '    } else {' +
+                        '      try { plus.runtime.quit(); } catch(ex) {}' +
+                        '    }' +
+                        '  }, false);' +
+                        '})();'
+                    );
+                    _log('返回键处理已注入到远程页面');
+                } catch (e) {
+                    _log('注入返回键处理失败: ' + e.message);
+                }
+
+                showMainWebview();
+            });
+
+            // 加载错误 → 显示错误界面
+            _state.mainWebview.addEventListener('error', function (e) {
+                var msg = (e && e.message) ? e.message : '未知错误';
+                _log('WebView error: ' + msg);
+                _showError('网络连接失败，请检查网络');
+            });
+
+            // Timeout 1：超时后强制显示 WebView（即使 loaded 还没触发）
             setTimeout(function () {
-                var loading = document.getElementById('app-loading');
-                if (loading) loading.style.display = 'none';
-            }, 300);
+                if (!_state.shown) {
+                    _log('加载超时(' + APP_CONFIG.loadTimeout + 'ms)，强制显示');
+                    showMainWebview();
+                }
+            }, APP_CONFIG.loadTimeout);
         }
 
-        // ===== 5+App 初始化 =====
-        document.addEventListener('plusready', function () {
-            console.log('[supOS] plusready fired, os=' + plus.os.name);
+        /**
+         * 初始化 5+App（只执行一次）
+         */
+        function initApp() {
+            if (_state.plusReady) return;
+            _state.plusReady = true;
 
-            // 主动关闭启动屏
-            plus.navigator.closeSplashscreen();
+            var osName = 'unknown';
+            try { osName = plus.os.name; } catch (e) {}
+            _log('initApp 启动, OS=' + osName);
+            _updateStatus('正在初始化...');
+
+            // 关闭启动屏
+            try { plus.navigator.closeSplashscreen(); } catch (e) {
+                _log('closeSplashscreen 失败: ' + e.message);
+            }
 
             // 设置状态栏
             try {
@@ -141,75 +414,100 @@
                 plus.navigator.setStatusBarBackground('#FFFFFF');
             } catch (e) {}
 
+            // === 模式B：本地模式 ===
             if (APP_CONFIG.useLocalMode) {
-                // === 模式B：本地模式 ===
-                var loading = document.getElementById('app-loading');
-                if (loading) loading.style.display = 'none';
-                var localUrl = plus.io.convertLocalFileSystemURL('_www/' + APP_CONFIG.localEntry);
-                window.location.href = localUrl;
+                _log('本地模式');
+                try {
+                    var loading = document.getElementById('app-loading');
+                    if (loading) loading.style.display = 'none';
+                    var localUrl = plus.io.convertLocalFileSystemURL('_www/' + APP_CONFIG.localEntry);
+                    window.location.href = localUrl;
+                } catch (e) {
+                    _log('本地模式失败: ' + e.message);
+                    window.location.href = APP_CONFIG.localEntry;
+                }
                 return;
             }
 
-            // === 模式A：在线模式（推荐） ===
-            // 创建新 WebView 加载远程地址（创建后默认隐藏，等待 loaded 或 超时 后显示）
-            _mainWebview = plus.webview.create(APP_CONFIG.serverUrl, 'main', {
-                plusrequire: 'ahead',              // 提前注入 plus API
-                titleNView: false,                 // 不使用原生标题栏
-                bounce: 'none',                    // 禁用回弹效果
-                render: 'always',                  // 始终渲染
-                webviewBGTransparent: false,        // 白色背景（不透明）
-                allowsInlineMediaPlayback: true,
-                mediaPlaybackRequiresUserAction: false,
-                mixed: true,                       // 允许 http + https 混合内容
-                hardwareAccelerated: true           // 硬件加速
-            });
+            // === 模式A：在线模式 ===
+            // 检查网络
+            if (!_checkNetwork()) {
+                _showError('无网络连接，请检查网络设置后重试');
+                return;
+            }
 
-            // 远程页面加载完成 → 显示
-            _mainWebview.addEventListener('loaded', function () {
-                console.log('[supOS] Remote page loaded');
-                showMainWebview();
-            });
+            // 创建远程 WebView
+            createRemoteWebview();
+        }
 
-            // 加载错误 → 在 loading 页面上显示错误 + 重试按钮
-            _mainWebview.addEventListener('error', function (e) {
-                console.error('[supOS] WebView error:', e.message);
-                _shown = false;
-                document.getElementById('loading-spinner').style.display = 'none';
-                document.getElementById('loading-text').textContent = '';
-                document.getElementById('loading-error').style.display = 'block';
-            });
+        // ===================================================================
+        //  多层启动兜底机制（核心改进）
+        // ===================================================================
 
-            // 超时兜底：避免 loaded 事件不触发导致永远白屏
-            setTimeout(function () {
-                if (!_shown) {
-                    console.warn('[supOS] Load timeout (' + APP_CONFIG.loadTimeout + 'ms), force showing webview');
-                    showMainWebview();
-                }
-            }, APP_CONFIG.loadTimeout);
-
+        // Layer 1：正常的 plusready 事件
+        document.addEventListener('plusready', function () {
+            _log('plusready 事件触发');
+            initApp();
         }, false);
 
-        // ===== Android 返回键处理 =====
+        // Layer 2：plus 对象可能已存在但 plusready 事件错过了
+        // （这在某些 HBuilderX 版本或调试模式下可能出现）
+        setTimeout(function () {
+            if (!_state.plusReady && typeof window.plus === 'object') {
+                _log('plus 对象已存在但 plusready 未触发，主动初始化');
+                initApp();
+            }
+        }, 300);
+
+        // Layer 3：plusready 超时等待
+        // 如果 5 秒内 plusready 没触发 且 plus 对象也不存在
+        setTimeout(function () {
+            if (!_state.plusReady) {
+                if (typeof window.plus === 'object') {
+                    _log('plusready 超时(' + APP_CONFIG.plusReadyTimeout + 'ms)，但 plus 已可用');
+                    initApp();
+                } else {
+                    _log('plusready 超时，plus 不可用 → 可能不在 5+App 环境');
+                    _updateStatus('正在跳转...');
+                    // 不在 5+App 环境（浏览器中直接打开等），直接跳转
+                    _fallbackRedirect();
+                }
+            }
+        }, APP_CONFIG.plusReadyTimeout);
+
+        // Layer 4：终极兜底 - 无论什么原因，20秒后如果还在 loading 就直接跳转
+        setTimeout(function () {
+            if (!_state.shown) {
+                _log('终极兜底超时(' + APP_CONFIG.ultimateTimeout + 'ms)，强制跳转');
+                _fallbackRedirect();
+            }
+        }, APP_CONFIG.ultimateTimeout);
+
+        // ===================================================================
+        //  Android 返回键处理（launcher webview 的备用监听）
+        //  主要逻辑已通过 evalJS 注入到 main webview
+        //  此处仅处理 main webview 尚未创建时的情况
+        // ===================================================================
         document.addEventListener('backbutton', function () {
-            var webview = plus.webview.getWebviewById('main');
-            if (webview) {
-                // canBack() 是异步 API，必须通过回调获取结果
-                webview.canBack(function (e) {
-                    if (e.canBack) {
-                        webview.back();
-                    } else {
-                        // 双击退出确认
-                        if (!window.__backPressed) {
-                            window.__backPressed = true;
-                            plus.nativeUI.toast('再按一次退出应用');
-                            setTimeout(function () { window.__backPressed = false; }, 2000);
-                        } else {
-                            plus.runtime.quit();
+            if (_state.mainWebview && _state.shown) {
+                // main webview 已显示，返回键应由注入的 JS 处理
+                // 此处不应触发（因为 main 在前台），但作为保底
+                try {
+                    _state.mainWebview.canBack(function (e) {
+                        if (e.canBack) {
+                            _state.mainWebview.back();
                         }
-                    }
-                });
+                    });
+                } catch (e) {}
             } else {
-                plus.runtime.quit();
+                // main webview 不存在或未显示，双击退出
+                if (!window.__backPressed) {
+                    window.__backPressed = true;
+                    try { plus.nativeUI.toast('再按一次退出应用'); } catch (ex) {}
+                    setTimeout(function () { window.__backPressed = false; }, 2000);
+                } else {
+                    try { plus.runtime.quit(); } catch (ex) {}
+                }
             }
         }, false);
     </script>

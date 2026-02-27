@@ -8,11 +8,11 @@
                 <div class="user-info">
                     <el-skeleton animated>
                         <template #template>
-                            <div style="display: flex; align-items: center;">
-                                <el-skeleton-item variant="circle" style="width: 72px; height: 72px;" />
-                                <div style="margin-left: 16px;">
-                                    <el-skeleton-item variant="text" style="width: 100px; height: 24px; margin-bottom: 8px;" />
-                                    <el-skeleton-item variant="text" style="width: 150px; height: 16px;" />
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <el-skeleton-item variant="circle" style="width: 72px; height: 72px; flex-shrink: 0;" />
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <el-skeleton-item variant="text" style="width: 100px; height: 22px;" />
+                                    <el-skeleton-item variant="text" style="width: 140px; height: 14px;" />
                                 </div>
                             </div>
                         </template>
@@ -22,15 +22,15 @@
             <!-- 功能列表骨架 -->
             <div class="function-list">
                 <div v-for="n in 3" :key="'skeleton-group-' + n" class="function-group">
-                    <div v-for="m in (n === 1 ? 1 : 2)" :key="'skeleton-item-' + m" class="function-item">
+                    <div v-for="m in (n === 3 ? 1 : 2)" :key="'skeleton-item-' + n + '-' + m" class="function-item">
                         <el-skeleton animated>
                             <template #template>
                                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                                     <div style="display: flex; align-items: center; gap: 12px;">
-                                        <el-skeleton-item variant="circle" style="width: 20px; height: 20px;" />
-                                        <el-skeleton-item variant="text" style="width: 80px; height: 18px;" />
+                                        <el-skeleton-item variant="rect" style="width: 20px; height: 20px; border-radius: 4px;" />
+                                        <el-skeleton-item variant="text" style="width: 80px; height: 16px;" />
                                     </div>
-                                    <el-skeleton-item variant="text" style="width: 16px; height: 16px;" />
+                                    <el-skeleton-item variant="text" style="width: 14px; height: 14px; border-radius: 2px;" />
                                 </div>
                             </template>
                         </el-skeleton>

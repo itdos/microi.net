@@ -12,19 +12,19 @@
                     <el-skeleton animated>
                         <template #template>
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <el-skeleton-item variant="circle" style="width: 24px; height: 24px;" />
-                                <el-skeleton-item variant="text" style="width: 80px; height: 20px;" />
+                                <el-skeleton-item variant="rect" style="width: 20px; height: 20px; border-radius: 4px;" />
+                                <el-skeleton-item variant="text" style="width: 80px; height: 18px;" />
                             </div>
                         </template>
                     </el-skeleton>
                 </div>
                 <div class="card-content">
-                    <div v-for="m in 4" :key="'skeleton-item-' + m" class="menu-item skeleton-item">
+                    <div v-for="m in 4" :key="'skeleton-item-' + m" class="menu-item" style="padding: 6px 0;">
                         <el-skeleton animated>
                             <template #template>
-                                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
-                                    <el-skeleton-item variant="circle" style="width: 36px; height: 36px;" />
-                                    <el-skeleton-item variant="text" style="width: 60%; height: 16px;" />
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                    <el-skeleton-item variant="rect" style="width: 44px; height: 44px; border-radius: 12px;" />
+                                    <el-skeleton-item variant="text" style="width: 48px; height: 14px;" />
                                 </div>
                             </template>
                         </el-skeleton>
@@ -211,7 +211,10 @@ const getVisibleChildren = (children) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 50px;
+    height: calc(50px + constant(safe-area-inset-top));
+    height: calc(50px + env(safe-area-inset-top));
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
     background: #fff;
     border-bottom: 1px solid #ebeef5;
     
@@ -226,10 +229,6 @@ const getVisibleChildren = (children) => {
     padding: 12px;
 }
 
-// 骨架屏样式
-.skeleton-item {
-    padding: 10px 12px;
-}
 
 .menu-card {
     background: #fff;
