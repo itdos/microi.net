@@ -676,6 +676,28 @@ var DiyCommon = {
             return "iTdos";
         }
     },
+    /**
+     * 获取当前客户端类型
+     * 返回值：PC、IOS、Android、H5、WeChat
+     * 优先级：5+App原生环境 > 微信浏览器 > 移动端H5 > PC
+     */
+    GetClientType() {
+        // 5+App 原生环境（HBuilder 打包的 APK/IPA）
+        if (typeof window !== 'undefined' && window.plus) {
+            var plusOs = '';
+            try { plusOs = plus.os.name; } catch (e) { }
+            if (plusOs === 'iOS') return 'IOS';
+            if (plusOs === 'Android') return 'Android';
+            return 'Android'; // 默认 Android
+        }
+        var ua = navigator.userAgent || '';
+        // 微信内置浏览器
+        if (/MicroMessenger/i.test(ua)) return 'WeChat';
+        // 移动端浏览器（H5）
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return 'H5';
+        // 桌面端
+        return 'PC';
+    },
     GetApiClientUrl() {
         var self = this;
         var customerApi = "";
@@ -3768,7 +3790,7 @@ var DiyCommon = {
     InitV8CodeSync(V8, router, execGlobalV8Code = true) {
         if(DiyCommon._V8BaseInstance == null){
             DiyCommon._V8BaseInstance = {
-                ClientType : "PC", //PC、IOS、Android、H5、WeChat
+                ClientType : DiyCommon.GetClientType(), //PC、IOS、Android、H5、WeChat
                 OsClient : DiyCommon.GetOsClient(),
                 DiyCommon : DiyCommon,
                 CreatQRCode : DiyCommon.CreatQRCode,

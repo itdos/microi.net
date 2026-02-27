@@ -47,6 +47,26 @@
             </div>
         </div>
     </div>
+    <script>
+      // 小程序 webview 模式下立即隐藏 loading 进度条，避免每次跳转都显示
+      (function() {
+        try {
+          var href = location.href || '';
+          var hash = location.hash || '';
+          var search = location.search || '';
+          var isMini = window.__wxjs_environment === 'miniprogram'
+            || /source=(wx-miniprogram|alipay-miniprogram|tt-miniprogram|lark-miniprogram|xhs-miniprogram|miniprogram)/.test(hash)
+            || /source=(wx-miniprogram|alipay-miniprogram|tt-miniprogram|lark-miniprogram|xhs-miniprogram|miniprogram)/.test(search)
+            || /source=(wx-miniprogram|alipay-miniprogram|tt-miniprogram|lark-miniprogram|xhs-miniprogram|miniprogram)/.test(href)
+            || /hideTabBar=1/.test(hash)
+            || /hideTabBar=1/.test(search);
+          if (isMini) {
+            var el = document.getElementById('microi_loading');
+            if (el) { el.style.display = 'none'; el.remove(); }
+          }
+        } catch(e) {}
+      })();
+    </script>
     <div id="app_microi"></div>
     <script src="/static/js/microi.loading.js?d=20260206" type="text/javascript"></script>
     <!-- Vite 入口 -->

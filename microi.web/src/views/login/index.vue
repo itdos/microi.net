@@ -122,12 +122,13 @@
                     <el-button
                         type="primary"
                         size="large"
-                        :loading="LoginWaiting"
+                        :disabled="LoginWaiting"
                         @click="Login"
                         class="login-button"
                     >
-                        <el-icon><Unlock /></el-icon>
-                        <span>登 录</span>
+                        <el-icon v-if="LoginWaiting" class="is-loading"><Loading /></el-icon>
+                        <el-icon v-else><Unlock /></el-icon>
+                        <span>{{ LoginWaiting ? '登录中...' : '登 录' }}</span>
                     </el-button>
                 </div>
 
@@ -707,20 +708,28 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 return;
             }
 
+            if (self.DiyCommon.IsNull(self.Account)) {
+                self.DiyCommon.Tips("请输入账号！", false);
+                return;
+            }
+
+            if (self.DiyCommon.IsNull(self.Pwd)) {
+                self.DiyCommon.Tips("请输入密码！", false);
+                return;
+            }
+
             if (self.SysConfig.EnablePrivacyPolicy && !self.CheckPrivacyPolicy) {
                 self.DiyCommon.Tips(`请先勾选[${self.SysConfig.PrivacyPolicyName || "同意隐私协议"}]！`, false);
                 return;
             }
 
-            self.LoginWaiting = true;
-            // 使用 Vue 响应式状态控制加载图标，移除 jQuery 操作
-
             // 加密密码
             var encryptedPwd = self.encryptPassword(self.Pwd);
             if (!encryptedPwd) {
-                self.LoginWaiting = false;
                 return;
             }
+
+            self.LoginWaiting = true;
 
             var loginApi = self.DiyApi.Login();
             if (self.SysConfig.DiySystem) {

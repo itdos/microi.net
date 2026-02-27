@@ -84,7 +84,9 @@
                     type="textarea"
                     :autosize="{ minRows: 1, maxRows: 4 }"
                     placeholder="输入消息..."
-                    @keyup.enter.exact="sendMessage"
+                    @keydown="handleInputKeydown"
+                    @compositionstart="isComposing = true"
+                    @compositionend="isComposing = false"
                 />
             </div>
             <div class="input-actions">
@@ -190,6 +192,7 @@ const chatMuted = ref(false);
 const chatPinned = ref(false);
 const loading = ref(false);
 const messagesContainer = ref(null);
+const isComposing = ref(false); // IME输入法组合状态
 
 // 消息列表
 const messages = ref([]);
@@ -203,6 +206,20 @@ const currentStreamMessage = ref(null);
 // 返回上一页
 const goBack = () => {
     router.back();
+};
+
+// 输入框键盘事件：Enter发送消息、Shift+Enter换行
+const handleInputKeydown = (e) => {
+    if (e.key === 'Enter') {
+        if (isComposing.value) return; // IME输入法组合中，不处理
+        if (e.shiftKey) {
+            // Shift+Enter: 换行（默认行为）
+            return;
+        }
+        // Enter: 发送消息
+        e.preventDefault();
+        sendMessage();
+    }
 };
 
 // 判断是否显示时间
@@ -352,6 +369,23 @@ const handleReceiveSendToUser = (message) => {
     
     // 只处理当前聊天的消息
     if (message.FromUserId !== chatId.value && message.ToUserId !== chatId.value) {
+        return;
+    }
+    
+    // 如果是自己发送的消息，跳过（已在sendMessage中本地添加过）
+    if (message.FromUserId === currentUser.value.Id) {
+        return;
+    }
+    
+    // 检查重复消息（基于内容+发送者+1秒内时间窗口）
+    const isDuplicate = messages.value.some(m => {
+        if (m.FromUserId !== message.FromUserId) return false;
+        if (m.Content !== message.Content) return false;
+        const timeDiff = Math.abs(new Date(m.SendTime) - new Date(message.SendTime || new Date()));
+        return timeDiff < 2000; // 2秒内相同内容视为重复
+    });
+    if (isDuplicate) {
+        console.log('[移动端聊天] 重复消息，已忽略');
         return;
     }
     
