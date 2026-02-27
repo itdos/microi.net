@@ -273,6 +273,73 @@ let _currentCameraIndex = 0
 let _cameraList = []
 
 /**
+ * 检测是否在微信内置浏览器中
+ */
+function isWeChatBrowser() {
+    return /MicroMessenger/i.test(navigator.userAgent)
+}
+
+/**
+ * 检测是否在 5+App 环境中
+ */
+function isPlusApp() {
+    return typeof window !== 'undefined' && !!window.plus
+}
+
+/**
+ * 检测是否为移动端
+ */
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
+
+/**
+ * 微信 JSSDK 扫码（微信内置浏览器环境）
+ * 需要页面已通过 wx.config 初始化 JSSDK
+ * @returns {Promise<string|null>}
+ */
+function wechatScanCode() {
+    return new Promise(function (resolve) {
+        if (typeof wx === 'undefined' || !wx.scanQRCode) {
+            resolve(null)
+            return
+        }
+        wx.scanQRCode({
+            needResult: 1,
+            scanType: ["qrCode", "barCode"],
+            success: function (res) {
+                var result = res.resultStr || ''
+                // 微信条码结果格式可能是 "TYPE,VALUE"
+                if (result.indexOf(',') > 0) {
+                    result = result.split(',').slice(1).join(',')
+                }
+                resolve(result)
+            },
+            fail: function () { resolve(null) },
+            cancel: function () { resolve(null) }
+        })
+    })
+}
+
+/**
+ * 5+App 原生扫码（APK 环境）
+ * @returns {Promise<string|null>}
+ */
+function plusBarcodeScan() {
+    return new Promise(function (resolve) {
+        if (!window.plus || !plus.barcode) {
+            resolve(null)
+            return
+        }
+        plus.barcode.scan(
+            '_www/barcode.html',
+            function (type, result) { resolve(result || null) },
+            function () { resolve(null) }
+        )
+    })
+}
+
+/**
  * 停止扫码器
  */
 async function stopScanner() {
@@ -296,57 +363,114 @@ async function stopScanner() {
 }
 
 /**
- * 启动摄像头扫码
- * @param {string} statusEl 状态文本元素
+ * 启动摄像头扫码（兼容移动端）
+ * 
+ * 策略优先级：
+ * 1. 5+App 环境 → plus.barcode 原生扫码
+ * 2. 微信内置浏览器 → wx.scanQRCode JSSDK
+ * 3. 其他浏览器 → html5-qrcode（先 getCameras，失败则用 facingMode）
+ * 
+ * @param {HTMLElement} statusEl 状态文本元素
  */
 async function startCameraScanner(statusEl) {
+    // === 策略1: 5+App 原生扫码 ===
+    if (isPlusApp() && window.plus && plus.barcode) {
+        if (statusEl) statusEl.textContent = '正在启动原生扫码...'
+        try {
+            var result = await plusBarcodeScan()
+            if (result) { completeScan(result); return }
+            if (statusEl) statusEl.textContent = '扫码已取消，请手动输入条码'
+        } catch (e) {
+            if (statusEl) statusEl.textContent = '原生扫码失败，请手动输入条码'
+        }
+        return
+    }
+
+    // === 策略2: 微信 JSSDK 扫码 ===
+    if (isWeChatBrowser() && typeof wx !== 'undefined' && wx.scanQRCode) {
+        if (statusEl) statusEl.textContent = '正在调用微信扫一扫...'
+        try {
+            var result = await wechatScanCode()
+            if (result) { completeScan(result); return }
+            if (statusEl) statusEl.textContent = '微信扫码已取消，请手动输入条码'
+        } catch (e) {
+            if (statusEl) statusEl.textContent = '微信扫码失败，请手动输入条码'
+        }
+        return
+    }
+
+    // === 策略3: html5-qrcode 摄像头扫码 ===
     try {
-        // 动态引入，避免打包体积问题
         const { Html5Qrcode } = await import('html5-qrcode')
         
         _html5QrCode = new Html5Qrcode('microiScanReader', { verbose: false })
 
-        // 获取可用摄像头列表
+        var scanConfig = {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            disableFlip: false
+        }
+        var onSuccess = function (decodedText) { completeScan(decodedText) }
+        var onError = function () { /* 扫码中，忽略空结果 */ }
+
+        // 先尝试获取摄像头列表
+        var cameraListOk = false
         try {
             _cameraList = await Html5Qrcode.getCameras()
+            if (_cameraList && _cameraList.length > 0) cameraListOk = true
         } catch (e) {
+            console.log('[ScanCode] getCameras 失败（移动端常见），将使用 facingMode 兜底:', e.message || e)
             _cameraList = []
         }
 
-        if (_cameraList.length === 0) {
-            // 没有摄像头，尝试使用 facingMode 后置摄像头
-            if (statusEl) statusEl.textContent = '未检测到摄像头，请手动输入条码'
-            return
-        }
-
-        // 优先使用后置摄像头（environment）
-        let cameraId = _cameraList[_currentCameraIndex % _cameraList.length].id
-        // 尝试找 environment 摄像头
-        for (const cam of _cameraList) {
-            if (cam.label && (cam.label.toLowerCase().includes('back') || cam.label.toLowerCase().includes('rear') || cam.label.toLowerCase().includes('environment'))) {
-                cameraId = cam.id
-                break
+        if (cameraListOk) {
+            // 获取到摄像头列表 — 优先使用后置摄像头
+            let cameraId = _cameraList[_currentCameraIndex % _cameraList.length].id
+            for (const cam of _cameraList) {
+                if (cam.label && (cam.label.toLowerCase().includes('back') || cam.label.toLowerCase().includes('rear') || cam.label.toLowerCase().includes('environment'))) {
+                    cameraId = cam.id
+                    break
+                }
+            }
+            if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+            await _html5QrCode.start(cameraId, scanConfig, onSuccess, onError)
+        } else {
+            // 获取摄像头列表失败（移动端浏览器常见）— 使用 facingMode 约束直接启动
+            // 这种方式会触发浏览器摄像头权限弹窗，不需要先 enumerateDevices
+            if (statusEl) statusEl.textContent = '正在请求摄像头权限...'
+            try {
+                await _html5QrCode.start(
+                    { facingMode: "environment" },
+                    scanConfig,
+                    onSuccess,
+                    onError
+                )
+                if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+            } catch (facingErr) {
+                console.log('[ScanCode] facingMode=environment 失败，尝试 user:', facingErr.message)
+                // 后置摄像头失败，尝试前置摄像头
+                try {
+                    await _html5QrCode.start(
+                        { facingMode: "user" },
+                        scanConfig,
+                        onSuccess,
+                        onError
+                    )
+                    if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+                } catch (userErr) {
+                    console.error('[ScanCode] 所有摄像头启动方式均失败:', userErr)
+                    // 最终降级：提示用户手动输入或使用图片识别
+                    if (statusEl) {
+                        if (isWeChatBrowser()) {
+                            statusEl.textContent = '微信浏览器暂不支持网页摄像头，请使用图片识别或手动输入条码'
+                        } else {
+                            statusEl.textContent = '无法访问摄像头，请使用图片识别或手动输入条码'
+                        }
+                    }
+                }
             }
         }
-
-        if (statusEl) statusEl.textContent = '对准二维码/条形码...'
-
-        await _html5QrCode.start(
-            cameraId,
-            {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0,
-                disableFlip: false
-            },
-            (decodedText) => {
-                // 扫码成功
-                completeScan(decodedText)
-            },
-            () => {
-                // 扫码中，忽略空结果
-            }
-        )
     } catch (err) {
         console.error('[ScanCode] 摄像头启动失败:', err)
         if (statusEl) {
@@ -399,14 +523,16 @@ async function scanFromFile(file, statusEl) {
  * @param {HTMLElement} statusEl 状态文本元素
  */
 async function switchCamera(statusEl) {
-    if (_cameraList.length <= 1) {
+    if (_cameraList.length <= 1 && _cameraList.length > 0) {
         if (statusEl) statusEl.textContent = '只有一个摄像头，无法切换'
         setTimeout(() => { if (statusEl) statusEl.textContent = '对准二维码/条形码...' }, 1500)
         return
     }
     // 停止当前
     await stopScanner()
-    _currentCameraIndex = (_currentCameraIndex + 1) % _cameraList.length
+    if (_cameraList.length > 1) {
+        _currentCameraIndex = (_currentCameraIndex + 1) % _cameraList.length
+    }
     if (statusEl) statusEl.textContent = '切换摄像头中...'
     await startCameraScanner(statusEl)
 }

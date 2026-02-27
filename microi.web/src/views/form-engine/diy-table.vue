@@ -846,6 +846,8 @@
         <!--抽屉或弹窗打开完整的Form-->
         <DiyFormDialog v-if="_shouldRenderDiyFormDialog" 
             @CallbackGetDiyTableRow="GetDiyTableRow" 
+            :FatherFormModel="FatherFormModel"
+            :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
             ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
         <!--导入功能-->
@@ -2454,29 +2456,28 @@ export default {
             if (self.SysMenuModel.Id) {
                 self.BtnLoading = true;
                 
-                // 守卫语句：延迟渲染DiyFormDialog
+                // 守卫语句：延迟渲染DiyFormDialog（异步组件需要重试等待加载完成）
                 const tryOpenForm = () => {
                     if (!self._shouldRenderDiyFormDialog) {
                         self._shouldRenderDiyFormDialog = true;
-                        self.$nextTick(() => {
-                            if (self.$refs.refDiyTable_DiyFormDialog) {
-                                openForm();
-                            } else {
-                                console.error('refDiyTable_DiyFormDialog ref未找到');
-                                self.BtnLoading = false;
-                            }
-                        });
-                    } else if (!self.$refs.refDiyTable_DiyFormDialog) {
-                        self.$nextTick(() => {
-                            if (self.$refs.refDiyTable_DiyFormDialog) {
-                                openForm();
-                            } else {
-                                console.error('refDiyTable_DiyFormDialog ref未找到');
-                                self.BtnLoading = false;
-                            }
-                        });
-                    } else {
+                    }
+                    if (self.$refs.refDiyTable_DiyFormDialog) {
                         openForm();
+                    } else {
+                        var retryCount = 0;
+                        var maxRetries = 20;
+                        var tryInit = function() {
+                            if (self.$refs.refDiyTable_DiyFormDialog) {
+                                openForm();
+                            } else if (retryCount < maxRetries) {
+                                retryCount++;
+                                setTimeout(tryInit, 50);
+                            } else {
+                                console.error('refDiyTable_DiyFormDialog ref未找到，已重试' + maxRetries + '次');
+                                self.BtnLoading = false;
+                            }
+                        };
+                        self.$nextTick(tryInit);
                     }
                 };
                 
