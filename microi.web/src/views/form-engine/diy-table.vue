@@ -45,8 +45,8 @@
                     </div>
                 </template> -->
                 
-                <!-- 移动端顶部导航 -->
-                <div v-if="diyStore.IsPhoneView" class="mobile-header">
+                <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
+                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-header">
                     <div class="mobile-header-left">
                         <el-icon class="back-icon" @click="$router.back()">
                             <ArrowLeft />

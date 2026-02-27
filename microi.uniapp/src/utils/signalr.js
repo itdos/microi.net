@@ -465,11 +465,15 @@ export function getSignalR() {
 
 /**
  * 连接 SignalR（如果已连接则复用）
+ * Bug#12: 检查连接是否真正成功
  */
 export async function connectSignalR() {
   const client = getSignalR()
   if (client.isConnected) return client
-  await client.connect()
+  const result = await client.connect()
+  if (!result || !client.isConnected) {
+    console.warn('[SignalR] connectSignalR: connection failed')
+  }
   return client
 }
 

@@ -2,8 +2,8 @@
     <div>
         <!--以全新页面形式打开Form（路由页面模式）-->
         <div v-if="IsPageMode" class="pluginPage" :class="{ 'mobile-form-page': diyStore.IsPhoneView }" style="margin-top: 10px;">
-            <!-- 移动端顶部导航 -->
-            <div v-if="diyStore.IsPhoneView" class="mobile-form-header-bar">
+            <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
+            <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-form-header-bar">
                 <div class="mobile-header-left">
                     <el-icon class="back-icon" @click="Go_1()">
                         <ArrowLeft />
@@ -46,7 +46,7 @@
             <div>
                 <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
                     style="margin-bottom: 10px;">
-                    <div class="pull-left" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView">
+                    <div class="pull-left" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView || diyStore.IsMiniProgram">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
                     </div>
@@ -1898,7 +1898,6 @@ export default {
     padding: 8px 12px;
     border: 1px solid #e4e7ed;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    height: 50px;
 }
 
 .form-actions {

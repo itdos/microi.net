@@ -288,7 +288,7 @@ export default {
         // 设置V8默认值
         SetV8DefaultValue(V8, field) {
             var self = this;
-            V8.ClientType = "PC";
+            V8.ClientType = self.DiyCommon ? self.DiyCommon.GetClientType() : "PC";
             V8.CurrentUser = self.GetCurrentUser;
             V8.OpenAnyTable = this.OpenAnyTable;
             return V8;

@@ -623,7 +623,17 @@ export default {
             });
 
             // ...处理编辑器信息
+            // 标记IME输入状态，防止中文输入法打字时自动换行
+            var _isComposing = false;
+            $("body").on("compositionstart", ".J__wcEditor", function () {
+                _isComposing = true;
+            });
+            $("body").on("compositionend", ".J__wcEditor", function () {
+                _isComposing = false;
+            });
+
             function surrounds() {
+                if (_isComposing) return; // IME输入过程中不处理，防止中文打字时自动换行
                 setTimeout(function () {
                     //chrome
                     var sel = window.getSelection();
@@ -675,7 +685,9 @@ export default {
                 _lastRange = _rng.getRange();
             });
             $("body").on("input", ".J__wcEditor", function () {
-                surrounds();
+                if (!_isComposing) {
+                    surrounds();
+                }
                 _lastRange = _rng.getRange();
             });
 

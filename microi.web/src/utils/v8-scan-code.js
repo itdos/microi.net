@@ -7,8 +7,9 @@
  *   2. 手动输入条码
  *   3. 图片上传识别
  *
- * PC 浏览器端使用 html5-qrcode 库实现摄像头调用
- * 移动端 H5 同样通过此模块调用后置摄像头
+ * 摄像头扫码使用 navigator.mediaDevices.getUserMedia 直接调用
+ * + jsQR 逐帧解码（与旧版 mumu-getQrcode 方案一致，兼容性最佳）
+ * + BarcodeDetector API 识别条形码（现代浏览器支持）
  *
  * 用法（V8 引擎代码中）:
  *   if (V8.Method?.ScanCode) {
@@ -20,10 +21,18 @@
  * ========================================
  */
 
-import { ElMessageBox } from 'element-plus'
+import jsQR from 'jsqr'
 
 let _scanDialogInstance = null
 let _resolveCallback = null
+let _videoElement = null
+let _canvasElement = null
+let _canvas2d = null
+let _scanAnimFrameId = null
+let _mediaStream = null
+let _currentFacingMode = 'environment' // 当前摄像头方向
+let _barcodeDetector = null // BarcodeDetector 实例（如浏览器支持）
+let _isScanning = false
 
 /**
  * 创建扫码弹窗 DOM 结构
@@ -46,7 +55,14 @@ function createScanDialog() {
                 </div>
             </div>
             <div class="microi-scan-body">
-                <div id="microiScanReader" class="microi-scan-reader"></div>
+                <div id="microiScanReader" class="microi-scan-reader">
+                    <video id="microiScanVideo" autoplay playsinline muted></video>
+                    <div class="microi-scan-box">
+                        <div class="microi-scan-line"></div>
+                        <div class="microi-scan-angle"></div>
+                    </div>
+                </div>
+                <canvas id="microiScanCanvas" style="display:none;"></canvas>
                 <div class="microi-scan-status" id="microiScanStatus">正在初始化摄像头...</div>
             </div>
             <div class="microi-scan-footer">
@@ -138,19 +154,55 @@ function createScanDialog() {
                 border-radius: 8px;
                 overflow: hidden;
                 background: #000;
+                position: relative;
             }
-            /* 覆盖 html5-qrcode 内部样式 */
-            #microiScanReader video {
+            #microiScanVideo {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
                 border-radius: 8px;
             }
-            #microiScanReader img[alt="Info icon"] {
-                display: none !important;
+            /* 扫描框动画 */
+            .microi-scan-box {
+                position: absolute;
+                top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                width: 200px; height: 200px;
+                border: 1px solid rgba(0, 255, 51, 0.3);
+                z-index: 2;
+                overflow: hidden;
             }
-            #html5-qrcode-button-camera-permission,
-            #html5-qrcode-button-camera-start,
-            #html5-qrcode-button-camera-stop,
-            #html5-qrcode-anchor-scan-type-change {
-                display: none !important;
+            .microi-scan-line {
+                width: 100%; height: calc(100% - 2px);
+                background: linear-gradient(180deg, rgba(0,255,51,0) 43%, #00ff33 211%);
+                border-bottom: 3px solid #00ff33;
+                transform: translateY(-100%);
+                animation: microiScanBeam 2s infinite alternate;
+                animation-timing-function: cubic-bezier(0.53,0,0.43,0.99);
+                animation-delay: 0.5s;
+            }
+            @keyframes microiScanBeam {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(0); }
+            }
+            .microi-scan-box::before, .microi-scan-box::after,
+            .microi-scan-angle::before, .microi-scan-angle::after {
+                content: ''; display: block; position: absolute;
+                width: 20px; height: 20px; z-index: 3;
+                border: 2px solid transparent;
+            }
+            .microi-scan-box::before, .microi-scan-box::after {
+                top: 0; border-top-color: #00ff33;
+            }
+            .microi-scan-angle::before, .microi-scan-angle::after {
+                bottom: 0; border-bottom-color: #00ff33;
+            }
+            .microi-scan-box::before, .microi-scan-angle::before {
+                left: 0; border-left-color: #00ff33;
+            }
+            .microi-scan-box::after, .microi-scan-angle::after {
+                right: 0; border-right-color: #00ff33;
             }
             .microi-scan-status {
                 margin-top: 12px;
@@ -212,7 +264,7 @@ function createScanDialog() {
                 border-color: var(--el-color-primary, #409eff);
                 color: var(--el-color-primary, #409eff);
             }
-            /* 移动端自适应 */
+            /* 移动端自适应：全屏模式 */
             @media (max-width: 600px) {
                 .microi-scan-dialog { 
                     width: 100%; 
@@ -221,7 +273,7 @@ function createScanDialog() {
                     border-radius: 0; 
                     height: 100vh;
                 }
-                .microi-scan-body { min-height: 40vh; }
+                .microi-scan-body { min-height: 40vh; padding: 10px; }
                 .microi-scan-reader { min-height: 35vh; }
             }
         `
@@ -267,10 +319,6 @@ function cancelScan() {
         _resolveCallback = null
     }
 }
-
-let _html5QrCode = null
-let _currentCameraIndex = 0
-let _cameraList = []
 
 /**
  * 检测是否在微信内置浏览器中
@@ -340,36 +388,172 @@ function plusBarcodeScan() {
 }
 
 /**
- * 停止扫码器
+ * 停止摄像头和扫码循环
  */
-async function stopScanner() {
-    if (_html5QrCode) {
-        try {
-            const state = _html5QrCode.getState()
-            // state 2 = SCANNING, 3 = PAUSED
-            if (state === 2 || state === 3) {
-                await _html5QrCode.stop()
+function stopScanner() {
+    _isScanning = false
+    // 停止逐帧扫描
+    if (_scanAnimFrameId) {
+        cancelAnimationFrame(_scanAnimFrameId)
+        _scanAnimFrameId = null
+    }
+    // 停止摄像头流
+    if (_mediaStream) {
+        _mediaStream.getTracks().forEach(function (track) {
+            track.stop()
+        })
+        _mediaStream = null
+    }
+    // 清理 video 元素
+    if (_videoElement) {
+        _videoElement.srcObject = null
+        _videoElement = null
+    }
+    _canvasElement = null
+    _canvas2d = null
+}
+
+/**
+ * 初始化 BarcodeDetector（用于条形码识别，现代浏览器支持）
+ * QR码由 jsQR 处理，条形码由 BarcodeDetector 处理
+ */
+function initBarcodeDetector() {
+    if (_barcodeDetector) return
+    try {
+        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+            _barcodeDetector = new BarcodeDetector({
+                formats: [
+                    'code_128', 'code_39', 'code_93',
+                    'ean_13', 'ean_8',
+                    'upc_a', 'upc_e',
+                    'itf', 'codabar',
+                    'data_matrix', 'aztec', 'pdf417'
+                ]
+            })
+            console.log('[ScanCode] BarcodeDetector 已初始化（支持条形码识别）')
+        }
+    } catch (e) {
+        console.log('[ScanCode] BarcodeDetector 不可用，仅支持 QR 码:', e.message)
+        _barcodeDetector = null
+    }
+}
+
+/**
+ * 逐帧扫码循环（核心逻辑，与旧版 mumu-getQrcode 一致）
+ * 每帧从 video 绘制到 canvas，然后用 jsQR 检测二维码 + BarcodeDetector 检测条形码
+ */
+function scanTick() {
+    if (!_isScanning || !_videoElement || !_canvas2d) return
+
+    if (_videoElement.readyState === _videoElement.HAVE_ENOUGH_DATA) {
+        // 同步 canvas 尺寸与 video 实际尺寸
+        var vw = _videoElement.videoWidth
+        var vh = _videoElement.videoHeight
+        if (vw > 0 && vh > 0) {
+            _canvasElement.width = vw
+            _canvasElement.height = vh
+            _canvas2d.drawImage(_videoElement, 0, 0, vw, vh)
+            var imageData = _canvas2d.getImageData(0, 0, vw, vh)
+
+            // === 1. jsQR 检测二维码 ===
+            var qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+            })
+            if (qrResult && qrResult.data) {
+                console.log('[ScanCode] jsQR 识别成功:', qrResult.data)
+                completeScan(qrResult.data)
+                return
             }
-        } catch (e) {
-            // ignore
+
+            // === 2. BarcodeDetector 检测条形码（异步，不阻塞帧循环）===
+            if (_barcodeDetector && _canvasElement) {
+                _barcodeDetector.detect(_canvasElement).then(function (barcodes) {
+                    if (!_isScanning) return
+                    if (barcodes && barcodes.length > 0) {
+                        var code = barcodes[0].rawValue
+                        if (code) {
+                            console.log('[ScanCode] BarcodeDetector 识别成功:', code, '格式:', barcodes[0].format)
+                            completeScan(code)
+                        }
+                    }
+                }).catch(function () { /* ignore */ })
+            }
         }
-        try {
-            _html5QrCode.clear()
-        } catch (e) {
-            // ignore
-        }
-        _html5QrCode = null
+    }
+    _scanAnimFrameId = requestAnimationFrame(scanTick)
+}
+
+/**
+ * 使用 getUserMedia 直接启动摄像头（兼容性最佳方案）
+ *
+ * 与旧版 mumu-getQrcode 组件使用相同的方式：
+ * - 直接调用 navigator.mediaDevices.getUserMedia
+ * - 不依赖 enumerateDevices / getCameras
+ * - facingMode 使用 { ideal: "environment" } 而非 { exact: "environment" }
+ *   以避免在无后置摄像头时直接失败
+ *
+ * @param {HTMLElement} statusEl 状态文本元素
+ * @param {string} facingMode 摄像头方向 'environment'|'user'
+ */
+async function startUserMedia(statusEl, facingMode) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (statusEl) statusEl.textContent = '当前浏览器不支持摄像头，请使用图片识别或手动输入条码'
+        return false
+    }
+
+    // 获取 DOM 元素
+    _videoElement = document.getElementById('microiScanVideo')
+    _canvasElement = document.getElementById('microiScanCanvas')
+    if (!_videoElement || !_canvasElement) {
+        if (statusEl) statusEl.textContent = '扫码界面初始化异常，请刷新重试'
+        return false
+    }
+    _canvas2d = _canvasElement.getContext('2d', { willReadFrequently: true })
+
+    if (statusEl) statusEl.textContent = '正在请求摄像头权限...'
+
+    try {
+        // 使用 ideal 而非 exact，提高兼容性（微信、手机浏览器）
+        _mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: { ideal: facingMode || 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        })
+
+        _videoElement.srcObject = _mediaStream
+        _videoElement.setAttribute('playsinline', 'true')
+        _videoElement.setAttribute('webkit-playsinline', 'true')
+        await _videoElement.play()
+
+        if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+
+        // 初始化 BarcodeDetector（条形码）
+        initBarcodeDetector()
+
+        // 开始逐帧扫描
+        _isScanning = true
+        _scanAnimFrameId = requestAnimationFrame(scanTick)
+        return true
+    } catch (err) {
+        console.error('[ScanCode] getUserMedia 失败:', err.name, err.message)
+        return false
     }
 }
 
 /**
  * 启动摄像头扫码（兼容移动端）
- * 
+ *
  * 策略优先级：
  * 1. 5+App 环境 → plus.barcode 原生扫码
- * 2. 微信内置浏览器 → wx.scanQRCode JSSDK
- * 3. 其他浏览器 → html5-qrcode（先 getCameras，失败则用 facingMode）
- * 
+ * 2. 微信内置浏览器 + JSSDK 已配置 → wx.scanQRCode
+ * 3. 所有浏览器（含微信） → getUserMedia 直接调用 + jsQR 逐帧解码
+ *    - 先尝试后置摄像头 facingMode: ideal "environment"
+ *    - 失败则尝试前置摄像头 facingMode: ideal "user"
+ *    - 全部失败则提示使用图片识别或手动输入
+ *
  * @param {HTMLElement} statusEl 状态文本元素
  */
 async function startCameraScanner(statusEl) {
@@ -386,102 +570,37 @@ async function startCameraScanner(statusEl) {
         return
     }
 
-    // === 策略2: 微信 JSSDK 扫码 ===
+    // === 策略2: 微信 JSSDK 扫码（仅当 JSSDK 已正确配置时） ===
     if (isWeChatBrowser() && typeof wx !== 'undefined' && wx.scanQRCode) {
         if (statusEl) statusEl.textContent = '正在调用微信扫一扫...'
         try {
-            var result = await wechatScanCode()
-            if (result) { completeScan(result); return }
-            if (statusEl) statusEl.textContent = '微信扫码已取消，请手动输入条码'
+            var wxResult = await wechatScanCode()
+            if (wxResult) { completeScan(wxResult); return }
+            // 微信扫码取消时，不 return，继续尝试 getUserMedia
+            if (statusEl) statusEl.textContent = '微信扫码已取消，正在尝试摄像头...'
         } catch (e) {
-            if (statusEl) statusEl.textContent = '微信扫码失败，请手动输入条码'
+            // JSSDK 调用失败，继续尝试 getUserMedia
+            console.log('[ScanCode] 微信 JSSDK 扫码失败，尝试 getUserMedia:', e)
         }
-        return
     }
 
-    // === 策略3: html5-qrcode 摄像头扫码 ===
-    try {
-        const { Html5Qrcode } = await import('html5-qrcode')
-        
-        _html5QrCode = new Html5Qrcode('microiScanReader', { verbose: false })
+    // === 策略3: getUserMedia 直接调用摄像头 + jsQR 逐帧解码 ===
+    // 注意：微信浏览器也支持 getUserMedia（HTTPS 环境下），不再直接放弃
 
-        var scanConfig = {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-            disableFlip: false
-        }
-        var onSuccess = function (decodedText) { completeScan(decodedText) }
-        var onError = function () { /* 扫码中，忽略空结果 */ }
+    // 3a: 先尝试后置摄像头
+    var success = await startUserMedia(statusEl, 'environment')
+    if (success) return
 
-        // 先尝试获取摄像头列表
-        var cameraListOk = false
-        try {
-            _cameraList = await Html5Qrcode.getCameras()
-            if (_cameraList && _cameraList.length > 0) cameraListOk = true
-        } catch (e) {
-            console.log('[ScanCode] getCameras 失败（移动端常见），将使用 facingMode 兜底:', e.message || e)
-            _cameraList = []
-        }
+    // 3b: 后置失败，尝试前置摄像头
+    console.log('[ScanCode] 后置摄像头失败，尝试前置...')
+    stopScanner() // 确保上一次尝试的资源已释放
+    success = await startUserMedia(statusEl, 'user')
+    if (success) return
 
-        if (cameraListOk) {
-            // 获取到摄像头列表 — 优先使用后置摄像头
-            let cameraId = _cameraList[_currentCameraIndex % _cameraList.length].id
-            for (const cam of _cameraList) {
-                if (cam.label && (cam.label.toLowerCase().includes('back') || cam.label.toLowerCase().includes('rear') || cam.label.toLowerCase().includes('environment'))) {
-                    cameraId = cam.id
-                    break
-                }
-            }
-            if (statusEl) statusEl.textContent = '对准二维码/条形码...'
-            await _html5QrCode.start(cameraId, scanConfig, onSuccess, onError)
-        } else {
-            // 获取摄像头列表失败（移动端浏览器常见）— 使用 facingMode 约束直接启动
-            // 这种方式会触发浏览器摄像头权限弹窗，不需要先 enumerateDevices
-            if (statusEl) statusEl.textContent = '正在请求摄像头权限...'
-            try {
-                await _html5QrCode.start(
-                    { facingMode: "environment" },
-                    scanConfig,
-                    onSuccess,
-                    onError
-                )
-                if (statusEl) statusEl.textContent = '对准二维码/条形码...'
-            } catch (facingErr) {
-                console.log('[ScanCode] facingMode=environment 失败，尝试 user:', facingErr.message)
-                // 后置摄像头失败，尝试前置摄像头
-                try {
-                    await _html5QrCode.start(
-                        { facingMode: "user" },
-                        scanConfig,
-                        onSuccess,
-                        onError
-                    )
-                    if (statusEl) statusEl.textContent = '对准二维码/条形码...'
-                } catch (userErr) {
-                    console.error('[ScanCode] 所有摄像头启动方式均失败:', userErr)
-                    // 最终降级：提示用户手动输入或使用图片识别
-                    if (statusEl) {
-                        if (isWeChatBrowser()) {
-                            statusEl.textContent = '微信浏览器暂不支持网页摄像头，请使用图片识别或手动输入条码'
-                        } else {
-                            statusEl.textContent = '无法访问摄像头，请使用图片识别或手动输入条码'
-                        }
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.error('[ScanCode] 摄像头启动失败:', err)
-        if (statusEl) {
-            if (err.name === 'NotAllowedError') {
-                statusEl.textContent = '摄像头权限被拒绝，请在浏览器设置中允许访问摄像头，或手动输入条码'
-            } else if (err.name === 'NotFoundError') {
-                statusEl.textContent = '未找到摄像头设备，请手动输入条码'
-            } else {
-                statusEl.textContent = '摄像头初始化失败: ' + (err.message || err) + '，请手动输入条码'
-            }
-        }
+    // 3c: 全部失败，最终降级提示
+    console.error('[ScanCode] 所有摄像头启动方式均失败')
+    if (statusEl) {
+        statusEl.textContent = '无法访问摄像头，请检查权限设置后重试，或使用图片识别/手动输入条码'
     }
 }
 
@@ -491,30 +610,75 @@ async function startCameraScanner(statusEl) {
  * @param {HTMLElement} statusEl 状态文本元素
  */
 async function scanFromFile(file, statusEl) {
+    if (statusEl) statusEl.textContent = '正在识别图片中的码...'
+
     try {
-        const { Html5Qrcode } = await import('html5-qrcode')
-        
-        if (!_html5QrCode) {
-            _html5QrCode = new Html5Qrcode('microiScanReader', { verbose: false })
+        // 将文件读取为 Image
+        var imgUrl = URL.createObjectURL(file)
+        var img = new Image()
+        img.src = imgUrl
+
+        await new Promise(function (resolve, reject) {
+            img.onload = resolve
+            img.onerror = reject
+        })
+
+        // 绘制到 canvas 上
+        var tempCanvas = document.createElement('canvas')
+        tempCanvas.width = img.naturalWidth
+        tempCanvas.height = img.naturalHeight
+        var tempCtx = tempCanvas.getContext('2d')
+        tempCtx.drawImage(img, 0, 0)
+        URL.revokeObjectURL(imgUrl)
+
+        var imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
+
+        // 1. jsQR 检测二维码
+        var qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth'
+        })
+        if (qrResult && qrResult.data) {
+            completeScan(qrResult.data)
+            return
         }
 
-        // 先停止摄像头
-        try {
-            const state = _html5QrCode.getState()
-            if (state === 2 || state === 3) {
-                await _html5QrCode.stop()
+        // 2. BarcodeDetector 检测条形码
+        initBarcodeDetector()
+        if (_barcodeDetector) {
+            var barcodes = await _barcodeDetector.detect(tempCanvas)
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                completeScan(barcodes[0].rawValue)
+                return
             }
-        } catch (e) {}
+        }
 
-        if (statusEl) statusEl.textContent = '正在识别图片中的码...'
+        // 3. 兜底：使用 html5-qrcode 的 scanFile（支持更多条形码格式）
+        try {
+            var { Html5Qrcode } = await import('html5-qrcode')
+            // 需要一个 DOM 元素 ID
+            var tempDiv = document.createElement('div')
+            tempDiv.id = 'microi-scan-temp-' + Date.now()
+            tempDiv.style.display = 'none'
+            document.body.appendChild(tempDiv)
+            var h5qr = new Html5Qrcode(tempDiv.id, { verbose: false })
+            var h5Result = await h5qr.scanFile(file, true)
+            tempDiv.remove()
+            if (h5Result) {
+                completeScan(h5Result)
+                return
+            }
+        } catch (h5Err) {
+            console.log('[ScanCode] html5-qrcode scanFile 也未识别:', h5Err.message)
+        }
 
-        const result = await _html5QrCode.scanFile(file, true)
-        completeScan(result)
-    } catch (err) {
-        console.error('[ScanCode] 图片识别失败:', err)
+        // 全部失败
         if (statusEl) statusEl.textContent = '图片中未识别到有效的二维码/条形码，请重试'
         // 重新启动摄像头
-        setTimeout(() => startCameraScanner(statusEl), 1000)
+        setTimeout(function () { startCameraScanner(statusEl) }, 1500)
+    } catch (err) {
+        console.error('[ScanCode] 图片识别失败:', err)
+        if (statusEl) statusEl.textContent = '图片识别出错: ' + (err.message || err)
+        setTimeout(function () { startCameraScanner(statusEl) }, 1500)
     }
 }
 
@@ -523,18 +687,18 @@ async function scanFromFile(file, statusEl) {
  * @param {HTMLElement} statusEl 状态文本元素
  */
 async function switchCamera(statusEl) {
-    if (_cameraList.length <= 1 && _cameraList.length > 0) {
-        if (statusEl) statusEl.textContent = '只有一个摄像头，无法切换'
-        setTimeout(() => { if (statusEl) statusEl.textContent = '对准二维码/条形码...' }, 1500)
-        return
-    }
-    // 停止当前
-    await stopScanner()
-    if (_cameraList.length > 1) {
-        _currentCameraIndex = (_currentCameraIndex + 1) % _cameraList.length
-    }
+    stopScanner()
+    // 切换方向
+    _currentFacingMode = (_currentFacingMode === 'environment') ? 'user' : 'environment'
     if (statusEl) statusEl.textContent = '切换摄像头中...'
-    await startCameraScanner(statusEl)
+    var success = await startUserMedia(statusEl, _currentFacingMode)
+    if (!success) {
+        // 切换失败，尝试切回原来的
+        _currentFacingMode = (_currentFacingMode === 'environment') ? 'user' : 'environment'
+        await startUserMedia(statusEl, _currentFacingMode)
+        if (statusEl) statusEl.textContent = '只有一个摄像头，无法切换'
+        setTimeout(function () { if (statusEl) statusEl.textContent = '对准二维码/条形码...' }, 1500)
+    }
 }
 
 /**
@@ -550,6 +714,9 @@ export function createScanCodeMethod(V8) {
                 V8.ScanCodeRes = result || ''
                 resolve()
             }
+
+            // 重置摄像头方向
+            _currentFacingMode = 'environment'
 
             // 创建弹窗
             const overlay = createScanDialog()
@@ -603,6 +770,8 @@ export function createScanCodeMethod(V8) {
             fileInput.onchange = (e) => {
                 const file = e.target.files && e.target.files[0]
                 if (file) {
+                    // 先停止摄像头再识别图片
+                    stopScanner()
                     scanFromFile(file, statusEl)
                 }
                 fileInput.value = '' // reset
