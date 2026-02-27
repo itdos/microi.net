@@ -19,7 +19,7 @@
             :class="'dialog-opentable ' + (diyStore.IsPhoneView ? 'is-phone-view' : '')"
         >
             <template #header>
-                <div style="display: flex;justify-content: space-between;">
+                <div style="display: flex;justify-content: space-between;width: 100%;">
                     <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
                         <fa-icon :icon="'fas fa-table'" />
                         {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
