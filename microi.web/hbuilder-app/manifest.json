@@ -24,7 +24,10 @@
             "plusrequire" : "ahead",
             "titleNView" : false,
             "bounce" : "none",
-            "webviewBGTransparent" : false
+            "webviewBGTransparent" : false,
+            "kernel" : "WKWebview",
+            "mixed" : true,
+            "hardwareAccelerated" : true
         },
         "statusbar" : {
             "immersed" : "supportedDevice",
@@ -41,9 +44,6 @@
         "softinput" : {
             "navBar" : "auto",
             "mode" : "adjustResize"
-        },
-        "uni-app" : {
-            "control" : "none"
         },
         "distribute" : {
             "icons" : {
@@ -97,7 +97,12 @@
                     "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
                 ],
                 "minSdkVersion" : 21,
-                "targetSdkVersion" : 30,
+                "targetSdkVersion" : 33,
+                "android:usesCleartextTraffic" : true,
+                "packagingOptions" : [
+                    "doNotStrip \"*/armeabi-v7a/*.so\"",
+                    "doNotStrip \"*/arm64-v8a/*.so\""
+                ],
                 "abiFilters" : [ "armeabi-v7a", "arm64-v8a", "x86" ]
             },
             "apple" : {
