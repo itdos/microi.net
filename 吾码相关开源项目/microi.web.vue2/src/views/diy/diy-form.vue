@@ -4834,9 +4834,62 @@ export default {
                 }
             } else if (field.Component == "FileUpload") {
                 if (self.getMultipleFlag(field, "FileUpload")) {
-                    self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true));
+                    // 初始化多文件数组并为每个文件补充 _RealPath，避免点击文件时打开 about:blank
+                    try {
+                        var fileArr = self.GetFormDataJsonValue(field, formData, true) || [];
+                        self.$set(self.FormDiyTableModel, field.Name, fileArr);
+                        var fileLimitCfg = (field.Config && field.Config.FileUpload && field.Config.FileUpload.Limit) || false;
+                        if (Array.isArray(fileArr)) {
+                            fileArr.forEach(function (fileObj) {
+                                try {
+                                    if (!fileObj) return;
+                                    var fileId = fileObj.Id || fileObj.id || fileObj.uid;
+                                    if (!fileId) return;
+                                    var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName || "";
+                                    var realKey = field.Name + "_" + fileId + "_RealPath";
+                                    // 如果已经有值则跳过
+                                    if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
+                                    if (!filePath) {
+                                        self.$set(self.FormDiyTableModel, realKey, "");
+                                    } else if (fileLimitCfg !== true) {
+                                        self.$set(self.FormDiyTableModel, realKey, self.DiyCommon.GetServerPath(filePath));
+                                    } else {
+                                        // 私有文件：先写 loading，再异步获取临时 URL
+                                        self.$set(self.FormDiyTableModel, realKey, "./static/img/loading.gif");
+                                        (function (fObj, fId, fPath, rKey) {
+                                            self.DiyCommon.Post(
+                                                "/api/HDFS/GetPrivateFileUrl",
+                                                {
+                                                    FilePathName: fPath,
+                                                    HDFS: self.SysConfig.HDFS || "Aliyun",
+                                                    FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                                    FormDataId: self.TableRowId,
+                                                    FieldId: field.Id
+                                                },
+                                                function (privateResult) {
+                                                    try {
+                                                        var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "";
+                                                        self.$set(self.FormDiyTableModel, rKey, finalPath);
+                                                    } catch (e) {}
+                                                },
+                                                function (err) {
+                                                    try {
+                                                        self.$set(self.FormDiyTableModel, rKey, "");
+                                                    } catch (e) {}
+                                                }
+                                            );
+                                        })(fileObj, fileId, filePath, realKey);
+                                    }
+                                } catch (e) {}
+                            });
+                        }
+                    } catch (e) {
+                        self.$set(self.FormDiyTableModel, field.Name, []);
+                    }
                 } else {
                     self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]);
+                    // 单文件上传：初始化 _RealPath，避免点击文件时打开 about:blank
+                    self.GetUploadPath(field);
                 }
             } else if (field.Component == "Select") {
                 // 如果有sql数据源
@@ -6224,6 +6277,10 @@ export default {
         //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
         GoUrl(url) {
             var self = this;
+            if (!url || url === "./static/img/loading.gif") {
+                self.$message.warning("文件地址无效或正在加载中，请稍后再试");
+                return;
+            }
             if (
                 self.SysConfig &&
                 (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase) &&

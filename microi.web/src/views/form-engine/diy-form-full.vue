@@ -46,11 +46,11 @@
             <div>
                 <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
                     style="margin-bottom: 10px;">
-                    <div class="pull-left" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView || diyStore.IsMiniProgram">
+                    <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView || diyStore.IsMiniProgram">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
                     </div>
-                    <div class="form-actions pull-right" :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
+                    <div class="form-actions " :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
                         <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.SaveBack") }}
                         </el-button>

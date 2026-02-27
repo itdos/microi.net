@@ -148,11 +148,11 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-$primary-color: #1890ff;
-$success-color: #52c41a;
-$info-color: #722ed1;
-$warning-color: #faad14;
-$danger-color: #ff4d4f;
+$primary-color: #4785ff;
+$success-color: #34c759;
+$info-color: #8b5cf6;
+$warning-color: #f59e0b;
+$danger-color: #ef4444;
 
 .tech-divider {
     position: relative;
@@ -161,224 +161,129 @@ $danger-color: #ff4d4f;
     width: 100%;
     display: flex;
     align-items: center;
-    
-    // 性能优化：提示浏览器这些属性会变化
-    will-change: transform;
-    
+
+    // 左右横线
+    &::before,
+    &::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--line-fade-start, transparent), var(--line-color, #e5e7eb) 12%, var(--line-color, #e5e7eb) 88%, var(--line-fade-end, transparent));
+    }
+
+    // 根据位置控制横线显隐
+    &[data-position="left"] {
+        &::before { flex: 0; max-width: 0; }
+        &::after  { flex: 1; }
+        .tech-divider__container { padding-left: 0; padding-right: 12px; }
+    }
+    &[data-position="center"] {
+        &::before,
+        &::after { flex: 1; }
+    }
+    &[data-position="right"] {
+        &::before { flex: 1; }
+        &::after  { flex: 0; max-width: 0; }
+        .tech-divider__container { padding-left: 12px; padding-right: 0; }
+    }
+
     // 主容器
     &__container {
         position: relative;
-        width: 100%;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
-        justify-content: var(--content-position, flex-start);
+        padding: 0 14px;
     }
-    
-    // 标签样式（有背景色）
+
+    // 标签样式（有背景色的小胶囊）
     &__tag {
-        position: relative;
         display: inline-flex;
         align-items: center;
-        gap: 12px;
-        padding: 1px 32px;
-        background: var(--tag-bg, linear-gradient(135deg, #{$primary-color} 0%, #40a9ff 100%));
-        border-radius: 30px;
+        gap: 6px;
+        padding: 3px 14px;
+        background: var(--tag-bg, #{$primary-color});
+        border-radius: 12px;
         color: #fff;
-        font-weight: 700;
-        font-size: 18px;
-        overflow: hidden;
-        box-shadow: 0 6px 24px var(--tag-shadow, rgba(24, 144, 255, 0.5)),
-                    0 0 40px var(--tag-glow, rgba(24, 144, 255, 0.3)),
-                    inset 0 2px 0 rgba(255, 255, 255, 0.3),
-                    inset 0 -2px 0 rgba(0, 0, 0, 0.1);
-        transform-style: preserve-3d;
-        
-        // 性能优化：只对transform和opacity做动画
-        will-change: transform;
-        
-        // 顶部高光
-        &::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 50%;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
-            border-radius: 30px 30px 0 0;
-            pointer-events: none;
-        }
-        
-        // 扫光效果 - 性能优化：使用transform而不是left
-        &::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 30%;
-            height: 100%;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(255, 255, 255, 0.5) 50%, 
-                transparent 100%
-            );
-            transform: translateX(-100%);
-            will-change: transform;
-            animation: tag-shine 4s ease-in-out infinite;
-        }
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 20px;
+        letter-spacing: 0.3px;
+        box-shadow: 0 1px 3px var(--tag-shadow, rgba(71, 133, 255, 0.25));
+        transition: box-shadow 0.2s ease;
     }
-    
-    // 普通标签（无背景，边框样式）
+
+    // 普通标签（轻量边框 + 色条）
     &__label {
         position: relative;
         display: inline-flex;
         align-items: center;
-        gap: 12px;
-        padding: 1px 28px;
-        background: linear-gradient(135deg, 
-            rgba(0, 0, 0, 0.02) 0%, 
-            rgba(0, 0, 0, 0.01) 100%
-        );
-        border: 3px solid var(--divider-color, #{$primary-color});
-        border-radius: 25px;
-        font-weight: 700;
-        font-size: 17px;
+        gap: 6px;
+        padding: 3px 12px 3px 14px;
+        background: var(--label-bg, rgba(71, 133, 255, 0.06));
+        border-radius: 6px;
+        border-left: 3px solid var(--divider-color, #{$primary-color});
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 20px;
+        letter-spacing: 0.2px;
         color: var(--divider-color, #{$primary-color});
-        box-shadow: 0 0 30px var(--divider-shadow, rgba(24, 144, 255, 0.4)),
-                    0 4px 16px rgba(0, 0, 0, 0.08),
-                    inset 0 0 30px var(--divider-shadow, rgba(24, 144, 255, 0.15));
-        backdrop-filter: blur(10px);
-        will-change: transform;
-        
-        // 内发光
-        &::before {
-            content: '';
-            position: absolute;
-            inset: -3px;
-            border-radius: 25px;
-            padding: 3px;
-            background: linear-gradient(135deg, 
-                var(--divider-color, #{$primary-color}), 
-                transparent 50%,
-                var(--divider-color, #{$primary-color})
-            );
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
-            opacity: 0.6;
-            will-change: transform;
-            animation: border-glow 3s ease-in-out infinite;
-        }
+        transition: background 0.2s ease;
     }
-    
-    // 图标 - 简化动画
+
+    // 图标
     &__icon {
-        font-size: 20px;
-        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
-        will-change: transform;
-        animation: icon-float 3s ease-in-out infinite;
+        font-size: 13px;
+        opacity: 0.85;
     }
-    
+
     // 文字
     &__text {
         position: relative;
         z-index: 2;
         white-space: nowrap;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
-    
-    // 位置调整
-    &[data-position="left"] {
-        .tech-divider__container {
-            justify-content: flex-start;
-        }
-    }
-    
-    &[data-position="center"] {
-        .tech-divider__container {
-            justify-content: center;
-        }
-    }
-    
-    &[data-position="right"] {
-        .tech-divider__container {
-            justify-content: flex-end;
-        }
-    }
-    
-    // 颜色主题
+
+    // ========== 颜色主题 ==========
     &--primary {
         --divider-color: #{$primary-color};
-        --divider-shadow: rgba(24, 144, 255, 0.4);
-        --tag-bg: linear-gradient(135deg, #{$primary-color} 0%, #40a9ff 100%);
-        --tag-shadow: rgba(24, 144, 255, 0.5);
-        --tag-glow: rgba(24, 144, 255, 0.3);
+        --line-color: #{rgba($primary-color, 0.18)};
+        --tag-bg: #{$primary-color};
+        --tag-shadow: #{rgba($primary-color, 0.25)};
+        --label-bg: #{rgba($primary-color, 0.06)};
     }
-    
     &--success {
         --divider-color: #{$success-color};
-        --divider-shadow: rgba(82, 196, 26, 0.4);
-        --tag-bg: linear-gradient(135deg, #{$success-color} 0%, #73d13d 100%);
-        --tag-shadow: rgba(82, 196, 26, 0.5);
-        --tag-glow: rgba(82, 196, 26, 0.3);
+        --line-color: #{rgba($success-color, 0.22)};
+        --tag-bg: #{$success-color};
+        --tag-shadow: #{rgba($success-color, 0.25)};
+        --label-bg: #{rgba($success-color, 0.06)};
     }
-    
     &--info {
         --divider-color: #{$info-color};
-        --divider-shadow: rgba(114, 46, 209, 0.4);
-        --tag-bg: linear-gradient(135deg, #{$info-color} 0%, #9254de 100%);
-        --tag-shadow: rgba(114, 46, 209, 0.5);
-        --tag-glow: rgba(114, 46, 209, 0.3);
+        --line-color: #{rgba($info-color, 0.18)};
+        --tag-bg: #{$info-color};
+        --tag-shadow: #{rgba($info-color, 0.25)};
+        --label-bg: #{rgba($info-color, 0.06)};
     }
-    
     &--warning {
         --divider-color: #{$warning-color};
-        --divider-shadow: rgba(250, 173, 20, 0.4);
-        --tag-bg: linear-gradient(135deg, #{$warning-color} 0%, #ffc53d 100%);
-        --tag-shadow: rgba(250, 173, 20, 0.5);
-        --tag-glow: rgba(250, 173, 20, 0.3);
+        --line-color: #{rgba($warning-color, 0.25)};
+        --tag-bg: #{$warning-color};
+        --tag-shadow: #{rgba($warning-color, 0.25)};
+        --label-bg: #{rgba($warning-color, 0.06)};
     }
-    
     &--danger {
         --divider-color: #{$danger-color};
-        --divider-shadow: rgba(255, 77, 79, 0.4);
-        --tag-bg: linear-gradient(135deg, #{$danger-color} 0%, #ff7875 100%);
-        --tag-shadow: rgba(255, 77, 79, 0.5);
-        --tag-glow: rgba(255, 77, 79, 0.3);
+        --line-color: #{rgba($danger-color, 0.2)};
+        --tag-bg: #{$danger-color};
+        --tag-shadow: #{rgba($danger-color, 0.25)};
+        --label-bg: #{rgba($danger-color, 0.06)};
     }
-    
     &--default {
         --divider-color: #{$primary-color};
-        --divider-shadow: rgba(24, 144, 255, 0.4);
-    }
-}
-
-// 动画 - 性能优化：只使用transform和opacity
-@keyframes tag-shine {
-    0% {
-        transform: translateX(-100%);
-    }
-    50%, 100% {
-        transform: translateX(400%);
-    }
-}
-
-@keyframes border-glow {
-    0%, 100% {
-        opacity: 0.4;
-    }
-    50% {
-        opacity: 0.8;
-    }
-}
-
-@keyframes icon-float {
-    0%, 100% {
-        transform: translateY(0) scale(1);
-    }
-    50% {
-        transform: translateY(-3px) scale(1.05);
+        --line-color: #e5e7eb;
+        --label-bg: #{rgba($primary-color, 0.06)};
     }
 }
 </style>
