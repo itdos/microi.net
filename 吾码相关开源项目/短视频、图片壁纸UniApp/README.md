@@ -4,8 +4,6 @@
 >* V1版本在线H5：[https://h5.jsnzk.com:1888](https://h5.jsnzk.com:1888)
 >* V2版本在线H5：[https://h5.jsnzk.com:1999](https://h5.jsnzk.com:1999)
 
->* V1版本APP下载：[https://www.pgyer.com/h5_jsnzk_com_1888](https://www.pgyer.com/h5_jsnzk_com_1888)
->* V2版本APP下载：[https://www.pgyer.com/h5_jsnzk_com_1999](https://www.pgyer.com/h5_jsnzk_com_1999)
 >* V2版本源码地址：[https://gitee.com/microi-net/douyin](https://gitee.com/microi-net/douyin) 
 
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc1.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
@@ -62,7 +60,7 @@
 # 后台管理系统预览图
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc2.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc3.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
-<img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc4.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
+
 
 # 更新日志
 >* v2.0.0（2024-11-24）
