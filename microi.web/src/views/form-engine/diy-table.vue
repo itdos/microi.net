@@ -3104,13 +3104,24 @@ export default {
             // 延迟渲染：首次调用时才渲染组件
             if (!self._shouldRenderDiyFormDialog) {
                 self._shouldRenderDiyFormDialog = true;
-                self.$nextTick(() => {
+            }
+            // 异步组件挂载需要时间，使用重试机制等待 ref 就绪
+            if (self.$refs.refDiyTable_DiyFormDialog) {
+                self.$refs.refDiyTable_DiyFormDialog.Init(param);
+            } else {
+                var retryCount = 0;
+                var maxRetries = 40;
+                var tryInit = function() {
                     if (self.$refs.refDiyTable_DiyFormDialog) {
                         self.$refs.refDiyTable_DiyFormDialog.Init(param);
+                    } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(tryInit, 50);
+                    } else {
+                        console.error('[OpenAnyForm] refDiyTable_DiyFormDialog 始终未挂载，已重试' + maxRetries + '次');
                     }
-                });
-            } else {
-                self.$refs.refDiyTable_DiyFormDialog.Init(param);
+                };
+                self.$nextTick(tryInit);
             }
         },
         /**
@@ -4117,15 +4128,24 @@ export default {
                     
                     if (!self._shouldRenderDiyFormDialog) {
                         self._shouldRenderDiyFormDialog = true;
-                        self.$nextTick(() => {
-                            setTimeout(() => {
-                                if (self.$refs.refDiyTable_DiyFormDialog) {
-                                    initFormDialog();
-                                }
-                            }, 300);
-                        });
-                    } else {
+                    }
+                    if (self.$refs.refDiyTable_DiyFormDialog) {
                         initFormDialog();
+                    } else {
+                        var retryCount = 0;
+                        var maxRetries = 40;
+                        var tryInitFormDialog = function() {
+                            if (self.$refs.refDiyTable_DiyFormDialog) {
+                                initFormDialog();
+                            } else if (retryCount < maxRetries) {
+                                retryCount++;
+                                setTimeout(tryInitFormDialog, 50);
+                            } else {
+                                console.error('[OpenFormDialog] refDiyTable_DiyFormDialog 始终未挂载，已重试' + maxRetries + '次');
+                                self.BtnLoading = false;
+                            }
+                        };
+                        self.$nextTick(tryInitFormDialog);
                     }
                 }
             } else {

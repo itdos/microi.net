@@ -35,7 +35,7 @@
                 <div class="login-input-param pwd">
                     <el-input 
                         v-model="Pwd" 
-                        type="password" 
+                        :type="showPassword ? 'text' : 'password'" 
                         size="large"
                         :placeholder="$t('Msg.InputPwd')" 
                         @keyup.enter="Login"
@@ -44,6 +44,15 @@
                             <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
                                 <el-icon color="white"><Key /></el-icon>
                             </div>
+                        </template>
+                        <template #suffix>
+                            <el-icon
+                                style="cursor: pointer; color: #909399;"
+                                @click="showPassword = !showPassword"
+                            >
+                                <View v-if="showPassword" />
+                                <Hide v-else />
+                            </el-icon>
                         </template>
                     </el-input>
                 </div>
@@ -267,7 +276,7 @@ import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
 import JSEncrypt from "jsencrypt"; // RSA加密库
 // Element Plus 图标
-import { User, Key, Lock, UserFilled, Loading, Right, Unlock } from "@element-plus/icons-vue";
+import { User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from "@element-plus/icons-vue";
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
@@ -281,7 +290,9 @@ export default {
         UserFilled,
         Loading,
         Right,
-        Unlock
+        Unlock,
+        View,
+        Hide
     },
     beforeCreate() {},
     setup() {
@@ -365,6 +376,7 @@ export default {
             ShowCaptcha: false,
             Account: "",
             Pwd: "",
+            showPassword: false,
             tipId: "",
             redirect: undefined,
             otherQuery: {},

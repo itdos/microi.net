@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight } from '@element-plus/icons-vue';
@@ -124,6 +124,9 @@ const menuList = computed(() => {
     });
 });
 
+// 订阅清理函数
+let _permissionUnsubscribe = null;
+
 // 初始化时检查加载状态
 onMounted(() => {
     // 模拟数据加载完成，如果路由已存在则直接显示
@@ -132,8 +135,8 @@ onMounted(() => {
             loading.value = false;
         }, 300);
     } else {
-        // 监听路由变化
-        const unwatch = permissionStore.$subscribe(() => {
+        // 监听路由变化，保存取消订阅函数
+        _permissionUnsubscribe = permissionStore.$subscribe(() => {
             if (permissionStore.routes && permissionStore.routes.length > 0) {
                 loading.value = false;
             }
@@ -141,11 +144,42 @@ onMounted(() => {
     }
 });
 
+// 组件卸载时清理订阅
+onBeforeUnmount(() => {
+    if (_permissionUnsubscribe) {
+        _permissionUnsubscribe();
+        _permissionUnsubscribe = null;
+    }
+    // 强制恢复 body 滚动（防止 el-dialog 未清理 overflow:hidden）
+    _restoreBodyScroll();
+});
+
 // 子菜单相关
 const showSubMenu = ref(false);
 const currentSubMenu = ref(null);
 const currentSubMenuItems = ref([]);
 const subMenuStack = ref([]); // 用于支持多级菜单返回
+
+/**
+ * 强制恢复 body 滚动状态
+ * 修复 el-dialog 在移动端 WebView 关闭后残留 overflow:hidden 导致页面无法滚动/点击的 bug
+ */
+function _restoreBodyScroll() {
+    try {
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        document.body.classList.remove('el-popup-parent--hidden');
+        document.documentElement.classList.remove('el-popup-parent--hidden');
+    } catch (e) {}
+}
+
+// 监听 dialog 关闭，强制恢复 body 滚动
+watch(showSubMenu, (val) => {
+    if (!val) {
+        // 延迟一帧，等 Element Plus 自己的关闭动画执行完再兜底检查
+        setTimeout(_restoreBodyScroll, 300);
+    }
+});
 
 // 处理菜单点击
 const handleMenuClick = (menu) => {
@@ -201,12 +235,16 @@ const getVisibleChildren = (children) => {
 .mobile-workspace {
     min-height: 100vh;
     background: #f5f7fa;
+    padding-top: calc(50px + constant(safe-area-inset-top));
+    padding-top: calc(50px + env(safe-area-inset-top));
     padding-bottom: 70px;
 }
 
 .workspace-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
     display: flex;
     align-items: center;
