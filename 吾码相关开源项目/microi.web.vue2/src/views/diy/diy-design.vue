@@ -2550,7 +2550,7 @@ export default {
             // }
             var param = lodash.cloneDeep(self.CurrentDiyTableModel);
             //Sql、V8代码全部转为Base64
-            self.DiyCommon.Base64EncodeDiyTable(param);
+            // self.DiyCommon.Base64EncodeDiyTable(param);
             // param.OsClient = self.OsClient
             self.DiyTableJsonToStr(param);
             param.FormEngineKey = "Diy_Table";
@@ -2572,7 +2572,7 @@ export default {
                 // }
                 var param = lodash.cloneDeep(self.CurrentDiyTableModel);
                 //Sql、V8代码全部转为Base64
-                self.DiyCommon.Base64EncodeDiyTable(param);
+                // self.DiyCommon.Base64EncodeDiyTable(param);
 
                 // param.OsClient = self.OsClient
                 self.DiyTableJsonToStr(param);
@@ -2603,7 +2603,7 @@ export default {
                 if (fieldList.length > 0) {
                     // var fieldList = [...self.DiyFieldList];
                     fieldList.forEach((element) => {
-                        self.DiyCommon.Base64EncodeDiyField(element);
+                        // self.DiyCommon.Base64EncodeDiyField(element);
                         self.DiyFieldJsonToStr(element);
                         element.OsClient = "";
                     });
@@ -2651,7 +2651,7 @@ export default {
                 var param = lodash.cloneDeep(self.CurrentDiyFieldModel);
                 // param.OsClient = self.OsClient
                 // param.BaiduMapConfig = {};  放到DiyFieldJsonToStr里面
-                self.DiyCommon.Base64EncodeDiyField(param);
+                // self.DiyCommon.Base64EncodeDiyField(param);
                 self.DiyFieldJsonToStr(param);
                 //2024-04-24：如果是报表引擎
                 var uptApiUrl = self.DiyApi.UptDiyField;
