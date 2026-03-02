@@ -178,7 +178,13 @@
                 </div>
             </div>
 
-            <el-dialog width="800px" :append-to-body="true" v-model="ShowPrivacyPolicy" :title="SysConfig.PrivacyPolicyName || '同意隐私协议'" :close-on-click-modal="false" draggable>
+            <el-dialog width="800px" 
+                :append-to-body="true" 
+                v-model="ShowPrivacyPolicy" 
+                :title="SysConfig.PrivacyPolicyName || '同意隐私协议'" 
+                :close-on-click-modal="false"
+                draggable
+                align-center>
                 <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
             </el-dialog>
 
@@ -190,6 +196,7 @@
                 title="用户注册" 
                 :close-on-click-modal="false" 
                 draggable
+                align-center
                 class="register-dialog"
             >
                 <el-form ref="form" :model="RegModel" label-width="100px" class="register-form">
