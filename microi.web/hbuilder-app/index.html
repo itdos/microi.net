@@ -52,30 +52,57 @@
             -webkit-appearance: none;
         }
         .loading-retry:active { background: #409EFF; color: #fff; }
+        .loading-server-url {
+            margin-top: 12px;
+            padding: 6px 14px;
+            background: #f0f4ff;
+            border: 1px solid #d0deff;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #4a6fa5;
+            word-break: break-all;
+            text-align: center;
+            max-width: 90vw;
+        }
+        .loading-server-url .url-label {
+            color: #888;
+            margin-right: 4px;
+        }
         .loading-log {
             position: fixed;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(30,30,30,0.88);
+            padding: 8px 10px;
+            max-height: 160px;
+            overflow-y: auto;
             font-size: 10px;
-            color: #bbb;
-            text-align: center;
+            line-height: 1.6;
+            color: #ccc;
             word-break: break-all;
-            max-height: 60px;
-            overflow: hidden;
         }
+        .loading-log .log-line {
+            display: block;
+            padding: 1px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .loading-log .log-line:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
     <div id="app-loading" class="loading-container">
         <div class="loading-spinner" id="loading-spinner"></div>
         <div class="loading-text" id="loading-text">正在加载...</div>
+        <div class="loading-server-url" id="loading-server-url">
+            <span class="url-label">访问地址：</span><span id="loading-server-url-val"></span>
+        </div>
         <div class="loading-error" id="loading-error">
             <div class="error-text" id="error-text">网络连接失败</div>
             <button class="loading-retry" onclick="retryLoad()">点击重试</button>
         </div>
-        <div class="loading-log" id="loading-log"></div>
     </div>
+    <div class="loading-log" id="loading-log"></div>
     <script>
         /**
          * Microi吾码 - 5+App (HBuilder APK) 入口
@@ -96,7 +123,8 @@
             // ============================================
             // 【重要】请修改为你的实际服务器地址
             // ============================================
-            serverUrl: 'https://mes-new.renyikj.cn/',
+            // serverUrl: 'https://mes-new.renyikj.cn/',
+            serverUrl: 'http://192.168.0.4:1988/',
 
             // 是否使用本地模式（加载 dist 目录的构建产物）
             // true = 离线模式（需要将 dist 产物复制到 hbuilder-app/dist/ 目录下）
@@ -125,14 +153,29 @@
             retryCount: 0           // 重试次数
         };
 
-        // ===== 诊断日志（显示在 loading 页面底部） =====
+        // ===== 页面加载完成后立即显示 serverUrl =====
+        (function () {
+            try {
+                var el = document.getElementById('loading-server-url-val');
+                if (el) el.textContent = APP_CONFIG.serverUrl;
+            } catch (e) {}
+        })();
+
+        // ===== 诊断日志（多行追加，显示在底部） =====
         function _log(msg) {
             var ts = new Date().toTimeString().substr(0, 8);
             var full = '[' + ts + '] ' + msg;
             console.log('[supOS] ' + msg);
             try {
                 var el = document.getElementById('loading-log');
-                if (el) el.textContent = full;
+                if (el) {
+                    var line = document.createElement('span');
+                    line.className = 'log-line';
+                    line.textContent = full;
+                    el.appendChild(line);
+                    // 自动滚动到最新一条
+                    el.scrollTop = el.scrollHeight;
+                }
             } catch (e) {}
         }
 
@@ -169,9 +212,10 @@
         function _fallbackRedirect() {
             _log('Fallback → 直接跳转: ' + APP_CONFIG.serverUrl);
             try {
-                // 隐藏 loading
                 var el = document.getElementById('app-loading');
                 if (el) el.style.display = 'none';
+                var logEl = document.getElementById('loading-log');
+                if (logEl) logEl.style.display = 'none';
             } catch (e) {}
             window.location.href = APP_CONFIG.serverUrl;
         }
@@ -220,6 +264,8 @@
                 try {
                     var loading = document.getElementById('app-loading');
                     if (loading) loading.style.display = 'none';
+                    var logEl = document.getElementById('loading-log');
+                    if (logEl) logEl.style.display = 'none';
 
                     // 同时将 launcher WebView 的背景设为透明
                     // 防止 launcher 仍遮挡 main WebView
@@ -336,18 +382,20 @@
                         '  var _bp = false;' +
                         '  document.addEventListener("backbutton", function(){' +
                         '    try {' +
+                        '      // 优先用 Vue Router 判断是否还有历史路由可以回退' +
                         '      var r = window.__VUE_ROUTER__;' +
                         '      if (!r && window.__VUE_APP__ && window.__VUE_APP__.config && window.__VUE_APP__.config.globalProperties) {' +
                         '        r = window.__VUE_APP__.config.globalProperties.$router;' +
                         '      }' +
-                        '      if (r && r.currentRoute && r.currentRoute.value) {' +
-                        '        var path = r.currentRoute.value.fullPath || r.currentRoute.value.path;' +
-                        '        var isHome = (path === "/" || path === "/mobile" || path === "/mobile/home" || path === "/home" || path === "/index" || /^\\/mobile\\/?$/.test(path));' +
-                        '        if (!isHome) {' +
+                        '      if (r) {' +
+                        '        // Vue Router 4: history.state.back 不为 null 说明有上一页' +
+                        '        var canGoBack = !!(window.history && window.history.state && window.history.state.back != null);' +
+                        '        if (canGoBack) {' +
                         '          r.back();' +
                         '          return;' +
                         '        }' +
                         '      } else if (window.history && window.history.length > 1) {' +
+                        '        // 降级：没拿到 router，用原生 history 判断' +
                         '        window.history.back();' +
                         '        return;' +
                         '      }' +
@@ -357,6 +405,7 @@
                         '        return;' +
                         '      }' +
                         '    }' +
+                        '    // 已在根页面，双击退出' +
                         '    if (!_bp) {' +
                         '      _bp = true;' +
                         '      try { plus.nativeUI.toast("再按一次退出应用"); } catch(ex) {}' +
