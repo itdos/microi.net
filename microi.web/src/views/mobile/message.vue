@@ -413,12 +413,16 @@ onBeforeUnmount(() => {
 .mobile-message {
     min-height: 100vh;
     background: #fff;
+    padding-top: calc(50px + constant(safe-area-inset-top));
+    padding-top: calc(50px + env(safe-area-inset-top));
     padding-bottom: 70px;
 }
 
 .message-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
     display: flex;
     align-items: center;

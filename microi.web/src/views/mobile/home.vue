@@ -172,12 +172,16 @@ const goTo = (path) => {
 .mobile-home {
     min-height: 100vh;
     background: #f5f7fa;
+    padding-top: calc(50px + constant(safe-area-inset-top));
+    padding-top: calc(50px + env(safe-area-inset-top));
     padding-bottom: 70px;
 }
 
 .home-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
     display: flex;
     align-items: center;
