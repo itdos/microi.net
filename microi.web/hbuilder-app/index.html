@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- 【配置项】请修改为你的实际服务器地址 -->
-    <script>var MICROI_SERVER_URL = 'http://192.168.31.59:1988/';</script>
+    <script>var MICROI_SERVER_URL = 'http://192.168.31.59:1988';</script>
     <title>Loading...</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -490,6 +490,11 @@
 
         // ===== Android 返回键处理（仅在 loading 页面生效） =====
         // 跳转后此监听器会被销毁，远程页面自行处理返回键
+        try {
+            plus.key.addEventListener('backbutton', function() {
+                try { plus.runtime.quit(); } catch(e) {}
+            }, false);
+        } catch(e) {}
         document.addEventListener('backbutton', function() {
             try { plus.runtime.quit(); } catch(e) {}
         }, false);

@@ -37,26 +37,57 @@
     <!-- 5+App (Wap2App) 环境：返回键 + 状态栏高度 -->
     <script>
     (function() {
+        // ===== 导航深度追踪（比 history.state.back 更可靠） =====
+        // 通过猴子补丁 history.pushState/replaceState 精确追踪路由层级
+        var __navDepth = 0;
+        var _origPush = history.pushState;
+        var _origReplace = history.replaceState;
+        history.pushState = function() {
+            __navDepth++;
+            return _origPush.apply(this, arguments);
+        };
+        history.replaceState = function() {
+            // replaceState 不增加深度（替换当前条目）
+            return _origReplace.apply(this, arguments);
+        };
+        window.addEventListener('popstate', function() {
+            __navDepth = Math.max(0, __navDepth - 1);
+        });
+
         function initPlusEnv() {
             if (typeof plus === 'undefined') return;
-            // 1. 状态栏高度 → CSS变量
+
+            // 1. 强制设置 webview 的 backButtonAutoControl 为 none
+            //    确保原生层不会自动处理返回键（仅由 JS 处理）
+            try {
+                var wv = plus.webview.currentWebview();
+                wv.setStyle({ backButtonAutoControl: 'none' });
+            } catch(e) {}
+
+            // 2. 状态栏高度 → CSS变量
             try {
                 var h = plus.navigator.getStatusbarHeight();
                 if (h > 0) {
                     document.documentElement.style.setProperty('--status-bar-height', h + 'px');
                 }
             } catch(e) {}
-            // 2. 返回键处理：有历史则后退，否则双击退出
+
+            // 3. 返回键处理（使用 plus.key —— 5+App 官方 API）
             var _lastBack = 0;
-            document.addEventListener('backbutton', function(e) {
-                e.preventDefault && e.preventDefault();
-                // Vue Router 4: history.state.back 非 null 表示有上级路由
-                var canBack = !!(window.history && window.history.state && window.history.state.back != null);
-                if (!canBack) {
-                    // 也检查 history.length（某些场景 state.back 不可靠）
-                    canBack = window.history && window.history.length > 1;
+            function handleBackButton() {
+                // 优先使用自己追踪的导航深度
+                if (__navDepth > 0) {
+                    window.history.back();
+                    return;
                 }
+                // 兜底：检查 Vue Router 4 的 history.state.back
+                var canBack = !!(window.history && window.history.state && window.history.state.back != null);
                 if (canBack) {
+                    window.history.back();
+                    return;
+                }
+                // 再兜底：检查 history.length
+                if (window.history && window.history.length > 1) {
                     window.history.back();
                     return;
                 }
@@ -68,8 +99,20 @@
                     _lastBack = now;
                     plus.nativeUI.toast('再按一次退出应用', { duration: 'short' });
                 }
+            }
+
+            // 使用 plus.key.addEventListener —— 5+App/Wap2App 官方返回键 API
+            try {
+                plus.key.addEventListener('backbutton', handleBackButton, false);
+            } catch(e) {}
+            // 同时在 document 上也监听（某些运行时版本会派发到 document）
+            document.addEventListener('backbutton', function(e) {
+                e.preventDefault && e.preventDefault();
+                e.stopPropagation && e.stopPropagation();
+                handleBackButton();
             }, false);
         }
+
         if (window.plus) {
             initPlusEnv();
         } else {
