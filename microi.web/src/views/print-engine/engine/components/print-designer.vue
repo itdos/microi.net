@@ -587,29 +587,80 @@ const updateData = () => {
 }
 
 /**
- * 浏览器打印
+ * 浏览器打印（同 print-doprint.vue 的修复逻辑）
+ * 修复：边框消失 / 多条数据第2页为空 / 背景色污染 / 分页内容重叠
  */
 const doPrint = () => {
-  // 参数: 打印时设置 左偏移量，上偏移量
-  let options = { leftOffset: -1, topOffset: -1 }
-  // 扩展
-  let ext = {
-    callback: () => {
+  const printData = pageInfo.remoteData.PrintObj
+  const dataArray = Array.isArray(printData) ? printData : [printData]
+
+  // 逐条调用 getHtml，子元素扁平追加（保持分页层级结构正确）
+  const wrapper = document.createElement('div')
+  wrapper.className = 'hiprint-printTemplate'
+  dataArray.forEach((item) => {
+    const pageEl = hiprintTemplate.getHtml(item)
+    if (pageEl && pageEl.length) {
+      const children = pageEl[0].childNodes
+      while (children.length > 0) {
+        wrapper.appendChild(children[0])
+      }
+    }
+  })
+
+  // 仅收集 hiprint 相关样式，避免注入应用背景色等无关 CSS
+  let collectedStyles = ''
+  document.querySelectorAll('style').forEach((s) => {
+    const css = s.innerHTML
+    if (css.indexOf('hiprint-print') > -1 || css.indexOf('hiprint_') > -1 || css.indexOf('.hiprintEp498') > -1) {
+      collectedStyles += `<style>${css}</style>\n`
+    }
+  })
+  collectedStyles += `<style>
+    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    table, .hiprint-printElement-tableTarget, .hiprint-printElement-tableTarget table {
+      border-collapse: collapse !important; border-spacing: 0 !important;
+    }
+    td, th,
+    .hiprint-printElement-tableTarget td, .hiprint-printElement-tableTarget th,
+    .hiprint-printElement-table td, .hiprint-printElement-table th {
+      border: 0.75pt solid #000 !important; box-sizing: border-box !important;
+    }
+    .hiprint-printPaper { page-break-after: always; overflow: hidden; }
+    .hiprint-printPanel { page-break-after: always; }
+    .hiprint-printPanel .hiprint-printPaper:last-child { page-break-after: avoid; }
+    .hiprint-printTemplate .hiprint-printPanel:last-child { page-break-after: avoid; }
+    @media print {
+      html, body { background: #fff !important; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      td, th, .hiprint-printElement-tableTarget td, .hiprint-printElement-tableTarget th {
+        border: 0.75pt solid #000 !important;
+      }
+    }
+  </style>`
+
+  const oldFrame = document.getElementById('hiwprint_iframe')
+  if (oldFrame) oldFrame.parentNode.removeChild(oldFrame)
+  const iframe = document.createElement('iframe')
+  iframe.id = 'hiwprint_iframe'
+  iframe.style.cssText = 'visibility:hidden;height:0;width:0;position:absolute;'
+  iframe.srcdoc = `<!DOCTYPE html><html><head><title></title><meta charset="UTF-8">${collectedStyles}</head><body style="background:#fff!important;"></body></html>`
+  let fired = false
+  iframe.onload = function () {
+    if (fired) return
+    fired = true
+    const win = iframe.contentWindow || iframe.contentDocument
+    const doc = win.document ? win.document : win
+    doc.body.innerHTML = wrapper.outerHTML
+    setTimeout(() => {
+      try { win.focus() } catch (e) { /* ignore */ }
+      try {
+        if (win.StyleMedia) { doc.execCommand('print', false, null) } else { win.print() }
+      } catch (e) { win.print() }
       console.log('浏览器打印窗口已打开')
-    },
-    styleHandler: () => {
-      // // 重写 文本 打印样式
-      // return '<style>.hiprint-printElement-text{color:red !important;}</style>'
-    },
+    }, 300)
   }
-  let dataType = isObjectOrArray(pageInfo.remoteData.PrintObj)
-  let tempPrintData = pageInfo.remoteData.PrintObj
-  if (dataType === 'array') {
-    //如果打印对象是数组，则打印第一个对象
-    hiprintTemplate.print(tempPrintData[0], options, ext)
-  } else {
-    hiprintTemplate.print(tempPrintData, options, ext)
-  }
+  document.body.appendChild(iframe)
 }
 
 //获取打印客户端

@@ -5,9 +5,14 @@
     <meta name="renderer" content="webkit">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <style>
+        :root {
+            --status-bar-height: 0px;
+            --status-bar-height: constant(safe-area-inset-top);
+            --status-bar-height: env(safe-area-inset-top);
+        }
         html,body{ 
             margin: 0px;
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             background-color: #EDF0F9 !important;
             font-size: 14px !important;
             background-size: 20%;

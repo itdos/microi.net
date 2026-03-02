@@ -3282,11 +3282,20 @@ export default {
             // 延迟渲染：首次调用时才渲染组件，避免循环依赖
             if (!self._shouldRenderDiyCustomDialog) {
                 self._shouldRenderDiyCustomDialog = true;
-                self.$nextTick(() => {
+                // 异步组件(如PrintEngineView)首次加载时，单次 $nextTick 不够等待其挂载完成
+                // 使用轮询检测 ref 就绪后再调用 Show()，最多等待 3 秒
+                const maxWait = 3000;
+                const interval = 50;
+                let waited = 0;
+                const tryShow = () => {
                     if (self.$refs.refDiyCustomDialog) {
                         self.$refs.refDiyCustomDialog.Show();
+                    } else if (waited < maxWait) {
+                        waited += interval;
+                        setTimeout(tryShow, interval);
                     }
-                });
+                };
+                self.$nextTick(tryShow);
             } else {
                 self.$refs.refDiyCustomDialog.Show();
             }

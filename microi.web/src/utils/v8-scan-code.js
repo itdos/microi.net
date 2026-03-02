@@ -116,8 +116,7 @@ function createScanDialog() {
                 align-items: center;
                 justify-content: space-between;
                 padding: 16px 20px;
-                padding-top: calc(16px + constant(safe-area-inset-top));
-                padding-top: calc(16px + env(safe-area-inset-top));
+                padding-top: calc(16px + var(--status-bar-height, 0px));
                 border-bottom: 1px solid #f0f0f0;
                 background: #fafafa;
             }

@@ -61,24 +61,141 @@ let hiprintTemplate
 
 /**
  * 浏览器打印
+ *
+ * 修复说明：
+ * 1. 边框消失：hiprint 原生 hiwprint 只注入 styleHandler CSS + print-lock.css（项目中不存在），
+ *    hiprint 自身 CSS 不会进入 print iframe。修复：从页面 <style> 中筛选 hiprint 相关 CSS 注入。
+ * 2. 第 2 页为空：hiprint getSimpleHtml(array) 存在 hinnn._paperList 状态污染。
+ *    修复：对每条数据单独调用 getHtml(item)，逐条收集，合并到同一层 wrapper。
+ * 3. 背景色污染：仅收集 hiprint 相关样式，不收集 Element UI/应用布局等无关 CSS。
+ * 4. 分页重叠：保持 hiprint-printTemplate > hiprint-printPanel 的扁平 DOM 结构，
+ *    确保 page-break-after: always 正常生效。
  */
 const doPrint = () => {
   loading.value = false
   console.log('执行浏览器打印')
-  // 参数: 打印时设置 左偏移量，上偏移量
-  let options = { leftOffset: -1, topOffset: -1 }
-  // 扩展
-  let ext = {
-    callback: () => {
+
+  const printData = pageInfo.remoteData.PrintObj
+  const dataArray = Array.isArray(printData) ? printData : [printData]
+
+  // ── 步骤1：逐条调用 getHtml，扁平化合并到同一个 wrapper ──
+  // getHtml 返回 jQuery(<div class="hiprint-printTemplate">panels...</div>)
+  // 要保持 hiprint-printTemplate > hiprint-printPanel 的扁平结构（分页依赖此层级）
+  const wrapper = document.createElement('div')
+  wrapper.className = 'hiprint-printTemplate'
+  dataArray.forEach((item) => {
+    const pageEl = hiprintTemplate.getHtml(item)
+    if (pageEl && pageEl.length) {
+      // 取出 getHtml 返回的 hiprint-printTemplate 内部子元素（即 hiprint-printPanel），
+      // 直接追加到 wrapper，避免嵌套 hiprint-printTemplate 破坏分页结构
+      const children = pageEl[0].childNodes
+      while (children.length > 0) {
+        wrapper.appendChild(children[0])
+      }
+    }
+  })
+
+  // ── 步骤2：仅收集 hiprint 相关样式，避免注入应用背景色等无关 CSS ──
+  let collectedStyles = ''
+  document.querySelectorAll('style').forEach((styleEl) => {
+    const css = styleEl.innerHTML
+    // 只收集包含 hiprint 关键类名的 <style> 块
+    if (
+      css.indexOf('hiprint-print') > -1 ||
+      css.indexOf('hiprint_') > -1 ||
+      css.indexOf('.hiprintEp498') > -1
+    ) {
+      collectedStyles += `<style>${css}</style>\n`
+    }
+  })
+  // 追加打印专项修复样式
+  collectedStyles += `<style>
+    /* 重置 body 背景防止染色 */
+    html, body {
+      background: #fff !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    table,
+    .hiprint-printElement-tableTarget,
+    .hiprint-printElement-tableTarget table {
+      border-collapse: collapse !important;
+      border-spacing: 0 !important;
+    }
+    td, th,
+    .hiprint-printElement-tableTarget td,
+    .hiprint-printElement-tableTarget th,
+    .hiprint-printElement-table td,
+    .hiprint-printElement-table th {
+      border: 0.75pt solid #000 !important;
+      box-sizing: border-box !important;
+    }
+    /* 确保分页正确 */
+    .hiprint-printPaper {
+      page-break-after: always;
+      overflow: hidden;
+    }
+    .hiprint-printPanel {
+      page-break-after: always;
+    }
+    .hiprint-printPanel .hiprint-printPaper:last-child {
+      page-break-after: avoid;
+    }
+    .hiprint-printTemplate .hiprint-printPanel:last-child {
+      page-break-after: avoid;
+    }
+    @media print {
+      html, body { background: #fff !important; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      td, th,
+      .hiprint-printElement-tableTarget td,
+      .hiprint-printElement-tableTarget th {
+        border: 0.75pt solid #000 !important;
+      }
+    }
+  </style>`
+
+  // ── 步骤3：构建 print iframe ──
+  const oldFrame = document.getElementById('hiwprint_iframe')
+  if (oldFrame) oldFrame.parentNode.removeChild(oldFrame)
+
+  const iframe = document.createElement('iframe')
+  iframe.id = 'hiwprint_iframe'
+  iframe.style.cssText = 'visibility:hidden;height:0;width:0;position:absolute;'
+  iframe.srcdoc = `<!DOCTYPE html><html><head><title></title><meta charset="UTF-8">${collectedStyles}</head><body style="background:#fff!important;"></body></html>`
+
+  let fired = false
+  iframe.onload = function () {
+    if (fired) return
+    fired = true
+    const win = iframe.contentWindow || iframe.contentDocument
+    const doc = win.document ? win.document : win
+    doc.body.innerHTML = wrapper.outerHTML
+    // 等待图片等资源加载后再触发打印
+    setTimeout(() => {
+      try { win.focus() } catch (e) { /* ignore */ }
+      try {
+        if (win.StyleMedia) {
+          doc.execCommand('print', false, null)
+        } else {
+          win.print()
+        }
+      } catch (e) {
+        win.print()
+      }
       console.log('浏览器打印窗口已打开')
-    },
-    // styleHandler: () => {
-    //   // 重写 文本 打印样式
-    //   return '<style>.hiprint-printElement-text{color:red !important;}</style>'
-    // },
+    }, 300)
   }
-  // 调用浏览器打印
-  hiprintTemplate.print(pageInfo.remoteData.PrintObj, options, ext)
+
+  document.body.appendChild(iframe)
 }
 
 //设计器容器
@@ -100,10 +217,25 @@ const loadDataApi = async (apiUrl) => {
   const response = await get(pageInfo.remoteData.DataApi, {})
   try {
     if (response) {
-      pageInfo.remoteData.PrintObj = response //替换动态数据源
+      // 智能提取打印数据：
+      // 支持以下 API 响应格式：
+      //   1. 直接数组: [{...}, {...}]  → 批量打印，每项一页
+      //   2. 包装对象: {Code:1, Data:[{...},{...}]} → 提取 Data 字段
+      //   3. 包装对象: {Code:1, Data:{...}}         → 提取 Data 字段（单条）
+      //   4. 普通对象: {...}                         → 直接使用（单条）
+      let printData = response
+      if (!Array.isArray(response) && response !== null && typeof response === 'object') {
+        // 常见接口包装格式：取 Data / data / list / rows 字段
+        const dataField = response.Data ?? response.data ?? response.list ?? response.rows ?? null
+        if (dataField !== null && dataField !== undefined) {
+          printData = dataField
+        }
+      }
+      console.log('[PrintEngine] API 返回数据条数:', Array.isArray(printData) ? printData.length : 1, printData)
+      pageInfo.remoteData.PrintObj = printData //替换动态数据源
       buildDesigner()
       nextTick(() => {
-        setTimeout(doPrint, 1000) // 1秒后加载脚本
+        setTimeout(doPrint, 1000) // 1秒后执行打印
       })
     }
   } catch (error) {
