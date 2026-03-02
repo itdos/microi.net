@@ -1840,7 +1840,7 @@ export default {
     padding: 0 10px !important;
     background: #f5f7fa;
     min-height: 100vh;
-    padding-top: 45px !important;
+    padding-top: calc(45px + var(--status-bar-height, 0px)) !important;
     
     .el-row {
         margin: 0 !important;

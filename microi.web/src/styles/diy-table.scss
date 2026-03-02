@@ -744,18 +744,18 @@
 // 移动端卡片列表容器 - 添加顶部间距避免被固定头部遮挡
 .mobile-box-card {
     @media screen and (max-width: 768px) {
-        // padding-top: 56px !important; // 头部高度 + 一些间距
+        padding-top: 0 !important; // 头部高度 + 安全区域
     }
 }
 .table-rowlist-tabs{
     @media screen and (max-width: 768px) {
-        padding-top: 56px !important; // 头部高度 + 一些间距
+        padding-top: calc(56px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
     }
 }
 .diy-child-table{
     .table-rowlist-tabs{
     @media screen and (max-width: 768px) {
-            padding-top: 0px !important; // 头部高度 + 一些间距
+            padding-top: 0px !important; // 子表不需要额外间距
         }
     }
 }
@@ -770,6 +770,27 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0px;
+
+    // 卡片模式-空状态
+    .card-empty-state {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px 40px;
+        .card-empty-icon {
+            width: 160px;
+            height: auto;
+            opacity: 0.8;
+        }
+        .card-empty-text {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #a0a6b1;
+            letter-spacing: 1px;
+        }
+    }
     
     // 一行5个卡片的特殊布局（el-col 不支持 span=4.8）
     .card-col-five {

@@ -18,7 +18,7 @@
             background-size: 20%;
         }
     </style>
-    <link href="/static/css/microi.loading.css?d=20260206" rel="stylesheet" />
+    <link href="/static/css/microi.loading.css?d=20260302" rel="stylesheet" />
     <!-- 微信 JSSDK：支持小程序 WebView 内 H5 与小程序通信 -->
     <script>
       // 仅在小程序 WebView 环境下加载 JSSDK
@@ -34,28 +34,110 @@
         var OsClientType = '';
         var ApiCustom = '';
     </script>
+    <!-- 5+App (Wap2App) 环境：返回键 + 状态栏高度 -->
+    <script>
+    (function() {
+        function initPlusEnv() {
+            if (typeof plus === 'undefined') return;
+            // 1. 状态栏高度 → CSS变量
+            try {
+                var h = plus.navigator.getStatusbarHeight();
+                if (h > 0) {
+                    document.documentElement.style.setProperty('--status-bar-height', h + 'px');
+                }
+            } catch(e) {}
+            // 2. 返回键处理：有历史则后退，否则双击退出
+            var _lastBack = 0;
+            document.addEventListener('backbutton', function(e) {
+                e.preventDefault && e.preventDefault();
+                // Vue Router 4: history.state.back 非 null 表示有上级路由
+                var canBack = !!(window.history && window.history.state && window.history.state.back != null);
+                if (!canBack) {
+                    // 也检查 history.length（某些场景 state.back 不可靠）
+                    canBack = window.history && window.history.length > 1;
+                }
+                if (canBack) {
+                    window.history.back();
+                    return;
+                }
+                // 没有历史了，双击退出
+                var now = Date.now();
+                if (now - _lastBack < 2000) {
+                    plus.runtime.quit();
+                } else {
+                    _lastBack = now;
+                    plus.nativeUI.toast('再按一次退出应用', { duration: 'short' });
+                }
+            }, false);
+        }
+        if (window.plus) {
+            initPlusEnv();
+        } else {
+            document.addEventListener('plusready', initPlusEnv, false);
+        }
+    })();
+    </script>
 </head>
 <body class="microi Classic">
     <div id="microi_loading">
-        <div class="microi-load">
-            <div class="microi-loading-container">
-                <div id="microi_loading_progress">0%</div>
-                <div id="microi_loading_speed">正在加载资源...</div>
-                <div id="microi_loading_size">0 MB / 0 MB</div>
-                <div class="microi-loading">
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                </div>
+        <div class="ml-stars" id="ml_stars"></div>
+        <div class="ml-splash">
+            <div class="ml-logo-ring"><div class="ml-logo-core">
+                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div></div>
+            <div class="ml-title" id="appTitle">Loading...</div>
+            <div class="ml-subtitle">正在加载资源</div>
+            <div class="ml-percent" id="loadPercent">0%</div>
+            <div class="ml-progress-wrap"><div class="ml-progress-bar" id="progressBar"></div></div>
+            <div class="ml-info speed" id="loadSpeed">正在加载资源...</div>
+            <div class="ml-info" id="loadSize"></div>
+            <div class="ml-dots" id="loadDots">
+                <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
             </div>
+            <div class="ml-watermark" id="watermark">Powered by Loading...</div>
         </div>
     </div>
     <script>
-      // 小程序 webview 模式下立即隐藏 loading 进度条，避免每次跳转都显示
       (function() {
         try {
+          // 读取 SysConfig 缓存，更新标题和公司名
+          var data = JSON.parse(localStorage.getItem('microi.net') || '{}');
+          var cfg = data.SysConfig;
+          if (cfg) {
+            if (cfg.SysTitle) {
+              document.title = cfg.SysTitle;
+              var t = document.getElementById('appTitle');
+              if (t) t.textContent = cfg.SysTitle;
+            }
+            if (cfg.CompanyName) {
+              var w = document.getElementById('watermark');
+              if (w) w.textContent = 'Powered by ' + cfg.CompanyName;
+            }
+          }
+        } catch(e) {}
+        try {
+          // 生成星空粒子
+          var starsEl = document.getElementById('ml_stars');
+          if (starsEl) {
+            for (var i = 0; i < 60; i++) {
+              var s = document.createElement('div');
+              s.className = 'ml-star';
+              var sz = Math.random() * 2.5 + 0.5;
+              s.style.cssText = 'width:' + sz + 'px;height:' + sz + 'px;' +
+                'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;' +
+                '--dur:' + (Math.random() * 3 + 2) + 's;animation-delay:' + (Math.random() * 3) + 's;';
+              starsEl.appendChild(s);
+            }
+          }
+          // 5+App (APK)：标记起始进度为20%（与 hbuilder-app 加载页衔接）
+          if (window.plus || navigator.userAgent.indexOf('Html5Plus') > -1) {
+            window.__microi_apk_start = 20;
+            var pe = document.getElementById('loadPercent');
+            var pb = document.getElementById('progressBar');
+            if (pe) pe.textContent = '20%';
+            if (pb) pb.style.width = '20%';
+          }
+          // 小程序 webview 模式下隐藏 loading
           var href = location.href || '';
           var hash = location.hash || '';
           var search = location.search || '';
@@ -73,7 +155,7 @@
       })();
     </script>
     <div id="app_microi"></div>
-    <script src="/static/js/microi.loading.js?d=20260206" type="text/javascript"></script>
+    <script src="/static/js/microi.loading.js?d=20260302" type="text/javascript"></script>
     <!-- Vite 入口 -->
     <script type="module" src="/src/main.js"></script>
 </body>

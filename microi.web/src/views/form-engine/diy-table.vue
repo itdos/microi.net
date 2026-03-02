@@ -565,6 +565,23 @@
                             </el-card>
                         </el-col>
                     </template>
+                    <!-- 卡片模式-空状态 -->
+                    <div v-if="!tableLoading && DiyTableRowList.length === 0" class="card-empty-state">
+                        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg" class="card-empty-icon">
+                            <g fill="none">
+                                <ellipse cx="100" cy="148" rx="80" ry="10" fill="#f0f2f5"/>
+                                <rect x="50" y="40" width="100" height="80" rx="8" fill="#e8ecf1" stroke="#d3d9e3" stroke-width="1.5"/>
+                                <rect x="60" y="55" width="50" height="6" rx="3" fill="#c4cad4"/>
+                                <rect x="60" y="68" width="80" height="4" rx="2" fill="#d8dde6"/>
+                                <rect x="60" y="78" width="65" height="4" rx="2" fill="#d8dde6"/>
+                                <rect x="60" y="88" width="72" height="4" rx="2" fill="#d8dde6"/>
+                                <rect x="60" y="100" width="40" height="8" rx="4" fill="#dce1e8"/>
+                                <circle cx="145" cy="45" r="22" fill="#f5f7fa" stroke="#e0e4ea" stroke-width="1.5"/>
+                                <path d="M137 45 l6 6 l10-12" stroke="#c4cad4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </g>
+                        </svg>
+                        <p class="card-empty-text">{{ $t('Msg.NoData') }}</p>
+                    </div>
                     <el-col
                         v-for="(model, index) in DiyTableRowList"
                         v-show="!(!diyStore.IsPhoneView && tableLoading)"

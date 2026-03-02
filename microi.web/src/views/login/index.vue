@@ -46,13 +46,15 @@
                             </div>
                         </template>
                         <template #suffix>
-                            <el-icon
-                                style="cursor: pointer; color: #909399;"
-                                @click="showPassword = !showPassword"
-                            >
-                                <View v-if="showPassword" />
-                                <Hide v-else />
-                            </el-icon>
+                            <span style="padding-left:10px;padding-right: 20px;">
+                                <el-icon
+                                    style="cursor: pointer; color: #909399;"
+                                    @click="showPassword = !showPassword"
+                                >
+                                    <View v-if="showPassword" />
+                                    <Hide v-else />
+                                </el-icon>
+                            </span>
                         </template>
                     </el-input>
                 </div>
@@ -87,7 +89,7 @@
                 </div>
 
                 <!-- 界面风格选择 -->
-                <div class="style-selector-wrapper" v-if="hasWebOS">
+                <div class="style-selector-wrapper" v-if="hasWebOS && SysConfig.EnableSystemStyle">
                     <div class="style-selector-label">选择界面风格</div>
                     <div class="style-selector-options">
                         <div 
