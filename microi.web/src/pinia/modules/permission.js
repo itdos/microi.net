@@ -185,6 +185,7 @@ function MenuBuild(result, data, isFater) {
                 menu = {
                     Id: item.Id,
                     Display: item.Display,
+                    AppDisplay : item.AppDisplay,
                     UrlParam: item.UrlParam,
                     Link: item.Link,
                     name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
@@ -194,6 +195,7 @@ function MenuBuild(result, data, isFater) {
                         Id: item.Id,
                         DiyTableId: item.DiyTableId,
                         Display: item.Display,
+                        AppDisplay : item.AppDisplay,
                         UrlParam: item.UrlParam,
                         title: item.Name,
                         icon: item.IconClass ? item.IconClass : ""
@@ -208,6 +210,7 @@ function MenuBuild(result, data, isFater) {
                         {
                             Id: coopyItem.Id,
                             Display: coopyItem.Display,
+                            AppDisplay : coopyItem.AppDisplay,
                             UrlParam: coopyItem.UrlParam,
                             Link: coopyItem.Link,
                             path: coopyItem.Url,
@@ -217,6 +220,7 @@ function MenuBuild(result, data, isFater) {
                                 Id: coopyItem.Id,
                                 DiyTableId: coopyItem.DiyTableId,
                                 Display: coopyItem.Display,
+                                AppDisplay : coopyItem.AppDisplay,
                                 UrlParam: coopyItem.UrlParam,
                                 title: coopyItem.Name,
                                 icon: coopyItem.IconClass ? coopyItem.IconClass : ""
@@ -244,6 +248,7 @@ function MenuBuild(result, data, isFater) {
                     menu = {
                         Id: coopyItem.Id,
                         Display: coopyItem.Display,
+                        AppDisplay : coopyItem.AppDisplay,
                         UrlParam: coopyItem.UrlParam,
                         Link: coopyItem.Link,
                         path: coopyItem.Url,
@@ -252,6 +257,7 @@ function MenuBuild(result, data, isFater) {
                             Id: coopyItem.Id,
                             DiyTableId: coopyItem.DiyTableId,
                             Display: coopyItem.Display,
+                            AppDisplay : coopyItem.AppDisplay,
                             UrlParam: coopyItem.UrlParam,
                             title: coopyItem.Name,
                             icon: coopyItem.IconClass ? coopyItem.IconClass : ""
@@ -267,6 +273,7 @@ function MenuBuild(result, data, isFater) {
                     menu = {
                         Id: item.Id,
                         Display: item.Display,
+                        AppDisplay : item.AppDisplay,
                         UrlParam: item.UrlParam,
                         Link: item.Link,
                         alwaysShow: true,
@@ -277,6 +284,7 @@ function MenuBuild(result, data, isFater) {
                             Id: item.Id,
                             DiyTableId: item.DiyTableId,
                             Display: item.Display,
+                            AppDisplay : item.AppDisplay,
                             UrlParam: item.UrlParam,
                             title: item.Name,
                             icon: item.IconClass ? item.IconClass : ""

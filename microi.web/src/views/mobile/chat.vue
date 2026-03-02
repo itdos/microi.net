@@ -554,11 +554,9 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: calc(50px + constant(safe-area-inset-top));
-    height: calc(50px + env(safe-area-inset-top));
+    height: calc(50px + var(--status-bar-height, 0px));
     padding: 0 12px;
-    padding-top: constant(safe-area-inset-top);
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--status-bar-height, 0px);
     background: #fff;
     border-bottom: 1px solid #e5e5e5;
     
@@ -582,8 +580,7 @@ onBeforeUnmount(() => {
 
 .chat-messages {
     flex: 1;
-    margin-top: calc(50px + constant(safe-area-inset-top));
-    margin-top: calc(50px + env(safe-area-inset-top));
+    margin-top: calc(50px + var(--status-bar-height, 0px));
     padding: 12px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;

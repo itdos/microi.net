@@ -27,7 +27,8 @@
             "webviewBGTransparent" : false,
             "kernel" : "WKWebview",
             "mixed" : true,
-            "hardwareAccelerated" : true
+            "hardwareAccelerated" : true,
+            "backButtonAutoControl" : "none"
         },
         "statusbar" : {
             "immersed" : "supportedDevice",
