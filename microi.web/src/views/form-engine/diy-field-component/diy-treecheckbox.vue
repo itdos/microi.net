@@ -83,6 +83,8 @@
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body
+            draggable
+            align-center
         >
             <el-form label-width="120px" label-position="top" size="small">
                 <el-divider content-position="left">数据源配置</el-divider>

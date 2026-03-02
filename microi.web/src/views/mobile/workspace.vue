@@ -70,6 +70,8 @@
             width="90%"
             class="submenu-dialog"
             :close-on-click-modal="true"
+            draggable
+            align-center
         >
             <div class="submenu-list">
                 <div 
