@@ -236,7 +236,7 @@ const getVisibleChildren = (children) => {
     min-height: 100vh;
     background: #f5f7fa;
     padding-top: calc(50px + var(--status-bar-height, 0px));
-    padding-bottom: 70px;
+    padding-bottom: 56px;
 }
 
 .workspace-header {
