@@ -8,6 +8,7 @@
         <el-dialog
             v-if="ShowAnyTable"
             draggable
+            align-center
             :modal="true"
             :width="'80%'"
             :modal-append-to-body="true"

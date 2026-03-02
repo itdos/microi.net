@@ -1,5 +1,7 @@
 <template>
-    <el-dialog v-model="dialogShow" width="60%" :before-close="handleClose" append-to-body title="选择图标">
+    <el-dialog v-model="dialogShow" width="60%" :before-close="handleClose" append-to-body title="选择图标"
+        draggable
+        align-center>
         <template #header>
             <div style="display: flex; align-items: center">
                 <el-input style="width: 200px" v-model="searchIcon" placeholder="搜索图标" @input="changeSearchIcon" clearable>

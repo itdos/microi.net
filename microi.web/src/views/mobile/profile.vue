@@ -147,6 +147,8 @@
         <!-- 修改密码弹窗 -->
         <el-dialog
             v-model="showPasswordDialog"
+            draggable
+            align-center
             title="修改密码"
             width="90%"
             class="password-dialog"
@@ -197,6 +199,8 @@
             title="关于系统"
             width="90%"
             class="about-dialog"
+            draggable
+            align-center
         >
             <div class="about-content">
                 <img :src="systemLogo" class="about-logo" alt="logo" />
