@@ -146,6 +146,8 @@
     title="预览页面"
     width="90%"
     v-model="dialogFormVisible"
+    draggable
+    align-center
   >
     <form-renderer
       :isPrivew="dialogFormVisible"
