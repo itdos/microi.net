@@ -368,58 +368,29 @@
                 return;
             }
 
-            // 远程页面加载完成 → 显示 + 注入返回键处理
+            // 远程页面加载完成 → 显示 + 注入状态栏高度 + 注入返回键处理
             _state.mainWebview.addEventListener('loaded', function () {
                 _log('远程页面 loaded 事件触发');
                 _updateStatus('页面加载完成');
 
-                // 注入 Android 返回键处理到远程页面
+                // 注入状态栏高度（Android 的 env(safe-area-inset-top) 返回 0，必须通过 JS 注入）
                 try {
-                    _state.mainWebview.evalJS(
-                        '(function(){' +
-                        '  if(window.__microiBackInited) return;' +
-                        '  window.__microiBackInited = true;' +
-                        '  var _bp = false;' +
-                        '  document.addEventListener("backbutton", function(){' +
-                        '    try {' +
-                        '      // 优先用 Vue Router 判断是否还有历史路由可以回退' +
-                        '      var r = window.__VUE_ROUTER__;' +
-                        '      if (!r && window.__VUE_APP__ && window.__VUE_APP__.config && window.__VUE_APP__.config.globalProperties) {' +
-                        '        r = window.__VUE_APP__.config.globalProperties.$router;' +
-                        '      }' +
-                        '      if (r) {' +
-                        '        // Vue Router 4: history.state.back 不为 null 说明有上一页' +
-                        '        var canGoBack = !!(window.history && window.history.state && window.history.state.back != null);' +
-                        '        if (canGoBack) {' +
-                        '          r.back();' +
-                        '          return;' +
-                        '        }' +
-                        '      } else if (window.history && window.history.length > 1) {' +
-                        '        // 降级：没拿到 router，用原生 history 判断' +
-                        '        window.history.back();' +
-                        '        return;' +
-                        '      }' +
-                        '    } catch(e) {' +
-                        '      if (window.history && window.history.length > 1) {' +
-                        '        window.history.back();' +
-                        '        return;' +
-                        '      }' +
-                        '    }' +
-                        '    // 已在根页面，双击退出' +
-                        '    if (!_bp) {' +
-                        '      _bp = true;' +
-                        '      try { plus.nativeUI.toast("再按一次退出应用"); } catch(ex) {}' +
-                        '      setTimeout(function(){ _bp = false; }, 2000);' +
-                        '    } else {' +
-                        '      try { plus.runtime.quit(); } catch(ex) {}' +
-                        '    }' +
-                        '  }, false);' +
-                        '})();'
-                    );
-                    _log('返回键处理已注入到远程页面');
+                    var sbHeight = 0;
+                    try { sbHeight = plus.navigator.getStatusbarHeight(); } catch (ex) {}
+                    if (sbHeight > 0) {
+                        _state.mainWebview.evalJS(
+                            'document.documentElement.style.setProperty("--status-bar-height", "' + sbHeight + 'px");'
+                        );
+                        _log('状态栏高度注入: ' + sbHeight + 'px');
+                    } else {
+                        _log('状态栏高度获取为 0，跳过注入');
+                    }
                 } catch (e) {
-                    _log('注入返回键处理失败: ' + e.message);
+                    _log('状态栏高度注入失败: ' + e.message);
                 }
+
+                // 返回键由 launcher webview 的 backbutton 监听统一处理
+                // （5+App 的 backbutton 事件只派发到 launcher webview，不会到子 webview）
 
                 showMainWebview();
             });
@@ -533,30 +504,39 @@
         }, APP_CONFIG.ultimateTimeout);
 
         // ===================================================================
-        //  Android 返回键处理（launcher webview 的备用监听）
-        //  主要逻辑已通过 evalJS 注入到 main webview
-        //  此处仅处理 main webview 尚未创建时的情况
+        //  Android 返回键处理（launcher webview 统一处理）
+        //  5+App 的 backbutton 事件只会派发到 launcher webview
+        //  通过 mainWebview.canBack() / .back() 控制远程页面的导航
         // ===================================================================
+        var __backPressed = false;
+        function _handleDoubleBackExit() {
+            if (!__backPressed) {
+                __backPressed = true;
+                try { plus.nativeUI.toast('再按一次退出应用'); } catch (ex) {}
+                setTimeout(function () { __backPressed = false; }, 2000);
+            } else {
+                try { plus.runtime.quit(); } catch (ex) {}
+            }
+        }
         document.addEventListener('backbutton', function () {
             if (_state.mainWebview && _state.shown) {
-                // main webview 已显示，返回键应由注入的 JS 处理
-                // 此处不应触发（因为 main 在前台），但作为保底
+                // 远程 WebView 已显示，检查是否能后退
                 try {
                     _state.mainWebview.canBack(function (e) {
                         if (e.canBack) {
                             _state.mainWebview.back();
+                        } else {
+                            // 已无更多历史，双击退出
+                            _handleDoubleBackExit();
                         }
                     });
-                } catch (e) {}
+                } catch (ex) {
+                    // canBack 调用异常，尝试直接 back
+                    try { _state.mainWebview.back(); } catch (e) {}
+                }
             } else {
                 // main webview 不存在或未显示，双击退出
-                if (!window.__backPressed) {
-                    window.__backPressed = true;
-                    try { plus.nativeUI.toast('再按一次退出应用'); } catch (ex) {}
-                    setTimeout(function () { window.__backPressed = false; }, 2000);
-                } else {
-                    try { plus.runtime.quit(); } catch (ex) {}
-                }
+                _handleDoubleBackExit();
             }
         }, false);
     </script>
