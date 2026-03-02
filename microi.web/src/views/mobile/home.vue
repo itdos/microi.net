@@ -172,8 +172,7 @@ const goTo = (path) => {
 .mobile-home {
     min-height: 100vh;
     background: #f5f7fa;
-    padding-top: calc(50px + constant(safe-area-inset-top));
-    padding-top: calc(50px + env(safe-area-inset-top));
+    padding-top: calc(50px + var(--status-bar-height, 0px));
     padding-bottom: 70px;
 }
 
@@ -186,10 +185,8 @@ const goTo = (path) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: calc(50px + constant(safe-area-inset-top));
-    height: calc(50px + env(safe-area-inset-top));
-    padding-top: constant(safe-area-inset-top);
-    padding-top: env(safe-area-inset-top);
+    height: calc(50px + var(--status-bar-height, 0px));
+    padding-top: var(--status-bar-height, 0px);
     background: #fff;
     border-bottom: 1px solid #ebeef5;
     
