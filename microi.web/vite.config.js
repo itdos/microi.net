@@ -75,7 +75,7 @@ export default defineConfig({
     server: {
         port: 1988,
         open: true,
-        host: 'localhost',
+        host: '0.0.0.0',
         proxy: {
             // 如果需要代理 API 请求，在这里配置
         },
