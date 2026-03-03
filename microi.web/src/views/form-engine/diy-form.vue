@@ -29,7 +29,10 @@
                     </div>
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
-                    <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id" :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="formContainerClass">
+                    <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id" 
+                        :id="'field-form-' + tabIndex" 
+                        :data-tab="FieldActiveTab" 
+                        :class="formContainerClass">
                         <el-form
                             :rules="FormRules"
                             :class="DiyTableModel.Name"
@@ -221,7 +224,9 @@
                         </el-form>
                     </div>
                 </el-tab-pane>
-                <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false" :key="'div_' + tab.Name" class="not-field">
+                <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false" 
+                    :key="'div_' + tab.Name" 
+                    class="not-field">
                     <div style="margin-top: -40px">
                         <img :src="'./static/img/no-data.svg'" style="width: 200px" />
                     </div>

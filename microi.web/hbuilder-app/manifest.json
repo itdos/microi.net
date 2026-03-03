@@ -1,7 +1,7 @@
 {
     "@platforms" : [ "android", "iPhone", "iPad" ],
-    "id" : "H5FF6B3AC",
-    "name" : "supOS",
+    "id" : "H51A6E02D",
+    "name" : "任亿科技",
     "description" : "supOS",
     "version" : {
         "name" : "4.7.7",
@@ -22,7 +22,6 @@
         "launchwebview" : {
             "render" : "always",
             "plusrequire" : "ahead",
-            "backButtonAutoControl" : "none",
             "titleNView" : false,
             "dock" : "bottom",
             "bounce" : "none",
@@ -82,8 +81,6 @@
             },
             "google" : {
                 "permissions" : [
-                    "<uses-feature android:name=\"android.hardware.camera\" android:required=\"false\"/>",
-                    "<uses-feature android:name=\"android.hardware.camera.autofocus\" android:required=\"false\"/>",
                     "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
                     "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
                     "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
@@ -123,7 +120,10 @@
                 "payment" : {},
                 "share" : {}
             },
-            "orientation" : [ "portrait-primary" ]
+            "orientation" : [ "portrait-primary" ],
+            "ios" : {
+                "dSYMs" : false
+            }
         }
     },
     "screenOrientation" : [ "portrait-secondary", "landscape-primary", "landscape-secondary" ],
