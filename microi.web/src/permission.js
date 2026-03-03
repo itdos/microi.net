@@ -133,5 +133,18 @@ router.beforeEach(async (to, from, next) => {
     }
 });
 
-router.afterEach(() => {
+router.afterEach((to) => {
+    // 5+App 返回键使用：路由完成后立即更新"是否在根页面"标志
+    // 在根页面（Tab 首页/登录页）按返回键应双击退出，而不是继续 router.back()
+    const ROOT_PATHS = [
+        '/mobile/home',
+        '/mobile/workspace',
+        '/mobile/message',
+        '/mobile/profile',
+        '/login',
+        '/'
+    ];
+    window.__microi_isRootPage = ROOT_PATHS.some(function(p) {
+        return to.path === p || to.path === p + '/';
+    });
 });
