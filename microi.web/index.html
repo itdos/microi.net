@@ -37,28 +37,10 @@
     <!-- 5+App (Wap2App) 环境：返回键 + 状态栏高度 -->
     <script>
     (function() {
-        // ===== 导航深度追踪（比 history.state.back 更可靠） =====
-        // 通过猴子补丁 history.pushState/replaceState 精确追踪路由层级
-        var __navDepth = 0;
-        var _origPush = history.pushState;
-        var _origReplace = history.replaceState;
-        history.pushState = function() {
-            __navDepth++;
-            return _origPush.apply(this, arguments);
-        };
-        history.replaceState = function() {
-            // replaceState 不增加深度（替换当前条目）
-            return _origReplace.apply(this, arguments);
-        };
-        window.addEventListener('popstate', function() {
-            __navDepth = Math.max(0, __navDepth - 1);
-        });
-
         function initPlusEnv() {
             if (typeof plus === 'undefined') return;
 
             // 1. 强制设置 webview 的 backButtonAutoControl 为 none
-            //    确保原生层不会自动处理返回键（仅由 JS 处理）
             try {
                 var wv = plus.webview.currentWebview();
                 wv.setStyle({ backButtonAutoControl: 'none' });
@@ -72,26 +54,28 @@
                 }
             } catch(e) {}
 
-            // 3. 返回键处理（使用 plus.key —— 5+App 官方 API）
+            // 3. 返回键处理
             var _lastBack = 0;
             function handleBackButton() {
-                // 优先使用自己追踪的导航深度
-                if (__navDepth > 0) {
-                    window.history.back();
+                // Vue 应用 mounted 后会设置 window.__microi_handleBack
+                // 由 App.vue 注册，读取 permission.js afterEach 设置的 __microi_isRootPage 标志
+                if (typeof window.__microi_handleBack === 'function') {
+                    window.__microi_handleBack();
                     return;
                 }
-                // 兜底：检查 Vue Router 4 的 history.state.back
-                var canBack = !!(window.history && window.history.state && window.history.state.back != null);
-                if (canBack) {
-                    window.history.back();
-                    return;
+                // Vue 尚未 mount 时的降级处理
+                if (window.__microi_isRootPage === false) { window.history.back(); return; }
+                if (window.__microi_isRootPage === true) {
+                    var now2 = Date.now();
+                    if (now2 - _lastBack < 2000) { plus.runtime.quit(); return; }
+                    _lastBack = now2;
+                    plus.nativeUI.toast('再按一次退出应用', { duration: 'short' }); return;
                 }
-                // 再兜底：检查 history.length
-                if (window.history && window.history.length > 1) {
-                    window.history.back();
-                    return;
-                }
-                // 没有历史了，双击退出
+                // 完全未初始化时降级
+                try {
+                    var pos = window.history.state && window.history.state.position;
+                    if (typeof pos === 'number' && pos > 0) { window.history.back(); return; }
+                } catch(e) {}
                 var now = Date.now();
                 if (now - _lastBack < 2000) {
                     plus.runtime.quit();
@@ -101,11 +85,11 @@
                 }
             }
 
-            // 使用 plus.key.addEventListener —— 5+App/Wap2App 官方返回键 API
+            // plus.key —— 5+App/Wap2App 官方返回键 API
             try {
                 plus.key.addEventListener('backbutton', handleBackButton, false);
             } catch(e) {}
-            // 同时在 document 上也监听（某些运行时版本会派发到 document）
+            // document 监听作为备份
             document.addEventListener('backbutton', function(e) {
                 e.preventDefault && e.preventDefault();
                 e.stopPropagation && e.stopPropagation();
