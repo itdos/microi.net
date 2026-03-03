@@ -34,6 +34,7 @@ let _currentFacingMode = 'environment' // 当前摄像头方向
 let _barcodeDetector = null // BarcodeDetector 实例（如浏览器支持）
 let _isScanning = false
 let _cameraFailed = false // 标记摄像头是否已确认不可用（用于控制拍照失败后是否重启摄像头）
+let _nativeBarcodeInstance = null // 原生 plus.barcode 扫码控件实例
 
 /**
  * 创建扫码弹窗 DOM 结构
@@ -88,7 +89,10 @@ function createScanDialog() {
         style.textContent = `
             #microi-scan-overlay {
                 position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
+                top: 0; 
+                left: 0; 
+                right: 0; 
+                bottom: 0;
                 background: rgba(0,0,0,0.6);
                 z-index: 99999;
                 display: flex;
@@ -116,7 +120,7 @@ function createScanDialog() {
                 align-items: center;
                 justify-content: space-between;
                 padding: 16px 20px;
-                padding-top: calc(16px + var(--status-bar-height, 0px));
+                padding-top: 16px;
                 border-bottom: 1px solid #f0f0f0;
                 background: #fafafa;
             }
@@ -149,12 +153,12 @@ function createScanDialog() {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                min-height: 300px;
+                // min-height: 300px;
             }
             .microi-scan-reader {
                 width: 100%;
                 max-width: 460px;
-                min-height: 280px;
+                // min-height: 280px;
                 border-radius: 8px;
                 overflow: hidden;
                 background: #000;
@@ -289,10 +293,14 @@ function createScanDialog() {
                     max-width: 100vw;
                     max-height: 100vh;
                     border-radius: 0; 
-                    height: 100vh;
+                    // height: 100vh;
+                    margin:10px;
                 }
-                .microi-scan-body { min-height: 40vh; padding: 10px; }
-                .microi-scan-reader { min-height: 35vh; }
+                .microi-scan-body { 
+                    // min-height: 40vh; 
+                    padding: 10px; 
+                }
+                // .microi-scan-reader { min-height: 35vh; }
             }
         `
         document.head.appendChild(style)
@@ -388,28 +396,96 @@ function wechatScanCode() {
 }
 
 /**
- * 5+App 原生扫码（APK 环境）
- * @returns {Promise<string|null>}
+ * 5+App 原生扫码——嵌入式（APK 环境）
+ *
+ * 将 plus.barcode.create() 定位到弹窗内 #microiScanReader 元素的精确区域，
+ * 只覆盖视频区域，弹窗的头部（关闭按钮）和底部（手动输入）仍为 HTML，完全可交互。
+ *
+ * - 不需要 HTTPS（原生摄像头，绕过 WebView 安全限制）
+ * - 返回 true 表示启动成功，false 表示模块不可用（调用方应 fall through 到 getUserMedia）
+ *
+ * @param {HTMLElement} statusEl 状态文本元素
+ * @returns {Promise<boolean>}
  */
-function plusBarcodeScan() {
-    return new Promise(function (resolve) {
-        if (!window.plus || !plus.barcode) {
-            resolve(null)
-            return
+async function startNativeBarcodeScanner(statusEl) {
+    if (!window.plus) return false
+
+    // 获取 barcode 模块（远程页面可能需要 plus.require 手动加载）
+    var barcodeModule = null
+    try { barcodeModule = plus.barcode } catch(e) {}
+    if (!barcodeModule) {
+        try { barcodeModule = plus.require('barcode') } catch(e) {}
+    }
+    if (!barcodeModule || typeof barcodeModule.create !== 'function') {
+        console.log('[ScanCode] plus.barcode 模块不可用')
+        return false
+    }
+
+    // 获取弹窗内视频区域的位置，将原生控件定位到此处
+    var readerEl = document.getElementById('microiScanReader')
+    if (!readerEl) return false
+    var rect = readerEl.getBoundingClientRect()
+
+    if (statusEl) statusEl.textContent = '正在启动摄像头...'
+
+    try {
+        // 支持的码制（数字常量作后备）
+        var filters = [0, 1, 2, 5, 6, 7, 8, 9, 10, 11]
+        try {
+            filters = [
+                barcodeModule.QR, barcodeModule.EAN13, barcodeModule.EAN8,
+                barcodeModule.UPCA, barcodeModule.UPCE, barcodeModule.CODABAR,
+                barcodeModule.CODE39, barcodeModule.CODE93, barcodeModule.CODE128,
+                barcodeModule.ITF
+            ].filter(function(f) { return f !== undefined && f !== null })
+        } catch(e) {}
+        if (filters.length === 0) filters = [0, 1, 2, 10]
+
+        var barcode = barcodeModule.create('microiScanNative', filters, {
+            top: Math.round(rect.top) + 'px',
+            left: Math.round(rect.left) + 'px',
+            width: Math.round(rect.width) + 'px',
+            height: Math.round(rect.height) + 'px',
+            position: 'static',
+            frameColor: '#00CC00',
+            scanbarColor: '#00CC00'
+        })
+
+        _nativeBarcodeInstance = barcode
+
+        barcode.onmarked = function(type, result) {
+            try { plus.device.vibrate(100) } catch(e) {}
+            completeScan(result || null)
         }
-        plus.barcode.scan(
-            '_www/barcode.html',
-            function (type, result) { resolve(result || null) },
-            function () { resolve(null) }
-        )
-    })
+
+        barcode.onerror = function(error) {
+            console.error('[ScanCode] plus.barcode error:', error)
+            if (statusEl) statusEl.textContent = '摄像头启动失败，请手动输入条码或拍照识别'
+        }
+
+        plus.webview.currentWebview().append(barcode)
+        barcode.start()
+
+        if (statusEl) statusEl.textContent = '对准二维码/条形码...'
+        return true
+    } catch(e) {
+        console.error('[ScanCode] plus.barcode 创建失败:', e)
+        _nativeBarcodeInstance = null
+        return false
+    }
 }
 
 /**
- * 停止摄像头和扫码循环
+ * 停止摄像头和扫码循环（同时清理原生 barcode 控件）
  */
 function stopScanner() {
     _isScanning = false
+    // 停止原生 barcode 控件（HTTP 模式下使用）
+    if (_nativeBarcodeInstance) {
+        try { _nativeBarcodeInstance.cancel() } catch(e) {}
+        try { _nativeBarcodeInstance.close() } catch(e) {}
+        _nativeBarcodeInstance = null
+    }
     // 停止逐帧扫描
     if (_scanAnimFrameId) {
         cancelAnimationFrame(_scanAnimFrameId)
@@ -546,6 +622,38 @@ async function startUserMedia(statusEl, facingMode) {
         _videoElement.setAttribute('webkit-playsinline', 'true')
         await _videoElement.play()
 
+        // 修复 Android WebView 首次获取的视频流不渲染画面的问题
+        // 等待 video 实际输出帧（videoWidth > 0），超时后自动重启流
+        var renderOk = await new Promise(function(waitResolve) {
+            var count = 0
+            function check() {
+                if (_videoElement && _videoElement.videoWidth > 0 && _videoElement.videoHeight > 0) {
+                    waitResolve(true)
+                    return
+                }
+                count++
+                if (count > 15) { waitResolve(false); return } // 1.5 秒超时
+                setTimeout(check, 100)
+            }
+            setTimeout(check, 100)
+        })
+        if (!renderOk && _videoElement) {
+            console.log('[ScanCode] 视频未渲染，重启流...')
+            if (_mediaStream) {
+                _mediaStream.getTracks().forEach(function(t) { t.stop() })
+            }
+            _mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    facingMode: { ideal: facingMode || 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            })
+            _videoElement.srcObject = _mediaStream
+            await _videoElement.play()
+        }
+
         if (statusEl) statusEl.textContent = '对准二维码/条形码...'
 
         // 初始化 BarcodeDetector（条形码）
@@ -594,17 +702,12 @@ async function startUserMedia(statusEl, facingMode) {
  * @param {HTMLElement} statusEl 状态文本元素
  */
 async function startCameraScanner(statusEl) {
-    // === 策略1: 5+App 原生扫码 ===
-    if (isPlusApp() && window.plus && plus.barcode) {
-        if (statusEl) statusEl.textContent = '正在启动原生扫码...'
-        try {
-            var result = await plusBarcodeScan()
-            if (result) { completeScan(result); return }
-            if (statusEl) statusEl.textContent = '扫码已取消，请手动输入条码'
-        } catch (e) {
-            if (statusEl) statusEl.textContent = '原生扫码失败，请手动输入条码'
-        }
-        return
+    // === 策略1: 5+App 原生扫码（嵌入对话框 #microiScanReader 区域，不需要 HTTPS） ===
+    if (isPlusApp()) {
+        var nativeOk = await startNativeBarcodeScanner(statusEl)
+        if (nativeOk) return
+        // 原生模块不可用 → fall through 到 getUserMedia（HTTPS 下可用）
+        console.log('[ScanCode] 原生扫码不可用，尝试 getUserMedia')
     }
 
     // === 策略2: 微信 JSSDK 扫码（仅当 JSSDK 已正确配置时） ===

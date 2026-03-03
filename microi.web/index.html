@@ -46,7 +46,10 @@
                 wv.setStyle({ backButtonAutoControl: 'none' });
             } catch(e) {}
 
-            // 2. 状态栏高度 → CSS变量
+            // 2. 状态栏高度 → CSS变量 + 默认深色文字（大部分页面白色头部）
+            try {
+                plus.navigator.setStatusBarStyle('dark');
+            } catch(e) {}
             try {
                 var h = plus.navigator.getStatusbarHeight();
                 if (h > 0) {
