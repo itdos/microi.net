@@ -1,7 +1,7 @@
 {
     "@platforms" : [ "android", "iPhone", "iPad" ],
     "id" : "H51A6E02D",
-    "name" : "任亿科技",
+    "name" : "奇强",
     "description" : "supOS",
     "version" : {
         "name" : "4.7.7",
@@ -22,6 +22,7 @@
         "launchwebview" : {
             "render" : "always",
             "plusrequire" : "ahead",
+            "backButtonAutoControl" : "none",
             "titleNView" : false,
             "dock" : "bottom",
             "bounce" : "none",
