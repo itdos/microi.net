@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- 【配置项】请修改为你的实际服务器地址 -->
-    <script>var MICROI_SERVER_URL = 'https://mes-new.renyikj.cn';</script>
+    <script>var MICROI_SERVER_URL = 'https://mes-new.renyikj.cn/';</script>
     <title>Loading...</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -411,18 +411,14 @@
 
         // ===== 重试 =====
         function retryLoad() {
-            _state.retryCount++;
-            if (_state.retryCount > 5) {
-                _state.redirected = false;
-                navigateToApp();
-                return;
-            }
             _state.redirected = false;
             _resetUI();
-            setTimeout(function() { startLoad(); }, 500);
+            setTimeout(function() { navigateToApp(); }, 500);
         }
 
         // ===== 启动加载 =====
+        // 不做 XHR 预检（Android WebView 中 xhr.timeout 在部分机型静默挂起）
+        // 直接跳转，让目标页面自己处理网络错误
         function startLoad() {
             if (!_checkNetwork()) {
                 _showError('无网络连接，请检查网络设置');
@@ -430,22 +426,10 @@
             }
             _updateStatus('正在连接服务器...');
             _loadAnim.start();
-            var xhr = new XMLHttpRequest();
-            xhr.open('HEAD', APP_CONFIG.serverUrl, true);
-            xhr.timeout = 10000;
-            xhr.onload = function() {
-                _log('服务器可达');
+            // 直接跳转，不做 XHR 预检
+            setTimeout(function() {
                 navigateToApp();
-            };
-            xhr.onerror = function() {
-                // CORS 可能导致 XHR 失败但页面实际可加载，直接跳转
-                _log('XHR error，尝试直接跳转');
-                navigateToApp();
-            };
-            xhr.ontimeout = function() {
-                _showError('连接服务器超时，请检查网络');
-            };
-            xhr.send();
+            }, 800);
         }
 
         // ===== 初始化 5+App =====
