@@ -1,6 +1,6 @@
 {
     "@platforms" : [ "android", "iPhone", "iPad" ],
-    "id" : "H51A6E02D",
+    "id" : "H5FF6B3AC",
     "name" : "奇强",
     "description" : "supOS",
     "version" : {
@@ -43,9 +43,6 @@
         "softinput" : {
             "navBar" : "auto",
             "mode" : "adjustResize"
-        },
-        "uni-app" : {
-            "control" : "none"
         },
         "distribute" : {
             "icons" : {
