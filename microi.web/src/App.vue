@@ -92,6 +92,38 @@ export default {
         if (!self.DiyCommon.isClientApp) {
             self.PageInit();
         }
+
+        // ===== 5+App 返回键：Vue Router 路由感知处理 =====
+        // permission.js 的 router.afterEach 在每次路由完成后设置 window.__microi_isRootPage
+        // 这里读取该标志，完全避免 $route.path 的异步时序问题
+        ;(function() {
+            var isApkEnv = !!(window.plus || navigator.userAgent.indexOf('Html5Plus') > -1);
+            if (!isApkEnv) return;
+            var _lastBack = 0;
+            var _backHandling = false; // 防止连续手势重复触发
+            window.__microi_handleBack = function() {
+                if (_backHandling) return;
+                _backHandling = true;
+                setTimeout(function() { _backHandling = false; }, 400);
+
+                // window.__microi_isRootPage 由 router.afterEach 在导航完成后设置
+                // 初始值 undefined 视为 false（还在加载中），走 back
+                var isRoot = !!window.__microi_isRootPage;
+                if (!isRoot) {
+                    try { self.$router.back(); } catch(e) { window.history.back(); }
+                    return;
+                }
+                // 在根页面：双击退出
+                var now = Date.now();
+                if (now - _lastBack < 2000) {
+                    try { plus.runtime.quit(); } catch(e) {}
+                } else {
+                    _lastBack = now;
+                    try { plus.nativeUI.toast('再按一次退出应用', { duration: 'short' }); } catch(e) {}
+                }
+            };
+        })();
+
         self.$nextTick(function () {
             var timer = setInterval(function () {
                 try {
@@ -115,6 +147,8 @@ export default {
         if (self.plusreadyHandler) {
             document.removeEventListener("plusready", self.plusreadyHandler, false);
         }
+        // 清理 Android 返回键处理
+        window.__microi_handleBack = null;
     },
     methods: {
         // 窗口大小变化处理
