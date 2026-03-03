@@ -147,4 +147,53 @@ router.afterEach((to) => {
     window.__microi_isRootPage = ROOT_PATHS.some(function(p) {
         return to.path === p || to.path === p + '/';
     });
+
+    // 5+App 状态栏文字颜色动态适配
+    // 根据页面顶部背景色自动切换状态栏文字颜色（白底用深色文字，深底用浅色文字）
+    if (typeof plus !== 'undefined' && plus.navigator) {
+        // 延迟检测，等待 Vue 组件渲染完成
+        setTimeout(function() {
+            try {
+                // 查找页面顶部 header 元素（fixed 定位的顶栏）
+                var headerEl = document.querySelector(
+                    '.home-header, .workspace-header, .message-header, ' +
+                    '.user-card, .mobile-form-header-bar, .mobile-header, ' +
+                    '.chat-header'
+                );
+                if (!headerEl) {
+                    // 默认：白色背景页面用深色文字
+                    plus.navigator.setStatusBarStyle('dark');
+                    return;
+                }
+                var bgColor = window.getComputedStyle(headerEl).backgroundColor;
+                if (!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)') {
+                    // 透明背景，尝试检查 background 属性（渐变等）
+                    var bg = window.getComputedStyle(headerEl).background;
+                    if (bg && /linear-gradient/.test(bg)) {
+                        // 渐变背景通常是深色主题色，用浅色文字
+                        plus.navigator.setStatusBarStyle('light');
+                        return;
+                    }
+                    plus.navigator.setStatusBarStyle('dark');
+                    return;
+                }
+                // 解析 rgb/rgba 值并计算亮度
+                var match = bgColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+                if (match) {
+                    var r = parseInt(match[1]);
+                    var g = parseInt(match[2]);
+                    var b = parseInt(match[3]);
+                    // 相对亮度公式 (ITU-R BT.709)
+                    var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    // 亮度 > 0.5 为浅色背景 → 深色文字；否则为深色背景 → 浅色文字
+                    plus.navigator.setStatusBarStyle(luminance > 0.5 ? 'dark' : 'light');
+                } else {
+                    plus.navigator.setStatusBarStyle('dark');
+                }
+            } catch(e) {
+                // 出错时默认深色文字
+                try { plus.navigator.setStatusBarStyle('dark'); } catch(e2) {}
+            }
+        }, 350);
+    }
 });
