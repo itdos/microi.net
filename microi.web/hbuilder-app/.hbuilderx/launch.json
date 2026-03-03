@@ -3,6 +3,10 @@
     "configurations" : [
         {
             "playground" : "standard",
+            "type" : "5+app:android"
+        },
+        {
+            "playground" : "standard",
             "type" : "uni-app:app-android"
         }
     ]
