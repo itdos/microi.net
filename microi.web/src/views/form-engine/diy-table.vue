@@ -2558,18 +2558,18 @@ export default {
                 || self.NotShowFields.findIndex(item => item.Name == fieldName || item.Id == fieldName) > -1) {
                 return false;
             }
-            if (self.TableDiyFieldIds && self.TableDiyFieldIds.find((item) => item == fieldName)) {
-                return false;
-            }
+            // if (self.TableDiyFieldIds && self.TableDiyFieldIds.find((item) => item == fieldName)) {
+            //     return false;
+            // }
             if (self.SysMenuModel.SelectFields && self.SysMenuModel.SelectFields.find((item) => item.Name == fieldName)) {
                 return false;
             }
-            if ((!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) && self.DiyFieldList.find((item) => item.Name == fieldName)) {
-                return true;
-            }
-            if (!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) {
-                return true;
-            }
+            // if ((!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) && self.DiyFieldList.find((item) => item.Name == fieldName)) {
+            //     return true;
+            // }
+            // if (!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) {
+            //     return true;
+            // }
             return true;
         },
         ColIsFixed(fieldId) {
