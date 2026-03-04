@@ -1,7 +1,7 @@
 ## 使项目跑起来
 
 >* 使用 node.js 18、20
->* nvm use 14。如何安装 nvm：https://blog.csdn.net/qq973702/article/details/143821242
+>* nvm use 20。如何安装 nvm：https://blog.csdn.net/qq973702/article/details/143821242
 >* npm install nrm -g
 >* nrm use taobao (📌 备注：如果 taobao 不行用 nrm use npmMirror)
 >* npm install
@@ -16,7 +16,7 @@
 
 ## 📌 切换后端接口地址
 
->* 在 src 目录创建 config.json 文件（修改后刷新浏览器即可生效，无需重启服务），内容如下：
+>* 在 src 目录下创建 config.json 文件（修改后刷新浏览器即可生效，无需重启服务），内容如下：
 ```json
 {
   "ApiBaseDev": "https://api.itdos.com"
@@ -31,7 +31,7 @@ http://localhost:1988/?OsClient=iTdos
 ## 定制组件目录
 >* [/src/views/custom/]为所有客户的定制组件，理论上不用上传到仓库，用户可主动删除里面的所有文件。
 
-## 格式化所有代码
+## 格式化指定文件
 ```shell
-npx prettier --write src/
+npx prettier --write src/views/index.vue
 ```
