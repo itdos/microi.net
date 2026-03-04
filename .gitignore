@@ -59,6 +59,7 @@ Microi.Anderson.sln
 
 .vscode
 config.json
+!microi.web/src/config.json
 publish
 
 
