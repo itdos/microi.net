@@ -5,6 +5,7 @@
   "author": "iTdos",
   "type": "module",
   "scripts": {
+    "postinstall": "git update-index --skip-worktree src/config.json",
     "dev": "vite",
     "build": "vite build",
     "build:clean": "rm -rf bin/Release/dist && vite build",
