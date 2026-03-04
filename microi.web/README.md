@@ -16,7 +16,11 @@
 
 ## 📌 切换后端接口地址
 
->* 在 src 目录下创建 config.json 文件（修改后刷新浏览器即可生效，无需重启服务），内容如下：
+>* `src/config.json` 文件已随源码提供默认配置，直接修改该文件即可（修改后刷新浏览器生效，无需重启服务）。
+>* 执行 `npm install` 后会自动运行 `git update-index --skip-worktree src/config.json`，**本地对该文件的任何修改都不会被 git 追踪上传**，团队协作互不影响。
+>* 若需重新让 git 追踪此文件，执行：`git update-index --no-skip-worktree src/config.json`
+
+默认内容如下：
 ```json
 {
   "ApiBaseDev": "https://api.itdos.com"
