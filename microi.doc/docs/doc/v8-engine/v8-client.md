@@ -43,7 +43,7 @@ var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
 >* 给当前表单字段属性赋值
 ```js
 //设置UserName字段为只读
-V8.FieldSet('UserName', 'Readonly', false);
+V8.FieldSet('UserName', 'Readonly', true);
 //给某个下拉框动态设置数据源：
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
