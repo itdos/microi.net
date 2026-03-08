@@ -5,6 +5,9 @@ import mdItCustomAttrs from "markdown-it-custom-attrs";
 export const shared = defineConfig({
 	title: "Microi吾码",
 	lastUpdated: true,
+	sitemap: {
+		hostname: "https://www.microi.net",
+	},
 	markdown: {
 		theme: "github-dark",
 		lineNumbers: true,

@@ -154,6 +154,16 @@ export const useDiyStore = defineStore("diy", {
         setSysConfig(val) {
             this.SysConfig = val;
             LocalStorageManager.set("SysConfig", val);
+            // APK (5+App) 环境：同时写入 plus.storage（原生 App 级全局存储，不受域名隔离）
+            // 这样 hbuilder-app 壳页面下次启动时能通过 plus.storage 读到标题和公司名
+            if (typeof window !== 'undefined' && window.plus) {
+                try {
+                    plus.storage.setItem('microi_apk_syscfg', JSON.stringify({
+                        SysTitle: val?.SysTitle || '',
+                        CompanyName: val?.CompanyName || ''
+                    }));
+                } catch(e) {}
+            }
         },
 
         setDiyChatShow(val) {
