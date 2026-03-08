@@ -203,6 +203,9 @@ loadFormData()
 </script>
 
 <style lang="scss">
+.microi-page-engine.pageengine{
+  padding-top: var(--status-bar-height, 0px);
+}
 .microi-page-engine {
   .jsoneditor-poweredBy {
     display: none;

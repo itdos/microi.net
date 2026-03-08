@@ -272,6 +272,9 @@ if (!props.isPrivew) {
 </script>
 
 <style lang="scss">
+.microi-page-engine.pageengine{
+  padding-top: var(--status-bar-height, 0px);
+}
 .microi-page-engine {
   .el-header {
     padding: 0;
