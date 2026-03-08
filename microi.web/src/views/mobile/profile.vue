@@ -108,6 +108,22 @@
                 </div>
             </div>
 
+            <!-- APK 服务器地址配置 -->
+            <div v-if="isApk" class="function-group apk-server-group">
+                <div class="function-item" @click="openServerUrlDialog">
+                    <div class="item-left">
+                        <el-icon class="item-icon apk-icon"><Connection /></el-icon>
+                        <div class="item-title-wrap">
+                            <span class="item-title">修改服务器地址</span>
+                            <span class="item-desc">{{ currentServerUrl }}</span>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <el-icon><ArrowRight /></el-icon>
+                    </div>
+                </div>
+            </div>
+
             <!-- 退出登录 -->
             <div class="function-group">
                 <div class="function-item logout-item" @click="handleLogout">
@@ -211,6 +227,58 @@
             </div>
         </el-dialog>
         
+        <!-- APK 修改服务器地址弹窗 -->
+        <el-dialog
+            v-if="isApk"
+            v-model="showServerUrlDialog"
+            title="修改服务器地址"
+            width="90%"
+            class="server-url-dialog"
+            draggable
+            align-center
+            :close-on-click-modal="false"
+        >
+            <div class="server-url-form">
+                <!-- 当前地址 -->
+                <div class="current-url-card">
+                    <div class="current-url-label">当前服务器</div>
+                    <div class="current-url-value">{{ currentServerUrl }}</div>
+                </div>
+                <!-- 新地址输入 -->
+                <div class="new-url-section">
+                    <div class="section-title">新地址配置</div>
+                    <div class="url-row">
+                        <el-select v-model="serverUrlForm.protocol" class="protocol-select" size="large">
+                            <el-option label="https://" value="https://" />
+                            <el-option label="http://" value="http://" />
+                        </el-select>
+                        <el-input
+                            v-model="serverUrlForm.domain"
+                            placeholder="域名或 IP，如 example.com"
+                            class="domain-input"
+                            size="large"
+                            clearable
+                            @keyup.enter="confirmServerUrl"
+                        />
+                    </div>
+                    <div class="url-preview" v-if="serverUrlForm.domain">
+                        <span class="preview-tag">预览</span>
+                        <span class="preview-text">{{ serverUrlForm.protocol }}{{ serverUrlForm.domain }}</span>
+                    </div>
+                </div>
+                <div class="tip-text">
+                    <el-icon><InfoFilled /></el-icon>
+                    修改后应用将自动重启并加载新地址
+                </div>
+            </div>
+            <template #footer>
+                <el-button @click="showServerUrlDialog = false">取消</el-button>
+                <el-button type="primary" :loading="serverUrlLoading" @click="confirmServerUrl">
+                    保存并重启
+                </el-button>
+            </template>
+        </el-dialog>
+
         <!-- 语言选择弹窗 -->
         <el-drawer
             v-model="showLangSelect"
@@ -246,7 +314,7 @@ import { ref, computed, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
 import { 
-    Brush, Lock, InfoFilled, SwitchButton, ArrowRight, Check 
+    Brush, Lock, InfoFilled, SwitchButton, ArrowRight, Check, Connection
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
@@ -346,6 +414,74 @@ const showThemePanel = ref(false);
 const showPasswordDialog = ref(false);
 const showAbout = ref(false);
 const showLangSelect = ref(false);
+
+// ===== APK 服务器地址配置 =====
+/** 检测当前是否运行在 5+App (APK) 环境 */
+const isApk = ref(typeof window !== 'undefined' && !!window.plus);
+/** 当前访问的服务器地址 */
+const currentServerUrl = ref(
+    typeof window !== 'undefined' ? window.location.origin : ''
+);
+const showServerUrlDialog = ref(false);
+const serverUrlLoading = ref(false);
+const serverUrlForm = reactive({
+    protocol: 'https://',
+    domain: ''
+});
+
+/** 打开修改服务器地址对话框，自动解析当前 URL */
+const openServerUrlDialog = () => {
+    const url = currentServerUrl.value || window.location.origin;
+    if (url.startsWith('https://')) {
+        serverUrlForm.protocol = 'https://';
+        serverUrlForm.domain = url.slice(8);
+    } else if (url.startsWith('http://')) {
+        serverUrlForm.protocol = 'http://';
+        serverUrlForm.domain = url.slice(7);
+    } else {
+        serverUrlForm.protocol = 'https://';
+        serverUrlForm.domain = url;
+    }
+    serverUrlLoading.value = false;
+    showServerUrlDialog.value = true;
+};
+
+/** 确认修改服务器地址，保存并重启 APK */
+const confirmServerUrl = () => {
+    const domain = serverUrlForm.domain.trim().replace(/\/$/, '');
+    if (!domain) {
+        ElMessage.warning('请输入域名或 IP 地址');
+        return;
+    }
+    const fullUrl = serverUrlForm.protocol + domain;
+    ElMessageBox.confirm(
+        `将切换服务器地址为\n\n${fullUrl}\n\n确认后应用将自动重启`,
+        '确认切换',
+        {
+            confirmButtonText: '确定并重启',
+            cancelButtonText: '取消',
+            type: 'warning',
+            customClass: 'server-url-confirm-box'
+        }
+    ).then(() => {
+        serverUrlLoading.value = true;
+        try {
+            localStorage.setItem('microi_apk_server_url', fullUrl);
+        } catch(e) {}
+        showServerUrlDialog.value = false;
+        try {
+            if (window.plus) {
+                plus.runtime.restart();
+            } else {
+                window.location.href = fullUrl;
+            }
+        } catch(e) {
+            window.location.href = fullUrl;
+        }
+    }).catch(() => {
+        serverUrlLoading.value = false;
+    });
+};
 
 // 密码表单
 const passwordFormRef = ref(null);
@@ -745,7 +881,116 @@ function isMiniProgram() {
         }
     }
 }
+// APK 服务器配置入口
+.apk-server-group {
+    margin-top: 0;
+    .apk-icon {
+        color: #7c5cfc !important;
+    }
+    .item-title-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .item-desc {
+        font-size: 11px;
+        color: #c0c4cc;
+        font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
 
+// APK 服务器地址弹窗
+:deep(.server-url-dialog) {
+    .el-dialog__header {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid #ebeef5;
+        .el-dialog__title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+    }
+    .el-dialog__body { padding: 20px; }
+    .el-dialog__footer { padding: 12px 20px 20px; }
+}
+
+.server-url-form {
+    .current-url-card {
+        background: linear-gradient(135deg, #f0f4ff 0%, #f5f0ff 100%);
+        border: 1px solid #dce4ff;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+        .current-url-label {
+            font-size: 11px;
+            color: #909399;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .current-url-value {
+            font-size: 13px;
+            color: #303133;
+            font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+            word-break: break-all;
+        }
+    }
+    .new-url-section {
+        .section-title {
+            font-size: 13px;
+            color: #606266;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .url-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            .protocol-select {
+                width: 110px;
+                flex-shrink: 0;
+            }
+            .domain-input {
+                flex: 1;
+            }
+        }
+        .url-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #f5f7fa;
+            border-radius: 6px;
+            .preview-tag {
+                font-size: 11px;
+                color: #fff;
+                background: var(--color-primary, #409eff);
+                border-radius: 4px;
+                padding: 1px 6px;
+                flex-shrink: 0;
+            }
+            .preview-text {
+                font-size: 12px;
+                color: #303133;
+                font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+                word-break: break-all;
+            }
+        }
+    }
+    .tip-text {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 16px;
+        font-size: 12px;
+        color: #909399;
+        .el-icon { font-size: 14px; color: #e6a23c; }
+    }
+}
 // 语言选择抽屉
 :deep(.lang-drawer) {
     .el-drawer__header {

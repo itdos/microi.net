@@ -92,14 +92,17 @@ onUnmounted(() => {
   z-index: 0;
   pointer-events: none;
   overflow: visible; /* 允许光晕溢出 */
+  contain: layout style;
 }
 
 .glow-layer {
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px); /* 更大的模糊扩散 */
+  filter: blur(80px); /* 降低模糊半径提升性能 */
   mix-blend-mode: screen;
-  will-change: transform, opacity;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* 只保留上半部分的3个光晕 - 缩小尺寸 */
@@ -134,72 +137,72 @@ onUnmounted(() => {
   animation: moveGlow3 4.5s infinite ease-in-out; /* 大幅加快 */
 }
 
-/* 光晕动画 - 左右上下移动 + 缩放变化 */
+/* 光晕动画 - 缩小缩放范围提升性能 */
 @keyframes moveGlow1 {
   0% { 
-    transform: translate(-30px, -30px) scale(0.8);
+    transform: translate3d(-30px, -30px, 0) scale(0.9);
     opacity: 0.7;
   }
   25% {
-    transform: translate(40px, 20px) scale(1.1);
+    transform: translate3d(40px, 20px, 0) scale(1.05);
     opacity: 0.95;
   }
   50% {
-    transform: translate(80px, 100px) scale(1.4);
+    transform: translate3d(80px, 100px, 0) scale(1.2);
     opacity: 0.75;
   }
   75% {
-    transform: translate(30px, 140px) scale(1.2);
+    transform: translate3d(30px, 140px, 0) scale(1.1);
     opacity: 0.85;
   }
   100% { 
-    transform: translate(-30px, -30px) scale(0.8);
+    transform: translate3d(-30px, -30px, 0) scale(0.9);
     opacity: 0.7;
   }
 }
 
 @keyframes moveGlow2 {
   0% { 
-    transform: translate(30px, -20px) scale(0.85);
+    transform: translate3d(30px, -20px, 0) scale(0.9);
     opacity: 0.75;
   }
   25% {
-    transform: translate(-30px, 30px) scale(1.15);
+    transform: translate3d(-30px, 30px, 0) scale(1.1);
     opacity: 0.9;
   }
   50% {
-    transform: translate(-80px, 90px) scale(1.45);
+    transform: translate3d(-80px, 90px, 0) scale(1.25);
     opacity: 0.8;
   }
   75% {
-    transform: translate(-40px, 130px) scale(1.25);
+    transform: translate3d(-40px, 130px, 0) scale(1.15);
     opacity: 0.95;
   }
   100% { 
-    transform: translate(30px, -20px) scale(0.85);
+    transform: translate3d(30px, -20px, 0) scale(0.9);
     opacity: 0.75;
   }
 }
 
 @keyframes moveGlow3 {
   0% { 
-    transform: translateX(-50%) translateY(-20px) scale(0.9);
+    transform: translateX(-50%) translate3d(0, -20px, 0) scale(0.95);
     opacity: 0.7;
   }
   25% {
-    transform: translateX(-50%) translateY(20px) scale(1.1);
+    transform: translateX(-50%) translate3d(0, 20px, 0) scale(1.05);
     opacity: 0.85;
   }
   50% {
-    transform: translateX(-50%) translateY(60px) scale(1.35);
+    transform: translateX(-50%) translate3d(0, 60px, 0) scale(1.2);
     opacity: 0.7;
   }
   75% {
-    transform: translateX(-50%) translateY(90px) scale(1.2);
+    transform: translateX(-50%) translate3d(0, 90px, 0) scale(1.1);
     opacity: 0.8;
   }
   100% { 
-    transform: translateX(-50%) translateY(-20px) scale(0.9);
+    transform: translateX(-50%) translate3d(0, -20px, 0) scale(0.95);
     opacity: 0.7;
   }
 }
@@ -211,12 +214,12 @@ onUnmounted(() => {
   }
   
   .glow-layer {
-    filter: blur(100px);
+    filter: blur(70px);
   }
   
   .glow-1, .glow-2, .glow-3 {
-    width: 600px;
-    height: 600px;
+    width: 500px;
+    height: 500px;
   }
 }
 
@@ -226,12 +229,12 @@ onUnmounted(() => {
   }
   
   .glow-layer {
-    filter: blur(80px);
+    filter: blur(50px);
   }
   
   .glow-1, .glow-2, .glow-3 {
-    width: 450px;
-    height: 450px;
+    width: 350px;
+    height: 350px;
   }
 }
 </style>
