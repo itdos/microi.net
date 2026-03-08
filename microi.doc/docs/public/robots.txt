@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://microi.net/sitemap.xml
+
+# 禁止爬取构建产物和内部文件
+Disallow: /assets/
+Disallow: /.vitepress/

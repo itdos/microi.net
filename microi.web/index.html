@@ -124,6 +124,7 @@
             <div class="ml-dots" id="loadDots">
                 <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
             </div>
+            <div class="ml-url" id="serverUrl"></div>
             <div class="ml-watermark" id="watermark">Powered by Loading...</div>
         </div>
     </div>
@@ -159,13 +160,19 @@
               starsEl.appendChild(s);
             }
           }
-          // 5+App (APK)：标记起始进度为20%（与 hbuilder-app 加载页衔接）
+          // 5+App (APK)：标记起始进度为20%（与 hbuilder-app 加载页衔接），并显示当前服务器地址
           if (window.plus || navigator.userAgent.indexOf('Html5Plus') > -1) {
             window.__microi_apk_start = 20;
             var pe = document.getElementById('loadPercent');
             var pb = document.getElementById('progressBar');
             if (pe) pe.textContent = '20%';
             if (pb) pb.style.width = '20%';
+            // 标记 APK 模式，激活 ml-url 显示
+            var loadEl = document.getElementById('microi_loading');
+            if (loadEl) loadEl.classList.add('is-apk');
+            // 显示当前访问地址（即 hbuilder-app 跳转过来的服务器地址）
+            var urlEl = document.getElementById('serverUrl');
+            if (urlEl) urlEl.textContent = window.location.href;
           }
           // 小程序 webview 模式下隐藏 loading
           var href = location.href || '';

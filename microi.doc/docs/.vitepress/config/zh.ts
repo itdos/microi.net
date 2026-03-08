@@ -15,6 +15,17 @@ export const zh = defineConfig({
 				content: "Microi吾码,低代码,开源低代码平台,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
 			},
 		],
+		// Open Graph（微信/微博/钉钉分享卡片 & 搜索引擎理解页面）
+		["meta", { property: "og:type", content: "website" }],
+		["meta", { property: "og:site_name", content: "Microi吾码" }],
+		["meta", { property: "og:title", content: "Microi吾码 - 开源 AI 低代码平台" }],
+		["meta", { property: "og:description", content: "开源低代码平台，基于 .NET + Vue3 + Element-Plus，支持 AI 引擎、API 接口引擎、表单引擎、工作流引擎等，始于2014年，2024年开源。" }],
+		["meta", { property: "og:image", content: "https://www.microi.net/home2.jpg" }],
+		["meta", { property: "og:url", content: "https://www.microi.net/" }],
+		["meta", { property: "og:locale", content: "zh_CN" }],
+		// 百度爬虫专项
+		["meta", { name: "baidu-site-verification", content: "codeva-2a7cV8xUpf" }], // 填入百度站长平台验证码
+		["meta", { name: "robots", content: "index, follow" }],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],

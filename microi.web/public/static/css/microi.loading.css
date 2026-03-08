@@ -116,6 +116,16 @@
     40% { transform: scale(1); opacity: 1; }
 }
 
+/* 服务器地址（APK环境显示） */
+#microi_loading .ml-url {
+    display: none;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+    word-break: break-all; text-align: center; max-width: 85vw;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+    margin-top: 4px; letter-spacing: 0.3px;
+}
+#microi_loading.is-apk .ml-url { display: block; }
+
 /* 水印 */
 #microi_loading .ml-watermark {
     position: absolute; bottom: 20px; left: 0; right: 0;
