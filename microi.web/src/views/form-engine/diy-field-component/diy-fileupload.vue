@@ -51,9 +51,11 @@
                         {{ GetFileName(modelValue) }}
                     </span>
                     <span class="file-size">{{ getSingleFileSize() }}</span>
+                    <el-button v-if="isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
+                    <el-button @click="ConfirmDelSingleUpload()" type="danger" size="small" :icon="Delete" link>删除</el-button>
                 </div>
             </div>
-            <el-button @click="ConfirmDelSingleUpload()" type="danger" size="small" :icon="Delete" link>删除</el-button>
+            
         </div>
 
         <!-- 查看模式 - 单文件 -->
@@ -68,6 +70,7 @@
                         {{ GetFileName(modelValue) }}
                     </span>
                     <span class="file-size">{{ getSingleFileSize() }}</span>
+                    <el-button v-if="isCadFile(GetFileName(modelValue))" @click="openCadPreview(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], GetFileName(modelValue), null)" type="primary" size="small" :icon="View" link>在线预览</el-button>
                 </div>
             </div>
         </div>
@@ -122,15 +125,23 @@
                             已上传
                         </el-tag>
                         <el-tag v-else type="danger" size="small">失败</el-tag>
+                        <el-button 
+                            v-if="isCadFile(file.Name)" 
+                            size="small" 
+                            type="primary" 
+                            :icon="View" 
+                            @click="openCadPreview(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file.Name, file)"
+                            link
+                        >在线预览</el-button>
+                        <el-button 
+                            v-if="FormMode != 'View'" 
+                            size="small" 
+                            type="danger" 
+                            :icon="Delete" 
+                            @click="ConfirmDelUploadFiles(file)"
+                            link
+                        />
                     </div>
-                    <el-button 
-                        v-if="FormMode != 'View'" 
-                        size="small" 
-                        type="danger" 
-                        :icon="Delete" 
-                        @click="ConfirmDelUploadFiles(file)"
-                        link
-                    />
                 </div>
             </div>
         </div>
@@ -170,10 +181,67 @@
                     <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
                     <div class="form-item-tip">单个文件的最大体积限制，单位MB</div>
                 </el-form-item>
+
+                <el-divider content-position="left">V8引擎代码</el-divider>
+
+                <el-form-item label="上传前V8引擎代码">
+                    <el-button 
+                        type="primary" 
+                        :icon="Edit" 
+                        @click="openCodeEditor('BeforeUploadV8', '上传前V8引擎代码')"
+                    >
+                        编辑代码{{ getCodeLength(configForm.BeforeUploadV8) }}
+                    </el-button>
+                    <div class="form-item-tip">上传前执行的V8引擎代码，V8.Result返回false可阻止上传</div>
+                </el-form-item>
+
+                <el-form-item label="上传成功后V8引擎代码">
+                    <el-button 
+                        type="primary" 
+                        :icon="Edit" 
+                        @click="openCodeEditor('UploadSuccessV8', '上传成功后V8引擎代码')"
+                    >
+                        编辑代码{{ getCodeLength(configForm.UploadSuccessV8) }}
+                    </el-button>
+                    <div class="form-item-tip">上传成功后执行的V8引擎JavaScript代码</div>
+                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 代码编辑器弹窗 -->
+        <el-dialog
+            v-if="codeEditorVisible"
+            v-model="codeEditorVisible"
+            :title="codeEditorTitle"
+            width="80%"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <diy-code-editor
+                v-model="codeEditorValue"
+                :field="{
+                    Name: codeEditorType,
+                    Component: 'CodeEditor',
+                    Config: {
+                        CodeEditor: {
+                            Language: 'javascript',
+                            Theme: 'vs-dark'
+                        }
+                    }
+                }"
+                :FormDiyTableModel="{ [codeEditorType]: codeEditorValue }"
+                :FormMode="'Edit'"
+                :ReadonlyFields="[]"
+                :FieldReadonly="false"
+            />
+            <template #footer>
+                <el-button @click="codeEditorVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveCodeEditor">确定</el-button>
             </template>
         </el-dialog>
     </div>
@@ -181,7 +249,7 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets } from '@element-plus/icons-vue';
+import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets, Edit, View } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 
@@ -245,8 +313,16 @@ const configForm = ref({
     Multiple: false,
     MaxCount: 10,
     Tips: '',
-    MaxSize: 10
+    MaxSize: 10,
+    BeforeUploadV8: '',
+    UploadSuccessV8: ''
 });
+
+// 代码编辑器弹窗相关
+const codeEditorVisible = ref(false);
+const codeEditorType = ref('');
+const codeEditorValue = ref('');
+const codeEditorTitle = ref('');
 
 // 打开配置弹窗
 const openConfig = () => {
@@ -262,7 +338,9 @@ const openConfig = () => {
         Multiple: props.field.Config.FileUpload.Multiple || false,
         MaxCount: props.field.Config.FileUpload.MaxCount || 10,
         Tips: props.field.Config.FileUpload.Tips || '',
-        MaxSize: props.field.Config.FileUpload.MaxSize || 10
+        MaxSize: props.field.Config.FileUpload.MaxSize || 10,
+        BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
+        UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
     configDialogVisible.value = true;
 };
@@ -279,8 +357,34 @@ const saveConfig = () => {
     props.field.Config.FileUpload.Tips = configForm.value.Tips;
     props.field.Config.FileUpload.MaxSize = configForm.value.MaxSize;
     
+    // 保存Upload V8配置
+    if (!props.field.Config.Upload) {
+        props.field.Config.Upload = {};
+    }
+    props.field.Config.Upload.BeforeUploadV8 = configForm.value.BeforeUploadV8;
+    props.field.Config.Upload.UploadSuccessV8 = configForm.value.UploadSuccessV8;
+    
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
+};
+
+// V8代码编辑器相关方法
+const getCodeLength = (value) => {
+    if (!value) return '';
+    const len = String(value).length;
+    return len > 0 ? `(${len})` : '';
+};
+
+const openCodeEditor = (type, title) => {
+    codeEditorType.value = type;
+    codeEditorTitle.value = title;
+    codeEditorValue.value = configForm.value[type] || '';
+    codeEditorVisible.value = true;
+};
+
+const saveCodeEditor = () => {
+    configForm.value[codeEditorType.value] = codeEditorValue.value;
+    codeEditorVisible.value = false;
 };
 
 // 暴露方法给父组件
@@ -377,6 +481,85 @@ const getFileIcon = (fileName) => {
     return iconMap[ext] || Document;
 };
 
+// 判断是否为CAD文件（支持在线预览的类型）
+const CAD_EXTENSIONS = ['dwg', 'step', 'stp'];
+const isCadFile = (fileName) => {
+    if (!fileName) return false;
+    const ext = fileName.toLowerCase().split('.').pop();
+    return CAD_EXTENSIONS.includes(ext);
+};
+
+// 获取CAD文件对应的转换后预览文件的存储路径（基于原始存储路径）
+const getCadPreviewStoragePath = (storagePath) => {
+    if (!storagePath) return '';
+    // 去掉查询参数，只处理路径本身
+    const pathOnly = storagePath.split('?')[0];
+    const ext = pathOnly.toLowerCase().split('.').pop();
+    const lastDotIndex = pathOnly.lastIndexOf('.');
+    const base = pathOnly.substring(0, lastDotIndex);
+    if (ext === 'dwg') return base + '_preview.dxf';
+    if (ext === 'step' || ext === 'stp') return base + '_preview.stl';
+    return '';
+};
+
+// 从modelValue或文件对象中提取存储路径（不是RealPath）
+const getFileStoragePath = (fileObj) => {
+    // 多文件模式：fileObj 直接有 .Path
+    if (fileObj && typeof fileObj === 'object' && fileObj.Path) return fileObj.Path;
+    // 单文件模式：从 modelValue 解析
+    const normalized = normalizeValue(props.modelValue);
+    if (normalized && typeof normalized === 'object' && normalized.Path) return normalized.Path;
+    // 兜底：如果是字符串路径
+    if (typeof props.modelValue === 'string' && props.modelValue.startsWith('/')) return props.modelValue;
+    return '';
+};
+
+// 打开CAD文件预览（在新浏览器标签页中打开）
+const openCadPreview = (url, fileName, fileObj) => {
+    // 优先用存储路径来计算预览文件路径
+    const storagePath = fileObj ? (fileObj.Path || '') : getFileStoragePath();
+    const previewStoragePath = getCadPreviewStoragePath(storagePath || url);
+    
+    if (!previewStoragePath) {
+        console.warn('openCadPreview: 无法计算预览路径', { url, storagePath });
+        DiyCommon.Tips('无法获取预览文件路径', false);
+        return;
+    }
+
+    const isLimit = props.field.Config?.FileUpload?.Limit === true;
+    
+    if (isLimit) {
+        // 私有文件：先获取预览文件的签名URL，再打开
+        DiyCommon.Tips('正在获取预览文件...', true);
+        DiyCommon.Post(
+            '/api/HDFS/GetPrivateFileUrl',
+            {
+                FilePathName: previewStoragePath,
+                HDFS: props.SysConfig.HDFS || 'Aliyun',
+                FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
+                FormDataId: props.TableRowId,
+                FieldId: props.field.Id
+            },
+            (result) => {
+                if (DiyCommon.Result(result) && result.Data) {
+                    const params = new URLSearchParams({ url: result.Data, name: fileName || '' });
+                    window.open(`#/mic/cad-preview?${params.toString()}`, '_blank');
+                } else {
+                    DiyCommon.Tips('预览文件获取失败，可能文件尚未转换完成', false);
+                }
+            },
+            () => {
+                DiyCommon.Tips('预览文件获取失败', false);
+            }
+        );
+    } else {
+        // 公开文件：直接用GetServerPath拼URL
+        const previewUrl = DiyCommon.GetServerPath(previewStoragePath);
+        const params = new URLSearchParams({ url: previewUrl, name: fileName || '' });
+        window.open(`#/mic/cad-preview?${params.toString()}`, '_blank');
+    }
+};
+
 // 初始化拖动排序
 const initSortable = () => {
     if (sortableContainer.value && props.FormMode != 'View') {
@@ -415,20 +598,14 @@ const onExceed = () => {
     DiyCommon.Tips(`最多只能上传${props.field.Config.FileUpload.MaxCount}个文件`, false);
 };
 
-// 上传前的钩子
-const BeforeFileUpload = (file) => {
-    console.log('=== BeforeFileUpload START ===');
-    console.log('file:', file);
-    console.log('isMultiple:', getMultipleFlag.value);
-    
+// 上传前的准备逻辑（提取为独立函数，供V8事件回调使用）
+const setupBeforeFileUpload = (file) => {
     if (!getMultipleFlag.value) {
         // 单文件模式：设置上传中状态
         props.FormDiyTableModel[props.field.Name] = '正在上传中...';
         emit('update:modelValue', '正在上传中...');
-        console.log('【单文件】设置上传中状态');
     } else {
-        // 多文件模式：添加State=0的占位文件（与旧版本一致）
-        console.log('【多文件】准备上传，file.uid:', file.uid);
+        // 多文件模式：添加State=0的占位文件
         if (!Array.isArray(props.FormDiyTableModel[props.field.Name])) {
             props.FormDiyTableModel[props.field.Name] = [];
         }
@@ -439,10 +616,31 @@ const BeforeFileUpload = (file) => {
             Size: file.size
         });
         emit('update:modelValue', props.FormDiyTableModel[props.field.Name]);
-        console.log('【多文件】添加占位文件，State=0');
+    }
+};
+
+// 上传前的钩子
+const BeforeFileUpload = (file) => {
+    // 上传前V8事件
+    if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.BeforeUploadV8) {
+        return new Promise((resolve, reject) => {
+            emit('CallbackRunV8Code', {
+                field: props.field,
+                thisValue: file,
+                _v8Code: props.field.Config.Upload.BeforeUploadV8,
+                callback: (result) => {
+                    if (result === false) {
+                        reject(); // 阻止上传
+                        return;
+                    }
+                    setupBeforeFileUpload(file);
+                    resolve(true);
+                }
+            });
+        });
     }
     
-    console.log('=== BeforeFileUpload END ===');
+    setupBeforeFileUpload(file);
     return true;
 };
 
@@ -543,9 +741,15 @@ const FileUploadSuccess = (result, file, fileList) => {
             });
         }
 
-        if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.onChange) {
-            emit('CallbackRunV8Code', { field: props.field });
+        // 上传成功后V8事件
+        if (props.field.Config?.Upload?.UploadSuccessV8) {
+            emit('CallbackRunV8Code', {
+                field: props.field,
+                _v8Code: props.field.Config.Upload.UploadSuccessV8
+            });
         }
+        // 触发标准V8Code（兼容旧版行为）
+        emit('CallbackRunV8Code', { field: props.field });
         
         console.log('=== FileUploadSuccess END ===');
     } else {

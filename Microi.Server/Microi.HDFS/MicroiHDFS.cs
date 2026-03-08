@@ -438,6 +438,10 @@ namespace Microi.net
                 }
                 #endregion
 
+                #region CAD文件异步转换（DWG/STEP/STP → 前端可预览格式）
+                CadFileConverter.ConvertAndUploadAsync(file.Value, fileSuffix, resultPath, clientModel, param.Limit, hdfs);
+                #endregion
+
                 #region 返回结果拼接
                 //如果是多上传
                 if (param.Multiple == true || files.Count > 1)
@@ -445,7 +449,7 @@ namespace Microi.net
                     result.Add(new
                     {
                         Path = resultPath,
-                        Name = realFileName,//file.FileName,
+                        Name = realFileName + fileSuffix,//file.FileName,
                         Size = file.Value.Length, // file.Length.GetFileSize(),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                         Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
@@ -457,7 +461,7 @@ namespace Microi.net
                     var tResult = new
                     {
                         Path = resultPath,
-                        Name = realFileName,//file.FileName,
+                        Name = realFileName + fileSuffix,//file.FileName,
                         Size = file.Value.Length, //file.Length.GetFileSize(),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                         Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
