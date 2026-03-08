@@ -659,7 +659,7 @@ function isMiniProgram() {
 
 .user-card {
     position: relative;
-    padding-top: 20px;
+    padding-top: var(--status-bar-height, 0px);
     margin-bottom: 12px;
     background: var(--color-primary);
     
@@ -668,7 +668,7 @@ function isMiniProgram() {
         top: 0;
         left: 0;
         right: 0;
-        height: 120px;
+        height: 100%;
         background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-dark, #2c7acc) 100%);
     }
     
