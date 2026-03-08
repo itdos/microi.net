@@ -3849,7 +3849,13 @@ export default {
             //如果是富文本，需要去掉html标签
             if (field.Component == "RichText") {
                 displayValue = self.DiyCommon.RemoveHtml(displayValue);
+            }else if (field.Component == "ImgUpload" || field.Component == 'FileUpload') {//如果是图片或文件控件
+                if(displayValue.startsWith("{")){
+                    var tempObj = JSON.parse(displayValue);
+                    displayValue = tempObj.Name;
+                }
             }
+
             result = displayValue; //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
             // return result + fuheWZ;
             result = result + fuheWZ;

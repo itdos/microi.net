@@ -181,10 +181,67 @@
                     <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
                     <div class="form-item-tip">单张图片的最大体积限制，单位MB</div>
                 </el-form-item>
+
+                <el-divider content-position="left">V8引擎代码</el-divider>
+
+                <el-form-item label="上传前V8引擎代码">
+                    <el-button 
+                        type="primary" 
+                        :icon="Edit" 
+                        @click="openCodeEditor('BeforeUploadV8', '上传前V8引擎代码')"
+                    >
+                        编辑代码{{ getCodeLength(configForm.BeforeUploadV8) }}
+                    </el-button>
+                    <div class="form-item-tip">上传前执行的V8引擎代码，V8.Result返回false可阻止上传</div>
+                </el-form-item>
+
+                <el-form-item label="上传成功后V8引擎代码">
+                    <el-button 
+                        type="primary" 
+                        :icon="Edit" 
+                        @click="openCodeEditor('UploadSuccessV8', '上传成功后V8引擎代码')"
+                    >
+                        编辑代码{{ getCodeLength(configForm.UploadSuccessV8) }}
+                    </el-button>
+                    <div class="form-item-tip">上传成功后执行的V8引擎JavaScript代码</div>
+                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 代码编辑器弹窗 -->
+        <el-dialog
+            v-if="codeEditorVisible"
+            v-model="codeEditorVisible"
+            :title="codeEditorTitle"
+            width="80%"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <diy-code-editor
+                v-model="codeEditorValue"
+                :field="{
+                    Name: codeEditorType,
+                    Component: 'CodeEditor',
+                    Config: {
+                        CodeEditor: {
+                            Language: 'javascript',
+                            Theme: 'vs-dark'
+                        }
+                    }
+                }"
+                :FormDiyTableModel="{ [codeEditorType]: codeEditorValue }"
+                :FormMode="'Edit'"
+                :ReadonlyFields="[]"
+                :FieldReadonly="false"
+            />
+            <template #footer>
+                <el-button @click="codeEditorVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveCodeEditor">确定</el-button>
             </template>
         </el-dialog>
     </div>
@@ -192,7 +249,7 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { UploadFilled, Delete, Rank } from '@element-plus/icons-vue';
+import { UploadFilled, Delete, Rank, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 
@@ -257,8 +314,16 @@ const configForm = ref({
     MaxCount: 10,
     Tips: '',
     Preview: false,
-    MaxSize: 10
+    MaxSize: 10,
+    BeforeUploadV8: '',
+    UploadSuccessV8: ''
 });
+
+// 代码编辑器弹窗相关
+const codeEditorVisible = ref(false);
+const codeEditorType = ref('');
+const codeEditorValue = ref('');
+const codeEditorTitle = ref('');
 
 // 打开配置弹窗
 const openConfig = () => {
@@ -275,7 +340,9 @@ const openConfig = () => {
         MaxCount: props.field.Config.ImgUpload.MaxCount || 10,
         Tips: props.field.Config.ImgUpload.Tips || '',
         Preview: props.field.Config.ImgUpload.Preview || false,
-        MaxSize: props.field.Config.ImgUpload.MaxSize || 10
+        MaxSize: props.field.Config.ImgUpload.MaxSize || 10,
+        BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
+        UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
     configDialogVisible.value = true;
 };
@@ -293,8 +360,34 @@ const saveConfig = () => {
     props.field.Config.ImgUpload.Preview = configForm.value.Preview;
     props.field.Config.ImgUpload.MaxSize = configForm.value.MaxSize;
     
+    // 保存Upload V8配置
+    if (!props.field.Config.Upload) {
+        props.field.Config.Upload = {};
+    }
+    props.field.Config.Upload.BeforeUploadV8 = configForm.value.BeforeUploadV8;
+    props.field.Config.Upload.UploadSuccessV8 = configForm.value.UploadSuccessV8;
+    
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
+};
+
+// V8代码编辑器相关方法
+const getCodeLength = (value) => {
+    if (!value) return '';
+    const len = String(value).length;
+    return len > 0 ? `(${len})` : '';
+};
+
+const openCodeEditor = (type, title) => {
+    codeEditorType.value = type;
+    codeEditorTitle.value = title;
+    codeEditorValue.value = configForm.value[type] || '';
+    codeEditorVisible.value = true;
+};
+
+const saveCodeEditor = () => {
+    configForm.value[codeEditorType.value] = codeEditorValue.value;
+    codeEditorVisible.value = false;
 };
 
 // 暴露方法给父组件
@@ -451,27 +544,14 @@ const onExceed = () => {
     DiyCommon.Tips(`最多只能上传${props.field.Config.ImgUpload.MaxCount}张图片`, false);
 };
 
-// 上传前的钩子
-const BeforeImgUpload = (file) => {
-    console.log('=== BeforeImgUpload START ===');
-    console.log('file:', file);
-    console.log('isMultiple:', getMultipleFlag.value);
-    
-    // 验证文件类型
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
-        DiyCommon.Tips('只能上传图片文件！', false);
-        return false;
-    }
-    
+// 上传前的准备逻辑（提取为独立函数，供V8事件回调使用）
+const setupBeforeImgUpload = (file) => {
     if (!getMultipleFlag.value) {
         // 单图片模式：设置上传中状态
         props.FormDiyTableModel[props.field.Name] = '正在上传中...';
         emit('update:modelValue', '正在上传中...');
-        console.log('【单图片】设置上传中状态');
     } else {
         // 多图片模式：添加State=0的占位图片
-        console.log('【多图片】准备上传，file.uid:', file.uid);
         if (!Array.isArray(props.FormDiyTableModel[props.field.Name])) {
             props.FormDiyTableModel[props.field.Name] = [];
         }
@@ -482,10 +562,38 @@ const BeforeImgUpload = (file) => {
             Size: file.size
         });
         emit('update:modelValue', props.FormDiyTableModel[props.field.Name]);
-        console.log('【多图片】添加占位图片，State=0');
+    }
+};
+
+// 上传前的钩子
+const BeforeImgUpload = (file) => {
+    // 验证文件类型
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+        DiyCommon.Tips('只能上传图片文件！', false);
+        return false;
     }
     
-    console.log('=== BeforeImgUpload END ===');
+    // 上传前V8事件
+    if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.BeforeUploadV8) {
+        return new Promise((resolve, reject) => {
+            emit('CallbackRunV8Code', {
+                field: props.field,
+                thisValue: file,
+                _v8Code: props.field.Config.Upload.BeforeUploadV8,
+                callback: (result) => {
+                    if (result === false) {
+                        reject(); // 阻止上传
+                        return;
+                    }
+                    setupBeforeImgUpload(file);
+                    resolve(true);
+                }
+            });
+        });
+    }
+    
+    setupBeforeImgUpload(file);
     return true;
 };
 
@@ -573,9 +681,15 @@ const ImgUploadSuccess = (result, file, fileList) => {
             });
         }
 
-        if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.onChange) {
-            emit('CallbackRunV8Code', { field: props.field });
+        // 上传成功后V8事件
+        if (props.field.Config?.Upload?.UploadSuccessV8) {
+            emit('CallbackRunV8Code', {
+                field: props.field,
+                _v8Code: props.field.Config.Upload.UploadSuccessV8
+            });
         }
+        // 触发标准V8Code（兼容旧版行为）
+        emit('CallbackRunV8Code', { field: props.field });
         
         console.log('=== ImgUploadSuccess END ===');
     } else {

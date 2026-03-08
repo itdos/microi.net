@@ -1673,7 +1673,7 @@ export default {
             Object.keys(componentBlocks).forEach((comp) => {
                 if (comp === component) return;
                 componentBlocks[comp].forEach((key) => {
-                    if (cfg && cfg.hasOwnProperty(key)) {
+                    if (!keepBlocks.has(key) && cfg && cfg.hasOwnProperty(key)) {
                         delete cfg[key];
                     }
                 });
