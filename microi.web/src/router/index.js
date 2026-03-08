@@ -218,6 +218,11 @@ export const asyncRoutes = [
     //         }
     //     ]
     // },
+    {
+        path: "/mic/cad-preview",
+        name: "mic_cad_preview",
+        component: () => import("@/views/cad-preview/index.vue")
+    },
     // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后
     {
         path: "/:pathMatch(.*)*",

@@ -82,10 +82,10 @@
       destroy-on-close
     >
       <div class="preview-content">
-        <!-- DWG文件预览 -->
-        <div v-if="previewFile?.type?.toLowerCase() === 'dwg' && previewFile?.filePath" class="dwg-preview">
-          <DwgViewer 
-            :file-path="'/' + previewFile.filePath" 
+        <!-- DWG/STEP/STP文件预览 -->
+        <div v-if="['dwg','step','stp'].includes(previewFile?.type?.toLowerCase()) && previewFile?.filePath" class="dwg-preview">
+          <CadViewer 
+            :file-path="getCadPreviewPath(previewFile)" 
             :file-name="previewFile.name"
           />
           <div class="preview-actions">
@@ -115,7 +115,7 @@ import { Download } from '@element-plus/icons-vue'
 import FolderTree from './components/FolderTree.vue'
 import FileList from './components/FileList.vue'
 import FileIcon from './components/FileIcon.vue'
-import DwgViewer from './components/DwgViewer.vue'
+import CadViewer from './components/CadViewer.vue'
 
 // 侧边栏宽度
 const sidebarWidth = ref(280)
@@ -135,6 +135,18 @@ const selectedFileIds = ref([])
 const fileLoading = ref(false)
 // 初始化加载状态
 const initializing = ref(true)
+
+// 获取CAD文件转换后的预览路径
+const getCadPreviewPath = (file) => {
+  const path = '/' + file.filePath
+  const ext = (file.type || '').toLowerCase()
+  const lastDot = path.lastIndexOf('.')
+  const base = path.substring(0, lastDot)
+  if (ext === 'dwg') return base + '_preview.dxf'
+  if (ext === 'step' || ext === 'stp') return base + '_preview.stl'
+  return path
+}
+
 // 记录已加载过的文件夹
 const loadedFolders = ref(new Set())
 // 当前正在加载的请求ID

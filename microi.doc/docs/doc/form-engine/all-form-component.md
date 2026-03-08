@@ -49,9 +49,19 @@ if(V8.Form.Phone.length != 11){
 
 ## 图片上传 ImgUpload
 >* 默认不允许匿名访问
+>* 上传前V8事件可通过`V8.ThisValue`访问到属性
+```js
+{
+  name : "WX20220109-155433@2x.png",
+  size : 952063,
+  type : "image/png"
+}
+```
+>* 上传后可通过`V8.Form.字段名`访问到图片URL地址、Name等
 
 ## 文件上传 FileUpload
 >* 默认不允许匿名访问
+>* V8事件同`图片上传 ImgUpload`
 
 ## 评分 Rate
 >* 评分组件，默认int类型，数据库存储为int类型
