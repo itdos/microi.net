@@ -18,7 +18,7 @@ router.beforeEach(async (to, from, next) => {
     if (!diySsoArray) {
         var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/GetTableDataAnonymous", {
             FormEngineKey: "Diy_Sso",
-            _SearchEqual: { IsEnable: true },
+            _Where: [["IsEnable", "=", 1]],
             OsClient: DiyCommon.GetOsClient()
         });
         if (diySsoResult.Code == 1 && Array.isArray(diySsoResult.Data) && diySsoResult.Data.length > 0) {
@@ -31,6 +31,66 @@ router.beforeEach(async (to, from, next) => {
         diySsoArray = JSON.parse(diySsoArray);
     }
     if (diySsoArray.length > 0) {
+    }
+    // 直接检测URL中的token参数，无需Diy_Sso配置即可自动登录
+    var directTokenMatch = /[?&]token=([^&;#]+)/i.exec(location.href);
+    if (!directTokenMatch) {
+        directTokenMatch = /[?&]token%3D([^&;#]+)/i.exec(location.href);
+    }
+    var directToken = directTokenMatch ? decodeURIComponent(directTokenMatch[1].replace(/\+/g, "%20")) : null;
+    if (directToken && ((directToken !== lastSsoToken) || !DiyCommon.getToken()) && directToken != "$V8.CurrentToken$") {
+        console.log("-------> SsoLogin direct token permission.js：" + directToken);
+        sessionStorage.setItem("LastSsoToken", directToken);
+        var newtoken = directToken.replace("Bearer%20", "").replace("Bearer ", "");
+        DiyCommon.setToken(newtoken);
+        var directLoginResult = await DiyCommon.PostAsync(DiyApi.TokenLogin(), {
+            _token: directToken,
+            Token: directToken,
+            OsClient: DiyCommon.GetOsClient()
+        });
+        if (directLoginResult.Code == 1) {
+            const diyStore = useDiyStore(pinia);
+            diyStore.setState("SystemStyle", "Classic");
+            diyStore.setCurrentUser(directLoginResult.Data);
+            // 优先级：to.path（当前目标路径） > to.query.redirect > SysConfig.DefaultIndexUrl > /
+            // 1. 当前目标路径不是/login，说明用户要直接访问该页面
+            if (to.path && to.path !== '/login' && to.path !== '/') {
+                next({ ...to, replace: true });
+                return;
+            }
+            // 2. 检查路由redirect参数
+            var redirectPath = to.query && to.query.redirect;
+            if (redirectPath) {
+                redirectPath = redirectPath.split('?')[0];
+                if (redirectPath && redirectPath !== '/login' && redirectPath !== '/') {
+                    next({ path: redirectPath, replace: true });
+                    return;
+                }
+            }
+            // 3. 检查系统默认首页配置
+            var sysConfigResult = await DiyCommon.FormEngine.GetFormDataAnonymous({
+                FormEngineKey: "Sys_Config",
+                _Where: [["IsEnable", "=", 1]],
+                OsClient: DiyCommon.GetOsClient()
+            });
+            if (sysConfigResult.Code == 1) {
+                var sysConfig = sysConfigResult.Data;
+                if (sysConfig && sysConfig.DefaultIndexUrl) {
+                    var url = sysConfig.DefaultIndexUrl;
+                    url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
+                    if (url.startsWith("/iframe/")) {
+                        url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
+                    } else if (url.startsWith("http")) {
+                        window.location.href = url;
+                        return;
+                    }
+                    next({ path: url });
+                    return;
+                }
+            }
+            next({ path: "/" });
+            return;
+        }
     }
     for (let index = 0; index < diySsoArray.length; index++) {
         const diySso = diySsoArray[index];
