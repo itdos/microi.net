@@ -370,7 +370,7 @@ export default {
         type: 0,
         title: this.product ? this.product.ShangpinMC : '商品详情',
         summary: '查看商品详情',
-        href: appConfig.webviewUrl + '/#/pages/mall/detail?id=' + this.productId
+        href: appConfig.webviewUrl.replace(/\/$/, '') + (appConfig.webviewUrl.includes('?') ? '#' : '/#') + '/pages/mall/detail?id=' + this.productId
       })
       // #endif
     },
