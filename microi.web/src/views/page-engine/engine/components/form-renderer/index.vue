@@ -1,5 +1,22 @@
 <template>
   <div class="microi-page-engine pageengine">
+    <!-- 移动端顶部导航 -->
+    <div v-if="isPhoneView" class="pe-mobile-header">
+      <div class="pe-header-bg">
+        <div class="pe-bg-circle c1"></div>
+        <div class="pe-bg-circle c2"></div>
+      </div>
+      <div class="pe-header-content">
+        <div class="pe-header-left">
+          <img class="pe-logo" :src="peLogoUrl" alt="logo" />
+          <div class="pe-header-text">
+            <span class="pe-title">{{ pePageTitle }}</span>
+            <span class="pe-subtitle">{{ peAppName }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <template v-if="showWatermark">
       <el-watermark
         :content="formData.JsonObj.formConfig.watermarkStyle.content"
@@ -46,6 +63,7 @@ import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'
+import { DiyCommon } from '@/utils/diy.common';
 import {
   buildDefaultFormJson,
   isEmpty,
@@ -56,12 +74,25 @@ import { widgetList, widgetOption } from '../../utils/builtWidget'
 
 import { usePageEngineStore } from '../../stores/pageEngine'
 import { useDark } from '@vueuse/core'
+import { useDiyStore } from '@/pinia'
 
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
+const diyStore = useDiyStore()
+
 //是否暗黑模式
 const isDark = useDark()
+
+// 移动端判断及顶部信息
+const isPhoneView = computed(() => diyStore.IsPhoneView)
+const peAppName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码')
+const pePageTitle = computed(() => formData.value?.Name || formData.value?.JsonObj?.formConfig?.title || '界面引擎')
+const peLogoUrl = computed(() => {
+  const logo = diyStore.SysConfig?.SysLogo
+  if (logo && DiyCommon) return DiyCommon.GetServerPath(logo)
+  return './static/img/logo/microi-logo.svg'
+})
 
 //注册组件
 let components = {}
@@ -275,6 +306,9 @@ if (!props.isPrivew) {
 .microi-page-engine.pageengine{
   padding-top: var(--status-bar-height, 0px);
 }
+.microi-page-engine.pageengine:has(.pe-mobile-header) {
+  padding-top: 0;
+}
 .microi-page-engine {
   .el-header {
     padding: 0;
@@ -283,5 +317,79 @@ if (!props.isPrivew) {
     margin: 0;
     padding: 0;
   }
+}
+
+/* 移动端界面引擎顶部导航 */
+.pe-mobile-header {
+  position: relative;
+  background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
+  padding: 14px 16px 18px;
+  padding-top: calc(14px + var(--status-bar-height, 0px));
+  z-index: 10;
+}
+
+.pe-header-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pe-bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+
+  &.c1 {
+    width: 200px;
+    height: 200px;
+    top: -50px;
+    right: -40px;
+  }
+  &.c2 {
+    width: 125px;
+    height: 125px;
+    bottom: -30px;
+    left: -30px;
+  }
+}
+
+.pe-header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.pe-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.pe-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  margin-right: 10px;
+  object-fit: cover;
+}
+
+.pe-header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pe-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pe-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 1px;
 }
 </style>
