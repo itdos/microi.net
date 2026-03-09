@@ -670,8 +670,37 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         },
         TokenLogin() {
             var self = this;
-            //token自动登录  2022-04-09
-            //取所有单点登录
+            //token自动登录
+            // 直接检测URL中的token参数，无需Diy_Sso配置即可自动登录
+            var directTokenMatch = /[?&]token=([^&;#]+)/i.exec(location.href);
+            if (!directTokenMatch) {
+                directTokenMatch = /[?&]token%3D([^&;#]+)/i.exec(location.href);
+            }
+            var directToken = directTokenMatch ? decodeURIComponent(directTokenMatch[1].replace(/\+/g, "%20")) : null;
+            if (!self.DiyCommon.IsNull(directToken) && directToken != "$V8.CurrentToken$") {
+                console.log("-------> SsoLogin direct token login：" + directToken);
+                var newtoken = directToken.replace("Bearer%20", "").replace("Bearer ", "");
+                self.DiyCommon.setToken(newtoken);
+                self.DiyCommon.Post(
+                    self.DiyApi.TokenLogin(),
+                    {
+                        _token: directToken,
+                        Token: directToken,
+                        OsClient: self.OsClient
+                    },
+                    function (result) {
+                        console.log("-------> SsoLogin direct tokenLogin result：", result);
+                        if (result.Code == 1) {
+                            self.LoginResult = result;
+                            self.diyStore.setCurrentUser(result.Data);
+                            self.diyStore.setState("SystemStyle", "Classic");
+                            self.GotoSystem();
+                        }
+                    }
+                );
+                return;
+            }
+            // 无直接token参数，回退到Diy_Sso配置方式
             var diySsoList = self.DiyCommon.Post(
                 "/api/FormEngine/GetTableDataAnonymous",
                 {
@@ -707,9 +736,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                                         TokenName: diySso.TokenName,
                                         OsClient: self.OsClient
                                     },
-                                    function (result) {
-                                        console.log("-------> SsoLogin ssoApiResult：", result);
-                                        if (result.Code == 1) {
+                                    function (ssoResult) {
+                                        console.log("-------> SsoLogin ssoApiResult：", ssoResult);
+                                        if (ssoResult.Code == 1) {
+                                            self.LoginResult = ssoResult;
+                                            self.diyStore.setCurrentUser(ssoResult.Data);
                                             self.diyStore.setState("SystemStyle", "Classic");
                                             self.GotoSystem();
                                         }

@@ -538,7 +538,7 @@ export default {
 .header-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #333;
+  color: #fff;
 }
 
 .header-action {
@@ -565,10 +565,10 @@ export default {
   padding: 16rpx 0 20rpx;
   position: relative;
   font-size: 28rpx;
-  color: #999;
+  color: #fff;
 
   &.active {
-    color: var(--theme, #4e6ef2);
+    // color: var(--theme, #4e6ef2);
     font-weight: 600;
   }
 }
