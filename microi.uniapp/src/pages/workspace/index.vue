@@ -359,12 +359,15 @@ export default {
           targetPath = '/' + targetPath
         }
         // Web端使用 hash 路由模式，URL格式为 base/#/path
-        targetPath = base + '/#' + targetPath
+        // 当 base 含查询参数（如 ?OsClient=xjy）时，用 # 而非 /# 避免 / 被浏览器当作查询参数值的一部分
+        const hashPrefix = base.includes('?') ? '#' : '/#'
+        targetPath = base + hashPrefix + targetPath
       }
 
-      // 附加 token 参数
+      // 附加 token 等参数到 hash 部分（hash 路由下参数需用 ? 跟在 hash 路径后）
       const token = getToken()
-      const sep = targetPath.includes('?') ? '&' : '?'
+      const hashHasQuery = targetPath.indexOf('?', targetPath.indexOf('#')) > -1
+      const sep = hashHasQuery ? '&' : '?'
       targetPath += sep + 'token=' + encodeURIComponent(token)
       targetPath += '&source=' + getSourceTag()
       targetPath += '&OsClient=' + appConfig.osClient
