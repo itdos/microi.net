@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- 【配置项】请修改为你的实际服务器地址 -->
     <script>
-        var MICROI_SERVER_URL = 'https://saas.jifulii.com';
+        var MICROI_SERVER_URL = 'http://192.168.0.4:1988?OsClient=qiqiang';
         // 优先读取用户在 APP 内自定义的服务器地址
         (function() { try { var s = localStorage.getItem('microi_apk_server_url'); if (s) MICROI_SERVER_URL = s; } catch(e) {} })();
     </script>
@@ -442,24 +442,6 @@
             _state.plusReady = true;
 
             try { _log('initApp, OS=' + plus.os.name); } catch(e) {}
-
-            // 从 plus.storage 读取上次缓存的标题和公司名
-            // （必须在 plusready 后读取，plus.storage 不受域名隔离，是 App 级全局存储）
-            try {
-                var cached = plus.storage.getItem('microi_apk_syscfg');
-                if (cached) {
-                    var cfg = JSON.parse(cached);
-                    if (cfg.SysTitle) {
-                        document.title = cfg.SysTitle;
-                        var t = document.getElementById('appTitle');
-                        if (t) t.textContent = cfg.SysTitle;
-                    }
-                    if (cfg.CompanyName) {
-                        var w = document.getElementById('watermark');
-                        if (w) w.textContent = 'Powered by ' + cfg.CompanyName;
-                    }
-                }
-            } catch(e) {}
 
             try { plus.navigator.closeSplashscreen(); } catch(e) {}
             try {

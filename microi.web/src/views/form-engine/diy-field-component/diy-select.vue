@@ -237,7 +237,10 @@ export default {
             var self = this;
             // if (newVal.length > 0 && self.FieldAllData.length == 0) {//2023-10-27注释
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
-            if (self.NeedResetDataSourse) {
+            // 首次数据加载时（FieldAllData为空），即使NeedResetDataSourse=false也要匹配
+            // 解决远程搜索SQL数据源在表内编辑时初始不显示值的问题
+            var isFirstLoad = self.FieldAllData.length === 0 && newVal && newVal.length > 0;
+            if (self.NeedResetDataSourse || isFirstLoad) {
                 self.FieldAllData = [...newVal];
 
                 // 只有在需要重置数据源时才同步 ModelValue
@@ -253,12 +256,24 @@ export default {
                     });
                     if (delData) self.ModelValue = delData;
                 } else {
-                    // 其他数据源，item是对象
-                    var saveField = self.field.Config.SelectSaveField;
-                    var delData = self.field.Data.find((item) => {
-                        return item[saveField] == self.ModelValue;
-                    });
-                    if (delData) self.ModelValue = delData;
+                    // 其他数据源（Sql/DataSource/ApiEngine），item是对象
+                    var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+                    if (saveField) {
+                        // ModelValue 可能已被 mounted() 转换为对象，需要提取原始值进行比较
+                        var compareVal = (typeof self.ModelValue === 'object' && self.ModelValue !== null && !Array.isArray(self.ModelValue))
+                            ? self.ModelValue[saveField] : self.ModelValue;
+                        var delData = self.field.Data.find((item) => {
+                            return item[saveField] == compareVal;
+                        });
+                        if (delData) {
+                            self.ModelValue = delData;
+                        } else if (!self.DiyCommon.IsNull(compareVal) && typeof self.ModelValue === 'object' && self.ModelValue !== null) {
+                            // 当前值不在数据源结果中（远程搜索有LIMIT时常见），
+                            // 将当前值对象插入field.Data，确保el-select能显示
+                            self.field.Data.push(self.ModelValue);
+                            self.FieldAllData = [...self.field.Data];
+                        }
+                    }
                 }
             }
             self.NeedResetDataSourse = true;
@@ -283,7 +298,7 @@ export default {
             });
         }
         
-        var modelValue = self.FormDiyTableModel[self.field.Name];
+        var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         // 普通数据源 Data 时，值就是字符串，不需要转换
         if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
             // 普通数据源，值直接是字符串，不做任何转换
@@ -324,21 +339,47 @@ export default {
         } else {
             self.ModelValue = modelValue;
         }
+
+        // 对于 SQL/DataSource/ApiEngine 数据源，如果 field.Data 已经加载，
+        // 需要从 field.Data 中查找匹配的完整选项对象，否则 el-select 的 value-key 无法匹配
+        if (self.field && self.field.Config &&
+            (self.field.Config.DataSource === "Sql" ||
+             self.field.Config.DataSource === "DataSource" ||
+             self.field.Config.DataSource === "ApiEngine") &&
+            self.field.Data && self.field.Data.length > 0 &&
+            !self.DiyCommon.IsNull(self.ModelValue)) {
+            var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+            if (saveField) {
+                var compareVal = (typeof self.ModelValue === 'object' && self.ModelValue !== null && !Array.isArray(self.ModelValue))
+                    ? self.ModelValue[saveField] : self.ModelValue;
+                var found = self.field.Data.find(function(item) { return item[saveField] == compareVal; });
+                if (found) {
+                    self.ModelValue = found;
+                }
+            }
+        }
+
         self.LastModelValue = self.ModelValue;
         self.$nextTick(function () {
             //如果是普通数据源或KeyValue
             if (self.field && (self.field.Config.DataSource == "Data" || self.field.Config.DataSource == "KeyValue")) {
                 self.FieldAllData = [...self.field.Data];
             }
-            // 🔥 修复：SQL数据源首次加载
-            // 如果是SQL/DataSource/ApiEngine数据源，且非远程搜索模式，需要主动加载数据
-            if (self.field && self.field.Config && 
-                (self.field.Config.DataSource === "Sql" || 
-                 self.field.Config.DataSource === "DataSource" || 
-                 self.field.Config.DataSource === "ApiEngine") &&
-                !self.field.Config.DataSourceSqlRemote) {
-                // 调用远程方法加载初始数据（传入空关键词）
-                self.SelectRemoteMethod("", self.field);
+            // SQL/DataSource/ApiEngine数据源处理
+            if (self.field && self.field.Config &&
+                (self.field.Config.DataSource === "Sql" ||
+                 self.field.Config.DataSource === "DataSource" ||
+                 self.field.Config.DataSource === "ApiEngine")) {
+                // 如果数据已加载，初始化FieldAllData
+                if (self.field.Data && self.field.Data.length > 0) {
+                    self.FieldAllData = [...self.field.Data];
+                }
+                // 远程搜索模式下，主动加载一次数据，确保表内编辑时能立即显示当前值
+                // SetFieldsData批量API不传_Keyword，含$Keyword$的SQL可能返回空
+                if (self.field.Config.DataSourceSqlRemote &&
+                    (!self.field.Data || self.field.Data.length === 0)) {
+                    self.SelectRemoteMethod("", self.field);
+                }
             }
             
             self.Initing = false;
