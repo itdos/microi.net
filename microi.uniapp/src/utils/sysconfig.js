@@ -3,7 +3,7 @@
  * 提供 SysConfig 的获取、缓存和读取
  */
 import { post } from './request.js'
-import appConfig from './config.js'
+import appConfig from '../config.js'
 
 const CACHE_KEY = 'sys_config_cache'
 const CACHE_EXPIRE = 30 * 60 * 1000 // 缓存30分钟

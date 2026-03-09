@@ -5,7 +5,7 @@
  */
 
 import Encrypt from 'encryptlong'
-import appConfig from './config.js'
+import appConfig from '../config.js'
 
 /**
  * RSA 加密密码

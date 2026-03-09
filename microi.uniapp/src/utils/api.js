@@ -3,7 +3,7 @@
  * 基于 Microi 低代码引擎的接口调用
  */
 import { post } from './request.js'
-import appConfig from './config.js'
+import appConfig from '../config.js'
 
 /**
  * 获取图片完整 URL

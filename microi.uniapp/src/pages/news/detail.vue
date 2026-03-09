@@ -59,7 +59,7 @@
 
 <script>
 import { getNewsDetail, getImageUrl, parseImages } from '@/utils/api.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {

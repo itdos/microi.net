@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 
