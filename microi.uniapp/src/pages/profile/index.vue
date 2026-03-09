@@ -220,7 +220,7 @@
 <script>
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin, setTheme } from '@/utils/theme.js'
 import { setLang } from '@/utils/i18n.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'

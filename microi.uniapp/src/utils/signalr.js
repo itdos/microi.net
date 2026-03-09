@@ -14,7 +14,7 @@
  */
 
 import { getToken, getUser } from './request.js'
-import appConfig from './config.js'
+import appConfig from '../config.js'
 
 const RS = '\x1e' // Record Separator
 

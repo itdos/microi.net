@@ -153,7 +153,7 @@
 </template>
 
 <script>
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.js'
 import { encryptPassword } from '@/utils/crypto.js'
