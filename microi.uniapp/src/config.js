@@ -17,8 +17,8 @@ export default {
   fileServer: 'https://static.jifulii.com',
 
   // ============ WebView 地址 ============
-  // webviewUrl: 'http://localhost:1988/?OsClient=xjy',
-  webviewUrl: 'https://saas.jifulii.com',
+  webviewUrl: 'http://localhost:1988/?OsClient=xjy',
+  // webviewUrl: 'https://saas.jifulii.com',
 
   // ============ 平台信息 ============
   appName: 'Loading...',

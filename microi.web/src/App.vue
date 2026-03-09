@@ -68,6 +68,11 @@ export default {
 
     async mounted() {
         // console.log("-------> App.vue mounted");
+        if(window && window.location && window.location.href) {
+            console.log('当前URL：', window.location.href);
+        } else {
+            console.log('无法获取当前URL');
+        }
         var self = this;
 
         // 初始化窗口大小监听，用于响应式布局
@@ -198,7 +203,24 @@ export default {
         },
         PageInit() {
             var self = this;
-            self.GetCurrentUserApp();
+            var authorization = self.$localStorageManager.get("Token");
+            var expires = self.$localStorageManager.get("TokenExpires");
+            // 如果Token已过期（如长时间关闭浏览器/App后重新打开），先刷新Token再获取用户信息，避免401
+            if (authorization && expires && new Date() >= new Date(expires)) {
+                self.DiyCommon.Post(
+                    "/api/SysUser/refreshToken",
+                    { authorization: authorization },
+                    function (result) {
+                        self.GetCurrentUserApp();
+                    },
+                    function (error) {
+                        // 刷新失败仍尝试获取用户信息（会触发登录弹窗）
+                        self.GetCurrentUserApp();
+                    }
+                );
+            } else {
+                self.GetCurrentUserApp();
+            }
             // 保存定时器引用，防止内存泄漏
             var refreshTokenTimer = window.setInterval(self.RefreshToken, 1000 * 60);
             self.timers.push(refreshTokenTimer);

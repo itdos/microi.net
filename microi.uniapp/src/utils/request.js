@@ -1,7 +1,7 @@
 /**
  * 网络请求封装
  */
-import appConfig from './config.js'
+import appConfig from '../config.js'
 
 // Token 存储 key
 const TOKEN_KEY = 'microi_token'

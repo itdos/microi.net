@@ -187,7 +187,7 @@
 
 <script>
 import { getProductList, getProductCategories, getProductTypes, parseImages, getImageUrl } from '@/utils/api.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getMenuButtonRect } from '@/utils/platform.js'
 

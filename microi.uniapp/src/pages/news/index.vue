@@ -110,7 +110,7 @@
 
 <script>
 import { getNewsList, getBannerList, parseImages, getImageUrl } from '@/utils/api.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {

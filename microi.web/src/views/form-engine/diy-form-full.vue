@@ -1,7 +1,9 @@
 <template>
     <div>
         <!--以全新页面形式打开Form（路由页面模式）-->
-        <div v-if="IsPageMode" class="pluginPage" :class="{ 'mobile-form-page': diyStore.IsPhoneView }" style="margin-top: 10px;">
+        <div v-if="IsPageMode" class="pluginPage" 
+            :class="{ 'mobile-form-page': diyStore.IsPhoneView, 'mini-program' : diyStore.IsMiniProgram }" 
+            style="margin-top: 10px;">
             <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
             <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-form-header-bar">
                 <div class="mobile-header-left">
@@ -1886,6 +1888,9 @@ export default {
             width: 100%;
         }
     }
+}
+.mobile-form-page.mini-program{
+    padding-top: calc(0px + var(--status-bar-height, 0px)) !important;
 }
 
 // 表单头部默认样式（页面模式）

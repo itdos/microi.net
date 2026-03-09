@@ -325,7 +325,8 @@ namespace Microi.net.Api
                 {
                     var jsonResult = new DosResult(
                         int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0,
+                        null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 
+                        null,
                         new
                         {
                             AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
@@ -341,9 +342,10 @@ namespace Microi.net.Api
                     context.Result = new JsonResult(
                         new DosResult(
                             int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
+                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 
+                            null, new
                             {
-
+                                AppendMsg = $"Token中未找到用户信息，可能是因为Redis缓存被清空了。OsClient：{osClient}"
                             }));
                     return;
                 }
@@ -472,7 +474,16 @@ namespace Microi.net.Api
                 if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                     )
                 {
-                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang)));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
+                    context.Result = new JsonResult(new DosResult(
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                        null, 
+                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                        null,
+                        new
+                        {
+                            AppendMsg = $"从Token的claims中未找到有效的用户信息。UserId：{userId}, OsClient：{tokenOsClient}"
+                        }
+                    ));
                     return;
                 }
                 else
@@ -490,7 +501,15 @@ namespace Microi.net.Api
                     //登陆身份已失效，因为redis被清了
                     if (tokenModel == null)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2")); //
+                        context.Result = new JsonResult(new DosResult(
+                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2",
+                            null,
+                            new
+                            {
+                                AppendMsg = $"Token对应的用户信息未找到，可能是因为Redis缓存被清空了。UserId：{userId}, OsClient：{tokenOsClient}"
+                            }
+                        ));
                         return;
                     }
                     else
@@ -504,7 +523,16 @@ namespace Microi.net.Api
                 if (sysUser == null)
                 {
                     //登陆身份已失效，因为redis被清了
-                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
+                    context.Result = new JsonResult(new DosResult(
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                        null, 
+                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                        null,
+                        new
+                        {
+                            AppendMsg = $"Token对应的用户信息未找到，可能是因为Redis缓存被清空了。UserId：{userId}, OsClient：{tokenOsClient}"
+                        }
+                    ));
                     return;
                 }
 
@@ -522,7 +550,16 @@ namespace Microi.net.Api
                 //如果token已过期，直接返回退出登录
                 if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
                 {
-                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
+                    context.Result = new JsonResult(new DosResult(
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                        null, 
+                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                        null,
+                        new
+                        {
+                            AppendMsg = $"Token已过期，最后更新时间：{tokenModel.UpdateTime}, 当前时间：{DateTime.Now}, 超过SessionAuthTimeout设置的过期时间：{sessionAuthTimeout}分钟"
+                        }
+                    ));
                     return;
                 }
                 if (sysUser != null &&

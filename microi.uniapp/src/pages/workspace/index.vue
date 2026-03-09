@@ -133,7 +133,7 @@
 <script>
 import { getToken, getUser } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 import { getSourceTag } from '@/utils/platform.js'

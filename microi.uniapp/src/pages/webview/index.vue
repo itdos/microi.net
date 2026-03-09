@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { getSourceTag } from '@/utils/platform.js'

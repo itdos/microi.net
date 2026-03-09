@@ -11,7 +11,8 @@
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
             @tab-click="tabClickRowList"
-            :class="!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide' : 'table-rowlist-tabs box-card-top-tabs'"
+            :class="(!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide' : 'table-rowlist-tabs box-card-top-tabs')
+                + (diyStore.IsMiniProgram ? ' mini-program' : '')"
         >
             <!-- 之前是使用GetPageTabs()，使用改成了预渲染  -->
             <template v-for="(tab, tabIndex) in SysMenuModel.PageTabs" :key="TypeFieldName + 'page_tabs_' + tab.Id + tabIndex">
