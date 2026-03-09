@@ -752,6 +752,11 @@
         padding-top: calc(56px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
     }
 }
+.table-rowlist-tabs.mini-program{
+    @media screen and (max-width: 768px) {
+        padding-top: calc(10px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
+    }
+}
 .diy-child-table{
     .table-rowlist-tabs{
     @media screen and (max-width: 768px) {

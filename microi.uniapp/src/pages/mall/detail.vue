@@ -240,7 +240,7 @@
 <script>
 import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct } from '@/utils/api.js'
 import { getToken } from '@/utils/request.js'
-import appConfig from '@/utils/config.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
