@@ -22,8 +22,8 @@ export default defineConfig({
         // 构建分析插件 - 生成可视化报告
         visualizer({
             open: false, // 构建后不自动打开
-            gzipSize: true, // 显示 gzip 压缩后的大小
-            brotliSize: true, // 显示 brotli 压缩后的大小
+            gzipSize: false, // 关闭 gzip 计算以加速构建（需要时可手动开启）
+            brotliSize: false, // 关闭 brotli 计算以加速构建
             filename: 'bin/Release/dist/stats.html' // 输出文件路径
         }),
         // 🔥 Brotli压缩 - 比gzip效果更好
@@ -32,7 +32,7 @@ export default defineConfig({
             ext: '.br',
             threshold: 10240, // 大于10KB才压缩
             deleteOriginFile: false,
-            compressionOptions: { level: 11 } // 最高压缩级别
+            compressionOptions: { level: 6 } // level 6 比 11 快 5-10 倍，体积仅大 1-2%
         }),
         // 🔥 Gzip压缩 - 兼容旧浏览器
         compression({
@@ -107,19 +107,8 @@ export default defineConfig({
         cssMinify: 'esbuild',
         // 确保 CSS 导入顺序一致
         assetsInlineLimit: 4096,
-        // 🔥 压缩优化
-        minify: 'terser',
-        terserOptions: {
-            compress: {
-                drop_console: true, // 生产环境移除console
-                drop_debugger: true, // 移除debugger
-                pure_funcs: ['console.log', 'console.info', 'console.debug'], // 移除特定函数调用
-                passes: 2 // 多次压缩以获得更好的结果
-            },
-            format: {
-                comments: false // 移除所有注释
-            }
-        },
+        // 🔥 压缩优化 - esbuild 比 terser 快 20-40 倍，体积差异仅 1-2%
+        minify: 'esbuild',
         rollupOptions: {
             // 🔥 确保依赖加载顺序：Vue -> Element Plus -> 其他
             output: {
@@ -148,6 +137,9 @@ export default defineConfig({
             'monaco-editor/esm/vs/language/typescript/ts.worker',
             'monaco-editor/esm/vs/editor/editor.worker'
         ]
+    },
+    esbuild: {
+        drop: ['console', 'debugger'] // 生产环境移除 console 和 debugger
     },
     define: {
         // 兼容 process.env
