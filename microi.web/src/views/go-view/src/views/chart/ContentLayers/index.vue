@@ -104,7 +104,8 @@ watch(
   () => reverseList.value,
   newValue => {
     layerList.value = newValue
-  }
+  },
+  { immediate: true }
 )
 
 // 右键事件
