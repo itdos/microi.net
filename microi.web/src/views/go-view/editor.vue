@@ -7,7 +7,7 @@
           <n-notification-provider>
             <n-loading-bar-provider>
               <go-view-message-inject />
-              <chart-editor v-if="ready" :project-id="projectId" />
+              <chart-editor v-if="ready" />
             </n-loading-bar-provider>
           </n-notification-provider>
         </n-dialog-provider>
