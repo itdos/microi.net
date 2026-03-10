@@ -4,7 +4,7 @@
         :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
         :style="{ 
             padding: _IsTableChild ? '0px' : '0px', 
-            paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '10px' }"
+            paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '0px' }"
     >
         <!-- type="border-card" -->
         <el-tabs

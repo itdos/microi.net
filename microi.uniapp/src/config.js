@@ -10,16 +10,16 @@
 // 否则 uni-app 编译小程序时会导出为 exports.config 而非 exports.default
 export default {
   // ============ OsClient 标识 ============
-  osClient: 'qiqiang',
+  osClient: 'xjy',
 
   // ============ 服务端接口地址 ============
   // apiBase: 'https://localhost:7266',
-  // apiBase: 'https://api.jifulii.com',
-  apiBase: 'https://qq-api.chongstech.com:3020',
+  apiBase: 'https://api.jifulii.com',
+  // apiBase: 'https://qq-api.chongstech.com:3020',
 
   // ============ WebView 地址 ============
-  webviewUrl: 'http://localhost:1988/?OsClient=qiqiang',
-  // webviewUrl: 'https://saas.jifulii.com',
+  // webviewUrl: 'http://localhost:1988/?OsClient=qiqiang',
+  webviewUrl: 'https://saas.jifulii.com',
 
   // ============ 静态资源服务器 ============
   fileServer: 'https://static.jifulii.com',

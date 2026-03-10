@@ -1,0 +1,5 @@
+export { setupNaive } from '@goview/plugins/naive'
+export { setupDirectives } from '@goview/plugins/directives'
+export { setupCustomComponents } from '@goview/plugins/customComponents'
+export { icon } from '@goview/plugins/icon'
+export { initFunction } from '@goview/plugins/initFunction'

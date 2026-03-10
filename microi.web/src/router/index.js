@@ -203,6 +203,30 @@ export const asyncRoutes = [
             }
         ]
     },
+    // GoView 大屏设计器
+    {
+        path: "/mic/data-dashboard/design/:Id",
+        component: Layout,
+        children: [
+            {
+                path: "/mic/data-dashboard/design/:Id",
+                name: "mic_data_dashboard_design",
+                component: () => import("@/views/go-view/editor.vue")
+            }
+        ]
+    },
+    // GoView 大屏预览
+    {
+        path: "/mic/data-dashboard/preview/:Id",
+        component: Layout,
+        children: [
+            {
+                path: "/mic/data-dashboard/preview/:Id",
+                name: "mic_data_dashboard_preview",
+                component: () => import("@/views/go-view/preview.vue")
+            }
+        ]
+    },
     // {
     //     path: "/file-manage",
     //     component: Layout,
