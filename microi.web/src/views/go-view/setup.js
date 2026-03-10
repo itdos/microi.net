@@ -33,11 +33,11 @@ export function setupGoView(app) {
   // 设置暗色主题
   setHtmlTheme()
 
-  // 注册图标集（按需加载，避免打包过大）
+  // 注册图标集（按需加载独立包，避免引入 409MB 的 @iconify/json）
   try {
-    import('@iconify/json/json/uim.json').then(m => addCollection(m.default))
-    import('@iconify/json/json/line-md.json').then(m => addCollection(m.default))
-    import('@iconify/json/json/wi.json').then(m => addCollection(m.default))
+    import('@iconify-json/uim/icons.json').then(m => addCollection(m.default))
+    import('@iconify-json/line-md/icons.json').then(m => addCollection(m.default))
+    import('@iconify-json/wi/icons.json').then(m => addCollection(m.default))
   } catch (e) {
     console.warn('go-view: iconify icons not loaded', e)
   }
