@@ -10,6 +10,10 @@ import { setupDirectives } from './src/plugins/directives'
 import { setHtmlTheme } from '@goview/utils'
 import 'iconify-icon'
 import { addCollection } from 'iconify-icon'
+// 标尺样式
+import 'vue3-sketch-ruler/lib/style.css'
+// 动画库
+import 'animate.css/animate.min.css'
 
 let initialized = false
 
@@ -45,6 +49,11 @@ export function setupGoView(app) {
   if (!window['$t']) {
     window['$t'] = (key) => key
   }
+
+  // 捕获未处理的 Promise 异常（go-view 内部依赖）
+  window.addEventListener('unhandledrejection', event => {
+    console.warn(`[go-view] UNHANDLED PROMISE REJECTION:`, event.reason)
+  })
 
   console.log('[go-view] setup completed')
 }
