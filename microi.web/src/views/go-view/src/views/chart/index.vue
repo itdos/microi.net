@@ -18,7 +18,7 @@
           <content-charts></content-charts>
           <content-layers></content-layers>
         </div>
-        <div style="flex: 1; min-width: 0; overflow: hidden;">
+        <div class="go-chart-configurations-wrap">
           <content-configurations></content-configurations>
         </div>
       </n-layout-content>
@@ -76,5 +76,11 @@ const {
   width: 100%;
   overflow: hidden;
   @include background-image("background-image");
+}
+.go-chart-configurations-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  height: calc(100vh - var(--goview-top-offset, 0px) - #{$--header-height});
 }
 </style>

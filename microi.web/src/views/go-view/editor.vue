@@ -113,5 +113,8 @@ export default defineComponent({
   height: calc(100vh - var(--goview-top-offset));
   overflow: hidden;
   position: relative;
+  // 隔离宿主框架的全局样式对 go-view 的影响
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>
