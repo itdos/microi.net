@@ -685,22 +685,29 @@ export default {
         };
 
         // 解析数据
+        // 标记：parseData 是否补充过缺失的 Id
+        let _idFixedInLastParse = false;
+
         const parseData = (value) => {
+            _idFixedInLastParse = false;
             if (!value) return [];
-            if (Array.isArray(value)) {
-                return value.map((item, index) => ({
+            const fillId = (item, index) => {
+                const needFix = !item.Id;
+                if (needFix) _idFixedInLastParse = true;
+                return {
                     ...item,
+                    Id: item.Id || DiyCommon.NewGuid(),
                     _rowKey: item._rowKey || `row_${Date.now()}_${index}`
-                }));
+                };
+            };
+            if (Array.isArray(value)) {
+                return value.map(fillId);
             }
             if (typeof value === 'string') {
                 try {
                     const parsed = JSON.parse(value);
                     if (Array.isArray(parsed)) {
-                        return parsed.map((item, index) => ({
-                            ...item,
-                            _rowKey: item._rowKey || `row_${Date.now()}_${index}`
-                        }));
+                        return parsed.map(fillId);
                     }
                 } catch (e) {
                     console.warn('JSON解析失败:', e);
@@ -778,6 +785,7 @@ export default {
         // 新增 - 直接在表内添加新行
         const handleAdd = () => {
             const newRow = {
+                Id: DiyCommon.NewGuid(),
                 _rowKey: `row_${Date.now()}_${tableData.value.length}`
             };
             // 初始化默认值
@@ -889,6 +897,7 @@ export default {
             // 遍历选中的数据，添加到表格
             dataSourceSelected.value.forEach(item => {
                 const newRow = {
+                    Id: item.Id || DiyCommon.NewGuid(),
                     _rowKey: `row_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                 };
                 // 只添加列配置中存在的字段
@@ -1332,11 +1341,19 @@ export default {
 
         // ==================== 生命周期 ====================
 
+        // 解析后如果补充了缺失的 Id，延迟同步回父组件以修复老数据
+        const syncIfIdFixed = () => {
+            if (_idFixedInLastParse && tableData.value.length > 0) {
+                nextTick(() => syncToParent());
+            }
+        };
+
         // 监听 modelValue 变化
         watch(
             () => props.modelValue,
             (newVal) => {
                 tableData.value = parseData(newVal);
+                syncIfIdFixed();
             },
             { immediate: true, deep: true }
         );
@@ -1347,6 +1364,7 @@ export default {
             (newVal) => {
                 if (newVal !== undefined) {
                     tableData.value = parseData(newVal);
+                    syncIfIdFixed();
                 }
             },
             { deep: true }
@@ -1357,6 +1375,7 @@ export default {
             const initialValue = props.modelValue || props.FormDiyTableModel?.[props.field?.Name];
             if (initialValue) {
                 tableData.value = parseData(initialValue);
+                syncIfIdFixed();
             }
             // 初始化拖拽
             if (!GetFieldReadOnly(props.field)) {

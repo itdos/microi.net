@@ -131,7 +131,7 @@
         </el-row>
       </el-header>
       <el-container>
-        <el-aside width="280px" style="padding: 15px">
+        <el-aside width="280px" style="padding: 10px 10px 0 0;">
           <el-card style="height: 85vh; overflow-y: auto">
             <el-tabs v-model="pageInfo.setting.activeName" class="demo-tabs">
               <el-tab-pane name="first">
@@ -266,7 +266,7 @@
           </el-main>
         </el-container>
 
-        <el-aside width="300px" style="padding: 15px">
+        <el-aside width="300px" style="padding: 10px 0 0 10px;">
           <el-card style="padding: 0px; height: 85vh; overflow-y: auto">
             <template #header>
               <div class="card-header">
@@ -1060,7 +1060,7 @@ const saveFormData = async () => {
     line-height: 55px;
     text-align: center;
     box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.1);
-    margin-top: 15px;
+    // margin-top: 15px;
     background-color: #fff;
 
     .leftlogo {

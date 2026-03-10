@@ -8,7 +8,13 @@ import compression from 'vite-plugin-compression';
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [
-        vue(),
+        vue({
+            template: {
+                compilerOptions: {
+                    isCustomElement: (tag) => tag === 'iconify-icon'
+                }
+            }
+        }),
         createSvgIconsPlugin({
             iconDirs: [path.resolve(process.cwd(), 'src/icons/svg')],
             symbolId: 'icon-[name]'
@@ -38,6 +44,7 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
+            '@goview': path.resolve(__dirname, 'src/views/go-view/src'),
             '@': path.resolve(__dirname, 'src'),
             // 兼容 SCSS 中 ~@ 的导入
             '~@': path.resolve(__dirname, 'src'),
@@ -60,6 +67,10 @@ export default defineConfig({
                     // 如果文件包含 @use "sass: 内置模块，将 @import 放到 @use 之后
                     if (source.includes('@use "sass:')) {
                         return source;
+                    }
+                    // go-view 文件注入 go-view 自己的全局样式
+                    if (filename.includes('views/go-view/src/')) {
+                        return `@import "@goview/styles/common/style.scss";\n${source}`;
                     }
                     return `@import "@/styles/variables.scss";\n${source}`;
                 },

@@ -60,7 +60,7 @@
 
 <script setup name="from-renderer">
 import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount, onActivated } from 'vue'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'
 import { DiyCommon } from '@/utils/diy.common';
@@ -186,6 +186,13 @@ const setupRefreshInterval = () => {
     }, i)
   }
 }
+
+onActivated(() => {
+  // keep-alive恢复时，重新将当前实例的数据写回共享store
+  if (!props.isPrivew) {
+    loadFormData()
+  }
+})
 
 onMounted(() => {
   //加载暗黑模式

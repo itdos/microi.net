@@ -1,0 +1,4049 @@
+{
+  "editCanvasConfig": {
+    "projectName": "任亿科技车间看板",
+    "width": 1920,
+    "height": 1080,
+    "filterShow": false,
+    "hueRotate": 30,
+    "saturate": 1,
+    "contrast": 1,
+    "brightness": 1,
+    "opacity": 1,
+    "rotateZ": 0,
+    "rotateX": 0,
+    "rotateY": 0,
+    "skewX": 0,
+    "skewY": 0,
+    "blendMode": "normal",
+    "background": "rgba(30, 33, 40, 1)",
+    "backgroundImage": null,
+    "selectColor": true,
+    "chartThemeColor": "dark",
+    "chartCustomThemeColorInfo": null,
+    "chartThemeSetting": {
+      "title": {
+        "show": true,
+        "textStyle": {
+          "color": "#BFBFBF",
+          "fontSize": 18
+        },
+        "subtextStyle": {
+          "color": "#A2A2A2",
+          "fontSize": 14
+        }
+      },
+      "xAxis": {
+        "show": true,
+        "name": "",
+        "nameGap": 15,
+        "nameTextStyle": {
+          "color": "#B9B8CE",
+          "fontSize": 12
+        },
+        "inverse": false,
+        "axisLabel": {
+          "show": true,
+          "fontSize": 12,
+          "color": "#B9B8CE",
+          "rotate": 0
+        },
+        "position": "bottom",
+        "axisLine": {
+          "show": true,
+          "lineStyle": {
+            "color": "#B9B8CE",
+            "width": 1
+          },
+          "onZero": true
+        },
+        "axisTick": {
+          "show": true,
+          "length": 5
+        },
+        "splitLine": {
+          "show": false,
+          "lineStyle": {
+            "color": "#484753",
+            "width": 1,
+            "type": "solid"
+          }
+        }
+      },
+      "yAxis": {
+        "show": true,
+        "name": "",
+        "nameGap": 15,
+        "nameTextStyle": {
+          "color": "#B9B8CE",
+          "fontSize": 12
+        },
+        "inverse": false,
+        "axisLabel": {
+          "show": true,
+          "fontSize": 12,
+          "color": "#B9B8CE",
+          "rotate": 0
+        },
+        "position": "left",
+        "axisLine": {
+          "show": true,
+          "lineStyle": {
+            "color": "#B9B8CE",
+            "width": 1
+          },
+          "onZero": true
+        },
+        "axisTick": {
+          "show": true,
+          "length": 5
+        },
+        "splitLine": {
+          "show": true,
+          "lineStyle": {
+            "color": "#484753",
+            "width": 1,
+            "type": "solid"
+          }
+        }
+      },
+      "legend": {
+        "show": true,
+        "type": "scroll",
+        "x": "center",
+        "y": "top",
+        "icon": "circle",
+        "orient": "horizontal",
+        "textStyle": {
+          "color": "#B9B8CE",
+          "fontSize": 18
+        },
+        "itemHeight": 15,
+        "itemWidth": 15,
+        "pageTextStyle": {
+          "color": "#B9B8CE"
+        }
+      },
+      "grid": {
+        "show": false,
+        "left": "10%",
+        "top": "60",
+        "right": "10%",
+        "bottom": "60"
+      },
+      "dataset": null,
+      "renderer": "svg"
+    },
+    "vChartThemeName": "vScreenVolcanoBlue",
+    "previewScaleType": "full"
+  },
+  "componentList": [
+    {
+      "id": "id_3ig1qhf71bi000",
+      "isGroup": false,
+      "attr": {
+        "x": 501,
+        "y": 5,
+        "w": 891,
+        "h": 78,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": true,
+        "hueRotate": 3,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1.2,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates06",
+      "chartConfig": {
+        "key": "Decorates06",
+        "chartKey": "VDecorates06",
+        "conKey": "VCDecorates06",
+        "title": "装饰-06",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates06.png"
+      },
+      "option": {
+        "colors": [
+          "#030F255C",
+          "#579EFFFF"
+        ],
+        "dataset": "     ",
+        "textColor": "#A6F3FFFF",
+        "textSize": 37
+      }
+    },
+    {
+      "id": "id_nacyd44c9lc00",
+      "isGroup": false,
+      "attr": {
+        "x": 684,
+        "y": 3,
+        "w": 516,
+        "h": 79,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates03",
+      "chartConfig": {
+        "key": "Decorates03",
+        "chartKey": "VDecorates03",
+        "conKey": "VCDecorates03",
+        "title": "装饰-03",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates03.png"
+      },
+      "option": {
+        "dataset": "",
+        "textColor": "#fff",
+        "textSize": 32,
+        "colors": [
+          "#1dc1f5",
+          "#1dc1f5"
+        ]
+      }
+    },
+    {
+      "id": "id_4syfrhf2eqg000",
+      "isGroup": false,
+      "attr": {
+        "x": 810,
+        "y": 103,
+        "w": 1075,
+        "h": 951,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border06",
+      "chartConfig": {
+        "key": "Border06",
+        "chartKey": "VBorder06",
+        "conKey": "VCBorder06",
+        "title": "边框-06",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border06.png"
+      },
+      "option": {
+        "colors": [
+          "#3140ad",
+          "#1089ff"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_5yj3uacnkew00",
+      "isGroup": false,
+      "attr": {
+        "x": 21,
+        "y": 103,
+        "w": 770,
+        "h": 468,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border06",
+      "chartConfig": {
+        "key": "Border06",
+        "chartKey": "VBorder06",
+        "conKey": "VCBorder06",
+        "title": "边框-06",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border06.png"
+      },
+      "option": {
+        "colors": [
+          "#3140ad",
+          "#1089ff"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_4lkx4gsq2gw000",
+      "isGroup": false,
+      "attr": {
+        "x": 88,
+        "y": 117,
+        "w": 432,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "当前生产情况总览",
+        "fontSize": 22,
+        "fontColor": "#D1F1FFFF",
+        "paddingX": 10,
+        "paddingY": 18,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 4,
+        "letterSpacing": 2,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_2rc6znuefx8000",
+      "isGroup": false,
+      "attr": {
+        "x": 83,
+        "y": -9,
+        "w": 411,
+        "h": 64,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates05",
+      "chartConfig": {
+        "key": "Decorates05",
+        "chartKey": "VDecorates05",
+        "conKey": "VCDecorates05",
+        "title": "装饰-05",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates05.png"
+      },
+      "option": {
+        "colors": [
+          "#00c2ff",
+          "#00c2ff4d"
+        ],
+        "dur": 3
+      }
+    },
+    {
+      "id": "id_2f2w7tqyumdc00",
+      "isGroup": false,
+      "attr": {
+        "x": 1481,
+        "y": 53,
+        "w": 411,
+        "h": 64,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates05",
+      "chartConfig": {
+        "key": "Decorates05",
+        "chartKey": "VDecorates05",
+        "conKey": "VCDecorates05",
+        "title": "装饰-05",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates05.png"
+      },
+      "option": {
+        "colors": [
+          "#00c2ff",
+          "#00c2ff4d"
+        ],
+        "dur": 3
+      }
+    },
+    {
+      "id": "id_13c3iwt6ago000",
+      "isGroup": false,
+      "attr": {
+        "x": 5,
+        "y": 20,
+        "w": 489,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates04",
+      "chartConfig": {
+        "key": "Decorates04",
+        "chartKey": "VDecorates04",
+        "conKey": "VCDecorates04",
+        "title": "装饰-04",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates04.png"
+      },
+      "option": {
+        "colors": [
+          "#1D77F5FF",
+          "#1dc1f5"
+        ],
+        "reverse": false
+      }
+    },
+    {
+      "id": "id_2e76gptb3ezo00",
+      "isGroup": false,
+      "attr": {
+        "x": 58,
+        "y": 152,
+        "w": 721,
+        "h": 32,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates05",
+      "chartConfig": {
+        "key": "Decorates05",
+        "chartKey": "VDecorates05",
+        "conKey": "VCDecorates05",
+        "title": "装饰-05",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates05.png"
+      },
+      "option": {
+        "colors": [
+          "#00c2ff",
+          "#00c2ff4d"
+        ],
+        "dur": 3
+      }
+    },
+    {
+      "id": "id_1jq24g1z5wgw00",
+      "isGroup": false,
+      "attr": {
+        "x": 36,
+        "y": 111,
+        "w": 65,
+        "h": 57,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "CirclePoint",
+      "chartConfig": {
+        "key": "CirclePoint",
+        "chartKey": "VCirclePoint",
+        "conKey": "VCCirclePoint",
+        "title": "圆点光环",
+        "category": "Mores",
+        "categoryName": "更多",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "flow-circle.png"
+      },
+      "option": {
+        "outCircle": 10,
+        "inCircle": 4,
+        "outCircleColor": "#547C9CFF",
+        "inCircleColor": "#50A2FFFF",
+        "outCircleWidth": 2
+      }
+    },
+    {
+      "id": "id_vnjmzcx2nsw00",
+      "isGroup": false,
+      "attr": {
+        "x": 21,
+        "y": 591,
+        "w": 770,
+        "h": 461,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border06",
+      "chartConfig": {
+        "key": "Border06",
+        "chartKey": "VBorder06",
+        "conKey": "VCBorder06",
+        "title": "边框-06",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border06.png"
+      },
+      "option": {
+        "colors": [
+          "#3140ad",
+          "#1089ff"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_25aipetmfodc00",
+      "isGroup": false,
+      "attr": {
+        "x": 539,
+        "y": 183,
+        "w": 225,
+        "h": 100,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border07",
+      "chartConfig": {
+        "key": "Border07",
+        "chartKey": "VBorder07",
+        "conKey": "VCBorder07",
+        "title": "边框-07",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border07.png"
+      },
+      "option": {
+        "colors": [
+          "#11eefd",
+          "#0078d2"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_1fz42jw2lon400",
+      "isGroup": false,
+      "attr": {
+        "x": 297,
+        "y": 182,
+        "w": 225,
+        "h": 100,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border07",
+      "chartConfig": {
+        "key": "Border07",
+        "chartKey": "VBorder07",
+        "conKey": "VCBorder07",
+        "title": "边框-07",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border07.png"
+      },
+      "option": {
+        "colors": [
+          "#11eefd",
+          "#0078d2"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_2lubihul3l2000",
+      "isGroup": false,
+      "attr": {
+        "x": 53,
+        "y": 182,
+        "w": 225,
+        "h": 102,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Border07",
+      "chartConfig": {
+        "key": "Border07",
+        "chartKey": "VBorder07",
+        "conKey": "VCBorder07",
+        "title": "边框-07",
+        "category": "Borders",
+        "categoryName": "边框",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "border07.png"
+      },
+      "option": {
+        "colors": [
+          "#11eefd",
+          "#0078d2"
+        ],
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_2kjf6fs54yg000",
+      "isGroup": false,
+      "attr": {
+        "x": 150,
+        "y": 190,
+        "w": 128,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "上月出勤人数",
+        "fontSize": 17,
+        "fontColor": "#549BFFFF",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_5uqicus4vro000",
+      "isGroup": false,
+      "attr": {
+        "x": 155,
+        "y": 222,
+        "w": 123,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "apiengine/diy_kb_sczl_lb",
+        "requestInterval": 1,
+        "requestIntervalUnit": "hour",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "120",
+        "fontSize": 17,
+        "fontColor": "#ffffff",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_5kxoxh7zib0000",
+      "isGroup": false,
+      "attr": {
+        "x": 397,
+        "y": 194,
+        "w": 123,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "当前班次",
+        "fontSize": 17,
+        "fontColor": "#549BFFFF",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_21xp9l7ih5xc00",
+      "isGroup": false,
+      "attr": {
+        "x": 397,
+        "y": 227,
+        "w": 123,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 1,
+        "requestHttpType": "get",
+        "requestUrl": "apiengine/diy_kb_sczl_bc",
+        "requestInterval": 1,
+        "requestIntervalUnit": "hour",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "白班",
+        "fontSize": 17,
+        "fontColor": "#ffffff",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_3hukdalld54000",
+      "isGroup": false,
+      "attr": {
+        "x": 637,
+        "y": 196,
+        "w": 123,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "在制工单数",
+        "fontSize": 17,
+        "fontColor": "#549BFFFF",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_q4hmzujq01s00",
+      "isGroup": false,
+      "attr": {
+        "x": 641,
+        "y": 225,
+        "w": 123,
+        "h": 42,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "apiengine/diy_kb_sczl_gds",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "25",
+        "fontSize": 17,
+        "fontColor": "#ffffff",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 1,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_5jicehdjzs4000",
+      "isGroup": false,
+      "attr": {
+        "x": 90,
+        "y": 605,
+        "w": 432,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "仓库备料齐套率（近7天）",
+        "fontSize": 22,
+        "fontColor": "#D1F1FFFF",
+        "paddingX": 10,
+        "paddingY": 18,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 4,
+        "letterSpacing": 2,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_25ui1n3quc8w00",
+      "isGroup": false,
+      "attr": {
+        "x": 36,
+        "y": 599,
+        "w": 65,
+        "h": 57,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "CirclePoint",
+      "chartConfig": {
+        "key": "CirclePoint",
+        "chartKey": "VCirclePoint",
+        "conKey": "VCCirclePoint",
+        "title": "圆点光环",
+        "category": "Mores",
+        "categoryName": "更多",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "flow-circle.png"
+      },
+      "option": {
+        "outCircle": 10,
+        "inCircle": 4,
+        "outCircleColor": "#547C9CFF",
+        "inCircleColor": "#50A2FFFF",
+        "outCircleWidth": 2
+      }
+    },
+    {
+      "id": "id_4ncg2gczuzu000",
+      "isGroup": false,
+      "attr": {
+        "x": 43,
+        "y": 639,
+        "w": 721,
+        "h": 32,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates05",
+      "chartConfig": {
+        "key": "Decorates05",
+        "chartKey": "VDecorates05",
+        "conKey": "VCDecorates05",
+        "title": "装饰-05",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates05.png"
+      },
+      "option": {
+        "colors": [
+          "#00c2ff",
+          "#00c2ff4d"
+        ],
+        "dur": 3
+      }
+    },
+    {
+      "id": "id_3vs0op0ppkk000",
+      "isGroup": false,
+      "attr": {
+        "x": 325,
+        "y": 204,
+        "w": 64,
+        "h": 64,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Icon",
+      "chartConfig": {
+        "key": "Icon",
+        "chartKey": "VIcon",
+        "conKey": "VCIcon",
+        "title": "horizon-alt",
+        "category": "Default",
+        "categoryName": "默认",
+        "package": "Icons",
+        "chartFrame": "static",
+        "image": "icon.png"
+      },
+      "option": {
+        "dataset": "wi:horizon-alt",
+        "color": "#FFE988FF",
+        "size": 64,
+        "rotate": 0
+      }
+    },
+    {
+      "id": "id_3ohcqibe9j8000",
+      "isGroup": false,
+      "attr": {
+        "x": 85,
+        "y": 201,
+        "w": 58,
+        "h": 61,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Icon",
+      "chartConfig": {
+        "key": "Icon",
+        "chartKey": "VIcon",
+        "conKey": "VCIcon",
+        "title": "user-md",
+        "category": "Default",
+        "categoryName": "默认",
+        "package": "Icons",
+        "chartFrame": "static",
+        "image": "icon.png"
+      },
+      "option": {
+        "dataset": "uim:user-md",
+        "color": "#69D0FFFF",
+        "size": 50,
+        "rotate": 0
+      }
+    },
+    {
+      "id": "id_1x9bmd7qxrts",
+      "isGroup": false,
+      "attr": {
+        "x": 563,
+        "y": 208,
+        "w": 64,
+        "h": 55,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Icon",
+      "chartConfig": {
+        "key": "Icon",
+        "chartKey": "VIcon",
+        "conKey": "VCIcon",
+        "title": "graph-bar",
+        "category": "Default",
+        "categoryName": "默认",
+        "package": "Icons",
+        "chartFrame": "static",
+        "image": "icon.png"
+      },
+      "option": {
+        "dataset": "uim:graph-bar",
+        "color": "#03F48CFF",
+        "size": 44,
+        "rotate": 0
+      }
+    },
+    {
+      "id": "id_oi5o3t0h1xs00",
+      "isGroup": false,
+      "attr": {
+        "x": 19,
+        "y": 642,
+        "w": 772,
+        "h": 391,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "apiengine/diy_kb_ygcl?OsClient=zhongfu",
+        "requestInterval": 60,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "BarLine",
+      "chartConfig": {
+        "key": "BarLine",
+        "chartKey": "VBarLine",
+        "conKey": "VCBarLine",
+        "title": "柱状图 & 折线图",
+        "category": "Bars",
+        "categoryName": "柱状图",
+        "package": "Charts",
+        "chartFrame": "echarts",
+        "image": "bar_line.png"
+      },
+      "option": {
+        "legend": {
+          "show": false,
+          "type": "scroll",
+          "x": "right",
+          "y": "top",
+          "icon": "circle",
+          "orient": "horizontal",
+          "textStyle": {
+            "color": "#B9B8CE",
+            "fontSize": 18
+          },
+          "itemHeight": 15,
+          "itemWidth": 15,
+          "pageTextStyle": {
+            "color": "#B9B8CE"
+          },
+          "data": null
+        },
+        "xAxis": {
+          "show": true,
+          "name": "",
+          "nameGap": 16,
+          "nameTextStyle": {
+            "color": "#B9B8CE",
+            "fontSize": 12
+          },
+          "inverse": false,
+          "axisLabel": {
+            "show": true,
+            "fontSize": 22,
+            "color": "#B9B8CE",
+            "rotate": 0
+          },
+          "position": "bottom",
+          "axisLine": {
+            "show": true,
+            "lineStyle": {
+              "color": "#B9B8CE",
+              "width": 1
+            },
+            "onZero": true
+          },
+          "axisTick": {
+            "show": true,
+            "length": 5
+          },
+          "splitLine": {
+            "show": false,
+            "lineStyle": {
+              "color": "#484753",
+              "width": 1,
+              "type": "solid"
+            }
+          },
+          "type": "category"
+        },
+        "yAxis": {
+          "show": true,
+          "name": "",
+          "nameGap": 15,
+          "nameTextStyle": {
+            "color": "#B9B8CE",
+            "fontSize": 14
+          },
+          "inverse": false,
+          "axisLabel": {
+            "show": true,
+            "fontSize": 15,
+            "color": "#B9B8CE",
+            "rotate": 0
+          },
+          "position": "left",
+          "axisLine": {
+            "show": false,
+            "lineStyle": {
+              "color": "#B9B8CE",
+              "width": 1
+            },
+            "onZero": true
+          },
+          "axisTick": {
+            "show": false,
+            "length": 5
+          },
+          "splitLine": {
+            "show": true,
+            "lineStyle": {
+              "color": "#484753",
+              "width": 1,
+              "type": "solid"
+            }
+          },
+          "type": "value"
+        },
+        "grid": {
+          "show": false,
+          "left": "10%",
+          "top": "60",
+          "right": "10%",
+          "bottom": "60"
+        },
+        "tooltip": {
+          "show": true,
+          "trigger": "axis",
+          "axisPointer": {
+            "show": true,
+            "type": "shadow"
+          }
+        },
+        "dataset": {
+          "dimensions": [
+            "product",
+            "齐套率"
+          ],
+          "source": [
+            {
+              "product": "2.1",
+              "齐套率": 85
+            },
+            {
+              "product": "2.2",
+              "齐套率": 78
+            },
+            {
+              "product": "2.3",
+              "齐套率": 92
+            },
+            {
+              "product": "2.4",
+              "齐套率": 65
+            },
+            {
+              "product": "2.5",
+              "齐套率": 88
+            },
+            {
+              "product": "2.6",
+              "齐套率": 72
+            },
+            {
+              "product": "2.7",
+              "齐套率": 95
+            }
+          ]
+        },
+        "series": [
+          {
+            "type": "bar",
+            "barWidth": 18,
+            "label": {
+              "show": true,
+              "position": "top",
+              "color": "#fff",
+              "fontSize": 17
+            },
+            "itemStyle": {
+              "color": null,
+              "borderRadius": 3
+            }
+          }
+        ],
+        "backgroundColor": "rgba(0,0,0,0)"
+      }
+    },
+    {
+      "id": "id_4qek4w8zkns000",
+      "isGroup": false,
+      "attr": {
+        "x": 869,
+        "y": 113,
+        "w": 432,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "已开工周计划的情况",
+        "fontSize": 22,
+        "fontColor": "#D1F1FFFF",
+        "paddingX": 10,
+        "paddingY": 18,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 4,
+        "letterSpacing": 2,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_1yl250rs57k000",
+      "isGroup": false,
+      "attr": {
+        "x": 817,
+        "y": 109,
+        "w": 65,
+        "h": 57,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "CirclePoint",
+      "chartConfig": {
+        "key": "CirclePoint",
+        "chartKey": "VCirclePoint",
+        "conKey": "VCCirclePoint",
+        "title": "圆点光环",
+        "category": "Mores",
+        "categoryName": "更多",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "flow-circle.png"
+      },
+      "option": {
+        "outCircle": 10,
+        "inCircle": 4,
+        "outCircleColor": "#547C9CFF",
+        "inCircleColor": "#50A2FFFF",
+        "outCircleWidth": 2
+      }
+    },
+    {
+      "id": "id_5nv464p9vw0000",
+      "isGroup": false,
+      "attr": {
+        "x": 835,
+        "y": 151,
+        "w": 1016,
+        "h": 32,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates05",
+      "chartConfig": {
+        "key": "Decorates05",
+        "chartKey": "VDecorates05",
+        "conKey": "VCDecorates05",
+        "title": "装饰-05",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates05.png"
+      },
+      "option": {
+        "colors": [
+          "#00c2ff",
+          "#00c2ff4d"
+        ],
+        "dur": 3
+      }
+    },
+    {
+      "id": "id_2relb35uyww000",
+      "isGroup": false,
+      "attr": {
+        "x": 835,
+        "y": 182,
+        "w": 1024,
+        "h": 851,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "apiengine/diy_kb_ykgscdd??OsClient=renyi",
+        "requestInterval": 60,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": "return res.Data",
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": "// 组件样式作用域标识\r\nconst scoped = this.subTree.scopeId\r\nfunction loadStyleString(css){\r\n\tlet style = document.createElement('style')\r\n\tstyle.type = 'text/css'\r\n\tstyle.appendChild(document.createTextNode(css))\r\n\tlet head = document.getElementsByTagName('head')[0]\r\n\thead.appendChild(style)\r\n}\r\nloadStyleString(`\r\n.ceil {\r\n    font-size: 20px !important;\r\n}\r\n.header-item{\r\n  font-size: 24px !important;\r\n}\r\n`)",
+          "vnodeBeforeMount": "// 组件样式作用域标识\r\nconst scoped = this.subTree.scopeId\r\nfunction loadStyleString(css){\r\n\tlet style = document.createElement('style')\r\n\tstyle.type = 'text/css'\r\n\tstyle.appendChild(document.createTextNode(css))\r\n\tlet head = document.getElementsByTagName('head')[0]\r\n\thead.appendChild(style)\r\n}\r\nloadStyleString(`\r\n.header-item{\r\n  font-size:30px;\r\n}\r\n`)"
+        },
+        "interactEvents": []
+      },
+      "key": "TableScrollBoard",
+      "chartConfig": {
+        "key": "TableScrollBoard",
+        "chartKey": "VTableScrollBoard",
+        "conKey": "VCTableScrollBoard",
+        "title": "轮播列表",
+        "category": "Tables",
+        "categoryName": "表格",
+        "package": "Tables",
+        "chartFrame": "common",
+        "image": "table_scrollboard.png"
+      },
+      "option": {
+        "header": [
+          "需求订单号",
+          "周计划号",
+          "物料名称",
+          "规格型号",
+          "备料进度",
+          "齐套数",
+          "已完工/总数"
+        ],
+        "dataset": [
+          [
+            "XQ20260001",
+            "ZJ2026W05",
+            "冷轧板",
+            "DC1E 1.2*215*185",
+            "备料中",
+            2560,
+            "2560/2560"
+          ],
+          [
+            "XQ20260001",
+            "ZJ2026W05",
+            "冷轧板",
+            "DC1E 0.9*190*205",
+            "备料中",
+            396,
+            "396/396"
+          ],
+          [
+            "XQ20260002",
+            "ZJ2026W06",
+            "冷轧板 上框左侧加强板",
+            "DC1E 1.5*220*170",
+            "备料中",
+            240,
+            "120/240"
+          ],
+          [
+            "XQ20260002",
+            "ZJ2026W06",
+            "冷轧板 扶手安装支架",
+            "DC1E 1.1*200*210",
+            "备料中",
+            465,
+            "230/465"
+          ],
+          [
+            "XQ20260003",
+            "ZJ2026W07",
+            "冷轧板 坐垫安装支架",
+            "DC1E 0.8*185*225",
+            "备料中",
+            3750,
+            "1800/3750"
+          ],
+          [
+            "XQ20260003",
+            "ZJ2026W07",
+            "冷轧板 头枕支架",
+            "DC1E 1.3*230*195",
+            "备料中",
+            918,
+            "450/918"
+          ],
+          [
+            "XQ20260004",
+            "ZJ2026W08",
+            "冷轧板 左/右B柱内板",
+            "DC1E 1.0*205*200",
+            "待备料",
+            393,
+            "0/393"
+          ],
+          [
+            "XQ20260005",
+            "ZJ2026W08",
+            "酸洗板",
+            "DC1E 1.4*210*180",
+            "备料中",
+            1094.9,
+            "800/1094.9"
+          ],
+          [
+            "XQ20260006",
+            "ZJ2026W09",
+            "刑材",
+            "DC1E 0.7*195*230",
+            "备料中",
+            275,
+            "275/275"
+          ],
+          [
+            "XQ20260006",
+            "ZJ2026W09",
+            "头部锁紧手柄",
+            "DC1E 1.6*225*175",
+            "备料中",
+            1053,
+            "1053/1053"
+          ],
+          [
+            "XQ20260007",
+            "ZJ2026W10",
+            "拼焊板",
+            "DC1E 0.9*200*215",
+            "备料中",
+            2430,
+            "1200/2430"
+          ],
+          [
+            "XQ20260008",
+            "ZJ2026W10",
+            "冷轧板DC01",
+            "DC1E 1.2*210*190",
+            "备料中",
+            200,
+            "150/200"
+          ],
+          [
+            "XQ20260009",
+            "ZJ2026W11",
+            "冷轧板",
+            "DC1E 1.1*235*185",
+            "备料中",
+            4000,
+            "2000/4000"
+          ],
+          [
+            "XQ20260009",
+            "ZJ2026W11",
+            "扁铁",
+            "DC1E 0.8*190*220",
+            "备料中",
+            1064,
+            "530/1064"
+          ],
+          [
+            "XQ20260010",
+            "ZJ2026W12",
+            "热轧板",
+            "DC1E 1.5*205*205",
+            "备料中",
+            2025,
+            "1000/2025"
+          ],
+          [
+            "XQ20260010",
+            "ZJ2026W12",
+            "右B柱内板总成",
+            "DC1E 1.3*215*195",
+            "备料中",
+            32.2,
+            "16/32.2"
+          ],
+          [
+            "XQ20260011",
+            "ZJ2026W13",
+            "镀锌板 左/右前车门锁加强板",
+            "DC1E 1.0*220*180",
+            "备料中",
+            170,
+            "85/170"
+          ],
+          [
+            "XQ20260012",
+            "ZJ2026W13",
+            "镀锌板 左/右前门外板支撑板",
+            "DC1E 0.9*230*190",
+            "已完工",
+            100,
+            "100/100"
+          ]
+        ],
+        "index": true,
+        "columnWidth": [
+          "80",
+          "150",
+          "150",
+          "150",
+          "150",
+          "150",
+          "150",
+          "150"
+        ],
+        "align": [
+          "center",
+          "center",
+          "center",
+          "center",
+          "center",
+          "center",
+          ""
+        ],
+        "rowNum": 10,
+        "waitTime": 4,
+        "headerHeight": 50,
+        "carousel": "single",
+        "headerBGC": "#254DA2FF",
+        "oddRowBGC": "#191E30FF",
+        "evenRowBGC": "#263254FF"
+      }
+    },
+    {
+      "id": "id_46vu93bwtuc000",
+      "isGroup": false,
+      "attr": {
+        "x": 771,
+        "y": 8,
+        "w": 434,
+        "h": 73,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "生产车间看板",
+        "fontSize": 38,
+        "fontColor": "#A6F3FFFF",
+        "paddingX": 10,
+        "paddingY": 10,
+        "textAlign": "center",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 5,
+        "letterSpacing": 0,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_2bujvc4bkuzo00",
+      "isGroup": false,
+      "attr": {
+        "x": 1403,
+        "y": 20,
+        "w": 500,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Decorates04",
+      "chartConfig": {
+        "key": "Decorates04",
+        "chartKey": "VDecorates04",
+        "conKey": "VCDecorates04",
+        "title": "装饰-04",
+        "category": "Decorates",
+        "categoryName": "装饰",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "decorates04.png"
+      },
+      "option": {
+        "colors": [
+          "#1D77F5FF",
+          "#1dc1f5"
+        ],
+        "reverse": true
+      }
+    },
+    {
+      "id": "id_rx89nfit4xs00",
+      "isGroup": false,
+      "attr": {
+        "x": 126,
+        "y": 337,
+        "w": 567,
+        "h": 243,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "VChartPie",
+      "chartConfig": {
+        "key": "VChartPie",
+        "chartKey": "VVChartPie",
+        "conKey": "VCVChartPie",
+        "title": "VChart饼图",
+        "category": "Pies",
+        "categoryName": "饼图",
+        "package": "VChart",
+        "chartFrame": "VChart",
+        "image": "vchart_pie.png"
+      },
+      "option": {
+        "legends": [
+          {
+            "visible": true,
+            "position": "middle",
+            "orient": "right",
+            "item": {
+              "visible": true,
+              "align": "left",
+              "shape": "circle",
+              "label": {
+                "style": {
+                  "fontSize": 16,
+                  "fill": "#B9B8CE",
+                  "fontFamily": "SimSun",
+                  "fontWeight": "normal"
+                }
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "visible": true,
+          "style": {
+            "panel": {
+              "padding": {
+                "top": 5,
+                "bottom": 10,
+                "left": 10,
+                "right": 10
+              },
+              "backgroundColor": "rgba(8, 28, 48, 0.95)",
+              "border": {
+                "color": "#CFCFCF",
+                "width": 0,
+                "radius": 2
+              },
+              "shadow": {
+                "x": 0,
+                "y": 4,
+                "blur": 12,
+                "spread": 0,
+                "color": "rgba(0, 0, 0, 0.2)"
+              }
+            },
+            "titleLabel": {
+              "fontSize": 14,
+              "fill": "#FFF",
+              "fontWeight": "bold",
+              "fontFamily": "SimSun",
+              "align": "left",
+              "lineHeight": 18
+            },
+            "keyLabel": {
+              "fontSize": 12,
+              "fill": "rgba(255,255,255,0.65)",
+              "fontWeight": "normal",
+              "fontFamily": "SimSun",
+              "align": "left",
+              "lineHeight": 18
+            },
+            "valueLabel": {
+              "fontSize": 12,
+              "fill": "#FFF",
+              "fontWeight": "normal",
+              "fontFamily": "SimSun",
+              "align": "right",
+              "lineHeight": 18
+            },
+            "shape": {
+              "size": 10,
+              "spacing": 10,
+              "shapeLineWidth": 0
+            },
+            "spaceRow": 10
+          }
+        },
+        "type": "pie",
+        "dataset": {
+          "values": [
+            {
+              "type": "Autocracies",
+              "year": "推车",
+              "value": 2733
+            },
+            {
+              "type": "Autocracies",
+              "year": "升降桌",
+              "value": 1712
+            },
+            {
+              "type": "Autocracies",
+              "year": "YFS升降桌",
+              "value": 890
+            },
+            {
+              "type": "Autocracies",
+              "year": "显示器支架",
+              "value": 3033
+            }
+          ]
+        },
+        "categoryField": "year",
+        "valueField": "value",
+        "seriesField": "year",
+        "category": "Pies",
+        "background": "rgba(0,0,0,0)"
+      }
+    },
+    {
+      "id": "id_3odzoscla88000",
+      "isGroup": false,
+      "attr": {
+        "x": 90,
+        "y": 308,
+        "w": 432,
+        "h": 45,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "TextCommon",
+      "chartConfig": {
+        "key": "TextCommon",
+        "chartKey": "VTextCommon",
+        "conKey": "VCTextCommon",
+        "title": "文字",
+        "category": "Texts",
+        "categoryName": "文本",
+        "package": "Informations",
+        "chartFrame": "common",
+        "image": "text_static.png"
+      },
+      "option": {
+        "link": "",
+        "linkHead": "http://",
+        "dataset": "民用件各项目产品产量占比",
+        "fontSize": 22,
+        "fontColor": "#D1F1FFFF",
+        "paddingX": 10,
+        "paddingY": 18,
+        "textAlign": "start",
+        "fontWeight": "normal",
+        "borderWidth": 0,
+        "borderColor": "#ffffff",
+        "borderRadius": 4,
+        "letterSpacing": 2,
+        "writingMode": "horizontal-tb",
+        "backgroundColor": "#00000000"
+      }
+    },
+    {
+      "id": "id_31o6v6zad9w000",
+      "isGroup": false,
+      "attr": {
+        "x": 40,
+        "y": 305,
+        "w": 65,
+        "h": 57,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": 1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "CirclePoint",
+      "chartConfig": {
+        "key": "CirclePoint",
+        "chartKey": "VCirclePoint",
+        "conKey": "VCCirclePoint",
+        "title": "圆点光环",
+        "category": "Mores",
+        "categoryName": "更多",
+        "package": "Decorates",
+        "chartFrame": "static",
+        "image": "flow-circle.png"
+      },
+      "option": {
+        "outCircle": 10,
+        "inCircle": 4,
+        "outCircleColor": "#547C9CFF",
+        "inCircleColor": "#50A2FFFF",
+        "outCircleWidth": 2
+      }
+    },
+    {
+      "id": "id_4qlaz4cv0d8000",
+      "isGroup": false,
+      "attr": {
+        "x": 706,
+        "y": -2,
+        "w": 169,
+        "h": 96,
+        "offsetX": 0,
+        "offsetY": 0,
+        "zIndex": -1
+      },
+      "styles": {
+        "filterShow": false,
+        "hueRotate": 0,
+        "saturate": 1,
+        "contrast": 1,
+        "brightness": 1,
+        "opacity": 1,
+        "rotateZ": 0,
+        "rotateX": 0,
+        "rotateY": 0,
+        "skewX": 0,
+        "skewY": 0,
+        "blendMode": "normal",
+        "animations": []
+      },
+      "preview": {
+        "overFlowHidden": false
+      },
+      "status": {
+        "lock": false,
+        "hide": false
+      },
+      "request": {
+        "requestDataType": 0,
+        "requestHttpType": "get",
+        "requestUrl": "",
+        "requestInterval": null,
+        "requestIntervalUnit": "second",
+        "requestContentType": 0,
+        "requestParamsBodyType": "none",
+        "requestSQLContent": {
+          "sql": "select * from  where"
+        },
+        "requestParams": {
+          "Body": {
+            "form-data": {},
+            "x-www-form-urlencoded": {},
+            "json": "",
+            "xml": ""
+          },
+          "Header": {},
+          "Params": {}
+        }
+      },
+      "filter": null,
+      "events": {
+        "baseEvent": {
+          "click": null,
+          "dblclick": null,
+          "mouseenter": null,
+          "mouseleave": null
+        },
+        "advancedEvents": {
+          "vnodeMounted": null,
+          "vnodeBeforeMount": null
+        },
+        "interactEvents": []
+      },
+      "key": "Image",
+      "chartConfig": {
+        "key": "Image",
+        "chartKey": "VImage",
+        "conKey": "VCImage",
+        "title": "微信图片_20260206123519_5038_4.png",
+        "category": "Mores",
+        "categoryName": "更多",
+        "package": "Informations",
+        "chartFrame": "static",
+        "image": "photo.png"
+      },
+      "option": {
+        "dataset": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAu0AAAC+CAYAAACBOzEXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF8WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxNDggNzkuMTY0MDM2LCAyMDE5LzA4LzEzLTAxOjA2OjU3ICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgeG1sbnM6cGhvdG9zaG9wPSJodHRwOi8vbnMuYWRvYmUuY29tL3Bob3Rvc2hvcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjEuMCAoV2luZG93cykiIHhtcDpDcmVhdGVEYXRlPSIyMDI1LTA5LTA3VDA5OjU4OjEzKzA4OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wMS0yOFQwOTo0OTo1MCswODowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wMS0yOFQwOTo0OTo1MCswODowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDoyZTcyOWMxYS05MjlhLTc0NDktOGNmNy1iMDQxOTJjZjllYTQiIHhtcE1NOkRvY3VtZW50SUQ9ImFkb2JlOmRvY2lkOnBob3Rvc2hvcDplMTk5NWZiYi1hYjZkLWVkNDQtOTZiYi03MWM4YzllYWQ3OWUiIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo4MGIxMzcyZS03NmRmLWIyNDUtYjJjNC1hNTBlZmIwZDYxYTciPiA8eG1wTU06SGlzdG9yeT4gPHJkZjpTZXE+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJjcmVhdGVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjgwYjEzNzJlLTc2ZGYtYjI0NS1iMmM0LWE1MGVmYjBkNjFhNyIgc3RFdnQ6d2hlbj0iMjAyNS0wOS0wN1QwOTo1ODoxMyswODowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIxLjAgKFdpbmRvd3MpIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDoyZTcyOWMxYS05MjlhLTc0NDktOGNmNy1iMDQxOTJjZjllYTQiIHN0RXZ0OndoZW49IjIwMjYtMDEtMjhUMDk6NDk6NTArMDg6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMS4wIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5b2+A0AABBpElEQVR42u2deZwcRd3/P9+a2Z0RCAEiRiBCOB/QGFGywXBDRATkEIlRHg4VJCA/5XCVQxRBblcOD1DB2wcQEDlUREUURDSLV+RB5NAACZgHUSAcu7Mz9f390TXsZM3uTlcf093zeb9e/epOdqq6uq7+VPW3viWqCkIIIYQQQkh2McwCQgghhBBCKNoJIYQQQgghFO2EEEIIIYRQtBNCCCGEEEIo2gkhhBBCCCGro5zGTZbusDVzOmaqavqb10NiB5gj8TPz1w8wEwghhBDSPaKd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",
+        "fit": "contain",
+        "borderRadius": 10
+      }
+    }
+  ],
+  "requestGlobalConfig": {
+    "requestDataPond": [],
+    "requestOriginUrl": "https://api.chongstech.com/",
+    "requestInterval": 30,
+    "requestIntervalUnit": "minute",
+    "requestParams": {
+      "Body": {
+        "form-data": {},
+        "x-www-form-urlencoded": {},
+        "json": "",
+        "xml": ""
+      },
+      "Header": {},
+      "Params": {}
+    }
+  }
+}
