@@ -1,0 +1,14 @@
+import { ConfigType, PackagesCategoryEnum, ChartFrameEnum } from '@goview/packages/index.d'
+import { ChatCategoryEnum, ChatCategoryEnumName } from '../../index.d'
+
+export const UnitySceneConfig: ConfigType = {
+  key: 'UnityScene',
+  chartKey: 'VUnityScene',
+  conKey: 'VCUnityScene',
+  title: 'Unity 3D 场景',
+  category: ChatCategoryEnum.UNITY_WEBGL,
+  categoryName: ChatCategoryEnumName.UNITY_WEBGL,
+  package: PackagesCategoryEnum.SCENES_3D,
+  chartFrame: ChartFrameEnum.STATIC,
+  image: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMTUwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzIzMjMyNCIgcng9IjYiLz48cG9seWdvbiBwb2ludHM9IjEwMCwyNSA1NSw1MCA1NSw5NSAxMDAsMTIwIDE0NSw5NSAxNDUsNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzUxZDZhOSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjEwMCIgeTE9IjI1IiB4Mj0iMTAwIiB5Mj0iNzIiIHN0cm9rZT0iIzUxZDZhOSIgc3Ryb2tlLXdpZHRoPSIyIiBvcGFjaXR5PSIuNiIvPjxsaW5lIHgxPSI1NSIgeTE9IjUwIiB4Mj0iMTAwIiB5Mj0iNzIiIHN0cm9rZT0iIzUxZDZhOSIgc3Ryb2tlLXdpZHRoPSIyIiBvcGFjaXR5PSIuNiIvPjxsaW5lIHgxPSIxNDUiIHkxPSI1MCIgeDI9IjEwMCIgeTI9IjcyIiBzdHJva2U9IiM1MWQ2YTkiIHN0cm9rZS13aWR0aD0iMiIgb3BhY2l0eT0iLjYiLz48dGV4dCB4PSIxMDAiIHk9IjE0MiIgZmlsbD0iIzg4OCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPlVuaXR5IFdlYkdMPC90ZXh0Pjwvc3ZnPgo='
+}

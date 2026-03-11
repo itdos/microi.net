@@ -7,7 +7,7 @@ import { usePackagesStore } from '@goview/store/modules/packagesStore/packagesSt
 import { ChartLayoutStoreEnum } from '@goview/store/modules/chartLayoutStore/chartLayoutStore.d'
 // 图标
 const { AirPlaneOutlineIcon, ImageIcon, BarChartIcon } = icon.ionicons5
-const { TableSplitIcon, RoadmapIcon, ChartPieIcon, SpellCheckIcon, GraphicalDataFlowIcon } = icon.carbon
+const { TableSplitIcon, RoadmapIcon, ChartPieIcon, SpellCheckIcon, GraphicalDataFlowIcon, Carbon3DSoftwareIcon } = icon.carbon
 
 // 图表
 export type MenuOptionsType = {
@@ -33,6 +33,10 @@ const packagesListObj = {
   [PackagesCategoryEnum.TABLES]: {
     icon: renderIcon(TableSplitIcon),
     label: PackagesCategoryName.TABLES
+  },
+  [PackagesCategoryEnum.SCENES_3D]: {
+    icon: renderIcon(Carbon3DSoftwareIcon),
+    label: PackagesCategoryName.SCENES_3D
   },
   [PackagesCategoryEnum.DECORATES]: {
     icon: renderIcon(GraphicalDataFlowIcon),
