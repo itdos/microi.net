@@ -22,8 +22,9 @@
                     v-model="dataSourceSelected"
                     multiple
                     filterable
-                    remote
-                    :remote-method="loadDataSourceOptions"
+                    :remote="isRemoteSearch"
+                    :remote-method="isRemoteSearch ? loadDataSourceOptions : undefined"
+                    :filter-method="isRemoteSearch ? undefined : filterDataSourceOptions"
                     :loading="dataSourceLoading"
                     placeholder="从数据源选择"
                     style="width: 300px; margin-right: 10px;"
@@ -31,6 +32,7 @@
                     collapse-tags
                     collapse-tags-tooltip
                     value-key="_dataSourceKey"
+                    @visible-change="handleDataSourceVisibleChange"
                 >
                     <el-option
                         v-for="item in dataSourceOptions"
@@ -457,7 +459,9 @@ export default {
         // 数据源批量导入相关
         const dataSourceSelected = ref([]);
         const dataSourceOptions = ref([]);
+        const dataSourceAllOptions = ref([]);  // 存储全量数据用于本地搜索
         const dataSourceLoading = ref(false);
+        const dataSourceLoaded = ref(false);   // 标记是否已加载过数据
 
         // ==================== 计算属性 ====================
         
@@ -469,6 +473,11 @@ export default {
             return jsonTableConfig.DataSource === 'Sql' || 
                    jsonTableConfig.DataSource === 'DataSource' || 
                    jsonTableConfig.DataSource === 'ApiEngine';
+        });
+
+        // 是否开启远程搜索（默认不开启，需要在配置中显式开启）
+        const isRemoteSearch = computed(() => {
+            return props.field?.Config?.JsonTable?.DataSourceSqlRemote === true;
         });
 
         // 获取数据源显示字段
@@ -837,8 +846,6 @@ export default {
                 };
                 
                 if (jsonTableConfig.DataSource === 'Sql') {
-                    // SQL 数据源 - 使用 GetDiyFieldSqlData 接口，传入 _FieldId
-                    // 后端会根据字段ID读取 Config.Sql 并执行
                     if (!props.field?.Id) {
                         console.warn('JSON表格字段缺少Id，无法加载SQL数据源');
                         dataSourceLoading.value = false;
@@ -846,11 +853,9 @@ export default {
                     }
                     apiUrl = DiyApi.GetDiyFieldSqlData;
                 } else if (jsonTableConfig.DataSource === 'DataSource' && jsonTableConfig.DataSourceId) {
-                    // 数据源引擎
                     apiUrl = DiyApi.GetDataSourceEngine;
                     postData.DataSourceKey = jsonTableConfig.DataSourceId;
                 } else if (jsonTableConfig.DataSource === 'ApiEngine' && jsonTableConfig.ApiEngineKey) {
-                    // 接口引擎
                     apiUrl = DiyApi.ApiEngineRun;
                     postData.ApiEngineKey = jsonTableConfig.ApiEngineKey;
                 } else {
@@ -858,17 +863,21 @@ export default {
                     return;
                 }
                 
-                console.log('loadDataSourceOptions postData:', postData, 'apiUrl:', apiUrl);
-                
                 const res = await DiyCommon.PostAsync(apiUrl, postData);
                 
                 if (res && DiyCommon.Result(res, false)) {
                     const resultData = res.Data || [];
                     // 为每条数据添加唯一标识
-                    dataSourceOptions.value = resultData.map((item, index) => ({
+                    const options = resultData.map((item, index) => ({
                         ...item,
                         _dataSourceKey: `ds_${Date.now()}_${index}`
                     }));
+                    dataSourceOptions.value = options;
+                    // 非远程搜索模式下，保存全量数据用于本地过滤
+                    if (!isRemoteSearch.value) {
+                        dataSourceAllOptions.value = options;
+                    }
+                    dataSourceLoaded.value = true;
                 } else {
                     dataSourceOptions.value = [];
                     if (res && res.Code !== 1) {
@@ -881,6 +890,45 @@ export default {
                 dataSourceOptions.value = [];
             } finally {
                 dataSourceLoading.value = false;
+            }
+        };
+
+        // 本地过滤数据源选项
+        const filterDataSourceOptions = (keyword) => {
+            if (!keyword) {
+                // 清空搜索时恢复全量数据
+                dataSourceOptions.value = [...dataSourceAllOptions.value];
+                return;
+            }
+            const lowerKeyword = keyword.toLowerCase();
+            const labelField = getDataSourceLabelField();
+            dataSourceOptions.value = dataSourceAllOptions.value.filter(item => {
+                // 搜索显示字段
+                const label = item[labelField];
+                if (label && String(label).toLowerCase().includes(lowerKeyword)) return true;
+                // 也搜索其他字段值
+                return Object.keys(item).some(key => {
+                    if (key === '_dataSourceKey') return false;
+                    const val = item[key];
+                    return val && String(val).toLowerCase().includes(lowerKeyword);
+                });
+            });
+        };
+
+        // 下拉框显示/隐藏时处理
+        const handleDataSourceVisibleChange = (visible) => {
+            if (visible) {
+                // 打开下拉框时，如果未加载过数据则自动加载
+                if (!dataSourceLoaded.value) {
+                    loadDataSourceOptions('');
+                }
+            } else {
+                // 关闭下拉框时，远程搜索模式重置数据，本地模式恢复全量
+                if (isRemoteSearch.value) {
+                    loadDataSourceOptions('');
+                } else {
+                    dataSourceOptions.value = [...dataSourceAllOptions.value];
+                }
             }
         };
 
@@ -978,7 +1026,7 @@ export default {
                 Sql: jsonTable.Sql || '',
                 DataSourceId: jsonTable.DataSourceId || '',
                 DataSourceApiEngineKey: jsonTable.ApiEngineKey || '',
-                DataSourceSqlRemote: false
+                DataSourceSqlRemote: jsonTable.DataSourceSqlRemote || false
             };
             configBatchImportDataList.value = [];
             // 将大写Key/Value转换为小写key/value
@@ -1133,6 +1181,7 @@ export default {
             props.field.Config.JsonTable.DataSourceId = configBatchImportDataSource.value.DataSourceId || '';
             props.field.Config.JsonTable.ApiEngineKey = configBatchImportDataSource.value.DataSourceApiEngineKey || '';
             props.field.Config.JsonTable.SelectLabel = configBatchImportDataSource.value.SelectLabel || '';
+            props.field.Config.JsonTable.DataSourceSqlRemote = configBatchImportDataSource.value.DataSourceSqlRemote || false;
             // 直接使用大驼峰Key/Value存储
             props.field.Config.JsonTable.KeyValueList = (configBatchImportKeyValueList.value || []).map(item => ({
                 Key: item.Key || '',
@@ -1160,6 +1209,7 @@ export default {
                 DataSourceId: configBatchImportDataSource.value.DataSourceId || jsonTable.DataSourceId || '',
                 ApiEngineKey: configBatchImportDataSource.value.DataSourceApiEngineKey || jsonTable.ApiEngineKey || '',
                 SelectLabel: configBatchImportDataSource.value.SelectLabel || jsonTable.SelectLabel || '',
+                DataSourceSqlRemote: configBatchImportDataSource.value.DataSourceSqlRemote || jsonTable.DataSourceSqlRemote || false,
                 KeyValueList: (configBatchImportKeyValueList.value || jsonTable.KeyValueList || []).map(item => ({
                     Key: item.Key || item.key || '',
                     Value: item.Value || item.value || ''
@@ -1229,7 +1279,7 @@ export default {
                 Sql: parsed.Sql || parsed.sql || '',
                 DataSourceId: parsed.DataSourceId || parsed.dataSourceId || '',
                 DataSourceApiEngineKey: parsed.ApiEngineKey || parsed.DataSourceApiEngineKey || '' ,
-                DataSourceSqlRemote: false
+                DataSourceSqlRemote: parsed.DataSourceSqlRemote || parsed.dataSourceSqlRemote || false
             };
             const kvList = parsed.KeyValueList || parsed.keyValueList || [];
             configBatchImportKeyValueList.value = kvList.map(item => ({
@@ -1408,6 +1458,7 @@ export default {
             visibleColumns,
             filteredTableData,
             hasDataSource,
+            isRemoteSearch,
             // methods
             GetFieldReadOnly,
             GetColumnComponent,
@@ -1420,6 +1471,8 @@ export default {
             handleCellChange,
             handleCellValueUpdate,
             loadDataSourceOptions,
+            filterDataSourceOptions,
+            handleDataSourceVisibleChange,
             handleBatchAdd,
             // 复杂组件
             isComplexComponent,
