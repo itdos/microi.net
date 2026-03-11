@@ -6,24 +6,14 @@ import { DialogReactive } from 'naive-ui'
 const { InformationCircleIcon } = icon.ionicons5
 import { renderIcon } from '@goview/utils'
 
-// * 开启加载
-export const loadingStart = () => {
-  window['$loading'].start()
-}
+// * 开启加载（go-view 内部进度由 ContentLoad 组件处理，不使用 NLoadingBar）
+export const loadingStart = () => {}
 
 // * 加载结束
-export const loadingFinish = () => {
-  setTimeout(() => {
-    window['$loading'].finish()
-  })
-}
+export const loadingFinish = () => {}
 
 // * 加载错误
-export const loadingError = () => {
-  setTimeout(() => {
-    window['$loading'].error()
-  })
-}
+export const loadingError = () => {}
 
 /**
  * * render 对话框
