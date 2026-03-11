@@ -43,7 +43,7 @@
       </SettingItem>
       <FontStyle :style="toRefs(optionData.label.style)"></FontStyle>
     </SettingItemBox>
-    <SettingItemBox name="分段样式">
+    <SettingItemBox name="分段样式" v-if="optionData.pie">
       <setting-item name="纹理类型">
         <n-select v-model:value="optionData.pie.style.texture" :options="styleConfig.texture" size="small"></n-select>
       </setting-item>
