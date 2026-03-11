@@ -52,8 +52,7 @@
 var Package = V8.Param.Package;  // 应用数据包
 var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪个父级系统菜单Id下
 
-// 定义调试模式
-var isDebug = true;
+// 执行日志收集（用于最终构建中文报告）
 var debugLog = {};
 
 // 参数校验
@@ -141,12 +140,13 @@ try {
         if (typeStr.match(/^(varchar|int|bigint|datetime|text|longtext|decimal|double|float|tinyint|date|time|timestamp|json)\(/)) {
             return String(diyType);
         }
-        if (typeStr == 'int' || typeStr == 'bigint' || typeStr == 'text' || typeStr == 'longtext' || 
+        if (typeStr == 'int' || typeStr == 'bigint' || typeStr == 'text' || typeStr == 'mediumtext' || typeStr == 'longtext' || 
             typeStr == 'datetime' || typeStr == 'date' || typeStr == 'time' || typeStr == 'timestamp' || 
             typeStr == 'json' || typeStr == 'tinyint' || typeStr == 'double' || typeStr == 'float') {
             return String(diyType);
         }
         
+        if (typeStr.indexOf('mediumtext') == 0) return String(diyType);
         if (typeStr.indexOf('varchar') == 0) return String(diyType);
         if (typeStr.indexOf('decimal') == 0) return String(diyType);
         
@@ -531,11 +531,24 @@ try {
     var diyTables = Package.DiyTables || [];
     var diyFields = Package.DiyFields || [];
     
+    // 辅助函数：判断字段Type是否为虚拟字段
+    var isVirtualFieldType = function(fieldType) {
+        return !fieldType || fieldType === '' || fieldType === '1' || fieldType === 1;
+    };
+
     // 阶段0：执行字段变更（重命名、修改类型/注释）
     debugLog.step2_5_phase0 = '开始处理字段变更';
     for (var i = 0; i < fieldChanges.length; i++) {
         var change = fieldChanges[i];
         if (!change.TableName || !change.OldName || !change.NewName) continue;
+        
+        // 如果新Type或旧Type是虚拟字段，跳过物理表变更
+        // 新Type是虚拟：不需要修改物理列
+        // 旧Type是虚拟：物理列本就不存在，无法修改（缺失的物理字段由phase1/2处理添加）
+        if (isVirtualFieldType(change.NewType) || isVirtualFieldType(change.OldType)) {
+            debugLog['change_skip_virtual_' + change.TableName + '_' + change.NewName] = '虚拟字段(OldType=' + change.OldType + ', NewType=' + change.NewType + ')，跳过物理表变更';
+            continue;
+        }
         
         var tableName = change.TableName;
         var oldName = change.OldName;
@@ -854,8 +867,20 @@ try {
             var addResult = V8.FormEngine.AddFormData('sys_menu', modelCopy);
             if (addResult.Code == 1) {
                 stats.MenuInserted++;
+            } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy._FormData.Url) {
+                // Url重复，自动追加后缀重试
+                var originalUrl = modelCopy._FormData.Url;
+                var urlCount = V8.Db.FromSql("SELECT COUNT(Id) FROM sys_menu WHERE Url='" + originalUrl.replace(/'/g, "''") + "'").ToScalar();
+                var newUrl = originalUrl + '-' + (Number(urlCount) + 1);
+                modelCopy._FormData.Url = newUrl;
+                debugLog['menu_url_retry_' + menu.Id] = originalUrl + ' → ' + newUrl;
+                var retryResult = V8.FormEngine.AddFormData('sys_menu', modelCopy);
+                if (retryResult.Code == 1) {
+                    stats.MenuInserted++;
+                } else {
+                    debugLog['menu_add_error_' + menu.Id] = retryResult.Msg;
+                }
             } else {
-                //新增的时候可能会报错【[Url]已存在唯一值：】【[ModuleEngineKey]已存在唯一值：】,暂时不处理，发布包的时候尽量避免重复
                 debugLog['menu_add_error_' + menu.Id] = addResult.Msg;
             }
         }
@@ -1087,30 +1112,78 @@ try {
 
     debugLog.endTime = new Date().toISOString();
 
+    // ==================== 构建中文执行日志 ====================
+
+    var errors = [];
+    for (var key in debugLog) {
+        if (key.indexOf('_error_') > -1) {
+            errors.push({ 标识: key, 详情: debugLog[key] });
+        }
+    }
+
+    var urlRetries = [];
+    for (var key in debugLog) {
+        if (key.indexOf('_url_retry_') > -1) {
+            urlRetries.push(debugLog[key]);
+        }
+    }
+
+    var pkgInfo = Package.PackageInfo || {};
+    var startTime = debugLog.startTime || '';
+    var endTime = debugLog.endTime || '';
+
+    var resultData = {
+        应用包信息: {
+            名称: pkgInfo.Name || '未命名',
+            版本: pkgInfo.Version || '',
+            来源租户: pkgInfo.OsClient || '',
+            创建人: pkgInfo.CreateUser || '',
+            创建时间: pkgInfo.CreateTime || '',
+            导入开始: startTime,
+            导入结束: endTime
+        },
+        执行概览: {
+            DDL建表: '执行' + (stats.DDLExecuted || 0) + '条，跳过' + (stats.DDLSkipped || 0) + '条，补充物理字段' + (stats.FieldsAdded || 0) + '个',
+            表结构: '新增' + stats.TableInserted + '条，修改' + stats.TableUpdated + '条',
+            字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条',
+            物理字段同步: '重命名' + (stats.PhysicalFieldsRenamed || 0) + '个，修改' + (stats.PhysicalFieldsModified || 0) + '个，新增' + (stats.PhysicalFieldsAdded || 0) + '个',
+            菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条',
+            工作流: '新增' + stats.FlowInserted + '条，修改' + stats.FlowUpdated + '条',
+            工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',
+            工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
+            接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条'
+        }
+    };
+
+    if (urlRetries.length > 0) {
+        resultData['菜单Url自动重命名'] = urlRetries;
+    }
+
+    if (errors.length > 0) {
+        resultData['失败详情（共' + errors.length + '条）'] = errors;
+    }
+
     // ==================== 返回结果 ====================
     // 注意：平台会根据返回Code自动管理事务
     // Code=1 时自动提交事务，Code=0 时自动回滚事务
     
+    var hasErrors = errors.length > 0;
     return {
         Code: 1,
-        Data: stats,
-        Msg: '导入成功',
-        Debug: isDebug ? debugLog : undefined
+        Data: resultData,
+        Msg: hasErrors ? '导入完成，但有' + errors.length + '条异常，请查看失败详情' : '导入成功'
     };
 
 } catch (error) {
     // ==================== 异常处理 ====================
     // 注意：返回Code=0时，平台会自动回滚事务
-    
-    debugLog.error = {
-        message: error.message,
-        stack: error.stack,
-        endTime: new Date().toISOString()
-    };
 
     return {
         Code: 0,
         Msg: '导入失败：' + error.message,
-        Debug: isDebug ? debugLog : undefined
+        Data: {
+            错误信息: error.message,
+            错误堆栈: error.stack
+        }
     };
 }
