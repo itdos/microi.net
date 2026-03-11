@@ -5,10 +5,8 @@
       <n-message-provider>
         <n-dialog-provider>
           <n-notification-provider>
-            <n-loading-bar-provider>
-              <go-view-message-inject />
-              <chart-editor v-if="ready" />
-            </n-loading-bar-provider>
+            <go-view-message-inject />
+            <chart-editor v-if="ready" />
           </n-notification-provider>
         </n-dialog-provider>
       </n-message-provider>
@@ -18,7 +16,7 @@
 
 <script>
 import { defineComponent, defineAsyncComponent, ref, onMounted, getCurrentInstance, nextTick } from 'vue'
-import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider, NLoadingBarProvider } from 'naive-ui'
+import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { DiyCommon } from '@/utils/diy.common'
 import { setupGoView } from './setup.js'
 import GoViewMessageInject from './GoViewMessageInject.vue'
@@ -30,7 +28,6 @@ export default defineComponent({
     NMessageProvider,
     NDialogProvider,
     NNotificationProvider,
-    NLoadingBarProvider,
     GoViewMessageInject,
     ChartEditor: defineAsyncComponent(() => import('./src/views/chart/index.vue'))
   },

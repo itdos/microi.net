@@ -4,14 +4,12 @@
       <n-message-provider>
         <n-dialog-provider>
           <n-notification-provider>
-            <n-loading-bar-provider>
-              <go-view-message-inject />
-              <div v-if="ready" class="go-view-preview-content">
-                <suspense>
-                  <preview-page />
-                </suspense>
-              </div>
-            </n-loading-bar-provider>
+            <go-view-message-inject />
+            <div v-if="ready" class="go-view-preview-content">
+              <suspense>
+                <preview-page />
+              </suspense>
+            </div>
           </n-notification-provider>
         </n-dialog-provider>
       </n-message-provider>
@@ -21,7 +19,7 @@
 
 <script>
 import { defineComponent, defineAsyncComponent, getCurrentInstance } from 'vue'
-import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider, NLoadingBarProvider } from 'naive-ui'
+import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { DiyCommon } from '@/utils/diy.common'
 import { setupGoView } from './setup.js'
 import GoViewMessageInject from './GoViewMessageInject.vue'
@@ -33,7 +31,6 @@ export default defineComponent({
     NMessageProvider,
     NDialogProvider,
     NNotificationProvider,
-    NLoadingBarProvider,
     GoViewMessageInject,
     PreviewPage: defineAsyncComponent(() => import('./src/views/preview/suspenseIndex.vue'))
   },
