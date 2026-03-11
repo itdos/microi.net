@@ -2,7 +2,7 @@
   <div>
     <!-- Echarts 全局设置 -->
     <global-setting :optionData="optionData"></global-setting>
-    <CollapseItem name="雷达" :expanded="true">
+    <CollapseItem name="雷达" :expanded="true" v-if="optionData.radar && optionData.series?.[0]?.areaStyle">
       <SettingItemBox name="样式">
         <SettingItem>
           <n-checkbox v-model:checked="radarConfig.splitArea.show">背景</n-checkbox>
