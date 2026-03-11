@@ -50,6 +50,20 @@ export default defineComponent({
       }
     }
   },
+  watch: {
+    '$route.params.Id': {
+      async handler(newId) {
+        if (newId && newId !== this.projectId) {
+          this.projectId = newId
+          this.ready = false
+          this.loading = true
+          await this.loadProjectData()
+          this.ready = true
+          this.loading = false
+        }
+      }
+    }
+  },
   async mounted() {
     const app = getCurrentInstance().appContext.app
     setupGoView(app)
@@ -72,7 +86,7 @@ export default defineComponent({
         })
         if (res.Code === 1 && res.Data) {
           let projectData = res.Data.ContentData
-          if (typeof projectData === 'string') {
+          if (typeof projectData === 'string' && projectData) {
             projectData = JSON.parse(projectData)
           }
 
@@ -85,6 +99,14 @@ export default defineComponent({
               componentList: projectData.componentList
             }
             window.sessionStorage.setItem('GO_CHART_STORAGE_LIST', JSON.stringify([storageItem]))
+          } else {
+            // ContentData 为空，清除旧数据避免显示上一个项目
+            window.sessionStorage.setItem('GO_CHART_STORAGE_LIST', JSON.stringify([{
+              id: this.projectId,
+              editCanvasConfig: {},
+              requestGlobalConfig: {},
+              componentList: []
+            }]))
           }
         }
       } catch (error) {
