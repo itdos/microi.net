@@ -68,7 +68,8 @@ $--color-dark-bg-5: #373739;
 $--color-dark-bg-5-shallow: darken($--color-dark-bg-5, $--dark-shalow);
 
 // 最大宽度
-$--max-width: 1920px;
+// $--max-width: 1920px;
+$--max-width: 100%;
 // 顶部距离
 $--header-height: 60px;
 // 宿主顶部偏移（嵌入其他系统时由外部设置 CSS 变量 --goview-top-offset）
