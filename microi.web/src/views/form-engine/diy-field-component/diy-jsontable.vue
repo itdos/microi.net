@@ -778,9 +778,13 @@ export default {
             return JSON.stringify(cleanData);
         };
 
+        // 记录最近一次 emit 出去的序列化值，用于 watch 中跳过内部引发的回环更新
+        let lastEmittedValue = null;
+
         // 同步数据到父组件
         const syncToParent = () => {
             const serialized = serializeData(tableData.value);
+            lastEmittedValue = serialized;
             emit('update:modelValue', serialized);
             emit('ModelChange', serialized);
             emit('CallbackFormValueChange', props.field, serialized);
@@ -1398,10 +1402,21 @@ export default {
             }
         };
 
+        // 将外部传入值标准化为字符串，用于与 lastEmittedValue 比较
+        const normalizeToString = (val) => {
+            if (val === null || val === undefined) return '';
+            if (typeof val === 'string') return val;
+            return JSON.stringify(val);
+        };
+
         // 监听 modelValue 变化
         watch(
             () => props.modelValue,
             (newVal) => {
+                // 跳过由本组件自身 syncToParent 引发的回环更新，避免重建行对象导致焦点丢失
+                if (lastEmittedValue !== null && normalizeToString(newVal) === lastEmittedValue) {
+                    return;
+                }
                 tableData.value = parseData(newVal);
                 syncIfIdFixed();
             },
@@ -1412,10 +1427,13 @@ export default {
         watch(
             () => props.FormDiyTableModel?.[props.field?.Name],
             (newVal) => {
-                if (newVal !== undefined) {
-                    tableData.value = parseData(newVal);
-                    syncIfIdFixed();
+                if (newVal === undefined) return;
+                // 跳过由本组件自身 syncToParent 引发的回环更新
+                if (lastEmittedValue !== null && normalizeToString(newVal) === lastEmittedValue) {
+                    return;
                 }
+                tableData.value = parseData(newVal);
+                syncIfIdFixed();
             },
             { deep: true }
         );
