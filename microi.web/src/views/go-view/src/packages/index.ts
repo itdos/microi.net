@@ -5,6 +5,7 @@ import { InformationList } from '@goview/packages/components/Informations/index'
 import { TableList } from '@goview/packages/components/Tables/index'
 import { PhotoList } from '@goview/packages/components/Photos/index'
 import { IconList } from '@goview/packages/components/Icons/index'
+import { Scenes3DList } from '@goview/packages/components/Scenes3D/index'
 import { PackagesCategoryEnum, PackagesType, ConfigType, FetchComFlagType } from '@goview/packages/index.d'
 
 const configModules: Record<string, { default: string }> = import.meta.glob('./components/**/config.vue', {
@@ -23,6 +24,7 @@ export let packagesList: PackagesType = {
   [PackagesCategoryEnum.VCHART]: VChartList,
   [PackagesCategoryEnum.INFORMATIONS]: InformationList,
   [PackagesCategoryEnum.TABLES]: TableList,
+  [PackagesCategoryEnum.SCENES_3D]: Scenes3DList,
   [PackagesCategoryEnum.DECORATES]: DecorateList,
   [PackagesCategoryEnum.PHOTOS]: PhotoList,
   [PackagesCategoryEnum.ICONS]: IconList
