@@ -83,7 +83,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, computed, provide, watch } from 'vue'
+import { onMounted, computed, provide, watch, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { chartColors } from '@goview/settings/chartThemes/index'
 import { MenuEnum } from '@goview/enums/editPageEnum'
 import { CreateComponentType, CreateComponentGroupType } from '@goview/packages/index.d'
@@ -93,7 +93,7 @@ import { MenuOptionsItemType } from '@goview/views/chart/hooks/useContextMenu.ho
 import { useChartEditStore } from '@goview/store/modules/chartEditStore/chartEditStore'
 import { SCALE_KEY } from '@goview/views/preview/hooks/useScale.hook'
 import { useLayout } from './hooks/useLayout.hook'
-import { useAddKeyboard } from '../hooks/useKeyboard.hook'
+import { useAddKeyboard, useRemoveKeyboard } from '../hooks/useKeyboard.hook'
 import { dragHandle, dragoverHandle, mousedownHandleUnStop, useMouseHandle } from './hooks/useDrag.hook'
 import { useComponentStyle, useSizeStyle } from './hooks/useStyle.hook'
 import { useInitVChartsTheme } from '@goview/hooks'
@@ -183,6 +183,19 @@ useInitVChartsTheme(chartEditStore)
 
 // 键盘事件
 onMounted(() => {
+  useAddKeyboard()
+})
+
+onUnmounted(() => {
+  useRemoveKeyboard()
+})
+
+// keep-alive 场景：离开时移除，回来时重新注册
+onDeactivated(() => {
+  useRemoveKeyboard()
+})
+
+onActivated(() => {
   useAddKeyboard()
 })
 </script>
