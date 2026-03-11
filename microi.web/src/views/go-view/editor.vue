@@ -47,6 +47,20 @@ export default defineComponent({
       }
     }
   },
+  watch: {
+    '$route.params.Id': {
+      async handler(newId) {
+        if (newId && newId !== this.projectId) {
+          this.projectId = newId
+          this.ready = false
+          this.loading = true
+          await this.loadProjectData()
+          this.ready = true
+          this.loading = false
+        }
+      }
+    }
+  },
   async mounted() {
     // 初始化 go-view 插件
     const app = getCurrentInstance().appContext.app
@@ -79,7 +93,7 @@ export default defineComponent({
 
           // 解析存储的 JSON 数据
           let projectData = res.Data.ContentData
-          if (typeof projectData === 'string') {
+          if (typeof projectData === 'string' && projectData) {
             projectData = JSON.parse(projectData)
           }
 
@@ -93,6 +107,9 @@ export default defineComponent({
             if (res.Data.ProjectName) {
               chartEditStore.editCanvasConfig.projectName = res.Data.ProjectName
             }
+          } else {
+            // ContentData 为空，重置 store 恢复默认画布配置
+            chartEditStore.$reset()
           }
         }
       } catch (error) {
