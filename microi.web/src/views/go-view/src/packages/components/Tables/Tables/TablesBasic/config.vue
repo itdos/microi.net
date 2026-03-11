@@ -14,7 +14,7 @@
         />
       </setting-item>
     </setting-item-box>
-    <setting-item-box :alone="false" name="分页设置">
+    <setting-item-box :alone="false" name="分页设置" v-if="optionData.pagination">
       <setting-item name="默认页码" :alone="true">
         <n-input-number v-model:value="optionData.pagination.page" size="small" placeholder="字体大小"></n-input-number>
       </setting-item>
@@ -29,7 +29,7 @@
         </div>
       </SettingItem>
     </setting-item-box>
-    <setting-item-box :alone="false" name="表格样式">
+    <setting-item-box :alone="false" name="表格样式" v-if="optionData.style">
       <SettingItem name="显示边框" :alone="true">
         <n-select v-model:value="(optionData as any).style.border" size="small" :options="borderFlag" />
       </SettingItem>
@@ -129,7 +129,7 @@ const props = defineProps({
 
 const header = ref()
 const median = ref<string[]>([])
-props.optionData.dataset.dimensions.forEach(item => {
+props.optionData.dataset?.dimensions?.forEach(item => {
   median.value.push(item.title)
 })
 
@@ -138,7 +138,7 @@ watch(
   () => props.optionData,
   () => {
     median.value = []
-    props.optionData.dataset.dimensions.forEach(item => {
+    props.optionData.dataset?.dimensions?.forEach(item => {
       median.value.push(item.title)
     })
     header.value = median.value.toString()
@@ -153,7 +153,7 @@ watch(
 watch([header], ([headerNew], [headerOld]) => {
   if (headerNew !== headerOld) {
     headerNew.split(',').forEach((item: string, index: number) => {
-      if (index + 1 <= props.optionData.dataset.dimensions.length) {
+      if (index + 1 <= (props.optionData.dataset?.dimensions?.length ?? 0)) {
         props.optionData.dataset.dimensions[index].title = headerNew.split(',')[index]
       }
     })

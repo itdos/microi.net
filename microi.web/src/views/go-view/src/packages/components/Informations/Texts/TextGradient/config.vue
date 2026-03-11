@@ -12,7 +12,7 @@
         <n-input-number v-model:value="optionData.size" size="small" placeholder="字体大小"></n-input-number>
       </setting-item>
     </setting-item-box>
-    <setting-item-box name="渐变色参数">
+    <setting-item-box name="渐变色参数" v-if="optionData.gradient">
       <setting-item name="起始值">
         <n-color-picker size="small" :modes="['hex']" v-model:value="optionData.gradient.from"></n-color-picker>
       </setting-item>

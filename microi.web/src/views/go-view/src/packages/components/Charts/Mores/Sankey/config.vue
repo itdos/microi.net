@@ -1,6 +1,6 @@
 <template>
   <div>
-    <CollapseItem name="桑基图" :expanded="true">
+    <CollapseItem name="桑基图" :expanded="true" v-if="optionData.tooltip && optionData.series">
       <SettingItemBox name="样式">
         <SettingItem name="方向">
           <n-select

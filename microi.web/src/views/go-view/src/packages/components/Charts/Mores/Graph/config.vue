@@ -1,6 +1,6 @@
 <template>
   <div>
-    <CollapseItem name="关系图" :expanded="true">
+    <CollapseItem name="关系图" :expanded="true" v-if="optionData.series?.[0] && optionData.legend">
       <SettingItemBox name="样式">
         <setting-item name="布局">
           <n-select v-model:value="graphConfig.layout" :options="GraphLayout" size="small" />
