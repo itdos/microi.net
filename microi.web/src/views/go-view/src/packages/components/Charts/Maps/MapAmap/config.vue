@@ -1,4 +1,5 @@
 <template>
+  <template v-if="optionData.mapOptions">
   <collapse-item name="基础" :expanded="true">
     <setting-item-box name="语言类型" :alone="true">
       <setting-item>
@@ -167,6 +168,7 @@
       </setting-item>
     </setting-item-box>
   </collapse-item>
+  </template>
 </template>
 
 <script setup lang="ts">
