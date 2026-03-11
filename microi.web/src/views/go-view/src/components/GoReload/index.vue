@@ -15,6 +15,7 @@ onMounted(() => {
 @include go('reload') {
   height: 100vh;
   width: 100vw;
+  max-width: 100%;
   @include fetch-bg-color('background-color')
 }
 </style>
