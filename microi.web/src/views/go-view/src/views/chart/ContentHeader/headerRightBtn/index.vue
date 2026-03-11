@@ -10,59 +10,72 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { renderIcon, goDialog, fetchPathByName, routerTurnByPath, setSessionStorage, getSessionStorage } from '@goview/utils'
-import { PreviewEnum } from '@goview/enums/pageEnum'
+import { ref, computed } from 'vue'
+import { renderIcon, goDialog, setSessionStorage, getSessionStorage } from '@goview/utils'
 import { StorageEnum } from '@goview/enums/storageEnum'
 import { useRoute } from 'vue-router'
 import { useChartEditStore } from '@goview/store/modules/chartEditStore/chartEditStore'
 import { syncData } from '../../ContentEdit/components/EditTools/hooks/useSyncUpdate.hook'
 import { icon } from '@goview/plugins'
+import { DiyCommon } from '@/utils/diy.common'
 import { cloneDeep } from 'lodash'
 
 const { BrowsersOutlineIcon, SendIcon, AnalyticsIcon } = icon.ionicons5
 const chartEditStore = useChartEditStore()
 
 const routerParamsInfo = useRoute()
+const saving = ref(false)
 
-// 预览
-const previewHandle = () => {
-  const path = fetchPathByName(PreviewEnum.CHART_PREVIEW_NAME, 'href')
-  if (!path) return
-  const { id } = routerParamsInfo.params
-  // id 标识
-  const previewId = typeof id === 'string' ? id : id[0]
-  const storageInfo = chartEditStore.getStorageInfo()
-  const sessionStorageInfo = getSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST) || []
-
-  if (sessionStorageInfo?.length) {
-    const repeateIndex = sessionStorageInfo.findIndex((e: { id: string }) => e.id === previewId)
-    // 重复替换
-    if (repeateIndex !== -1) {
-      sessionStorageInfo.splice(repeateIndex, 1, { id: previewId, ...storageInfo })
-      setSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST, sessionStorageInfo)
-    } else {
-      sessionStorageInfo.push({
-        id: previewId,
-        ...storageInfo
-      })
-      setSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST, sessionStorageInfo)
-    }
-  } else {
-    setSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST, [{ id: previewId, ...storageInfo }])
-  }
-  // 跳转
-  routerTurnByPath(path, [previewId], undefined, true)
+// 获取当前项目 ID
+const getProjectId = () => {
+  const { Id } = routerParamsInfo.params
+  return typeof Id === 'string' ? Id : Id[0]
 }
 
-// 发布
-const sendHandle = () => {
-  goDialog({
-    message: '想体验发布功能，请前往 master-fetch 分支查看: https://gitee.com/MTrun/go-view/tree/master-fetch',
-    positiveText: '了然',
-    closeNegativeText: true,
-    onPositiveCallback: () => {}
-  })
+// 保存到后端
+const saveToServer = async () => {
+  const projectId = getProjectId()
+  if (!projectId) return false
+  const storageInfo = chartEditStore.getStorageInfo()
+  const contentData = JSON.stringify(storageInfo)
+  try {
+    saving.value = true
+    const res = await DiyCommon.FormEngine.UptFormData({
+      FormEngineKey: 'mic_data_dashboard',
+      Id: projectId,
+      ContentData: contentData
+    })
+    if (res.Code === 1) {
+      window['$message'].success('保存成功')
+      return true
+    } else {
+      window['$message'].error(res.Msg || '保存失败')
+      return false
+    }
+  } catch (error) {
+    console.error('[go-view] Save error:', error)
+    window['$message'].error('保存失败')
+    return false
+  } finally {
+    saving.value = false
+  }
+}
+
+// 保存
+const saveHandle = async () => {
+  await saveToServer()
+}
+
+// 预览：先保存，再新开预览页
+const previewHandle = async () => {
+  const saved = await saveToServer()
+  if (!saved) return
+  const projectId = getProjectId()
+  // 将数据写入 sessionStorage 供预览页读取
+  const storageInfo = chartEditStore.getStorageInfo()
+  setSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST, [{ id: projectId, ...storageInfo }])
+  // 在宿主框架中打开预览路由
+  window.open(`/#/mic/data-dashboard/preview/${projectId}`, '_blank')
 }
 
 const btnList = [
@@ -81,9 +94,9 @@ const btnList = [
   },
   {
     select: true,
-    title: '发布',
+    title: '保存',
     icon: renderIcon(SendIcon),
-    event: sendHandle
+    event: saveHandle
   }
 ]
 

@@ -64,7 +64,7 @@ const renderUserInfo = () => {
       }),
       h('div', null, [
         h('div', null, [
-          h(NText, { depth: 2 }, { default: () => '奔跑的面条' })
+          h(NText, { depth: 2 }, { default: () => '数据大屏' })
         ])
       ])
     ]
@@ -91,15 +91,15 @@ const options = ref([
     key: 'contact',
     icon: renderIcon(ChatboxEllipsesIcon)
   },
-  {
-    type: 'divider',
-    key: 'd3'
-  },
-  {
-    label: renderLang('global.logout'),
-    key: 'logout',
-    icon: renderIcon(LogOutOutlineIcon)
-  }
+  // {
+  //   type: 'divider',
+  //   key: 'd3'
+  // },
+  // {
+  //   label: renderLang('global.logout'),
+  //   key: 'logout',
+  //   icon: renderIcon(LogOutOutlineIcon)
+  // }
 ])
 
 // 图片渲染错误
