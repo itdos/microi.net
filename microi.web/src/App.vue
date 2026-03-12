@@ -85,6 +85,9 @@ export default {
         // 初始化主题色的文字颜色变量
         this.initThemeColorDefaults();
 
+        // 恢复 OpenClaw 风格主题（data-theme 和 body class）
+        this.restoreOcTheme();
+
         if (window.plus) {
             self.PageInit();
         } else {
@@ -160,6 +163,22 @@ export default {
         WindowResize() {
             var isPhoneView = window.innerWidth <= 768;
             this.diyStore.setIsPhoneView(isPhoneView);
+        },
+        // 恢复 OpenClaw 风格主题
+        restoreOcTheme() {
+            var theme = localStorage.getItem('microi_oc_theme') || '';
+            if (!theme) return;
+            var appEl = document.getElementById('app-microi');
+            if (appEl) appEl.setAttribute('data-theme', theme);
+            document.body.classList.remove('oc-theme-dark', 'oc-theme-light');
+            document.documentElement.classList.remove('oc-theme-dark', 'oc-theme-light', 'dark');
+            if (theme === 'openclaw-dark') {
+                document.body.classList.add('oc-theme-dark');
+                document.documentElement.classList.add('oc-theme-dark', 'dark');
+            } else if (theme === 'openclaw-light') {
+                document.body.classList.add('oc-theme-light');
+                document.documentElement.classList.add('oc-theme-light');
+            }
         },
         // 初始化主题色的文字颜色变量
         initThemeColorDefaults() {
