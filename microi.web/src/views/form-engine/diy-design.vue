@@ -147,6 +147,7 @@
                                         :ColSpan="24"
                                         :LabelWidth="'100px'"
                                         :LabelPosition="'top'"
+                                        :CodeEditorMini="true"
 
                                         :FormData="CurrentDiyFieldModel"
                                         @CallbackForm="CallbackForm_Field"
@@ -178,6 +179,7 @@
                                         :ColSpan="24"
                                         :LabelWidth="'100px'"
                                         :LabelPosition="'top'"
+                                        :CodeEditorMini="true"
 
                                         :FormData="CurrentDiyTableModel"
                                         @CallbackForm="CallbackForm_Table"
@@ -726,6 +728,7 @@ export default {
             self.DiyCommon.Post(
                 self.DiyApi.GetSysMenuStep(),
                 {
+                    _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "DiyTableId", "ParentId", "Sort"],
                     // self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, {
                     TableName: "Sys_Menu",
                     _OrderBy: "Sort",

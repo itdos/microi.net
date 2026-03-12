@@ -157,7 +157,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public async Task<DosResultList<SysMenu>> GetSysMenuStep(SysMenuParam param)
+        public async Task<DosResultList<dynamic>> GetSysMenuStep(SysMenuParam param)
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -165,21 +165,21 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            var where = new Where<SysMenu>();
-            where.And(d => d.IsDeleted != 1);
+            var where = new List<List<object>>();
+            where.Add(new List<object>(){ "IsDeleted", "<>", 1 });
             if (param.Ids != null)
             {
-                where.And(d => d.Id.In(param.Ids));
+                where.Add(new List<object>(){ "Id", "In", param.Ids });
             }
             if (param.Display != null)
             {
-                where.And(d => d.Display == param.Display);
+                where.Add(new List<object>(){ "Display", "=", param.Display });
             }
             if (param.AppDisplay != null)
             {
-                where.And(d => d.AppDisplay == param.AppDisplay);
+                where.Add(new List<object>(){ "AppDisplay", "=", param.AppDisplay });
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
@@ -247,38 +247,58 @@ namespace Microi.net
                             "fe06ab66-7a10-4f3c-bced-523605f4c65e",//系统日志
                         });
                     }
-                    where.And(d => d.Id.In(ids));// || d.UserId == param._CurrentSysUser.Id
+                    where.Add(new List<object>(){ "Id", "In", ids });// || d.UserId == param._CurrentSysUser.Id
                 }
             }
-            var selectCol = new List<string>() {
-                "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService",
-                "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url",
-                "DiyTableId", "ParentId", "Sort"
+            var selectFields = new List<string>() {
+                // "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService",
+                // "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url",
+                // "DiyTableId", "ParentId", "Sort",
             };
-            var fields = new SysMenu().GetFields();
-            var selectFields = new List<Field>();
-            foreach (var item in selectCol)
+            if(param._SelectFields != null && param._SelectFields.Any())
             {
-                if (fields.Any(d => d.Name == item))
-                {
-                    selectFields.Add(fields.First(d => d.Name == item));
-                }
+                selectFields = param._SelectFields;
             }
-            var allList = dbSession.From<SysMenu>()
-                                        .Select(selectFields.ToArray())
-                                        .Where(where)
-                                        .OrderBy(d => d.Sort)
-                                        .ToList();
-            var firstList = new List<SysMenu>();
+            var allResult = await MicroiEngine.FormEngine.GetTableDataAsync("sys_menu", new
+            {
+                _SelectFields = selectFields,
+                _Where = where,
+                _OrderBy = "Sort",
+                _OrderByType = "ASC",
+            });
+            var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
+
+            // 按ParentId构建字典索引，将递归子节点查找从O(n²)优化为O(n)
+            var childrenMap = new Dictionary<string, List<dynamic>>();
+            foreach (var item in allData)
+            {
+                string parentId = item.ParentId?.ToString() ?? "";
+                if (!childrenMap.ContainsKey(parentId))
+                {
+                    childrenMap[parentId] = new List<dynamic>();
+                }
+                childrenMap[parentId].Add(item);
+            }
+
+            // 获取第一级菜单
+            var firstList = new List<dynamic>();
             if (!param._ChildSystemId.DosIsNullOrWhiteSpace())
             {
-                firstList = allList.Where(d => d.ParentId == param._ChildSystemId)
-                                    .ToList();
+                if (childrenMap.TryGetValue(param._ChildSystemId, out var childItems))
+                {
+                    firstList.AddRange(childItems);
+                }
             }
             else
             {
-                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty)
-                                    .ToList();
+                var rootKeys = new HashSet<string> { Guid.Empty.ToString(), "", DiyCommon.UlidEmpty };
+                foreach (var kvp in childrenMap)
+                {
+                    if (rootKeys.Contains(kvp.Key))
+                    {
+                        firstList.AddRange(kvp.Value);
+                    }
+                }
             }
 
             var dataCount = firstList.Count;
@@ -291,37 +311,22 @@ namespace Microi.net
             {
                 firstList = firstList.Take(param._Top.Value).ToList();
             }
-            //递归获取层级
-            GetAllBaseDataChild(allList, firstList);
-            return new DosResultList<SysMenu>(1, firstList, "", dataCount);
+            //递归获取层级（使用字典索引优化）
+            BuildChildrenFromMap(childrenMap, firstList);
+            return new DosResultList<dynamic>(1, firstList, "", dataCount);
         }
         /// <summary>
-        /// 递归获取层级
+        /// 递归获取层级（基于字典索引，O(n)复杂度）
         /// </summary>
-        private void GetDiyAllBaseDataChild(List<dynamic> allList, List<dynamic> list)
+        private void BuildChildrenFromMap(Dictionary<string, List<dynamic>> childrenMap, List<dynamic> list)
         {
-            foreach (var sysMenu in list)
+            foreach (var item in list)
             {
-                if (allList.Any(d => d.ParentId == sysMenu.Id))
+                string id = item.Id?.ToString();
+                if (id != null && childrenMap.TryGetValue(id, out var children))
                 {
-                    sysMenu._Child = allList.Where(d => d.ParentId == sysMenu.Id).OrderBy(d => d.Sort).ToList();
-                    //递归获取层级
-                    GetDiyAllBaseDataChild(allList, sysMenu._Child);
-                }
-            }
-        }
-        /// <summary>
-        /// 递归获取层级
-        /// </summary>
-        private void GetAllBaseDataChild(List<SysMenu> allList, List<SysMenu> list)
-        {
-            foreach (var sysMenu in list)
-            {
-                if (allList.Any(d => d.ParentId == sysMenu.Id))
-                {
-                    sysMenu._Child = allList.Where(d => d.ParentId == sysMenu.Id).OrderBy(d => d.Sort).ToList();
-                    //递归获取层级
-                    GetAllBaseDataChild(allList, sysMenu._Child);
+                    item._Child = children;
+                    BuildChildrenFromMap(childrenMap, children);
                 }
             }
         }
