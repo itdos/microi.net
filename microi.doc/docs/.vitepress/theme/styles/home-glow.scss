@@ -283,46 +283,136 @@ body:has(.VPHome) {
   }
 }
 
-// 按钮增强
+// 按钮光效动画
+@keyframes btn-shimmer {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+@keyframes btn-pulse-blue {
+  0%, 100% { box-shadow: 0 4px 20px rgba(0, 150, 255, 0.4), 0 0 0 0 rgba(0, 150, 255, 0.3); }
+  50% { box-shadow: 0 4px 25px rgba(0, 150, 255, 0.6), 0 0 20px 3px rgba(0, 150, 255, 0.15); }
+}
+
+@keyframes btn-pulse-purple {
+  0%, 100% { box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4), 0 0 0 0 rgba(138, 43, 226, 0.3); }
+  50% { box-shadow: 0 4px 25px rgba(138, 43, 226, 0.6), 0 0 20px 3px rgba(138, 43, 226, 0.15); }
+}
+
+@keyframes btn-pulse-orange {
+  0%, 100% { box-shadow: 0 4px 20px rgba(255, 120, 0, 0.4), 0 0 0 0 rgba(255, 120, 0, 0.3); }
+  50% { box-shadow: 0 4px 25px rgba(255, 120, 0, 0.6), 0 0 20px 3px rgba(255, 120, 0, 0.15); }
+}
+
+@keyframes btn-pulse-green {
+  0%, 100% { box-shadow: 0 4px 20px rgba(0, 210, 106, 0.4), 0 0 0 0 rgba(0, 210, 106, 0.3); }
+  50% { box-shadow: 0 4px 25px rgba(0, 210, 106, 0.6), 0 0 20px 3px rgba(0, 210, 106, 0.15); }
+}
+
+@keyframes btn-border-rotate {
+  0% { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+// 按钮增强 —— 通用基础
 .VPButton {
+  position: relative;
+  overflow: hidden;
   transform: translateY(0);
-  transition: transform 0.35s ease-out,
-              box-shadow 0.35s ease-out,
-              background 0.3s ease-out !important;
-  
-  &.brand {
-    background: linear-gradient(135deg, #8a2be2 0%, #6a11cb 100%) !important;
-    border: 1px solid rgba(138, 43, 226, 0.5);
-    box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
-    
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.4s ease-out,
+              filter 0.4s ease-out !important;
+
+  // 扫光层
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -100%;
+    width: 60%;
+    height: 200%;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.25) 50%,
+      transparent 70%
+    );
+    pointer-events: none;
+    transition: none;
+  }
+
+  &:hover::after {
+    animation: btn-shimmer 0.7s ease-out forwards;
+  }
+}
+
+// 4 个按钮独立配色（通过 nth-child 选择器）
+.VPHero .actions {
+  // —— 第1个按钮：电光蓝 ——
+  .action:nth-child(1) .VPButton {
+    background: linear-gradient(135deg, #0096ff 0%, #00d4ff 100%) !important;
+    border: 1px solid rgba(0, 180, 255, 0.6) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+    animation: btn-pulse-blue 3s ease-in-out infinite;
+
     &:hover {
-      transform: translateY(-4px) !important;
-      box-shadow: 0 10px 35px rgba(138, 43, 226, 0.6),
-                  0 0 45px rgba(138, 43, 226, 0.3) !important;
+      transform: translateY(-5px) scale(1.06) !important;
+      box-shadow: 0 12px 40px rgba(0, 150, 255, 0.55),
+                  0 0 60px rgba(0, 210, 255, 0.25) !important;
+      filter: brightness(1.15);
+      animation: none;
     }
   }
-  
-  &.alt {
-    background: rgba(30, 30, 45, 0.8) !important;
-    border: 1px solid rgba(0, 191, 255, 0.3);
-    
+
+  // —— 第2个按钮：霓虹紫 ——
+  .action:nth-child(2) .VPButton {
+    background: linear-gradient(135deg, #8a2be2 0%, #c850c0 100%) !important;
+    border: 1px solid rgba(168, 50, 200, 0.6) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+    animation: btn-pulse-purple 3s ease-in-out infinite 0.5s;
+
     &:hover {
-      background: rgba(40, 40, 55, 0.9) !important;
-      border-color: rgba(0, 191, 255, 0.6);
-      transform: translateY(-4px) !important;
-      box-shadow: 0 10px 30px rgba(0, 191, 255, 0.3) !important;
+      transform: translateY(-5px) scale(1.06) !important;
+      box-shadow: 0 12px 40px rgba(138, 43, 226, 0.55),
+                  0 0 60px rgba(200, 80, 192, 0.25) !important;
+      filter: brightness(1.15);
+      animation: none;
     }
   }
-  
-  &.sponsor {
-    background: linear-gradient(135deg, #ff0080 0%, #ff4040 100%) !important;
-    border: 1px solid rgba(255, 0, 128, 0.5);
-    box-shadow: 0 4px 20px rgba(255, 0, 128, 0.4);
-    
+
+  // —— 第3个按钮：烈焰橙 ——
+  .action:nth-child(3) .VPButton {
+    background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%) !important;
+    border: 1px solid rgba(255, 120, 0, 0.6) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+    animation: btn-pulse-orange 3s ease-in-out infinite 1s;
+
     &:hover {
-      transform: translateY(-4px) !important;
-      box-shadow: 0 10px 35px rgba(255, 0, 128, 0.6),
-                  0 0 45px rgba(255, 0, 128, 0.3) !important;
+      transform: translateY(-5px) scale(1.06) !important;
+      box-shadow: 0 12px 40px rgba(255, 106, 0, 0.55),
+                  0 0 60px rgba(238, 9, 121, 0.25) !important;
+      filter: brightness(1.15);
+      animation: none;
+    }
+  }
+
+  // —— 第4个按钮：翡翠绿 ——
+  .action:nth-child(4) .VPButton {
+    background: linear-gradient(135deg, #00d26a 0%, #00b4d8 100%) !important;
+    border: 1px solid rgba(0, 210, 106, 0.6) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+    animation: btn-pulse-green 3s ease-in-out infinite 1.5s;
+
+    &:hover {
+      transform: translateY(-5px) scale(1.06) !important;
+      box-shadow: 0 12px 40px rgba(0, 210, 106, 0.55),
+                  0 0 60px rgba(0, 180, 216, 0.25) !important;
+      filter: brightness(1.15);
+      animation: none;
     }
   }
 }
@@ -348,8 +438,8 @@ body:has(.VPHome) {
       transform: translateY(-5px) !important;
     }
   }
-  
-  .VPButton {
+
+  .VPHero .actions .action .VPButton {
     &:hover {
       transform: translateY(-3px) scale(1.03) !important;
     }
