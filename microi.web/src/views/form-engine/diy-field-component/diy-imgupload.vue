@@ -182,6 +182,11 @@
                     <div class="form-item-tip">单张图片的最大体积限制，单位MB</div>
                 </el-form-item>
 
+                <el-form-item label="保存为完整路径">
+                    <el-switch v-model="configForm.SaveFullPath" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">开启后保存时Path将存储完整URL（含文件服务器域名），而非相对路径</div>
+                </el-form-item>
+
                 <el-divider content-position="left">V8引擎代码</el-divider>
 
                 <el-form-item label="上传前V8引擎代码">
@@ -315,6 +320,7 @@ const configForm = ref({
     Tips: '',
     Preview: false,
     MaxSize: 10,
+    SaveFullPath: false,
     BeforeUploadV8: '',
     UploadSuccessV8: ''
 });
@@ -341,6 +347,7 @@ const openConfig = () => {
         Tips: props.field.Config.ImgUpload.Tips || '',
         Preview: props.field.Config.ImgUpload.Preview || false,
         MaxSize: props.field.Config.ImgUpload.MaxSize || 10,
+        SaveFullPath: props.field.Config.ImgUpload.SaveFullPath || false,
         BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
@@ -359,6 +366,7 @@ const saveConfig = () => {
     props.field.Config.ImgUpload.Tips = configForm.value.Tips;
     props.field.Config.ImgUpload.Preview = configForm.value.Preview;
     props.field.Config.ImgUpload.MaxSize = configForm.value.MaxSize;
+    props.field.Config.ImgUpload.SaveFullPath = configForm.value.SaveFullPath;
     
     // 保存Upload V8配置
     if (!props.field.Config.Upload) {
