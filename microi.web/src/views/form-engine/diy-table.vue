@@ -503,7 +503,7 @@
                                             _LimitEdit &&
                                             scope.row._IsInTableAdd !== true &&
                                             scope.row.IsVisibleEdit == true) ||
-                                        (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.length > 0) ||
+                                        (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.some(btn => btn.IsVisible)) ||
                                         (_LimitDel && scope.row.IsVisibleDel == true)
                                     "
                                     class="more-action-btn"
@@ -1348,7 +1348,17 @@ export default {
             if (self.SysMenuModel.TableActionFixedWidth) {
                 return self.SysMenuModel.TableActionFixedWidth;
             }
-            return 210 + self.MaxRowBtnsOut;
+            var baseWidth = 30;
+            // 详情按钮
+            if (self.IsPermission('NoDetail')) {
+                baseWidth += 80;
+            }
+            // 更多按钮（编辑/删除/内部自定义按钮）
+            var canEdit = self.TableChildFormMode != 'View' && self._LimitEdit;
+            if (canEdit || self._LimitDel || self.HasVisibleMoreBtnsIn) {
+                baseWidth += 100;
+            }
+            return baseWidth + self.MaxRowBtnsOut;
         },
         ShowSelectLabel: function () {
             return function (scope, field) {
@@ -1654,6 +1664,7 @@ export default {
             // ],
             TempBtnIsVisible: [],
             MaxRowBtnsOut: 0,
+            HasVisibleMoreBtnsIn: false,
             ShowUpdateBtn: true,
             ShowDeleteBtn: true,
             ShowSaveBtn: true,
@@ -3052,16 +3063,28 @@ export default {
                 roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             }
             
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
-                    if (element.Permission.indexOf(btn.Id) > -1) {
-                        result = true;
+                    // 兼容 Permission 为字符串或数组的情况
+                    var permission = element.Permission;
+                    if (typeof permission === 'string') {
+                        try { permission = JSON.parse(permission); } catch(e) { /* 保持原字符串 */ }
+                    }
+                    if (Array.isArray(permission)) {
+                        if (permission.includes(btn.Id)) {
+                            result = true;
+                        }
+                    } else if (typeof permission === 'string') {
+                        if (permission.indexOf(btn.Id) > -1) {
+                            result = true;
+                        }
                     }
                 });
                 return result;
             }
 
+            // 如果没有配置任何角色权限限制（roleLimitModel为空），与LimitEdit等保持一致
             return false;
         },
         async RunMoreBtn(btn, row, v8) {
@@ -4869,6 +4892,7 @@ export default {
                             var moreBtnsOutTemplate = moreBtns.filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
                             var moreBtnsInTemplate = moreBtns.filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
                             self.MaxRowBtnsOut = 0;
+                            self.HasVisibleMoreBtnsIn = false;
                             
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
                             
@@ -4912,6 +4936,11 @@ export default {
                                 allOutBtn.forEach(el => { allOutBtnLength += el.Name.length; });
                                 var newWidth = allOutBtnLength * 15 + allOutBtn.length * 45;
                                 if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
+                                
+                                // 追踪是否有可见的内部按钮（用于动态计算操作列宽度）
+                                if (!self.HasVisibleMoreBtnsIn && rowBtnsIn.some(btn => btn.IsVisible)) {
+                                    self.HasVisibleMoreBtnsIn = true;
+                                }
                             }
                             
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
@@ -5123,6 +5152,11 @@ export default {
 
                 self.HandlerBtns(_rowMoreBtnsInCopy, row);
                 row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
+                
+                // 追踪是否有可见的内部按钮
+                if (!self.HasVisibleMoreBtnsIn && _rowMoreBtnsInCopy.some(btn => btn.IsVisible)) {
+                    self.HasVisibleMoreBtnsIn = true;
+                }
 
                 //刘诚2025-6-29新增，判断默认的显示和删除按钮是否显示
                 // 注意：IsVisibleDetail/Edit/Del 已经在 GetDiyTableRow 的 for 循环中处理过了
