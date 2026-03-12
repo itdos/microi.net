@@ -247,6 +247,24 @@ export const asyncRoutes = [
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")
     },
+    // OpenClaw 暗黑管理系统（独立布局，不使用 Layout）
+    {
+        path: "/openclaw",
+        name: "openclaw",
+        component: () => import("@/views/openclaw/index.vue"),
+        hidden: true,
+        redirect: "/openclaw/dashboard",
+        children: [
+            { path: "dashboard", name: "openclaw_dashboard", component: () => import("@/views/openclaw/dashboard/index.vue"), meta: { title: "OpenClaw 仪表盘" } },
+            { path: "tasks", name: "openclaw_tasks", component: () => import("@/views/openclaw/tasks/index.vue"), meta: { title: "任务中心" } },
+            { path: "articles", name: "openclaw_articles", component: () => import("@/views/openclaw/articles/index.vue"), meta: { title: "文章管理" } },
+            { path: "accounts", name: "openclaw_accounts", component: () => import("@/views/openclaw/accounts/index.vue"), meta: { title: "平台账号" } },
+            { path: "interact", name: "openclaw_interact", component: () => import("@/views/openclaw/interact/index.vue"), meta: { title: "互评记录" } },
+            { path: "nodes", name: "openclaw_nodes", component: () => import("@/views/openclaw/nodes/index.vue"), meta: { title: "节点管理" } },
+            { path: "llm", name: "openclaw_llm", component: () => import("@/views/openclaw/llm/index.vue"), meta: { title: "AI模型配置" } },
+            { path: "settings", name: "openclaw_settings", component: () => import("@/views/openclaw/settings/index.vue"), meta: { title: "系统设置" } }
+        ]
+    },
     // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后
     {
         path: "/:pathMatch(.*)*",
