@@ -140,6 +140,7 @@
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
                                                 :ParentFieldList="DiyFieldList"
+                                                :CodeEditorMini="CodeEditorMini"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackFormValueChange="CallbackFormValueChange"
                                                 @CallbakOnKeyup="FieldOnKeyup"
@@ -208,6 +209,7 @@
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
                                                 :ParentFieldList="DiyFieldList"
+                                                :CodeEditorMini="CodeEditorMini"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackFormValueChange="CallbackFormValueChange"
                                                 @CallbakOnKeyup="FieldOnKeyup"
@@ -506,6 +508,10 @@ export default {
         },
     },
     props: {
+        CodeEditorMini: {
+            type: Boolean,
+            default: false
+        },
         // AutoInit: {
         //     type: Boolean,
         //     default: true
