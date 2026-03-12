@@ -34,7 +34,25 @@
                     </div>
 
                     <div class="header">
-                        <!-- <h2>{{ $t("Msg.Themes") }}</h2> -->
+                        <h2>🦞 风格主题</h2>
+                    </div>
+                    <div class="content controls">
+                        <div class="form-row">
+                            <div class="col-md-12 oc-theme-row">
+                                <a :class="'ss_theme ss_theme_wide theme-oc-dark ' + (currentOcTheme == 'openclaw-dark' ? 'active' : '')" @click="applyOcTheme('openclaw-dark')">
+                                    <span class="oc-theme-label">暗夜炫酷</span>
+                                </a>
+                                <a :class="'ss_theme ss_theme_wide theme-oc-light ' + (currentOcTheme == 'openclaw-light' ? 'active' : '')" @click="applyOcTheme('openclaw-light')">
+                                    <span class="oc-theme-label">极光白</span>
+                                </a>
+                                <a v-if="currentOcTheme" class="ss_theme ss_theme_wide theme-oc-reset" @click="applyOcTheme('')">
+                                    <span class="oc-theme-label">恢复默认</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="header">
                         <h2>更多主题颜色</h2>
                     </div>
                     <div class="content controls">
@@ -93,7 +111,8 @@ export default {
         return {
             BackgroundsArr: [],
             WallpapersArr: [],
-            ShowThemes: false
+            ShowThemes: false,
+            currentOcTheme: ''
         };
     },
 
@@ -110,6 +129,13 @@ export default {
             if (!self.SysConfig.ThemeColor) self.themeClassChange("", "#409eff");
             else self.themeClassChange("", self.SysConfig.ThemeColor);
         }
+
+        // 恢复之前保存的 OpenClaw 风格主题
+        var savedOcTheme = localStorage.getItem('microi_oc_theme') || '';
+        if (savedOcTheme) {
+            self.currentOcTheme = savedOcTheme;
+            self._applyOcThemeDOM(savedOcTheme);
+        }
     },
     methods: {
         themeChange(val) {
@@ -122,6 +148,9 @@ export default {
 
         changeTheme(color) {
             if (!color && this.SysConfig.ThemeColor) color = this.SysConfig.ThemeColor;
+
+            // 清除 OpenClaw 风格主题
+            if (this.currentOcTheme) this.applyOcTheme('');
 
             console.log("修改主题颜色：", color);
             // 动态修改 CSS 变量
@@ -151,6 +180,9 @@ export default {
             this.diyStore.setThemeColor(color);
         },
         themeClassChange(themeClass, bodyClass) {
+            // 清除 OpenClaw 风格主题
+            if (this.currentOcTheme) this.applyOcTheme('');
+
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", bodyClass);
             document.documentElement.style.setProperty("--theme-color", bodyClass);
@@ -176,6 +208,45 @@ export default {
             }
 
             this.diyStore.setThemeColor(bodyClass);
+        },
+        // OpenClaw 风格主题切换
+        applyOcTheme(theme) {
+            this.currentOcTheme = theme;
+            localStorage.setItem('microi_oc_theme', theme);
+            this._applyOcThemeDOM(theme);
+
+            // 同步设置主题色，使按钮等组件也用赤橙色
+            if (theme) {
+                var accentColor = '#f97316';
+                document.documentElement.style.setProperty('--color-primary', accentColor);
+                document.documentElement.style.setProperty('--theme-color', accentColor);
+                document.documentElement.style.setProperty('--el-color-primary', accentColor);
+                this.diyStore.setThemeColor(accentColor);
+            }
+        },
+        _applyOcThemeDOM(theme) {
+            var appEl = document.getElementById('app-microi') || document.getElementById('app_microi');
+            if (!appEl) { appEl = document.querySelector('#app-microi, [id^=app]'); }
+            if (appEl) {
+                if (theme) {
+                    appEl.setAttribute('data-theme', theme);
+                } else {
+                    appEl.removeAttribute('data-theme');
+                }
+            }
+            // body + html class 用于控制 popper 等挂在 body 的弹出层 & 滚动越界背景
+            document.body.classList.remove('oc-theme-dark', 'oc-theme-light');
+            document.documentElement.classList.remove('oc-theme-dark', 'oc-theme-light');
+            if (theme === 'openclaw-dark') {
+                document.body.classList.add('oc-theme-dark');
+                document.documentElement.classList.add('oc-theme-dark', 'dark');
+            } else if (theme === 'openclaw-light') {
+                document.body.classList.add('oc-theme-light');
+                document.documentElement.classList.add('oc-theme-light');
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
         },
         // 计算颜色亮度 (0-255)
         getColorBrightness(color) {
@@ -368,6 +439,64 @@ export default {
 .theme-white {
     background-color: #F5F5F5;
     border: 2px solid #ddd;
+}
+
+/* OpenClaw 风格主题按钮 */
+.oc-theme-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    clear: both;
+}
+
+.ss_theme_wide {
+    width: auto !important;
+    min-width: 80px;
+    height: 32px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    float: none !important;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ss_theme_wide .oc-theme-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+}
+
+.ss_theme_wide.active {
+    box-shadow: 0 0 0 2px #f97316 !important;
+    border-color: #f97316 !important;
+}
+
+.theme-oc-dark {
+    background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #f97316 100%);
+    border: 1px solid rgba(249,115,22,0.3) !important;
+
+    .oc-theme-label { color: #f0f0f5; text-shadow: 0 0 8px rgba(249,115,22,0.5); }
+    &:hover { box-shadow: 0 2px 12px rgba(239,68,68,0.3); transform: translateY(-1px); }
+}
+
+.theme-oc-light {
+    background: linear-gradient(135deg, #f0f2f5 0%, #ffffff 50%, #f97316 100%);
+    border: 1px solid rgba(249,115,22,0.2) !important;
+
+    .oc-theme-label { color: #1a1a2e; text-shadow: none; }
+    &:hover { box-shadow: 0 2px 12px rgba(249,115,22,0.15); transform: translateY(-1px); }
+}
+
+.theme-oc-reset {
+    background: linear-gradient(135deg, #e8e8e8 0%, #ffffff 100%);
+    border: 1px solid #ddd !important;
+
+    .oc-theme-label { color: #606266; }
+    &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 }
 
 .theme-select-trigger {

@@ -683,6 +683,9 @@ export default {
                 // 只在直接页面模式下处理路由变化
                 if (!self._isDirectPageMode || !isFormPageRoute) return;
                 
+                // keep-alive 停用状态下不处理路由变化，防止缓存实例干扰新实例
+                if (self._isDeactivated) return;
+                
                 // 确保已经 mounted 过
                 if (!self._isMounted) return;
                 
@@ -718,9 +721,11 @@ export default {
         }
     },
     computed: {
-        // 判断是否为页面模式（通过路由参数判断 + 必须是直接访问，非嵌套子表）
+        // 判断是否为页面模式（通过路由参数判断 + 必须是直接访问，非嵌套子表 + 未被 keep-alive 停用）
         IsPageMode() {
             var self = this;
+            // 被 keep-alive 停用的实例不应该渲染页面模式内容，防止缓存实例因路由变化重新挂载 DiyForm 导致重复请求
+            if (self._isDeactivated) return false;
             // 必须同时满足：1. 路由是 form-page 路径  2. 是直接页面访问（非弹窗内的子表）
             var isFormPageRoute = self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
             return isFormPageRoute && self._isDirectPageMode;
@@ -805,10 +810,17 @@ export default {
             _isReloadingForm: false, // 防止 ReloadForm 死循环
             _isMounted: false, // 防止 mounted 重复执行
             _isDirectPageMode: false, // 标识是否为直接通过路由访问的页面模式（非嵌套的子表弹窗）
+            _isDeactivated: false, // keep-alive 停用标记，防止缓存实例响应路由变化导致重复请求
 
             // ========== 抽屉打开上下文 ==========
             _pendingDrawerContext: null
         };
+    },
+    activated() {
+        this._isDeactivated = false;
+    },
+    deactivated() {
+        this._isDeactivated = true;
     },
     async mounted() {
         var self = this;

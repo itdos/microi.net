@@ -43,6 +43,7 @@ import "./permission"; // permission control
 import "./utils/error-log"; // error log
 import "animate.css";
 import "./styles/itdos.diy.scss";
+import "./styles/theme-openclaw.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
 // 主题色工具 - 360 极速浏览器兼容方案
