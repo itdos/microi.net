@@ -21,22 +21,23 @@
                 </template>
             </el-table-column>
             <el-table-column prop="Notice" label="通知" width="50">
-                <template
-                    #default="scope"
-                    v-if="
-                        scope.row.Component !== 'AutoNumber' &&
-                        scope.row.Component !== 'TableChild' &&
-                        scope.row.Component !== 'Guid' &&
-                        scope.row.Component !== 'Progress' &&
-                        scope.row.Component !== 'FontAwesome' &&
-                        scope.row.Component !== 'DevComponent' &&
-                        scope.row.Component !== 'ImgUpload' &&
-                        scope.row.Component !== 'FileUpload' &&
-                        scope.row.Component !== 'Divider' &&
-                        scope.row.Component !== 'HTML'
-                    "
-                >
-                    <el-checkbox v-model="scope.row.Notice" @change="change(scope.row, 'Notice')"></el-checkbox>
+                <template #default="scope">
+                    <el-checkbox
+                        v-if="
+                            scope.row.Component !== 'AutoNumber' &&
+                            scope.row.Component !== 'TableChild' &&
+                            scope.row.Component !== 'Guid' &&
+                            scope.row.Component !== 'Progress' &&
+                            scope.row.Component !== 'FontAwesome' &&
+                            scope.row.Component !== 'DevComponent' &&
+                            scope.row.Component !== 'ImgUpload' &&
+                            scope.row.Component !== 'FileUpload' &&
+                            scope.row.Component !== 'Divider' &&
+                            scope.row.Component !== 'HTML'
+                        "
+                        v-model="scope.row.Notice"
+                        @change="change(scope.row, 'Notice')"
+                    ></el-checkbox>
                 </template>
             </el-table-column>
         </el-table>
@@ -58,22 +59,23 @@
                 </template>
             </el-table-column>
             <el-table-column prop="Notice" label="通知" width="50">
-                <template
-                    #default="scope"
-                    v-if="
-                        scope.row.Component !== 'AutoNumber' &&
-                        scope.row.Component !== 'TableChild' &&
-                        scope.row.Component !== 'Guid' &&
-                        scope.row.Component !== 'Progress' &&
-                        scope.row.Component !== 'FontAwesome' &&
-                        scope.row.Component !== 'DevComponent' &&
-                        scope.row.Component !== 'ImgUpload' &&
-                        scope.row.Component !== 'FileUpload' &&
-                        scope.row.Component !== 'Divider' &&
-                        scope.row.Component !== 'HTML'
-                    "
-                >
-                    <el-checkbox v-model="scope.row.Notice" @change="change(scope.row, 'Notice')"></el-checkbox>
+                <template #default="scope">
+                    <el-checkbox
+                        v-if="
+                            scope.row.Component !== 'AutoNumber' &&
+                            scope.row.Component !== 'TableChild' &&
+                            scope.row.Component !== 'Guid' &&
+                            scope.row.Component !== 'Progress' &&
+                            scope.row.Component !== 'FontAwesome' &&
+                            scope.row.Component !== 'DevComponent' &&
+                            scope.row.Component !== 'ImgUpload' &&
+                            scope.row.Component !== 'FileUpload' &&
+                            scope.row.Component !== 'Divider' &&
+                            scope.row.Component !== 'HTML'
+                        "
+                        v-model="scope.row.Notice"
+                        @change="change(scope.row, 'Notice')"
+                    ></el-checkbox>
                 </template>
             </el-table-column>
         </el-table>

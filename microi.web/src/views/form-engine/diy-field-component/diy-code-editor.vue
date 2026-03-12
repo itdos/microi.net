@@ -1,5 +1,67 @@
 <template>
-    <div class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
+    <!-- Mini模式：只显示一个按钮，点击弹出编辑器 -->
+    <div v-if="CodeEditorMini" class="code-editor-mini">
+        <el-button type="primary" :icon="Edit" @click="openMiniEditor">
+            编辑代码{{ miniCodeLength }}
+        </el-button>
+
+        <el-dialog
+            v-if="miniEditorVisible"
+            v-model="miniEditorVisible"
+            title="编辑代码"
+            width="80%"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <div class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
+                <div class="monaco-toolbar">
+                    <div class="toolbar-left">
+                        <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
+                            <el-icon><MagicStick /></el-icon> 格式化
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="foldAllCode" title="折叠所有代码">
+                            <el-icon><DArrowLeft /></el-icon> 折叠
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="findInCode" title="查找">
+                            <el-icon><Search /></el-icon> 查找
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="showShortcuts" title="快捷键">
+                            <el-icon><InfoFilled /></el-icon> 快捷键
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
+                            <el-icon><Document /></el-icon> V8文档
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="increaseFontSize" title="放大">
+                            <el-icon><ZoomIn /></el-icon>
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="decreaseFontSize" title="缩小">
+                            <el-icon><ZoomOut /></el-icon>
+                        </button>
+                        <button class="toolbar-btn ai-btn" :class="{ active: aiPanelVisible }" @click.prevent="toggleAiPanel" title="AI编程助手">
+                            <el-icon><ChatDotSquare /></el-icon> AI编程
+                        </button>
+                    </div>
+                </div>
+                <div class="editor-body">
+                    <div class="editor-main">
+                        <div
+                            :id="'monaco-editor-' + (field && field.Id) + '-' + RandomValue"
+                            class="monaco-editor"
+                            :style="{ height: EditorHeight }"
+                        ></div>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <el-button @click="closeMiniEditor">取消</el-button>
+                <el-button type="primary" @click="saveMiniEditor">确定</el-button>
+            </template>
+        </el-dialog>
+    </div>
+
+    <!-- 正常模式：完整编辑器 -->
+    <div v-else class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
         <div class="monaco-toolbar">
             <div class="toolbar-left">
                 <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
@@ -256,14 +318,19 @@
 </template>
 
 <script setup>
-import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
+import { onMounted, ref, reactive, computed, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
 
 // 动态导入 Monaco Editor（延迟加载，减少首屏体积）
+// 使用全局缓存，避免多个组件实例之间的 worker 引用冲突
 let monaco = null;
-let jsonWorker, cssWorker, htmlWorker, tsWorker, EditorWorker;
 
 // 异步初始化 Monaco
 const initMonaco = async () => {
+    // 优先使用全局缓存的 monaco 实例
+    if (window.__monacoEditorInstance) {
+        monaco = window.__monacoEditorInstance;
+        return monaco;
+    }
     if (monaco) return monaco;
     
     const [
@@ -283,12 +350,34 @@ const initMonaco = async () => {
     ]);
     
     monaco = monacoModule;
-    jsonWorker = jsonWorkerModule.default;
-    cssWorker = cssWorkerModule.default;
-    htmlWorker = htmlWorkerModule.default;
-    tsWorker = tsWorkerModule.default;
-    EditorWorker = editorWorkerModule.default;
     
+    // 将 worker 构造函数存储在全局，确保 MonacoEnvironment.getWorker 始终能正确引用
+    if (!window.__monacoWorkers) {
+        window.__monacoWorkers = {
+            json: jsonWorkerModule.default,
+            css: cssWorkerModule.default,
+            html: htmlWorkerModule.default,
+            ts: tsWorkerModule.default,
+            editor: editorWorkerModule.default
+        };
+    }
+    
+    // 全局只设置一次 MonacoEnvironment，使用全局 worker 引用
+    if (!window.__monacoEnvSet) {
+        window.__monacoEnvSet = true;
+        globalThis.MonacoEnvironment = {
+            getWorker(arg1, label) {
+                const w = window.__monacoWorkers;
+                if (label === 'json') return new w.json();
+                if (label === 'css' || label === 'scss' || label === 'less') return new w.css();
+                if (label === 'html' || label === 'handlebars' || label === 'razor') return new w.html();
+                if (['typescript', 'javascript'].includes(label)) return new w.ts();
+                return new w.editor();
+            },
+        };
+    }
+    
+    window.__monacoEditorInstance = monaco;
     return monaco;
 };
 import { getToken } from '@/utils/auth.js';
@@ -309,7 +398,8 @@ import {
     WarningFilled,
     DocumentChecked,
     CopyDocument,
-    VideoPause
+    VideoPause,
+    Edit
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
@@ -330,6 +420,10 @@ const props = defineProps({
     FormData: {
         type: Object,
         default: () => ({})
+    },
+    CodeEditorMini: {
+        type: Boolean,
+        default: false
     },
     ReadonlyFields: {
         type: Array,
@@ -379,13 +473,13 @@ const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
         nextValue = (newValue === null || newValue === undefined) ? '' : String(newValue);
     }
 
-    console.log('[CodeEditor] watch modelValue:', {
-        newValue,
-        nextValue,
-        currentEditorValue: monacoEditor ? monacoEditor.getValue() : 'editor not created',
-        isSelfUpdating,
-        hasFocus: monacoEditor && monacoEditor.hasTextFocus ? monacoEditor.hasTextFocus() : false
-    });
+    // console.log('[CodeEditor] watch modelValue:', {
+    //     newValue,
+    //     nextValue,
+    //     currentEditorValue: monacoEditor ? monacoEditor.getValue() : 'editor not created',
+    //     isSelfUpdating,
+    //     hasFocus: monacoEditor && monacoEditor.hasTextFocus ? monacoEditor.hasTextFocus() : false
+    // });
 
     // 先更新内部状态
     ModelValue.value = nextValue;
@@ -433,25 +527,6 @@ const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
     applyLargeFileOptions(nextValue);
     monacoEditor.setValue(nextValue);
 });
-
-// 配置 Monaco Editor 环境
-globalThis.MonacoEnvironment = {
-    getWorker(arg1, label) {
-        if (label === 'json') {
-            return new jsonWorker();
-        }
-        if (label === 'css' || label === 'scss' || label === 'less') {
-            return new cssWorker();
-        }
-        if (label === 'html' || label === 'handlebars' || label === 'razor') {
-            return new htmlWorker();
-        }
-        if (['typescript', 'javascript'].includes(label)) {
-            return new tsWorker();
-        }
-        return new EditorWorker();
-    },
-};
 
 // 关键：使用 let 而不是 ref
 let monacoEditor = null;
@@ -595,7 +670,10 @@ const applyLargeFileOptions = (text) => {
 };
 
 onMounted(() => {
-    Init();
+    // Mini模式下不自动初始化编辑器，等用户点击按钮后再初始化
+    if (!props.CodeEditorMini) {
+        Init();
+    }
 });
 
 const formatCode = () => {
@@ -1406,6 +1484,51 @@ const copyAiCode = (code) => {
     }
 };
 
+// ==================== Mini 模式 ====================
+const miniEditorVisible = ref(false);
+let miniEditorBackup = ''; // 打开弹窗时备份的值，用于取消恢复
+
+const miniCodeLength = computed(() => {
+    const val = ModelValue.value;
+    if (!val) return '';
+    const len = String(val).length;
+    return len > 0 ? `（${len}字）` : '';
+});
+
+// 销毁当前编辑器实例（Mini模式弹窗关闭时调用）
+const disposeEditor = () => {
+    if (monacoEditor) {
+        monacoEditor.dispose();
+        monacoEditor = null;
+    }
+};
+
+const openMiniEditor = () => {
+    miniEditorBackup = ModelValue.value;
+    miniEditorVisible.value = true;
+    nextTick(() => {
+        Init();
+    });
+};
+
+const closeMiniEditor = () => {
+    // 取消：恢复备份值
+    if (miniEditorBackup !== ModelValue.value) {
+        ModelValue.value = miniEditorBackup;
+        emits('update:modelValue', miniEditorBackup);
+        emits('ModelChange', miniEditorBackup);
+        emits('CallbackFormValueChange', props.field, miniEditorBackup);
+    }
+    disposeEditor();
+    miniEditorVisible.value = false;
+};
+
+const saveMiniEditor = () => {
+    // 确定：保持当前编辑器的值
+    disposeEditor();
+    miniEditorVisible.value = false;
+};
+
 // 暴露方法供父组件调用
 defineExpose({
     openConfig
@@ -1926,6 +2049,15 @@ defineExpose({
 @keyframes ai-slide-in {
     from { width: 0; min-width: 0; opacity: 0; }
     to { width: 380px; min-width: 380px; opacity: 1; }
+}
+
+// Mini模式按钮样式
+.code-editor-mini {
+    display: inline-block;
+
+    .el-button {
+        font-size: 13px;
+    }
 }
 
 .shortcuts-content {

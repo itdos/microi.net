@@ -41,8 +41,8 @@ export default {
             url = decodeURIComponent(self.$route.fullPath.replace("/iframe/", ""));
         }
         if (url) {
-            //如果url是guid，就表示是接口引擎
-            if (self.isValidGUID(url)) {
+            //如果url是guid或ulid，就表示是接口引擎
+            if (self.isValidGUID(url) || self.isValidULID(url)) {
                 var apiEngineResult = await self.DiyCommon.ApiEngine.Run(url, {
                     MenuId: menuId
                 });
@@ -67,6 +67,13 @@ export default {
     },
 
     methods: {
+        isValidULID(ulid) {
+            // ULID 正则表达式模式
+            // 格式: 26位 Crockford Base32 字符（0-9, A-Z 排除 I, L, O, U）
+            // 第一个字符限制为 0-7（时间戳高位限制）
+            const ulidPattern = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i;
+            return ulidPattern.test(ulid);
+        },
         isValidGUID(guid) {
             // GUID 正则表达式模式
             // 支持以下格式：

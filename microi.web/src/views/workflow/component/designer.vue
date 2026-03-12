@@ -70,6 +70,7 @@
                                     :DefaultValues="DefaultValues_Node"
                                     :ColSpan="24"
                                     :LabelPosition="'top'"
+                                    :CodeEditorMini="true"
                                     @CallbackForm="CallbackForm_Node"
                                     @CallbackFormValueChange="CallbackFormValueChange_Node"
                                 ></DiyForm>
@@ -88,6 +89,7 @@
                                     :DefaultValues="DefaultValues_Line"
                                     :ColSpan="24"
                                     :LabelPosition="'top'"
+                                    :CodeEditorMini="true"
                                     @CallbackForm="CallbackForm_Line"
                                     @CallbackFormValueChange="CallbackFormValueChange_Line"
                                 ></DiyForm>
@@ -106,6 +108,7 @@
                                     :TableRowId="DiyTableRowId_Flow"
                                     :ColSpan="24"
                                     :LabelPosition="'top'"
+                                    :CodeEditorMini="true"
                                     :DefaultValues="FlowDesignModel"
                                     @CallbackFormValueChange="CallbackFormValueChange_Flow"
                                 ></DiyForm>

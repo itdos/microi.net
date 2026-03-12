@@ -215,6 +215,7 @@ const GetSysMenuList = () => {
     DiyCommon.Post(
         proxy.DiyApi.GetSysMenuStep(),
         {
+            _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "DiyTableId", "ParentId", "Sort"],
             TableName: "Sys_Menu",
             _OrderBy: "Sort",
             _OrderByType: "ASC"
