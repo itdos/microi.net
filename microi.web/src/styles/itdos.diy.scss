@@ -1,4 +1,7 @@
 .microi {
+    .el-rate{
+        height: auto;
+    }
     .el-form--inline .el-form-item{
         vertical-align: unset;
     }
@@ -330,6 +333,8 @@
             line-height: 30px;
             color: #6b6b6b;
             overflow: hidden;
+            display: flex;
+            align-items: center;
         }
         .title {
             font-weight: bold;

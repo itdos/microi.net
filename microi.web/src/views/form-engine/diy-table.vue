@@ -584,10 +584,10 @@
                         <p class="card-empty-text">{{ $t('Msg.NoData') }}</p>
                     </div>
                     <el-col
-                        v-for="(model, index) in DiyTableRowList"
+                        v-for="(item, index) in DiyTableRowList"
                         v-show="!(!diyStore.IsPhoneView && tableLoading)"
-                        @click="DiyTableRowClick(model)"
-                        :key="model.Id"
+                        @click="DiyTableRowClick(item)"
+                        :key="item.Id"
                             :xs="24"
                             :sm="12"
                             :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
@@ -601,7 +601,7 @@
                             <!-- 🔥 性能优化：减少不必要的响应式计算 -->
                             <el-card
                                 class="box-card card-data-animate no-padding"
-                                :class="{ 'card-selected': TableEnableBatch && isCardSelected(model) }"
+                                :class="{ 'card-selected': TableEnableBatch && isCardSelected(item) }"
                                 :style="SysMenuModel.TableCardImgField ? '' : 'border-top: 5px solid var(--color-primary)'"
                             >
                                 <div 
@@ -610,9 +610,9 @@
                                     <img
                                         v-if="SysMenuModel.TableCardImgField"
                                         :src="
-                                            model[SysMenuModel.TableCardImgField]
+                                            item[SysMenuModel.TableCardImgField]
                                                 ? GetFileServerUrl(
-                                                    model[SysMenuModel.TableCardImgField]
+                                                    item[SysMenuModel.TableCardImgField]
                                                 )
                                                 : bodyBgSvg
                                         "
@@ -637,9 +637,9 @@
                                             style="padding: 5px 10px; font-size: 14px"
                                         >
                                             <!-- 批量选择复选框 - 放在第一个字段左侧 -->
-                                            <div v-if="fieldIndex === 0 && TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(model)">
+                                            <div v-if="fieldIndex === 0 && TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
                                                 <el-checkbox
-                                                    :model-value="isCardSelected(model)"
+                                                    :model-value="isCardSelected(item)"
                                                 />
                                             </div>
                                             <!--如果是表内编辑（卡片模式）-->
@@ -648,10 +648,10 @@
                                                     <span class="card-inline-edit-label">{{ field.Label }}：</span>
                                                     <div class="card-inline-edit-control">
                                                         <component
-                                                            v-model="model[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                                            v-model="item[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                                                             :TableInEdit="true"
                                                             :field="field"
-                                                            :FormDiyTableModel="model"
+                                                            :FormDiyTableModel="item"
                                                             :FormMode="TableChildFormMode"
                                                             :TableId="TableId"
                                                             :TableName="TableName"
@@ -662,12 +662,12 @@
                                                             :LoadType="'Table'"
                                                             @CallbackRunV8Code="
                                                                 ({ field, thisValue, callback }) => {
-                                                                    return RunV8Code({ field: field, thisValue: thisValue, row: model, callback: callback });
+                                                                    return RunV8Code({ field: field, thisValue: thisValue, row: item, callback: callback });
                                                                 }
                                                             "
                                                             @CallbakOnKeyup="
                                                                 (event, field) => {
-                                                                    return FieldOnKeyup(event, field, { $index: index, row: model });
+                                                                    return FieldOnKeyup(event, field, { $index: index, row: item });
                                                                 }
                                                             "
                                                             :is="'Diy' + field.Component"
@@ -675,9 +675,12 @@
                                                     </div>
                                                 </div>
                                             </template>
+                                            <template v-else-if="field.Component == 'Rate'">
+                                                {{ field.Label }}：<el-rate v-model="item[field.AsName || field.Name]" :disabled="true" />
+                                            </template>
                                             <!--如果不是表内编辑（卡片模式）-->
                                             <template v-else>
-                                                {{ field.Label }}：{{ GetColValue({ row: model }, field) }}
+                                                {{ field.Label }}：{{ GetColValue({ row: item }, field) }}
                                             </template>
                                         </div>
                                     </div>
@@ -696,18 +699,18 @@
                                     "
                                 >
                                     <el-button
-                                        v-for="(btn, btnIndex) in model._RowMoreBtnsOut"
+                                        v-for="(btn, btnIndex) in item._RowMoreBtnsOut"
                                         :key="
                                             TypeFieldName +
                                             'more_btn_showrowtrue_' +
-                                            model.Id +
+                                            item.Id +
                                             btnIndex
                                         "
                                         v-show="btn.IsVisible && !TableChildField.Readonly"
                                         :type="GetMoreBtnStyle(btn)"
                                         class="row-more-btns-out"
                                         :loading="BtnV8Loading"
-                                        @click.stop="RunMoreBtn(btn, model)"
+                                        @click.stop="RunMoreBtn(btn, item)"
                                         style=""
                                         size="small"
                                     >
@@ -721,7 +724,7 @@
                                         v-if="IsPermission('NoDetail')"
                                         icon="Tickets"
                                         class="marginRight10"
-                                        @click="OpenDetail(model, 'View')"
+                                        @click="OpenDetail(item, 'View')"
                                         size="small"
                                     >
                                         {{ $t('Msg.Detail') }}
@@ -749,25 +752,25 @@
                                                         LimitEdit() && TableChildFormMode != 'View'
                                                     "
                                                     icon="Edit"
-                                                    @click="OpenDetail(model, 'Edit')"
+                                                    @click="OpenDetail(item, 'Edit')"
                                                 >
                                                     {{ $t('Msg.Edit') }}
                                                 </el-dropdown-item>
-                                                <template v-if="model._RowMoreBtnsIn.length > 0">
+                                                <template v-if="item._RowMoreBtnsIn.length > 0">
                                                     <template
                                                         v-for="(
                                                             btn, btnIndex
-                                                        ) in model._RowMoreBtnsIn"
+                                                        ) in item._RowMoreBtnsIn"
                                                     >
                                                         <el-dropdown-item
                                                             v-if="btn.IsVisible"
                                                             :key="
                                                                 TypeFieldName +
                                                                 'more_btn_' +
-                                                                model.Id +
+                                                                item.Id +
                                                                 btnIndex
                                                             "
-                                                            @click="RunMoreBtn(btn, model)"
+                                                            @click="RunMoreBtn(btn, item)"
                                                         >
                                                             <fa-icon
                                                                 :icon="
@@ -788,7 +791,7 @@
                                                     "
                                                     icon="Delete"
                                                     divided
-                                                    @click="DelDiyTableRow(model)"
+                                                    @click="DelDiyTableRow(item)"
                                                 >
                                                     {{ $t('Msg.Delete') }}
                                                 </el-dropdown-item>
