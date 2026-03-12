@@ -210,50 +210,49 @@ var DiyCommon = {
         return "https://static.itdos.com";
     },
     //如果是"."开头，会直接返回
-    GetServerPath: function (path, returnNoImg) {
+    GetServerPath: function (url, returnNoImg) {
         var self = this;
-
-        if (!path) {
+        if (!url) {
             if (returnNoImg === false) {
                 return "";
             }
             return "./static/img/nohead-girl.png";
         }
-        if (path.toLowerCase().startsWith("http")) {
-            return path;
+        var urlPah = '';
+        if (typeof(url) == 'object') {
+            urlPah = url.Path;
+        }else{
+            urlPah = url.toString();
         }
-        if (path.startsWith("{")) {
-            var pathObj = JSON.parse(path);
-            if(pathObj.Path){
-                return DiyCommon.GetServerPath(pathObj.Path, returnNoImg);
+        if (urlPah.startsWith(".")) {
+            return urlPah;
+        }
+        //如果是json
+        if (urlPah.startsWith('{')) {
+            try {
+                var urlObj = JSON.parse(urlPah);
+                if (urlObj && urlObj.Path) {
+                    urlPah = urlObj.Path;
+                }
+            } catch (e) {
+                // 解析失败，继续使用原始字符串
             }
         }
-        if (path.startsWith(".")) {
-            return path;
-            path = path.substr(1, path.length - 1);
+        if (urlPah.startsWith('http')) {
+            return urlPah;
         }
-        // if (path.startsWith("/") && !path.startsWith("\\")) {
-        //     path = "/" + path;
-        // }
-        // 取文件格式，如果是视频、音频文件，则使用mediaServer
-        // var format = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
-        // if (
-        //   format === ".mp4" ||
-        //   format === ".avi" ||
-        //   format === ".rmvb" ||
-        //   format === ".wmv" ||
-        //   format === ".mov" ||
-        //   format === ".flv" ||
-        //   format === ".3gp" ||
-        //   format === ".mp3" ||
-        //   format === ".ogg" ||
-        //   format === ".wma" ||
-        //   format === ".flac" ||
-        //   format === ".ape"
-        // ) {
-        //   return DiyCommon.GetMediaServer() + path;
-        // }
-        return DiyCommon.GetFileServer() + path;
+        
+        if (urlPah.startsWith('{')) {
+            var urlObj = JSON.parse(urlPah);
+            return DiyCommon.GetFileServer().TrimEnd('/') + urlObj.Path;
+        }
+        if (urlPah.startsWith('[')) {
+            var urlArr = JSON.parse(urlPah);
+            if (urlArr.length > 0) {
+                return DiyCommon.GetFileServer().TrimEnd('/') + urlArr[0].Path;
+            }
+        }
+        return DiyCommon.GetFileServer().TrimEnd('/') + urlPah;
     },
     pathBase: "./",
     RepalceUrlKey(url) {
@@ -3154,24 +3153,31 @@ var DiyCommon = {
                                 // 如果值为空或正在上传中，设置为空字符串
                                 if (DiyCommon.IsNull(val) || val === '正在上传中...') {
                                     formDiyTableModel[formField] = '';
-                                    continue;
                                 }
-                                
                                 // 如果已经是 JSON 字符串格式（正确格式），保持不变
-                                if (typeof val === "string" && val.startsWith('{')) {
+                                else if (typeof val === "string" && val.startsWith('{')) {
+                                    var _validJson = false;
                                     try {
-                                        // 验证是否是有效的 JSON
-                                        var testParse = JSON.parse(val);
-                                        // 如果是有效的 JSON 对象，保持不变
-                                        continue;
-                                    } catch (e) {
-                                        // JSON 解析失败，继续后续处理
+                                        JSON.parse(val);
+                                        _validJson = true;
+                                    } catch (e) { /* JSON 解析失败，继续后续处理 */ }
+                                    
+                                    if (!_validJson) {
+                                        // 不是有效JSON，当作普通字符串路径处理
+                                        var fileName = val.split('/').pop();
+                                        var jsonObj = {
+                                            Id: 'legacy_' + new Date().getTime(),
+                                            Name: fileName,
+                                            Size: '',
+                                            CreateTime: '',
+                                            Path: val,
+                                            State: 1
+                                        };
+                                        formDiyTableModel[formField] = JSON.stringify(jsonObj);
                                     }
                                 }
-                                
                                 // 如果是对象（新上传的文件），序列化为 JSON 字符串
-                                if (typeof val === "object" && val !== null && !Array.isArray(val)) {
-                                    // 确保对象包含必要字段：Id, Name, Size, CreateTime, Path, State
+                                else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
                                     if (val.Path || val.path || val.Url || val.url) {
                                         var jsonObj = {
                                             Id: val.Id || val.id || '',
@@ -3182,12 +3188,10 @@ var DiyCommon = {
                                             State: val.State !== undefined ? val.State : 1
                                         };
                                         formDiyTableModel[formField] = JSON.stringify(jsonObj);
-                                        continue;
                                     }
                                 }
-                                
                                 // 如果是数组，取第一个元素并处理
-                                if (Array.isArray(val)) {
+                                else if (Array.isArray(val)) {
                                     if (val.length === 0) {
                                         formDiyTableModel[formField] = "";
                                     } else {
@@ -3203,7 +3207,6 @@ var DiyCommon = {
                                             };
                                             formDiyTableModel[formField] = JSON.stringify(jsonObj);
                                         } else if (typeof first === "string") {
-                                            // 如果是字符串路径，包装成对象
                                             var fileName = first.split('/').pop();
                                             var jsonObj = {
                                                 Id: 'legacy_' + new Date().getTime(),
@@ -3216,11 +3219,9 @@ var DiyCommon = {
                                             formDiyTableModel[formField] = JSON.stringify(jsonObj);
                                         }
                                     }
-                                    continue;
                                 }
-                                
                                 // 如果是普通字符串路径（老数据格式），包装成 JSON 对象
-                                if (typeof val === "string" && val.trim() !== "") {
+                                else if (typeof val === "string" && val.trim() !== "") {
                                     var fileName = val.split('/').pop();
                                     var jsonObj = {
                                         Id: 'legacy_' + new Date().getTime(),
@@ -3235,6 +3236,35 @@ var DiyCommon = {
                             }
                             // 多文件场景：保持数组格式不变，不需要处理 RealPath（RealPath 只用于前端显示）
                             // 数组中的每个对象应该保持 {Id, Name, Size, CreateTime, Path, State} 格式
+
+                            // 处理「保存为完整路径」配置：将相对路径转换为完整URL
+                            if (cfg && cfg.SaveFullPath === true) {
+                                var fileServer = DiyCommon.GetFileServer();
+                                var currentVal = formDiyTableModel[formField];
+                                if (!DiyCommon.IsNull(currentVal)) {
+                                    if (!isMultiple) {
+                                        // 单文件：解析JSON字符串，修改Path后重新序列化
+                                        if (typeof currentVal === "string" && currentVal.startsWith('{')) {
+                                            try {
+                                                var parsed = JSON.parse(currentVal);
+                                                if (parsed.Path && !parsed.Path.toLowerCase().startsWith("http")) {
+                                                    parsed.Path = fileServer + parsed.Path;
+                                                    formDiyTableModel[formField] = JSON.stringify(parsed);
+                                                }
+                                            } catch (e) { /* ignore */ }
+                                        }
+                                    } else {
+                                        // 多文件：遍历数组中的每个对象，修改Path
+                                        if (Array.isArray(currentVal)) {
+                                            currentVal.forEach(function(item) {
+                                                if (item && item.Path && !item.Path.toLowerCase().startsWith("http")) {
+                                                    item.Path = fileServer + item.Path;
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         } catch (e) {
                             // 容错：不要阻塞其它字段处理
                             console.log("ForRowModelHandler - 处理单图/单文件字段出错:", formField, e);

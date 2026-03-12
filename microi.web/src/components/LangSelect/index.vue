@@ -1,5 +1,5 @@
 <template>
-    <el-dropdown trigger="click" class="international" @command="handleSetLanguage">
+    <el-dropdown trigger="hover" class="international" @command="handleSetLanguage">
         <div>
             <fa-icon :class="'fas fa-globe'" />
             <!-- <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span> -->
