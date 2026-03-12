@@ -1448,11 +1448,22 @@ export default {
             var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
                 FkId: self.SysMenuId
             });
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
-                    if (element.Permission.indexOf(btn.Id) > -1) {
-                        result = true;
+                    // 兼容 Permission 为字符串或数组的情况
+                    var permission = element.Permission;
+                    if (typeof permission === 'string') {
+                        try { permission = JSON.parse(permission); } catch(e) { /* 保持原字符串 */ }
+                    }
+                    if (Array.isArray(permission)) {
+                        if (permission.includes(btn.Id)) {
+                            result = true;
+                        }
+                    } else if (typeof permission === 'string') {
+                        if (permission.indexOf(btn.Id) > -1) {
+                            result = true;
+                        }
                     }
                 });
                 return result;
@@ -1724,11 +1735,22 @@ export default {
             var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
                 FkId: self.SysMenuId
             });
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
-                    if (element.Permission.indexOf(btn.Id) > -1) {
-                        result = true;
+                    // 兼容 Permission 为字符串或数组的情况
+                    var permission = element.Permission;
+                    if (typeof permission === 'string') {
+                        try { permission = JSON.parse(permission); } catch(e) { /* 保持原字符串 */ }
+                    }
+                    if (Array.isArray(permission)) {
+                        if (permission.includes(btn.Id)) {
+                            result = true;
+                        }
+                    } else if (typeof permission === 'string') {
+                        if (permission.indexOf(btn.Id) > -1) {
+                            result = true;
+                        }
                     }
                 });
                 return result;
