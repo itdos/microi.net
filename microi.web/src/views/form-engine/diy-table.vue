@@ -2712,6 +2712,9 @@ export default {
                     //但是注意一点：GetSysMenuModelAfter 里面的GetDiyTableRow方法下面有句GetShowDiyFieldList这个代码，一定要在GetDiyFieldAfter处理好后执行。
                     self.GetDiyFieldAfter(results[2]);
 
+                    // 补充加载SearchFieldIds引用但DiyFieldList中缺失的表字段
+                    await self.EnsureSearchFieldsLoaded();
+
                     //2022-05-14 新增：全部After处理好了再获取数据
                     var isInit = param && param.IsInit ? true : false;
                     self.GetDiyTableRow({ _PageIndex: 1, IsInit: isInit });
@@ -3626,6 +3629,57 @@ export default {
                 });
             }
             return sums;
+        },
+        /**
+         * 补充加载SearchFieldIds中引用但DiyFieldList中缺失的表字段
+         * 当SearchFieldIds引用了JoinTable或其他表的字段，而GetDiyFieldByDiyTables未返回时，
+         * 此方法会额外请求缺失表的字段并追加到DiyFieldList中
+         */
+        async EnsureSearchFieldsLoaded() {
+            var self = this;
+            if (!self.SearchFieldIds || self.SearchFieldIds.length === 0) return;
+            if (!self.DiyFieldList) return;
+
+            // 收集DiyFieldList中已有的字段Id集合
+            var loadedFieldIds = new Set(self.DiyFieldList.map(function (f) { return f.Id; }));
+
+            // 收集SearchFieldIds中引用但DiyFieldList中缺失的TableId
+            var missingTableIds = [];
+            var missingTableIdSet = new Set();
+            self.SearchFieldIds.forEach(function (item) {
+                if (!item || typeof item === 'string') return;
+                var fieldId = item.Id;
+                var tableId = item.TableId;
+                if (fieldId && !loadedFieldIds.has(fieldId) && tableId && !missingTableIdSet.has(tableId)) {
+                    missingTableIdSet.add(tableId);
+                    missingTableIds.push(tableId);
+                }
+            });
+
+            if (missingTableIds.length === 0) return;
+
+            // 请求缺失表的字段
+            try {
+                var result = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyFieldByDiyTables, {
+                    TableIds: missingTableIds
+                });
+                if (result && self.DiyCommon.Result(result, false) && Array.isArray(result.Data)) {
+                    result.Data.forEach(function (field) {
+                        // 避免重复添加
+                        if (!loadedFieldIds.has(field.Id)) {
+                            self.DiyCommon.DiyFieldConfigStrToJson(field);
+                            self.DiyCommon.Base64DecodeDiyField(field);
+                            self.DiyCommon.EnsureFieldProperties(field);
+                            self.DiyFieldList.push(field);
+                            loadedFieldIds.add(field.Id);
+                        }
+                    });
+                    // 触发数据源加载
+                    self.DiyCommon.SetFieldsData(result.Data);
+                }
+            } catch (e) {
+                console.warn('[DiyTable] 补充加载搜索字段失败:', e);
+            }
         },
         GetDiyField() {
             var self = this;
