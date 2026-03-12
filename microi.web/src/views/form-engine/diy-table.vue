@@ -1009,6 +1009,7 @@ import { tableUtilsMixin, diyCommonMixin } from "./mixins";
 // 独立组件
 import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.vue";
 import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissionDialog.vue";
+import DiySearch from "@/views/form-engine/diy-search.vue";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -1018,6 +1019,7 @@ export default {
         PanThumb,
         DiyImportDialog,
         DiyPermissionDialog,
+        DiySearch,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
     },
@@ -1361,16 +1363,17 @@ export default {
             return baseWidth + self.MaxRowBtnsOut;
         },
         ShowSelectLabel: function () {
-            return function (scope, field) {
-                let labelName = this.GetColValue(scope, field);
+            var self = this;
+            return (scope, field) => {
+                let labelName = self.GetColValue(scope, field);
                 let obj = field.Data?.find((item) => item[field.Config.SelectSaveField] == labelName);
                 if (obj) labelName = obj[field.Config.SelectLabel];
                 return labelName;
             };
         },
         GetSearchFieldList: function () {
-            return function (type, InOrOut) {
-                var self = this;
+            var self = this;
+            return (type, InOrOut) => {
                 if (self.SearchFieldIds.length == 0) {
                     return [];
                 }
