@@ -17,23 +17,41 @@ export default {
             if (!url) {
                 return url;
             }
-            if (url.startsWith('http')) {
-                return url;
-            }
+            var urlPah = '';
             if (typeof(url) == 'object') {
-                return self.SysConfig.FileServer.TrimEnd('/') + url.Path;
+                urlPah = url.Path;
+            }else{
+                urlPah = url.toString();
             }
-            if (url.startsWith('{')) {
-                var urlObj = JSON.parse(url);
+            if (urlPah.startsWith(".")) {
+                return urlPah;
+            }
+            //如果是json
+            if (urlPah.startsWith('{')) {
+                try {
+                    var urlObj = JSON.parse(urlPah);
+                    if (urlObj && urlObj.Path) {
+                        urlPah = urlObj.Path;
+                    }
+                } catch (e) {
+                    // 解析失败，继续使用原始字符串
+                }
+            }
+            if (urlPah.startsWith('http')) {
+                return urlPah;
+            }
+            
+            if (urlPah.startsWith('{')) {
+                var urlObj = JSON.parse(urlPah);
                 return self.SysConfig.FileServer.TrimEnd('/') + urlObj.Path;
             }
-            if (url.startsWith('[')) {
-                var urlArr = JSON.parse(url);
+            if (urlPah.startsWith('[')) {
+                var urlArr = JSON.parse(urlPah);
                 if (urlArr.length > 0) {
                     return self.SysConfig.FileServer.TrimEnd('/') + urlArr[0].Path;
                 }
             }
-            return self.SysConfig.FileServer.TrimEnd('/') + url;
+            return self.SysConfig.FileServer.TrimEnd('/') + urlPah;
         },
         
         /**

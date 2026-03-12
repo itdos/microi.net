@@ -3538,7 +3538,7 @@ export default {
                     }
 
                     var formDiyTableModel = formData;
-
+                    
                     self.DiyCommon.ForRowModelHandler(formDiyTableModel, self.DiyFieldList);
 
                     //DIY架构修改，_RowModel不再传入string，而是{}

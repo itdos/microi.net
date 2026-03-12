@@ -26,7 +26,7 @@
             <ThemeSelect class="right-menu-item hover-effect" />
 
             <!-- 切换界面风格 -->
-            <el-dropdown v-if="hasWebOS" trigger="click">
+            <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
                     <font-awesome-icon icon="fa-solid fa-display" style="color: #333;font-size:18px;" />
                 </a>
@@ -57,7 +57,7 @@
                 </template>
             </el-dropdown>
 
-            <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
+            <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="hover">
                 <div class="avatar-wrapper">
                     <img :src="GetCurrentUserAvatar()" class="user-avatar" />
                     <span style="margin-left: 5px; font-size: 14px">

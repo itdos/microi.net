@@ -1,5 +1,5 @@
 <template>
-    <el-popover v-model="ShowThemes" placement="bottom" width="300" trigger="click">
+    <el-popover v-model="ShowThemes" placement="bottom" width="300" trigger="hover">
         <div class="site-settings">
             <div class="site-settings-content">
                 <div class="block block-transparent nm">
