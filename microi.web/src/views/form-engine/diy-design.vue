@@ -477,7 +477,7 @@ export default {
         },
         CallbackFormValueChange_DiyTable(field, value) {
             var self = this;
-            console.log("CallbackFormValueChange_DiyTable", field, value);
+            // console.log("CallbackFormValueChange_DiyTable", field, value);
             self.CurrentDiyTableModel[field.Name] = value;
         },
         RecoverDiyField() {
