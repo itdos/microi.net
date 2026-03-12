@@ -492,9 +492,8 @@ export default {
 
     computed: {
         GetSearchFieldList: function () {
-            return function (type, InOrOut) {
-                const self = this;
-
+            const self = this;
+            return (type, InOrOut) => {
                 if (self.SearchFieldIds.length === 0) {
                     return [];
                 }
