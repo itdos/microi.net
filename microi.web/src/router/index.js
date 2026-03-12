@@ -247,13 +247,13 @@ export const asyncRoutes = [
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")
     },
-    // OpenClaw 暗黑管理系统（独立布局，不使用 Layout）
+    // OpenClaw 管理系统（使用主框架 Layout，菜单由后端或侧边栏统一管理）
     {
         path: "/openclaw",
-        name: "openclaw",
-        component: () => import("@/views/openclaw/index.vue"),
+        component: Layout,
         hidden: true,
         redirect: "/openclaw/dashboard",
+        meta: { title: "OpenClaw", icon: "Monitor" },
         children: [
             { path: "dashboard", name: "openclaw_dashboard", component: () => import("@/views/openclaw/dashboard/index.vue"), meta: { title: "OpenClaw 仪表盘" } },
             { path: "tasks", name: "openclaw_tasks", component: () => import("@/views/openclaw/tasks/index.vue"), meta: { title: "任务中心" } },
