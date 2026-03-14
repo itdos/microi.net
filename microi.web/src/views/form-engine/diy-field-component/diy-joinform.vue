@@ -59,10 +59,11 @@
                     v-model="configForm.TableId" 
                     placeholder="请选择关联表格"
                     filterable
+                    :filter-method="filterTableMethod"
                     style="width: 100%"
                 >
                     <el-option
-                        v-for="table in DiyTableList"
+                        v-for="table in filteredTableList"
                         :key="table.Id"
                         :label="table.Description || table.Name"
                         :value="table.Id"
@@ -79,10 +80,11 @@
                     v-model="configForm.JoinFieldName" 
                     placeholder="请选择主表字段"
                     filterable
+                    :filter-method="filterFieldMethod"
                     style="width: 100%"
                 >
                     <el-option
-                        v-for="field in parentFieldListOptions"
+                        v-for="field in filteredFieldList"
                         :key="field.Name"
                         :label="field.Label || field.Name"
                         :value="field.Name"
@@ -178,7 +180,31 @@ const internalConfig = ref(null);
 // 配置弹窗相关
 const configDialogVisible = ref(false);
 const DiyTableList = ref([]);
+const tableFilterText = ref('');
+const filteredTableList = computed(() => {
+    if (!tableFilterText.value) return DiyTableList.value;
+    const keyword = tableFilterText.value.toLowerCase();
+    return DiyTableList.value.filter(table =>
+        (table.Description || '').toLowerCase().includes(keyword) ||
+        (table.Name || '').toLowerCase().includes(keyword)
+    );
+});
+const filterTableMethod = (val) => {
+    tableFilterText.value = val;
+};
 const parentFieldListOptions = ref([]);  // 重命名避免与props冲突
+const fieldFilterText = ref('');
+const filteredFieldList = computed(() => {
+    if (!fieldFilterText.value) return parentFieldListOptions.value;
+    const keyword = fieldFilterText.value.toLowerCase();
+    return parentFieldListOptions.value.filter(f =>
+        (f.Label || '').toLowerCase().includes(keyword) ||
+        (f.Name || '').toLowerCase().includes(keyword)
+    );
+});
+const filterFieldMethod = (val) => {
+    fieldFilterText.value = val;
+};
 const configForm = ref({
     TableId: '',
     JoinFieldName: '',
@@ -473,7 +499,8 @@ const GetDiyTableList = () => {
     DiyCommon.Post(
         proxy.DiyApi.GetTableData,
         {
-            FormEngineKey : 'diy_table'
+            FormEngineKey : 'diy_table',
+            _SelectFields: ['Id','Name','Description']
         },
         (result) => {
             if (DiyCommon.Result(result)) {
