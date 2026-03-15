@@ -73,16 +73,9 @@ microi.web/hbuilder-app/unpackage/resources
 # 构建产物目录（不应提交到 git）
 /microi.vue3.os.build/
 /microi.webos.build/
-microi.web/public/autopage/assets/
-microi.web/public/autoprint/assets/
-microi.web/public/im/assets/
 
 # 子项目构建产物
-吾码相关开源项目/microi.webos.build/
-吾码相关开源项目/microi.webos.build.zip
 吾码相关开源项目/microi.web.vue2/dist/
-吾码相关开源项目/microi.web.vue2/public/autoprint/assets/
-吾码相关开源项目/microi.web.vue2/public/im/assets/
 
 # 编译安装包和 APK/IPA
 *.apk
