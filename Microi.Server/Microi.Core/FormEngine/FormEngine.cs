@@ -1634,6 +1634,12 @@ namespace Microi.net
                     var dynamicResult = fs.ToList<dynamic>();
                     result = JArray.FromObject(dynamicResult).ToObject<List<JObject>>();
 
+                    foreach (var item in result)
+                    {
+                        item["TableName"] = (string)diyTableModel.Name;
+                        item["TableDescription"] = (string)diyTableModel.Description;
+                    }
+
                     //设置缓存
                     cache.SetAsync(cacheFieldList, result);
 
@@ -1655,11 +1661,7 @@ namespace Microi.net
                         result = result.Where(d => param._SelectFields.Contains(d["Name"].Val<string>())).ToList();
                     }
 
-                    foreach (var item in result)
-                    {
-                        item["TableName"] = (string)diyTableModel.Name;
-                        item["TableDescription'"] = (string)diyTableModel.Description;
-                    }
+                    
                     return new DosResultList<JObject>(1, result);
                 }
                 return new DosResultList<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));

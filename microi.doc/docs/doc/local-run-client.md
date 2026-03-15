@@ -23,35 +23,17 @@ nvm use 18
 node -v
 ```
 
-## 运行PC端vue2传统界面源码
+## 运行前端源码
 * 在欢迎页打开Microi吾码开源版【/microi.web/】文件夹
 * 查看【/microi.web/README.md】文件，执行几条npm常规命令后即可跑起来
 ```cmd
-nvm use 14【注意一定需要14】
+nvm use 20
 nrm use taobao
 npm install
 npm run dev
 ```
 
-## 运行PC端vue3仿webos操作系统界面（编译版）
-* 进入【/microi.webos/】文件夹
-* 执行命令#http-server即可跑起来
-
-## 运行PC端vue3仿webos操作系统界面源码（个人版）
-* 在欢迎页打开Microi吾码个人版【/microi.vue3.os/】文件夹
-* 查看【/microi.vue3.os/说明.txt】文件，执行几条npm常规命令后即可跑起来
-```cmd
-#nvm use 18【建议使用18，与我们开发团队node版本一致】
-#nrm use taobao
-#npm install
-#npm run dev
-```
-
-## 运行移动端vue3 uniapp源码（基于图鸟UI）
-* 进入【/microi.vue3.tuniao/】文件夹
-* 执行#npm install后，使用小程序调试工具即可打开
-
 ## 本地编译发布到docker镜像
 >* 首先本地要安装好Docker Desktop：[https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
 >* 执行 `npm run build` 命令打包
->* 进入`dist/itdos.os/`目录，执行`publish-demo.sh`脚本即可（记得用记事本打开修改里面的配置）
+>* 进入`bin/Release/`目录，执行`publish-demo.sh`脚本即可（记得用记事本打开修改里面的配置）
