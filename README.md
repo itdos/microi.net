@@ -2,6 +2,7 @@
 
 ## 平台简介
 >* 官方文档：[https://microi.net](https://microi.net)
+>* **Microi.OpenClaw 吾码小龙虾**：[https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw)
 >* 技术框架：[__<font color="red">**低代码 + AI**</font>__]开发模式，支持`传统开发`，.NET10 + Vue + Redis + MySql/SqlServer/Oracle + Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
 >* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript`编写`后端api接口`，在线 [[AI编程]](https://microi.net/doc/v8-engine/ai-apiengine.html)，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
