@@ -17,7 +17,7 @@
         <java.version>17</java.version>
         <grpc.version>1.29.0</grpc.version>
         <protobuf.version>3.21.7</protobuf.version>
-        <tomcat.version>9.0.85</tomcat.version>
+        <tomcat.version>9.0.86</tomcat.version>
     </properties>
     <dependencies>
         <dependency>
