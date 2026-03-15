@@ -19,7 +19,7 @@ hero:
       text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
     - theme: brand
-      text: OpenClaw
+      text: OpenClaw 吾码小龙虾
       link: https://gitee.com/microi-net/microi.openclaw
   image:
     src: /home2.jpg
