@@ -48,7 +48,7 @@
     "js-base64": "^3.7.2",
     "js-cookie": "2.2.0",
     "jsencrypt": "^3.5.4",
-    "jszip": "3.2.1",
+    "jszip": "3.10.1",
     "monaco-editor": "^0.30.1",
     "normalize.css": "7.0.0",
     "nprogress": "0.2.0",
