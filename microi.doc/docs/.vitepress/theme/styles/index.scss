@@ -1,3 +1,30 @@
+// 登录页面：隐藏导航栏、侧边栏、页脚，内容全屏
+body:has(.ai-login-page) {
+  .VPNav, .VPNavBar, .VPSidebar, .VPFooter, .VPLocalNav {
+    display: none !important;
+  }
+  .VPContent {
+    padding-top: 0 !important;
+  }
+  .VPDoc .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .VPDoc .content {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  .VPDoc .content-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  // 隐藏 vitepress 页面标题
+  .VPDoc h1, .VPDoc .header-anchor {
+    display: none !important;
+  }
+}
+
 .VPDoc.has-aside .content-container,
 .VPDoc.has-aside .container,
 .VPDoc.has-aside .content{
