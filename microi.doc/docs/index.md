@@ -26,7 +26,9 @@ hero:
 features:
   - icon: 🤖
     title: AI 引擎
-    details: 支持AI数据分析、AI在线/本地编程，自动差量同步向量数据库，更精准的AI结果，支持接入在线OpenAI、DeepSeek等AI服务商，支持接入本地部署的AI模型，支持AI训练、AI微调、AI提示词管理等，完善的自然语言转SQL/V8引擎代码
+    details: 支持AI数据分析、AI在线/本地编程，自动差量同步向量数据库，更精准的AI结果，支持接入在线OpenAI、DeepSeek等AI服务商，支持接入本地部署的AI模型，支持AI训练、AI微调、AI提示词管理等，完善的自然语言转SQL/V8引擎代码。接入OpenClaw小龙虾，支持远程集群管理。
+    link: https://gitee.com/microi-net/microi.openclaw
+    linkText: OpenClaw 吾码小龙虾
   - icon: 🔗
     title: API 接口引擎
     details: 在线使用JavaScript编写后端api接口，在线AI编程，极致的性能与开发效率，无需编译发布，保存即生效。支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等。可实现任何复杂的业务逻辑
