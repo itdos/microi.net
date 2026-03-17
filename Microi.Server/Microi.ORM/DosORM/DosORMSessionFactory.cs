@@ -27,24 +27,28 @@ namespace Microi.net
                 throw new ArgumentNullException(nameof(connectionString));
 
             //2026-03-16：为MySQL连接字符串补充关键参数，防止事务期间连接超时+Fatal error
+            //注意：项目使用MySql.Data（Oracle官方驱动），不支持MySqlConnector专有参数如Keepalive
             if (dbType == DatabaseType.MySql)
             {
-                if (!connectionString.Contains("Keepalive", StringComparison.OrdinalIgnoreCase))
+                if (!connectionString.Contains("ConnectionReset", StringComparison.OrdinalIgnoreCase)
+                    && !connectionString.Contains("Connection Reset", StringComparison.OrdinalIgnoreCase))
                 {
-                    connectionString = connectionString.TrimEnd(';') + ";Keepalive=60";
-                }
-                if (!connectionString.Contains("ConnectionReset", StringComparison.OrdinalIgnoreCase))
-                {
-                    connectionString = connectionString.TrimEnd(';') + ";ConnectionReset=true";
+                    connectionString = connectionString.TrimEnd(';') + ";Connection Reset=true";
                 }
                 if (!connectionString.Contains("DefaultCommandTimeout", StringComparison.OrdinalIgnoreCase)
                     && !connectionString.Contains("Default Command Timeout", StringComparison.OrdinalIgnoreCase))
                 {
-                    connectionString = connectionString.TrimEnd(';') + ";DefaultCommandTimeout=300";
+                    connectionString = connectionString.TrimEnd(';') + ";Default Command Timeout=300";
                 }
-                if (!connectionString.Contains("AllowUserVariables", StringComparison.OrdinalIgnoreCase))
+                if (!connectionString.Contains("AllowUserVariables", StringComparison.OrdinalIgnoreCase)
+                    && !connectionString.Contains("Allow User Variables", StringComparison.OrdinalIgnoreCase))
                 {
-                    connectionString = connectionString.TrimEnd(';') + ";AllowUserVariables=True;UseAffectedRows=False";
+                    connectionString = connectionString.TrimEnd(';') + ";Allow User Variables=True";
+                }
+                if (!connectionString.Contains("UseAffectedRows", StringComparison.OrdinalIgnoreCase)
+                    && !connectionString.Contains("Use Affected Rows", StringComparison.OrdinalIgnoreCase))
+                {
+                    connectionString = connectionString.TrimEnd(';') + ";Use Affected Rows=False";
                 }
             }
 

@@ -214,11 +214,29 @@ export default {
     }
 
     this.loadChatRecord()
+
+    // 监听 SignalR 重连事件，自动重新订阅
+    this._onReconnected = () => {
+      console.log('[Chat] SignalR 重连成功，重新加载聊天记录')
+      this.loadChatRecord()
+    }
+    try {
+      const client = getSignalR()
+      if (client) client.on('_connected', this._onReconnected)
+    } catch (e) {}
   },
 
   onUnload() {
     this.stopPolling()
     this.cleanupSignalREvents()
+    // 清理重连监听
+    if (this._onReconnected) {
+      try {
+        const client = getSignalR()
+        if (client) client.off('_connected', this._onReconnected)
+      } catch (e) {}
+      this._onReconnected = null
+    }
   },
 
   methods: {
@@ -232,14 +250,36 @@ export default {
 
     // 加载聊天记录（通过 SignalR）
     async loadChatRecord() {
+      if (!this._loadRetryCount) this._loadRetryCount = 0
       try {
-        const client = await connectSignalR()
-
-        // Bug#12: 检查连接是否成功
-        if (!client.isConnected) {
-          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
+        // 带超时的连接，防止无限等待
+        let client
+        try {
+          client = await Promise.race([
+            connectSignalR(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), 8000))
+          ])
+        } catch (e) {
+          console.warn('[Chat] 连接超时或失败:', e.message)
+          if (this._loadRetryCount < 3) {
+            this._loadRetryCount++
+            setTimeout(() => this.loadChatRecord(), 3000)
+          }
           return
         }
+
+        // Bug#12: 检查连接是否成功
+        if (!client || !client.isConnected) {
+          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
+          if (this._loadRetryCount < 3) {
+            this._loadRetryCount++
+            setTimeout(() => this.loadChatRecord(), 3000)
+          }
+          return
+        }
+
+        // 连接成功，重置重试计数
+        this._loadRetryCount = 0
 
         // 清理旧事件
         this.cleanupSignalREvents()

@@ -69,16 +69,21 @@ const tabbarItems = [
     }
 ];
 
+// 记录最后一次主动点击的 tab，用于从工作台跳转到子页面时保持高亮
+const lastClickedTab = ref('home');
+
 const activeTab = computed(() => {
     const currentPath = route.path;
     if (currentPath.includes('/mobile/workspace')) return 'workspace';
     if (currentPath.includes('/mobile/message') || currentPath.includes('/mobile/chat')) return 'message';
     if (currentPath.includes('/mobile/profile')) return 'mine';
     if (currentPath.includes('/mobile/home') || currentPath === '/') return 'home';
-    return 'home';
+    // 当前路径不属于任何 tab 页（例如从工作台进入的数据列表），保持最后一次点击的 tab 高亮
+    return lastClickedTab.value;
 });
 
 const handleTabClick = (item) => {
+    lastClickedTab.value = item.name;
     if (route.path !== item.path) {
         router.push(item.path);
     }

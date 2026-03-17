@@ -195,16 +195,18 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
         return false;
     }
     
-    // 检查全局标志：防止重复注册
-    if (window._chatEventsRegistered) {
-        console.warn('[ChatCommon] ⚠️ 聊天事件已注册，阻止重复注册');
-        return false;
-    }
-    
     const {
         enableDuplicateCheck = true,  // 启用消息去重
-        logPrefix = '[ChatCommon]'     // 日志前缀
+        logPrefix = '[ChatCommon]',    // 日志前缀
+        scope = 'default'              // 作用域标识（pc/mobile等）
     } = options;
+    
+    // 使用作用域标志防止同一作用域重复注册
+    if (!window._chatEventsScopes) window._chatEventsScopes = {};
+    if (window._chatEventsScopes[scope]) {
+        console.warn(`${logPrefix} ⚠️ [${scope}] 聊天事件已注册，阻止重复注册`);
+        return false;
+    }
     
     console.log(`${logPrefix} 开始注册 WebSocket 事件监听器`);
     
@@ -279,9 +281,9 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
         }
     });
     
-    // 设置全局标志
-    window._chatEventsRegistered = true;
-    console.log(`${logPrefix} ✅ WebSocket 事件监听器注册完成（全局唯一）`);
+    // 设置作用域标志
+    window._chatEventsScopes[scope] = true;
+    console.log(`${logPrefix} ✅ WebSocket 事件监听器注册完成（作用域: ${scope}）`);
     
     return true;
 }
@@ -289,14 +291,13 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
 /**
  * 清理WebSocket事件监听
  */
-export function cleanupWebSocketEvents(websocket, logPrefix = '[ChatCommon]') {
+export function cleanupWebSocketEvents(websocket, logPrefix = '[ChatCommon]', scope = 'default') {
     if (!websocket) return;
     
-    // 注意：SignalR的off()无法移除匿名函数，所以只清理全局标志
-    console.log(`${logPrefix} 清理全局聊天事件标志`);
+    console.log(`${logPrefix} 清理聊天事件标志 (作用域: ${scope})`);
     
-    if (window._chatEventsRegistered) {
-        window._chatEventsRegistered = false;
+    if (window._chatEventsScopes && window._chatEventsScopes[scope]) {
+        delete window._chatEventsScopes[scope];
     }
     
     // 清理消息去重缓存

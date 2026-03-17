@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
@@ -195,41 +196,55 @@ namespace Microi.net
                         dbTypeString = "MySql";
                     }
 
-                    // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
-                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbTypeString);
-                    client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
-                    // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
-                    if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
+                    try
                     {
-                        var osClientProp = client.Db.GetType().GetProperty("OsClient");
-                        osClientProp?.SetValue(client.Db, osClient);
+                        // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
+                        var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbTypeString);
+                        client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
+                        // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
+                        if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
+                        {
+                            var osClientProp = client.Db.GetType().GetProperty("OsClient");
+                            osClientProp?.SetValue(client.Db, osClient);
+                        }
+
+                        // 【防御】检查 DbReadType 是否有效，为空时使用默认值 MySql
+                        var dbReadTypeString = client.OsClientModel["DbReadType"]?.Val<string>();
+                        if (dbReadTypeString.DosIsNullOrWhiteSpace())
+                        {
+                            dbReadTypeString = "MySql";
+                        }
+
+                        var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbReadTypeString);
+                        client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
+                        // 【修复】设置 OsClient
+                        if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
+                        {
+                            var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
+                            osClientProp?.SetValue(client.DbRead, osClient);
+                        }
+
+                        // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
+                        // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
+                        if (client.DosOrmDb == null || client.DosOrmDbRead == null)
+                        {
+                            var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                            client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.OsClientModel["DbConn"].Val<string>());
+
+                            var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+                            client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.OsClientModel["DbReadConn"].Val<string>());
+                        }
                     }
-
-                    // 【防御】检查 DbReadType 是否有效，为空时使用默认值 MySql
-                    var dbReadTypeString = client.OsClientModel["DbReadType"]?.Val<string>();
-                    if (dbReadTypeString.DosIsNullOrWhiteSpace())
+                    catch (Exception ex)
                     {
-                        dbReadTypeString = "MySql";
-                    }
-
-                    var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbReadTypeString);
-                    client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
-                    // 【修复】设置 OsClient
-                    if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
-                    {
-                        var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
-                        osClientProp?.SetValue(client.DbRead, osClient);
-                    }
-
-                    // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
-                    // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
-                    if (client.DosOrmDb == null || client.DosOrmDbRead == null)
-                    {
-                        var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbType"].Val<string>());
-                        client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.OsClientModel["DbConn"].Val<string>());
-
-                        var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
-                        client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.OsClientModel["DbReadConn"].Val<string>());
+                        var safeConnStr = SanitizeConnectionString(client.OsClientModel["DbConn"]?.Val<string>());
+                        var safeReadConnStr = SanitizeConnectionString(client.OsClientModel["DbReadConn"]?.Val<string>());
+                        throw new Exception(
+                            $"OsClient.GetClient数据库连接失败：OsClient=[{osClient}]，" +
+                            $"DbType=[{dbTypeString}]，" +
+                            $"写库连接字符串=[{safeConnStr}]，" +
+                            $"读库连接字符串=[{safeReadConnStr}]，" +
+                            $"错误信息：{ex.Message}", ex);
                     }
 
                     // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
@@ -462,6 +477,16 @@ namespace Microi.net
                     currentClientModel.OsClientModel["IndexCodeApi"] = indexCodeApi;
                 }
             }
+        }
+
+        /// <summary>
+        /// 隐藏连接字符串中的密码，用于安全日志输出
+        /// </summary>
+        public static string SanitizeConnectionString(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) return "(空)";
+            // 匹配 password=xxx 或 pwd=xxx，支持带引号和不带引号的值
+            return Regex.Replace(connectionString, @"(?i)(password|pwd)\s*=\s*([^;]*)", "$1=***");
         }
     }
 
