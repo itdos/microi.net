@@ -234,7 +234,7 @@ html:not(.dark) {
   
   // 表格单元格样式优化
   td, th {
-    padding: 1.5rem 1rem !important;
+    // padding: 1.5rem 1rem !important;
     vertical-align: middle !important;
     border: 1px solid var(--vp-c-divider) !important;
   }
