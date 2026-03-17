@@ -1,6 +1,11 @@
-# MQTT引擎（IoT物联网）
->* 集成MQTT服务器，支持485、zigbee、蓝牙、Modbus的物联网设备MQTT网关，接口引擎在线编写业务逻辑代码，使IoT物联网开发效率提升10倍
-## 例子：在接口引擎中编写业务逻辑
+# 📡 MQTT 引擎（IoT 物联网）
+
+> **集成 MQTT 服务器，支持 485、ZigBee、蓝牙、Modbus 的物联网设备 MQTT 网关，接口引擎在线编写业务逻辑代码，使 IoT 开发效率提升 10 倍**
+
+---
+
+## 💡 例子：在接口引擎中编写业务逻辑
+::: details 展开查看 JavaScript 代码（22 行）
 ```javascript
 var eventName = V8.EventName;
 if(eventName == 'StartServer'){//服务器端启动MQTT服务
@@ -25,3 +30,4 @@ if(eventName == 'StartServer'){//服务器端启动MQTT服务
   return { Code : 0, Msg : '错误的MQTT事件！' };
 }
 ```
+:::

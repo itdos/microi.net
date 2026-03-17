@@ -1,10 +1,16 @@
-# V8函数列表-前端
-## 介绍
->* 前端V8引擎代码与服务器端V8的编程语言均为Javascript语法
->* 前端V8引擎支持完整ES6语法
->* 前端V8引擎集成了很多函数直接通过http调用后端接口，与V8.Post()写对应的接口地址效果一样
->* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）
->* 前端V8函数主要用于表单属性的前端V8事件、模块引擎V8按钮代码等
+# 🌐 V8 函数列表 - 前端
+
+> **前端 V8 引擎支持完整 ES6 语法，集成丰富的前端函数库**
+
+---
+
+## 📌 介绍
+
+- 前端 V8 引擎代码与服务器端 V8 的编程语言均为 JavaScript 语法
+- 前端 V8 引擎支持完整 ES6 语法
+- 集成了很多函数直接通过 HTTP 调用后端接口，与 `V8.Post()` 写对应接口地址效果一样
+- 若前端直接调用服务器端的通用增删改查接口，前端 V8 事件**不会执行**（服务器端 V8 事件会执行）
+- 主要用于表单属性的前端 V8 事件、模块引擎 V8 按钮代码等
 
 ## V8.Form
 >* 访问当前表单字段值
@@ -376,6 +382,7 @@ V8.WF.StartWork({
 
 ## V8.SendSystemMessage
 >* 发送系统消息、消息提醒
+::: details 展开查看 JavaScript 代码（25 行）
 ```js
 //消息内容
 var msgContent = '测试v8发送系统消息！' + new Date().toString();
@@ -403,6 +410,7 @@ return V8.Http.Post({
   }
 });
 ```
+:::
 
 ## V8.FormWF
 >* 访问当前是否打开了带流程界面的表单，返回值：
@@ -424,6 +432,7 @@ V8.Base64.isValid('已加密字符串');//判断是否是已加密的base64格�
 
 ## V8.OpenDialog
 >* 打开一个定制组件对话框
+::: details 展开查看 JavaScript 代码（28 行）
 ```javascript
 V8.OpenDialog({    
     ComponentName:'NodeColConfig',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
@@ -454,6 +463,7 @@ props: {
         this.DataAppend.V8.CloseThisDialog();
     }
 ```
+:::
 >* 通用打开iframe
 ```js
 V8.OpenDialog({    
@@ -506,6 +516,7 @@ var result = await V8.ApiEngine.Run('ApiEngineKey', {
 
 ## V8.OpenAnyForm
 >* 打开一个任意表单
+::: details 展开查看 JavaScript 代码（26 行）
 ```javascript
 V8.OpenAnyForm({
   TableName: "Diy_ShouhouDD", //必传。打开哪张表。
@@ -534,9 +545,11 @@ V8.OpenAnyForm({
   },
 });
 ```
+:::
 
 ## V8.OpenAnyTable
 >* 打开一个任意列表
+::: details 展开查看 JavaScript 代码（28 行）
 ```javascript
 V8.OpenAnyTable({   
   SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
@@ -567,6 +580,7 @@ V8.OpenAnyTable({
   }
 })
 ```
+:::
 
 ## 表单按钮防重复点击
 ```js
@@ -593,6 +607,7 @@ var sysTitle = V8.SysConfig.SysTitle;
 
 ## 移动端函数
 ### 蓝牙打印
+::: details 展开查看 JavaScript 代码（143 行）
 ```js
 //单条打印
 if(V8.ClientType == 'PC'){
@@ -738,6 +753,7 @@ if (V8.ClientType == 'PC') {
     }
 }
 ```
+:::
 
 ### 二维码、条形码扫码 V8.Method?.ScanCode
 >* 支持H5、小程序、APP

@@ -1,9 +1,15 @@
-# Office在线编辑
-## 介绍
->* 目前平台集成的OnlyOffice免费社区版做为文档编辑、预览服务，后期可能会集成更多
+# 📑 Office 在线编辑
 
-## 通过编排部署onlyoffice服务
->* 如遇onlyoffice/documentserver超时，可使用吾码公开镜像：registry.cn-hangzhou.aliyuncs.com/microios/onlyoffice-documentserver:202509
+> 平台集成 **OnlyOffice** 免费社区版作为文档编辑、预览服务，支持 Word、Excel、PPT 在线编辑。
+
+---
+
+## 🐳 通过 Docker 编排部署 OnlyOffice
+
+::: tip 💡 提示
+如遇 `onlyoffice/documentserver` 拉取超时，可使用吾码公开镜像：`registry.cn-hangzhou.aliyuncs.com/microios/onlyoffice-documentserver:202509`
+:::
+::: details 展开查看 JSON 配置（22 行）
 ```json
 version: '3.8'
 services:
@@ -28,9 +34,15 @@ services:
       - /microi/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
       - /microi/onlyoffice/DocumentServer/db:/var/lib/postgresql
 ```
+:::
 
-## 设置反向代理、配置平台系统设置
->* 假设咱们的反向代理地址为：[https://net.itdos.net:1021](https://net.itdos.net:1021)
->* 在平台系统设置中给【OnlyOfficeApiBase】字段（若无则创建）设置值为【https://net.itdos.net:1021】
+---
 
-## 之后平台的所有附件如果是ppt、excel、word格式文件，则会默认以onlyoffice打开
+## ⚙️ 设置反向代理与平台配置
+
+1. 假设反向代理地址为：`https://net.itdos.net:1021`
+2. 在平台 **系统设置** 中设置 **`OnlyOfficeApiBase`** 字段值为 `https://net.itdos.net:1021`（若无此字段则先创建）
+
+::: tip 💡 效果
+配置完成后，平台中所有 PPT、Excel、Word 格式的附件将默认通过 OnlyOffice 在线打开。
+:::

@@ -18,4 +18,4 @@ If you encounter problems, you can try the following solutions.
 
 - If the error is a dependency package problem, please try to search for the dependency package in Github's Issues
 - Try to consult friends or technical bosses you know.
-- Ask questions in Microi's QQ:60831381, please describe the questions as clearly as possible so that everyone can help you better. You can refer to [Wisdom of Asking](https://github.com/tvvocold/How-To-Ask-Questions-The-Smart-Way)
+- Ask questions in Microi's QQ:51050055, please describe the questions as clearly as possible so that everyone can help you better. You can refer to [Wisdom of Asking](https://github.com/tvvocold/How-To-Ask-Questions-The-Smart-Way)

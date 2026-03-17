@@ -1,10 +1,21 @@
-# 接口引擎
+# ⚙️ 接口引擎
 
-## 简介
->* `写一个获取数据的接口只要1分钟`，接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
->* 在线使用JavaScript编写api接口，在线**[`AI编程`](https://microi.net/doc/v8-engine/ai-apiengine.html)**，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等
->* 可实现任意复杂的业务场景，`极致的性能（V8代码预编译、多级缓存）`与`开发效率`，无需`本地编译发布`，保存即生效
->* 经过8年以上成功案例的验证，部分项目高达500个以上接口。[[FormEngine用法]](/doc/v8-engine/form-engine) [[Where条件用法]](/doc/v8-engine/where)
+> **写一个获取数据的接口只要 1 分钟，在线使用 JavaScript 编写 API 接口，保存即生效**
+
+---
+
+## 📌 简介
+
+- 接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
+- 在线使用 JavaScript 编写 API 接口，支持 [AI 编程](/doc/v8-engine/ai-apiengine)
+- 支持 `Get`/`Post` 请求，返回 JSON、字符串、文件、HTML 等
+- 支持自定义接口地址、分布式锁、权限、自定义扩展函数等
+- 极致的性能（V8 代码预编译、多级缓存）与开发效率，无需本地编译发布
+- 经过 8 年以上成功案例验证，部分项目高达 500+ 接口
+
+::: tip 相关文档
+[[FormEngine 用法]](/doc/v8-engine/form-engine)    [[Where 条件用法]](/doc/v8-engine/where)
+:::
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
 
@@ -75,6 +86,7 @@ System.Threading.Tasks.Task.Run(function(){
 
 ## 扩展接口引擎
 >* 详见[`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.V8Engine)类库，在[`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs)类中扩展
+::: details 展开查看 JavaScript 代码（40 行）
 ```js
 using System;
 using Dos.Common;
@@ -117,9 +129,11 @@ namespace Microi.net
     }
 }
 ```
+:::
 
 ## 返回数据
 >* 将数据返回给前端，可以是JSON、字符串、Html、文件等
+::: details 展开查看 JavaScript 代码（38 行）
 ```javascript
 //当指定了Code值为1时，平台会自动提交事务，无需手动执行V8.DbTrans.Commit()
 return { Code : 1, Data : [1, 2, 3], Msg : '事务已提交！' };
@@ -160,6 +174,7 @@ V8.Result = {
 //旧版返回方式（仍然支持，但建议弃用这种方式）
 //V8.Result = { Code : 1, Data : [] }
 ```
+:::
 
 ## 接口配置
 ### 基础配置
@@ -203,6 +218,7 @@ return {
 >* 2、定义需要向前端输出的日志内容：【var debugLog = {};】
 >* 3、记录日志：【debugLog.Log1 = list1Result;】。也可以使用【V8.Method.AddSysLog】写MongoDB日志，然后在系统设置 -> 系统日志中查看
 >* 4、判断是否向前端输出日志：【DataAppend : { DebugLog : isDebugLog ? debugLog : null }】
+::: details 展开查看 JavaScript 代码（41 行）
 ```js
 //【第一步】定义是否需要向前端输出日志内容，需要调试时为true，不需要调试时为false
 var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog = V8.SysConfig.V8EngineDebugLog;
@@ -246,8 +262,10 @@ return {
     }
 };
 ```
+:::
 
 ## 捕获接口代码异常
+::: details 展开查看 JavaScript 代码（29 行）
 ```js
 try{
   //你的接口引擎代码
@@ -279,6 +297,7 @@ try{
     };
 }
 ```
+:::
 
 ## 接口引擎实战
 >* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](/doc/v8-engine/apiengine-index.html)

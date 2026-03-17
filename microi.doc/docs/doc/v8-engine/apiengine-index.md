@@ -1,11 +1,18 @@
-# 接口引擎实战
->* 发送第三方短信：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
->* 发送阿里云短信：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
->* 自定义导出Excel：[https://microi.blog.csdn.net/article/details/143619083](https://microi.blog.csdn.net/article/details/143619083)
->* 微信小程序授权手机号登录：[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
->* 微信v3支付JSAPI下单：[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
->* 微信支付回调接口：[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
->* MongoDB相关操作：[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)
+# 🛠️ 接口引擎实战
+
+> **实战教程集合，通过接口引擎实现各种业务场景**
+
+---
+
+| 实战项目 | 链接 |
+| :-- | :-- |
+| 发送第三方短信 | [CSDN](https://microi.blog.csdn.net/article/details/143990546) |
+| 发送阿里云短信 | [CSDN](https://microi.blog.csdn.net/article/details/143990603) |
+| 自定义导出 Excel | [CSDN](https://microi.blog.csdn.net/article/details/143619083) |
+| 微信小程序授权手机号登录 | [CSDN](https://microi.blog.csdn.net/article/details/144106817) |
+| 微信 v3 支付 JSAPI 下单 | [CSDN](https://microi.blog.csdn.net/article/details/144156119) |
+| 微信支付回调接口 | [CSDN](https://microi.blog.csdn.net/article/details/144168810) |
+| MongoDB 相关操作 | [CSDN](https://microi.blog.csdn.net/article/details/144434527) |
 
 ## 更多平台内置接口引擎详见
 [https://web.microi.net/#/api-engine](https://web.microi.net/#/api-engine)
@@ -13,6 +20,7 @@
 ## 日期相关处理
 
 >* 在【系统设置】->【开发配置】->【全局前端V8引擎、全局服务器端V8引擎】增加【DateFormat、DateAdd、DateNow】相关函数
+::: details 展开查看 JavaScript 代码（120 行）
 ```js
 function DateNow(format) {
   var time = new Date();
@@ -135,6 +143,7 @@ function DateAdd(startTime, strInterval, number, format) {
   return DateFormat(result, realFormat);
 }
 ```
+:::
 
 ### 日期格式化
 ```js
@@ -176,6 +185,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 <img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
 
 ### 使用接口引擎替换导出接口
+::: details 展开查看 JavaScript 代码（49 行）
 ```javascript
 //新建一个接口引擎，代码如下：
 //动态设置数据源
@@ -227,6 +237,7 @@ return {
   }
 };
 ```
+:::
 
 #### 使用定制接口替换导出接口
 ```csharp
@@ -237,6 +248,7 @@ return {
 
 
 ## 在接口引擎中对文件的接收、下载、上传
+::: details 展开查看 JavaScript 代码（62 行）
 ```js
 //接收到的文件列表
 var filesByteBase64 = V8.FilesByteBase64;
@@ -301,12 +313,14 @@ upResult2.DataAppend = {
 };
 return upResult2;
 ```
+:::
 
 
 
 
 ## JS处理浮点数计算精度问题
 >* 在【系统设置】->【开发配置】->【全局前端V8引擎、全局服务器端V8引擎】增加一个自定义calc函数，用于处理浮点数精度问题
+::: details 展开查看 JavaScript 代码（21 行）
 ```js
 function calc(operation, ...numbers) {
     const multipliers = numbers.map(num => {
@@ -330,6 +344,7 @@ function calc(operation, ...numbers) {
                  operation === '/' ? Math.pow(maxMultiplier, numbers.length - 1) : maxMultiplier);
 }
 ```
+:::
 >* 用法
 ```js
 //计算：0.005-0.002-0.0007

@@ -1,8 +1,8 @@
-# 模块引擎
-## 介绍
->模块引擎包含了模块配置、数据源配置、接口替换、动态按钮等配置
+# 📦 模块引擎
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
+> **包含模块配置、数据源配置、接口替换、动态按钮等配置**
+
+![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 ## 打开方式
 ### **Diy**
@@ -19,6 +19,7 @@
 ```
 #### 地址接口引擎
 >* 当打开方式选择为**Iframe**时，可选择动态返回地址的接口引擎，以实现第三方系统的单点登录
+::: details 展开查看 JavaScript 代码（22 行）
 ```js
 //先取缓存
 var cacheTokenKey = `Microi:${V8.OsClient}:IotToken-meslogin-jwlrd`;
@@ -43,6 +44,7 @@ if(resultObj.code == 0 && resultObj.data && resultObj.data.token)//表示成功
 }
 return { Code : 0, Data : resultObj, Msg : result };
 ```
+:::
 
 ### **SecondMenu**
 >* 含子菜单的上级菜单
@@ -90,6 +92,7 @@ return { Code : 0, Data : resultObj, Msg : result };
 >支持**弹窗**和**表内**
 
 >* **导入接口替换**
+::: details 展开查看 JavaScript 代码（53 行）
 ```js
 //可以使用接口引擎实现导入接口，一旦替换了导入接口，那么导入进度（redis）也一定要设置
 if(!V8.Param.TableId){
@@ -145,6 +148,7 @@ V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
 return { Code : 1 };
 ```
+:::
 
 >* **导入进度接口替换**
 ```js

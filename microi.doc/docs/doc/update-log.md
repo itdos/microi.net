@@ -1,5 +1,10 @@
-# 更新日志
->* 由于前端、移动端已100%开源，后端99%开源，且由团队多人持续维护升级，导致更新频率较高，因此所有更新日志请见Gitee仓库[https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master)提交日志
+# 📝 更新日志
+
+> **由于前端、移动端已 100% 开源，后端 99% 开源，且由团队多人持续维护升级，更新频率较高**
+
+::: tip 查看全部更新日志
+所有更新日志请见 Gitee 仓库提交记录：[https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master)
+:::
 
 ::: details Latest - 重要更新 - 2025-08-07
 ```js

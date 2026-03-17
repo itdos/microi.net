@@ -1,8 +1,16 @@
-# 任务调度
-## 介绍
->* 平台支持定时任务，可定时执行接口引擎或定制开发的.net dll文件
+# ⏰ 任务调度
 
-## 停止所有任务
+> **支持定时执行接口引擎或定制开发的 .NET DLL 文件**
+
+---
+
+## 📌 介绍
+
+平台支持定时任务，可定时执行接口引擎或定制开发的 .NET DLL 文件。
+
+---
+
+## ⚠️ 停止所有任务
 ```sql
 -- 执行sql语句
 update diy_schedule_job set Status='暂停';
@@ -20,6 +28,7 @@ delete from microi_job_job_details where JOB_NAME = 'dnsSync';
 ```
 
 ## 自动删除任务重复结果日志
+::: details 展开查看 JavaScript 代码（24 行）
 ```js
 // 比如说定时任务执行的是一个接口引擎，我们在接口引擎最后增加以下代码：
 // 假设任务名为：dnsSync，我们只保留最近N条重复的相同结果日志
@@ -46,3 +55,4 @@ WHERE Message = '${JSON.stringify(result)}'
 `).ExecuteNonQuery();
 return result;
 ```
+:::

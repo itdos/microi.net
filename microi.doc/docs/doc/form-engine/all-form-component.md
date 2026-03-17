@@ -1,8 +1,12 @@
-# 所有表单组件
->* 本篇对所有表单组件进行介绍
+# 🧩 所有表单组件
+
+> **本篇对 Microi吾码平台所有表单组件进行介绍**
+
+---
 
 ## 单行文本 Text
->* 若要限制单行文本只允许输入数字、身份证号、手机号、纯字母等等，可通过字段的值变更V8事件、表单提交前V8事件来进行限制
+
+若要限制单行文本只允许输入数字、身份证号、手机号、纯字母等，可通过字段的值变更 V8 事件、表单提交前 V8 事件进行限制：
 ```js
 //Phone字段属性的【值变更V8事件】
 V8.Form.Phone = V8.Form.Phone.replace(/\D/g, '');//输入框只能输入数字
@@ -124,6 +128,7 @@ V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
 ]);
 ```
 >* 提交V8事件引擎代码
+::: details 展开查看 JavaScript 代码（38 行）
 ```js
 //-------前端代码-------
 var selectData = V8.TableRowSelected;//获取选中的数据
@@ -164,6 +169,7 @@ for(var i = 0; i < renwuzhanList.Data.length; i++){
 }
 return { Code : 1 };//会自动提交事务，因为Code == 1
 ```
+:::
 
 ## 关联表单 JoinForm
 >* 一般用于自定表单模板

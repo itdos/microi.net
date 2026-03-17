@@ -26,6 +26,28 @@ namespace Microi.net
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentNullException(nameof(connectionString));
 
+            //2026-03-16：为MySQL连接字符串补充关键参数，防止事务期间连接超时+Fatal error
+            if (dbType == DatabaseType.MySql)
+            {
+                if (!connectionString.Contains("Keepalive", StringComparison.OrdinalIgnoreCase))
+                {
+                    connectionString = connectionString.TrimEnd(';') + ";Keepalive=60";
+                }
+                if (!connectionString.Contains("ConnectionReset", StringComparison.OrdinalIgnoreCase))
+                {
+                    connectionString = connectionString.TrimEnd(';') + ";ConnectionReset=true";
+                }
+                if (!connectionString.Contains("DefaultCommandTimeout", StringComparison.OrdinalIgnoreCase)
+                    && !connectionString.Contains("Default Command Timeout", StringComparison.OrdinalIgnoreCase))
+                {
+                    connectionString = connectionString.TrimEnd(';') + ";DefaultCommandTimeout=300";
+                }
+                if (!connectionString.Contains("AllowUserVariables", StringComparison.OrdinalIgnoreCase))
+                {
+                    connectionString = connectionString.TrimEnd(';') + ";AllowUserVariables=True;UseAffectedRows=False";
+                }
+            }
+
             // 将 Microi.net.DatabaseType 转换为 Dos.ORM.DatabaseType
             var dosDbType = (Dos.ORM.DatabaseType)(int)dbType;
 

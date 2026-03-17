@@ -1,10 +1,16 @@
-# V8函数列表-后端
-## 介绍
->* 服务器端V8引擎代码与前端V8的编程语言均为Javascript语法
->* 服务器端V8引擎支持ES6语法
->* 服务器端V8引擎集成了后端一些对象、方法，可以使用js调用后端方法（非http）
->* 服务器端V8引擎代码在服务器端执行
->* 服务器端V8函数主要用于表单属性的服务器端V8事件、接口引擎、数据源引擎等
+# 🖥️ V8 函数列表 - 后端
+
+> **服务器端 V8 引擎支持 ES6 语法，集成后端对象和方法**
+
+---
+
+## 📌 介绍
+
+- 服务器端 V8 引擎代码与前端 V8 的编程语言均为 JavaScript 语法
+- 服务器端 V8 引擎支持 ES6 语法
+- 集成了后端对象、方法，可使用 JS 调用后端方法（非 HTTP）
+- 服务器端 V8 代码在服务器端执行
+- 主要用于表单属性的服务器端 V8 事件、接口引擎、数据源引擎等
 
 ## 接口引擎 V8.ApiEngine
 >* [接口引擎详细介绍](/doc/v8-engine/api-engine)
@@ -52,6 +58,7 @@ var result3 = V8.Cache.Remove(cacheKey);//返回bool类型
 
 ## C#系统类 System
 >* 服务器端V8代码能直接使用.net下的System命名空间
+::: details 展开查看 C# 代码（39 行）
 ```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
@@ -93,9 +100,11 @@ System.Threading.Tasks.Task.Run(function(){
   });
 });
 ```
+:::
 
 ## 常用函数 V8.Method
 >* 集成了一些常用函数，可自定义扩展
+::: details 展开查看 JavaScript 代码（26 行）
 ```javascript
 //从redis中获取当前登陆用户的token和身份信息
 //token：可选，是否包含Bearer均支持
@@ -124,6 +133,7 @@ V8.Method.AddSysLog({
 	Level : 1,//日志等级
 });
 ```
+:::
 
 ## V8.Base64
 >* Base64转换，与System.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
@@ -267,6 +277,7 @@ V8.MongoDb.GetFormData({
 
 ## V8.Http
 >* 对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
+::: details 展开查看 JavaScript 代码（45 行）
 ```javascript
 //post请求，返回string，对应的也有V8.Http.Get，参数名称则为GetParam
 var loginResult = V8.Http.Post({
@@ -314,6 +325,7 @@ var result = V8.Http.Post({
   PostParamString : '<xml><text>1</text></xml>'
 });
 ```
+:::
 
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
