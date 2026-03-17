@@ -3732,6 +3732,10 @@ export default {
         },
         GetDiyFieldAfter(result) {
             var self = this;
+            if(result.Code != 1){
+                self.DiyCommon.Tips("获取表字段列表失败：" + result.Msg, false);
+                return;
+            }
             //这里需要DiyFieldStrToJson转换，否则取不到配置数据
 
             result.Data.forEach((field) => {

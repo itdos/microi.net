@@ -21,8 +21,12 @@
             <text class="avatar-char">{{ (currentUser.Name || currentUser.Account || 'U').charAt(0) }}</text>
           </view>
           <view class="user-detail" v-if="isLoggedIn">
-            <text class="user-name">{{ currentUser.Name || currentUser.Account || t('common.user') }}</text>
-            <text class="user-account">{{ t('common.account') }}: {{ currentUser.Account || '-' }}</text>
+            <view class="user-name-row">
+              <text class="user-name">{{ currentUser.Name || currentUser.Account || t('common.user') }}</text>
+              <text class="tenant-tag" v-if="currentUser.TenantName">{{ currentUser.TenantName }}</text>
+            </view>
+            <text class="user-account">{{ currentUser.Account || '-' }}</text>
+            <text class="user-org" v-if="orgInfo">{{ orgInfo }}</text>
           </view>
           <view class="user-detail" v-else>
             <text class="user-name">{{ t('common.notLoggedIn') }}</text>
@@ -271,6 +275,19 @@ export default {
     currentLangName() {
       const item = this.langOptions.find(l => l.value === this.currentLang)
       return item ? item.label : '中文'
+    },
+    // 组织信息：部门 + 角色
+    orgInfo() {
+      const user = this.currentUser
+      if (!user) return ''
+      const parts = []
+      if (user.DeptName) parts.push(user.DeptName)
+      const roles = user._Roles
+      if (Array.isArray(roles) && roles.length > 0) {
+        const roleNames = roles.map(r => r.Name).filter(Boolean)
+        if (roleNames.length > 0) parts.push(roleNames.join('、'))
+      }
+      return parts.join(' · ')
     }
   },
 
@@ -502,6 +519,13 @@ export default {
 .user-detail {
   margin-left: 28rpx;
   flex: 1;
+  min-width: 0;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .user-name {
@@ -509,12 +533,31 @@ export default {
   font-weight: 700;
   color: #fff;
   display: block;
+  margin-right: 12rpx;
+}
+
+.tenant-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  line-height: 1;
+  padding: 6rpx 14rpx;
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.95);
+  border-radius: 30rpx;
+  white-space: nowrap;
 }
 
 .user-account {
   font-size: 24rpx;
   color: rgba(255,255,255,0.8);
   margin-top: 8rpx;
+  display: block;
+}
+
+.user-org {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.6);
+  margin-top: 6rpx;
   display: block;
 }
 

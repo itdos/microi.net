@@ -977,7 +977,7 @@ export default {
         
         // 使用公共模块清理WebSocket事件
         if (self.websocketEventsRegistered) {
-            cleanupWebSocketEvents(self.$websocket, '[PC聊天]');
+            cleanupWebSocketEvents(self.$websocket, '[PC聊天]', 'pc-chat');
             self.websocketEventsRegistered = false;
         }
     },
@@ -1315,7 +1315,8 @@ export default {
                     }
                 }, {
                     enableDuplicateCheck: true,
-                    logPrefix: '[PC聊天]'
+                    logPrefix: '[PC聊天]',
+                    scope: 'pc-chat'
                 });
                 
                 if (success) {

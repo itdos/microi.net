@@ -45,12 +45,16 @@
         <div class="user-card">
             <div class="user-card-bg"></div>
             <div class="user-info">
-                <el-avatar :size="72" :src="userAvatar" class="user-avatar">
+                <el-avatar :size="64" :src="userAvatar" class="user-avatar">
                     {{ currentUser.Name?.charAt(0) || 'U' }}
                 </el-avatar>
                 <div class="user-detail">
-                    <h2 class="user-name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
-                    <p class="user-account">账号: {{ currentUser.Account || 'Loading...' }}</p>
+                    <div class="user-name-row">
+                        <h2 class="user-name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
+                        <span class="tenant-tag" v-if="currentUser.TenantName">{{ currentUser.TenantName }}</span>
+                    </div>
+                    <p class="user-account">{{ currentUser.Account || '' }}</p>
+                    <p class="user-org" v-if="orgInfo">{{ orgInfo }}</p>
                 </div>
             </div>
         </div>
@@ -310,6 +314,7 @@
 </template>
 
 <script setup>
+import { DiyCommon } from "@/utils/diy.common.js";
 import { ref, computed, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
@@ -350,9 +355,23 @@ const currentUser = computed(() => diyStore.GetCurrentUser);
 const userAvatar = computed(() => {
     const avatar = currentUser.value?.Avatar;
     if (avatar) {
-        return avatar.startsWith('http') ? avatar : window.DiyCommon.GetServerPath(avatar);
+        return avatar.startsWith('http') ? avatar : DiyCommon.GetServerPath(avatar);
     }
     return './static/img/nohead-girl.png';
+});
+
+// 组织信息：部门 + 角色
+const orgInfo = computed(() => {
+    const user = currentUser.value;
+    if (!user) return '';
+    const parts = [];
+    if (user.DeptName) parts.push(user.DeptName);
+    const roles = user._Roles;
+    if (Array.isArray(roles) && roles.length > 0) {
+        const roleNames = roles.map(r => r.Name).filter(Boolean);
+        if (roleNames.length > 0) parts.push(roleNames.join('、'));
+    }
+    return parts.join(' · ');
 });
 
 // 版本号 - 从 package.json 获取
@@ -364,8 +383,8 @@ const version = computed(() => {
 const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const systemLogo = computed(() => {
-    const logo = window.DiyCommon.GetServerPath(diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg');
-    return logo.startsWith('http') ? logo : window.DiyCommon.GetServerPath(logo);
+    const logo = DiyCommon.GetServerPath(diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg');
+    return logo.startsWith('http') ? logo : DiyCommon.GetServerPath(logo);
 });
 
 const loginBottomContent = computed(() => {
@@ -575,8 +594,8 @@ const submitPassword = async () => {
 const handleSetLanguage = (lang) => {
     locale.value = lang;
     localStorage.setItem('language', lang);
-    if (window.DiyCommon?.ChangeLang) {
-        window.DiyCommon.ChangeLang(lang);
+    if (DiyCommon?.ChangeLang) {
+        DiyCommon.ChangeLang(lang);
     }
     showLangSelect.value = false;
     ElMessage.success('语言已切换');
@@ -676,29 +695,58 @@ function isMiniProgram() {
         position: relative;
         display: flex;
         align-items: center;
-        padding: 20px;
+        padding: 24px 20px;
         
         .user-avatar {
-            border: 3px solid #fff;
+            border: 2px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 64px;
+            height: 64px;
+            flex-shrink: 0;
         }
         
         .user-detail {
-            margin-left: 16px;
+            margin-left: 14px;
+            min-width: 0;
+            flex: 1;
             
+            .user-name-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
             .user-name {
                 font-size: 20px;
-                font-weight: 600;
+                font-weight: 700;
                 color: #fff !important;
-                margin: 0 0 6px 0;
-                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                margin: 0;
+                line-height: 1.3;
+            }
+
+            .tenant-tag {
+                display: inline-block;
+                font-size: 11px;
+                line-height: 1;
+                padding: 3px 8px;
+                background: rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                white-space: nowrap;
+                backdrop-filter: blur(4px);
             }
             
             .user-account {
                 font-size: 13px;
-                color: rgba(255, 255, 255, 0.95) !important;
-                margin: 0;
-                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+                color: rgba(255, 255, 255, 0.85) !important;
+                margin: 4px 0 0 0;
+            }
+
+            .user-org {
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.65) !important;
+                margin: 3px 0 0 0;
             }
         }
     }

@@ -167,15 +167,15 @@ export default {
 <style lang="scss">
 // scoped 也可以使用scoped，然后使用 /deep/
 .xjy-kehu-childtable-class {
-    padding-top: 10px;
     // margin-left: -100px;
 
     .item {
+        max-width: calc(50% - 40px);
         align-items: center;
         display: flex;
         justify-content: center;
         width: 160px;
-        margin: 0 20px 0px 0;
+        margin: 10px 20px 0px 0;
         padding: 15px 10px;
         cursor: pointer;
         float: left;
