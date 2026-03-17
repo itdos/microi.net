@@ -287,7 +287,12 @@ const sendMessage = async () => {
     
     // 发送到服务器
     try {
-        await sendMessageToUser(websocket, {
+        const ws = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+        if (!ws || ws.state !== 'Connected') {
+            ElMessage.error('连接已断开，请稍后重试');
+            return;
+        }
+        await sendMessageToUser(ws, {
             Content: content,
             OsClient: DiyCommon.GetOsClient(),
             ToUserId: chatId.value,
@@ -334,30 +339,32 @@ const loadMoreMessages = () => {
 const loadChatRecord = async () => {
     websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
     if (!websocket || websocket.state !== 'Connected') {
-        console.log('[移动端聊天] WebSocket未连接，无法加载聊天记录');
+        console.log('[移动端聊天] WebSocket未连接，等待重试...');
+        // 等待连接就绪
+        let retryCount = 0;
+        const waitForWs = () => {
+            retryCount++;
+            websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            if (websocket && websocket.state === 'Connected') {
+                doLoadChatRecord();
+            } else if (retryCount >= 20) {
+                console.warn('[移动端聊天] WebSocket连接超时');
+            } else {
+                setTimeout(waitForWs, 500);
+            }
+        };
+        setTimeout(waitForWs, 500);
         return;
     }
     
+    doLoadChatRecord();
+};
+
+const doLoadChatRecord = async () => {
     try {
-        const records = await getChatRecord(websocket, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
-        if (records && records.length > 0) {
-            messages.value = records.map(r => ({
-                id: r.Id || Date.now().toString(),
-                Type: r.Type || 'text',
-                Content: r.Content,
-                SendTime: r.SendTime,
-                FromUserId: r.FromUserId,
-                ToUserId: r.ToUserId,
-                isSelf: r.FromUserId === currentUser.value.Id,
-                senderName: r.FromUserId === currentUser.value.Id ? '我' : chatName.value,
-                avatar: '',
-                isStreaming: false
-            }));
-            
-            nextTick(() => {
-                scrollToBottom();
-            });
-        }
+        // 实际聊天记录通过 ReceiveSendChatRecordToUser 回调接收
+        await getChatRecord(websocket, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
+        console.log('[移动端聊天] SendChatRecordToUser请求已发送');
     } catch (error) {
         console.error('[移动端聊天] 加载聊天记录失败:', error);
     }
@@ -381,7 +388,7 @@ const handleReceiveSendToUser = (message) => {
     const isDuplicate = messages.value.some(m => {
         if (m.FromUserId !== message.FromUserId) return false;
         if (m.Content !== message.Content) return false;
-        const timeDiff = Math.abs(new Date(m.SendTime) - new Date(message.SendTime || new Date()));
+        const timeDiff = Math.abs(new Date(m.SendTime) - new Date(message.CreateTime || message.SendTime || new Date()));
         return timeDiff < 2000; // 2秒内相同内容视为重复
     });
     if (isDuplicate) {
@@ -393,11 +400,11 @@ const handleReceiveSendToUser = (message) => {
         id: Date.now().toString(),
         Type: message.Type || 'text',
         Content: message.Content,
-        SendTime: message.SendTime || new Date().toISOString(),
+        SendTime: message.CreateTime || message.SendTime || new Date().toISOString(),
         FromUserId: message.FromUserId,
         ToUserId: message.ToUserId,
         isSelf: message.FromUserId === currentUser.value.Id,
-        senderName: message.FromUserId === currentUser.value.Id ? '我' : chatName.value,
+        senderName: message.FromUserId === currentUser.value.Id ? '我' : (message.FromUserName || chatName.value),
         avatar: '',
         isStreaming: false
     };
@@ -409,11 +416,11 @@ const handleReceiveSendToUser = (message) => {
     });
 };
 
-const handleReceiveAIChunk = (chunk) => {
-    console.log('[移动端聊天] 收到AI流式消息:', chunk);
+const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
+    console.log('[移动端聊天] 收到AI流式消息:', { chunk: chunk?.substring?.(0, 30), fromUserId, toUserId, isComplete });
     
-    // 只处理发给当前聊天的消息
-    if (chunk.ToUserId !== currentUser.value.Id) {
+    // 只处理发给当前用户且与当前聊天相关的消息
+    if (toUserId !== currentUser.value.Id || fromUserId !== chatId.value) {
         return;
     }
     
@@ -422,23 +429,23 @@ const handleReceiveAIChunk = (chunk) => {
         currentStreamMessage.value = {
             id: Date.now().toString(),
             Type: 'text',
-            Content: chunk.Content || '',
+            Content: chunk || '',
             SendTime: new Date().toISOString(),
-            FromUserId: 'AI',
-            ToUserId: currentUser.value.Id,
+            FromUserId: fromUserId,
+            ToUserId: toUserId,
             isSelf: false,
-            senderName: 'AI助手',
+            senderName: chatName.value,
             avatar: '',
             isStreaming: true
         };
         messages.value.push(currentStreamMessage.value);
     } else {
         // 追加内容到现有消息
-        currentStreamMessage.value.Content += chunk.Content || '';
+        currentStreamMessage.value.Content += chunk || '';
     }
     
     // 检查是否完成
-    if (chunk.IsComplete) {
+    if (isComplete === true || isComplete === 'true') {
         currentStreamMessage.value.isStreaming = false;
         currentStreamMessage.value = null;
     }
@@ -456,11 +463,11 @@ const handleReceiveSendChatRecordToUser = (records) => {
             id: r.Id || Date.now().toString(),
             Type: r.Type || 'text',
             Content: r.Content,
-            SendTime: r.SendTime,
+            SendTime: r.CreateTime || r.SendTime,
             FromUserId: r.FromUserId,
             ToUserId: r.ToUserId,
             isSelf: r.FromUserId === currentUser.value.Id,
-            senderName: r.FromUserId === currentUser.value.Id ? '我' : chatName.value,
+            senderName: r.FromUserId === currentUser.value.Id ? '我' : (r.FromUserName || chatName.value),
             avatar: '',
             isStreaming: false
         }));

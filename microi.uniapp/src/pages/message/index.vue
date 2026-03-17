@@ -51,8 +51,9 @@
           placeholder-style="color:#bbb;font-size:13px;"
           v-model="searchKeyword"
           @confirm="doSearch"
+          @input="onSearchInput"
         />
-        <view v-if="searchKeyword" class="search-clear" @tap="searchKeyword = ''">✕</view>
+        <view v-if="searchKeyword" class="search-clear" @tap="clearSearch">✕</view>
       </view>
     </view>
 
@@ -117,6 +118,8 @@
       class="msg-scroll"
       scroll-y
       v-if="isLoggedIn && activeTab === 'contacts'"
+      @scrolltolower="onContactScrollToLower"
+      :lower-threshold="100"
     >
       <!-- 骨架屏 -->
       <view v-if="contactLoading && contactList.length === 0" class="skeleton-list">
@@ -130,7 +133,7 @@
       </view>
 
       <view
-        v-for="contact in filteredContacts"
+        v-for="contact in contactList"
         :key="contact.Id"
         class="contact-item"
         @tap="startChat(contact)"
@@ -144,8 +147,16 @@
         </view>
       </view>
 
+      <!-- 加载更多提示 -->
+      <view v-if="contactLoadingMore" class="loading-more-hint">
+        <text>加载中...</text>
+      </view>
+      <view v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">
+        <text>已加载全部联系人</text>
+      </view>
+
       <!-- 空状态 -->
-      <view class="empty-state" v-if="!contactLoading && filteredContacts.length === 0">
+      <view class="empty-state" v-if="!contactLoading && contactList.length === 0">
         <text class="empty-icon">📇</text>
         <text class="empty-text">{{ t('message.noContacts') }}</text>
       </view>
@@ -212,6 +223,13 @@ export default {
       contactList: [],
       dialogContactList: [],
       wsConnected: false,
+      // 通讯录分页
+      contactPageIndex: 1,
+      contactPageSize: 20,
+      contactHasMore: true,
+      contactLoadingMore: false,
+      // 搜索防抖 timer
+      contactSearchTimer: null,
       // SignalR 事件回调引用（方便移除）
       _onReceiveLastContacts: null,
       _onReceiveMessage: null,
@@ -229,14 +247,6 @@ export default {
       return this.messageList.filter(m =>
         (m.ContactUserName || '').toLowerCase().includes(kw) ||
         (m.LastMessage || '').toLowerCase().includes(kw)
-      )
-    },
-    filteredContacts() {
-      if (!this.searchKeyword) return this.contactList
-      const kw = this.searchKeyword.toLowerCase()
-      return this.contactList.filter(c =>
-        (c.Name || '').toLowerCase().includes(kw) ||
-        (c.DepartmentName || '').toLowerCase().includes(kw)
       )
     }
   },
@@ -305,11 +315,32 @@ export default {
         }
         client.on('ReceiveSendUnreadCountToUser', this._onReceiveUnreadCount)
 
+        // 监听重连恢复事件，自动刷新数据
+        this._onReconnected = () => {
+          console.log('[Message] SignalR重连成功，刷新数据')
+          this.wsConnected = true
+          this.requestLastContacts()
+        }
+        client.on('_connected', this._onReconnected)
+
         // 请求最近联系人
         this.requestLastContacts()
 
+        // 超时保护：如果8秒内没收到回调，关闭loading并显示空状态
+        this._loadingTimeout = setTimeout(() => {
+          if (this.loading) {
+            console.warn('[Message] 加载超时，关闭loading')
+            this.loading = false
+            this.refreshing = false
+            this.ensureAIFirst()
+          }
+        }, 8000)
+
         // 如果 SignalR 连接失败，使用轮询兜底
         if (!client.isConnected) {
+          console.warn('[Message] SignalR未连接，启动轮询兜底')
+          this.loading = false
+          this.ensureAIFirst()
           this.startPollingFallback()
         }
       } catch (e) {
@@ -331,6 +362,11 @@ export default {
           ContactUserId: '',
           OsClient: appConfig.osClient
         })
+      } else {
+        console.warn('[Message] requestLastContacts: SignalR未连接')
+        this.loading = false
+        this.refreshing = false
+        this.ensureAIFirst()
       }
     },
 
@@ -370,25 +406,73 @@ export default {
       }
     },
 
-    // 加载通讯录
-    async loadContacts() {
-      this.contactLoading = true
+    // 加载通讯录（支持分页和远端搜索）
+    async loadContacts(isLoadMore = false) {
+      if (isLoadMore) {
+        this.contactLoadingMore = true
+      } else {
+        this.contactLoading = true
+      }
       try {
         const res = await post('/api/SysUser/GetSysUserPublicInfo', {
           State: 1,
-          _PageIndex: 1,
-          _PageSize: 100
+          _PageIndex: this.contactPageIndex,
+          _PageSize: this.contactPageSize,
+          _Keyword: this.searchKeyword || ''
         }, true)
         if (res.Code === 1 && res.Data) {
-          this.contactList = [
-            { Id: 'AI', Name: 'AI助手', DepartmentName: '系统' },
-            ...(res.Data || [])
-          ]
+          const data = res.Data || []
+          if (isLoadMore) {
+            this.contactList = this.contactList.concat(data)
+          } else {
+            if (!this.searchKeyword) {
+              this.contactList = [
+                { Id: 'AI', Name: 'AI助手', DepartmentName: '系统' },
+                ...data
+              ]
+            } else {
+              this.contactList = data
+            }
+          }
+          // 判断是否还有更多
+          const aiOffset = (!this.searchKeyword && this.contactPageIndex === 1) ? 1 : 0
+          const loadedCount = this.contactList.length - aiOffset
+          this.contactHasMore = loadedCount < (res.Total || 0)
         }
       } catch (e) {
         console.error('[Message] loadContacts error:', e)
       } finally {
         this.contactLoading = false
+        this.contactLoadingMore = false
+      }
+    },
+
+    // 通讯录滚动到底部加载更多
+    onContactScrollToLower() {
+      if (this.contactHasMore && !this.contactLoadingMore && !this.contactLoading) {
+        this.contactPageIndex++
+        this.loadContacts(true)
+      }
+    },
+
+    // 搜索输入事件（通讯录远端搜索）
+    onSearchInput() {
+      if (this.activeTab !== 'contacts') return
+      clearTimeout(this.contactSearchTimer)
+      this.contactSearchTimer = setTimeout(() => {
+        this.contactPageIndex = 1
+        this.contactHasMore = true
+        this.loadContacts(false)
+      }, 300)
+    },
+
+    // 清除搜索
+    clearSearch() {
+      this.searchKeyword = ''
+      if (this.activeTab === 'contacts') {
+        this.contactPageIndex = 1
+        this.contactHasMore = true
+        this.loadContacts(false)
       }
     },
 
@@ -412,12 +496,18 @@ export default {
     switchToContacts() {
       this.activeTab = 'contacts'
       if (this.contactList.length === 0) {
-        this.loadContacts()
+        this.contactPageIndex = 1
+        this.contactHasMore = true
+        this.loadContacts(false)
       }
     },
 
     // 清理 SignalR 事件
     cleanupSignalREvents() {
+      if (this._loadingTimeout) {
+        clearTimeout(this._loadingTimeout)
+        this._loadingTimeout = null
+      }
       const client = getSignalR()
       if (this._onReceiveLastContacts) {
         client.off('ReceiveSendLastContacts', this._onReceiveLastContacts)
@@ -427,6 +517,9 @@ export default {
       }
       if (this._onReceiveUnreadCount) {
         client.off('ReceiveSendUnreadCountToUser', this._onReceiveUnreadCount)
+      }
+      if (this._onReconnected) {
+        client.off('_connected', this._onReconnected)
       }
     },
 
@@ -815,6 +908,14 @@ export default {
   flex-direction: column;
   align-items: center;
   padding: 120rpx 0;
+}
+
+/* 加载更多提示 */
+.loading-more-hint {
+  text-align: center;
+  padding: 24rpx 0;
+  color: #999;
+  font-size: 24rpx;
 }
 
 .empty-icon {

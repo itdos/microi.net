@@ -29,8 +29,9 @@
                     class="search-input"
                     :placeholder="activeTab === 'messages' ? '搜索消息' : '搜索联系人'" 
                     v-model="searchKeyword"
+                    @input="activeTab === 'contacts' ? onContactSearchInput() : null"
                 />
-                <span v-if="searchKeyword" class="search-clear" @click="searchKeyword = ''">✕</span>
+                <span v-if="searchKeyword" class="search-clear" @click="clearSearch">✕</span>
             </div>
         </div>
 
@@ -86,9 +87,9 @@
         </div>
 
         <!-- 通讯录列表 -->
-        <div class="msg-scroll" v-if="activeTab === 'contacts'">
+        <div class="msg-scroll" v-if="activeTab === 'contacts'" @scroll="onContactScroll">
             <!-- 骨架屏 -->
-            <div v-if="contactLoading && filteredContacts.length === 0" class="skeleton-list">
+            <div v-if="contactLoading && contactList.length === 0" class="skeleton-list">
                 <div class="sk-item" v-for="i in 8" :key="i">
                     <div class="sk-avatar sk-avatar-sm"></div>
                     <div class="sk-content">
@@ -99,7 +100,7 @@
             </div>
 
             <div 
-                v-for="contact in filteredContacts" 
+                v-for="contact in contactList" 
                 :key="contact.Id"
                 class="contact-item"
                 @click="startNewChat(contact)"
@@ -115,8 +116,16 @@
                 </div>
             </div>
 
+            <!-- 加载更多提示 -->
+            <div v-if="contactLoadingMore" class="loading-more-hint">
+                加载中...
+            </div>
+            <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">
+                已加载全部联系人
+            </div>
+
             <!-- 空状态 -->
-            <div v-if="!contactLoading && filteredContacts.length === 0" class="empty-state">
+            <div v-if="!contactLoading && contactList.length === 0" class="empty-state">
                 <span class="empty-icon">📇</span>
                 <span class="empty-text">暂无联系人</span>
             </div>
@@ -202,6 +211,12 @@ const messageList = ref([]);
 // 联系人列表
 const contactList = ref([]);
 
+// 通讯录分页
+const contactPageIndex = ref(1);
+const contactPageSize = ref(20);
+const contactHasMore = ref(true);
+const contactLoadingMore = ref(false);
+
 // 弹窗联系人列表
 const dialogContactList = ref([]);
 
@@ -218,14 +233,16 @@ const filteredMessageList = computed(() => {
     );
 });
 
-// 过滤联系人列表
-const filteredContacts = computed(() => {
-    if (!searchKeyword.value) return contactList.value;
-    return contactList.value.filter(contact => 
-        contact.Name.includes(searchKeyword.value) ||
-        (contact.DepartmentName && contact.DepartmentName.includes(searchKeyword.value))
-    );
-});
+// 搜索关键词变化时远程搜索通讯录
+let contactSearchTimer = null;
+const onContactSearchInput = () => {
+    clearTimeout(contactSearchTimer);
+    contactSearchTimer = setTimeout(() => {
+        contactPageIndex.value = 1;
+        contactHasMore.value = true;
+        loadContacts(false);
+    }, 300);
+};
 
 // 搜索联系人
 const searchContacts = () => {
@@ -267,7 +284,9 @@ const switchToContacts = () => {
     activeTab.value = 'contacts';
     if (contactList.value.length === 0) {
         contactLoading.value = true;
-        loadContacts();
+        contactPageIndex.value = 1;
+        contactHasMore.value = true;
+        loadContacts(false);
     }
 };
 
@@ -309,75 +328,120 @@ const startDialogChat = (contact) => {
 const loadLastContacts = async () => {
     websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
     if (!websocket || websocket.state !== 'Connected') {
-        console.log('[移动端消息] WebSocket未连接，无法加载联系人');
-        loading.value = false;
+        console.log('[移动端消息] WebSocket未连接，等待重试...');
+        // 轮询等待WebSocket连接（最多10秒）
+        let retryCount = 0;
+        const maxRetries = 20;
+        const waitForConnection = () => {
+            retryCount++;
+            websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            if (websocket && websocket.state === 'Connected') {
+                doLoadLastContacts();
+            } else if (retryCount >= maxRetries) {
+                console.warn('[移动端消息] WebSocket连接超时');
+                loading.value = false;
+            } else {
+                setTimeout(waitForConnection, 500);
+            }
+        };
+        setTimeout(waitForConnection, 500);
         return;
     }
     
+    doLoadLastContacts();
+};
+
+const doLoadLastContacts = async () => {
     try {
-        const contacts = await getLastContacts(websocket, currentUser.value.Id, DiyCommon.GetOsClient());
-        if (contacts && contacts.length > 0) {
-            // 直接使用原始数据，不进行映射
-            messageList.value = contacts;
-            
-            // 确保AI助手在第一位
-            const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
-            if (aiIndex === -1) {
-                messageList.value.unshift({
-                    ContactUserId: 'AI',
-                    ContactUserName: 'AI助手',
-                    ContactUserAvatar: '',
-                    LastMessage: '我是您的AI助手，有什么可以帮您？',
-                    UpdateTime: new Date().toISOString(),
-                    UnRead: 0,
-                    muted: false
-                });
-            } else if (aiIndex > 0) {
-                const ai = messageList.value.splice(aiIndex, 1)[0];
-                messageList.value.unshift(ai);
+        // 调用invoke触发服务端推送，实际数据通过 onReceiveLastContacts 回调接收
+        await getLastContacts(websocket, currentUser.value.Id, DiyCommon.GetOsClient());
+        console.log('[移动端消息] SendLastContacts请求已发送');
+        // 设置超时保护：如果8秒内回调没触发，关闭loading
+        setTimeout(() => {
+            if (loading.value) {
+                console.warn('[移动端消息] 加载超时，关闭loading');
+                loading.value = false;
             }
-        }
+        }, 8000);
     } catch (error) {
         console.error('[移动端消息] 加载联系人失败:', error);
-    } finally {
         loading.value = false;
     }
 };
 
-// 加载通讯录
-const loadContacts = () => {
+// 加载通讯录（支持分页和远端搜索）
+const loadContacts = (isLoadMore = false) => {
+    if (isLoadMore) {
+        contactLoadingMore.value = true;
+    } else {
+        contactLoading.value = true;
+    }
+    
     DiyCommon.Post(
         '/api/SysUser/GetSysUserPublicInfo',
         {
             State: 1,
-            _PageIndex: 1,
-            _PageSize: 50
+            _PageIndex: contactPageIndex.value,
+            _PageSize: contactPageSize.value,
+            _Keyword: searchKeyword.value || ''
         },
         function(result) {
             if (DiyCommon.Result(result)) {
-                console.log('[移动端消息] 加载通讯录成功:', result.Data?.length);
+                const data = result.Data || [];
+                console.log('[移动端消息] 加载通讯录成功:', data.length, '总数:', result.Total);
                 
-                // AI助手放第一位
-                contactList.value = [
-                    {
-                        Id: 'AI',
-                        Name: 'AI助手',
-                        UserImg: '',
-                        DepartmentName: '系统'
-                    },
-                    ...(result.Data || [])
-                ];
-                dialogContactList.value = result.Data || [];
+                if (isLoadMore) {
+                    contactList.value = contactList.value.concat(data);
+                } else {
+                    // 首次加载或搜索：替换数据，无搜索关键字时加AI助手
+                    if (!searchKeyword.value) {
+                        contactList.value = [
+                            { Id: 'AI', Name: 'AI助手', UserImg: '', DepartmentName: '系统' },
+                            ...data
+                        ];
+                    } else {
+                        contactList.value = data;
+                    }
+                    dialogContactList.value = data;
+                }
+                
+                // 判断是否还有更多
+                const aiOffset = (!searchKeyword.value && contactPageIndex.value === 1) ? 1 : 0;
+                const loadedCount = contactList.value.length - aiOffset;
+                contactHasMore.value = loadedCount < (result.Total || 0);
             } else {
                 console.error('[移动端消息] 加载通讯录失败:', result.Message);
             }
             contactLoading.value = false;
+            contactLoadingMore.value = false;
         },
         function(error) {
             console.error('[移动端消息] 加载通讯录请求失败:', error);
             contactLoading.value = false;
+            contactLoadingMore.value = false;
         }
     );
+};
+
+// 通讯录列表滚动加载更多
+const onContactScroll = (e) => {
+    const target = e.target;
+    if (!target) return;
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+    if (isNearBottom && contactHasMore.value && !contactLoadingMore.value && !contactLoading.value) {
+        contactPageIndex.value++;
+        loadContacts(true);
+    }
+};
+
+// 清除搜索
+const clearSearch = () => {
+    searchKeyword.value = '';
+    if (activeTab.value === 'contacts') {
+        contactPageIndex.value = 1;
+        contactHasMore.value = true;
+        loadContacts(false);
+    }
 };
 
 // 注册WebSocket事件（使用公共模块）
@@ -446,7 +510,8 @@ const registerWebSocketEvents = () => {
         }
     }, {
         enableDuplicateCheck: true,
-        logPrefix: '[移动端消息]'
+        logPrefix: '[移动端消息]',
+        scope: 'mobile-message'
     });
     
     if (success) {
@@ -457,7 +522,7 @@ const registerWebSocketEvents = () => {
 // 注销WebSocket事件（使用公共模块）
 const unregisterWebSocketEvents = () => {
     if (wsEventsRegistered) {
-        cleanupWebSocketEvents(websocket, '[移动端消息]');
+        cleanupWebSocketEvents(websocket, '[移动端消息]', 'mobile-message');
         wsEventsRegistered = false;
     }
 };
@@ -466,7 +531,6 @@ onMounted(() => {
     console.log('[移动端消息] 组件已挂载');
     registerWebSocketEvents();
     loadLastContacts();
-    loadContacts();
 });
 
 onBeforeUnmount(() => {
@@ -758,6 +822,14 @@ onBeforeUnmount(() => {
         color: #999;
         margin-bottom: 16px;
     }
+}
+
+/* 加载更多提示 */
+.loading-more-hint {
+    text-align: center;
+    padding: 12px 0;
+    color: #999;
+    font-size: 13px;
 }
 
 .empty-btn {

@@ -185,6 +185,53 @@ namespace Microi.net
         /// <returns></returns>
         public override async Task OnDisconnectedAsync(Exception exception)
         {
+            string connid = base.Context.ConnectionId;
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken();
+                var osClient = currentToken?.OsClient;
+                var userId = currentToken?.CurrentUser?["Id"].Val<string>();
+                
+                // 如果通过 token 获取不到用户信息，尝试从 Claims 获取
+                if (string.IsNullOrEmpty(userId) && Context.User?.Identity?.IsAuthenticated == true)
+                {
+                    userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+                    osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
+                }
+                
+                if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
+                {
+                    var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+                    ClientInfo clientInfo = await diyCacheBase.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
+                    if (clientInfo != null)
+                    {
+                        // 移除当前断开的连接ID
+                        clientInfo.ConnectionIds.Remove(connid);
+                        if (clientInfo.LastConnectionId == connid)
+                        {
+                            clientInfo.LastConnectionId = clientInfo.ConnectionIds.FirstOrDefault();
+                        }
+                        
+                        if (clientInfo.ConnectionIds.Count > 0)
+                        {
+                            // 还有其他连接，更新缓存
+                            await diyCacheBase.SetAsync($"Microi:{osClient}:ChatOnline:{userId}", clientInfo);
+                        }
+                        else
+                        {
+                            // 没有活跃连接了，移除在线记录
+                            await diyCacheBase.RemoveAsync($"Microi:{osClient}:ChatOnline:{userId}");
+                        }
+                        Console.WriteLine($"[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WebSocket] OnDisconnectedAsync 错误: {ex.Message}");
+            }
+            
+            await base.OnDisconnectedAsync(exception);
         }
         /// <summary>
         /// 
@@ -693,6 +740,11 @@ namespace Microi.net
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
                 ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
+                if (clientInfoFrom2 == null)
+                {
+                    Console.WriteLine($"[WebSocket] SendChatRecordToUser: 用户 {msg.FromUserId} 不在线");
+                    return;
+                }
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
                 // 转换为DTO避免ObjectId序列化问题
                 var result2Dto = result2.Select(m => new MessageBodyDto
@@ -790,7 +842,7 @@ namespace Microi.net
 
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
-                ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}ChatOnline:{msg.ToUserId}");
+                ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ToUserId}");
                 if (clientInfoTo != null)
                 {
                     if (msg._iHubContext != null)
