@@ -1,8 +1,14 @@
-# SaaS引擎
-## 介绍
->* SaaS引擎作为平台的亮点之一，承载了所有租户的核心独立开发配置
->* 平台默认是SaaS模式，因此部署平台必须自定义指定`OsClient`、`OsClientType`、`OsClientNetwork`
->* 每个租户一个`独立数据库`，可以在`主库`的`sys_osclients`表中中为每个租户配置独立的`数据库连接字符串`、`MongoDB`、`Redis`、`MQ`、`阿里云`、`MinIO`等
+# 🌐 SaaS 引擎
+
+> **承载所有租户的核心独立开发配置，一套程序驱动 N 个租户**
+
+---
+
+## 📌 介绍
+
+- SaaS 引擎作为平台的亮点之一，承载所有租户的核心独立开发配置
+- 平台默认是 SaaS 模式，部署时必须指定 `OsClient`、`OsClientType`、`OsClientNetwork`
+- 每个租户一个独立数据库，可在主库 `sys_osclients` 表中配置独立的数据库连接、MongoDB、Redis、MQ、阿里云、MinIO 等
 >* 一套程序驱动N个租户数据库，而不必每个租户再部署一套docker程序
 >* 本地二次开发`一键切换租户数据库`、`环境`
 >* `主库`即部署平台时`环境变量`或`appsettings.json`中配置的`数据库连接字符串[OsClientDbConn]`
@@ -42,6 +48,7 @@
 >* 如果未使用阿里云OSS，则可以使用MinIO
 >* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
 >* 比如说博主的反向代理配置文件
+::: details 展开查看 Shell 命令（88 行）
 ```shell
 proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
 server {
@@ -132,6 +139,7 @@ server {
     #LOG END
 }
 ```
+:::
 
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)

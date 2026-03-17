@@ -1,11 +1,21 @@
-# FormEngine用法
+# 📝 FormEngine 用法
 
-## 前后端V8语法一致，但略有差别
->* 此文档为前后端V8共享文档，均为Javascript语法，用法基本一致，但略有差别
->* 服务器端【V8.FormEngine】对表的所有操作，均支持第二个参数传入V8.DbTrans数据库事务对象
->* 服务器端【V8.FormEngine】对表的所有操作均不会触发表单属性的任何事件（除非传入_InvokeType:'Client'），前端【V8.FormEngine】均会触发
->* 前端直接调用V8.FormEngine对应的接口地址（如https://***/api/formEngine/addFormData）也会触发表单属性服务器端V8事件
->* V8.FormEngine下所有函数均为单表操作（除Batch批量操作外），如需多表关联查询请查看V8.ModuleEngine用法
+> **前后端 V8 共享文档，均为 JavaScript 语法，用法基本一致，略有差别**
+
+---
+
+## 📌 前后端 V8 语法差异
+
+| 端 | 说明 |
+| :--: | ---- |
+| 服务器端 | `V8.FormEngine` 对表的所有操作均支持第二个参数传入 `V8.DbTrans` 数据库事务对象 |
+| 服务器端 | `V8.FormEngine` 操作**不会触发**表单属性的任何事件（除非传入 `_InvokeType:'Client'`） |
+| 前端 | `V8.FormEngine` 操作**会触发**表单属性事件 |
+| 前端 | 直接调用 FormEngine 对应的接口地址也会触发服务器端 V8 事件 |
+
+::: tip 提示
+`V8.FormEngine` 下所有函数均为单表操作（除 Batch 批量操作外），多表关联查询请查看 `V8.ModuleEngine` 用法。
+:::
 >* __<font color="red">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</font>__
 
 ## 前端V8异步、同步用法
@@ -78,6 +88,7 @@ var data = result.Data;//格式：{}
 ```
 
 ## 获取数据列表 GetTableData
+::: details 展开查看 JavaScript 代码（22 行）
 ```javascript
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     Ids : [1, 2, 3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
@@ -102,6 +113,7 @@ if(result.Code != 1){
 }
 var data = result.Data;//格式：[]
 ```
+:::
 
 ### 匿名获取数据列表 GetTableDataAnonymous
 >* 用法和以上GetTableData一致
@@ -262,6 +274,7 @@ var addField = V8.FormEngine.AddField({
 ## 获取某个字段配置的数据源 GetFieldData
 
 ## 在事务中执行增删改查、调用其它接口引擎
+::: details 展开查看 JavaScript 代码（37 行）
 ```js
 //业务逻辑1：查询数据
 var selectResult = V8.FormEngine.GetTableData('tableName', {
@@ -301,3 +314,4 @@ if(apiEngineResult && apiEngineResult.Code != 1){
 //注意：只要指定了Code的值，并且不等于1，则平台会自动回滚事务
 return { Code : 1, Msg : '操作成功！' };
 ```
+:::

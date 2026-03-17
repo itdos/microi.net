@@ -1,7 +1,13 @@
-# 系统设置
->* 系统设置非常重要，当开好一个数据库，第一件事就是配置系统设置
-## 验证码
+# ⚙️ 系统设置
+
+> **系统设置非常重要，开好数据库后第一件事就是配置系统设置**
+
+---
+
+## 🔐 验证码
+
 ### 获取验证码图片
+::: details 展开查看 JavaScript 代码（24 行）
 ```js
 //通过浏览器测试：
 https://api.microios.com/api/Captcha/getCaptcha?OsClient=micrios
@@ -28,11 +34,17 @@ GetCaptcha(){
     });
 }
 ```
+:::
+---
+
 ### 提交验证码
 ```js
 //参数传入_CaptchaId、_CaptchaValue
 ```
+---
+
 ### 验证码配置
+::: details 展开查看 JSON 配置（24 行）
 ```json
 {
     "CaptchaType": 11, // 验证码类型，值为0-11，具体效果见平台文档
@@ -59,6 +71,7 @@ GetCaptcha(){
     }
 }
 ```
+:::
 |CaptchaType|字体|静态图|动图|
 |:--:|:--:|:--:|:--:|
 | DEFAULT (0) |   | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987335545209958389942.gif/20230909/1.gif" data-fancybox="gallery" alt="" width=130> | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987336384782028080986.gif/20230909/2.gif" data-fancybox="gallery" alt="" width=130> |

@@ -1,9 +1,18 @@
-# 消息队列
-## 介绍
->* 平台目前支持RabbitMQ消息队列
+# 📨 消息队列
 
-## RabbitMQ Docker编排
+> **平台目前支持 RabbitMQ 消息队列**
+
+---
+
+## 📌 介绍
+
+平台目前支持 RabbitMQ 消息队列。
+
+---
+
+## 🐳 RabbitMQ Docker 编排
 >* 端口1673是web管理面板
+::: details 展开查看 Shell 命令（23 行）
 ```shell
 version: '3.8'
 services:
@@ -29,6 +38,7 @@ services:
         max-size: "10m"
         max-file: "10"
 ```
+:::
 
 ## SaaS引擎MQ配置
 >* MQHost：192.168.31.199
@@ -44,6 +54,7 @@ services:
 >* ApiEngineKey：messagetest
 
 ## 生产一个消息
+::: details 展开查看 JavaScript 代码（20 行）
 ```js
 //前端调用生产消息接口
 V8.Post('/api/mq/sendmsg', {
@@ -66,6 +77,7 @@ V8.MQ.SendMsg('test_queue', {
   }
 );
 ```
+:::
 
 ## 消费一个消息
 >* 在接口引擎[messagetest]中自动消费，因为创建消息队列时指定的ApiEngineKey：messagetest

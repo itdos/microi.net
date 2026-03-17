@@ -1,29 +1,64 @@
-# Docker部署
+# 🐳 Docker 部署
 
-## 说明
->* Docker部署需要一定的服务器linux操作系统基础
+> **通过 Docker 编排部署 Microi吾码低代码平台全套环境**
 
-## 视频教程
->* 待重新录制上传
->* 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+---
 
-## Docker编排部署（推荐）
->* 生产环境建议通过服务器面板原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
->* Redis、Mongodb根据实际情况自由决定编排部署还是使用服务器面板部署，__<font color="red">注意：使用宝塔面板在ubuntu24上原生安装的Redis、Mongodb，可能会遇到安装失败、或安装成功后修改端口、密码时无法成功启动服务，此时建议直接卸载，使用docker编排部署即可</font>__
->* 请将编排中的镜像地址替换为您的实际地址，这里的默认地址为开源版镜像
->* 如果使用非公开镜像，需要先在服务器进行登录后再执行编排
-```shell
-//请替换[阿里云docker帐号]、[阿里云docker密码]、[地域：如hangzhou、beijing]
-docker login --username=帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
+## 📌 说明
+
+::: warning 前置条件
+Docker 部署需要一定的服务器 Linux 操作系统基础。
+:::
+
+---
+
+## 🎥 视频教程
+
+- 待重新录制上传
+- 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
+---
+
+## 🚀 Docker 编排部署（推荐）
+
+::: tip 生产环境建议
+- 通过服务器面板**原生安装 MySQL**（低配服务器建议 v5.7.x，高配服务器建议 v8.0.x）
+- Redis、MongoDB 根据实际情况自由决定编排部署还是服务器面板部署
+:::
+
+::: danger Ubuntu 24 注意
+使用宝塔面板在 Ubuntu 24 上原生安装的 Redis、MongoDB，可能会遇到安装失败或修改端口/密码后无法启动服务，建议直接卸载改用 Docker 编排部署。
+:::
+
+请将编排中的镜像地址替换为您的实际地址（默认为开源版镜像）。如使用非公开镜像，需先登录：
+
+```bash
+# 请替换帐号、密码、地域
+docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
-### 1、安装MySql
->* __<font color="red">推荐使用服务器面板进行原生安装mysql</font>__
->* __<font color="red">注意：使用宝塔面板在ubuntu24上原生安装的mysql8.0，可能会遇到将3306端口修改为其它端口始终无法成功启动，改回3306就可以启动，暂时没找到解决方案，此时建议直接使用3306即可</font>__
->* __<font color="red">安装好数据库后：</font>__
->* 1、使用面板的数据库性能配置，如服务器是16GB运行内存，那么建议优化方案建议选择8-16GB
->* 2、在配置文件中[mysqld]下面添加【lower_case_table_names = 1】
->* __<font color="red">3、尝试使用服务器面板的数据库管理进行还原数据库（有一定概率会失败，比如说数据库中存在大量视图，而视图与视图之间又存在关联sql，就会导致还原失败），若还原数据库失败，可以尝试使用Navicat的数据传输功能进行还原数据库（成功率100%，若遇到视图与视图之间存在关联sql，请依次单个还原视图）</font>__
->* 4、还原成功后，建议执行以下sql：
+---
+
+### 1️⃣ 安装 MySQL
+
+::: tip 推荐
+推荐使用服务器面板进行**原生安装 MySQL**。
+:::
+
+::: danger Ubuntu 24 + MySQL 8.0 注意
+使用宝塔面板在 Ubuntu 24 上原生安装的 MySQL 8.0，可能遇到修改 3306 端口为其它端口后无法启动的问题，建议直接使用 3306 端口。
+:::
+
+**安装后操作：**
+
+1. 使用面板的数据库性能配置进行优化
+2. 在配置文件 `[mysqld]` 下添加 `lower_case_table_names = 1`
+3. 尝试使用服务器面板的数据库管理进行还原数据库
+
+::: warning 还原数据库失败？
+若面板还原失败（如视图之间存在关联 SQL），可使用 Navicat 的**数据传输**功能（成功率 100%）。若遇到视图关联问题，请依次单个还原视图。
+:::
+
+4. 还原成功后，建议执行以下 SQL：
 ```sql
 -- 若不能通过Navicat连接数据库，如果是docker部署的mysql，先进入mysql的docker容器
 docker exec -it 容器Id/Name bash
@@ -39,8 +74,14 @@ update diy_schedule_job set Status='暂停';
 update microi_job_triggers set TRIGGER_STATE='PAUSED';
 ```
 
-#### Mysql5.7编排
->* 低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]
+---
+
+#### MySQL 5.7 编排
+
+::: tip 配置建议
+低配服务器建议 v5.7.x（如 4核8G/16G），高配服务器建议 v8.0.x（如 8核8G/16G）
+:::
+::: details 展开查看 Shell 命令（20 行）
 ```shell
 version: '3.8'
 services:
@@ -63,7 +104,9 @@ services:
         max-size: 10m
         max-file: "10"
 ```
->* MySql5.7数据库配置文件：microi_mysql.cnf
+:::
+MySQL 5.7 数据库配置文件 `microi_mysql.cnf`：
+::: details 展开查看 Shell 命令（51 行）
 ```shell
 [mysqld]
 # 基础配置
@@ -117,9 +160,16 @@ innodb_flush_log_at_trx_commit = 2  # 事务提交时延后刷盘（SSD安全）
 sync_binlog = 1000                  # 批量同步binlog（降低SSD磨损）
 innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需）
 ```
+:::
 
-#### Mysql8.0编排
->* 低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]
+---
+
+#### MySQL 8.0 编排
+
+::: tip 配置建议
+低配服务器建议 v5.7.x，高配服务器建议 v8.0.x
+:::
+::: details 展开查看 Shell 命令（20 行）
 ```shell
 version: '3.8'
 services:
@@ -142,7 +192,9 @@ services:
         max-size: 10m
         max-file: "10"
 ```
->* MySql8.0数据库配置文件：microi_mysql8.0.cnf
+:::
+MySQL 8.0 数据库配置文件 `microi_mysql8.0.cnf`：
+::: details 展开查看 Shell 命令（61 行）
 ```shell
 [mysqld]
 # 基础配置
@@ -206,10 +258,17 @@ log_bin_trust_function_creators = ON  # 允许二进制日志记录存储函数
 # 性能Schema优化（根据监控需求调整）
 performance_schema = ON
 ```
+:::
 
 
-### 3、Redis编排
->* 注意有两个地方有【password123456】需要修改为您的自定义密码
+---
+
+### 3️⃣ Redis 编排
+
+::: warning 注意
+编排中有两个地方包含 `password123456`，请修改为您的自定义密码。
+:::
+::: details 展开查看 Shell 命令（93 行）
 ```shell
 version: '3.8'
 services:
@@ -305,10 +364,17 @@ services:
     tty: true
     stdin_open: true
 ```
+:::
 
 
-### 4、MongoDB编排
->* 注意修改默认密码【password123456】
+---
+
+### 4️⃣ MongoDB 编排
+
+::: warning 注意
+请修改默认密码 `password123456`。
+:::
+::: details 展开查看 Shell 命令（21 行）
 ```shell
 version: '3.8'
 services:
@@ -332,12 +398,24 @@ services:
         max-size: 10m
         max-file: "10"
 ```
+:::
 
-### 5、Minio编排
->* 注意要修改默认密码【password123456】
->* 1011（9001）为MinIO后台管理面板端口，安装好过后需要访问后台添加【public（名称自定义，必需修改权限[Access Policy]为[public]）】和【private（名称自定义）】两个桶（Buckets）
->* 1010（9000）为Endpoint端口，用于在SaaS引擎中配置EndPoint，如[192.168.31.199:1010]，若做了域名的反向代理则直接填写域名即可，如[static.itdos.com]
->* MinIO在做域名的反向代理时，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题
+---
+
+### 5️⃣ MinIO 编排
+
+::: warning 注意修改默认密码 `password123456`
+:::
+
+| 端口 | 说明 |
+| :--: | ---- |
+| 1011 (9001) | MinIO 后台管理面板，安装后需添加 `public`（权限设为 public）和 `private` 两个 Bucket |
+| 1010 (9000) | Endpoint 端口，用于 SaaS 引擎配置 EndPoint，如 `192.168.31.199:1010` |
+
+::: danger MinIO 反向代理注意
+必须设置 `proxy_set_header Host $http_host`，否则导致私有桶只能上传无法下载。阿里云 OSS、CDN、负载均衡默认配置不会有此问题。
+:::
+::: details 展开查看 Shell 命令（25 行）
 ```shell
 version: '3.8'
 services:
@@ -365,10 +443,17 @@ services:
     tty: true
     stdin_open: true
 ```
+:::
 
-### 6、低代码平台程序编排（Api + Web + WebOS + Mobile + Watchtower自动更新）
->* 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像，随时更新
->* microi-web编排的OsClient环境变量可不指定，默认为空（SaaS模式）
+---
+
+### 6️⃣ 低代码平台程序编排（Api + Web + WebOS + Mobile + Watchtower）
+
+::: tip 说明
+- 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像
+- `microi-web` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
+:::
+::: details 展开查看 Shell 命令（102 行）
 ```shell
 version: '3.8'
 services:
@@ -473,19 +558,30 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  
     command: --cleanup --include-stopped --interval 10 microi-api microi-web microi-webos microi-mobile
 ```
+:::
 
 
-## 本地Docker环境
+---
 
-### 1、本地安装Docker Desktop
->* 下载地址：[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
->* 注意如果本地开发环境是windows，需要windows专业版及以上，不支持windows家庭版
+## 💻 本地 Docker 环境
 
-### 2、本地打包并上传docker镜像-后端
->* 首先需要一个容器镜像服务，可以使用阿里云免费的：[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
->* 也可以自己在服务器上搭建一套【harbor】做为容器镜像服务
->* 编译打包到【/Microi.net.Api/bin/Release/net8.0/】
->* 在【/Microi.net.Api/bin/Release/】处创建【Dockerfile】文件
+### 1️⃣ 本地安装 Docker Desktop
+
+- 下载地址：[Docker Desktop](https://docs.docker.com/get-started/get-docker/)
+
+::: warning Windows 用户注意
+需要 **Windows 专业版**及以上，不支持 Windows 家庭版。
+:::
+
+---
+
+### 2️⃣ 本地打包并上传 Docker 镜像 - 后端
+
+- 容器镜像服务可使用阿里云免费服务：[阿里云容器镜像服务](https://cr.console.aliyun.com/cn-hangzhou/instances)
+- 也可自行搭建 [Harbor](https://goharbor.io/) 容器镜像服务
+- 编译打包到 `/Microi.net.Api/bin/Release/net8.0/`
+
+在 `/Microi.net.Api/bin/Release/` 处创建 `Dockerfile`：
 ```powershell
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 MAINTAINER iTdos
@@ -497,7 +593,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 RUN echo 'Asia/Shanghai' >/etc/timezone
 CMD ["dotnet", "Microi.net.Api.dll", "--urls", "http://0.0.0.0:80"]
 ```
->* 在【/Microi.net.Api/bin/Release/】处创建【publish.sh（windows为publish.bat）】文件
+在同目录创建 `publish.sh`（Windows 为 `publish.bat`）：
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -508,11 +604,14 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 ```
->* 在cmd处执行publish.sh或publish.bat
+在 cmd 中执行 `publish.sh` 或 `publish.bat`。
 
-### 3、本地打包并上传docker镜像-前端
->* 使用#npm run build命令打包前端到【/microi.vue2.pc/dist/itdos.os/dist/】
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【Dockerfile】文件
+---
+
+### 3️⃣ 本地打包并上传 Docker 镜像 - 前端
+
+- 使用 `npm run build` 打包前端
+- 在打包输出目录创建 `Dockerfile`：
 ```powershell
 #Vue2
 FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
@@ -528,7 +627,7 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 RUN chmod -R 755 /usr/share/nginx/html
 CMD ["/bin/bash", "-c", "sed -i \"s@window.OsClient = '';@window.OsClient = '$OsClient';@;s@window.ApiBase = '';@window.ApiBase = '$ApiBase';@;s@window.ApiCustom = '';@window.ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
 ```
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【publish.sh（windows为publish.bat）】文件
+在同目录创建 `publish.sh`（Windows 为 `publish.bat`）：
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -539,7 +638,7 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker tag microi-os registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 ```
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【default.conf】文件
+在同目录创建 `default.conf`：
 ```json
 server {
 	listen	0.0.0.0:80;
@@ -559,24 +658,30 @@ server {
 	}
 }
 ```
-> 在cmd处执行publish.sh或publish.bat
+在 cmd 中执行 `publish.sh` 或 `publish.bat`。
 
+---
 
-
-### 5、登陆到docker容器镜像服务
+### 5️⃣ 登录 Docker 容器镜像服务
 ```powershell
 docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
 
-## 服务器安装Docker环境
->* 可以通过linux命令安装docker环境，也可以通过宝塔、1Panel等面板工具安装docker环境
+---
+
+## 🛠️ 服务器安装 Docker 环境
+
+可通过 Linux 命令安装，也可通过宝塔、1Panel 等面板工具安装：
 ```powershell
 curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
 
-## Docker常用命令
+---
+
+## 📝 Docker 常用命令
+::: details 展开查看 powershell 代码（42 行）
 ```powershell
 批量清理docker日志文件（第一个符号#要一并执行）
 #!/bin/bash
@@ -621,30 +726,47 @@ docker image prune -a -f
 docker image prune -a -f
 
 ```
+:::
 
-## MySql的一些注意事项
->* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
->* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
->* mysql必须设置：lower_case_table_names = 1
->* 使用宝塔、Navicat还原数据库之前，若旧的数据库不是空的，请先删除数据库、重新创建数据库，然后再进行还原
->* __<font color="red">使用宝塔在ubuntu24上原生安装的mysql8.0，可能会遇到将3306端口修改为其它端口始终无法成功启动，改回3306就可以启动，暂时没找到解决方案</font>__
+---
 
->* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加【table_definition_cache = 2000】（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
+## ⚙️ MySQL 注意事项
 
->* 使用navicat进行数据传输时可能报错【 Incorrect datetime value: '0000-00-00 00:00:00' for column 'CreateTime' at row 】，先数据库查询【SELECT @@GLOBAL.sql_mode;】，然后删除【 NO_ZERO_DATE 和 NO_ZERO_IN_DATE 】，最终配置：
+::: tip 核心要点
+- 建议使用宝塔、1Panel 等服务器面板工具原生安装 MySQL
+- 安装成功后，一定要根据服务器实际配置设置 MySQL 的性能配置
+- **必须设置**：`lower_case_table_names = 1`
+- 还原数据库前，若旧库不为空，请先删除并重新创建数据库
+:::
+
+::: danger Ubuntu 24 + MySQL 8.0
+使用宝塔在 Ubuntu 24 上原生安装的 MySQL 8.0，可能遇到修改 3306 端口后无法启动的问题。
+:::
+
+::: warning 宝塔 MySQL 5.7 性能调整缺陷
+宝塔的 MySQL 5.7 性能调整存在缺陷，例如优化方案选择 48-64GB 时，`table_open_cache=4096` 但 `table_definition_cache` 只有 400，可能出现 `1615 - Prepared statement needs to be re-prepared` 错误。
+
+**解决方案：** 在配置文件中添加 `table_definition_cache = 2000`（可为 `table_open_cache` 值的一半或 75%）。临时方案：`SET GLOBAL table_definition_cache = 2000;`
+:::
+
+::: warning Navicat 数据传输报错
+若报错 `Incorrect datetime value: '0000-00-00 00:00:00'`，先查询 `SELECT @@GLOBAL.sql_mode;`，然后删除 `NO_ZERO_DATE` 和 `NO_ZERO_IN_DATE`：
+:::
 ```json
 [mysqld]
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 ```
 
->* 还原数据库时，可能报错【Dumping data for table [SQL] Process terminated】，需要增加配置
+::: warning 还原数据库报错
+若报错 `Dumping data for table [SQL] Process terminated`，需增加配置：
+:::
 ```json
 [mysqld]
 max_allowed_packet = 512M
 net_buffer_length = 16384
 ```
 
->* 宝塔安装mysql后默认root无法通过外网登录，可以在服务器执行以下命令开放（项目正式上线后为了安全性可以防火墙不开放mysql端口即可）
+**宝塔安装后 root 无法外网登录？** 在服务器执行以下命令开放（项目上线后为了安全性可关闭防火墙 MySQL 端口）：
 ```sql
 mysql -u root -p
 show databases;
@@ -653,7 +775,7 @@ select host,user from user;
 update user set host='%' where user='root';
 flush privileges;
 ```
->* Mysql问题排查常用sql
+**MySQL 问题排查常用 SQL：**
 ```sql
 -- 查看当前连接数和使用情况
 SHOW STATUS LIKE 'Threads_connected';
@@ -667,7 +789,9 @@ WHERE command != 'Sleep';
 SHOW STATUS LIKE 'Max_used_connections';
 ```
 
-## Redis的一些注意事项
+---
+
+## 📦 Redis 注意事项
 ```cmd
 //检查Redis运行状态
 docker exec -it redis容器名称 redis-cli -a 'redis密码' info stats
@@ -681,5 +805,10 @@ redis-cli -p 3306 -a 'redis密码' monitor
 docker exec -it redis容器名称 redis-cli -a 'redis密码' info clients
 ```
 
-## MinIO的一些注意事项
->* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
+---
+
+## 📂 MinIO 注意事项
+
+::: danger 反向代理必须配置
+MinIO 在做反向代理时，必须设置 `proxy_set_header Host $http_host`，否则会导致私有桶只能上传无法下载。阿里云 OSS、CDN、负载均衡默认配置不会有此问题。
+:::

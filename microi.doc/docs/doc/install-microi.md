@@ -1,51 +1,96 @@
-# 一键安装
+# 🚀 一键安装
 
-## 前言
->* 有人提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源 AI 低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
->* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
->* __<font color="red">注意：生产环境并不推荐使用一键安装脚本，而是采用【原生安装mysql + 程序docker编排】的形式安装平台，请参考文档[Docker部署](https://microi.net/doc/docker-run.html)</font>__
->* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
-# CentOS7/Ubuntu一键安装脚本
+> **零门槛部署 Microi吾码全套环境**，自动安装 MySQL + Redis + MinIO + MongoDB + 低代码平台程序
+
+---
+
+## 📖 前言
+
+- 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供一键安装脚本
+- 自动安装 **MySQL + Redis + MinIO + MongoDB + Watchtower + 低代码平台程序**
+
+::: danger ⚠️ 重要提示
+**生产环境不推荐使用一键安装脚本**，建议采用【原生安装 MySQL + 程序 Docker 编排】的形式，请参考 [Docker 部署文档](/doc/docker-run)
+:::
+
+::: warning 💡 内存注意
+脚本安装 MySQL 默认为 4G 内存服务器的性能配置，2G 内存服务器建议下载脚本去掉性能配置再运行。
+:::
+
+---
+
+## 📦 CentOS7 / Ubuntu 一键安装脚本
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
 
-## 注意事项：
->* 执行上面脚本时，会提示【输入 g 以公网IP安装，输入 n 以内网IP安装】，请根据实际情况输入g或n
->* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
->* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
->* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
->* __<font color=red>如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口（否则可能出现navicat能连接数据库，而docker程序无法连接数据库的情况），然后执行#docker restart microi-install-api重启api。ubuntu22.*、centos不存在此问题。</font>__
+---
 
-## 删除所有已安装容器【这将导致所有数据丢失】
-```cmd
+## ⚠️ 注意事项
+
+| 序号 | 说明 |
+| :--: | ---- |
+| 1 | 执行脚本时会提示【输入 `g` 以公网 IP 安装，输入 `n` 以内网 IP 安装】，请根据实际情况输入 |
+| 2 | 若服务器没有 Docker 环境，会提示按 `y` 安装（推荐使用 1Panel、宝塔等面板工具管理服务器并安装 Docker） |
+| 3 | 安装成功后，**必须开放** microi-api 端口、前端传统界面端口、前端 Web 操作系统端口、MinIO 端口 |
+| 4 | 重复执行一键脚本前会提示先删除所有已安装容器，**这将导致所有数据丢失** |
+
+::: danger Ubuntu 24.x 特别注意
+安装成功后服务器**内部防火墙**（非云端防火墙规则）必须开放 MySQL、Redis 的端口（否则可能出现 Navicat 能连接数据库，而 Docker 程序无法连接数据库的情况），然后执行 `docker restart microi-install-api` 重启 API。Ubuntu 22.x、CentOS 不存在此问题。
+:::
+
+---
+
+## 🗑️ 删除所有已安装容器
+
+::: danger 此操作将导致所有数据丢失
+```bash
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+:::
 
-## 安装成功预览图
+---
+
+## 📸 安装成功预览图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
-## 踩过的坑
->* 有些服务器走不了任何docker加速源，因此博主将redis、mysql、mongodb、minio、watchtower全部跟程序一样打包上传到容器镜像服务。相关文章【[记录将服务器上已安装好的mysql、redis等docker容器镜像发布到自己的阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441)】
->* mysql指定表名不区分大小写（lower_case_table_names=1）不支持环境变量，采用特殊办法实现
->* mysql性能处理
->* mysql自动创建数据库、还原数据库、设置root权限
->* mysql、minio等数据映射目录加入随机目录机制
->* 所有环境加入随机端口、随机帐号密码机制
->* 脚本语法上的一些处理
->* 必须让用户手动确认公网IP安装或内网IP安装
->* ubuntu24.*不太兼容mysql5.6、redis6.2，因此脚本升级为了mysql5.7、redis7.4.2
+---
 
-## 安装过程图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+## 🧩 踩过的坑
 
-## 安装结果docker
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+| 问题 | 解决方案 |
+| ---- | ---- |
+| 部分服务器无法使用 Docker 加速源 | 将 Redis、MySQL、MongoDB、MinIO、Watchtower 全部打包上传到[阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441) |
+| MySQL `lower_case_table_names=1` 不支持环境变量 | 采用挂载配置文件方式实现 |
+| MySQL 性能优化 | 通过自定义 `my.cnf` 配置缓冲区参数 |
+| MySQL 自动创建/还原数据库 | 脚本自动下载 SQL 备份并还原 |
+| 数据安全 | MySQL、MinIO 等数据目录加入随机目录机制 |
+| 端口冲突 | 所有环境加入随机端口、随机帐号密码机制 |
+| 用户需手动确认网络模式 | 必须选择公网 IP 或内网 IP 安装 |
+| Ubuntu 24.x 兼容性 | 脚本升级为 MySQL 5.7 + Redis 7.4.2 |
 
-## 脚本代码【有点东西】
->* 目前更新于【2025-04-03 17:18】，后续可能会经常更新
->* 脚本最新地址：[https://gitee.com/ITdos/microi.net/blob/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-centos.sh)
+---
 
+## 🖥️ 安装过程图
+
+![安装过程](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+
+---
+
+## 🐳 安装结果 Docker
+
+![安装结果](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+
+---
+
+## 📝 脚本源码
+
+::: tip 版本信息
+- 更新于 **2025-04-03 17:18**，后续可能会经常更新
+- 脚本最新地址：[Gitee 仓库](https://gitee.com/ITdos/microi.net/blob/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-centos.sh)
+:::
+
+::: details 展开查看 powershell 代码（302 行）
 ```powershell
 #!/bin/bash
 
@@ -350,3 +395,4 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
+:::

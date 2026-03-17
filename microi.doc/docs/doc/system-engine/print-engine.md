@@ -1,6 +1,12 @@
-# 打印引擎
-## 预览图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
+# 🖨️ 打印引擎
+
+> **在线制作打印模板，支持多种打印场景**
+
+---
+
+## 📸 预览图
+
+![打印引擎预览](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
 
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
@@ -31,6 +37,7 @@
 >npm i microi-printengine@latest
 
 >必须是Vue3 + Vite 项目, 任意页面即可集成 ,以下代码是集成demo
+::: details 展开查看 JavaScript 代码（56 行）
 ```javascript
 <template>
   <!-- 打印设计器 -->
@@ -89,6 +96,7 @@ onBeforeUnmount(() => {
 }
 </style>
 ```
+:::
 
 ## iframe模式集成方式
 >这种模式说白了就是百搭,把低代码设计器当成一个在线工具,它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台.假以时日自定义扩展组件有上百个时,完全可以独当一面成为一方霸主,独立产品. 平台集成使用Iframe,把页面设计器嵌入到自己页面中,通过postMessage方式与父页面进行通信,父页面可以获取到设计器生成的页面JSON,也可以把token传给设计器
@@ -114,6 +122,7 @@ methods: {
  }
 ```
 ## Vue3组合式 集成demo
+::: details 展开查看 JavaScript 代码（107 行）
 ```javascript
 <template>
   <div v-loading="loading" class="iframe-container">
@@ -223,4 +232,5 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped></style>
 ```
+:::
 

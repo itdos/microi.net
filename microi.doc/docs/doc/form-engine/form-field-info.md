@@ -1,9 +1,14 @@
-# 表单、字段属性、事件
+# 📋 表单、字段属性、事件
 
-## 表单属性
+> **表单属性与字段属性的各类 V8 事件详解**
 
-### 前端进入表单V8事件
->* 可以做一些默认值处理
+---
+
+## 📄 表单属性
+
+### 前端进入表单 V8 事件
+
+可以做一些默认值处理：
 ```js
 //如果是新增数据
 if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编辑）、View（预览）
@@ -11,8 +16,11 @@ if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编�
 }
 ```
 
-### 前端提交表单前V8事件
->* 可以做一些表单验证，提升用户体验
+---
+
+### 前端提交表单前 V8 事件
+
+可以做一些表单验证，提升用户体验：
 >* __<font color="red">注意：如果直接通过如Postman调用接口的方式来进行增删改，此前端V8事件事件并“不会执行”（后端V8事件会执行）</font>__
 ```js
 //若代码出现return Code为0时，则会在前端阻止表单继续提交
@@ -48,6 +56,7 @@ if(V8.CurrentUser.Level < 999){
 >* 此事件在事务中执行
 >* __<font color="red">注意：如果直接通过Postman调用接口的方式来进行增删改，此V8事件代码“仍会执行”</font>__
 >* __<font color="red">注意：如果是在后端V8事件、接口引擎中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作），但可以通过传入_InvokeType:'Client'实现也执行此事件</font>__
+::: details 展开查看 JavaScript 代码（28 行）
 ```js
 //表单提交类型，可能的值：Insert、Update、Delete
 var submitType = V8.FormSubmitAction;
@@ -78,12 +87,14 @@ if(result && result.Code != 1){
     return result;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
 }
 ```
+:::
 
 
 ### 服务器端表单提交后V8事件
 >* 此事件仍在事务中执行，如果要获取当前表单提交后的数据，需要使用V8.DbTrans对象来获取
 >* __<font color="red">注意：如果直接通过Postman调用接口的方式来进行增删改，此V8事件代码“仍会执行”</font>__
 >* __<font color="red">注意：如果是在后端V8事件、接口引擎中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作），但可以通过传入_InvokeType:'Client'实现也执行此事件</font>__
+::: details 展开查看 JavaScript 代码（33 行）
 ```js
 //若代码出现return，并且未指定Code的值、或Code值不等于1时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
@@ -119,6 +130,7 @@ if(result && result.Code != 1){
     return result;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
 }
 ```
+:::
 
 ## 字段属性
 ### 绑定角色

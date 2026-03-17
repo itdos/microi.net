@@ -179,6 +179,12 @@ namespace Dos.ORM
         /// <returns></returns>
         public SqlSection FromSql(string sql)
         {
+            //2026-03-16：执行SQL前检查连接状态，提前发现MySQL连接断开问题，避免Fatal error
+            if (conn != null && conn.State != ConnectionState.Open)
+            {
+                throw new InvalidOperationException(
+                    $"数据库事务连接已断开（State={conn.State}），无法执行SQL。可能原因：事务持有时间过长导致MySQL服务器主动断开连接，或V8事件执行耗时过长。SQL={sql?.Substring(0, Math.Min(sql?.Length ?? 0, 200))}");
+            }
             return dbSession.FromSql(sql).SetDbTransaction(trans);
         }
 

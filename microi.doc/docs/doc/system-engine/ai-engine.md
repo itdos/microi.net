@@ -1,6 +1,10 @@
-# AI引擎
+# 🤖 AI 引擎
 
-## 用法
+> **在接口引擎中调用 AI 大模型能力**
+
+---
+
+## 💡 用法
 ```javascript
 var option = {
   url : V8.SysConfig.ApiBase + '/api/ai/chat',
