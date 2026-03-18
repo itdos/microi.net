@@ -131,12 +131,12 @@ dataList.Data.forEach((item, index) => {
   //循环导入数据
   var addResult = V8.FormEngine.AddFormData('tableName', item, V8.DbTrans);
   if(addResult.Code != 1){
-    V8.DbTrans.Rollback();//回滚事务
+    //返回错误结果，平台会自动回滚事务（禁止手动调用V8.DbTrans.Rollback()）
     V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
     //写进度
     importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入出现错误：${addResult.Msg}。已回滚！`);
     V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
-    break;
+    return { Code : 0, Msg : addResult.Msg };//平台识别到Code!=1，自动回滚事务
   }
   //写进度（覆盖上一条）
   importStepList[importStepList.length - 1] = DateNow('yyyy-MM-dd HH:mm:ss') + `：已导入【${index+1}】条数据...`;

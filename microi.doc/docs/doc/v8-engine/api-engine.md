@@ -141,8 +141,8 @@ return { Code : 1, Data : [1, 2, 3], Msg : '事务已提交！' };
 //若代码出现return，并且未指定Code的值、或Code值不等于1时，则会自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，事务已回滚！' };
 
-//若代码出现return，并且未指定Code的值，则会自动回滚事务，无需手动执行V8.DbTrans.Rollback()
-V8.DbTrans.Commit();//除非在此手动执行[V8.DbTrans.Commit();]提交事务，此时平台才不会自动回滚事务
+//若代码出现return，并且未指定Code值（平台识别到非{Code:1}结构时自动回滚事务）
+//【注意】禁止手动调用V8.DbTrans.Commit()或V8.DbTrans.Rollback()，事务生命周期由平台统一管理
 return { A : 111, B : 222 };
 
 //支持返回JSON
