@@ -2,7 +2,7 @@
 ## The front and back V8 syntax is consistent, but slightly different
 > * This document is a V8 shared document on the front and back ends, both with Javascript syntax and basically the same usage, but with slight differences.
 > * The second parameter is passed into the V8.DbTrans database transaction object for all table operations performed by the server [V8.FormEngine]
-> * Once the database transaction object is used in the interface engine, V8.DbTrans.Commit() commit or V8.DbTrans.Rollback() rollback must be performed, but not in V8 events (commit or rollback will be performed according to whether V8.Result is false)
+> * **Never call V8.DbTrans.Commit() or V8.DbTrans.Rollback() manually** in V8 events or interface engines. The platform automatically commits when returning `{Code:1}` and automatically rolls back otherwise. The transaction lifecycle is fully managed by the platform.
 > * All functions in V8.FormEngine are single-table operations (except batch operations). For multi-table association queries, see V8.ModuleEngine Usage
 
 ## Front-end V8 asynchronous, synchronous usage
@@ -30,7 +30,7 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 ```javascript
 //同步执行
 //后端V8第二个参数均支持传入V8.DbTrans数据库事务对象
-//注意一旦使用了V8.DbTrans对象，就必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚
+//注意：无需手动执行V8.DbTrans.Commit()或V8.DbTrans.Rollback()，平台会根据return结果自动提交或回滚事务
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : [],
 }, V8.DbTrans);

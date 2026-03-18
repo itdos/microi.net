@@ -174,10 +174,11 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 
 //扩展数据库的事务用法
+//【注意】emptyExTrans 是扮展库自己创建的事务，与 V8.DbTrans 完全独立，需要手动管理生命周期
 var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
 var count = emptyExTrans.FromSql("delete from diy_extend_test where Id='49ec484d-a2cf-47fe-b498-6efb2bf9f99d'").ExecuteNonQuery();
-//emptyExTrans.Commit();//提交事务
-emptyExTrans.Rollback();//回滚事务
+emptyExTrans.Commit();//提交事务
+//emptyExTrans.Rollback();//回滚事务
 emptyExTrans.Close();//释放事务对象
 return { Code : 1, Data : count };
 ```
@@ -188,7 +189,7 @@ return { Code : 1, Data : count };
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-* 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
+* 无需在接口引擎中手动调用【V8.DbTrans.Rollback()】，平台会自动管理事务的提交与回滚（返回Code=1时自动提交，否则自动回滚）。**事务生命周期由平台统一管理，调用V8.DbTrans.Commit()或Rollback()均无效。**
 * 接口引擎示例
 ```javascript
 //操作第一张表，带事务

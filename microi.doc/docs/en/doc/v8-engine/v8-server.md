@@ -164,10 +164,11 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 
 //扩展数据库的事务用法
+//【注意】emptyExTrans 是扮展库自己创建的事务，与 V8.DbTrans 完全独立，需要手动管理生命周期
 var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
 var count = emptyExTrans.FromSql("delete from diy_extend_test where Id='49ec484d-a2cf-47fe-b498-6efb2bf9f99d'").ExecuteNonQuery();
-//emptyExTrans.Commit();//提交事务
-emptyExTrans.Rollback();//回滚事务
+emptyExTrans.Commit();//提交事务
+//emptyExTrans.Rollback();//回滚事务
 emptyExTrans.Close();//释放事务对象
 return { Code : 1, Data : count };
 ```
@@ -178,7 +179,7 @@ return { Code : 1, Data : count };
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-* There is no need to use try catch in the interface engine to catch the exception and execute [V8.DbTrans.Rollback()]. The interface engine will recognize the exception and execute [V8.DbTrans.Rollback()]]
+* There is no need to manually call [V8.DbTrans.Rollback()] in the interface engine. The platform automatically manages transaction commit and rollback (auto-commits when returning Code=1, auto-rolls back otherwise). **Calling V8.DbTrans.Commit() or V8.DbTrans.Rollback() has no effect — transaction lifecycle is fully managed by the platform.**
 * Interface Engine Example
 ```javascript
 //操作第一张表，带事务
