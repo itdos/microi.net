@@ -299,6 +299,11 @@ namespace Microi.net
                         firstList.AddRange(kvp.Value);
                     }
                 }
+                // 根级菜单可能来自多个"空父级"bucket，合并后需重新按 Sort 排序
+                if (firstList.Count > 0)
+                {
+                    firstList = firstList.OrderBy(d => (object)d.Sort).ToList();
+                }
             }
 
             var dataCount = firstList.Count;
