@@ -503,7 +503,9 @@ var DiyCommon = {
         "FormBtns",
         "PageTabs",
         "InTableEditFields",
-        "TableHeaders"
+        "TableHeaders",
+        "CardTitleTagFields",
+        "CardBottomTagFields"
     ],
     ShowVideo: function () {
         var self = this;

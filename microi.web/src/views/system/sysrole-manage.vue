@@ -156,80 +156,23 @@
                                         </span>
                                     </template>
                                 </el-table-column>
-                                <el-table-column label="权限">
+                                <el-table-column label="权限" min-width="360">
                                     <template #default="scope">
-                                        <el-checkbox-group v-model="scope.row.Permission">
-                                            <el-checkbox
-                                                value="Add"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'Add');
-                                                    }
-                                                "
-                                                >{{ $t("Msg.Add") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="Edit"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'Edit');
-                                                    }
-                                                "
-                                                >{{ $t("Msg.Edit") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="Del"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'Del');
-                                                    }
-                                                "
-                                                >{{ $t("Msg.Del") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="Import"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'Import');
-                                                    }
-                                                "
-                                                >{{ $t("Msg.Import") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="Export"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'Export');
-                                                    }
-                                                "
-                                                >{{ $t("Msg.Export") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="NoDetail"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'NoDetail');
-                                                    }
-                                                "
-                                                >无{{ $t("Msg.Detail") }}</el-checkbox
-                                            >
-                                            <el-checkbox
-                                                value="NoSearch"
-                                                @change="
-                                                    (val) => {
-                                                        return BtnChange(val, scope.row, 'NoSearch');
-                                                    }
-                                                "
-                                                >无{{ $t("Msg.Search") }}</el-checkbox
-                                            >
-
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.MoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.ExportMoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.BatchSelectMoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageTabs" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.FormBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                        </el-checkbox-group>
+                                        <div class="permission-checkbox-group">
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Add')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Add')"> {{ $t("Msg.Add") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Edit')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Edit')"> {{ $t("Msg.Edit") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Del')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Del')"> {{ $t("Msg.Del") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Import')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Import')"> {{ $t("Msg.Import") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Export')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Export')"> {{ $t("Msg.Export") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('NoDetail')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'NoDetail')"> 无{{ $t("Msg.Detail") }}</label>
+                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('NoSearch')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'NoSearch')"> 无{{ $t("Msg.Search") }}</label>
+                                            <label v-for="btn in scope.row.MoreBtns" :key="'m-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                            <label v-for="btn in scope.row.ExportMoreBtns" :key="'e-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                            <label v-for="btn in scope.row.BatchSelectMoreBtns" :key="'b-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                            <label v-for="btn in scope.row.PageBtns" :key="'p-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                            <label v-for="btn in scope.row.PageTabs" :key="'t-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                            <label v-for="btn in scope.row.FormBtns" :key="'f-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
+                                        </div>
                                     </template>
                                 </el-table-column>
                             </el-table>
@@ -319,6 +262,32 @@ export default {
             // self.$nextTick(function () {
             //     //self.FastClick.attach(document.querySelector('.layx-window'))
             // })
+        },
+        handlePermChange(checked, row, type) {
+            var self = this;
+            if (checked) {
+                if (!row.Permission.includes(type)) {
+                    row.Permission.push(type);
+                }
+            } else {
+                var idx = row.Permission.indexOf(type);
+                if (idx > -1) {
+                    row.Permission.splice(idx, 1);
+                }
+            }
+            self.BtnChange(checked, row, type);
+        },
+        togglePermission(checked, row, value) {
+            if (checked) {
+                if (!row.Permission.includes(value)) {
+                    row.Permission.push(value);
+                }
+            } else {
+                var idx = row.Permission.indexOf(value);
+                if (idx > -1) {
+                    row.Permission.splice(idx, 1);
+                }
+            }
         },
         BtnChange(val, row, type) {
             var self = this;
@@ -810,6 +779,31 @@ export default {
 .el-table.table-sysmenu-roles {
     .cell {
         white-space: normal;
+    }
+    .permission-checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        align-items: center;
+    }
+    .perm-cb {
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 13px;
+        user-select: none;
+        white-space: nowrap;
+        padding: 2px 6px;
+        border-radius: 3px;
+        transition: background-color 0.15s;
+        &:hover {
+            background-color: #f0f2f5;
+        }
+        input[type="checkbox"] {
+            margin-right: 4px;
+            cursor: pointer;
+            accent-color: var(--el-color-primary, #409eff);
+        }
     }
 }
 #divTzyCourseManage .rowAttachments .el-upload {
