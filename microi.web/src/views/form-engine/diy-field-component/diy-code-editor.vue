@@ -15,6 +15,7 @@
             append-to-body
             draggable
             align-center
+            @closed="onMiniDialogClosed"
         >
             <div class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
                 <div class="monaco-toolbar">
@@ -366,14 +367,6 @@ const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
         // 修复：正确处理空值，null/undefined 转为空字符串，其他转为字符串
         nextValue = (newValue === null || newValue === undefined) ? '' : String(newValue);
     }
-
-    // console.log('[CodeEditor] watch modelValue:', {
-    //     newValue,
-    //     nextValue,
-    //     currentEditorValue: monacoEditor ? monacoEditor.getValue() : 'editor not created',
-    //     isSelfUpdating,
-    //     hasFocus: monacoEditor && monacoEditor.hasTextFocus ? monacoEditor.hasTextFocus() : false
-    // });
 
     // 先更新内部状态
     ModelValue.value = nextValue;
@@ -1391,6 +1384,11 @@ const closeMiniEditor = () => {
     }
     disposeEditor();
     miniEditorVisible.value = false;
+};
+
+// 弹窗关闭后统一清理（处理右上角X按钮等非取消/确定方式关闭的情况）
+const onMiniDialogClosed = () => {
+    disposeEditor();
 };
 
 const saveMiniEditor = () => {
