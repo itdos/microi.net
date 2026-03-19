@@ -361,7 +361,7 @@
                                 <!--如果没有使用模板引擎、也不是默认模板控件-->
                                 <template v-else>
                                     <!--如果是表内编辑-->
-                                    <div v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1"
+                                    <div v-if="SysMenuModel.InTableEdit && IsInTableEditField(field.Id)"
                                         @dblclick.prevent.stop>
                                         <component
                                             v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
@@ -630,7 +630,7 @@
                                             :key="field.Id"
                                             class="item no-br"
                                             :class="{
-                                                'over-hide': !(SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1),
+                                                'over-hide': !(SysMenuModel.InTableEdit && IsInTableEditField(field.Id)),
                                                 'card-first-field': fieldIndex === 0 && TableEnableBatch
                                             }"
                                             :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
@@ -643,7 +643,7 @@
                                                 />
                                             </div>
                                             <!--如果是表内编辑（卡片模式）-->
-                                            <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1 && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
+                                            <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(field.Id) && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
                                                 <div class="card-inline-edit-item" @click.stop>
                                                     <span class="card-inline-edit-label">{{ field.Label }}：</span>
                                                     <div class="card-inline-edit-control">
@@ -1795,6 +1795,28 @@ export default {
         var self = this;
     },
     methods: {
+        /**
+         * 判断某个字段Id是否在 InTableEditFields 中
+         * InTableEditFields 可能是：
+         *   - 字符串（逗号分隔或单个Id）：'aaa,bbb'
+         *   - 纯Id数组：['aaa', 'bbb']
+         *   - 对象数组：[{ Id: 'aaa' }, { Id: 'bbb' }]
+         */
+        IsInTableEditField(fieldId) {
+            const fields = this.SysMenuModel?.InTableEditFields;
+            if (!fields) return false;
+            if (typeof fields === 'string') {
+                return fields.split(',').map(s => s.trim()).indexOf(fieldId) > -1;
+            }
+            if (Array.isArray(fields)) {
+                if (fields.length === 0) return false;
+                if (typeof fields[0] === 'object' && fields[0] !== null) {
+                    return fields.some(f => f.Id === fieldId);
+                }
+                return fields.indexOf(fieldId) > -1;
+            }
+            return false;
+        },
         /**
          * 初始化移动端滚动监听
          */
