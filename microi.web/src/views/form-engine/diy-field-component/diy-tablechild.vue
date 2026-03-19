@@ -16,7 +16,7 @@
         :PrimaryTableFieldName="field.Config.TableChild.PrimaryTableFieldName"
         :TableChildCallbackField="field.Config.TableChildCallbackField"
         :TableChildFormMode="FormMode"
-        :FatherFormModel="FormDiyTableModel"
+        :FatherFormModel="fatherFormModelSnapshot"
         :ParentV8="ParentV8"
         :TableChildData="field.Config.TableChild.Data"
         :SearchAppend="field.Config.TableChild.SearchAppend"
@@ -153,6 +153,15 @@ const emit = defineEmits([
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+
+// 模拟老版本 FormDiyTableModelListen：返回浅拷贝以触发子组件 FatherFormModel watcher
+const fatherFormModelSnapshot = computed(() => {
+    // 支持自定义父级 model（如点击A子表一行数据，更新B子表数据）
+    if (!DiyCommon.IsNull(props.field._ParentFormModel)) {
+        return Object.assign({}, { ...props.field._ParentFormModel });
+    }
+    return Object.assign({}, { ...props.FormDiyTableModel });
+});
 
 // 子表组件实例引用
 const tableChildInstance = ref(null);
