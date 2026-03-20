@@ -86,4 +86,4 @@ unpackage/release/
 # Python 虚拟环境
 .venv/
 
-
+/Microi.VSCode/
