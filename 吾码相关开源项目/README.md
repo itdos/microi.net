@@ -1,15 +1,47 @@
 
-## 源码目录说明
+# Microi 吾码 · 开源项目索引
 
-* microi.web.vue2：PC传统界面100%完整源码（`2018年开始采用vue2重构，至2026年已维护8年，现停止维护`，vue2 + element-ui + webpack + vuex）
-* microi.uniapp.uni-ui：移动端100%完整源码（`由于microi.web已完全兼容移动端，此项目停止维护`，uniapp + uni-ui + vue3）
-* microi.uniapp.tuniao：基于图鸟UI的Microi吾码移动端版，已归档、已停更
-* microi.uniapp.uni-ui：基于uni-ui的Microi吾码移动端版，已归档、已停更
-* microi.uniapp.uview：基于uView的Microi吾码移动端版，已归档、已停更
-* microi.web.qiankun：Microi吾码vue2版本的微服务框架，已归档、已停更
-* microi.webos.build：Microi吾码webos编译打包后的产物，已归档、已停更
-* Microi.gRPC.Server：.NET gRPC服务端，已归档、已停更
-* Microi.gRPC.Client：.NET gRPC客户端，已归档、已停更
-* Microi.gRPC.Java：Java gRPC客户端，已归档、已停更
-* 微信、支付宝在线支付商城UniApp：已归档、已停更
-* 微信、支付宝在线支付H5：已归档、已停更
+> 本目录收录了 Microi 吾码平台历年来的相关开源项目，包含正在维护的项目与已归档的历史版本。
+
+---
+
+## 维护中
+
+| 项目 | 说明 | 技术栈 |
+|------|------|--------|
+| **企业官网UniApp** | Microi 官方企业官网，持续迭代更新中 | UniApp · Vue3 |
+| **microi.web.vue2** | PC 端传统界面 100% 完整源码，2018 年采用 Vue2 重构，历经 8 年维护（2018–2026），现已停止维护，代码完整归档 | Vue2 · Element-UI · Webpack · Vuex |
+
+---
+
+## 已归档
+
+> 以下项目已停止维护，源码以压缩包形式存档，仅供参考与学习。
+
+### 移动端
+
+| 项目 | 说明 |
+|------|------|
+| **microi.uniapp.uni-ui** | 基于 uni-ui 的 Microi 移动端版本（由于 microi.web 已完全兼容移动端，停止维护） |
+| **microi.uniapp.tuniao** | 基于图鸟 UI 的 Microi 移动端版本 |
+| **microi.uniapp.uview** | 基于 uView UI 的 Microi 移动端版本 |
+| **微信、支付宝在线支付商城 UniApp** | 微信 / 支付宝在线支付商城小程序版 |
+| **微信、支付宝在线支付 H5** | 微信 / 支付宝在线支付 H5 版本 |
+| **短视频、图片壁纸 UniApp** | 短视频与图片壁纸展示小程序 |
+
+### PC / Web 端
+
+| 项目 | 说明 |
+|------|------|
+| **microi.web.qiankun** | Microi 吾码 Vue2 版本的微前端（qiankun）框架 |
+| **microi.webos.build** | Microi 吾码 WebOS 编译打包产物 |
+
+### 服务端 / 后端
+
+| 项目 | 说明 |
+|------|------|
+| **Microi.gRPC.Server** | .NET gRPC 服务端示例 |
+| **Microi.gRPC.Client** | .NET gRPC 客户端示例 |
+| **Microi.gRPC.Java** | Java gRPC 客户端示例 |
+| **Microi 后端二次开发 demo** | 基于 Microi 后端的二次开发示例项目 |
+| **Microi.V8.Debug** | V8 引擎调试相关工具 |
