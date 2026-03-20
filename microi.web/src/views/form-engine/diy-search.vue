@@ -30,7 +30,7 @@
                     </div>
                     <el-date-picker
                         v-model="SearchDateTime[field.AsName || field.Name]"
-                        type="datetimerange"
+                        :type="GetDatePickerType(field)"
                         :value-format="GetDateTimeFormat(field)"
                         range-separator="至"
                         start-placeholder="开始日期"
@@ -251,7 +251,7 @@
 .checkbox-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 5px;
 
     :deep(.el-checkbox) {
         margin: 0;
@@ -679,24 +679,41 @@ export default {
         /**
          * 获取日期时间格式
          */
+        /**
+         * 获取日期选择器类型（range模式）
+         */
+        GetDatePickerType(field) {
+            if (!field || !field.Config || !field.Config.DateTimeType) {
+                return "daterange";
+            }
+            const typeMap = {
+                datetime: "datetimerange",
+                date: "daterange",
+                month: "monthrange",
+                year: "daterange",
+                datetime_HHmm: "datetimerange",
+                datetime_HH: "datetimerange",
+            };
+            return typeMap[field.Config.DateTimeType] || "daterange";
+        },
         GetDateTimeFormat(field) {
             if (!field || !field.Config || !field.Config.DateTimeType) {
-                return "yyyy-MM-dd";
+                return "YYYY-MM-DD";
             }
 
             const formatMap = {
-                datetime: "yyyy-MM-dd HH:mm:ss",
-                date: "yyyy-MM-dd",
-                week: "yyyy 第 WW 周",
-                month: "yyyy-MM",
-                year: "yyyy",
-                datetime_HHmm: "yyyy-MM-dd HH:mm",
-                datetime_HH: "yyyy-MM-dd HH",
+                datetime: "YYYY-MM-DD HH:mm:ss",
+                date: "YYYY-MM-DD",
+                week: "YYYY 第 ww 周",
+                month: "YYYY-MM",
+                year: "YYYY",
+                datetime_HHmm: "YYYY-MM-DD HH:mm",
+                datetime_HH: "YYYY-MM-DD HH",
                 "HH:mm": "HH:mm",
                 "HH:mm:ss": "HH:mm:ss"
             };
 
-            return formatMap[field.Config.DateTimeType] || "yyyy-MM-dd";
+            return formatMap[field.Config.DateTimeType] || "YYYY-MM-DD";
         },
 
         /**

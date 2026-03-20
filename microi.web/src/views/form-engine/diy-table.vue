@@ -148,7 +148,7 @@
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
 
-                    <div class="search-input-group" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
+                    <div class="search-input-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
@@ -169,7 +169,7 @@
                         ></DiySearch>
                     </template> -->
                     <!--清除搜索-->
-                    <div class="search-clear-group" v-if="IsPermission('NoSearch')">
+                    <div class="search-clear-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch')">
                         <el-button
                             :icon="RefreshLeft"
                             @click="
@@ -586,7 +586,6 @@
                     <el-col
                         v-for="(item, index) in DiyTableRowList"
                         v-show="!(!diyStore.IsPhoneView && tableLoading)"
-                        @click="DiyTableRowClick(item)"
                         :key="item.Id"
                             :xs="24"
                             :sm="12"
@@ -598,12 +597,12 @@
                                 IsCardFiveCol() ? 'card-col-five' : ''
                             ]"
                         >
-                            <!-- 🔥 性能优化：减少不必要的响应式计算 -->
                             <el-card
-                                class="box-card card-data-animate no-padding"
+                                class="box-card card-data-animate no-padding card-redesign"
                                 :class="{ 'card-selected': TableEnableBatch && isCardSelected(item) }"
-                                :style="SysMenuModel.TableCardImgField ? '' : 'border-top: 5px solid var(--color-primary)'"
+                                @click="CardItemClick(item)"
                             >
+                                <!-- 卡片图片区域 -->
                                 <div 
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
                                 >
@@ -611,9 +610,7 @@
                                         v-if="SysMenuModel.TableCardImgField"
                                         :src="
                                             item[SysMenuModel.TableCardImgField]
-                                                ? GetFileServerUrl(
-                                                    item[SysMenuModel.TableCardImgField]
-                                                )
+                                                ? GetFileServerUrl(item[SysMenuModel.TableCardImgField])
                                                 : bodyBgSvg
                                         "
                                         class="preview"
@@ -624,24 +621,64 @@
                                                 : 'height:100px;width:100%;object-fit:cover;')
                                         "
                                     />
-                                    <div class="body" style="padding-top: 10px; flex: 1;">
-                                        <div
-                                            v-for="(field, fieldIndex) in CardShowDiyFieldList"
-                                            :key="field.Id"
-                                            class="item no-br"
-                                            :class="{
-                                                'over-hide': !(SysMenuModel.InTableEdit && IsInTableEditField(field.Id)),
-                                                'card-first-field': fieldIndex === 0 && TableEnableBatch
-                                            }"
-                                            :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
-                                            style="padding: 5px 10px; font-size: 14px"
-                                        >
-                                            <!-- 批量选择复选框 - 放在第一个字段左侧 -->
-                                            <div v-if="fieldIndex === 0 && TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
-                                                <el-checkbox
-                                                    :model-value="isCardSelected(item)"
-                                                />
+                                    <!-- 卡片内容区域 -->
+                                    <div class="card-body" style="flex: 1;">
+                                        <!-- ====== 第一行：序号 + 标题 + CardTitleTagFields ====== -->
+                                        <div class="card-title-row" v-if="CardShowDiyFieldList.length > 0">
+                                            <!-- 序号 -->
+                                            <span class="card-index-badge">{{ getCardIndex(index) }}</span>
+                                            <!-- 批量选择复选框 -->
+                                            <div v-if="TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
+                                                <el-checkbox :model-value="isCardSelected(item)" />
                                             </div>
+                                            <!-- 标题内容（第一个字段） -->
+                                            <span class="card-title-text">
+                                                <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardShowDiyFieldList[0].Id) && NeedDiyTemplateFieldLst.indexOf(CardShowDiyFieldList[0].Component) === -1">
+                                                    <div class="card-inline-edit-item" @click.stop>
+                                                        <div class="card-inline-edit-control">
+                                                            <component
+                                                                v-model="item[DiyCommon.IsNull(CardShowDiyFieldList[0].AsName) ? CardShowDiyFieldList[0].Name : CardShowDiyFieldList[0].AsName]"
+                                                                :TableInEdit="true"
+                                                                :field="CardShowDiyFieldList[0]"
+                                                                :FormDiyTableModel="item"
+                                                                :FormMode="TableChildFormMode"
+                                                                :TableId="TableId"
+                                                                :TableName="TableName"
+                                                                :DiyConfig="SysMenuModel.DiyConfig"
+                                                                :FieldReadonly="GetFieldIsReadOnly(CardShowDiyFieldList[0])"
+                                                                :DiyTableModel="CurrentDiyTableModel"
+                                                                :DiyFieldList="DiyFieldList"
+                                                                :LoadType="'Table'"
+                                                                @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
+                                                                @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
+                                                                :is="'Diy' + CardShowDiyFieldList[0].Component"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <template v-else-if="isMuban(CardShowDiyFieldList[0], { row: item })">
+                                                    <span v-html="item[CardShowDiyFieldList[0].Name + '_TmpEngineResult']"></span>
+                                                </template>
+                                                <template v-else>
+                                                    {{ GetColValue({ row: item }, CardShowDiyFieldList[0]) }}
+                                                </template>
+                                            </span>
+                                            <!-- CardTitleTagFields 标签 -->
+                                            <div class="card-title-tags" v-if="CardTitleTagFieldList && CardTitleTagFieldList.length > 0">
+                                                <template v-for="tagField in CardTitleTagFieldList" :key="'title-tag-' + tagField.Id">
+                                                    <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
+                                                        <span v-if="isMuban(tagField, { row: item })" v-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                        <el-tag v-else size="small" class="card-title-tag" effect="light">{{ GetColValue({ row: item }, tagField) }}</el-tag>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <!-- ====== 中间行：其余字段 ====== -->
+                                        <div
+                                            v-for="(field, fieldIndex) in CardShowDiyFieldList.slice(1)"
+                                            :key="field.Id"
+                                            class="card-field-row"
+                                        >
                                             <!--如果是表内编辑（卡片模式）-->
                                             <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(field.Id) && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
                                                 <div class="card-inline-edit-item" @click.stop>
@@ -660,139 +697,103 @@
                                                             :DiyTableModel="CurrentDiyTableModel"
                                                             :DiyFieldList="DiyFieldList"
                                                             :LoadType="'Table'"
-                                                            @CallbackRunV8Code="
-                                                                ({ field, thisValue, callback }) => {
-                                                                    return RunV8Code({ field: field, thisValue: thisValue, row: item, callback: callback });
-                                                                }
-                                                            "
-                                                            @CallbakOnKeyup="
-                                                                (event, field) => {
-                                                                    return FieldOnKeyup(event, field, { $index: index, row: item });
-                                                                }
-                                                            "
+                                                            @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
+                                                            @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
                                                             :is="'Diy' + field.Component"
                                                         />
                                                     </div>
                                                 </div>
                                             </template>
                                             <template v-else-if="field.Component == 'Rate'">
-                                                {{ field.Label }}：<el-rate v-model="item[field.AsName || field.Name]" :disabled="true" />
+                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <el-rate v-model="item[field.AsName || field.Name]" :disabled="true" />
                                             </template>
-                                            <!--如果不是表内编辑（卡片模式）-->
+                                            <!-- V8TmpEngineTable 模板引擎 -->
+                                            <template v-else-if="isMuban(field, { row: item })">
+                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <span class="card-field-value" v-html="item[field.Name + '_TmpEngineResult']"></span>
+                                            </template>
+                                            <!--普通字段-->
                                             <template v-else>
-                                                {{ field.Label }}：{{ GetColValue({ row: item }, field) }}
+                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <span class="card-field-value">{{ GetColValue({ row: item }, field) }}</span>
                                             </template>
+                                        </div>
+                                        <!-- ====== 底部行：CardBottomTagFields + 创建时间/更新时间 ====== -->
+                                        <div class="card-bottom-row">
+                                            <div class="card-bottom-tags">
+                                                <template v-if="CardBottomTagFieldList && CardBottomTagFieldList.length > 0">
+                                                    <template v-for="tagField in CardBottomTagFieldList" :key="'bottom-tag-' + tagField.Id">
+                                                        <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
+                                                            <span v-if="isMuban(tagField, { row: item })" v-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <el-tag v-else size="small" class="card-bottom-tag" effect="plain" type="info">{{ GetColValue({ row: item }, tagField) }}</el-tag>
+                                                        </template>
+                                                    </template>
+                                                </template>
+                                                <template v-else>
+                                                    <span class="card-update-time" v-if="item.UpdateTime">更新 {{ formatCardTime(item.UpdateTime) }}</span>
+                                                </template>
+                                            </div>
+                                            <span class="card-create-time" v-if="item.CreateTime">创建 {{ formatCardTime(item.CreateTime) }}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div
-                                    class="bottom"
-                                    style="
-                                        text-align: right;
-                                        padding: 10px;
-                                        display: flex;
-                                        flex-wrap: wrap;
-                                        text-align: right;
-                                        justify-content: flex-end;
-                                        align-content: flex-end;
-                                        gap: 5px;
-                                    "
-                                >
+                                <!-- ====== 操作按钮区域 ====== -->
+                                <div class="card-actions" @click.stop>
                                     <el-button
                                         v-for="(btn, btnIndex) in item._RowMoreBtnsOut"
-                                        :key="
-                                            TypeFieldName +
-                                            'more_btn_showrowtrue_' +
-                                            item.Id +
-                                            btnIndex
-                                        "
+                                        :key="TypeFieldName + 'card_btn_out_' + item.Id + btnIndex"
                                         v-show="btn.IsVisible && !TableChildField.Readonly"
                                         :type="GetMoreBtnStyle(btn)"
-                                        class="row-more-btns-out"
+                                        class="card-action-btn"
                                         :loading="BtnV8Loading"
                                         @click.stop="RunMoreBtn(btn, item)"
-                                        style=""
                                         size="small"
+                                        round
                                     >
-                                        <fa-icon
-                                            :icon="btn.Icon || 'fa-solid fa-file-code'"
-                                        />
+                                        <fa-icon :icon="btn.Icon || 'fa-solid fa-file-code'" />
                                         {{ btn.Name }}
                                     </el-button>
-                                    <!-- </view> -->
                                     <el-button
-                                        v-if="IsPermission('NoDetail')"
-                                        icon="Tickets"
-                                        class="marginRight10"
-                                        @click="OpenDetail(item, 'View')"
+                                        v-if="_LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleEdit"
+                                        class="card-action-btn"
+                                        @click.stop="OpenDetail(item, 'Edit')"
                                         size="small"
+                                        round
+                                        type="primary"
+                                        plain
                                     >
-                                        {{ $t('Msg.Detail') }}
+                                        <el-icon><Edit /></el-icon>
+                                        {{ $t('Msg.Edit') }}
                                     </el-button>
-                                    <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
+                                    <template v-if="item._RowMoreBtnsIn && item._RowMoreBtnsIn.length > 0">
+                                        <el-button
+                                            v-for="(btn, btnIndex) in item._RowMoreBtnsIn"
+                                            :key="TypeFieldName + 'card_btn_in_' + item.Id + btnIndex"
+                                            v-show="btn.IsVisible && !TableChildField.Readonly"
+                                            class="card-action-btn"
+                                            @click.stop="RunMoreBtn(btn, item)"
+                                            size="small"
+                                            round
+                                            plain
+                                        >
+                                            <fa-icon :icon="!btn.Icon ? 'far fa-check-circle' : btn.Icon" class="mr-1" />
+                                            {{ btn.Name }}
+                                        </el-button>
+                                    </template>
+                                    <!-- 更多操作（三点菜单） -->
                                     <el-dropdown
-                                        class="table-row-more-btn"
-                                        v-if="
-                                            TableChildFormMode != 'View' &&
-                                            !TableChildField.Readonly
-                                        "
+                                        v-if="_LimitDel && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleDel"
                                         trigger="click"
-                                        size="small"
+                                        @click.stop
                                     >
-                                        <el-button size="small">
-                                            {{ $t('Msg.More')
-                                            }}<el-icon class="el-icon--right"
-                                                ><arrow-down
-                                            /></el-icon>
+                                        <el-button class="card-action-btn card-action-btn-more" size="small" round plain @click.stop>
+                                            <el-icon><MoreFilled /></el-icon>
                                         </el-button>
                                         <template #dropdown>
-                                            <el-dropdown-menu :class="(diyStore.IsPhoneView ? 'phone-table-more-btn' : '') + ' table-more-btn'">
-                                                <el-dropdown-item
-                                                    v-if="
-                                                        LimitEdit() && TableChildFormMode != 'View'
-                                                    "
-                                                    icon="Edit"
-                                                    @click="OpenDetail(item, 'Edit')"
-                                                >
-                                                    {{ $t('Msg.Edit') }}
-                                                </el-dropdown-item>
-                                                <template v-if="item._RowMoreBtnsIn.length > 0">
-                                                    <template
-                                                        v-for="(
-                                                            btn, btnIndex
-                                                        ) in item._RowMoreBtnsIn"
-                                                    >
-                                                        <el-dropdown-item
-                                                            v-if="btn.IsVisible"
-                                                            :key="
-                                                                TypeFieldName +
-                                                                'more_btn_' +
-                                                                item.Id +
-                                                                btnIndex
-                                                            "
-                                                            @click="RunMoreBtn(btn, item)"
-                                                        >
-                                                            <fa-icon
-                                                                :icon="
-                                                                    !btn.Icon
-                                                                        ? 'far fa-check-circle'
-                                                                        : btn.Icon
-                                                                "
-                                                                :class="'more-btn mr-1'"
-                                                            />
-                                                            {{ btn.Name }}
-                                                        </el-dropdown-item>
-                                                    </template>
-                                                </template>
-
-                                                <el-dropdown-item
-                                                    v-if="
-                                                        LimitDel() && TableChildFormMode != 'View'
-                                                    "
-                                                    icon="Delete"
-                                                    divided
-                                                    @click="DelDiyTableRow(item)"
-                                                >
+                                            <el-dropdown-menu>
+                                                <el-dropdown-item @click="DelDiyTableRow(item)" style="color: #f56c6c;">
+                                                    <el-icon><Delete /></el-icon>
                                                     {{ $t('Msg.Delete') }}
                                                 </el-dropdown-item>
                                             </el-dropdown-menu>
@@ -971,6 +972,12 @@
             class="mobile-search-drawer"
             :title="$t('Msg.Search')"
         >
+            <!-- 移动端关键词搜索 -->
+            <div class="mobile-keyword-search" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" style="margin-bottom: 12px;">
+                <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" clearable @keyup.enter="GetDiyTableRow({ _PageIndex: 1 }); showMobileSearch = false;">
+                    <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 }); showMobileSearch = false;"></el-button></template>
+                </el-input>
+            </div>
             <DiySearch
                 v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                 :ref="'refDiySearchMobile'"
@@ -1235,6 +1242,44 @@ export default {
             }
             // 回退：使用ShowDiyFieldList前4个字段
             return self.ShowDiyFieldList ? self.ShowDiyFieldList.slice(0, 4) : [];
+        },
+        // 卡片标题右侧Tag字段列表
+        CardTitleTagFieldList() {
+            var self = this;
+            var tagFields = self.SysMenuModel.CardTitleTagFields;
+            if (!tagFields || !Array.isArray(tagFields) || tagFields.length === 0 || !self.DiyFieldList || self.DiyFieldList.length === 0) return [];
+            var result = [];
+            tagFields.forEach(function (element) {
+                var found = self.DiyFieldList.find(function (item) {
+                    return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
+                });
+                if (found && !self.DiyCommon.IsNull(found.Id)) {
+                    if (element && element.AsName) {
+                        found = Object.assign({}, found, { AsName: element.AsName });
+                    }
+                    result.push(found);
+                }
+            });
+            return result;
+        },
+        // 卡片底部左侧Tag字段列表
+        CardBottomTagFieldList() {
+            var self = this;
+            var tagFields = self.SysMenuModel.CardBottomTagFields;
+            if (!tagFields || !Array.isArray(tagFields) || tagFields.length === 0 || !self.DiyFieldList || self.DiyFieldList.length === 0) return [];
+            var result = [];
+            tagFields.forEach(function (element) {
+                var found = self.DiyFieldList.find(function (item) {
+                    return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
+                });
+                if (found && !self.DiyCommon.IsNull(found.Id)) {
+                    if (element && element.AsName) {
+                        found = Object.assign({}, found, { AsName: element.AsName });
+                    }
+                    result.push(found);
+                }
+            });
+            return result;
         },
         // 卡片全选状态
         cardSelectAll: {
@@ -2061,6 +2106,33 @@ export default {
             }
         },
         // ========== 性能优化V3 END ==========
+        
+        // ========== 卡片模式辅助方法 ==========
+        getCardIndex(index) {
+            var self = this;
+            // 考虑分页和移动端滚动加载的序号
+            if (self.diyStore.IsPhoneView) {
+                return (self._mobileWindowStart || 0) + index + 1;
+            }
+            return (self.DiyTableRowPageIndex - 1) * self.DiyTableRowPageSize + index + 1;
+        },
+        formatCardTime(timeStr) {
+            if (!timeStr) return '';
+            // 支持常见的时间格式，截取前16位显示 YYYY-MM-DD HH:mm
+            var str = String(timeStr);
+            if (str.length >= 16) return str.substring(0, 16);
+            if (str.length >= 10) return str.substring(0, 10);
+            return str;
+        },
+        // 卡片点击：先执行原有行点击逻辑，再打开详情
+        CardItemClick(item) {
+            var self = this;
+            self.DiyTableRowClick(item);
+            if (self.IsPermission('NoDetail')) {
+                self.OpenDetail(item, 'View');
+            }
+        },
+        // ========== 卡片模式辅助方法 END ==========
         
         GetColWidth(field, fieldIndex) {
             var self = this;
@@ -4891,6 +4963,15 @@ export default {
 
                         // 性能优化：找出需要模板引擎处理的字段
                         var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
+                        // 卡片模式下，CardTitleTagFields/CardBottomTagFields中的V8TmpEngineTable字段也需处理
+                        if (self.TableDisplayMode === 'Card') {
+                            var extraTagFields = [].concat(self.CardTitleTagFieldList || [], self.CardBottomTagFieldList || [], self.CardShowDiyFieldList || []);
+                            extraTagFields.forEach(function(f) {
+                                if (f && !self.DiyCommon.IsNull(f.V8TmpEngineTable) && !templateEngineFields.some(function(e) { return e.Id === f.Id; })) {
+                                    templateEngineFields.push(f);
+                                }
+                            });
+                        }
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
                         for (var i = 0; i < result.Data.length; i++) {
