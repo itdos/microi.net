@@ -366,13 +366,12 @@ namespace Microi.net.Api
                 }
 
                 var id = (string)getResult.Data.Id;
-                var encodedCode = V8Base64.StringToBase64(apiV8Code ?? "");
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
                 {
                     OsClient = osClient,
                     Id = id,
-                    ApiV8Code = encodedCode,
+                    ApiV8Code = apiV8Code ?? "",
                     UpdateTime = DateTime.Now
                 });
 
@@ -393,6 +392,97 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 return Ok(new DosResult(0, null, "更新接口引擎代码失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 新增接口引擎（VS Code 本地创建）
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> CreateApiEngine([FromBody] JObject param)
+        {
+            var (ok, msg, currentToken) = await CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+
+            var osClient = param["OsClient"].Val<string>();
+            var apiName = param["ApiName"].Val<string>();
+            var apiEngineKey = param["ApiEngineKey"].Val<string>();
+            var apiAddress = param["ApiAddress"].Val<string>();
+            var apiRemark = param["ApiRemark"].Val<string>();
+            var lockVal = param["Lock"].Val<int>();
+            var allowAnonymous = param["AllowAnonymous"].Val<int>();
+            var isEnable = param["IsEnable"]?.Val<int>() ?? 1;
+            var category = param["Category"].Val<string>();
+
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                osClient = currentToken.OsClient ?? ConfigHelper.GetAppSettings("OsClient");
+            }
+
+            if (apiName.DosIsNullOrWhiteSpace())
+            {
+                return Ok(new DosResult(0, null, "ApiName 不能为空"));
+            }
+            if (apiEngineKey.DosIsNullOrWhiteSpace())
+            {
+                return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            }
+
+            try
+            {
+                // 检查 ApiEngineKey 是否已存在
+                var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                {
+                    OsClient = osClient,
+                    _Where = new[] {
+                        new { Name = "ApiEngineKey", Value = apiEngineKey, Type = "=" },
+                        new { Name = "IsDeleted", Value = "0", Type = "=" }
+                    }
+                });
+                if (existResult.Code == 1 && existResult.Data != null)
+                {
+                    return Ok(new DosResult(0, null, $"ApiEngineKey [{apiEngineKey}] 已存在"));
+                }
+
+                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
+                {
+                    OsClient = osClient,
+                    ApiName = apiName,
+                    ApiEngineKey = apiEngineKey,
+                    ApiAddress = apiAddress ?? "",
+                    ApiRemark = apiRemark ?? "",
+                    Lock = lockVal,
+                    AllowAnonymous = allowAnonymous,
+                    IsEnable = isEnable,
+                    Category = category ?? "未分类",
+                    ApiV8Code = "",
+                    ApiRole = "[]",
+                    EnableLog = 0,
+                    StopHttp = 0,
+                    Timeout = 600,
+                    MaxStatements = 100000000,
+                    LimitMemory = 2048,
+                    LimitRecursion = 10000,
+                    Files = "[]",
+                    IsDeleted = 0,
+                    UpdateTime = DateTime.Now
+                });
+
+                if (addResult.Code == 1)
+                {
+                    return Ok(new DosResult(1, new
+                    {
+                        Message = $"接口引擎 [{apiEngineKey}] 创建成功",
+                        ApiEngineKey = apiEngineKey,
+                        Category = category ?? "未分类"
+                    }));
+                }
+
+                return Ok(addResult);
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "创建接口引擎失败：" + ex.Message));
             }
         }
 
@@ -767,14 +857,13 @@ namespace Microi.net.Api
                 }
 
                 var id = (string)getResult.Data.Id;
-                var encodedCode = V8Base64.StringToBase64(v8Code ?? "");
 
                 // 动态构建更新参数
                 var updateParam = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["Id"] = id,
-                    [eventType] = encodedCode
+                    [eventType] = v8Code ?? ""
                 };
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("Diy_Table", updateParam);
