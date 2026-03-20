@@ -70,7 +70,17 @@ const tabbarItems = [
 ];
 
 // 记录最后一次主动点击的 tab，用于从工作台跳转到子页面时保持高亮
-const lastClickedTab = ref('home');
+// 根据初始路由推断默认值：大多数数据列表页从工作台进入
+const getInitialTab = () => {
+    const path = route.path;
+    if (path.includes('/mobile/workspace')) return 'workspace';
+    if (path.includes('/mobile/message') || path.includes('/mobile/chat')) return 'message';
+    if (path.includes('/mobile/profile')) return 'mine';
+    if (path.includes('/mobile/home') || path === '/') return 'home';
+    // 不属于任何 tab 直属页面（如数据列表页），默认为工作台
+    return 'workspace';
+};
+const lastClickedTab = ref(getInitialTab());
 
 const activeTab = computed(() => {
     const currentPath = route.path;

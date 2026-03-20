@@ -26,16 +26,37 @@
 
       <!-- 小程序授权登录（默认显示，仅支持授权登录的平台显示） -->
       <view class="auth-section" v-if="!showAccountLogin && hasAuthLogin">
-        <button
-          class="mp-login-btn"
-          :loading="wxLoginLoading"
-          @tap="handleAuthLogin"
-        >
-          <text class="mp-login-icon">🔐</text>
-          <text>{{ t('login.authLogin') }}</text>
-        </button>
+        <!-- 手机号授权按钮（新用户未绑定时显示） -->
+        <template v-if="showPhoneAuth">
+          <text class="phone-auth-tip">该微信号尚未绑定账号，请授权手机号完成注册</text>
+          <button
+            class="mp-login-btn phone-auth-btn"
+            open-type="getPhoneNumber"
+            :loading="phoneAuthLoading"
+            @getphonenumber="handleGetPhoneNumber"
+          >
+            <text class="mp-login-icon">📱</text>
+            <text>授权手机号登录</text>
+          </button>
+          <view class="switch-login" @tap="showPhoneAuth = false">
+            <text class="arrow-icon">←</text>
+            <text>返回</text>
+          </view>
+        </template>
 
-        <view class="switch-login" @tap="showAccountLogin = true">
+        <!-- 默认授权登录按钮 -->
+        <template v-else>
+          <button
+            class="mp-login-btn"
+            :loading="wxLoginLoading"
+            @tap="handleAuthLogin"
+          >
+            <text class="mp-login-icon">🔐</text>
+            <text>{{ t('login.authLogin') }}</text>
+          </button>
+        </template>
+
+        <view class="switch-login" v-if="!showPhoneAuth" @tap="showAccountLogin = true">
           <text>{{ t('login.accountLogin') }}</text>
           <text class="arrow-icon">→</text>
         </view>
@@ -185,6 +206,10 @@ export default {
       accountLoginLoading: false,
       // 是否支持平台授权登录
       hasAuthLogin: supportsAuthLogin(),
+      // 手机号授权（微信小程序新用户绑定）
+      showPhoneAuth: false,
+      cachedLoginCode: '',
+      phoneAuthLoading: false,
       // 隐私协议
       privacyChecked: false,
       currentYear: new Date().getFullYear(),
@@ -342,6 +367,8 @@ export default {
 
     /**
      * 平台授权登录（跨平台：微信/支付宝/飞书/抖音等）
+     * 流程：先用 uni.login() 的 LoginCode 尝试 openid 登录
+     *       若用户未绑定，则弹出手机号授权按钮进行注册绑定
      */
     async handleAuthLogin() {
       if (!this.checkPrivacy()) return
@@ -355,7 +382,7 @@ export default {
 
       this.wxLoginLoading = true
       try {
-        // 1. 调用平台登录获取 code
+        // 1. 调用平台登录获取 code（用于 jscode2session 换 openid）
         let loginRes
         try {
           loginRes = await uni.login({ provider })
@@ -372,24 +399,24 @@ export default {
           return
         }
 
-        const code = loginRes.code
+        const loginCode = loginRes.code
+        this.cachedLoginCode = loginCode
 
-        // 2. 将 code 发送给对应平台的后端接口换取 Token
+        // 2. 用 LoginCode 尝试 openid 登录（不传 Code，后端只做 openid 查找）
         const authApi = getAuthLoginApi(appConfig)
         const result = await post(authApi, {
-          Code: code,
+          LoginCode: loginCode,
           OsClient: appConfig.osClient
         }, false)
 
         if (result.Code === 1 && result.Data) {
-          // Token 已由 request.js 自动从响应头提取并保存
+          // 已绑定用户，直接登录成功
           const token = getToken()
           if (token) {
             setUser(result.Data)
             this.showLoginSuccess(result.Data)
             this.navigateToWebview()
           } else {
-            // 兜底：尝试从响应体提取
             const bodyToken = result.Data.Token || result.Data.token
             if (bodyToken) {
               setToken(bodyToken)
@@ -403,16 +430,9 @@ export default {
           }
         } else {
           const msg = result.Msg || this.t('login.loginFailed')
-          // 如果后端提示未绑定，则切换到账号密码登录
-          if (result.Code === 1001 || msg.includes('未绑定') || msg.includes('未注册')) {
-            uni.showModal({
-              title: '提示',
-              content: this.t('login.unboundAuth'),
-              showCancel: false,
-              success: () => {
-                this.showAccountLogin = true
-              }
-            })
+          // 未绑定帐号，显示手机号授权按钮进行注册绑定
+          if (msg.includes('未绑定') || msg.includes('未注册') || result.Code === 1001) {
+            this.showPhoneAuth = true
           } else {
             uni.showToast({ title: msg, icon: 'none', duration: 2500 })
           }
@@ -422,6 +442,72 @@ export default {
         uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
       } finally {
         this.wxLoginLoading = false
+      }
+    },
+
+    /**
+     * 微信手机号授权回调（新用户注册绑定）
+     * 通过 <button open-type="getPhoneNumber"> 触发
+     */
+    async handleGetPhoneNumber(e) {
+      if (e.detail.errMsg && !e.detail.errMsg.includes('ok')) {
+        uni.showToast({ title: '您已取消手机号授权', icon: 'none' })
+        return
+      }
+      const phoneCode = e.detail.code
+      if (!phoneCode) {
+        uni.showToast({ title: '获取手机号授权码失败', icon: 'none' })
+        return
+      }
+
+      this.phoneAuthLoading = true
+      try {
+        // 如果 cachedLoginCode 过期，重新获取
+        let loginCode = this.cachedLoginCode
+        if (!loginCode) {
+          const provider = getLoginProvider()
+          const loginRes = await uni.login({ provider })
+          if (loginRes && loginRes.code) {
+            loginCode = loginRes.code
+            this.cachedLoginCode = loginCode
+          }
+        }
+
+        const authApi = getAuthLoginApi(appConfig)
+        const result = await post(authApi, {
+          LoginCode: loginCode,
+          Code: phoneCode,
+          OsClient: appConfig.osClient
+        }, false)
+
+        if (result.Code === 1 && result.Data) {
+          const token = getToken()
+          if (token) {
+            setUser(result.Data)
+            this.showLoginSuccess(result.Data)
+            this.navigateToWebview()
+          } else {
+            const bodyToken = result.Data.Token || result.Data.token
+            if (bodyToken) {
+              setToken(bodyToken)
+              setUser(result.Data)
+              this.showLoginSuccess(result.Data)
+              this.navigateToWebview()
+            } else {
+              uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
+              this.showAccountLogin = true
+            }
+          }
+          this.showPhoneAuth = false
+        } else {
+          const msg = result.Msg || this.t('login.loginFailedMsg')
+          uni.showToast({ title: msg, icon: 'none', duration: 2500 })
+        }
+      } catch (e) {
+        console.error('手机号授权登录异常:', e)
+        uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' })
+      } finally {
+        this.phoneAuthLoading = false
       }
     },
 
@@ -752,6 +838,19 @@ export default {
     font-size: 36rpx;
     margin-right: 12rpx;
   }
+}
+
+.phone-auth-tip {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  margin-bottom: 32rpx;
+  line-height: 1.6;
+}
+
+.phone-auth-btn {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%) !important;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.4) !important;
 }
 
 .switch-login {

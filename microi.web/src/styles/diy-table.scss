@@ -826,14 +826,13 @@
     // PC端卡片容器 - 默认样式
     .card-wrapper-desktop {
         box-sizing: border-box;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         
         .box-card {
             height: 100%;
-            border-radius: 4px;
-            // border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
         }
     }
     
@@ -858,12 +857,11 @@
         }
         
         .box-card {
-            border-radius: 4px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06) !important;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             background: #fff;
-            // border: 1px solid rgba(0, 0, 0, 0.04);
             margin-left: 10px;
             margin-right: 10px;
             
@@ -876,51 +874,6 @@
                 border-radius: 0;
                 object-fit: cover;
                 height: 160px;
-            }
-            
-            .body {
-                padding: 16px !important;
-                
-                .item {
-                    padding: 0 !important;
-                    font-size: 14px !important;
-                    line-height: 1.6;
-                    color: #666;
-                    display: flex;
-                    word-break: break-all;
-                    align-items: center;
-                    
-                    &:first-child {
-                        font-size: 16px !important;
-                        font-weight: 600 !important;
-                        color: #333;
-                        margin-bottom: 8px;
-                        line-height: 1.4;
-                    }
-                    
-                    &:not(:first-child) {
-                        border-bottom: 1px solid #f5f5f5;
-                        padding-bottom: 0px !important;
-                        
-                        &:last-child {
-                            border-bottom: none;
-                        }
-                    }
-                }
-            }
-            
-            .bottom {
-                padding: 5px 5px !important;
-                border-top: 1px solid #f0f0f0;
-                background: linear-gradient(to bottom, #fafafa 0%, #f5f5f5 100%);
-                
-                .el-button {
-                    height: 36px;
-                    padding: 0 16px;
-                    font-size: 14px;
-                    border-radius: 8px;
-                    font-weight: 500;
-                }
             }
         }
     }
@@ -987,19 +940,17 @@
 .card-content-horizontal {
     display: flex;
     flex-direction: row;
-    align-items: center;
+    align-items: stretch;
     
     .preview {
-        // width: 120px;
-        // min-width: 120px;
         height: auto;
         max-height: 100%;
         object-fit: cover;
         flex-shrink: 0;
-        border-radius: 4px 0 0 4px;
+        border-radius: 12px 0 0 0;
     }
     
-    .body {
+    .card-body {
         flex: 1;
         display: flex;
         flex-direction: column;
@@ -1030,19 +981,249 @@
 /* 卡片选中状态 */
 .box-card.card-selected {
     border: 2px solid var(--el-color-primary) !important;
-    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.35) !important;
+    box-shadow: 0 6px 20px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.35) !important;
     transform: translateY(-3px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 卡片第一个字段 - 带复选框时使用flex布局 */
-.card-first-field {
-    display: flex !important;
-    align-items: center;
-    gap: 6px;
+/* ========== 新版卡片样式 card-redesign ========== */
+.box-card.card-redesign {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    
+    :deep(.el-card__body) {
+        padding: 0;
+    }
 }
 
-/* 卡片复选框容器 - 第一个字段左侧 */
+.box-card.card-data-animate {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: visible;
+    
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.15),
+                    0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+}
+
+/* 卡片内容区域 */
+.card-body {
+    padding: 14px 16px 6px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* 第一行：序号 + 标题 + Tag */
+.card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f2f5;
+    margin-bottom: 6px;
+}
+
+.card-index-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--el-color-primary, #409eff) 0%, var(--el-color-primary-light-3, #79bbff) 100%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.3);
+}
+
+.card-title-text {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a2e;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-title-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    max-width: 50%;
+    justify-content: flex-end;
+}
+
+.card-title-tag {
+    border-radius: 6px;
+    font-size: 11px;
+    height: 22px;
+    line-height: 22px;
+    padding: 0 8px;
+    border: none;
+    background: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.1);
+    color: var(--el-color-primary, #409eff);
+    font-weight: 500;
+}
+
+.card-tag-html {
+    display: inline-flex;
+    align-items: center;
+    
+    :deep(.el-tag) {
+        border-radius: 6px;
+        font-size: 11px;
+        height: 22px;
+        line-height: 22px;
+    }
+}
+
+/* 字段行 */
+.card-field-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    border-bottom: 1px dashed #f5f5f5;
+    
+    &:last-of-type {
+        border-bottom: none;
+    }
+}
+
+.card-field-label {
+    color: #8c8c8c;
+    flex-shrink: 0;
+    margin-right: 8px;
+    font-size: 12px;
+    
+    &::after {
+        content: '：';
+    }
+}
+
+.card-field-value {
+    color: #333;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400;
+    word-break: break-all;
+    
+    :deep(img) {
+        max-width: 100%;
+        height: auto;
+    }
+}
+
+/* 底部行：Tag + 创建时间 */
+.card-bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0 4px 0;
+    margin-top: 4px;
+    border-top: 1px solid #f0f2f5;
+    min-height: 28px;
+}
+
+.card-bottom-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex: 1;
+    overflow: hidden;
+}
+
+.card-bottom-tag {
+    border-radius: 4px;
+    font-size: 11px;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 6px;
+    background: #f5f7fa;
+    border-color: #e4e7ed;
+    color: #606266;
+}
+
+.card-create-time {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: #bfbfbf;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.card-update-time {
+    font-size: 11px;
+    color: #bfbfbf;
+    white-space: nowrap;
+}
+
+/* 操作按钮区域 */
+.card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: right;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 16px 12px 16px;
+    border-top: 1px solid #f0f2f5;
+    background: linear-gradient(to bottom, #fafbfc 0%, #f5f6f8 100%);
+}
+
+.card-action-btn {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 15px;
+    transition: all 0.2s ease;
+    
+    &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    &:active {
+        transform: translateY(0);
+    }
+    
+    .el-icon, svg {
+        margin-right: 4px;
+        font-size: 12px;
+    }
+}
+
+.card-action-btn-more {
+    padding: 0 8px;
+    min-width: 30px;
+    .el-icon {
+        margin-right: 0;
+    }
+}
+
+.card-action-btn-danger {
+    &:hover {
+        box-shadow: 0 3px 8px rgba(245, 108, 108, 0.3);
+    }
+}
+
+/* 卡片复选框容器 */
 .card-checkbox-wrapper {
     flex-shrink: 0;
     cursor: pointer;
@@ -1091,18 +1272,6 @@
     }
 }
 
-/* 卡片容器添加相对定位 */
-.box-card.card-data-animate {
-    position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: visible;
-    
-    &:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    }
-}
-
 /* 卡片模式表内编辑样式 */
 .card-inline-edit-item {
     display: flex;
@@ -1142,6 +1311,54 @@
 
         :deep(.el-select .el-input__inner) {
             height: 28px;
+        }
+    }
+}
+
+/* 移动端卡片适配 */
+@media screen and (max-width: 768px) {
+    .card-body {
+        padding: 12px 14px 6px 14px;
+    }
+    
+    .card-title-row {
+        padding-bottom: 8px;
+    }
+    
+    .card-title-text {
+        font-size: 15px;
+    }
+    
+    .card-field-row {
+        padding: 5px 0;
+    }
+    
+    .card-actions {
+        padding: 8px 14px 10px 14px;
+        gap: 6px;
+    }
+    
+    .card-action-btn {
+        height: 32px;
+        padding: 0 12px;
+        font-size: 12px;
+    }
+    
+    .card-index-badge {
+        min-width: 22px;
+        height: 22px;
+        font-size: 11px;
+    }
+}
+
+/* PC端卡片样式 */
+.card-wrapper-desktop {
+    .box-card.card-redesign {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        
+        &:hover {
+            box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.12),
+                        0 4px 12px rgba(0, 0, 0, 0.04);
         }
     }
 }
