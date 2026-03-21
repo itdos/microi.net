@@ -1,6 +1,303 @@
-# 🤖 AI 代写接口引擎
+# 🤖 AI 编程全指南
 
-> **使用 AI 快速学习 V8 接口引擎用法及数据库架构，直接生成接口引擎代码，准确率高达 99%**
+> **在线 + 本地双模式 AI 编程，让 AI 充分了解你的 V8 API 与数据库结构，接口引擎代码生成准确率高达 99%**
+
+---
+
+## 🎯 为什么说 Microi吾码做到了真正的 AI + 低代码？
+
+传统低代码的"AI 能力"停留在建表、建表单的表层，而 Microi吾码选择了一条更本质的路径：
+
+**V8 接口引擎 = 标准 JavaScript 后端代码**，AI 最擅长的就是写代码。
+
+- 接口引擎代码就是标准 JavaScript，AI 可以直接生成且正确率极高
+- 将数据库表结构、字段含义、菜单关系一键喂给 AI，AI 就能精准理解你的业务数据
+- **在线 AI 编程**：浏览器中用 DeepSeek / ChatGPT / Kimi 等工具写代码，复制粘贴到平台
+- **本地 AI 编程**：VS Code + GitHub Copilot / Claude Code / Cursor，知识库自动注入，写代码 → 执行 → 调试全在编辑器内完成，无需离开
+- **从 V8 代码中调用 AI 大模型**：在接口引擎里直接请求 DeepSeek 等接口，实现 ReAct 模式
+
+> 博主某 MES 项目：500+ 张表，大量接口引擎由 AI 一次生成，准确率高达 **99%**。
+
+---
+
+## 模式一：🌐 在线 AI 编程
+
+在浏览器中打开任意 AI 工具，上传 V8 引擎文档 + 你的数据库结构，AI 直接写出可用的接口引擎代码。
+
+### 第一步：导出数据库结构（db.json）
+
+VS Code 插件（Microi吾码）支持**一键拉取**数据库结构，详见[模式二](#模式二-本地-ai-编程vs-code-插件)。
+
+如果在平台 Web 界面操作，可以新建一个接口引擎，将以下代码粘贴并执行，把返回的 `Data` 保存为 `db.json`：
+
+::: details 展开查看获取数据库结构的接口引擎代码
+```js
+var tables = V8.FormEngine.GetTableData('diy_table', {
+    _PageSize: 10000, _OrderBy: 'Name', _OrderByType: 'ASC',
+    _SelectFields: ['Id', 'Name', 'Description']
+});
+if (tables.Code != 1) return { Code: 0, Msg: tables.Msg };
+
+var fields = V8.FormEngine.GetTableData('diy_field', {
+    _PageSize: 100000, _OrderBy: 'TableId', _OrderByType: 'ASC',
+    _SelectFields: ['Id', 'Name', 'Label', 'Description', 'Type', 'Component', 'TableId', 'Config']
+});
+if (fields.Code != 1) return { Code: 0, Msg: fields.Msg };
+
+var menus = V8.FormEngine.GetTableData('sys_menu', {
+    _PageSize: 10000,
+    _SelectFields: ['Id', 'Name', 'ParentId', 'DiyTableId']
+});
+
+// 构建字段映射
+var fieldMap = {};
+for (var i = 0; i < fields.Data.length; i++) {
+    var f = fields.Data[i];
+    var cfg = {};
+    try { cfg = JSON.parse(f.Config || '{}'); } catch(e) {}
+    if (!fieldMap[f.TableId]) fieldMap[f.TableId] = [];
+    fieldMap[f.TableId].push({
+        Id: f.Id, Name: f.Name, Label: f.Label,
+        Description: f.Description, Type: f.Type, Component: f.Component,
+        ChildTableId: cfg.TableChildTableId, ChildSysMenuId: cfg.TableChildSysMenuId
+    });
+}
+
+// 构建菜单树
+var menuMap = {};
+for (var m = 0; m < menus.Data.length; m++) {
+    menuMap[menus.Data[m].Id] = menus.Data[m];
+}
+var menuTree = [];
+for (var m2 = 0; m2 < menus.Data.length; m2++) {
+    var menu = menus.Data[m2];
+    if (!menu.ParentId) {
+        menu._Child = [];
+        menuTree.push(menu);
+    }
+}
+for (var m3 = 0; m3 < menus.Data.length; m3++) {
+    var menu2 = menus.Data[m3];
+    if (menu2.ParentId && menuMap[menu2.ParentId]) {
+        if (!menuMap[menu2.ParentId]._Child) menuMap[menu2.ParentId]._Child = [];
+        menuMap[menu2.ParentId]._Child.push(menu2);
+    }
+}
+
+var resultTables = [];
+for (var t = 0; t < tables.Data.length; t++) {
+    var tbl = tables.Data[t];
+    resultTables.push({
+        Id: tbl.Id, Name: tbl.Name, Description: tbl.Description,
+        Fields: fieldMap[tbl.Id] || []
+    });
+}
+
+V8.Result = { Tables: resultTables, Menus: menuTree, Summary: '共 ' + resultTables.length + ' 张表' };
+```
+:::
+
+> **提示**：600+ 张表、1 万个字段的数据库，结构数据只有 **~300KB**，不到 1 秒拿到，格式化后的 `db.json` 约 2MB。
+
+### 第二步：让 AI 学习文档 + 数据库结构
+
+在新的 AI 会话中，上传以下内容（以 Claude / DeepSeek 为例，支持上传文件）：
+
+1. 平台 V8 引擎文档（在本代码仓库 `docs/doc/v8-engine/` 下）：
+   - `api-engine.md`（接口引擎总览）
+   - `v8-server.md`（V8 全局对象参考）
+   - `form-engine.md`（表单引擎 CRUD）
+   - `where.md`（查询条件语法）
+2. 你的数据库结构文件 `db.json`
+
+::: tip 使用建议
+- **强烈建议**：复杂业务逻辑每个接口新开一个会话，避免上下文丢失
+- 第二次会话可以直接复用同一个 `db.json`，不需要重新导出
+- 使用[本地 AI 模式](#模式二-本地-ai-编程vs-code-插件)时，知识库由 VS Code 插件**全自动维护**，无需手动上传
+:::
+
+### 第三步：用描述让 AI 写接口引擎
+
+给 AI 一段标准的开场白（复制下面的模板），然后描述你的业务逻辑：
+
+::: details 展开查看「描述业务逻辑」标准前缀模板
+```
+现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎代码：
+
+在写接口引擎代码之前，请先阅读以下注意事项：
+1. 假如你没理解我描述的业务逻辑，请不要先生成代码，先和我沟通确认，
+   目标是代码一次执行成功，而不是反复试错。
+2. 所有表名、字段名请严格从 db.json 中查找，不要凭空猜测。
+3. 注意性能：大数据量表应先查全量数据，在内存中做关联判断，
+   不要在循环内多次查询数据库。
+4. V8.FormEngine 不支持关联查询，需要关联时请用 V8.Db.FromSql()。
+5. 所有写库操作都用 V8.DbTrans，保证自动提交/回滚。
+6. 若需要进度跟踪，用 V8.Cache，Key 以 `Microi:{V8.OsClient}:` 开头。
+```
+:::
+
+### 示例效果
+
+<img src="https://static.itdos.com/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
+
+> **案例 1**：一个用于批量排班的接口引擎，描述业务逻辑后经 **2~3 轮对话**即完成，100% 准确。
+>
+> **案例 2**：一个用于跨系统数据迁移的接口引擎（生成 INSERT / CREATE TABLE SQL，带事务），**一次生成成功**。
+
+---
+
+## 模式二：💻 本地 AI 编程（VS Code 插件）
+
+这是本次更新带来的全新一体化开发模式：**在 VS Code 中直接用 GitHub Copilot / Claude Code / Cursor 编写接口引擎，知识库自动注入，无需离开编辑器。**
+
+### 工作原理
+
+```
+安装 VS Code 插件「Microi吾码」
+        ↓
+  登录并点击「拉取」
+        ↓
+  插件自动完成：
+  ① 拉取所有接口引擎 .js 到本地
+  ② 拉取所有 V8 事件 .js 到本地
+  ③ 拉取数据库结构（表名 / 字段名 / 字段描述 / 菜单结构）
+        ↓
+  自动生成 AI 知识库文件（放在本地工作区）：
+  • .github/copilot-instructions.md  ← GitHub Copilot 读取
+  • CLAUDE.md                        ← Claude Code 读取
+  • .cursorrules                     ← Cursor 读取
+
+  知识库内容包含：
+  ✅ V8 引擎全部 API（FormEngine / Db / Cache / Http / ApiEngine 等）
+  ✅ _Where 查询条件语法
+  ✅ 你的数据库所有表结构（表名 / 字段名 / 类型 / 业务说明）
+  ✅ 菜单树结构（哪个菜单对应哪张表）
+        ↓
+  打开任意 .js 接口引擎文件
+        ↓
+  GitHub Copilot / Claude Code / Cursor 自动获得完整上下文
+  → 直接 AI 辅助编写接口引擎代码，无需额外的"喂文档"步骤
+        ↓
+  保存 → 自动推送到数据库（或手动 Ctrl+S）
+  远程执行 / 远程逐行调试，全在 VS Code 内完成
+```
+
+### 安装插件
+
+在 VS Code 扩展市场搜索 **Microi吾码** 安装，或从 [OpenClaw](https://gitee.com/microi-net/microi.openclaw) 下载 `.vsix` 文件手动安装。
+
+### 一键拉取 + 自动建立知识库
+
+登录成功后，点击左侧 Microi 侧栏顶部的 **↓（拉取）** 按钮，或执行命令：
+
+```
+Microi: 拉取V8引擎代码
+```
+
+插件会自动完成以下操作（支持多服务器并发）：
+
+| 步骤 | 内容 |
+|---|---|
+| ① 拉取接口引擎 | 所有 `ApiEngineKey.js` 保存到本地目录 |
+| ② 拉取 V8 事件 | 所有表单 V8 事件 `.js` 保存到本地目录 |
+| ③ 拉取数据库结构 | 表名、字段名、类型、说明、菜单树一并拉取 |
+| ④ 自动生成知识库 | `copilot-instructions.md` / `CLAUDE.md` / `.cursorrules` |
+
+知识库生成后，你在 VS Code 中打开任意 `.js` 文件，AI 助手已经了解：
+
+- **V8 引擎完整 API**（不需要你手动告诉 AI 怎么用 `V8.FormEngine.GetTableData`）
+- **你的数据库表结构**（AI 知道你的表叫什么，字段叫什么，业务含义是什么）
+- **_Where 条件用法**（AI 能自动写出正确的查询条件）
+
+### 写代码 → 执行 → 调试，全闭环
+
+| 操作 | 方式 |
+|---|---|
+| AI 辅助写代码 | Copilot 自动补全，或在 Copilot Chat / Claude Code 输入需求 |
+| 远程执行 | 右键 → `Microi: 远程执行当前接口引擎`（弹出参数输入框） |
+| 逐行调试 | 右键 → `Microi: 远程逐行调试`，支持断点 / Step Over / 变量观察 |
+| 推送保存 | 文件保存时自动同步到数据库，无需编译发布 |
+
+<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">
+
+### 单独更新 AI 知识库
+
+数据库结构发生变化后，无需重新拉取全部代码，单独执行：
+
+```
+Microi: 拉取数据库结构到AI知识库
+```
+
+即可更新三个知识库文件，让 AI 立即感知最新的表结构。
+
+### 效率对比
+
+| 开发模式 | 准备上下文 | 写代码 | 执行调试 | 推送部署 |
+|---|---|---|---|---|
+| 传统手写 | 无 | 手写 | 打开浏览器平台 | 浏览器平台 |
+| 在线 AI 编程 | 手动上传文档 + db.json | AI + 复制粘贴 | 浏览器平台 | 浏览器平台 |
+| **本地 AI 编程（推荐）** | **全自动，拉取时自动生成** | **AI 在 VS Code 实时辅助** | **VS Code 内执行/调试** | **保存自动推送** |
+
+---
+
+## 模式三：🔗 在 V8 代码中调用 AI 大模型
+
+除了让 AI 来写代码，你也可以在接口引擎内部直接调用 AI 接口，实现 AI 驱动的业务逻辑。
+
+```javascript
+// 示例：在 V8 事件中自动检查代码是否有问题
+var option = {
+    url: V8.SysConfig.ApiBase + '/api/ai/chat',
+    data: {
+        UserChatMsg: `帮我快速检查一下这段JavaScript代码是否有问题：\n${V8.Form.ApiV8Code}`,
+        AiModel: 'deepseek-r1:1.5b',
+    },
+    dataType: 'json',
+    success: function(result) {
+        if (result.Code == 1) {
+            V8.FormSet('AiCheckResult', result.Data);
+        } else {
+            V8.FormSet('AiCheckResult', result.Msg);
+        }
+    }
+};
+V8.Post(option);
+```
+
+亦可在接口引擎中调用：
+
+```javascript
+// 在接口引擎中调用 AI 做自然语言转 SQL
+var aiResult = V8.Http.Post(
+    V8.SysConfig.ApiBase + '/api/ai/chat',
+    JSON.stringify({
+        UserChatMsg: '帮我把这段需求转换成 SQL：' + V8.Param.UserInput,
+        AiModel: 'deepseek-r1:7b',
+    }),
+    { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + V8.CurrentToken }
+);
+var sql = JSON.parse(aiResult).Data;
+var rows = V8.Db.FromSql(sql).ToList();
+V8.Result = rows;
+```
+
+---
+
+## 💡 最佳实践
+
+::: tip 写复杂业务接口前
+1. 先执行「拉取」让知识库保持最新（数据库有变更时）
+2. 在 Copilot Chat 或 Claude Code 中描述需求，附上相关表名
+3. 每个复杂接口新开一个 AI 会话，防止上下文被稀释
+4. 让 AI 先理解业务、再写代码，遇到疑问先沟通，不要边写边猜
+5. 生成后用"远程执行"快速验证，有问题截图给 AI 继续修改
+:::
+
+::: warning 字段名一定要让 AI 从数据库结构中查找
+无论在线还是本地模式，都要明确告诉 AI：**字段名请从数据库结构文件（db.json 或知识库）中查找**，不要凭空猜测字段名，这是造成出错的主要原因。
+:::
+
 
 ---
 
