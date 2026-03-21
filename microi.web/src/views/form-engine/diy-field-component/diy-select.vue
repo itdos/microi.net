@@ -30,6 +30,7 @@
                 return SelectRemoteMethod(query, field);
             }
         "
+        :suffix-icon="field.Config.DataSourceSqlRemote == true ? _ArrowDownIcon : undefined"
         :placeholder="GetFieldPlaceholder(field)"
         :value-key="GetSelectValueKey(field)"
         @change="
@@ -99,6 +100,8 @@
 
 <script>
 import _ from "underscore";
+import { ArrowDown } from "@element-plus/icons-vue";
+import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
 
 export default {
@@ -115,6 +118,7 @@ export default {
             LastModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
             FieldAllData: [],
             NeedResetDataSourse: true,
+            _ArrowDownIcon: markRaw(ArrowDown),
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -194,7 +198,8 @@ export default {
                     self.ModelValue = normalizedVal;
                     return;
                 }
-                self.ModelValue = normalizedVal;
+                // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
+                self.ModelValue = self._resolveTextFormatValue(normalizedVal);
             }
         },
         ModelProps: function (newVal, oldVal) {
@@ -230,7 +235,8 @@ export default {
                     self.ModelValue = normalizedVal;
                     return;
                 }
-                self.ModelValue = normalizedVal;
+                // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
+                self.ModelValue = self._resolveTextFormatValue(normalizedVal);
             }
         },
         "field.Data": function (newVal, oldVal) {
@@ -329,10 +335,15 @@ export default {
                 try {
                     modelValue = JSON.parse(modelValue);
                 } catch (error) {}
-            } else if (self.field && self.field.Config && self.field.Config.SelectSaveFormat == "Text" && self.field.Config.SelectLabel) {
+            } else if (self.field && self.field.Config && self.field.Config.SelectSaveFormat == "Text" &&
+                (!self.DiyCommon.IsNull(self.field.Config.SelectLabel) || !self.DiyCommon.IsNull(self.field.Config.SelectSaveField))) {
                 var newModelValue = {};
-                newModelValue[self.field.Config.SelectSaveField || self.field.Config.SelectLabel] = modelValue;
-                newModelValue[self.field.Config.SelectLabel] = modelValue;
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectSaveField)) {
+                    newModelValue[self.field.Config.SelectSaveField] = modelValue;
+                }
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectLabel)) {
+                    newModelValue[self.field.Config.SelectLabel] = modelValue;
+                }
                 modelValue = newModelValue;
             }
             self.ModelValue = modelValue;
@@ -358,6 +369,9 @@ export default {
                 }
             }
         }
+
+        // 确保当前值的选项存在于field.Data中（表内编辑时，数据源可能因LIMIT不包含当前值）
+        self._ensureSelectOption(self.ModelValue);
 
         self.LastModelValue = self.ModelValue;
         self.$nextTick(function () {
@@ -387,6 +401,59 @@ export default {
     },
 
     methods: {
+        // 修复：SQL/DataSource/ApiEngine数据源 + 存储形式"字段"时，将字符串值转换为el-select需要的对象
+        _resolveTextFormatValue(val) {
+            var self = this;
+            // 如果已经是对象，确保它存在于field.Data中
+            if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+                self._ensureSelectOption(val);
+                return val;
+            }
+            // 只处理 SQL/DataSource/ApiEngine 数据源 + 单选 + 存储形式"字段"(Text)
+            if (self.field && self.field.Config &&
+                self.field.Config.SelectSaveFormat === "Text" &&
+                (self.field.Config.DataSource === "Sql" ||
+                 self.field.Config.DataSource === "DataSource" ||
+                 self.field.Config.DataSource === "ApiEngine") &&
+                (!self.DiyCommon.IsNull(self.field.Config.SelectLabel) || !self.DiyCommon.IsNull(self.field.Config.SelectSaveField)) &&
+                typeof val === 'string' && val !== '') {
+                var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+                // 先从 field.Data 中查找完整对象
+                if (self.field.Data && self.field.Data.length > 0) {
+                    var found = self.field.Data.find(function(item) { return item[saveField] == val; });
+                    if (found) {
+                        return found;
+                    }
+                }
+                // 未找到，构造合成对象让 el-select 能通过 value-key 匹配
+                var newObj = {};
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectSaveField)) {
+                    newObj[self.field.Config.SelectSaveField] = val;
+                }
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectLabel)) {
+                    newObj[self.field.Config.SelectLabel] = val;
+                }
+                // 将合成对象插入field.Data，确保el-option能渲染
+                self._ensureSelectOption(newObj);
+                return newObj;
+            }
+            return val;
+        },
+        // 确保当前值对应的选项存在于field.Data中（数据源有LIMIT时，已加载数据可能不包含当前值）
+        _ensureSelectOption(valObj) {
+            var self = this;
+            if (!valObj || typeof valObj !== 'object' || Array.isArray(valObj)) return;
+            if (!self.field || !self.field.Config) return;
+            var ds = self.field.Config.DataSource;
+            if (ds !== 'Sql' && ds !== 'DataSource' && ds !== 'ApiEngine') return;
+            var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+            if (!saveField || self.DiyCommon.IsNull(valObj[saveField])) return;
+            if (!self.field.Data) self.field.Data = [];
+            var exists = self.field.Data.some(function(item) { return item[saveField] == valObj[saveField]; });
+            if (!exists) {
+                self.field.Data.push(valObj);
+            }
+        },
         // 修复：标准化选择框的值，根据单选/多选返回正确类型
         normalizeSelectValue(value) {
             const isMultiple = this.field?.Component === 'MultipleSelect';
