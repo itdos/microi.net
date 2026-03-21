@@ -311,6 +311,7 @@ app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromMinutes(20)
 });
+app.UseMiddleware<Microi.net.Api.V8DebugWebSocketMiddleware>(); // V8 逐行调试 WebSocket
 if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 {
     app.UseSwagger();
