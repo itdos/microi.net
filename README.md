@@ -10,7 +10,7 @@
 
 **Microi吾码** 是一款面向开发者的开源 AI 低代码平台，采用 **低代码 + AI** 双驱动开发模式，同时完美支持传统开发。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2024 年 11 月正式开源**。
 
-强大的 [**API 接口引擎**](/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持在线 [**AI 编程**](/doc/v8-engine/ai-apiengine)，极致的性能与开发效率，无需编译发布，保存即生效。
+强大的 [**API 接口引擎**](/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)，AI 自动获取 V8 引擎 API 知识库 + 你的数据库结构，接口代码生成准确率高达 99%，极致的开发效率，无需编译发布，保存即生效。
 
 | 资源 | 地址 |
 |---|---|
@@ -55,11 +55,21 @@
 | 📝 **[表单引擎](/doc/form-engine/form-engine-info)** | 支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑 |
 | 📦 **[模块引擎](/doc/system-engine/module-engine)** | 多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式 |
 | 🔄 **[工作流引擎 v4](/doc/system-engine/wf-engine)** | 完全自主研发，由表单引擎 + 接口引擎驱动 |
-| 🤖 **[AI 引擎](/doc/system-engine/ai-engine)** | 集成 DeepSeek 等 AI 模型，AI 代码检查、AI 在线/本地编程、自然语言转 SQL |
+| 🤖 **[AI 编程](/doc/v8-engine/ai-apiengine)** | **在线 AI + 本地 AI 双模式**：自动注入 V8 API 知识库与数据库结构，GitHub Copilot / Claude Code / Cursor 开箱即用；平台内置 DeepSeek 等 AI 模型，支持自然语言转 SQL、代码检查 |
 | 🎨 **[界面引擎](/doc/system-engine/page-engine)** | 可视化界面自定义设计，支持 ECharts 图表 |
 | 🖨️ **[打印引擎](/doc/system-engine/print-engine)** | 在线制作打印模板，无需导出即可打印 |
 | 📊 **[报表引擎](/doc/system-engine/report-engine)** | 虚拟表格、ECharts 报表，支持自定义增删改 |
 | ☁️ **[SaaS 引擎](/doc/system-engine/saas-engine)** | 三种模式：数据库隔离多租户、TenantId 租户隔离、独立组织机构隔离 |
+
+### 🤖 AI + 低代码 开发模式
+
+| 模式 | 工具 | 说明 |
+|---|---|---|
+| **在线 AI 编程** | DeepSeek / ChatGPT / Kimi 等 | 上传 V8 文档 + 数据库结构（db.json），AI 直接生成接口引擎代码 |
+| **本地 AI 编程** | VS Code + Copilot / Claude Code / Cursor | 插件自动注入知识库（V8 API + 你的数据库结构），写代码→执行→调试全在 VS Code 内完成 |
+| **V8 代码调用 AI** | 接口引擎 + DeepSeek 接口 | 在接口引擎中直接调 AI，实现智能问答、自然语言转 SQL 等 |
+
+> [→ 查看 AI 编程全指南](/doc/v8-engine/ai-apiengine)
 
 ### 🏗️ 基础架构
 
