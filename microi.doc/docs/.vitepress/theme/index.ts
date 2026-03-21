@@ -2,6 +2,7 @@
 import { h, Fragment } from 'vue'
 import DefaultTheme from "vitepress/theme";
 import GlowBackground from "./components/GlowBackground.vue";
+import Hero3DBackground from "./components/Hero3DBackground.vue";
 import ContactCard from "./components/ContactCard.vue";
 import ProductShowcase from "./components/ProductShowcase.vue";
 import AiChat from "./components/AiChat.vue";
@@ -14,7 +15,7 @@ export default {
     ...DefaultTheme,
     Layout: () => {
         return h(DefaultTheme.Layout, null, {
-            'layout-top': () => h(GlowBackground),
+            'layout-top': () => h(Fragment, null, [h(GlowBackground), h(Hero3DBackground)]),
             'home-features-after': () => h(Fragment, null, [h(AiChat), h(ProductShowcase)]),
             'nav-bar-content-after': () => h(UserBar)
         })

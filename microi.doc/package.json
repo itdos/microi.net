@@ -19,6 +19,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^25.0.9",
+		"@types/three": "^0.183.1",
 		"markdown-it-custom-attrs": "^1.0.2",
 		"sass": "^1.97.2",
 		"typescript": "^5.9.3",
@@ -31,6 +32,7 @@
 		"@alicloud/openapi-client": "^0.4.15",
 		"@alicloud/pop-core": "^1.8.0",
 		"marked": "^17.0.1",
-		"p-limit": "^7.2.0"
+		"p-limit": "^7.2.0",
+		"three": "^0.183.2"
 	}
 }
