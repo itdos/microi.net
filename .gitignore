@@ -87,3 +87,4 @@ unpackage/release/
 .venv/
 
 /Microi.VSCode/
+/microi-v8-engine/
