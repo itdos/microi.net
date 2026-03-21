@@ -36,12 +36,27 @@ namespace Microi.net
                     port = clientModel.OsClientModel["MqttPort"].Val<int>();
                 }
 
-                // 1. 创建选项（旧版无WithConnectionValidator）
-                var options = new MqttServerOptionsBuilder()
+                // WebSocket 端口（MqttWsPort，默认 port+1，如 1884）
+                // 客户端通过 Nginx 反向代理 /mqtt 路径使用 wss:// 连接
+                var wsPort = port + 1;
+                if (clientModel != null && clientModel.OsClientModel["MqttWsPort"] != null && clientModel.OsClientModel["MqttWsPort"].Val<int>() > 0)
+                {
+                    wsPort = clientModel.OsClientModel["MqttWsPort"].Val<int>();
+                }
+
+                // 1. 创建选项（TCP + WebSocket 双端口）
+                var optionsBuilder = new MqttServerOptionsBuilder()
                     .WithDefaultEndpoint()
                     .WithDefaultEndpointPort(port)
-                    .WithDefaultEndpointBoundIPAddress(IPAddress.Any)
-                    .Build();
+                    .WithDefaultEndpointBoundIPAddress(IPAddress.Any);
+
+                // 启用 WebSocket 端点（供 Nginx 反向代理 wss:// 使用）
+                optionsBuilder = optionsBuilder
+                    .WithWebSocketEndpoint()
+                    .WithWebSocketEndpointPort(wsPort)
+                    .WithWebSocketEndpointBoundIPAddress(IPAddress.Any);
+
+                var options = optionsBuilder.Build();
 
                 _mqttServer = new MqttFactory().CreateMqttServer(options) as MqttServer;
 
@@ -54,7 +69,7 @@ namespace Microi.net
                 await _mqttServer.StartAsync();
                 IsRunning = true;
 
-                Console.WriteLine("Microi：【成功】MQTT服务启动成功！");
+                Console.WriteLine($"Microi：【成功】MQTT服务启动成功！TCP端口:{port}，WebSocket端口:{wsPort}");
 
                 //触发接口引擎
                 if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
@@ -527,7 +542,7 @@ namespace Microi.net
             _mqttServer.ValidatingConnectionAsync -= OnValidateConnection;
             _mqttServer.ClientConnectedAsync -= OnClientConnected;
             _mqttServer.ClientDisconnectedAsync -= OnClientDisconnected;
-            _mqttServer.ClientDisconnectedAsync -= OnClientDisconnected;
+            _mqttServer.InterceptingPublishAsync -= OnMessageReceived;
             _mqttServer.RetainedMessageChangedAsync -= OnRetainedMessageChanged;
 
             await _mqttServer.StopAsync();
