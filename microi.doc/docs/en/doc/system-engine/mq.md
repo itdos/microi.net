@@ -1,9 +1,18 @@
-# Message Queue
-## Introduction
-> * The platform currently supports RabbitMQ message queues
+# 📨Message queue
 
-## RabbitMQ Docker orchestration
+> **The platform currently supports RabbitMQ message queues**
+
+---
+
+## 📌Introduction
+
+The platform currently supports RabbitMQ message queues.
+
+---
+
+## 🐳RabbitMQ Docker orchestration
 * Port 1673 is web admin panel
+::: details Expand View Shell Commands (line 23)
 ```shell
 version: '3.8'
 services:
@@ -29,6 +38,7 @@ services:
         max-size: "10m"
         max-file: "10"
 ```
+:::
 
 ## SaaS Engine MQ Configuration
 >* MQHost:192.168.31.199
@@ -44,6 +54,7 @@ services:
 >* ApiEngineKey:messagetest
 
 ## Producing a message
+::: details Expand to view JavaScript code (20 lines)
 ```js
 //前端调用生产消息接口
 V8.Post('/api/mq/sendmsg', {
@@ -66,6 +77,7 @@ V8.MQ.SendMsg('test_queue', {
   }
 );
 ```
+:::
 
 ## Consuming a message
 > * Automatically consumed in the interface engine [messagetest], because the ApiEngineKey specified when creating the message queue: messagetest

@@ -1,37 +1,71 @@
-# Quickly get started
+# ⚡Get Started Quickly
 
-## Video Tutorial
-> * To be re-recorded and uploaded
-> * history video tutorial:[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+> **Quickly create business modules using the Microi low-code platform.**
 
-## Introduction
-* Different from the new menu, next step, next step and next step of other low-code platforms, a module can be created. Microi code is oriented to developers and uses the traditional development thinking process to create modules.
-* Method 1: First create a table in the platform [Form Engine], then design the form, then create a module and associate the form.
-* Method 2: first create a physical table in [database management tool (such as Navicat)], then load the physical table in the platform [form engine], then design the form, create a module and associate the form.
-* A physical table can be associated with multiple [module engines] to design modules.
-* A physical table can be approved by multiple [process engines] for associated processes.
-* A physical table can be associated by multiple [report engines] to design virtual reports.
+---
+
+## 🎥Video tutorial
+
+- To be re-recorded and uploaded
+- Historical video tutorial: [https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
+---
+
+## 📖Introduction
+
+Microi code for developers, using the traditional development thinking process to create modules, support two ways:
+
+| Method | Process |
+| :--: | ---- |
+| Method 1 | Create table in platform [form engine] → design form → create module and associate form |
+| Way 2 | Create physical tables in database tools (such as Navicat) → load physical tables on the platform → design forms → create modules |
+
+::: tip flexible association
+- A physical table can be associated with design modules by multiple [module engines].
+- A physical table can be approved by multiple [Process Engine] associated processes.
+- A physical table can be associated with multiple [Report Engines] to design reports.
+:::
+
 <img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
 
+---
 
-## Method 1: Create a physical table
-* Enter the [Form Engine] module and add a new piece of data to automatically create a new physical table in the database.
-* When there are multiple databases, you can optionally specify which database to create the table in (if you don't select it, it is the main database)
+## 📝Step 1: Create a physical table
 
-## Method 2: Create a physical table
-* Enter [Database Management Tools (such as Navicat)] to add a physical table and add required fields
-* If it is the main library: enter the platform [form engine], select the physical table just created in the [non-Diy table] drop-down box, and click [load as Diy table], then the table will automatically generate a piece of data
-* If it is an extended library: enter the platform [database extension], add or view the data in the extended library, select the newly created physical table from the [non-Diy table] drop-down box, and click [load as Diy table]. at this time, the platform [form engine] will automatically generate a data
+### Method 1: Create through the platform
 
-## 3, Design Forms
-* View the data created in the form engine, and click [Design] in the operation bar to enter the form designer.
-* Each drag of a field control immediately adds a physical field to the database, and each subsequent save modifies the field.
+1. Enter the [Form Engine] module and add a new piece of data to automatically create a new physical table in the database.
+2. When there are multiple databases, you can choose to specify which database to create (if not, it is the main database)
 
-## 4. Create a menu (module)
-* Enter [Module Engine], add a new data, select the open method as [Diy], select the physical table just created, and select the template as [Search Table] or [Search Card] (more templates can be expanded)
-* For more configuration and gameplay, see the platform document [Module Engine. md]]
+### Method 2: Create through database tools
 
-## 5. Enter the menu just created
-* After entering the menu, you can see that the functions of adding, deleting, modifying and checking are all ready.
-* If you can't see the menu, it may be an error in automatically assigning permissions to the admin role, or other roles do not have permissions to view. Go to the platform [Role Management] to configure the permissions.
+1. Add physical tables and fields to database management tools (such as Navicat)
+2. * * Main Library * *: Enter [Form Engine], select Physical Table in the [Non-Diy Table] drop-down box → Click [Load as Diy Table]]
+3. **Extended Library**: Enter [Database Extension], select a physical table in the extended library data → click [Load as Diy Table]]
+
+---
+
+## 🎨Step 2: Design the Form
+
+1. View the created data in the form engine, and click [Design] in the operation bar to enter the form designer.
+2. Each drag a field control will immediately add a physical field to the database, and then each save will modify the field.
+
+---
+
+## 📦Step 3: Create Menu (Module)
+
+1. Enter [Module Engine] to add data
+2. Select [Diy] as the opening method and select the physical table just created.
+3. Select a template: [Search Form] or [Search Card] (you can expand more templates)
+4. For more configuration and play methods, see the document [Module Engine]]
+
+---
+
+## ✅Step 4: Enter the menu
+
+- After entering the menu, you can see that the functions of adding, deleting, modifying and checking are all ready.
+
+::: warning can't see the menu?
+It may be an error in automatically empowering the admin role, or other roles do not have permission to view. Go to the platform [Role Management] to configure permissions.
+:::
 

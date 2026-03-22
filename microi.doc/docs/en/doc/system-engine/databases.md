@@ -1,8 +1,13 @@
-# extended database
+# 🗄️ Expand the database
 
-## Introduction
-> * Platform support in`数据库管理`Add more database connection strings in
-> *`表单引擎`When creating a table, you can choose which one to create.`数据库`
+> **The platform supports multi-database configuration, adding more connections in database management**
+
+---
+
+## 📌Introduction
+
+- Platform support in`数据库管理`Add more database connection strings in
+- `表单引擎`When creating a table, you can choose which one to create.`数据库`
 > *`接口引擎`can be used in`V8.Dbs.DbKey`Access the specified`数据库`
 
 ## Extended Database Objects V8.Dbs.DbKey

@@ -1,8 +1,12 @@
-# All form components
-> * This article introduces all form components
+# 🧩All form components
+
+> **This article introduces all form components of Microi's code platform.**
+
+---
 
 ## Single Line Text
-> * if you want to restrict a single line of text to only allow input of numbers, id numbers, mobile phone numbers, pure letters, etc., you can change the V8 event by changing the value of the field and the V8 event before the form is submitted.
+
+To restrict a single line of text to only numbers, ID numbers, mobile phone numbers, pure letters, etc., you can change the V8 event and V8 event before form submission through the value of the field:
 ```js
 //Phone字段属性的【值变更V8事件】
 V8.Form.Phone = V8.Form.Phone.replace(/\D/g, '');//输入框只能输入数字
@@ -38,22 +42,32 @@ The database is stored as a json string.
 > * Commonly used drop-down selection
 
 ## Drop-down check MultipleSelect
-The database is stored as a json string.
+>* The database stores data as a JSON string
 
 ## Switch
 > * The switch component defaults to the int type, turning on 1 and turning off 0 (the very old version defaults to the bit type, and it is recommended to replace it with the int type)
-> * __<font color = "red"> The switch component cannot be of varchar type, otherwise it will be turned on regardless of whether the data inventory is "1" or "0" </font>__
+>* <strong><span style="color:red">The switch component cannot be of varchar type, otherwise it will be turned on regardless of whether the data inventory is "1" or "0"</span></strong>
 
 ## Date Time DateTime
 > * It is recommended to use varchar type, the main reason is that the date supports various formatting
 
 ## Image upload ImgUpload
 > * Anonymous access is not allowed by default
+> * V8 events before uploading can be passed`V8.ThisValue`Access to properties
+```js
+{
+  name : "WX20220109-155433@2x.png",
+  size : 952063,
+  type : "image/png"
+}
+```
+> * can be uploaded through`V8.Form.字段名`Access to image URL address, Name, etc.
 
 ## File Upload FileUpload
-> * Anonymous access is not allowed by default
+>* Anonymous access is not allowed by default.
+> * V8 events`图片上传 ImgUpload`
 
-## Rating
+## Rating Rate
 > * scoring component, default int type, database storage is int type
 
 ## Color selection ColorPicker
@@ -65,8 +79,8 @@ The database is stored as a json string.
 ## Button
 * Button component that supports V8 code
 
-## HTML
-> * Not yet published
+## HyperText Markup Language
+* HTML component, support custom HTML code
 
 ## Automatic Numbering AutoNumber
 > * Automatic numbering of self-distributed lock, support custom prefix
@@ -86,17 +100,17 @@ The database is stored as a json string.
 ## Organization Department
 > * Platform organization selection
 
-## Address Address
+## Address
 > * provincial and municipal linkage
 
 ## Mobile phone verification code PhoneSMS
-> * Not yet published
+> * Mobile phone verification code component, support to send SMS verification code
 
 ## Progress bar Progress
 * Show progress, database stores numbers
 
 ## Timeline Timeline
-> * Not yet published
+> * Timeline Component
 
 ## Icon Library FontAwesome
 > * Integrated FontAwesome
@@ -114,6 +128,7 @@ V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
 ]);
 ```
 > * Submit V8 event engine code
+::: details Expand to view JavaScript code (38 lines)
 ```js
 //-------前端代码-------
 var selectData = V8.TableRowSelected;//获取选中的数据
@@ -154,6 +169,7 @@ for(var i = 0; i < renwuzhanList.Data.length; i++){
 }
 return { Code : 1 };//会自动提交事务，因为Code == 1
 ```
+:::
 
 ## Associate Form JoinForm
 > * Generally used for custom form templates
@@ -165,4 +181,4 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 > * This is a very powerful component
 
 ## JSON table JsonTable
-> * Not yet published
+> * Support table display and editing of JSON data

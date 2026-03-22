@@ -1,21 +1,26 @@
-# Data Source Engine
+# 🧩Data Source Engine
 
-## Foreword
-> * The concept of the data source engine mainly provides data sources. Its essence is similar to that of the interface engine. Two modes of SQL data source and ordinary data source are additionally added.
-> * When the [Type] of the data source engine is [V8 Data Source], there is no difference from [Interface Engine]
+> **It mainly provides data sources, supporting V8, SQL, and common data sources.**
 
-## SQL Data Source
-> * directly enter SQL statements in the code editor. $CurrentUser.* $variables are supported
-> * The advantage is that you don't need to use V8.Db.FromSql() to execute SQL statements like the interface engine, but write SQL statements directly. Some implementation engineers prefer this mode.
-* Sample code:
+---
+
+## 📌Preface
+
+- The data source engine primarily provides data sources. Essentially, it is similar to the interface engine, with the addition of two modes: SQL data sources and regular data sources.
+- When the type is [V8 Data Source], there is no difference from [Interface Engine]
+
+## SQL data source
+>* Enter SQL statements directly in the code editor; supports the $CurrentUser.*$ variable.
+>* The advantage is that, unlike with the interface engine where you have to use V8.Db.FromSql() to execute SQL statements, you can write SQL directly. This approach is preferred by many implementation engineers.
+>* Example code:
 ```sql
 SELECT * FROM tableName WHERE UserId = '$CurrentUser.Id$'
 ```
 
-## Common Data Source
-> * Enter json data directly in the code editor
-> * The advantage is the extreme performance. There is no need to call the bottom layer of the V8 engine and directly return data, such as the storage of some basic data: data such as the addresses of provinces and cities across the country.
-* Sample code:
+## Common data source
+>* Enter JSON data directly in the code editor
+>* The advantage is extreme performance: it bypasses the V8 engine’s underlying layers and returns data directly, making it ideal for storing basic data such as nationwide province, city, and district address information.
+>* Example code:
 ```json
 [{ Id : 1, Name : '张三' }, { Id : 2, Name : '李四' }]
 ```
@@ -24,4 +29,4 @@ SELECT * FROM tableName WHERE UserId = '$CurrentUser.Id$'
 ```
 
 ## V8 Data Source
-> * There is no difference from the interface engine at this time
+>* At this point, it is no different from the interface engine.
