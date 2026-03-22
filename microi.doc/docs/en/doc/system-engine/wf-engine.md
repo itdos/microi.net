@@ -1,26 +1,31 @@
-# Process Engine, Workflow Engine
-## Foreword
-> **First Edition**：In 2008, the blogger took over the workflow engine developed by his former colleagues based on Microsoft WWF and developed OA systems and ERP systems for more than 10 state-owned enterprises and institutions.
+# 🔄Process engine, workflow engine
+
+> **Microi code fourth edition workflow engine, supports conditional branching, multi-level approval, parallel approval, V8 events, etc.**
+
+---
+
+## 📌Preface
+> **First edition**：In 2008, the blogger took over the workflow engine developed by his former colleagues based on Microsoft WWF and developed OA systems and ERP systems for more than 10 state-owned enterprises and institutions.
 
 > **Second Edition**：The blogger participated in the secondary development and bug repair of ccflow workflow engine in 2012. He was once the super moderator of ccflow forum and used Microsoft SelverLight technology at that time (unfortunately, he was eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance. It is strongly recommended to pay attention to it.
 
-> **Third Edition**：In 2014, bloggers used Microsoft's latest "WWF" to independently develop "the third edition of workflow engine" and cooperated with AvalonJs UEditor to develop "low-code platform", applying dozens of state-owned enterprises, institutions and units of measurement.
+> **Third edition**：In 2014, bloggers used Microsoft's latest "WWF" to independently develop "the third edition of workflow engine" and cooperated with AvalonJs UEditor to develop "low-code platform", applying dozens of state-owned enterprises, institutions and units of measurement.
 
 > **Fourth Edition: Bloggers Use Microi Code' Form Engine' to Drive' Workflow Engine' in 2018. NET core Vue completely self-developed the' 4th generation workflow engine' (since Microsoft WWF does not support. net core, so self-developed)**
 
 
 ## Advantages of the fourth generation workflow engine
 > * [Process Attributes] and [Node Attributes] are driven by [Form Engine] for greater flexibility
-> * Rich front-end V8 events and back-end V8 events to meet complex business requirements, such as calling V8 functions to send`邮件、短信、微信`notifications, such as calling`FormEngine`,`ApiEngine`Implement complex business logic
+> * Rich front-end V8 events and back-end V8 events to meet complex business requirements, such as calling V8 functions to send`邮件、短信、微信`notifications, such as calling`FormEngine`、`ApiEngine`Implement complex business logic
 > * [Process Engine] and Business Forms`完全解耦`It is convenient to integrate third-party forms and secondary development. Even without a form, [the process engine] can rely on one`FromData`JSON data to run the process
 > * Process Designer Fully Open Source
 > * Process business management has been applied in hundreds of customers
 
-## Preview
+## Preview image
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # Description of physical tables related to the process engine
 >* **WF_FlowDesign**：Flowchart design table, a flowchart corresponds to a piece of data.
->* **WF_Node**：Process Node Attribute Table
+>* **Workflow Node**：Process Node Attribute Table
 >* **WF_Line**：Process Condition (Line) Attribute Table
 >* **WF_Flow**：The process instance table. When a process is initiated, one piece of instance data is generated. One piece of instance data corresponds to N pieces of work data in the WF_Work table.
 >* **WF_Work**：The process work to-do table, such as the launch of a process instance, generated 3 to-do, will write 3 WF_Work data.
@@ -70,7 +75,7 @@ V8.WF.ForceSelectUsers=['userid'];
 > * You can use V8.Result = { Code : 0, Msg: 'prevent process commits '}; Rollback transactions, prevent process commits
 
 ### Conditional Judgment V8 Event (Backend)
-> * Can use all backend V8 functions
+>* Can use all backend V8 functions
 ```javascript
 //这里赋值的V8.LineValue，就是[条件属性]设置的[条件值]
 if(V8.Form.Money <= 100){
@@ -80,32 +85,32 @@ if(V8.Form.Money <= 100){
 }
 ```
 ### Node End V8 Event (front end)
-> * Can use all front-end V8 functions
+>* All frontend V8 functions can be used.
 >* **V8.WF.WorkResult**：The data returned after the process is successfully executed, such as which node is sent and which approvers are sent.
 
 ### Node End V8 Event (Backend)
-> * Can use all backend V8 functions
+>* Can use all backend V8 functions
 >* **V8.WF.NextNode**：Accessing the next node entity
 >* **V8.WF.NextTodoUsers**：Access Recipient, format:[{Id:'',Name:''}]
 
 
 
-## Function introduction
-### My to-do
+## Feature Overview
+### My to-do list
 * Get the WF_Work table, pending my work.
-### I initiated
+### Initiated by me
 > * Get the WF_Flow table, I initiated the process instance.
-### I dealt
+### The one I handled
 * Get the WF_Work table that I 've dealt.
 > * The reason why I do not get the work I process from the WF_Flow table is to realize the field permission control of each node and to realize the recall function.
-### CC my
+### CC me
 > * Get the WF_History table, cc gave me the job.
 > * The reason why I don't get the work that was copied to me from the WF_Flow table is to realize the field permission control of each node.
-### I'm related
+### My related
 > * Get the WF_Work table, I received the pending work, but not the work handled by me.
 ### All instances
 > * administrator permission, obtain all process instances (non-work) initiated by the owner in the WF_Flow table
-### Withdrawal
+### Withdraw
 > * After node A is submitted to node B and before node B approves, the submittor of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
 > * After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
 > * node a really wants to withdraw again, only node c refuses and returns to node a.

@@ -1,28 +1,37 @@
-# DosResult Description
-## Introduction
-* The type returned by almost all interfaces on the server side is DosResult, so it is recommended that the interface engine and server-side secondary development should also be returned to the front end in this way.
+# 📋DosResult Explanation
+
+> The type returned by almost all interfaces on the server side is`DosResult`, it is recommended that the interface engine and server-side secondary development also use this format to return to the front end.
+
+---
+
+## 📖Data Structures
+
 ```javascript
 { 
-    Code : 1,//值说明见下面
-    Data : {},//可能是任何类型，根据接口实际需求，如：{}、[]、string、int、null等
-    DataCount : 0,//如果是获取数据列表，返回数据总数，用于分页
-    Msg : '错误信息',//当Code不等于1时，一般Msg都有错误信息。
-    DataAppend : {}//一些附加数据，如获取一条订单信息，返回在Data里，DataAppend里面可能会返回一些额外的信息。
+    Code : 1,          // 状态码，值说明见下方表格
+    Data : {},          // 可能是任何类型：{}、[]、string、int、null 等
+    DataCount : 0,      // 数据列表时返回总数，用于分页
+    Msg : '错误信息',    // 当 Code ≠ 1 时，一般包含错误信息
+    DataAppend : {}     // 附加数据，如订单详情中的额外信息
 }
 ```
 
-## The value description of the current code built-in
-```html
-1：请求成功
-0：请求出现异常或一些验证未通过，并且Msg会包含异常信息
-2：获取单条数据时（GetFormData），请求成功，但要获取的数据并不存在（注意获取多条数据[GetTableData]时，即使未取到数据，code仍然为1）
-1001：用户登陆身份已失效，或本次请求未在header中传入有效的token值
-1002：登陆身份验证失败
-1003：未获取或未输入验证码
-1004：图形验证码错误
-1005：第三方短信验证码余额不足或其它软件商原因导致无法发送短信验证码（非客户端原因），此时客户端可能会有临时允许通过图形验证码授权继续操作业务逻辑
+---
 
-//注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）
-1006：数据库受影响行数为0（如修改不存在的数据、删除不存在的数据）
-```
+## 📝Code Status Code Explanation
 
+| Code | Explanation |
+|---|---|
+| **1** | ✅Request successful |
+| **0** | ❌Request exception or validation failed, 'Msg' contains exception information |
+| **2** | ⚠️ When getting a single piece of data ('GetFormData'), the data does not exist. Note: 'GetTableData' Code is still 1 even if no data is fetched |
+| **1001** | 🔒The user logon identity has expired or a valid token was not passed in the header |
+| **1002** | 🔒Logon authentication failed |
+| **1003** | 🔒No verification code obtained or entered |
+| **1004** | 🔒Graphical verification code error |
+| **1005** | 📱If the balance of the third-party SMS verification code is insufficient or the software provider cannot send it, the client may temporarily allow the graphical verification code to replace it. |
+| **1006** | ⚠The number of affected rows in the database is 0 (such as modifying/deleting non-existent data) |
+
+::: tip💡Attention
+From`Microi.net.dll v3.0.2`At first, if the number of rows affected by the database is 0 when deleting or modifying data, it is still returned.`Code=1`Success, and an additional return`DataCount`For the actual number of rows affected (the previous version returns.`Code=1006`).
+:::

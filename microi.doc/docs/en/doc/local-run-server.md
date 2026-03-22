@@ -1,18 +1,29 @@
-# Source code running locally-backend
+# 💻Source code running locally-backend
 
-## Video Tutorial
-> * To be re-recorded and uploaded
-> * history video tutorial:[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+> **Run the Microi back-end service in the local environment.**
 
-## Download the source code and. NET environment
-* Use git tool to pull the latest code from open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-* Download and install. NET 10 SDK:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
+---
 
-## Open the solution using Visual Studio Code (recommended for Mac)
-* Download and install vs code:[https://code.visualstudio.com/](https://code.visualstudio.com/)
-* Open vs code and install plugins: C#, C# Dev Kit,. NET Install Tool three components
-* On the welcome page, open the open source version of Microi code [/Microi. Server] directory folder, wait a few seconds will automatically appear [solution explorer], wait for vs code to automatically restore nuget library
-* The [/Microi.net.Api/appsettings.json] file must be configured
+## 🎥Video tutorial
+
+- To be re-recorded and uploaded
+- Historical video tutorial: [https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
+---
+
+## 📦Download the source code and. NET environment
+
+- Use Git to pull the latest code from an open source address:[Gitee repository](https://gitee.com/ITdos/microi.net)
+- Download and install. NET 10 SDK:[.NET Download Page](https://dotnet.microsoft.com/zh-cn/download)
+
+---
+
+## 🛠️ Open solution with VS Code (Mac recommended)
+
+1. Download and install [VS Code](https://code.visualstudio.com/)
+2. Install the plug-ins: **C Sharp**, **C# Dev Kit**, **. NET Install Tool**
+3. Open`/Microi.Server`Directory, wait a few seconds and [Solution Explorer] will automatically appear, waiting for the NuGet library to be automatically restored.
+4. **Must** be configured`/Microi.net.Api/appsettings.json`File
 ```json
   "AppSettings": {
     "OsClient": "iTdos",//【必须】自定义SaaS引擎Key，与数据库【sys_osclient】表的【OsClient】字段值对应
@@ -31,23 +42,51 @@
     //其余配置分布式存储（如阿里云OSS、MinIO）、MQ消息队列、ES搜索引擎等，均在平台【SaaS引擎】中动态配置
   },
 ```
-* __<font color = "red"> After pulling the source code, please update Microi.net.dll to the latest version first </font>__
-* __<font color = "red"> If the automatic restoration of nuget fails or the project fails to be loaded, you can try to restart vs code to reload the project and wait for nuget to restore </font>__
-* Right-click the [Microi.net.Api] project, debug --> start a new instance
-* Access Address:`https://localhost:7266`(Ports are configured in/Microi.net.Api/Properties/launchSettings.json)
+::: warning Notes
+- After pulling the source code, please **give priority'Microi.net.dll'Update to latest version**
+- If the compilation fails due to the failure of NuGet automatic restore or the failure of loading the project, you can try to restart VS Code to reload the project and wait for NuGet to restore it.
+:::
 
-## Use Visual Studio 2022 to open the solution (Windows recommended)
-* Download and install vs2022:[https://visualstudio.microsoft.com/zh-hans/](https://visualstudio.microsoft.com/zh-hans/)
-* Double-click directly to open the [/Microi.net.sln] file, and wait a moment after opening it. Right-click the [Microi.net.Api] project to regenerate it.
-* If the nuget package fails to be restored, please close vs2022 and reopen the Microi.net.sln file to continue trying. Generally, it is a network problem. You can also try to use the mobile phone hotspot.
-* The [/Microi.net.Api/appsettings.json] file must be configured, as described above.
+5. Right-click`Microi.net.Api`Project → Debug → Start a new instance
+6. Access Address:`https://localhost:7266`(port in`/Microi.net.Api/Properties/launchSettings.json`configuration)
 
-## Configure required parameters
-* To make the project run, at least [database Redis] two environments are needed, one is indispensable.
+---
 
-## Environment Configuration Considerations
-* Unable to use system log function without MongoDB environment
-* If you do not have a distributed storage environment such as MinIO or Alibaba Cloud OSS, you cannot use the file/image upload function.
-* Message Queuing cannot be used without a RabbitMQ environment
-* Search engine functionality is not available without an ES environment
+## 🖥️ Open a solution with Visual Studio 2022 (Windows recommended)
 
+1. Download and install [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hans/)
+2. Double-click to open`/Microi.net.sln`, wait a moment, right click`Microi.net.Api`Project → Regenerate
+3. If restoring the NuGet package fails, close VS2022 and reopen it`Microi.net.sln`(Generally, it is a network problem. You can try hot spots on your mobile phone.)
+4. **Must** be configured`/Microi.net.Api/appsettings.json`, ibid.
+
+---
+
+## ⚙Configuration required parameters
+
+::: tip minimum requirements
+To make the project run, at least two environments of **database Redis** are required, one of which is indispensable.
+:::
+
+---
+
+## 📝Environment Configuration Notes
+
+| Environment | Affect function |
+| :-- | :-- |
+| No MongoDB | Unable to use system log |
+| No MinIO/Alibaba Cloud OSS | Unable to upload using file/image |
+| No RabbitMQ | Unable to use message queue |
+| No Elasticsearch | Unable to use search engine |
+
+---
+
+## 🐳Locally compile and publish to a Docker image
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+2. In`Microi.net.Api`Execute under the project directory:
+
+```bash
+dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
+```
+
+3. Enter`./bin/Release/`Table of Contents, Execute`publish-demo.sh`Script (remember to modify the configuration inside first)

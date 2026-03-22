@@ -1,8 +1,16 @@
-# Task Scheduling
-## Introduction
-> * The platform supports scheduled tasks and can regularly execute interface engines or custom-developed. net dll files
+# ⏰Task Scheduling
 
-## Stop all tasks
+> **Support timing execution interface engine or custom development. NET DLL file**
+
+---
+
+## 📌Introduction
+
+The platform supports timing tasks, which can execute interface engines or custom-developed. NET DLL file.
+
+---
+
+## ⚠Stop all tasks
 ```sql
 -- 执行sql语句
 update diy_schedule_job set Status='暂停';
@@ -20,6 +28,7 @@ delete from microi_job_job_details where JOB_NAME = 'dnsSync';
 ```
 
 ## Automatically delete task duplicate result logs
+::: details Expand to view JavaScript code (24 lines)
 ```js
 // 比如说定时任务执行的是一个接口引擎，我们在接口引擎最后增加以下代码：
 // 假设任务名为：dnsSync，我们只保留最近N条重复的相同结果日志
@@ -46,3 +55,4 @@ WHERE Message = '${JSON.stringify(result)}'
 `).ExecuteNonQuery();
 return result;
 ```
+:::

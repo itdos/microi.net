@@ -1,12 +1,22 @@
-# FormEngine Usage
+# 📝FormEngine Usage
 
-## The front and back V8 syntax is consistent, but slightly different
-> * This document is a V8 shared document on the front and back ends, both with Javascript syntax and basically the same usage, but with slight differences.
-> * The second parameter is passed into the V8.DbTrans database transaction object for all table operations performed by the server [V8.FormEngine]
-> * All operations of the server [V8.FormEngine] on the table will not trigger any event of the form attribute (unless_InvokeType:'Client' is passed in), and the front end [V8.FormEngine] will trigger
-> * the front-end directly calling the interface address corresponding to V8.FormEngine (such as https:// ***/api/formEngine/addFormData) will also trigger the form attribute server-side V8 event
-> * All functions in V8.FormEngine are single-table operations (except batch operations). For multi-table association queries, see V8.ModuleEngine Usage
-> *_<font color = "red"> note: starting from Microi.net.dll v3.0.2, if the number of affected rows in the database is 0 when deleting and modifying data, Code = 1 is still returned successfully, and the additional DataCount value is the actual number of affected rows (Code = 1006 was returned in previous versions)</font>__
+> **The front and back V8 share documents, which are JavaScript syntax, and the usage is basically the same with slight differences.**
+
+---
+
+## 📌Before and after V8 syntax differences
+
+| End | Explanation |
+| :--: | ---- |
+| Server-side | All operations on the table 'V8.FormEngine' support the second parameter passed into the 'V8.DbTrans' database transaction object |
+| Server-side | 'V8.FormEngine' operation **will not trigger any events of** form properties (unless '_InvokeType:'Client' is passed in) |
+| Frontend | 'V8.FormEngine' action **will trigger** form property event |
+| Frontend | Directly calling the interface address corresponding to the FormEngine will also trigger the server-side V8 event. |
+
+::: tip tip
+`V8.FormEngine`All the following functions are single-table operations (except Batch operations). For more information, see`V8.ModuleEngine`Usage.
+:::
+>* <strong><span style="color:red">note: starting from Microi.net.dll v3.0.2, if the number of affected rows in the database is 0 when deleting and modifying data, Code = 1 is still returned successfully, and the additional DataCount value is the actual number of affected rows (Code = 1006 was returned in previous versions)</span></strong>
 
 ## Front-end V8 asynchronous, synchronous usage
 ```javascript
@@ -78,6 +88,7 @@ var data = result.Data;//格式：{}
 ```
 
 ## Get Data List GetTableData
+::: details Expand to view JavaScript code (22 lines)
 ```javascript
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     Ids : [1, 2, 3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
@@ -102,19 +113,20 @@ if(result.Code != 1){
 }
 var data = result.Data;//格式：[]
 ```
+:::
 
 ### Anonymously Get Data List GetTableDataAnonymous
 > * Usage consistent with the above GetTableData
 > * note that if it is used in front-end V8, [allow anonymous reading] must be turned on in the form properties]
 
 ### Get only the number of data GetTableDataCount
-> * Usage consistent with the above GetTableData
+>* Usage is consistent with the above GetTableData.
 ```js
 var dataCount = result.DataCount;
 ```
 
 ### Get tree data list GetTableDataTree
-> * Usage consistent with the above GetTableData
+>* Usage is consistent with the above GetTableData.
 > * note that the [tree structure] configuration must be enabled in the form properties
 
 
@@ -149,7 +161,7 @@ var addResult = V8.FormEngine.AddTableData(addList);
 ```
 
 ## Modify a data UptFormData
-> *_<font color = "red"> Note: Only the incoming Id can be modified for a single piece of data. To modify it according to other conditions, please use [UptFormDataByWhere] in consideration of safety (to prevent batch misoperation and update). </font>__
+>* <strong><span style="color:red">Note: Only the incoming Id can be modified for a single piece of data. To modify it according to other conditions, please use [UptFormDataByWhere] in consideration of safety (to prevent batch misoperation and update).</span></strong>
 
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
@@ -180,7 +192,7 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
 ```
 
 ## Batch Modify Data UptTableData
-> * is equal to the old version`UptFormDataBatch`
+>* is equivalent to the old version`UptFormDataBatch`
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -205,7 +217,7 @@ V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
 ```
 
 ## Bulk Delete Data DelTableData
-> * is equal to the old version`DelFormDataBatch`
+>* is equivalent to the old version`DelFormDataBatch`
 ```javascript
 //也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -262,6 +274,7 @@ var addField = V8.FormEngine.AddField({
 ## Gets the data source GetFieldData for a field configuration
 
 ## In the transaction, add, delete, modify, and call other interface engines.
+::: details Expand to view JavaScript code (37 lines)
 ```js
 //业务逻辑1：查询数据
 var selectResult = V8.FormEngine.GetTableData('tableName', {
@@ -301,3 +314,4 @@ if(apiEngineResult && apiEngineResult.Code != 1){
 //注意：只要指定了Code的值，并且不等于1，则平台会自动回滚事务
 return { Code : 1, Msg : '操作成功！' };
 ```
+:::

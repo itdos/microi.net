@@ -1,10 +1,23 @@
-# Template Engine
-## Introduction
-> *`模板引擎`Currently applied in`表单属性`in 【`表格V8模板引擎`]], 【`表单V8模板引擎`], used to process the final rendered data, as shown in the following figure`根据字段值`Display`不同颜色`the background
+# 📦Template engine
+
+> **Used to process the final rendered data, such as displaying a different colored background based on field values**
+
+---
+
+## 📌Introduction
+
+`模板引擎`Currently applied in`表单属性`in 【`表格 V8 模板引擎`】、【`表单 V8 模板引擎`]:
+
 <img src="https://static.itdos.com/upload/img/csdn/ScreenShot_2026-01-11_120812_139.png" style="margin: 5px;">
 
-## Examples
-> * Note here`V8.Form`You can only access the [Query Column] field value configured in [Module Engine]. If the query column configuration is empty, you can access all field values.
+---
+
+## 💡Example
+
+::: tip Note
+Here's`V8.Form`You can only access the value of the Query Column field configured in Module Engine. If the query column is set to null, you can access all the field values.
+:::
+::: details Expand to view JavaScript code (28 lines)
 ```js
 //使用bootstrap样式
 var value = V8.Form.Zhuangtai;
@@ -35,6 +48,7 @@ else if(V8.Form.HebingID){
   V8.Result = V8.Form.XuqiuDDH;//默认
 }
 ```
+:::
 ## Support 'bootstrap', 'element-ui style
 
 Commonly used`bootstrap`Style:
@@ -87,7 +101,7 @@ if(!V8.IsNull(V8.Form.TupianMS) && V8.Form.TupianMS.indexOf('[')!=-1){
 }
 V8.Result = html;
 ```
-## Link Jump
+## Link redirection
 ```js
 if(V8.Form.SuoshuKH && V8.Form.SuoshuKH.KehuMC){
   V8.Result = `<a href="/#/kehu?FormDataId=${V8.Form.KehuID}" target="_blank">${V8.Form.SuoshuKH.KehuMC}</a>`;

@@ -1,12 +1,23 @@
-# Interface Engine
+# ⚙Interface Engine
 
-## Introduction
-> *`写一个获取数据的接口只要1分钟`As one of the biggest highlights of the platform, the interface engine mainly solves complex business logic and uniformly manages custom interfaces.
-> * use JavaScript to write api interface online, **['AI Write V8 Engine Code'](https://microi.net/doc/v8-engine/ai-apiengine.html)**, support`[Get、Post]`request, support return`[JSON、字符串、文件、HTML]`Wait, support`[自定义接口地址、分布式锁、权限、自定义扩展函数]`Wait
-> * can realize any complex business scenario,`极致的性能（V8代码预编译、多级缓存）`with`开发效率`,`本地编译发布`, effective upon saving
-> * After more than 8 years of successful cases, some projects have more than 500 interfaces. [[FormEngine Usage]](/doc/v8-engine/form-engine) [[Where Conditional Usage]](/doc/v8-engine/where)
+> **It takes only 1 minute to write an interface to obtain data, and the API interface JavaScript written online is used, and the saving will take effect.**
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/Microi20260122.png)
+---
+
+## 📌Introduction
+
+- As one of the biggest highlights of the platform, the interface engine mainly solves complex business logic and uniformly manages custom interfaces.
+- Use JavaScript to write API interface online, support [AI programming](/doc/v8-engine/ai-apiengine)
+- Support`Get`/`Post`Request, return JSON, string, file, HTML, etc.
+- Support custom interface addresses, distributed locks, permissions, custom extension functions, etc.
+- Extreme performance (V8 code pre-compilation, multi-level cache) and development efficiency without local compilation and release
+- After more than 8 years of successful case verification, some projects up to 500 interface
+
+::: tip Related Documentation
+[[FormEngine Usage]](/doc/v8-engine/form-engine) [[Where Conditional Usage]](/doc/v8-engine/where)
+:::
+
+![在这里插入图片描述](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
 
 ```js
 //获取一个数据列表
@@ -22,13 +33,13 @@ return result;
 ```
 
 ## Powerful V8 debugging capabilities
-> * Support`本地`,`在线`Two ways to write V8 interface engine,`双向增量同步`Online, local V8 code
-> * Support`本地调试V8事件代码`,`接口引擎代码`and supports V8 code calls`平台插件源码`Associated Debugging
+> * Support`本地`、`在线`Two ways to write V8 interface engine,`双向增量同步`Online, local V8 code
+>* Support`本地调试V8事件代码`、`接口引擎代码`and supports V8 code calls`平台插件源码`Associated Debugging
 >* **整个接口请求全路径支持`断点调试`**：
 >> 1.`前端`Form entry V8 event`[支持调试]`
 > 2.`前端`V8 event before form submission`[支持调试]`
 >> 3.`后端`V8 event before form submission`[支持调试]`
-> 4.**'Backend' V8 Event Invoke <font color = "red"> Interface Engine </font>**`[支持调试]`
+> 4.**'Backend' V8 Event Invoke <span style="color:red">Interface Engine</span>**`[支持调试]`
 > 5.**'Backend' interface engine call 'V8.Cache'Any back-end plug-in source code such**`[支持调试]`
 >> 6.`后端`V8 event after form submission`[支持调试]`
 > 7.`前端`V8 event after form submission`[支持调试]`
@@ -43,7 +54,7 @@ return result;
 > * Whatever your request is`form-data`Still`payload-json`, all supported
 
 ## V8.Param
-> * can receive and access`form`,`json`,`url`three parameters
+> * can receive and access`form`、`json`、`url`three parameters
 ```javascript
 //支持接收3种类型的参数，均使用V8.Param.***访问
 var id = V8.Param.Id;
@@ -75,6 +86,7 @@ System.Threading.Tasks.Task.Run(function(){
 
 ## Extended Interface Engine
 > * See [`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi. Server/Microi.V8Engine) class library, in [`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs) class
+::: details Expand to view JavaScript code (40 lines)
 ```js
 using System;
 using Dos.Common;
@@ -117,9 +129,11 @@ namespace Microi.net
     }
 }
 ```
+:::
 
 ## Return data
 > * Return data to the front end, which can be JSON, string, Html, file, etc.
+::: details Expand to view JavaScript code (38 lines)
 ```javascript
 //当指定了Code值为1时，平台会自动提交事务，无需手动执行V8.DbTrans.Commit()
 return { Code : 1, Data : [1, 2, 3], Msg : '事务已提交！' };
@@ -160,15 +174,16 @@ V8.Result = {
 //旧版返回方式（仍然支持，但建议弃用这种方式）
 //V8.Result = { Code : 1, Data : [] }
 ```
+:::
 
 ## Interface Configuration
-### Basic configuration
+### Basic Configuration
 > * Name (`ApiName`) Customization, such as: [Mobile] to obtain a list of goods
 >* Key (`ApiEngineKey`) Customization, such as: get-product-list
 > * Prohibit external calls (`StopHttp`), after opening, this interface (function) can only be called through the interface engine V8 code or the server-side V8 event, and the custom interface address is invalid
 
 ### Custom Interface Address
-> * custom interface address (`ApiAddress`), it is recommended to use uniformly`/apiengine/`Beginning, such:`/apiengine/get-product-list`. Of course you want to customize it`/api111/b2222/c333/d444`You can also use`ApiBase + ApiAddress`Access Interface
+> * custom interface address (`ApiAddress`), it is recommended to use uniformly`/apiengine/`Beginning, such:`/apiengine/get-product-list`。 Of course you want to customize it`/api111/b2222/c333/d444`You can also use`ApiBase + ApiAddress`Access Interface
 
 ### distributed lock
 > * For interfaces in some scenarios, distributed locks must be used, such as deducting inventory after order shipment approval to prevent inventory from becoming negative. (Of course, you can also use message queues, which are explained in other articles)
@@ -195,7 +210,7 @@ return {
   }
 };
 ```
-## Interface Test
+## API testing
 > Interface Engine form provides the ability for the interface to run tests (driven by the form engine)
 
 ## interface debugging
@@ -203,6 +218,7 @@ return {
 > * 2. Define the log content to be output to the front end: [var debugLog = {};];]
 > * 3. Record log: [debugLog.Log1 = list1Result;];]. You can also use [V8.Method.AddSysLog] to write the MongoDB log, and then view it in System Settings-> System Log
 > * 4. judge whether to output the log to the front end: [DataAppend: { DebugLog : isDebugLog ? debugLog: null}]]
+::: details Expand to view JavaScript code (41 lines)
 ```js
 //【第一步】定义是否需要向前端输出日志内容，需要调试时为true，不需要调试时为false
 var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog = V8.SysConfig.V8EngineDebugLog;
@@ -246,8 +262,10 @@ return {
     }
 };
 ```
+:::
 
 ## Catch interface code exceptions
+::: details Expand to view JavaScript code (29 lines)
 ```js
 try{
   //你的接口引擎代码
@@ -279,9 +297,10 @@ try{
     };
 }
 ```
+:::
 
 ## Interface Engine Actual Combat
-> * here we will release a large number of interface engines to realize complex function combat: [interface engine combat](/en/apiengine/apiengine-index.html)
+> * here we will release a large number of interface engines to realize complex function combat: [interface engine combat](/doc/v8-engine/apiengine-index.html)
 
 ## Precautions
 > * if a parameter passed in by the front end is an array, when V8.Param of the interface engine receives the parameter, it is also an array and can use all the features of the array, but it cannot be used`Array.isArray(V8.Param.ArrayParamName)`to judge as true

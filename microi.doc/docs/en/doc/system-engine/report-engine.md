@@ -1,15 +1,24 @@
-# Report Engine
-## Introduction
-> * report engine is implemented by [data source engine interface engine form engine module engine]. currently, only table display format is supported. for ECharts graphical display format, please use [interface engine]]
+# 📊Report engine
 
-## Feature Highlights:
+> **By [data source engine interface engine form engine module engine] combination implementation**
+
+---
+
+## 📌Introduction
+
+The report engine currently supports tabular presentation. Please use [Interface Engine] for ECharts graphical presentation].
+
+---
+
+## ✨Feature Highlights
 > * 1. Fully customized add, delete, modify, and query are supported: general statistical report data comes from multiple tables, and multiple tables may need to be operated when adding, modifying, and deleting, which can be implemented through interface engine transactions.
 > * 2. The report generates virtual diy_table tables and virtual diy_field fields.
 > * 3, report support independent form design (virtual field)
 > * 4. Support [Module Engine] to configure query columns, editable columns, searchable columns, etc.
 
-## Use steps
+## Usage Steps
 > * 1. Create a data source engine. Currently, a report engine requires a data source engine to provide data source support. The data source supports SQL, V8, and JSON (if the data source type of the old version contains Chinese, please modify the three items to uppercase letters)
+::: details Expand to view JavaScript code (line 21)
 ```js
 var _where = [];
 var sql = `SELECT ShebeiMC,ShebeiXH,YujiFWSJ,SUM(Shuliang) AS Shuliang FROM diy_huanxinlb A
@@ -33,6 +42,7 @@ if(V8.Param._PageSize && V8.Param._PageIndex){
 var result = V8.Db.FromSql(sql).ToArray();
 return result;
 ```
+:::
 > * 2. Create a report engine. Select the corresponding data source, save it and then configure the fields to be displayed.
 > * 3. add a module to [module engine DIY] and select [DIY] as the opening method]. and select the virtual report that was just automatically generated
 > * 4. in the design of [report engine], modify [query interface replacement, add interface replacement, modify interface replacement, delete interface replacement] to the corresponding implementation interface of the interface engine (for example, replace with:/apiengine/get_webuser_info)

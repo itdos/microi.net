@@ -1,10 +1,16 @@
-# V8 Function List-Front End
-## Introduction
-> * The front-end V8 engine code and the server-side V8 programming language are both Javascript syntax.
-> * Front-end V8 engine supports full ES6 syntax
-> * The front-end V8 engine integrates many functions to directly call the back-end interface through http, which has the same effect as V8.Post() writing the corresponding interface address
-> * The front-end V8 engine code is executed at the front-end. If the server-end low-code platform general addition, deletion, modification and query interface is directly called, the front-end V8 event will not be executed (the server-end V8 event will be executed)
-> * Front-end V8 functions are mainly used for front-end V8 events of form attributes, module engine V8 button codes, etc.
+# 🌐V8 Function List-Front End
+
+> **The front-end V8 engine supports full ES6 syntax and integrates rich front-end function libraries.**
+
+---
+
+## 📌Introduction
+
+- The front-end V8 engine code and the server-side V8 programming language are JavaScript syntax
+- Front-end V8 engine supports full ES6 syntax
+- Integrates many functions to call the back-end interface directly through HTTP, and`V8.Post()`The effect of writing the corresponding interface address is the same.
+- If the front-end directly calls the server-side general add, delete, modify and query interface, the front-end V8 event **will not be executed** (the server-side V8 event will be executed)
+- Mainly used for front-end V8 events of form properties, module engine V8 button code, etc.
 
 ## V8.Form
 > * Access current form field values
@@ -43,7 +49,7 @@ var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
 > * assigns a value to the current form field property
 ```js
 //设置UserName字段为只读
-V8.FieldSet('UserName', 'Readonly', false);
+V8.FieldSet('UserName', 'Readonly', true);
 //给某个下拉框动态设置数据源：
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
@@ -250,7 +256,7 @@ V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
 ```
 
 ## V8.OpenTableSetWhere
-> * Specify search criteria for the table in [V8 event code before pop-up] of the pop-up table
+>* In the [V8 Event Code Before Popup] of the popup form, specify the search criteria for the form.
 ```js
 V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
   ['ShangpinMC', 'Like', '商用直饮机']
@@ -376,6 +382,7 @@ V8.WF.StartWork({
 
 ## V8.SendSystemMessage
 > * Send system message, message reminder
+::: details Expand to view JavaScript code (25 lines)
 ```js
 //消息内容
 var msgContent = '测试v8发送系统消息！' + new Date().toString();
@@ -403,6 +410,7 @@ return V8.Http.Post({
   }
 });
 ```
+:::
 
 ## V8.FormWF
 > * access whether the form with the process interface is currently open, and return the value:
@@ -424,6 +432,7 @@ V8.Base64.isValid('已加密字符串');//判断是否是已加密的base64格�
 
 ## V8.OpenDialog
 > * Open a custom component dialog
+::: details Expand to view JavaScript code (28 lines)
 ```javascript
 V8.OpenDialog({    
     ComponentName:'NodeColConfig',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
@@ -454,6 +463,7 @@ props: {
         this.DataAppend.V8.CloseThisDialog();
     }
 ```
+:::
 > * Universal open iframe
 ```js
 V8.OpenDialog({    
@@ -506,6 +516,7 @@ var result = await V8.ApiEngine.Run('ApiEngineKey', {
 
 ## V8.OpenAnyForm
 > * Open an arbitrary form
+::: details Expand to view JavaScript code (26 lines)
 ```javascript
 V8.OpenAnyForm({
   TableName: "Diy_ShouhouDD", //必传。打开哪张表。
@@ -534,9 +545,11 @@ V8.OpenAnyForm({
   },
 });
 ```
+:::
 
 ## V8.OpenAnyTable
 > * Open an arbitrary list
+::: details Expand to view JavaScript code (28 lines)
 ```javascript
 V8.OpenAnyTable({   
   SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
@@ -567,6 +580,7 @@ V8.OpenAnyTable({
   }
 })
 ```
+:::
 
 ## Form button anti-duplicate click
 ```js
@@ -589,10 +603,11 @@ var sysTitle = V8.SysConfig.SysTitle;
 ```
 
 ## V8.FormEngine
-> * See platform documentation:[FormEngine usage](/doc/v8-engine/form-engine.html)
+>* See the platform documentation: [FormEngine Usage](/doc/v8-engine/form-engine.html)
 
 ## Mobile End Function
 ### Bluetooth Printing
+::: details Expand to view the JavaScript code (143 lines)
 ```js
 //单条打印
 if(V8.ClientType == 'PC'){
@@ -738,8 +753,9 @@ if (V8.ClientType == 'PC') {
     }
 }
 ```
+:::
 
-### Two-dimensional code, bar code scan code V8.Method?. ScanCode
+### Two-dimensional code, bar code scan code V8.Method?. Scan Code
 > * Support H5, applets, APP
 ```js
 if (V8.Method?.ScanCode) {

@@ -1,5 +1,10 @@
-# Update Log
-> * Since the front-end and mobile terminals are 100 open source, and the back-end is 99% open source, and the team is continuously maintained and upgraded, resulting in a high update frequency, please refer to Gitee warehouse [https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master) submission log for all update logs
+# 📝Change Log
+
+> **Since 100 of the front-end and mobile terminals are open source and 99% of the back-end are open source, and many people in the team are continuously maintaining and upgrading, the update frequency is relatively high.**
+
+::: tip View all update logs
+For all update logs, please refer to Gitee warehouse submission record:[https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master)
+:::
 
 ::: details Latest-Important Update -2025-08-07
 ```js

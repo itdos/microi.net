@@ -1,21 +1,35 @@
-# Custom Components
-## Foreword
-> * In actual form development, often the component library of the low-code platform cannot meet all needs
-> * Therefore, Microi Code provides two ways to solve this problem: one is through [**Custom Component**], and the other is through [**Extended Component Library]**
-> * First look at the example:
-## Example 1 (Custom Components)
-> customer requirements: data statistics need to be displayed at the top of customer details, and after clicking each statistics, the page will automatically scroll down to the corresponding sub-table position.
+# 🎨Custom Components
+
+> **When the platform component library cannot meet the requirements, solve the problem by customizing the component or extending the component library.**
+
+---
+
+## 📌Preface
+
+- In actual form development, the component library of the low-code platform does not meet all needs.
+- Microi Code provides two methods: **Custom Components** and **Extended Component Library**
+
+---
+
+## 📸Example 1 (Custom Components)
+
+Customer requirements: Data statistics are displayed at the top of the customer details, and each statistic is automatically scrolled to the corresponding sub-table position after clicking:
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
-## Example 2 (Custom Components)
-> room information has two special components: 1. choose several rooms, several halls and several people
-> 2. after selecting the residential area, you need to obtain all the buildings in the residential area, all the units below the selected buildings, and all the room numbers below the selected units.
+---
+
+## 📸Example 2 (Custom Components)
+
+There are two special components to the listing information:
+1. Choose several rooms, several halls and several guards
+2. Obtain the building after selecting the community → Obtain the unit after selecting the building → Obtain the room number after selecting the unit
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
 ## Implementation steps
 ## 1. Create a custom vue component in the source code of Microi Code Framework
 > For example:/src/views/custom/xjy/components/kehu-childtable-class.vue
+::: details Expand to view the JavaScript code (160 lines)
 ```javascript
 <template>
     <div class="xjy-kehu-childtable-class">
@@ -178,6 +192,7 @@ export default {
 <style lang="scss">
 </style>
 ```
+:::
 ## 2. Drag the form design into a [Custom Component] and fill in the component path
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
 ## 3. Just publish the front-end project

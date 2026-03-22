@@ -1,9 +1,14 @@
-# Forms, field properties, events
+# 📋Forms, field properties, events
 
-## Form Properties
+> **Detailed explanation of various V8 events of form attributes and field attributes**
+
+---
+
+## 📄Form Properties
 
 ### Front End Entry Form V8 Event
-> * can do some default value processing
+
+Some default value handling can be done:
 ```js
 //如果是新增数据
 if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编辑）、View（预览）
@@ -11,9 +16,12 @@ if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编�
 }
 ```
 
+---
+
 ### Front-end V8 event before form submission
-> * Can do some form validation to improve user experience
-> *_<font color = "red"> note: if you directly call the interface by Postman to add, delete, this front-end V8 event will not be executed (the back-end V8 event will be executed)</font>__
+
+You can do some form validation to improve the user experience:
+>* <strong><span style="color:red">note: if you directly call the interface by Postman to add, delete, this front-end V8 event will not be executed (the back-end V8 event will be executed)</span></strong>
 ```js
 //若代码出现return Code为0时，则会在前端阻止表单继续提交
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
@@ -46,8 +54,9 @@ if(V8.CurrentUser.Level < 999){
 
 ### Server-side form pre-submit V8 event
 > * This event is executed in a transaction
-> *_<font color = "red"> Note: This V8 event code "will still be executed" if additions, deletions and changes are made directly by Postman calling the interface </font>__
-> *_<font color = "red"> note: if V8.FormEngine is called in the back-end V8 event and interface engine for addition, deletion and modification, this event "will not be executed" (developers generally only want to do basic addition, deletion and modification to prevent unexpected actions), but this event can also be executed by passing in_InvokeType:'Client' </font>__
+>* <strong><span style="color:red">Note: This V8 event code "will still be executed" if additions, deletions and changes are made directly by Postman calling the interface</span></strong>
+>* <strong><span style="color:red">note: if V8.FormEngine is called in the back-end V8 event and interface engine for addition, deletion and modification, this event "will not be executed" (developers generally only want to do basic addition, deletion and modification to prevent unexpected actions), but this event can also be executed by passing in_InvokeType:'Client'</span></strong>
+::: details Expand to view JavaScript code (28 lines)
 ```js
 //表单提交类型，可能的值：Insert、Update、Delete
 var submitType = V8.FormSubmitAction;
@@ -78,12 +87,14 @@ if(result && result.Code != 1){
     return result;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
 }
 ```
+:::
 
 
 ### V8 event after server-side form submission
 > * This event is still executed in the transaction. If you want to obtain the data after the current form is submitted, you need to use the V8.DbTrans object to obtain
-> *_<font color = "red"> Note: This V8 event code "will still be executed" if additions, deletions and changes are made directly by Postman calling the interface </font>__
-> *_<font color = "red"> note: if V8.FormEngine is called in the back-end V8 event and interface engine for addition, deletion and modification, this event "will not be executed" (developers generally only want to do basic addition, deletion and modification to prevent unexpected actions), but this event can also be executed by passing in_InvokeType:'Client' </font>__
+>* <strong><span style="color:red">Note: If you perform CRUD operations directly by calling the API via Postman, this V8 event code will "still execute"</span></strong>
+>* <strong><span style="color:red">Note: If V8.FormEngine is called from within a backend V8 event or the API engine to perform create, delete, or update operations, this event "will not be executed" (developers typically only intend to perform basic CRUD operations to avoid unexpected behavior). However, you can still trigger this event by passing _InvokeType:'Client'.</span></strong>
+::: details Expand to view JavaScript code (line 33)
 ```js
 //若代码出现return，并且未指定Code的值、或Code值不等于1时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
@@ -119,7 +130,8 @@ if(result && result.Code != 1){
     return result;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
 }
 ```
+:::
 
 ## Field Properties
-### Binding Role
+### Bind Role
 > * When the field is bound to a role, only the role can see this field when viewing the form

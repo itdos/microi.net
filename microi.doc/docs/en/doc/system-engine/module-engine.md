@@ -1,10 +1,10 @@
-# Module Engine
-## Introduction
-> The module engine includes module configuration, data source configuration, interface replacement, dynamic buttons and other configurations.
+# 📦Module Engine
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
+> **Including module configuration, data source configuration, interface replacement, dynamic button and other configurations**
+
+![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## Module Configuration
-## Open mode
+## How to open it
 ### **Diy**
 * Rendering with the form engine, opening is a table
 
@@ -19,6 +19,7 @@
 ```
 #### Address Interface Engine
 > * When the opening method is selected as **Iframe**, the interface engine of dynamic return address can be selected to realize single sign-on of third-party systems
+::: details Expand to view JavaScript code (22 lines)
 ```js
 //先取缓存
 var cacheTokenKey = `Microi:${V8.OsClient}:IotToken-meslogin-jwlrd`;
@@ -43,6 +44,7 @@ if(resultObj.code == 0 && resultObj.data && resultObj.data.token)//表示成功
 }
 return { Code : 0, Data : resultObj, Msg : result };
 ```
+:::
 
 ### **SecondMenu**
 > * Superior menu with submenu
@@ -51,7 +53,7 @@ return { Code : 0, Data : resultObj, Msg : result };
 > * Virtual Reports
 
 ## Data Source Configuration
->* **Association Table**：Which tables to join, set the table alias
+>* **Associated table**：Which tables to join, set the table alias
 
 >* **Query Columns**：Select Which Fields
 
@@ -78,7 +80,7 @@ Note: The DIY table selected by default already occupies the table alias A.
 
 Variable names that can be used:$CurrentUser. Id $, $CurrentUser. Level $, $CurrentUser. DeptId $, $CurrentUser. DeptCode $, $yyyy $, $yyyy-MM$(date format and so on)
 
->* **Import Template**：Prepare import templates in advance for users to download
+>* **Import template**：Prepare import templates in advance for users to download
 
 >* **Table Paging Sequence Increment**：Non-first page sequence number inherits page number
 
@@ -90,6 +92,7 @@ Variable names that can be used:$CurrentUser. Id $, $CurrentUser. Level $, $Curr
 > Support **pop-up** and **table**
 
 >* **Import Interface Replacement**
+::: details Expand to view JavaScript code (53 lines)
 ```js
 //可以使用接口引擎实现导入接口，一旦替换了导入接口，那么导入进度（redis）也一定要设置
 if(!V8.Param.TableId){
@@ -145,6 +148,7 @@ V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
 return { Code : 1 };
 ```
+:::
 
 >* **Import Progress Interface Replacement**
 ```js

@@ -1,14 +1,27 @@
 
-# _Where Conditional Usage
-## Introduction
-> *_There is no difference in the JavaScript writing of where in the interface engine, front-end V8 code, and server-side V8 code
-> * _Where each parameter value is finally parameterized and executed in the database through ORM, without SQL injection risk, and supports MySql, Oracle and SqlServer databases (more databases can be expanded)
-> *_<font color = red> Note: If the old interface engine V8 code parses the old version of_Where conditional format passed in by the front end, you need to use V8.Method.ParseWhere() to convert the new version of_Where to the old version </font>__
-```js
-var _oldWhere = V8.Method.ParseWhere(V8.Param._Where);//新版前端传入的_Where参数为新版格式
-```
+# 🔍_Where Conditional Usage
 
-## V8 Engine Usage
+> **'_Where' is a common conditional query parameter in the V8 engine and supports the unified syntax of the front and back ends.**
+
+---
+
+## 📌Introduction
+
+- `_Where`The JavaScript writing in the interface engine, front-end V8 code, and server-side V8 code * * are exactly the same * *
+- Each parameter value is finally in **parameterized form** executed in the database through ORM, **no SQL injection risk**
+- Support MySQL, Oracle, SqlServer databases (can scale more databases)
+
+::: warning Attention
+The old interface engine V8 code if the old version passed in by the front end is resolved.`_Where`Conditional formatting, which requires the use`V8.Method.ParseWhere()`The new version`_Where`Convert to Legacy:
+```js
+var _oldWhere = V8.Method.ParseWhere(V8.Param._Where); // 新版前端传入的_Where参数为新版格式
+```
+:::
+
+---
+
+## ⚙️ V8 Engine Usage
+::: details Expand to view JavaScript code (37 lines)
 ```js
 // 对应sql：WHERE Account = 'cccc' AND Account LIKE '%VK%'
 var result = V8.FormEngine.GetTableData('Sys_User', {
@@ -48,6 +61,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
     ]
 })
 ```
+:::
 
 ## It is worth noting that if it is a server-side. net secondary development, use c# syntax (not V8 javascript syntax)
 ```csharp

@@ -1,51 +1,96 @@
-# One-click installation
+# 🚀One-click installation
 
-## Foreword
-> * some people suggested that he did not want to compile code locally, package image, upload image, install server environment, install docker container and other complicated operations. see article [[open source low code platform-Microi code-Docker deployment](https://microi.blog.csdn.net/article/details/143576299)]]
-> * therefore, editor-in-chief bo wrote a one-click installation script [mysql redis minio mongodb watchtower low-code platform program]
-> *_<font color = "red"> note: the production environment does not recommend using a one-click installation script, but uses the form of [native installation of mysql program docker arrangement] to install the platform, please refer to the document [Docker deployment](https://microi.net/doc/docker-run.html)</font>__
-> * script installation mysql defaults to the performance configuration of 4G memory server. 2G memory server recommends downloading scripts to remove performance configuration before running scripts
-# CentOS7/Ubuntu One-Click Installation Script
+> **零门槛部署 Microi吾码全套环境**，自动安装 MySQL + Redis + MinIO + MongoDB + 低代码平台程序
+
+---
+
+## 📖Preface
+
+- Provide one-click installation scripts for users who do not want to compile code locally, package images, install environments, and other cumbersome operations.
+- Automatic installation of **MySQL Redis MinIO MongoDB Watchtower low-code platform program**
+
+::: danger⚠Important Notice
+**One-click installation script is not recommended for the production environment**. It is recommended to use [Native installation of MySQL program Docker orchestration]. For more information, see [Docker deployment documentation](/doc/docker-run)
+:::
+
+::: warning💡Memory Attention
+The script installation MySQL defaults to the performance configuration of the 4G memory server. It is recommended to download the script to remove the performance configuration before running the 2G memory server.
+:::
+
+---
+
+## 📦CentOS7 / Ubuntu One-Click Installation Script
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
 
-## Note:
-> * when executing the above script, you will be prompted [enter g to install with public network IP, enter n to install with internal network IP], please enter g or n according to the actual situation
-> * if the server does not have a docker environment, you will also be prompted whether to press y to install. although the blogger suggests using panel tools such as 1Panel and pagoda to manage the server and install docker, if you want to start quickly, type y directly.
-> * After the installation is successful, the microi-api port, front-end traditional interface port, front-end Web operating system port, and MinIO port must be opened.
-> * You will be prompted to delete all installed containers before executing the one-click script repeatedly, which will cause all data loss:
-> *_<font color = red> if it is ubuntu24. *, after successful installation, the internal firewall (non-cloud firewall rules) of the server must open the ports of mysql and redis (otherwise, the navicat can connect to the database and the docker program cannot connect to the database), and then execute# docker restart microi-install-api to restart the api. ubuntu22. *, centos does not have this problem. </font> __
+---
 
-## Delete all installed containers [this will result in loss of all data]]
-```cmd
+## ⚠Important Notes
+
+| Serial Number | Explanation |
+| :--: | ---- |
+| one | When executing the script, you will be prompted [enter 'g' to install with public network IP, enter 'n' to install with internal network IP], please enter according to the actual situation |
+| two | If the server does not have a Docker environment, you will be prompted to press 'y' to install (it is recommended to use panel tools such as 1Panel and pagoda to manage the server and install Docker) |
+| three | After the installation is successful, **must open** microi-api port, front-end traditional interface port, front-end Web operating system port, MinIO port |
+| four | Before repeating the one-click script, you will be prompted to delete all installed containers, **this will result in all data loss** |
+
+::: danger Ubuntu 24.x Special attention
+After the installation is successful, the server * * internal firewall * * (on-cloud firewall rule) must open the ports of MySQL and Redis (otherwise, the Navicat can connect to the database and the Docker program cannot connect to the database), and then execute`docker restart microi-install-api`Restart the API. Ubuntu 22.x, CentOS does not have this problem.
+:::
+
+---
+
+## 🗑Delete all installed containers
+
+::: dangerThis operation will result in the loss of all data
+```bash
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+:::
 
-## Preview of successful installation
+---
+
+## 📸Installation successful preview
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
-## Tread the pit
-> * some servers cannot walk any docker acceleration source, so the blogger packages redis, mysql, mongodb, minio, and watchtower to the container mirroring service like programs. Related articles [[record publishing docker container images such as mysql and redis installed on the server to your own ariyun container image service](https://microi.blog.csdn.net/article/details/143837441)]]
-> * mysql specifies that the table name is not case-sensitive (lower_case_table_names = 1) and does not support environment variables.
-> * mysql performance processing
-> * mysql automatically creates a database, restores the database, and sets root permissions
-> * mysql, minio and other data mapping directories add a random directory mechanism
-> * Add random port and random account password mechanism to all environments
-> * Some processing on script syntax
-> * The user must manually confirm the public IP installation or intranet IP installation
-> * ubuntu24. * is not compatible with mysql5.6 and redis6.2, so the script is upgraded to mysql5.7 and redis7.4.2
+---
 
-## Installation process diagram
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+## 🧩Tread the pit
 
-## Docker Installation Results
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+| Problem | Solution |
+| ---- | ---- |
+| Some servers cannot use Docker acceleration sources | 将 Redis、MySQL、MongoDB、MinIO、Watchtower 全部打包上传到[阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441) |
+| MySQL 'lower_case_table_names = 1' does not support environment variables | Implementation by mounting configuration file |
+| MySQL performance optimization | Configure buffer parameters by customizing 'my.cn f' |
+| MySQL Automatically Create/Restore Databases | The script automatically downloads the SQL backup and restores it |
+| Data security | MySQL, MinIO and other data directories are added to the random directory mechanism. |
+| Port conflict | Add random port and random account password mechanism to all environments |
+| The user needs to manually confirm the network mode | You must select public IP or intranet IP to install |
+| Ubuntu 24.x compatibility | Script Upgrade to MySQL 5.7 Redis 7.4.2 |
 
-## Script Code [Something]]
-> * currently updated at [2025-04-03 17:18], which may be updated frequently in the future.
-> * Script latest address:[https://gitee.com/ITdos/microi.net/blob/master/数据库、案例、文档、资料/install-microi-centos.sh)
+---
 
+## 🖥Installation process diagram
+
+![安装过程](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+
+---
+
+## 🐳Docker installation result
+
+![安装结果](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+
+---
+
+## 📝Script source code
+
+::: tip version information
+- Updated at * * 2025-04-03 17:18 *, and may be updated frequently in the future.
+- Latest script address:[Gitee repository](https://gitee.com/ITdos/microi.net/blob/master/数据库、案例、文档、资料/install-microi-centos.sh)
+:::
+
+::: details Expand to view the powershell code (302 lines)
 ```powershell
 #!/bin/bash
 
@@ -350,3 +395,4 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
+:::

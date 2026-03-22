@@ -1,7 +1,13 @@
-# System Settings
-> * system settings are very important. when opening a database, the first thing is to configure system settings
-## CAPTCHA
+# ⚙️ System settings
+
+> **System settings are very important. The first thing to do after opening the database is to configure system settings.**
+
+---
+
+## 🔐Verification code
+
 ### Get verification code image
+::: details Expand to view JavaScript code (24 lines)
 ```js
 //通过浏览器测试：
 https://api.microios.com/api/Captcha/getCaptcha?OsClient=micrios
@@ -28,11 +34,17 @@ GetCaptcha(){
     });
 }
 ```
+:::
+---
+
 ### Submit verification code
 ```js
 //参数传入_CaptchaId、_CaptchaValue
 ```
+---
+
 ### Verification code configuration
+::: details Expand to view JSON configuration (24 lines)
 ```json
 {
     "CaptchaType": 11, // 验证码类型，值为0-11，具体效果见平台文档
@@ -59,7 +71,8 @@ GetCaptcha(){
     }
 }
 ```
-| CaptchaType | Font | Static graph | Moving figure |
+:::
+| CaptchaType | Font | Static graph | Animated GIF |
 |:--:|:--:|:--:|:--:|
 | DEFAULT (0) |  | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987335545209958389942.gif/20230909/1.gif" data-fancybox="gallery" alt="" width=130> | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987336384782028080986.gif/20230909/2.gif" data-fancybox="gallery" alt="" width=130> |
 | CHINESE (1) |  | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987348140208461391418.gif/20230909/2-1.gif" data-fancybox="gallery" alt="" width=130> | <img src="https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6382987348878749178882619.gif/20230909/2-2.gif" data-fancybox="gallery" alt="" width=130> |

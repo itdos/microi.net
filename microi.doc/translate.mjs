@@ -27,7 +27,6 @@ const config = {
 	// excludeFiles: ["aboutus.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
-		{ code: "ja", name: "日语", target: "ja" },
 	],
 	// 不翻译的文本模式 (正则表达式)
 	noTranslatePatterns: [
@@ -202,6 +201,8 @@ async function processMarkdownLine(line, lang) {
 		"Element-Plus",
 		"<script\\s+setup>",
 		"SFC",
+		"<\\/?[a-zA-Z][a-zA-Z0-9]*(?:\\s[^>]*)?>", // 所有HTML标签（开标签、闭标签、自闭合标签）
+		"__", // Markdown加粗标记（下划线风格）
 	];
 	// const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join('|')}|\\`.+?\\`)`, 'g');
 	const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join("|")}|\`.+?\`)`, "g");
@@ -578,10 +579,18 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
 
 		const content = fs.readFileSync(sourcePath, "utf8");
 		const translatedContent = await translateMarkdown(content, lang);
+
+		// 后处理：修复 markdown __ 加粗标记与 HTML 标签混用导致 VitePress 编译失败的问题
+		// 将 __<font/span...>...</font/span>__ 替换为纯 HTML <strong><span>...</span></strong>
+		const fixedContent = translatedContent.replace(
+			/__<(font|span)([^>]*)>(.*?)<\/(font|span)>__/g,
+			'<strong><span$2>$3</span></strong>'
+		);
+
 		const targetPath = path.join(config.sourceDir, lang.target, relativePath);
 
 		ensureDir(path.dirname(targetPath));
-		fs.writeFileSync(targetPath, translatedContent);
+		fs.writeFileSync(targetPath, fixedContent);
 
 		return targetPath;
 	} catch (err) {

@@ -1,10 +1,16 @@
-# V8 Function List-Backend
-## Introduction
-> * server-side V8 engine code and front-end V8 programming language are Javascript syntax
-> * Server-side V8 engine supports ES6 syntax
-> * The server-side V8 engine integrates some back-end objects and methods, and can use js to call back-end methods (not http)
-> * Server-side V8 engine code is executed on the server side
-> * Server-side V8 functions are mainly used for server-side V8 events, interface engines, data source engines, etc. of form attributes
+# 🖥️ V8 Function List-Backend
+
+> **Server-side V8 engine supports ES6 syntax and integrates backend objects and methods**
+
+---
+
+## 📌Introduction
+
+- Server-side V8 engine code and front-end V8 programming language are JavaScript syntax
+- Server-side V8 engine supports ES6 syntax
+- Integrates back-end objects and methods, and can use JS to call back-end methods (non-HTTP)
+- Server-side V8 code is executed on the server side
+- Server-side V8 events, interface engines, data source engines, etc., mainly for form properties
 
 ## Interface Engine V8.ApiEngine
 > * [Interface Engine Details](/doc/v8-engine/api-engine)
@@ -26,7 +32,7 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 
 ## Cache Operations V8.Cache
 * Distributed cache operation class, usage V8.Cache('Key', 'Value', '0.00:10:00 ');
-> * Note: The format of the expiration time must be`d.HH:mm:ss`, such`0.12:00:00`0 days, 12 hours,`1.10:10:00`If the expiration time parameter is not passed for 10 hours and 10 minutes a day, it is permanent.
+> * Note: The format of the expiration time must be`d.HH:mm:ss`, such as`0.12:00:00`0 days, 12 hours,`1.10:10:00`If the expiration time parameter is not passed for 10 hours and 10 minutes a day, it is permanent.
 > * The recommended naming rule for the cache key is:`Microi:${V8.OsClient}:{分类key值}:{Key}`, which is consistent with the platform's cache Key naming rules, is easy to view, and distinguishes SaaS tenants to prevent cache confusion.
 ```javascript
 var cacheKey = `Microi:${V8.OsClient}:FormData:baoming`;
@@ -52,6 +58,7 @@ var result3 = V8.Cache.Remove(cacheKey);//返回bool类型
 
 ## C# System Class System
 > * server-side V8 code can directly use the System namespace under. net
+::: details Expand to see the C# code (line 39)
 ```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
@@ -93,9 +100,11 @@ System.Threading.Tasks.Task.Run(function(){
   });
 });
 ```
+:::
 
 ## Common functions V8.Method
 > * Integrates some common functions, can be customized extension
+::: details Expand to view JavaScript code (26 lines)
 ```javascript
 //从redis中获取当前登陆用户的token和身份信息
 //token：可选，是否包含Bearer均支持
@@ -124,6 +133,7 @@ V8.Method.AddSysLog({
 	Level : 1,//日志等级
 });
 ```
+:::
 
 ## V8.Base64
 > * Base64 conversion. Unlike System.Convert.ToBase64String(bytes), V8.Base64 directly returns the source string if an exception occurs.
@@ -156,10 +166,10 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 ## Database read-only objects V8.DbRead
 > * Database read-only object. The usage is the same as that of V8.Db. When read/write splitting is not deployed in the database, the value of this object is consistent with that of the V8.Db object.
 
-## Extended Database Objects V8.Dbs.DbKey
-> * access to multi-database (extended library) objects, extended library management see:[https://web.microi.net/#/database](https://web.microi.net/#/database)
-> * note: the [DbKey] field is missing in the table above the old database version. you need to update the database, add it manually, or wait for the application store to go online and install the [database management] application.
-> * Example: When accessing the Oracle extension library, the value of DbKey is OracleDB1, where the V8.Dbs.OracleDB1 object is equivalent to the V8.Db object.
+## Extend database object V8.Dbs.DbKey
+>* Access objects in multiple databases (extension libraries). For extension library management, see: [https://web.microi.net/#/database](https://web.microi.net/#/database)
+>* Note: Tables in older database versions are missing the [DbKey] field. You need to update the database, add the field manually, or wait for the App Store to launch the [Database Management] app and install it.
+>* Example: To access the Oracle extension library, set the DbKey value to OracleDB1. In this case, the V8.Dbs.OracleDB1 object is equivalent to the V8.Db object.
 ```js
 var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 
@@ -172,14 +182,14 @@ emptyExTrans.Commit();//提交事务
 emptyExTrans.Close();//释放事务对象
 return { Code : 1, Data : count };
 ```
-> * known problem: after adding the extension library to the platform, the docker container of the api needs to be restarted before it takes effect.
+>* Known Issue: After adding an extension library to the platform, you must restart the API’s Docker container for the changes to take effect.
 
 ## Database Transactions V8.DbTrans
 > * Database transaction objects, which can be used like V8.Db, such:
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-* There is no need to manually call [V8.DbTrans.Rollback()] in the interface engine. The platform automatically manages transaction commit and rollback (auto-commits when returning Code=1, auto-rolls back otherwise). **Calling V8.DbTrans.Commit() or V8.DbTrans.Rollback() has no effect — transaction lifecycle is fully managed by the platform.**
+* There is no need to manually call [V8.DbTrans.Rollback()] in the interface engine. The platform will automatically manage the commit and rollback of transactions (automatically commit when Code = 1 is returned, otherwise it will automatically roll back). **The transaction lifecycle is managed by the platform. Calling V8.DbTrans.Commit() or Rollback() is invalid.**
 * Interface Engine Example
 ```javascript
 //操作第一张表，带事务
@@ -268,6 +278,7 @@ V8.MongoDb.GetFormData({
 
 ## V8.Http
 > * for RestSharp encapsulation, note that the post of the front end V8 is V8.Post(). at present, V8.Http is not encapsulated for the time being. the writing method is inconsistent for the time being and will be unified later.
+::: details Expand to view JavaScript code (45 lines)
 ```javascript
 //post请求，返回string，对应的也有V8.Http.Get，参数名称则为GetParam
 var loginResult = V8.Http.Post({
@@ -315,6 +326,7 @@ var result = V8.Http.Post({
   PostParamString : '<xml><text>1</text></xml>'
 });
 ```
+:::
 
 ## V8.Header, V8.Param
 > * currently, both of them can only be used in the interface engine to obtain the message sent by the client http post request interface engine address and Request Payload parameters.
@@ -370,7 +382,7 @@ var redisHost = V8.OsClientModel.RedisHost;
 
 ## V8.FormSubmitAction
 * Form submission type: Possible values:`Insert` `Delete` `Update`(string type)
-> * Note that there is no server-side V8 event`FormOutAction`,`FormOutAfterAction`, only`FormSubmitAction`
+> * Note that there is no server-side V8 event`FormOutAction`、`FormOutAfterAction`, only`FormSubmitAction`
 
 ## V8.EventName
 > * The name of the backend V8 event. It is relatively easy to use in the global V8 engine code. Possible values:
@@ -384,16 +396,16 @@ WFNodeStart：流程节点开始V8事件
 ```
 
 
-## V8.Param
+## V8.Parameter
 > * Used to access the parameters passed in by the front end, url parameters, form-data parameters, and payload-json parameters can be accessed.
 
 ## V8.Action
 * Used to access methods customized at the global server V8 code
 
 ## V8.InvokeType
-> * Access to the current call type, possible values:`Server`,`Client`When the accessed V8.InvokeType is empty, the default`Server`
-> *`Server`: Server-side calls, such as calling the interface engine in the interface engine and calling the interface engine in the back-end V8 event
-> *`Client`: Front-end calls, such as calling the interface engine in the front-end V8 event and submitting the form in the front-end
+> * Access to the current call type, possible values:`Server`、`Client`When the accessed V8.InvokeType is empty, the default`Server`
+>*`Server`: Server-side calls, such as calling the interface engine in the interface engine and calling the interface engine in the back-end V8 event
+>*`Client`: Front-end calls, such as calling the interface engine in the front-end V8 event and submitting the form in the front-end
 
 ## V8.TableModel
 > * In the backend V8 event, you can access the current operation`diy_table`Table Information

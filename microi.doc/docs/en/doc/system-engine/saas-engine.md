@@ -1,34 +1,40 @@
-# SaaS Engine
-## Introduction
-> * As one of the highlights of the platform, the SaaS engine hosts the core independent development configuration of all tenants.
-> * The platform is SaaS mode by default, so the deployment platform must be customized and specified`OsClient`,`OsClientType`,`OsClientNetwork`
-> * One per tenant`独立数据库`, can be in`主库`of`sys_osclients`Configure a separate for each tenant in the table`数据库连接字符串`,`MongoDB`,`Redis`,`MQ`,`阿里云`,`MinIO`Wait
+# 🌐SaaS engine
+
+> **Host the core independent development configuration of all tenants, a set of programs to drive N tenants**
+
+---
+
+## 📌Introduction
+
+- As one of the highlights of the platform, the SaaS engine hosts the core independent development configuration of all tenants.
+- The platform defaults to the SaaS mode and must be specified during deployment.`OsClient`、`OsClientType`、`OsClientNetwork`
+- A separate database for each tenant, available in the main library.`sys_osclients`Configure independent database connection, MongoDB, Redis, MQ, Aliyun, MinIO, etc.
 > * One set of programs drives N tenant databases, instead of deploying another set of docker programs for each tenant
-> * Local secondary development`一键切换租户数据库`,`环境`
-> *`主库`when deploying the platform`环境变量`or`appsettings.json`configured in`数据库连接字符串[OsClientDbConn]`
-> * All`Saas引擎配置`to`主库`prevail, the tenant library's`Saas引擎配置`The table can be cleared of data.
+> * Local secondary development`一键切换租户数据库`、`环境`
+>*`主库`when deploying the platform`环境变量`or`appsettings.json`configured in`数据库连接字符串[OsClientDbConn]`
+> * All`Saas引擎配置`with`主库`prevail, the tenant library's`Saas引擎配置`The table can be cleared of data.
 
 ## 'OsClient'
-> * OsClient value is`SaaS引擎Key`, determine which tenant, value custom, recommended all lowercase letters, such as fill in`microi`,`anderson`,`iTdos`
+> * OsClient value is`SaaS引擎Key`, determine which tenant, value custom, recommended all lowercase letters, such as fill in`microi`、`anderson`、`iTdos`
 
 ## 'OsClientType'
-> * OsClientType value is`SaaS引擎环境类型`, value customization, such`正式环境`,`测试环境`,`外帐环境`Wait
-> * If filled in`Product`, on behalf`正式环境`, then this piece of data`数据库连接字符串`,`MongoDB`,`Redis`All shall be filled in`正式环境`Configuration
-> * If filled in`Dev`, on behalf`测试环境`, then this piece of data`数据库连接字符串`,`MongoDB`,`Redis`All shall be filled in`测试环境`Configuration
+> * OsClientType value is`SaaS引擎环境类型`, value customization, such`正式环境`、`测试环境`、`外帐环境`Wait
+> * If filled in`Product`, on behalf`正式环境`, then this piece of data`数据库连接字符串`、`MongoDB`、`Redis`All shall be filled in`正式环境`Configuration
+>* If filled in`Dev`, represent`测试环境`, then this data record's`数据库连接字符串`、`MongoDB`、`Redis`All should be filled in.`测试环境`The configuration
 
 ## 'OsClientNetwork'
-> * OsClientNetwork value is`SaaS引擎网络类型`, value customization, such`内网`,`外网`Wait
-> * If filled in`Internal`, on behalf`内网环境`, then this piece of data`数据库连接字符串`,`MongoDB`,`Redis`In the IP should be filled in`内网环境`The IP
-> * If filled in`Internet`, on behalf`公网环境`, then this piece of data`数据库连接字符串`,`MongoDB`,`Redis`In the IP should be filled in`公网环境`The IP
+> * OsClientNetwork value is`SaaS引擎网络类型`,custom value, such as`内网`、`外网`Wait
+>* If filled in`Internal`, represent`内网环境`, then this data record's`数据库连接字符串`、`MongoDB`、`Redis`In the IP should be filled in`内网环境`of the IP
+>* If filled in`Internet`, represent`公网环境`, then this data record's`数据库连接字符串`、`MongoDB`、`Redis`All IPs in it should be filled in.`公网环境`of the IP
 
 ## The program must specify the above 3 parameters
-> * Local secondary development modification`OsClient` `OsClientType` `OsClientNetwork`Three values to easily switch`不同租户`of`不同环境`
+> * Local secondary development modification`OsClient` `OsClientType` `OsClientNetwork`Three values to easily switch`不同租户`of the`不同环境`
 * In the main library`sys_osclients`In the table,`OsClient`   `OsClientType`   `OsClientNetwork`The three fields are unique at the same time. For example, the following three data items are supported at the same time:
 > * When`OsClient`="microi ",`OsClientType`="Product ",`OsClientNetwork`="Internal`DbConn`= "Data Source = 192.168.1.11;Database = microi"`内网IP` `正式环境数据库`
-> * When`OsClient`="microi ",`OsClientType`="Dev ",`OsClientNetwork`="Internal ",`DbConn=`"Data Source = 192.168.1.11;Database = microi_dev" means that`内网IP` `测试环境数据库`
-> * When`OsClient`="microi ",`OsClientType`="Dev ",`OsClientNetwork`="Internet ",`DbConn`= "Data Source = 59.110.139.95; When Database = microi_dev", it means that`公网IP` `测试环境数据库`
+>* When`OsClient`="microi",`OsClientType`="Dev ",`OsClientNetwork`="Internal ",`DbConn=`"Data Source = 192.168.1.11;Database = microi_dev" means that`内网IP` `测试环境数据库`
+>* When`OsClient`="microi",`OsClientType`="Dev",`OsClientNetwork`="Internet ",`DbConn`= "Data Source = 59.110.139.95; When Database = microi_dev", it means that`公网IP` `测试环境数据库`
 
-## Basic configuration
+## Basic Configuration
 > * Support database read and write separation, support specified storage media
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
@@ -42,6 +48,7 @@
 > * If you are not using Alibaba Cloud OSS, you can use MinIO
 > * It is worth noting that MinIO must set [proxy_set_header Host $http_host] when doing reverse proxy, while ariyun OSS, CDN and load balancing will have no problem under the default configuration.
 > * For example, the reverse proxy profile of the blogger
+::: details Expand View Shell Commands (line 88)
 ```shell
 proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
 server {
@@ -132,6 +139,7 @@ server {
     #LOG END
 }
 ```
+:::
 
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
