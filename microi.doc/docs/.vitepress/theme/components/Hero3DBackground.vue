@@ -266,7 +266,7 @@ async function initScene() {
   // 4. 左下角 "Microi" 3D 品牌水印 (DOM + CSS 3D Transform)
   // ========================
   const brandEl = document.createElement('div')
-  brandEl.style.cssText = 'position:fixed;bottom:18px;left:18px;z-index:2;pointer-events:none;perspective:600px;'
+  brandEl.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:2;pointer-events:none;perspective:600px;'
 
   const brandInner = document.createElement('div')
   brandInner.style.cssText = 'transform-style:preserve-3d;will-change:transform;position:relative;transform-origin:center center;'
