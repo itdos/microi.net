@@ -1,6 +1,8 @@
 # 🚀 开源 AI 低代码平台 - Microi吾码
 
-> **低代码 + AI 开发模式，支持传统开发**
+> **低代码平台与 AI 编程深度融合的开源平台**
+>
+> 低代码 + AI 本地编程 + AI 在线编程 + AI 数据分析，同时支持传统开发
 >
 > .NET10 + Vue3 + Redis + 跨数据库 + Element-Plus · 平台始于 2014 年，2024 年 11 月正式开源
 
@@ -8,9 +10,9 @@
 
 ## 📖 平台简介
 
-**Microi吾码** 是一款面向开发者的开源 AI 低代码平台，采用 **低代码 + AI** 双驱动开发模式，同时完美支持传统开发。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2024 年 11 月正式开源**。
+**Microi吾码** 是一款面向开发者的开源 AI 低代码平台，**低代码与 AI 编程深度融合**——VS Code 插件一键拉取业务代码与数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成知识库，AI 不仅懂平台 API，更了解你的每一张表、每一个字段。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2024 年 11 月正式开源**。
 
-强大的 [**API 接口引擎**](/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)，AI 自动获取 V8 引擎 API 知识库 + 你的数据库结构，接口代码生成准确率高达 99%，极致的开发效率，无需编译发布，保存即生效。
+强大的 [**API 接口引擎**](/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)，VS Code 插件一键拉取全部业务代码 + 数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成 AI 知识库，AI 不仅懂 V8 API，更了解你的每一张表、每一个字段，接口代码生成准确率高达 99%。保存即部署，远程真机执行 + 逐行断点调试全在 VS Code 内完成，无需编译发布。
 
 | 资源 | 地址 |
 |---|---|
@@ -51,11 +53,13 @@
 
 | 引擎 | 说明 |
 |---|---|
-| 🔗 **[接口引擎](/doc/v8-engine/api-engine)** | 集成 Google V8 引擎，在线使用 JavaScript 编写后端接口，支持 Get/Post，支持返回 JSON、文件、HTML 等 |
+| 🔗 **[接口引擎](/doc/v8-engine/api-engine)** | 在线使用 JavaScript 编写后端接口，支持 AI 在线编程 + VS Code 本地 AI 编程，保存即生效无需编译发布，支持 Get/Post，支持返回 JSON、文件、HTML 等 |
+| 🤖 **[AI 本地编程](/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)** | **业界首创。** VS Code 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，GitHub Copilot / Claude Code / Cursor 零配置开箱即用，写代码 → 远程执行 → 逐行断点调试全在 VS Code 内闭环 |
+| 🤖 **[AI 在线编程](/doc/v8-engine/ai-apiengine)** | 平台内置 DeepSeek 等 AI 模型，上传 V8 文档 + 数据库结构即可生成高质量接口代码，支持自然语言转 SQL、代码智能检查与优化 |
+| 📊 **AI 数据分析** | 自然语言提问，AI 自动分析业务数据并生成可视化图表，支持接入 DeepSeek、OpenAI 等大模型，自动差量同步向量数据库，AI 训练、微调、提示词管理一站式管理 |
 | 📝 **[表单引擎](/doc/form-engine/form-engine-info)** | 支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑 |
 | 📦 **[模块引擎](/doc/system-engine/module-engine)** | 多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式 |
 | 🔄 **[工作流引擎 v4](/doc/system-engine/wf-engine)** | 完全自主研发，由表单引擎 + 接口引擎驱动 |
-| 🤖 **[AI 编程](/doc/v8-engine/ai-apiengine)** | **在线 AI + 本地 AI 双模式**：自动注入 V8 API 知识库与数据库结构，GitHub Copilot / Claude Code / Cursor 开箱即用；平台内置 DeepSeek 等 AI 模型，支持自然语言转 SQL、代码检查 |
 | 🎨 **[界面引擎](/doc/system-engine/page-engine)** | 可视化界面自定义设计，支持 ECharts 图表 |
 | 🖨️ **[打印引擎](/doc/system-engine/print-engine)** | 在线制作打印模板，无需导出即可打印 |
 | 📊 **[报表引擎](/doc/system-engine/report-engine)** | 虚拟表格、ECharts 报表，支持自定义增删改 |
@@ -65,9 +69,10 @@
 
 | 模式 | 工具 | 说明 |
 |---|---|---|
-| **在线 AI 编程** | DeepSeek / ChatGPT / Kimi 等 | 上传 V8 文档 + 数据库结构（db.json），AI 直接生成接口引擎代码 |
-| **本地 AI 编程** | VS Code + Copilot / Claude Code / Cursor | 插件自动注入知识库（V8 API + 你的数据库结构），写代码→执行→调试全在 VS Code 内完成 |
-| **V8 代码调用 AI** | 接口引擎 + DeepSeek 接口 | 在接口引擎中直接调 AI，实现智能问答、自然语言转 SQL 等 |
+| **本地 AI 编程** ⭐ | VS Code + Copilot / Claude Code / Cursor | **推荐模式，业界首创。** 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，AI 精准了解你的 V8 API 和 数据库表，写代码 → 保存自动部署 → 远程执行 → 逐行断点调试，全在 VS Code 内闭环完成 |
+| **在线 AI 编程** | 平台内置 DeepSeek / ChatGPT / Kimi 等 | 上传 V8 文档 + 数据库结构（db.json），AI 直接生成接口引擎代码，支持代码补全、智能检查与优化 |
+| **AI 数据分析** | DeepSeek / OpenAI + 向量数据库 | 自然语言提问即可分析业务数据，自动生成可视化图表；自动差量同步向量数据库，支持 AI 训练、微调、提示词管理 |
+| **V8 代码调用 AI** | 接口引擎 + DeepSeek 接口 | 在接口引擎中直接调 AI，实现智能问答、自然语言转 SQL、内容审核等 |
 
 > [→ 查看 AI 编程全指南](/doc/v8-engine/ai-apiengine)
 
@@ -112,7 +117,7 @@
 
 | 版本 | 价格 | 说明 |
 |---|---|---|
-| **开源版** | 免费 | PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。**仅无法使用在线 AI 相关功能** |
+| **开源版** | 免费 | PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。**VS Code 本地 AI 编程完全免费，搭配 Copilot / Claude Code / Cursor 即可使用** |
 | **个人版** | ￥999 | 额外包含 **WebOS 100% 完整源码**，功能、开源程度与企业版完全一致，**无任何限制、无限分发部署** |
 | **企业版** | ￥10w（首付 ￥2.5w） | 提供更多培训、咨询等售后服务，**优先响应平台升级需求** |
 

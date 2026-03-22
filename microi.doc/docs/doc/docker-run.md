@@ -2,24 +2,59 @@
 
 > **通过 Docker 编排部署 Microi吾码低代码平台全套环境**
 
----
+## 🚀 一键安装（零门槛部署）
 
-## 📌 说明
+针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-::: warning 前置条件
-Docker 部署需要一定的服务器 Linux 操作系统基础。
+自动安装 **MySQL + Redis + MinIO + MongoDB + Ollama + Qdrant + Watchtower + 低代码平台程序（API + Web）**，基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
+
+### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
+```cmd
+url=https://static.itdos.com/install/install-microi.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi.sh $url;fi;bash install-microi.sh
+```
+
+### ⚠️ 注意事项
+
+| 序号 | 说明 |
+| :--: | ---- |
+| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】和【Demo 示例数据库 / 空数据库】 |
+| 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
+| 3 | MySQL 性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位） |
+| 4 | 端口从 **7000 开始顺序 +1 分配**（7000-7009），安装前会自动检测端口占用，若有冲突则从 7100 开始重试 |
+| 5 | 安装前脚本会**先在防火墙中开放**所有端口，再部署服务（若使用云服务器，还需在云控制台安全组中开放） |
+| 6 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
+
+### 📋 端口分配表（默认从 7000 开始）
+
+| 端口 | 服务 | 容器内部端口 |
+| :--: | ---- | :--: |
+| 7000 | MySQL 5.7 | 3306 |
+| 7001 | Redis 7.4 | 6379 |
+| 7002 | MongoDB | 27017 |
+| 7003 | MinIO API | 9000 |
+| 7004 | MinIO Console | 9001 |
+| 7005 | Ollama AI | 11434 |
+| 7006 | Qdrant HTTP | 6333 |
+| 7007 | Qdrant gRPC | 6334 |
+| 7008 | API | 80 |
+| 7009 | Web 前端 | 80 |
+
+> 若 7000-7009 中有端口被占用，脚本会自动从 7100-7109 开始重新检测，以此类推（每次 +100）。
+
+### 🗑️ 删除所有已安装容器/编排
+
+::: danger 此操作将导致所有数据丢失
+方式一（推荐）：进入各编排目录执行 `docker compose down`
+
+方式二（强制删除所有容器）：
+```bash
+docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
+```
 :::
 
 ---
 
-## 🎥 视频教程
-
-- 待重新录制上传
-- 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
-
----
-
-## 🚀 Docker 编排部署（推荐）
+## 🔧 Docker 手动编排部署
 
 ::: tip 生产环境建议
 - 通过服务器面板**原生安装 MySQL**（低配服务器建议 v5.7.x，高配服务器建议 v8.0.x）
@@ -447,13 +482,13 @@ services:
 
 ---
 
-### 6️⃣ 低代码平台程序编排（Api + Web + WebOS + Mobile + Watchtower）
+### 6️⃣ 低代码平台程序编排（Api + Web + Watchtower）
 
 ::: tip 说明
 - 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像
 - `microi-web` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
 :::
-::: details 展开查看 Shell 命令（102 行）
+::: details 展开查看 Shell 命令（70 行）
 ```shell
 version: '3.8'
 services:
@@ -505,46 +540,6 @@ services:
     tty: true
     stdin_open: true
 
-  microi-webos:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-webos:latest
-    container_name: microi-webos
-    volumes:
-      - /etc/localtime:/etc/localtime
-      - /usr/share/fonts:/usr/share/fonts
-    environment:
-      - OsClient=
-      - ApiBase=https://api.itdos.com
-    ports:
-      - "1002:80"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "10"
-    restart: always
-    tty: true
-    stdin_open: true
-
-  microi-mobile:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-mobile:latest
-    container_name: microi-mobile
-    volumes:
-      - /etc/localtime:/etc/localtime
-      - /usr/share/fonts:/usr/share/fonts
-    environment:
-      - OsClient=
-      - ApiBase=https://api.itdos.com
-    ports:
-      - "1003:80"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "10"
-    restart: always
-    tty: true
-    stdin_open: true
-
   watchtower:
     image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
     container_name: watchtower
@@ -556,10 +551,182 @@ services:
       - /etc/localtime:/etc/localtime
       - /root/.docker/config.json:/config.json
       - /var/run/docker.sock:/var/run/docker.sock  
-    command: --cleanup --include-stopped --interval 10 microi-api microi-web microi-webos microi-mobile
+    command: --cleanup --include-stopped --interval 10 microi-api microi-web
 ```
 :::
 
+
+---
+
+### 7️⃣ Ollama 编排
+
+>* Docker会自动创建所需的数据目录，无需手动创建
+>* 通过docker编排部署
+::: details 展开查看 Shell 命令（50 行）
+```shell
+version: '3.8'
+services:
+  # Ollama AI 服务（使用阿里云镜像加速）
+  microi-ollama:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/ollama:latest  # 使用阿里云镜像，也可使用日期版本如 :20260129
+    container_name: microi-ollama
+    ports:
+      - "1434:11434"  # 如需修改端口，直接改这里，如 "8080:11434"
+    volumes:
+      - /microi/ollama/data:/root/.ollama  # 持久化模型数据（统一存储在/microi目录下）
+    restart: always  # 开机自动启动
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - microi-ollama-network
+
+networks:
+  microi-ollama-network:
+    driver: bridge
+
+# =====================================================
+# Microi.net 专用 Ollama + DeepSeek 部署方案
+# 使用阿里云镜像加速
+# =====================================================
+#
+# 【验证部署】
+#   curl http://localhost:1434/api/tags
+#   docker exec microi-ollama ollama list
+#
+# 【测试AI对话】
+#   curl http://localhost:1434/v1/chat/completions \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "model": "deepseek-r1:1.5b",
+#       "messages": [{"role": "user", "content": "你好"}]
+#     }'
+#
+# 【下载其他模型】
+#   docker exec microi-ollama ollama pull deepseek-r1:7b # 下载7B模型
+#   docker exec microi-ollama ollama pull deepseek-coder:1.3b # 下载Coder模型
+#   docker exec microi-ollama ollama pull deepseek-coder:6.7b # 下载Coder 6.7B模型
+#   docker logs -f microi-ollama # 查看下载进度
+#   docker exec microi-ollama ollama list # 查看已安装模型
+# =====================================================
+```
+:::
+
+>* 拉取nomic-embed-text模型（384维，用于中英文文本）
+```shell
+docker exec microi-ollama ollama pull nomic-embed-text
+```
+
+>* 测试API
+```
+curl http://localhost:1434/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{"model": "nomic-embed-text", "input": "测试"}'
+```
+
+### 7️⃣ Qdrant 向量数据库编排
+::: details 展开查看 Shell 命令（93 行）
+```shell
+version: '3.8'
+services:
+  # Qdrant向量数据库服务
+  microi-qdrant:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest
+    container_name: microi-qdrant
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "1333:6333"      # HTTP API端口
+      - "1334:6334"      # gRPC端口（可选，高性能场景）
+      
+    # 数据卷挂载（持久化存储）
+    volumes:
+      - /microi/qdrant/storage:/qdrant/storage          # 主存储目录
+      - /microi/qdrant/snapshots:/qdrant/snapshots      # 快照目录
+      - /microi/qdrant/config:/qdrant/config            # 配置文件目录（可选）
+
+    # 环境变量配置（所有优化配置）
+    environment:
+      # 安全配置（生产环境建议启用）
+      - QDRANT__SERVICE__API_KEY=password123456         # API密钥（取消注释后启用）
+      - QDRANT__SERVICE__ENABLE_TLS=false               # TLS加密（本地部署可关闭）
+
+      # 核心配置
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      
+      # 性能优化配置
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=4          # 搜索线程数
+      - QDRANT__STORAGE__PERFORMANCE__MAX_OPTIMIZATION_THREADS=2    # 优化线程数
+      - QDRANT__STORAGE__PERFORMANCE__UPDATE_QUEUE_SIZE=100         # 更新队列大小
+      
+      # HNSW索引优化（提升搜索速度）
+      - QDRANT__STORAGE__HNSW_INDEX__M=16                           # HNSW图的连接数（默认16）
+      - QDRANT__STORAGE__HNSW_INDEX__EF_CONSTRUCT=100               # 构建时的搜索深度（默认100）
+      
+      # 内存优化
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=true                       # 将Payload存储到磁盘（节省内存）
+      - QDRANT__STORAGE__MMAP_THRESHOLD_KB=102400                   # 100MB以上使用mmap（减少内存占用）
+      
+      # 持久化与恢复
+      - QDRANT__STORAGE__WAL__WAL_CAPACITY_MB=32                    # WAL日志容量（MB）
+      - QDRANT__STORAGE__WAL__WAL_SEGMENTS_AHEAD=0                  # 提前创建WAL段数
+      - QDRANT__STORAGE__SNAPSHOT_PATH=/qdrant/snapshots            # 快照路径
+      
+      # 日志配置
+      - QDRANT__LOG_LEVEL=INFO                                      # 日志级别: TRACE, DEBUG, INFO, WARN, ERROR
+      
+      # 集群配置（单机部署可忽略）
+      - QDRANT__CLUSTER__ENABLED=false                              # 是否启用集群模式
+      
+      # 资源限制（防止OOM）
+      - QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB=102400     # mmap阈值
+      - QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB=20480    # 索引阈值（20MB）
+        
+    # 资源限制（根据服务器实际情况调整）
+    #deploy:
+    #  resources:
+    #    limits:
+    #      cpus: '4.0'              # 最大CPU核心数
+    #      memory: 8G               # 最大内存
+    
+    # 健康检查（可选，如不需要可删除）
+    # 作用：监控服务状态，自动重启失败的容器
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # 网络配置
+    networks:
+      - microi-qdrant-network
+    
+    # 标签（便于管理）
+    labels:
+      - "com.microi.service=qdrant"
+      - "com.microi.description=Qdrant Vector Database for AI"
+      - "com.microi.version=1.0"
+
+# 网络定义
+networks:
+  microi-qdrant-network:
+    driver: bridge  # 简单桥接网络，无需固定IP
+
+# http://localhost:1333/healthz # 健康检查接口
+# 管理界面: http://localhost:1333/dashboard
+# 检查向量数据是否已初始化：
+# http://localhost:1333/collections/microi_schema
+# 查看 points_count 是否>0
+```
+:::
 
 ---
 
