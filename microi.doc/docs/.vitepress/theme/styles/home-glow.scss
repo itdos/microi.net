@@ -52,9 +52,17 @@ div[class*="VPHome"] {
   }
   
   // Hero 区域特殊处理
+  // Hero 区域特殊处理
   .VPHero {
     .name {
       color: #ffffff !important;
+      // 当3D标题注入后，隐藏原始clip文字
+      &[data-injected3d] {
+        .clip {
+          -webkit-text-fill-color: transparent !important;
+          background: none !important;
+        }
+      }
     }
     
     .text {
