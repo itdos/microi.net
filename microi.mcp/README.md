@@ -6,7 +6,21 @@
 
 ---
 
-## 提供的 AI 能力（6 个 Tools）
+## ⭐ 推荐方式：安装 VS Code 插件（零配置）
+
+**大多数用户无需手动配置 MCP。** 安装 [Microi吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=microi.v8-engine) 后，MCP 自动配置，开箱即用：
+
+- 自动生成 `.vscode/mcp.json`（GitHub Copilot）和 `.cursor/mcp.json`（Cursor）
+- Token 自动刷新，无需存储密码
+- 同时注入 AI 指令文件（`.github/copilot-instructions.md`、`CLAUDE.md`、`.cursorrules`）
+
+安装插件 → 配置服务器连接 → 拉取代码 → **MCP 立即可用**，支持 GitHub Copilot、Cursor、Claude Code for VS Code。
+
+> 以下内容适用于 **不使用 VS Code 插件** 或需要 **SSE 远程部署** 的场景。
+
+---
+
+## 提供的 AI 能力（10 个 Tools）
 
 | Tool | 功能 | 读/写 |
 |------|------|-------|
@@ -14,21 +28,20 @@
 | `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
 | `microi_list_engines` | 列出所有接口引擎 | 只读 |
 | `microi_get_engine_code` | 获取接口引擎 JavaScript 源码 | 只读 |
+| `microi_save_engine_code` | 保存接口引擎代码 | 读写 |
+| `microi_create_engine` | 创建新的接口引擎 | 读写 |
 | `microi_run_engine` | 远程执行接口引擎（⚠️ 可能有副作用） | 读写 |
 | `microi_list_events` | 列出所有 V8 表单事件 | 只读 |
+| `microi_get_event_code` | 获取 V8 事件源码 | 只读 |
+| `microi_save_event_code` | 保存 V8 事件代码 | 读写 |
 
 ---
 
-## 快速开始：如何使用 MCP
+## 手动配置：本地 stdio 模式
 
-### 第 1 步：选择运行模式
+适用于不使用 VS Code 插件的开发者。AI 工具在每次启动时自动拉起 MCP Server 进程。
 
-| 模式 | 适用场景 | 特点 |
-|------|---------|------|
-| **本地 stdio** | 个人开发 | AI 工具自动拉起 MCP 进程，零部署 |
-| **远程 SSE** | 团队共享 / 生产环境 | Docker 部署一次，所有人连同一个地址 |
-
-### 第 2 步：安装和构建
+### 安装
 
 ```bash
 git clone https://gitee.com/microi-net/microi.mcp.git
@@ -37,38 +50,27 @@ npm install
 npm run build
 ```
 
-### 第 3 步：配置到你的 AI 工具
-
----
-
-## 📌 本地 stdio 模式（个人开发推荐）
-
-AI 工具在每次启动时自动拉起 MCP Server 进程，无需单独部署。
-
 ### GitHub Copilot（VS Code）
 
-在项目的 `.vscode/settings.json` 中添加：
+在项目的 `.vscode/mcp.json` 中添加：
 
-```jsonc
+```json
 {
-  "mcp": {
-    "servers": {
-      "microi": {
-        "command": "node",
-        "args": ["/path/to/microi.mcp/dist/index.js"],
-        "env": {
-          "MICROI_API_URL": "https://api.microi.net",
-          "MICROI_USERNAME": "your_username",
-          "MICROI_PASSWORD": "your_password",
-          "MICROI_OS_CLIENT": ""
-        }
+  "servers": {
+    "microi": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/microi.mcp/dist/index.js"],
+      "env": {
+        "MICROI_API_URL": "https://api.microi.net",
+        "MICROI_USERNAME": "your_username",
+        "MICROI_PASSWORD": "your_password",
+        "MICROI_OS_CLIENT": ""
       }
     }
   }
 }
 ```
-
-> 将 `/path/to/microi.mcp` 替换为实际克隆路径。`MICROI_OS_CLIENT` 留空则使用后端默认应用。
 
 ### Cursor
 
@@ -91,7 +93,7 @@ AI 工具在每次启动时自动拉起 MCP Server 进程，无需单独部署�
 }
 ```
 
-### Claude Code
+### Claude Code (CLI)
 
 ```bash
 claude mcp add microi -- \
@@ -101,31 +103,24 @@ claude mcp add microi -- \
   node /path/to/microi.mcp/dist/index.js
 ```
 
+> 将 `/path/to/microi.mcp` 替换为实际克隆路径。`MICROI_OS_CLIENT` 留空则使用后端默认应用。
+
 ---
 
-## 📌 远程 SSE 模式（团队 / 生产推荐）
+## 远程 SSE 模式（团队 / 生产推荐）
 
 将 MCP Server 部署为 Docker 容器，所有人连同一个 SSE 地址。
 
-### 部署方式 A：挂载到已有的 API 域名下（推荐，无需单独域名）
-
-通过 Nginx 反向代理，将 MCP 挂载到已有的 API 域名下，如 `https://api.microi.net/mcp/sse`。
-
-**1. 启动 MCP 容器**
+### 部署
 
 ```bash
 cd microi.mcp
 cp .env.example .env
 # 编辑 .env 填入后端地址和管理员账号
-```
-
-```bash
 docker compose up -d
 ```
 
-**2. 配置 Nginx 反向代理**
-
-将 `nginx-mcp.conf` 的内容添加到 api.microi.net 的 Nginx `server {}` 块中：
+### Nginx 反向代理（推荐挂载到已有 API 域名下）
 
 ```nginx
 # MCP SSE 端点
@@ -150,32 +145,26 @@ location /mcp/health {
 }
 ```
 
-```bash
-nginx -t && nginx -s reload
-```
-
-**3. 验证部署**
+### 验证
 
 ```bash
 curl https://api.microi.net/mcp/health
 # 应返回 {"status":"ok","server":"microi-mcp-server","version":"1.0.0"}
 ```
 
-**4. AI 工具连接 SSE**
+### AI 工具连接 SSE
 
-GitHub Copilot（`.vscode/settings.json`）：
+GitHub Copilot（`.vscode/mcp.json`）：
 
-```jsonc
+```json
 {
-  "mcp": {
-    "servers": {
-      "microi": {
-        "url": "https://api.microi.net/mcp/sse",
-        "headers": {
-          "X-Microi-Username": "your_username",
-          "X-Microi-Password": "your_password",
-          "X-Microi-OsClient": ""
-        }
+  "servers": {
+    "microi": {
+      "url": "https://api.microi.net/mcp/sse",
+      "headers": {
+        "X-Microi-Username": "your_username",
+        "X-Microi-Password": "your_password",
+        "X-Microi-OsClient": ""
       }
     }
   }
@@ -199,21 +188,7 @@ Cursor（`.cursor/mcp.json`）：
 }
 ```
 
-> ⚠️ 配置文件包含敏感信息（密码），请加入 `.gitignore` 避免提交到 Git。
-
-### 部署方式 B：独立域名
-
-如果希望使用独立域名（如 `mcp.microi.net`），直接将容器的 3000 端口反向代理到该域名即可，AI 工具 URL 改为 `https://mcp.microi.net/sse`。
-
----
-
-## 发布 Docker 镜像
-
-```bash
-# 开源版模板（需修改 Docker 帐号信息）
-chmod +x publish-demo.sh
-./publish-demo.sh
-```
+> ⚠️ 配置文件包含敏感信息，请加入 `.gitignore` 避免提交到 Git。
 
 ---
 
@@ -222,18 +197,22 @@ chmod +x publish-demo.sh
 | 变量 | 必填 | 说明 | 示例 |
 |------|------|------|------|
 | `MICROI_API_URL` | ✅ | Microi 后端 API 地址 | `https://api.microi.net` |
-| `MICROI_USERNAME` | ✅ | 登录账号 | `admin` |
-| `MICROI_PASSWORD` | ✅ | 登录密码（明文，自动 RSA 加密） | |
+| `MICROI_USERNAME` | ※ | 登录账号（无 Token 时必填） | `admin` |
+| `MICROI_PASSWORD` | ※ | 登录密码（明文，自动 RSA 加密） | |
+| `MICROI_TOKEN` | ※ | JWT Token（VS Code 插件自动管理） | |
+| `MICROI_TOKEN_FILE` | | Token 文件路径（VS Code 插件自动管理） | |
 | `MICROI_OS_CLIENT` | | 应用标识 | |
 | `MICROI_RSA_PUBLIC_KEY` | | 自定义 RSA 公钥（PEM） | |
 | `MCP_TRANSPORT` | | `stdio`（默认） 或 `sse` | |
 | `MCP_PORT` | | SSE 端口（默认 `3000`） | |
 
+> ※ 认证优先级：`MICROI_TOKEN_FILE` > `MICROI_TOKEN` > `MICROI_USERNAME` + `MICROI_PASSWORD`
+
 ---
 
 ## 使用示例
 
-配置完成后，在 AI 对话中直接提问，AI 会自动调用 MCP Tool：
+配置完成后，在 AI 对话中直接提问：
 
 ```
 你：帮我查一下 Sys_User 表有哪些字段
@@ -250,29 +229,22 @@ AI：[调用 microi_run_engine] → 返回执行结果
 
 ## 安全性
 
-- SSE 模式每个连接独立认证，必须提供帐号密码，仅知道 URL 无法访问
-- 使用与 VS Code 插件完全相同的认证机制（RSA 加密登录 + JWT Token）
 - 所有操作受 Microi 后端权限控制，用户只能访问自己有权限的数据
-- 查询类 Tool 均为只读，`microi_run_engine` 是唯一的写操作
+- 使用 RSA 加密登录 + JWT Token 认证
+- SSE 模式每个连接独立认证，仅知道 URL 无法访问
 - Token 自动刷新（每 12 分钟），无需明文存储长期密码
-- MCP Server 等同于用该用户身份登录平台，不会绕过任何权限
-- 不同租户（OsClient）连接不同数据库，数据完全隔离
+- 不同租户（OsClient）数据完全隔离
 
 ---
 
-## 与 VS Code 插件 / Skills 的关系
+## 与 VS Code 插件的关系
 
 | 方案 | 覆盖内容 | 适用场景 |
 |------|---------|---------|
-| **VS Code 插件** | V8 全部 API 知识 + 数据库表结构 + 代码补全 | 日常开发，自动化 |
-| **MCP Server**（本项目） | 实时查询数据、远程执行引擎 | AI 实时操作平台 |
-| **Skills** | 具体场景的编码最佳实践和代码模板 | 进阶模式，深度指导 |
+| **VS Code 插件**（推荐） | MCP 自动配置 + API 知识库 + 代码补全 + 表结构文档 | 日常开发，开箱即用 |
+| **MCP Server**（本项目） | 实时查询数据、远程执行引擎 | 不使用插件 / 团队 SSE 部署 |
 
-> 💡 推荐三者搭配使用：插件提供 API 知识和表结构 → MCP 提供实时数据查询 → Skills 提供编码最佳实践。
-
-## License
-
-MIT
+> 💡 安装 VS Code 插件即可获得 MCP 全部能力，无需单独配置本项目。
 
 ## License
 
