@@ -24,7 +24,7 @@
   "other" : "其它",
   "other-case1.md" : "迈巴赫物性",
 
-  "docker-run.md" : "Docker部署",
+  "docker-run.md" : "Docker部署（一键安装）",
   "local-run-server.md" : "源码本地运行-后端",
   "local-run-client.md" : "源码本地运行-前端",
   "win-install-microi.md" : "Windows部署",

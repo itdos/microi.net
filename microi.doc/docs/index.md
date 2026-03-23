@@ -13,7 +13,7 @@ hero:
       text: 文档
       link: /doc/index
     - theme: brand
-      text: 免费试用
+      text: 在线使用
       link: https://web.microi.net
     - theme: brand
       text: Gitee源码
