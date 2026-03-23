@@ -1,0 +1,8 @@
+dist
+*.bat
+*.sh
+!publish-demo.sh
+# 允许 Docker 配置文件被 Git 跟踪
+!Dockerfile
+!default.conf
+!itdos-heart
