@@ -1,7 +1,7 @@
 /**
  * SignalR WebSocket 客户端 —— 适用于微信小程序 (uni-app)
  * =========================================================
- * 参考 microi.web/src/views/chat 项目的 SignalR 通信协议
+ * 参考 Microi.Client/src/views/chat 项目的 SignalR 通信协议
  * 使用 uni.connectSocket 实现 WebSocket 连接
  *
  * SignalR JSON 协议说明：

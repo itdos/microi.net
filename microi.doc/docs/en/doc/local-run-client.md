@@ -35,8 +35,8 @@ node -v
 
 ## ▶Running front-end source code
 
-1. Open in VS Code`/microi.web/`Folder
-2. View`/microi.web/README.md`, execute the following command:
+1. Open in VS Code`/Microi.Client/`Folder
+2. View`/Microi.Client/README.md`, execute the following command:
 
 ```bash
 nvm use 20

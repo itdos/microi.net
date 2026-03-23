@@ -35,8 +35,8 @@ node -v
 
 ## ▶️ 运行前端源码
 
-1. 在 VS Code 打开 `/microi.web/` 文件夹
-2. 查看 `/microi.web/README.md`，执行以下命令：
+1. 在 VS Code 打开 `/Microi.Client/` 文件夹
+2. 查看 `/Microi.Client/README.md`，执行以下命令：
 
 ```bash
 nvm use 20
