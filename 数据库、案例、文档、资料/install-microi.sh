@@ -268,6 +268,21 @@ install_deps
 echo ''
 echo '[步骤2/11] Docker 环境就绪 ✓'
 
+# === 磁盘空间预检 ===
+echo ''
+echo 'Microi：检查磁盘可用空间...'
+ROOT_AVAIL_KB=$(df -P /home 2>/dev/null | tail -1 | awk '{print $4}' || echo "0")
+if [ -z "${ROOT_AVAIL_KB}" ]; then
+  ROOT_AVAIL_KB=0
+fi
+ROOT_AVAIL_MB=$((ROOT_AVAIL_KB / 1024))
+echo "Microi：/home 分区可用空间: ${ROOT_AVAIL_MB}MB"
+if [ ${ROOT_AVAIL_MB} -lt 2048 ]; then
+  echo "Microi：警告：磁盘可用空间不足 2GB（当前 ${ROOT_AVAIL_MB}MB）。"
+  echo "Microi：MySQL初始化、Docker镜像拉取等操作需要较多磁盘空间。"
+  echo "Microi：建议至少保留 5GB 以上可用空间。如空间不足可能导致安装失败。"
+fi
+
 # ============================================================
 # 步骤3：端口分配与占用检测
 # ============================================================
@@ -391,6 +406,15 @@ MONGO_ROOT_PASSWORD=$(generate_random_password)
 MINIO_ACCESS_KEY=$(generate_random_password)
 MINIO_SECRET_KEY=$(generate_random_password)
 QDRANT_API_KEY=$(generate_random_password)
+
+# 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
+for _pw_var in MYSQL_ROOT_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY QDRANT_API_KEY; do
+  eval _pw_val="\${${_pw_var}}"
+  if [ -z "${_pw_val}" ]; then
+    echo "Microi：错误：密码生成失败（${_pw_var}为空），请检查 openssl 是否安装正确。"
+    exit 1
+  fi
+done
 echo 'Microi：各服务密码/密钥已随机生成 ✓'
 
 MYSQL_DATA_DIR=$(generate_random_data_dir "mysql")
@@ -428,11 +452,13 @@ generate_mysql_config() {
   local sort_buffer_size
   local read_buffer_size
   local join_buffer_size
+  local innodb_log_file_size
 
   if [ ${total_mem_mb} -le 1024 ]; then
     echo "Microi：MySQL配置模式: 极低配(≤1GB内存)" >&2
     innodb_buffer_pool_size="128M"
     innodb_log_buffer_size="16M"
+    innodb_log_file_size="48M"
     key_buffer_size="16M"
     tmp_table_size="16M"
     max_heap_table_size="16M"
@@ -446,6 +472,7 @@ generate_mysql_config() {
     echo "Microi：MySQL配置模式: 低配(2GB内存)" >&2
     innodb_buffer_pool_size="256M"
     innodb_log_buffer_size="32M"
+    innodb_log_file_size="64M"
     key_buffer_size="32M"
     tmp_table_size="32M"
     max_heap_table_size="32M"
@@ -459,6 +486,7 @@ generate_mysql_config() {
     echo "Microi：MySQL配置模式: 标准(4GB内存)" >&2
     innodb_buffer_pool_size="512M"
     innodb_log_buffer_size="64M"
+    innodb_log_file_size="128M"
     key_buffer_size="64M"
     tmp_table_size="64M"
     max_heap_table_size="64M"
@@ -472,6 +500,7 @@ generate_mysql_config() {
     echo "Microi：MySQL配置模式: 中配(8GB内存)" >&2
     innodb_buffer_pool_size="1G"
     innodb_log_buffer_size="128M"
+    innodb_log_file_size="256M"
     key_buffer_size="128M"
     tmp_table_size="128M"
     max_heap_table_size="128M"
@@ -485,6 +514,7 @@ generate_mysql_config() {
     echo "Microi：MySQL配置模式: 高配(16GB内存)" >&2
     innodb_buffer_pool_size="3G"
     innodb_log_buffer_size="256M"
+    innodb_log_file_size="256M"
     key_buffer_size="256M"
     tmp_table_size="256M"
     max_heap_table_size="256M"
@@ -498,6 +528,7 @@ generate_mysql_config() {
     echo "Microi：MySQL配置模式: 超高配(>16GB内存)" >&2
     innodb_buffer_pool_size="5G"
     innodb_log_buffer_size="256M"
+    innodb_log_file_size="512M"
     key_buffer_size="256M"
     tmp_table_size="256M"
     max_heap_table_size="256M"
@@ -535,7 +566,7 @@ max_heap_table_size = ${max_heap_table_size}
 # InnoDB优化
 innodb_flush_method = O_DIRECT
 innodb_flush_neighbors = 0
-innodb_log_file_size = 256M
+innodb_log_file_size = ${innodb_log_file_size}
 innodb_log_files_in_group = 2
 innodb_read_io_threads = 4
 innodb_write_io_threads = 4
@@ -619,6 +650,14 @@ compose_up() {
   else
     echo "Microi：错误：编排 [${project_name}] 部署失败 ✗"
     echo "Microi：请检查以上错误日志。常见原因：镜像拉取失败、端口冲突、磁盘空间不足。"
+    # 自动输出容器日志帮助排查
+    echo '------------------------------------------------------------------'
+    echo 'Microi：尝试输出相关容器日志：'
+    for cname in $(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null); do
+      echo "--- 容器 ${cname} 日志 ---"
+      docker logs "${cname}" 2>&1 | tail -30
+    done
+    echo '------------------------------------------------------------------'
     exit 1
   fi
 }
@@ -673,6 +712,20 @@ echo '------------------------------------------------------------------'
 
 MYSQL_DIR="${COMPOSE_BASE_DIR}/microi-install-mysql"
 
+# 检查磁盘可用空间（MySQL初始化至少需要1GB）
+MYSQL_DATA_MOUNT=$(df -P "${MYSQL_DATA_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
+if [ -n "${MYSQL_DATA_MOUNT}" ]; then
+  DISK_AVAIL_MB=$((MYSQL_DATA_MOUNT / 1024))
+  echo "Microi：MySQL 数据目录所在磁盘可用空间: ${DISK_AVAIL_MB}MB"
+  if [ ${DISK_AVAIL_MB} -lt 1024 ]; then
+    echo "Microi：错误：磁盘可用空间不足 1GB（当前 ${DISK_AVAIL_MB}MB），MySQL初始化可能失败。"
+    echo "Microi：请清理磁盘空间后重试，或更换数据目录至空间充足的磁盘。"
+    exit 1
+  fi
+else
+  echo "Microi：警告：无法检测磁盘可用空间，继续安装..."
+fi
+
 rm -rf "${MYSQL_DATA_DIR}"
 mkdir -p "${MYSQL_DATA_DIR}"
 sudo chown -R 999:999 "${MYSQL_DATA_DIR}"
@@ -720,8 +773,35 @@ echo ''
 echo 'Microi：等待MySQL容器启动...'
 sleep 5
 
+# 先检查容器是否还在运行（避免空等60秒）
+if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
+  echo 'Microi：错误：MySQL 容器启动后立即退出，以下是容器日志：'
+  echo '------------------------------------------------------------------'
+  docker logs microi-install-mysql57 2>&1 | tail -50
+  echo '------------------------------------------------------------------'
+  echo 'Microi：正在清理失败的MySQL部署...'
+  docker stop microi-install-mysql57 > /dev/null 2>&1 || true
+  docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+  rm -rf "${MYSQL_DATA_DIR}"
+  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
+  exit 1
+fi
+
 MYSQL_READY=false
 for i in $(seq 1 30); do
+  # 每轮检查容器是否仍在运行
+  if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
+    echo 'Microi：错误：MySQL 容器在等待过程中退出，以下是容器日志：'
+    echo '------------------------------------------------------------------'
+    docker logs microi-install-mysql57 2>&1 | tail -50
+    echo '------------------------------------------------------------------'
+    echo 'Microi：正在清理失败的MySQL部署...'
+    docker stop microi-install-mysql57 > /dev/null 2>&1 || true
+    docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+    rm -rf "${MYSQL_DATA_DIR}"
+    echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
+    exit 1
+  fi
   if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
     MYSQL_READY=true
     break
@@ -731,8 +811,15 @@ for i in $(seq 1 30); do
 done
 
 if [ "${MYSQL_READY}" = false ]; then
-  echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪，脚本退出。'
-  echo 'Microi：可执行 docker logs microi-install-mysql57 查看详细错误日志。'
+  echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪。以下是容器日志：'
+  echo '------------------------------------------------------------------'
+  docker logs microi-install-mysql57 2>&1 | tail -50
+  echo '------------------------------------------------------------------'
+  echo 'Microi：正在清理失败的MySQL部署...'
+  docker stop microi-install-mysql57 > /dev/null 2>&1 || true
+  docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+  rm -rf "${MYSQL_DATA_DIR}"
+  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
   exit 1
 fi
 echo 'Microi：MySQL 容器已启动就绪 ✓'
@@ -752,7 +839,7 @@ SQL_FILE="${SQL_TMP_DIR}/${SQL_FILE_NAME}"
 
 mkdir -p "${SQL_TMP_DIR}"
 echo "Microi：下载数据库备份文件: ${SQL_ZIP_URL}"
-if curl -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"; then
+if curl -fSL -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"; then
   echo 'Microi：数据库备份文件下载完成 ✓'
 else
   echo 'Microi：错误：数据库备份文件下载失败，请检查网络连接。'
@@ -808,7 +895,25 @@ echo '------------------------------------------------------------------'
 
 REDIS_DIR="${COMPOSE_BASE_DIR}/microi-install-redis"
 
-echo "Microi：Redis 端口: ${REDIS_PORT}, 密码: ${REDIS_PASSWORD}"
+# 根据服务器内存动态设置Redis maxmemory（约占总内存的25%，最小128mb，最大8gb）
+TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+if [ -z "${TOTAL_MEM_KB}" ]; then TOTAL_MEM_KB=2097152; fi
+TOTAL_MEM_MB=$((TOTAL_MEM_KB / 1024))
+if [ ${TOTAL_MEM_MB} -le 1024 ]; then
+  REDIS_MAXMEMORY="128mb"
+elif [ ${TOTAL_MEM_MB} -le 2048 ]; then
+  REDIS_MAXMEMORY="256mb"
+elif [ ${TOTAL_MEM_MB} -le 4096 ]; then
+  REDIS_MAXMEMORY="512mb"
+elif [ ${TOTAL_MEM_MB} -le 8192 ]; then
+  REDIS_MAXMEMORY="1gb"
+elif [ ${TOTAL_MEM_MB} -le 16384 ]; then
+  REDIS_MAXMEMORY="2gb"
+else
+  REDIS_MAXMEMORY="4gb"
+fi
+
+echo "Microi：Redis 端口: ${REDIS_PORT}, 密码: ${REDIS_PASSWORD}, maxmemory: ${REDIS_MAXMEMORY}"
 
 mkdir -p "${REDIS_DIR}"
 cat > "${REDIS_DIR}/docker-compose.yml" <<EOF
@@ -830,7 +935,7 @@ services:
       - "--requirepass"
       - "${REDIS_PASSWORD}"
       - "--maxmemory"
-      - "8gb"
+      - "${REDIS_MAXMEMORY}"
       - "--maxmemory-policy"
       - "allkeys-lru"
       - "--timeout"
@@ -1114,7 +1219,7 @@ services:
         max-file: "10"
 
   microi-install-web:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-web:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-web-dev:latest
     container_name: microi-install-web
     restart: always
     tty: true
