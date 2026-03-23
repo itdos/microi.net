@@ -13,6 +13,8 @@ export interface MicroiConfig {
   password: string;
   osClient?: string;
   rsaPublicKey?: string;
+  /** 直接传入已有 Token（跳过帐号密码登录，适用于需要验证码的服务器） */
+  token?: string;
 }
 
 export interface ApiResponse<T = unknown> {
@@ -73,6 +75,10 @@ export class MicroiClient {
   constructor(config: MicroiConfig) {
     this.config = config;
     this.rsaPublicKey = config.rsaPublicKey || DEFAULT_RSA_PUBLIC_KEY;
+    // 如果直接传入 token，跳过登录流程
+    if (config.token) {
+      this.token = config.token;
+    }
   }
 
   /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
@@ -84,8 +90,22 @@ export class MicroiClient {
     return encrypted.toString('base64');
   }
 
-  /** 登录并获取 JWT token */
-  async login(): Promise<void> {
+  /** 外部更新 token（由 VS Code 扩展 token 文件同步） */
+  updateToken(newToken: string): void {
+    this.token = newToken;
+  }
+
+  /** 登录并获取 JWT token（若已有 token 则直接启动刷新） */
+  async login(options?: { skipAutoRefresh?: boolean }): Promise<void> {
+    // 若通过 token 初始化，跳过登录
+    if (this.token) {
+      if (!options?.skipAutoRefresh) {
+        this.startAutoRefresh();
+      }
+      console.error('[microi-mcp] Using provided token (skip login)');
+      return;
+    }
+
     const encryptedPwd = this.rsaEncrypt(this.config.password);
 
     const res = await fetch(`${this.config.apiBaseUrl}/api/SysUser/Login`, {
@@ -100,7 +120,16 @@ export class MicroiClient {
     });
 
     const token = res.headers.get('authorization') || '';
-    const json = (await res.json()) as ApiResponse;
+    const text = await res.text();
+    if (!res.ok || !text) {
+      throw new Error(`Login failed: HTTP ${res.status} — ${text?.slice(0, 200) || 'empty response'}`);
+    }
+    let json: ApiResponse;
+    try {
+      json = JSON.parse(text) as ApiResponse;
+    } catch {
+      throw new Error(`Login failed: invalid JSON — ${text.slice(0, 200)}`);
+    }
 
     if (json.Code !== 1) {
       throw new Error(`Login failed: ${json.Msg || 'Unknown error'}`);
@@ -139,7 +168,8 @@ export class MicroiClient {
 
   /** 通用 POST 请求 */
   private async post<T = unknown>(path: string, body: unknown): Promise<ApiResponse<T>> {
-    const res = await fetch(`${this.config.apiBaseUrl}${path}`, {
+    const url = `${this.config.apiBaseUrl}${path}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +181,18 @@ export class MicroiClient {
     const newToken = res.headers.get('authorization');
     if (newToken) this.token = newToken;
 
-    return (await res.json()) as ApiResponse<T>;
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
+    }
+    if (!text) {
+      throw new Error(`HTTP ${res.status} — empty response body`);
+    }
+    try {
+      return JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
+    }
   }
 
   /** 通用 GET 请求 */
@@ -169,7 +210,18 @@ export class MicroiClient {
     const newToken = res.headers.get('authorization');
     if (newToken) this.token = newToken;
 
-    return (await res.json()) as ApiResponse<T>;
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
+    }
+    if (!text) {
+      throw new Error(`HTTP ${res.status} — empty response body`);
+    }
+    try {
+      return JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
+    }
   }
 
   // ---------- API 方法 ----------

@@ -57,7 +57,6 @@ nuget-push-all.sh
 release-push-all.sh
 Microi.Anderson.sln
 
-.vscode
 config.json
 !microi.web/src/config.json
 publish
@@ -90,4 +89,6 @@ unpackage/release/
 /microi-v8-engine/
 
 /microi.mcp/publish.sh
+
+.vscode
 .cursor/mcp.json

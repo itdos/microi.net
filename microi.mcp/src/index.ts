@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -9,6 +10,20 @@ interface SseSession {
   client: MicroiClient;
 }
 
+/** 从 VS Code 扩展写入的 token 文件中读取指定服务器的 token */
+function readTokenFromFile(filePath: string, apiUrl: string, osClient: string): string | undefined {
+  try {
+    const tokens: Record<string, string> = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    if (osClient) {
+      const exact = tokens[`${apiUrl}|${osClient}`];
+      if (exact) return exact;
+    }
+    return tokens[apiUrl] || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function main(): Promise<void> {
   const config: MicroiConfig = {
     apiBaseUrl: (process.env.MICROI_API_URL || '').replace(/\/+$/, ''),
@@ -16,7 +31,17 @@ async function main(): Promise<void> {
     password: process.env.MICROI_PASSWORD || '',
     osClient: process.env.MICROI_OS_CLIENT || '',
     rsaPublicKey: process.env.MICROI_RSA_PUBLIC_KEY || undefined,
+    token: process.env.MICROI_TOKEN || undefined,
   };
+
+  // Token 文件优先级最高（VS Code 扩展持续刷新写入）
+  const tokenFilePath = process.env.MICROI_TOKEN_FILE;
+  if (tokenFilePath) {
+    const fileToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
+    if (fileToken) {
+      config.token = fileToken;
+    }
+  }
 
   const transport = process.env.MCP_TRANSPORT || 'stdio';
 
@@ -28,23 +53,41 @@ async function main(): Promise<void> {
     }
     await startSSE(parseInt(process.env.MCP_PORT || '3000', 10), config);
   } else {
-    // stdio 模式：凭据必须来自 env（本地单用户）
-    if (!config.apiBaseUrl || !config.username || !config.password) {
-      console.error('Missing required environment variables:');
-      console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
-      console.error('  MICROI_USERNAME     - Login username');
-      console.error('  MICROI_PASSWORD     - Login password');
-      console.error('Optional:');
-      console.error('  MICROI_OS_CLIENT    - OsClient identifier');
-      console.error('  MICROI_RSA_PUBLIC_KEY - Custom RSA public key (PEM format)');
+    // stdio 模式：Token 文件 > MICROI_TOKEN > username/password
+    if (!config.apiBaseUrl) {
+      console.error('Missing required: MICROI_API_URL');
       process.exit(1);
     }
+    if (!config.token && (!config.username || !config.password)) {
+      console.error('Missing required environment variables:');
+      console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
+      console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
+      console.error('  MICROI_TOKEN        - JWT token (fallback)');
+      console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
+      console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');
+      console.error('Optional:');
+      console.error('  MICROI_OS_CLIENT    - OsClient identifier');
+      process.exit(1);
+    }
+    const useTokenFile = !!tokenFilePath;
     const client = new MicroiClient(config);
-    await client.login();
+    await client.login({ skipAutoRefresh: useTokenFile });
     const server = createMcpServer(client);
     await startStdio(server);
 
+    // 监听 token 文件变化（VS Code 扩展每 14 分钟刷新 token 并写入文件）
+    if (tokenFilePath) {
+      fs.watchFile(tokenFilePath, { interval: 5000 }, () => {
+        const newToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
+        if (newToken) {
+          client.updateToken(newToken);
+          console.error('[microi-mcp] Token updated from file');
+        }
+      });
+    }
+
     const cleanup = (): void => {
+      if (tokenFilePath) { fs.unwatchFile(tokenFilePath); }
       client.destroy();
       process.exit(0);
     };
