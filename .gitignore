@@ -51,7 +51,7 @@ package-lock.json
 # 忽略开发配置文件
 appsettings.*.json
 
-.github
+
 nuget-push-all.sh
 
 release-push-all.sh
