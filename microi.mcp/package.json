@@ -1,0 +1,37 @@
+{
+  "name": "@microi/mcp-server",
+  "version": "1.0.0",
+  "description": "Microi吾码低代码平台 MCP Server — 让 AI 工具直接查询数据、获取表结构、执行接口引擎",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "start:sse": "MCP_TRANSPORT=sse node dist/index.js"
+  },
+  "keywords": [
+    "microi",
+    "mcp",
+    "低代码",
+    "ai",
+    "copilot",
+    "cursor",
+    "claude"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "express": "^4.21.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

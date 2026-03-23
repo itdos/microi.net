@@ -1,11 +1,12 @@
 #region << 版 本 注 释 >>
 /****************************************************
-* 文 件 名：V8DebugController.cs
+* 文 件 名：V8EngineController.cs
 * Copyright(c) Microi.net
 * 创 建 人：Anderson
 * 电子邮箱：973702@qq.com
 * 创建日期：2026-01-13
 * 文件描述：V8引擎本地调试同步API（路由层）
+*           路由同时兼容 api/V8Engine/* 和 api/V8Debug/*
 *******************************************************/
 #endregion
 using Microi.net;
@@ -18,11 +19,13 @@ namespace Microi.net.Api
 {
     /// <summary>
     /// V8引擎本地调试同步API（路由层，核心逻辑在 V8DebugLogic）
+    /// 同时兼容 api/V8Engine/* 和 api/V8Debug/* 两种路由
     /// </summary>
-    [Route("api/[controller]/[action]")]
+    [Route("api/V8Engine/[action]")]
+    [Route("api/V8Debug/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    public class V8DebugController : Controller
+    public class V8EngineController : Controller
     {
         [HttpGet]
         public async Task<IActionResult> GetStatus()
@@ -175,6 +178,57 @@ namespace Microi.net.Api
             osClient = V8DebugLogic.ResolveOsClient(osClient, token);
             if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8DebugLogic.GetDbSchema(osClient);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateTable([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var name = param["Name"].Val<string>();
+            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
+            var result = await V8DebugLogic.CreateTable(osClient, name, param["Description"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddField([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var tableId = param["TableId"].Val<string>();
+            var name = param["Name"].Val<string>();
+            var label = param["Label"].Val<string>();
+            if (tableId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "TableId 不能为空"));
+            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
+            if (label.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Label 不能为空"));
+            var result = await V8DebugLogic.AddField(
+                osClient, tableId, name, label,
+                param["Type"].Val<string>(), param["Component"].Val<string>(),
+                param["Visible"]?.Val<int>() ?? 1, param["AppVisible"]?.Val<int>() ?? 1,
+                param["Tab"].Val<string>(), param["TableWidth"]?.Val<int>() ?? 120,
+                param["Sort"]?.Val<int>() ?? 100, param["NameConfirm"]?.Val<int>() ?? 0,
+                param["Readonly"]?.Val<int>() ?? 0);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateModule([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var name = param["Name"].Val<string>();
+            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
+            var result = await V8DebugLogic.CreateModule(
+                osClient, name,
+                param["DiyTableId"].Val<string>(),
+                param["ComponentName"].Val<string>(), param["ComponentPath"].Val<string>(),
+                param["Display"]?.Val<int>() ?? 1, param["AppDisplay"]?.Val<int>() ?? 1,
+                param["OpenType"].Val<string>(), param["Url"].Val<string>());
             return Ok(result);
         }
 

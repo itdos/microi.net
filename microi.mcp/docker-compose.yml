@@ -1,0 +1,19 @@
+services:
+  microi-mcp:
+    build: .
+    container_name: microi-mcp-server
+    restart: unless-stopped
+    ports:
+      - "${MCP_PORT:-3000}:3000"
+    environment:
+      - MICROI_API_URL=${MICROI_API_URL}
+      - MICROI_USERNAME=${MICROI_USERNAME}
+      - MICROI_PASSWORD=${MICROI_PASSWORD}
+      - MICROI_OS_CLIENT=${MICROI_OS_CLIENT:-}
+      - MCP_TRANSPORT=sse
+      - MCP_PORT=3000
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
