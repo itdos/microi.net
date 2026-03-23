@@ -1,4 +1,4 @@
-# Microi吾码 - 前端项目（microi.web）
+# Microi吾码 - 前端项目（Microi.Client）
 
 > 基于 **Vue 3 + Vite + Element Plus + Pinia** 构建的开源低代码平台前端，支持界面引擎、表单引擎、打印引擎、工作流、移动端等核心能力。
 
@@ -7,10 +7,9 @@
 ## 📁 项目结构
 
 ```
-microi.web/
+Microi.Client/
 ├── bin/
 │   └── Release/               # 编译后产物目录（npm run build 输出）
-├── hbuilder-app/               # HBuilderX App 打包项目（用于生成 Android / iOS 应用）
 ├── public/                     # 静态资源
 ├── src/
 │   ├── assets/                 # 静态资源（图片、图标等）

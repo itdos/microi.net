@@ -2,9 +2,9 @@
 
 ## 概述
 
-microi.web 是一个标准的 Vue 3 + Vite 项目（非 uni-app），无法直接使用 HBuilderX 的 uni-app 打包。
+Microi.Client 是一个标准的 Vue 3 + Vite 项目（非 uni-app），无法直接使用 HBuilderX 的 uni-app 打包。
 
-本目录提供了 **5+App (Wap2App)** 方案，将 microi.web 包装成原生 APK，同时保留 `plus` API 能力（蓝牙打印、摄像头扫码等）。
+本目录提供了 **5+App (Wap2App)** 方案，将 Microi.Client 包装成原生 APK，同时保留 `plus` API 能力（蓝牙打印、摄像头扫码等）。
 
 ## 打包模式：在线模式
 
@@ -30,7 +30,7 @@ APK 启动后，通过 WebView 直接导航（`location.replace`）到远程服�
 
 1. 打开 HBuilderX
 2. 菜单：文件 → 导入 → 从本地目录导入
-3. 选择 `microi.web/hbuilder-app/` 目录
+3. 选择 `microi.app/` 目录
 4. 项目类型选择 **5+App**
 
 ### 第三步：配置应用信息
@@ -82,7 +82,7 @@ APK 启动后，通过 WebView 直接导航（`location.replace`）到远程服�
 ## 目录结构
 
 ```
-hbuilder-app/
+microi.app/
 ├── manifest.json       # HBuilderX 应用配置（权限、图标等）
 ├── index.html          # 5+App 入口页面（顶部配置 MICROI_SERVER_URL）
 └── README.md           # 本文件
@@ -92,7 +92,7 @@ hbuilder-app/
 
 ### 为什么不直接用 uni-app 打包？
 
-microi.web 是 Vue 3 + Vite + Element Plus 项目，使用了大量 Web 端专有库（Monaco Editor、ECharts、FullCalendar 等），无法转换为 uni-app 项目。5+App (Wap2App) 方案直接在 WebView 中运行标准 Web 应用，同时注入 `plus` 原生 API。
+Microi.Client 是 Vue 3 + Vite + Element Plus 项目，使用了大量 Web 端专有库（Monaco Editor、ECharts、FullCalendar 等），无法转换为 uni-app 项目。5+App (Wap2App) 方案直接在 WebView 中运行标准 Web 应用，同时注入 `plus` 原生 API。
 
 ### plus API 可用性
 
