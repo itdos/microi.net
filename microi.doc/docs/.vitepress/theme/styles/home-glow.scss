@@ -34,6 +34,10 @@ div[class*="VPHome"] {
     color: inherit !important;
   }
   
+  .VPHero.has-image .name{
+    margin : 0;
+  }
+
   .name,
   .text,
   .tagline,
