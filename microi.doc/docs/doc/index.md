@@ -146,7 +146,7 @@
 ```
 Microi.net/
 ├── Microi.Server/     # 🔧 后端 99% 源码（.NET10，自 2014 年一路升级）
-├── microi.web/        # 🖥️ PC 传统界面 100% 源码（Vue3 + Element-Plus + Vite + Pinia）
+├── Microi.Client/     # 🖥️ PC 传统界面 100% 源码（Vue3 + Element-Plus + Vite + Pinia）
 ├── microi.uniapp/     # 📱 UniApp 移动端 100% 源码（小程序 / H5 / App）
 └── microi.doc/        # 📝 官方文档（基于 VitePress）
 ```

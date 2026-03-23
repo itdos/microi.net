@@ -4,14 +4,14 @@
 
 本项目是 [Microi.net](https://github.com/user/Microi.net) 低代码平台的小程序 / App 端，采用 **uni-app (Vue 3 + Vite)** 开发。  
 支持编译为**微信、支付宝、抖音、飞书、小红书小程序**以及 **App**，一套代码多端运行。  
-用户在小程序内完成登录后，通过 WebView 加载 PC/移动端 H5 页面（`microi.web`），实现完整的移动办公与业务体验。
+用户在小程序内完成登录后，通过 WebView 加载 PC/移动端 H5 页面（`Microi.Client`），实现完整的移动办公与业务体验。
 
 ## 功能特性
 
 - **多平台授权登录**：微信 / 支付宝 / 抖音 / 飞书 / 小红书小程序一键授权登录
 - **账号密码登录**：支持传统登录方式，密码 RSA 加密传输
 - **验证码支持**：根据系统配置自动开启图形验证码
-- **WebView 工作台**：登录后通过 WebView 加载 `microi.web` 实现免二次登录访问
+- **WebView 工作台**：登录后通过 WebView 加载 `Microi.Client` 实现免二次登录访问
 - **商城 / 资讯 / 消息**：内置商城、新闻资讯、即时消息（SignalR）等原生页面
 - **Token 自动续期**：每次打开 App / 小程序自动调用 RefreshToken 实现长期免登录
 - **多语言**：内置 vue-i18n 国际化支持
@@ -70,7 +70,7 @@ export default {
   // 后端接口地址
   apiBase: 'https://your-api-domain.com',
 
-  // WebView 加载地址（即 microi.web 部署地址）
+  // WebView 加载地址（即 Microi.Client 部署地址）
   webviewUrl: 'https://your-h5-domain.com',
 
   // OsClient 标识（对应后端多租户标识）
