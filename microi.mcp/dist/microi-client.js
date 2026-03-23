@@ -106,34 +106,34 @@ export class MicroiClient {
     }
     // ---------- API 方法 ----------
     async getStatus() {
-        return this.get('/api/V8Debug/GetStatus');
+        return this.get('/api/V8Engine/GetStatus');
     }
     async getDbSchema() {
-        return this.post('/api/V8Debug/GetDbSchema', {
+        return this.post('/api/V8Engine/GetDbSchema', {
             OsClient: this.config.osClient,
         });
     }
     async getEngineList(keyword) {
-        return this.post('/api/V8Debug/GetApiEngineList', {
+        return this.post('/api/V8Engine/GetApiEngineList', {
             OsClient: this.config.osClient,
             ...(keyword ? { _SearchKey: keyword } : {}),
         });
     }
     async getEngineCode(apiEngineKey) {
-        return this.post('/api/V8Debug/GetApiEngineCode', {
+        return this.post('/api/V8Engine/GetApiEngineCode', {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
         });
     }
     async executeEngine(apiEngineKey, params) {
-        return this.post('/api/V8Debug/ExecuteApiEngine', {
+        return this.post('/api/V8Engine/ExecuteApiEngine', {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
             ...(params || {}),
         });
     }
     async getEventList(keyword) {
-        return this.post('/api/V8Debug/GetV8EventList', {
+        return this.post('/api/V8Engine/GetV8EventList', {
             OsClient: this.config.osClient,
             ...(keyword ? { _SearchKey: keyword } : {}),
         });

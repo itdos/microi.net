@@ -13,8 +13,8 @@ var result = V8.FormEngine.GetTableData('SysUser', {
     ['Account', '=', V8.Param.account],
     ['AND', 'Status', '=', 1]
   ],
-  PageIndex: 1,
-  PageSize: 20
+  _PageIndex: 1,
+  _PageSize: 20
 });
 ```
 
@@ -55,21 +55,21 @@ var result = V8.FormEngine.GetTableData('SysUser', {
 var list = V8.Db.FromSql(
   'SELECT a.Id, a.Name, b.OrderCount FROM Customer a LEFT JOIN (SELECT CustomerId, COUNT(*) OrderCount FROM OrderHeader GROUP BY CustomerId) b ON a.Id = b.CustomerId WHERE a.Status = @p0',
   1
-).ToList();
+).ToArray();
 
 // ✅ 安全：多个参数
 var row = V8.Db.FromSql(
   'SELECT * FROM SysUser WHERE Account = @p0 AND DeptId = @p1',
   V8.Param.account,
   V8.Param.deptId
-).ToModel();
+).First();
 
 // 统计
 var count = V8.Db.FromSql(
   'SELECT COUNT(*) FROM OrderHeader WHERE Status = @p0 AND CreateTime >= @p1',
   1,
   V8.Param.startDate
-).ExecuteScalar();
+).ToScalar();
 
 // 非查询（UPDATE / INSERT / DELETE）
 V8.Db.FromSql(
@@ -83,36 +83,58 @@ V8.Db.FromSql(
 
 | 方法 | 返回 | 用途 |
 |------|------|------|
-| `.ToList()` | 数组 | 查询多条 |
-| `.ToModel()` | 对象 \| null | 查询单条 |
-| `.ExecuteScalar()` | 单值 | COUNT / MAX / SUM |
+| `.ToArray()` | 数组 | 查询多条 |
+| `.First()` | 对象 \| null | 查询单条 |
+| `.ToScalar()` | 单值 | COUNT / MAX / SUM 等 |
 | `.ExecuteNonQuery()` | 影响行数 | UPDATE / DELETE / INSERT |
+
+> 别名：`.ToList()` = `.ToArray()`，`.ToModel()` = `.First()`，`.ExecuteScalar()` = `.ToScalar()`
 
 ### 读写分离
 
 ```javascript
 V8.Db.FromSql(...)      // 主库（读写）
 V8.DbRead.FromSql(...)  // 从库（只读，适合报表和大量查询）
+// 未部署读写分离时 V8.DbRead 与 V8.Db 一致
 ```
 
-### 跨应用查询
+### 跨应用查询（扩展数据库）
 
 ```javascript
-V8.Dbs['otherOsClient'].FromSql('SELECT * FROM Table WHERE Id = @p0', id).ToModel();
+var list = V8.Dbs.OracleDB1.FromSql('SELECT * FROM Table WHERE Id = @p0', id).ToArray();
 ```
 
 ## 数据库事务
 
+### 接口引擎事务（自动管理）
+
 ```javascript
-// V8.Db 在同一引擎内自动开启事务
+// 接口引擎中 V8.Db 自动开启事务：
+// 返回 Code=1 → 自动提交事务
+// 返回 Code≠1 → 自动回滚事务
+// 手动调用 V8.DbTrans.Commit() 或 V8.DbTrans.Rollback() 均无效
 V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1', 100, fromId).ExecuteNonQuery();
 V8.Db.FromSql('UPDATE Account SET Balance = Balance + @p0 WHERE Id = @p1', 100, toId).ExecuteNonQuery();
 
-// 手动提交（不提交则在引擎执行完毕后自动提交）
-V8.DbTrans.Commit();
+// V8.DbTrans 可传给 FormEngine 和 ApiEngine.Run 共享事务
+V8.FormEngine.UptFormData('Table1', { Id: 'x', Status: 1 }, V8.DbTrans);
+V8.ApiEngine.Run('other-engine', { Id: 'x' }, V8.DbTrans);
+```
 
-// 手动回滚
-V8.DbTrans.Rollback();
+### 扩展数据库事务（手动管理）
+
+```javascript
+// 扩展数据库需要手动管理事务
+var exTrans = V8.Dbs.OracleDB1.BeginTransaction();
+try {
+  exTrans.FromSql('UPDATE t1 SET a = @p0 WHERE Id = @p1', 1, id1).ExecuteNonQuery();
+  exTrans.FromSql('UPDATE t2 SET b = @p0 WHERE Id = @p1', 2, id2).ExecuteNonQuery();
+  exTrans.Commit();
+} catch (ex) {
+  exTrans.Rollback();
+} finally {
+  exTrans.Close();  // 必须释放事务对象
+}
 ```
 
 ## 绝对禁止
@@ -120,7 +142,7 @@ V8.DbTrans.Rollback();
 ```javascript
 // ❌ 绝对禁止：拼接 SQL 字符串
 var sql = "SELECT * FROM SysUser WHERE Account = '" + V8.Param.account + "'";
-V8.Db.FromSql(sql).ToList();  // SQL 注入漏洞！
+V8.Db.FromSql(sql).ToArray();  // SQL 注入漏洞！
 
 // ❌ 禁止：动态拼接表名
 var sql = "SELECT * FROM " + V8.Param.tableName + " WHERE Id = @p0";
@@ -129,7 +151,7 @@ var sql = "SELECT * FROM " + V8.Param.tableName + " WHERE Id = @p0";
 var list = V8.Db.FromSql(
   'SELECT * FROM SysUser WHERE Account = @p0',
   V8.Param.account
-).ToList();
+).ToArray();
 ```
 
 ## 常见查询模式
@@ -144,11 +166,11 @@ var result = V8.FormEngine.GetTableData('TableName', {
   _Where: [['Status', '=', 1]],
   _OrderBy: 'CreateTime',
   _OrderByType: 'DESC',
-  PageIndex: pageIndex,
-  PageSize: pageSize
+  _PageIndex: pageIndex,
+  _PageSize: pageSize
 });
 
-return { Code: 1, Data: result.Data, Total: result.Total };
+return { Code: 1, Data: result.Data, Total: result.DataCount };
 ```
 
 ### 模糊搜索（多字段）
@@ -164,8 +186,8 @@ if (keyword) {
 
 var result = V8.FormEngine.GetTableData('Customer', {
   _Where: where,
-  PageIndex: 1,
-  PageSize: 20
+  _PageIndex: 1,
+  _PageSize: 20
 });
 ```
 
@@ -178,12 +200,14 @@ var list = V8.Db.FromSql(`
   INNER JOIN Customer c ON o.CustomerId = c.Id
   WHERE o.Status = @p0 AND o.CreateTime >= @p1
   ORDER BY o.CreateTime DESC
-`, 1, V8.Param.startDate).ToList();
+`, 1, V8.Param.startDate).ToArray();
 ```
 
 ## 注意事项
 
 - `V8.Db.FromSql` 的参数占位符从 `@p0` 开始递增
 - `V8.FormEngine` 操作会触发该表上的 V8 事件，加 `_InvokeType: 'Client'` 可跳过
-- 查询结果数量较大时务必分页，避免返回过多数据
+- 查询结果数量较大时务必分页，`_PageSize` 默认最大 1000
 - `V8.DbRead` 适用于不需要实时性的报表查询
+- 接口引擎的事务由平台自动管理，**不要手动调用** `V8.DbTrans.Commit/Rollback`
+- 扩展数据库事务必须手动调用 `BeginTransaction/Commit/Rollback/Close`

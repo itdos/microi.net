@@ -1,0 +1,13 @@
+---
+description: Microi V8 引擎代码编写最佳实践
+globs: ["microi-v8-engine/**/*.js"]
+---
+
+编写 Microi 吾码 V8 引擎代码时，参考以下 Skill 文件获取 API 用法、代码模板和安全规范：
+
+- @microi.skills/v8-crud-api/SKILL.md — 增删改查接口引擎
+- @microi.skills/v8-table-event/SKILL.md — 表单事件（提交前/后、打开/关闭）
+- @microi.skills/v8-sql-query/SKILL.md — 安全 SQL 查询（参数化、_Where 语法）
+- @microi.skills/v8-http-integration/SKILL.md — 调用外部 HTTP API
+- @microi.skills/v8-cache-pattern/SKILL.md — Redis 缓存模式
+- @microi.skills/v8-security/SKILL.md — 安全最佳实践（权限校验、防注入）

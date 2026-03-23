@@ -9,21 +9,22 @@
 ```javascript
 // ✅ 使用 _Where（自动参数化）
 V8.FormEngine.GetTableData('SysUser', {
-  _Where: [['Account', '=', V8.Param.account]]
+  _Where: [['Account', '=', V8.Param.account]],
+  _PageSize: 20
 });
 
 // ✅ 使用 @p0 参数占位符
-V8.Db.FromSql('SELECT * FROM SysUser WHERE Account = @p0', V8.Param.account).ToList();
+V8.Db.FromSql('SELECT * FROM SysUser WHERE Account = @p0', V8.Param.account).ToArray();
 ```
 
 ### 禁止：字符串拼接
 
 ```javascript
 // ❌ 绝对禁止
-V8.Db.FromSql("SELECT * FROM SysUser WHERE Account = '" + V8.Param.account + "'").ToList();
+V8.Db.FromSql("SELECT * FROM SysUser WHERE Account = '" + V8.Param.account + "'").ToArray();
 
 // ❌ 禁止动态拼接表名/字段名
-V8.Db.FromSql("SELECT * FROM " + V8.Param.table).ToList();
+V8.Db.FromSql("SELECT * FROM " + V8.Param.table).ToArray();
 ```
 
 ## 2. 权限校验
@@ -197,17 +198,17 @@ return { Code: 1, Data: user };
 
 ```javascript
 // 记录敏感操作
-V8.Method.AddSysLog(
-  '删除用户',
-  JSON.stringify({
+V8.Method.AddSysLog({
+  Title: '删除用户',
+  Content: JSON.stringify({
     OperatorId: V8.CurrentUser.Id,
     OperatorName: V8.CurrentUser.Name,
     TargetId: V8.Param.userId,
-    IP: V8.IPHelper.GetClientIP(),
     Time: DateNow('yyyy-MM-dd HH:mm:ss')
   }),
-  '安全审计'
-);
+  Type: '安全审计',
+  Level: 2
+});
 ```
 
 ## 8. 错误处理
@@ -216,11 +217,11 @@ V8.Method.AddSysLog(
 
 ```javascript
 try {
-  var result = V8.Db.FromSql('SELECT ...', V8.Param.id).ToList();
+  var result = V8.Db.FromSql('SELECT * FROM t WHERE Id = @p0', V8.Param.id).ToArray();
   return { Code: 1, Data: result };
 } catch (ex) {
   // 记录完整错误日志
-  V8.Log.Error('查询失败: ' + ex.message + ' | 参数: ' + JSON.stringify(V8.Param));
+  console.error('查询失败: ' + ex.message + ' | 参数: ' + JSON.stringify(V8.Param));
   // 返回给前端的信息不含内部细节
   return { Code: 0, Msg: '查询失败，请稍后重试' };
 }

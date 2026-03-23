@@ -2786,7 +2786,6 @@ export default {
         FormSet(fieldName, value, field) {
             var self = this;
             self.FormDiyTableModel[fieldName] = value;
-            self.FormDiyTableModel[fieldName] = value;
             try {
                 // self.$refs['ref_' + fieldName].trigger('change');
                 // self.$refs['ref_' + fieldName].dispatchEvent(new MouseEvent('change'));

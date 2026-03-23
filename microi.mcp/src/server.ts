@@ -237,5 +237,115 @@ export function createMcpServer(client: MicroiClient): McpServer {
     },
   );
 
+  // ========================
+  // Tool: 保存接口引擎代码
+  // ========================
+  server.tool(
+    'microi_save_engine_code',
+    'Save (update) the JavaScript source code of an existing API engine. This will overwrite the current code on the server.',
+    {
+      apiEngineKey: z.string().describe('The unique key of the API engine'),
+      code: z.string().describe('The complete JavaScript source code to save'),
+    },
+    async ({ apiEngineKey, code }) => {
+      try {
+        const result = await client.saveEngineCode(apiEngineKey, code);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: `✅ Engine "${apiEngineKey}" code saved successfully.` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 创建接口引擎
+  // ========================
+  server.tool(
+    'microi_create_engine',
+    'Create a new API engine on the Microi platform. The engine will be created with the given key, name, and optional initial code.',
+    {
+      apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
+      apiName: z.string().describe('Display name of the engine'),
+      category: z.string().optional().describe('Category to organize engines'),
+      code: z.string().optional().describe('Initial JavaScript code for the engine'),
+    },
+    async ({ apiEngineKey, apiName, category, code }) => {
+      try {
+        const result = await client.createEngine({
+          ApiEngineKey: apiEngineKey,
+          ApiName: apiName,
+          Category: category,
+          Code: code,
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: `✅ Engine "${apiEngineKey}" created successfully.` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 获取 V8 事件代码
+  // ========================
+  server.tool(
+    'microi_get_event_code',
+    'Get the JavaScript source code of a specific V8 event by table name and event type.',
+    {
+      formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
+      eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
+    },
+    async ({ formEngineKey, eventType }) => {
+      try {
+        const result = await client.getEventCode(formEngineKey, eventType);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+
+        const event = result.Data;
+        const lines = [
+          `## V8 Event: ${formEngineKey} / ${eventType}`,
+          '',
+          '```javascript',
+          event?.Code || '// No code available',
+          '```',
+        ];
+
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 保存 V8 事件代码
+  // ========================
+  server.tool(
+    'microi_save_event_code',
+    'Save (update) the JavaScript source code of a V8 event. This will overwrite the current event code on the server.',
+    {
+      formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
+      eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
+      code: z.string().describe('The complete JavaScript source code to save'),
+    },
+    async ({ formEngineKey, eventType, code }) => {
+      try {
+        const result = await client.saveEventCode(formEngineKey, eventType, code);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: `✅ Event "${formEngineKey}/${eventType}" code saved successfully.` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
   return server;
 }

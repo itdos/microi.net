@@ -175,39 +175,71 @@ export class MicroiClient {
   // ---------- API 方法 ----------
 
   async getStatus(): Promise<ApiResponse> {
-    return this.get('/api/V8Debug/GetStatus');
+    return this.get('/api/V8Engine/GetStatus');
   }
 
   async getDbSchema(): Promise<ApiResponse<{ Tables: DbTable[] }>> {
-    return this.post('/api/V8Debug/GetDbSchema', {
+    return this.post('/api/V8Engine/GetDbSchema', {
       OsClient: this.config.osClient,
     });
   }
 
   async getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[]>> {
-    return this.post('/api/V8Debug/GetApiEngineList', {
+    return this.post('/api/V8Engine/GetApiEngineList', {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
     });
   }
 
   async getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>> {
-    return this.post('/api/V8Debug/GetApiEngineCode', {
+    return this.post('/api/V8Engine/GetApiEngineCode', {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
     });
   }
 
   async executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse> {
-    return this.post('/api/V8Debug/ExecuteApiEngine', {
+    return this.post('/api/V8Engine/ExecuteApiEngine', {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
       ...(params || {}),
     });
   }
 
+  async saveEngineCode(apiEngineKey: string, code: string): Promise<ApiResponse> {
+    return this.post('/api/V8Engine/UpdateApiEngineCode', {
+      OsClient: this.config.osClient,
+      ApiEngineKey: apiEngineKey,
+      Code: code,
+    });
+  }
+
+  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string }): Promise<ApiResponse> {
+    return this.post('/api/V8Engine/CreateApiEngine', {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>> {
+    return this.post('/api/V8Engine/GetV8EventCode', {
+      OsClient: this.config.osClient,
+      FormEngineKey: formEngineKey,
+      EventType: eventType,
+    });
+  }
+
+  async saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse> {
+    return this.post('/api/V8Engine/UpdateV8EventCode', {
+      OsClient: this.config.osClient,
+      FormEngineKey: formEngineKey,
+      EventType: eventType,
+      Code: code,
+    });
+  }
+
   async getEventList(keyword?: string): Promise<ApiResponse<V8Event[]>> {
-    return this.post('/api/V8Debug/GetV8EventList', {
+    return this.post('/api/V8Engine/GetV8EventList', {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
     });
