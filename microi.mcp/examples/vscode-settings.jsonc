@@ -1,0 +1,18 @@
+// 将此内容添加到项目的 .vscode/settings.json 中
+// GitHub Copilot — 本地 stdio 模式
+{
+  "mcp": {
+    "servers": {
+      "microi": {
+        "command": "node",
+        "args": ["/path/to/microi.mcp/dist/index.js"],
+        "env": {
+          "MICROI_API_URL": "https://api.microi.net",
+          "MICROI_USERNAME": "your_username",
+          "MICROI_PASSWORD": "your_password",
+          "MICROI_OS_CLIENT": ""
+        }
+      }
+    }
+  }
+}
