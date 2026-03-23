@@ -1,0 +1,17 @@
+// 将此内容添加到项目的 .vscode/settings.json 中
+// GitHub Copilot — 远程 SSE 模式（连接已部署的 MCP Server）
+// ⚠️ 包含敏感信息，请勿提交到 Git（建议加入 .gitignore）
+{
+  "mcp": {
+    "servers": {
+      "microi": {
+        "url": "https://api.microi.net/mcp/sse",
+        "headers": {
+          "X-Microi-Username": "your_username",
+          "X-Microi-Password": "your_password",
+          "X-Microi-OsClient": ""
+        }
+      }
+    }
+  }
+}

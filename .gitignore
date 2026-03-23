@@ -88,3 +88,6 @@ unpackage/release/
 
 /Microi.VSCode/
 /microi-v8-engine/
+
+/microi.mcp/publish.sh
+.cursor/mcp.json
