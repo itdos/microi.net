@@ -63,9 +63,9 @@ config.json
 publish
 
 
-Microi.Client/hbuilder-app/unpackage/cache
-Microi.Client/hbuilder-app/unpackage/release
-Microi.Client/hbuilder-app/unpackage/resources
+microi.app/unpackage/cache
+microi.app/unpackage/release
+microi.app/unpackage/resources
 /go-view/
 /renyi3d-webgl/
 /microi.openclaw/
