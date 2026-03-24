@@ -2,8 +2,10 @@
 # macos若遇权限问题无法运行此脚本，请执行命令#chmod -R 777 publish-demo.sh
 # 请修改脚本中的[阿里云docker帐号]、[阿里云docker密码]、[地域]、[命名空间]
 
-echo "请输入本次要发布的microi-api版本号："
-read version
+default_version="v$(grep '<MicroiNetVersion>' ../../../Directory.Build.props | head -1 | sed 's/.*<MicroiNetVersion>\([^<]*\)<\/MicroiNetVersion>.*/\1/')"
+echo "请输入本次要发布的版本号（直接回车默认 $default_version）："
+read input_version
+version="${input_version:-$default_version}"
 
 docker login --username=阿里云docker帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
 docker build -t microi-api .

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { API } from './api-paths.js';
 
 const DEFAULT_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
@@ -108,7 +109,7 @@ export class MicroiClient {
 
     const encryptedPwd = this.rsaEncrypt(this.config.password);
 
-    const res = await fetch(`${this.config.apiBaseUrl}/api/SysUser/Login`, {
+    const res = await fetch(`${this.config.apiBaseUrl}${API.LOGIN}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,7 +149,7 @@ export class MicroiClient {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.refreshTimer = setInterval(async () => {
       try {
-        const res = await fetch(`${this.config.apiBaseUrl}/api/SysUser/RefreshToken`, {
+        const res = await fetch(`${this.config.apiBaseUrl}${API.REFRESH_TOKEN}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -227,31 +228,31 @@ export class MicroiClient {
   // ---------- API 方法 ----------
 
   async getStatus(): Promise<ApiResponse> {
-    return this.get('/api/V8Engine/GetStatus');
+    return this.get(API.GET_STATUS);
   }
 
   async getDbSchema(): Promise<ApiResponse<{ Tables: DbTable[] }>> {
-    return this.post('/api/V8Engine/GetDbSchema', {
+    return this.post(API.GET_DB_SCHEMA, {
       OsClient: this.config.osClient,
     });
   }
 
   async getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[]>> {
-    return this.post('/api/V8Engine/GetApiEngineList', {
+    return this.post(API.GET_ENGINE_LIST, {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
     });
   }
 
   async getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>> {
-    return this.post('/api/V8Engine/GetApiEngineCode', {
+    return this.post(API.GET_ENGINE_CODE, {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
     });
   }
 
   async executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse> {
-    return this.post('/api/V8Engine/ExecuteApiEngine', {
+    return this.post(API.EXECUTE_ENGINE, {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
       ...(params || {}),
@@ -259,22 +260,22 @@ export class MicroiClient {
   }
 
   async saveEngineCode(apiEngineKey: string, code: string): Promise<ApiResponse> {
-    return this.post('/api/V8Engine/UpdateApiEngineCode', {
+    return this.post(API.UPDATE_ENGINE_CODE, {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
-      Code: code,
+      ApiV8Code: code,
     });
   }
 
   async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string }): Promise<ApiResponse> {
-    return this.post('/api/V8Engine/CreateApiEngine', {
+    return this.post(API.CREATE_ENGINE, {
       OsClient: this.config.osClient,
       ...data,
     });
   }
 
   async getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>> {
-    return this.post('/api/V8Engine/GetV8EventCode', {
+    return this.post(API.GET_EVENT_CODE, {
       OsClient: this.config.osClient,
       FormEngineKey: formEngineKey,
       EventType: eventType,
@@ -282,18 +283,61 @@ export class MicroiClient {
   }
 
   async saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse> {
-    return this.post('/api/V8Engine/UpdateV8EventCode', {
+    return this.post(API.UPDATE_EVENT_CODE, {
       OsClient: this.config.osClient,
       FormEngineKey: formEngineKey,
       EventType: eventType,
-      Code: code,
+      V8Code: code,
     });
   }
 
   async getEventList(keyword?: string): Promise<ApiResponse<V8Event[]>> {
-    return this.post('/api/V8Engine/GetV8EventList', {
+    return this.post(API.GET_EVENT_LIST, {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
+    });
+  }
+
+  // ---------- 低代码系统设计 API 方法 ----------
+
+  async createTable(name: string, description?: string): Promise<ApiResponse> {
+    return this.post(API.CREATE_TABLE, {
+      OsClient: this.config.osClient,
+      Name: name,
+      Description: description || '',
+    });
+  }
+
+  async addField(data: {
+    TableId: string; Name: string; Label: string;
+    Type?: string; Component?: string;
+    Visible?: number; AppVisible?: number;
+    Tab?: string; TableWidth?: number; Sort?: number;
+    NameConfirm?: number; Readonly?: number;
+  }): Promise<ApiResponse> {
+    return this.post(API.ADD_FIELD, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async createModule(data: {
+    Name: string; DiyTableId?: string; ParentId?: string;
+    ComponentName?: string; ComponentPath?: string;
+    Display?: number; AppDisplay?: number;
+    OpenType?: string; Url?: string; Sort?: number;
+  }): Promise<ApiResponse> {
+    return this.post(API.CREATE_MODULE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async setRolePermission(roleId: string, menuIds: string[]): Promise<ApiResponse> {
+    return this.post(API.SET_ROLE_PERMISSION, {
+      OsClient: this.config.osClient,
+      RoleId: roleId,
+      MenuIds: menuIds,
     });
   }
 

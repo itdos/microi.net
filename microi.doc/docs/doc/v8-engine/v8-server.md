@@ -31,6 +31,7 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 >* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
 
 ## 缓存操作 V8.Cache
+>* 平台分布式缓存是L1、L2级联动的分布式缓存，L1为本地内存缓存，L2为redis缓存，V8.Cache操作的就是L2级redis缓存，平台会自动管理L1和L2的联动关系。当覆盖数据库、或直接修改数据库表结构数据后，可能需要手动重启api的docker容器以实现自动清除L1级缓存，然后可通过redis desktop manage软件清除L2级缓存。
 >* 分布式缓存操作类，用法V8.Cache('Key', 'Value', '0.00:10:00');
 >* 注意：过期时间的格式必须是`d.HH:mm:ss`，如`0.12:00:00`0天12小时，`1.10:10:00`一天10小时10分钟，也可以不传过期时间参数，则为永久。
 >* 建议使用的缓存Key命名规则为：`Microi:${V8.OsClient}:{分类key值}:{Key}`，这样与平台的缓存Key命名规则一致，方便查看，并且区分SaaS租户，防止缓存混乱
