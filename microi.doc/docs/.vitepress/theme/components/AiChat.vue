@@ -130,7 +130,7 @@ const quickQuestions = [
 
 // 预设的AI知识库回复
 const knowledgeBase = {
-  '是什么': `<strong>Microi吾码</strong> 是一个开源 AI 低代码平台，始于2014年（基于Avalon.js），2018年使用 Vue 重构，2024年11月正式开源。<br/><br/>基于 <strong>.NET10 + Vue3 + Element-Plus + Redis</strong>，提供表单引擎、API接口引擎、AI引擎、工作流引擎、3D引擎等 <strong>20+ 引擎</strong>，支持分布式部署、跨数据库、跨平台，不限用户数、表单数、数据量。`,
+  '是什么': `<strong>Microi吾码</strong> 是一个开源 AI 低代码平台，始于2014年（基于Avalon.js），2018年使用 Vue 重构，2025年正式开源。<br/><br/>基于 <strong>.NET10 + Vue3 + Element-Plus + Redis</strong>，提供表单引擎、API接口引擎、AI引擎、工作流引擎、3D引擎等 <strong>20+ 引擎</strong>，支持分布式部署、跨数据库、跨平台，不限用户数、表单数、数据量。`,
   '数据库': `Microi吾码支持多种主流数据库：<br/><br/>• <strong>MySQL</strong> 5.5+<br/>• <strong>SQL Server</strong> 2000+<br/>• <strong>Oracle</strong> 11g+<br/><br/>还支持 <strong>分库分表、读写分离、多主同步</strong> 等高级特性，通过数据源引擎可灵活切换和管理多个数据库实例。`,
   'AI': `Microi吾码 AI 引擎具备以下核心能力：<br/><br/>• 🤖 <strong>AI 数据分析</strong> — 自然语言转SQL，智能报表<br/>• 💻 <strong>AI 在线编程</strong> — 在线AI编写后端V8代码<br/>• 🧠 <strong>向量数据库</strong> — 自动差量同步，更精准的AI结果<br/>• 🔗 <strong>多模型支持</strong> — 接入 DeepSeek / OpenAI / 本地模型<br/>• 🦞 <strong>OpenClaw 小龙虾</strong> — 远程AI集群管理<br/>• 🎯 <strong>AI训练与微调</strong> — 支持提示词管理和模型定制`,
   '开始': `快速开始使用 Microi吾码：<br/><br/>1️⃣ 访问 <a href="https://web.microi.net" target="_blank" rel="noopener">web.microi.net</a> 在线体验<br/>2️⃣ 查阅 <a href="/doc/index">官方文档</a> 了解详情<br/>3️⃣ 前往 <a href="https://gitee.com/ITdos/microi.net" target="_blank" rel="noopener">Gitee 仓库</a> 获取源码<br/>4️⃣ 使用 Docker 一键部署到本地<br/><br/>提供前后端源代码，支持 Vue / React / Angular 二次开发。`,
