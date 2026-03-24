@@ -18,7 +18,7 @@ using Dos.Common;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// V8引擎本地调试同步API（路由层，核心逻辑在 V8DebugLogic）
+    /// V8引擎MCP API（路由层，核心逻辑在 V8McpLogic）
     /// 同时兼容 api/V8Engine/* 和 api/V8Debug/* 两种路由
     /// </summary>
     [Route("api/V8Engine/[action]")]
@@ -27,185 +27,216 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class V8EngineController : Controller
     {
-        [HttpGet]
+        [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            return Ok(new DosResult(1, V8DebugLogic.BuildStatusData(token)));
+            return Ok(new DosResult(1, V8McpLogic.BuildStatusData(token)));
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetApiEngineList(string osClient)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetApiEngineList(string osClient, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
             if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
-            var result = await V8DebugLogic.GetApiEngineList(osClient);
+            var result = await V8McpLogic.GetApiEngineList(osClient);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetApiEngine(string osClient, string apiEngineKey)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetApiEngine(string osClient, string apiEngineKey, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            apiEngineKey = apiEngineKey ?? param?["ApiEngineKey"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
-            var result = await V8DebugLogic.GetApiEngine(osClient, apiEngineKey);
+            var result = await V8McpLogic.GetApiEngine(osClient, apiEngineKey);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetApiEngineCode(string osClient, string apiEngineKey)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetApiEngineCode(string osClient, string apiEngineKey, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            apiEngineKey = apiEngineKey ?? param?["ApiEngineKey"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
-            var result = await V8DebugLogic.GetApiEngineCode(osClient, apiEngineKey);
+            var result = await V8McpLogic.GetApiEngineCode(osClient, apiEngineKey);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetUpdatedApiEngines(string osClient, string lastSyncTime)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetUpdatedApiEngines(string osClient, string lastSyncTime, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
-            var result = await V8DebugLogic.GetUpdatedApiEngines(osClient, lastSyncTime);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            lastSyncTime = lastSyncTime ?? param?["LastSyncTime"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            var result = await V8McpLogic.GetUpdatedApiEngines(osClient, lastSyncTime);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> UpdateApiEngineCode([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var apiEngineKey = param["ApiEngineKey"].Val<string>();
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
-            var result = await V8DebugLogic.UpdateApiEngineCode(osClient, apiEngineKey, param["ApiV8Code"].Val<string>());
+            // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
+            var code = param["ApiV8Code"].Val<string>() ?? param["Code"].Val<string>();
+            var result = await V8McpLogic.UpdateApiEngineCode(osClient, apiEngineKey, code);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateApiEngine([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var apiName = param["ApiName"].Val<string>();
             var apiEngineKey = param["ApiEngineKey"].Val<string>();
             if (apiName.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiName 不能为空"));
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
-            var result = await V8DebugLogic.CreateApiEngine(
+            // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
+            var code = param["ApiV8Code"].Val<string>() ?? param["Code"].Val<string>();
+            var result = await V8McpLogic.CreateApiEngine(
                 osClient, apiName, apiEngineKey,
                 param["ApiAddress"].Val<string>(), param["ApiRemark"].Val<string>(),
                 param["Lock"].Val<int>(), param["AllowAnonymous"].Val<int>(),
-                param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>());
+                param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> CheckVersions([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            var items = param["Items"]?.ToObject<List<V8DebugLogic.VersionCheckItem>>();
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var items = param["Items"]?.ToObject<List<V8McpLogic.VersionCheckItem>>();
             if (items == null || items.Count == 0) return Ok(new DosResult(0, null, "Items 不能为空"));
-            var result = await V8DebugLogic.CheckVersions(osClient, items);
+            var result = await V8McpLogic.CheckVersions(osClient, items);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> ExecuteApiEngine([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            var result = await V8DebugLogic.ExecuteApiEngine(
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.ExecuteApiEngine(
                 osClient, param["ApiEngineKey"].Val<string>(), param["V8Code"].Val<string>(),
                 param["Param"] as JObject ?? new JObject(), token, HttpContext);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetV8EventList(string osClient)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetV8EventList(string osClient, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
             if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
-            var result = await V8DebugLogic.GetV8EventList(osClient);
+            var result = await V8McpLogic.GetV8EventList(osClient);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetV8EventCode(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var formEngineKey = param?["FormEngineKey"].Val<string>();
+            if (formEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
+            var eventType = param?["EventType"].Val<string>();
+            if (eventType.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "EventType 不能为空"));
+            var result = await V8McpLogic.GetV8EventCode(osClient, formEngineKey, eventType);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> UpdateV8EventCode([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var formEngineKey = param["FormEngineKey"].Val<string>();
             if (formEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
-            var result = await V8DebugLogic.UpdateV8EventCode(
-                osClient, formEngineKey, param["EventType"].Val<string>(), param["V8Code"].Val<string>());
+            // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 V8Code
+            var code = param["V8Code"].Val<string>() ?? param["Code"].Val<string>();
+            var result = await V8McpLogic.UpdateV8EventCode(
+                osClient, formEngineKey, param["EventType"].Val<string>(), code);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> ExecuteV8Event([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var v8Code = param["V8Code"].Val<string>();
             if (v8Code.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "V8Code 不能为空"));
-            var result = await V8DebugLogic.ExecuteV8Event(
+            var result = await V8McpLogic.ExecuteV8Event(
                 osClient, param["EventType"].Val<string>(), v8Code,
                 param["Form"] as JObject ?? new JObject(), token, HttpContext);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetDbSchema(string osClient)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetDbSchema(string osClient, [FromBody] JObject param = null)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8DebugLogic.ResolveOsClient(osClient, token);
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
             if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
-            var result = await V8DebugLogic.GetDbSchema(osClient);
+            var result = await V8McpLogic.GetDbSchema(osClient);
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateTable([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var name = param["Name"].Val<string>();
             if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
-            var result = await V8DebugLogic.CreateTable(osClient, name, param["Description"].Val<string>());
+            var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>());
             return Ok(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> AddField([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var tableId = param["TableId"].Val<string>();
             var name = param["Name"].Val<string>();
             var label = param["Label"].Val<string>();
             if (tableId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "TableId 不能为空"));
             if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
             if (label.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Label 不能为空"));
-            var result = await V8DebugLogic.AddField(
+            var result = await V8McpLogic.AddField(
                 osClient, tableId, name, label,
                 param["Type"].Val<string>(), param["Component"].Val<string>(),
                 param["Visible"]?.Val<int>() ?? 1, param["AppVisible"]?.Val<int>() ?? 1,
@@ -218,25 +249,28 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<IActionResult> CreateModule([FromBody] JObject param)
         {
-            var (ok, msg, token) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8DebugLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var name = param["Name"].Val<string>();
             if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
-            var result = await V8DebugLogic.CreateModule(
+            var result = await V8McpLogic.CreateModule(
                 osClient, name,
                 param["DiyTableId"].Val<string>(),
                 param["ComponentName"].Val<string>(), param["ComponentPath"].Val<string>(),
                 param["Display"]?.Val<int>() ?? 1, param["AppDisplay"]?.Val<int>() ?? 1,
-                param["OpenType"].Val<string>(), param["Url"].Val<string>());
+                param["OpenType"].Val<string>(), param["Url"].Val<string>(),
+                param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100);
             return Ok(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> DebugSession(string action, string sessionId)
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> DebugSession(string action, string sessionId, [FromBody] JObject param = null)
         {
-            var (ok, msg, _) = await V8DebugLogic.CheckPermission();
+            var (ok, msg, _) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
+            action = action ?? param?["Action"].Val<string>();
+            sessionId = sessionId ?? param?["SessionId"].Val<string>();
 
             switch (action?.ToLower())
             {
@@ -258,6 +292,20 @@ namespace Microi.net.Api
                 default:
                     return Ok(new DosResult(0, null, "无效的 action 参数，支持: create, status"));
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetRolePermission([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var roleId = param["RoleId"].Val<string>();
+            var menuIds = param["MenuIds"]?.ToObject<List<string>>();
+            if (roleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "RoleId 不能为空"));
+            if (menuIds == null || menuIds.Count == 0) return Ok(new DosResult(0, null, "MenuIds 不能为空"));
+            var result = await V8McpLogic.SetRolePermission(osClient, roleId, menuIds);
+            return Ok(result);
         }
     }
 }

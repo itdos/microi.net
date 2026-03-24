@@ -33,6 +33,7 @@
 <img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" style="margin: 5px;">

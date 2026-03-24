@@ -18,7 +18,7 @@ using Microsoft.AspNetCore.Http;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// V8 调试 WebSocket 中间件（路由层，核心逻辑在 V8DebugWebSocketLogic）
+    /// V8 调试 WebSocket 中间件（路由层，核心逻辑在 V8McpDebugSession）
     /// </summary>
     public class V8DebugWebSocketMiddleware
     {
@@ -74,7 +74,7 @@ namespace Microi.net.Api
 
                 Console.WriteLine($"Microi：[V8Debug] 鉴权通过，开始 WebSocket 会话");
                 var ws = await context.WebSockets.AcceptWebSocketAsync();
-                var session = new V8DebugWebSocketLogic(ws, currentToken, context);
+                var session = new V8McpDebugSession(ws, currentToken, context);
                 await session.RunAsync();
                 Console.WriteLine("Microi：[V8Debug] WebSocket 会话已结束");
             }
