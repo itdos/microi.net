@@ -7,7 +7,7 @@ titleTemplate: 开源 AI 低代码平台
 hero:
   name: Micro<span style="-webkit-text-fill-color:red !important;">i</span>吾码
   text: AI 深度融合的开源低代码平台
-  tagline: AI 本地编程（VS Code + Copilot/Cursor/Claude）+ AI 在线编程 + AI 数据分析，支持传统开发。.NET10 + Vue + Redis + 跨数据库
+  tagline: AI 本地编程（VS Code Copilot/Cursor/Claude + MCP + Skills）、AI 在线编程、AI 数据分析。.NET10 + Vue3 + 跨数据库/跨平台
   actions:
     - theme: brand
       text: 文档
