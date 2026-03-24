@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import { MicroiClient, type MicroiConfig } from './microi-client.js';
-import { createMcpServer } from './server.js';
+import { createMcpServer, type McpServerContext } from './server.js';
 
 interface SseSession {
   transport: SSEServerTransport;
@@ -33,6 +33,12 @@ async function main(): Promise<void> {
     rsaPublicKey: process.env.MICROI_RSA_PUBLIC_KEY || undefined,
     token: process.env.MICROI_TOKEN || undefined,
   };
+
+  // 本地开发服务器（localhost / 127.0.0.1）使用自签证书，允许 Node.js 跳过 TLS 验证
+  if (/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(config.apiBaseUrl)) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    console.error('[microi-mcp] Detected localhost HTTPS, disabled TLS certificate verification');
+  }
 
   // Token 文件优先级最高（VS Code 扩展持续刷新写入）
   const tokenFilePath = process.env.MICROI_TOKEN_FILE;
@@ -72,7 +78,8 @@ async function main(): Promise<void> {
     const useTokenFile = !!tokenFilePath;
     const client = new MicroiClient(config);
     await client.login({ skipAutoRefresh: useTokenFile });
-    const server = createMcpServer(client);
+    const serverContext: McpServerContext = { osClient: config.osClient || '', apiBaseUrl: config.apiBaseUrl, label: process.env.MICROI_LABEL || '' };
+    const server = createMcpServer(client, serverContext);
     await startStdio(server);
 
     // 监听 token 文件变化（VS Code 扩展每 14 分钟刷新 token 并写入文件）
@@ -141,7 +148,8 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
       });
       await client.login();
 
-      const server = createMcpServer(client);
+      const sseContext: McpServerContext = { osClient: osClient || '', apiBaseUrl: defaultConfig.apiBaseUrl, label: '' };
+      const server = createMcpServer(client, sseContext);
       const sseTransport = new SSEServerTransport('/messages', res);
 
       sessions.set(sseTransport.sessionId, { transport: sseTransport, client });

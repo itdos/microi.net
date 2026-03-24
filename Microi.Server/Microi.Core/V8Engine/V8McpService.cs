@@ -1,11 +1,11 @@
 #region << 版 本 注 释 >>
 /****************************************************
-* 文 件 名：V8DebugService.cs
+* 文 件 名：V8McpService.cs
 * Copyright(c) Microi.net
 * 创 建 人：Anderson
 * 电子邮箱：973702@qq.com
 * 创建日期：2026-03-21
-* 文件描述：V8引擎调试核心服务（开源部分）
+* 文件描述：V8引擎MCP 核心服务（开源部分）
 *           提供代码插桩、安全序列化等纯工具方法
 *           不依赖 ASP.NET Core / Microi.net 内部类型
 *******************************************************/
@@ -17,11 +17,10 @@ using Newtonsoft.Json;
 namespace Microi.net
 {
     /// <summary>
-    /// V8 调试核心服务（开源工具方法）
+    /// V8 MCP 核心服务（开源工具方法）
     /// 代码插桩、安全序列化等不依赖闭源类型的方法
-    /// InitV8Param / CollectVariables 等涉及内部类型的方法已移至 Microi.net/V8Engine/V8DebugLogic.cs
     /// </summary>
-    public static class V8DebugService
+    public static class V8McpService
     {
         /// <summary>
         /// 代码插桩：在每个有效语句行前插入 __dbg(lineNumber) 检查点调用
