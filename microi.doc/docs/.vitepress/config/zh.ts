@@ -5,7 +5,7 @@ export const zh = defineConfig({
 	base: "/",
 	title: "Microi吾码",
 	lang: "zh-CN",
-	description: "Microi吾码官方文档，开源低代码平台，开源 AI 低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
+	description: "Microi吾码官方文档，开源低代码平台，开源 AI 低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2025年开源。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		[
@@ -19,7 +19,7 @@ export const zh = defineConfig({
 		["meta", { property: "og:type", content: "website" }],
 		["meta", { property: "og:site_name", content: "Microi吾码" }],
 		["meta", { property: "og:title", content: "Microi吾码 - 开源 AI 低代码平台" }],
-		["meta", { property: "og:description", content: "开源低代码平台，基于 .NET + Vue3 + Element-Plus，支持 AI 引擎、API 接口引擎、表单引擎、工作流引擎等，始于2014年，2024年开源。" }],
+		["meta", { property: "og:description", content: "开源低代码平台，基于 .NET + Vue3 + Element-Plus，支持 AI 引擎、API 接口引擎、表单引擎、工作流引擎等，始于2014年，2025年开源。" }],
 		["meta", { property: "og:image", content: "https://www.microi.net/home2.jpg" }],
 		["meta", { property: "og:url", content: "https://www.microi.net/" }],
 		["meta", { property: "og:locale", content: "zh_CN" }],
