@@ -70,9 +70,6 @@
     <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="" style="width:100%"/></td>
-  </tr>
-  <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg"/></td>
