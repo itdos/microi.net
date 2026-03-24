@@ -2,9 +2,9 @@
 
 > **低代码平台与 AI 编程深度融合的开源平台**
 >
-> 低代码 + AI 本地编程 + AI 在线编程 + AI 数据分析，同时支持传统开发
+> AI 本地编程（VS Code Copilot/Cursor/Claude + MCP + Skills）、AI 在线编程、AI 数据分析，同时支持传统开发
 >
-> .NET10 + Vue3 + Redis + 跨数据库 + Element-Plus · 平台始于 2014 年，2024 年 11 月正式开源
+> .NET10 + Vue3 + Redis + 跨数据库/跨平台 + Element-Plus · 平台始于 2014 年，2024 年 11 月正式开源
 
 ---
 
