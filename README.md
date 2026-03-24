@@ -43,8 +43,13 @@
 ## 📸 预览图
 
 <table>
+<tr>
+  <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="width:100%"/></td>
+  </tr>
+  <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="width:100%"/></td>
+  </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png"/></td>
     <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg"/></td>
   </tr>
@@ -64,7 +69,7 @@
     <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="" style="width:100%"/></td>
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg"/></td>
