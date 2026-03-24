@@ -4,13 +4,13 @@
 >
 > AI 本地编程（VS Code Copilot/Cursor/Claude + MCP + Skills）、AI 在线编程、AI 数据分析，同时支持传统开发
 >
-> .NET10 + Vue3 + Redis + 跨数据库/跨平台 + Element-Plus · 平台始于 2014 年，2024 年 11 月正式开源
+> .NET10 + Vue3 + Redis + 跨数据库/跨平台 + Element-Plus · 平台始于 2014 年，2025 年正式开源
 
 ---
 
 ## 📖 平台简介
 
-**Microi吾码** 是一款面向开发者的开源 AI 低代码平台，**低代码与 AI 编程深度融合**——VS Code 插件一键拉取业务代码与数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成知识库，AI 不仅懂平台 API，更了解你的每一张表、每一个字段。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2024 年 11 月正式开源**。
+**Microi吾码** 是一款面向开发者的开源 AI 低代码平台，**低代码与 AI 编程深度融合**——VS Code 插件一键拉取业务代码与数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成知识库，AI 不仅懂平台 API，更了解你的每一张表、每一个字段。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
 
 强大的 [**API 接口引擎**](/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)，VS Code 插件一键拉取全部业务代码 + 数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成 AI 知识库，AI 不仅懂 V8 API，更了解你的每一张表、每一个字段，接口代码生成准确率高达 99%。保存即部署，远程真机执行 + 逐行断点调试全在 VS Code 内完成，无需编译发布。
 
