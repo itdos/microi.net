@@ -112,25 +112,25 @@
                                     </el-row>
                                     <el-row :gutter="20">
                                         <el-col :span="12" :xs="24">
-                                            <el-form-item label="真实公司名称" required>
-                                                <el-input v-model="applyForm.RealCompany" placeholder="贵公司的工商注册全称" clearable />
-                                            </el-form-item>
-                                        </el-col>
-                                        <el-col :span="12" :xs="24">
-                                            <el-form-item label="授权显示名称" required>
-                                                <el-input v-model="applyForm.Company" placeholder="License上显示的公司名称" clearable />
-                                            </el-form-item>
-                                        </el-col>
-                                    </el-row>
-                                    <el-row :gutter="20">
-                                        <el-col :span="12" :xs="24">
-                                            <el-form-item label="联系人">
-                                                <el-input v-model="applyForm.Name" placeholder="联系人姓名" clearable />
+                                            <el-form-item label="公司名称" required>
+                                                <el-input v-model="applyForm.Company" placeholder="贵公司名称" clearable />
                                             </el-form-item>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <el-form-item label="服务器IP">
                                                 <el-input v-model="applyForm.IP" placeholder="部署服务器的公网IP" clearable />
+                                            </el-form-item>
+                                        </el-col>
+                                    </el-row>
+                                    <el-row :gutter="20">
+                                        <el-col :span="12" :xs="24">
+                                            <el-form-item label="联系人" required>
+                                                <el-input v-model="applyForm.Name" placeholder="联系人姓名" clearable />
+                                            </el-form-item>
+                                        </el-col>
+                                        <el-col :span="12" :xs="24">
+                                            <el-form-item label="联系电话" required>
+                                                <el-input v-model="applyForm.Phone" placeholder="联系电话" clearable />
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
@@ -242,9 +242,9 @@ export default {
             applyForm: {
                 Account: "",
                 Password: "",
-                RealCompany: "",
                 Company: "",
                 Name: "",
+                Phone: "",
                 IP: "",
                 ProductType: "Enterprise",
                 Remark: "",
@@ -317,12 +317,16 @@ export default {
                 ElMessage.warning("请填写授权密码");
                 return;
             }
-            if (!self.applyForm.RealCompany.trim()) {
-                ElMessage.warning("请填写真实公司名称");
+            if (!self.applyForm.Company.trim()) {
+                ElMessage.warning("请填写公司名称");
                 return;
             }
-            if (!self.applyForm.Company.trim()) {
-                ElMessage.warning("请填写授权显示名称");
+            if (!self.applyForm.Name.trim()) {
+                ElMessage.warning("请填写联系人");
+                return;
+            }
+            if (!self.applyForm.Phone.trim()) {
+                ElMessage.warning("请填写联系电话");
                 return;
             }
             if (!self.applyForm.ProductType) {
@@ -335,9 +339,9 @@ export default {
                 HID: self.hid,
                 Account: self.applyForm.Account.trim(),
                 Password: self.applyForm.Password,
-                RealCompany: self.applyForm.RealCompany.trim(),
                 Company: self.applyForm.Company.trim(),
                 Name: self.applyForm.Name.trim(),
+                Phone: self.applyForm.Phone.trim(),
                 IP: self.applyForm.IP.trim(),
                 ProductType: self.applyForm.ProductType,
                 Remark: self.applyForm.Remark.trim(),

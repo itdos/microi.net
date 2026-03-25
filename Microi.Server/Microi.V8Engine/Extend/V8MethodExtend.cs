@@ -26,6 +26,22 @@ namespace Microi.net
         {
             return JObject.FromObject(null);
         }
+        /// <summary>
+        /// 生成新的 GUID 字符串，强烈建议使用 NewUlid 方法替代 GUID，Ulid 具有更好的排序性和更短的字符串长度
+        /// </summary>
+        /// <returns></returns>
+        public string NewGuid()
+        {
+            return Guid.NewGuid().ToString();
+        }
+        /// <summary>
+        /// 生成新的 ULID 字符串，推荐使用 ULID 替代 GUID，ULID 具有更好的排序性和更短的字符串长度，非常适合用作数据库主键
+        /// </summary>
+        /// <returns></returns>
+        public string NewUlid()
+        {
+            return Ulid.NewUlid().ToString();
+        }
 
         #region 加密签名辅助函数
 

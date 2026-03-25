@@ -62,7 +62,9 @@ var result3 = V8.Cache.Remove(cacheKey);//返回bool类型
 ::: details 展开查看 C# 代码（39 行）
 ```csharp
 //生成一个服务器端GUID值
+//强烈建议使用 V8.Method.NewUlid() 方法替代 System.Guid.NewGuid()，Ulid 具有更好的排序性和更短的字符串长度
 System.Guid.NewGuid()
+
 
 //将字符串转为base64字符串，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
