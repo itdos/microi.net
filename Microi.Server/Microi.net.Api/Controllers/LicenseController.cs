@@ -31,7 +31,7 @@ namespace Microi.net.Api
             try
             {
                 var result = await LicenseService.ApplyAsync(
-                    request?.HID, request?.Company, request?.Name, request?.RealCompany,
+                    request?.HID, request?.Company, request?.Name, request?.Phone,
                     request?.IP, request?.ProductType, request?.ExpirationDate,
                     request?.UpdateExpirationDate, request?.Remark,
                     request?.Account, request?.Password);
@@ -62,7 +62,7 @@ namespace Microi.net.Api
             try
             {
                 var result = await LicenseService.IssueAsync(
-                    request?.HID, request?.Company, request?.Name, request?.RealCompany,
+                    request?.HID, request?.Company, request?.Name, request?.Phone,
                     request?.IP, request?.ProductType, request?.ExpirationDate,
                     request?.UpdateExpirationDate);
                 return Json(result);
@@ -249,8 +249,8 @@ namespace Microi.net.Api
     /// </summary>
     public class LicenseApplyRequest
     {
-        /// <summary>真实公司名称</summary>
-        public string RealCompany { get; set; }
+        /// <summary>联系电话</summary>
+        public string Phone { get; set; }
         /// <summary>服务器IP</summary>
         public string IP { get; set; }
         /// <summary>硬件指纹ID</summary>
@@ -278,8 +278,8 @@ namespace Microi.net.Api
     /// </summary>
     public class LicenseIssueRequest
     {
-        /// <summary>真实公司名称</summary>
-        public string RealCompany { get; set; }
+        /// <summary>联系电话</summary>
+        public string Phone { get; set; }
         /// <summary>服务器IP</summary>
         public string IP { get; set; }
         /// <summary>客户的硬件指纹ID</summary>
