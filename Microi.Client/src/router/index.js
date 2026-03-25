@@ -247,6 +247,20 @@ export const asyncRoutes = [
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")
     },
+    // License 授权管理
+    {
+        path: "/license",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/license",
+                name: "system_license",
+                component: () => import("@/views/system/license.vue"),
+                meta: { title: "授权管理" }
+            }
+        ]
+    },
     // OpenClaw 管理系统（使用主框架 Layout，菜单由后端或侧边栏统一管理）
     {
         path: "/openclaw",

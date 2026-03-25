@@ -436,8 +436,11 @@ export default {
         self.GetSysMenu();
         self.GetSysDataSourceList();
         self.GetApiEngineList();
-        self.GetExceptionFieldList();
-        self.GetDeletedDiyField();
+        // 2026-03-25 修复：报表引擎的表是虚拟的，调用异常字段和回收站接口会报错
+        if (self.PageType != 'Report') {
+            self.GetExceptionFieldList();
+            self.GetDeletedDiyField();
+        }
         // self.$nextTick(function () {
         //     // self.LoadDragula();
         //     // setTimeout(() => {
@@ -1087,9 +1090,14 @@ export default {
         CallbackDeleteField(field) {
             var self = this;
             self.DiyCommon.OsConfirm('确定删除字段【' + field.Label + '】？', function() {
-                self.DiyCommon.Post(self.DiyApi.DelDiyField,{
-                    Id: field.Id
-                },
+                // 2026-03-25：报表引擎的字段是虚拟的，使用 FormEngine 删除，不操作物理表
+                var delApiUrl = self.DiyApi.DelDiyField;
+                var delParam = { Id: field.Id };
+                if (self.PageType == "Report") {
+                    delApiUrl = self.DiyApi.FormEngine.DelFormData;
+                    delParam = { FormEngineKey: "diy_field", Id: field.Id };
+                }
+                self.DiyCommon.Post(delApiUrl, delParam,
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.DiyCommon.Tips(self.$t("Msg.Success"));
@@ -1269,12 +1277,18 @@ export default {
                         self.DiyFieldJsonToStr(element);
                         element.OsClient = "";
                     });
+                    // 2026-03-25：报表引擎的字段是虚拟的，使用 UptFormDataBatch，不操作物理表
+                    var saveFieldApiUrl = self.DiyApi.UptDiyFieldList;
+                    var saveFieldParam = { FieldList: fieldList, TableId: self.$route.params.Id };
+                    if (self.PageType == "Report") {
+                        saveFieldApiUrl = self.DiyApi.FormEngine.UptFormDataBatch;
+                        saveFieldParam = fieldList.map(function(element) {
+                            return { FormEngineKey: "diy_field", ...element };
+                        });
+                    }
                     self.DiyCommon.Post(
-                        self.DiyApi.UptDiyFieldList,
-                        {
-                            FieldList: fieldList,
-                            TableId: self.$route.params.Id
-                        },
+                        saveFieldApiUrl,
+                        saveFieldParam,
                         function (result) {
                             self.SaveAllDiyFieldLoding = false;
                             if (self.DiyCommon.Result(result)) {
@@ -1443,9 +1457,12 @@ export default {
             var apiUrl = self.DiyApi.AddDiyField;
             if (self.PageType == "Report") {
                 apiUrl = self.DiyApi.FormEngine.AddFormData;
+                param.IsVirtual = 1;
+                var _rowModel = { ...param };
+                _rowModel.IsVirtual = 1;
                 param = {
                     FormEngineKey: "diy_field",
-                    _RowModel: { ...param }
+                    _FormData: _rowModel
                 };
             }
             console.log('[diy-design] API URL:', apiUrl);

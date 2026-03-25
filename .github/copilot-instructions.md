@@ -466,6 +466,8 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi-v8-engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/.microi-db-schema.md`
 - `microi-v8-engine/Microi吾码 (localhost_7266)/iTdos.Product.Internet/.microi-db-schema.md`
 - `microi-v8-engine/Microi吾码 - 演示 (api.itdos.com)/microi_demo.Product.Internal/.microi-db-schema.md`
+- `microi-v8-engine/congshi (api.chongstech.com)/congshi.Product.Internal/.microi-db-schema.md`
+- `microi-v8-engine/远东 (api.chongstech.com)/yuandong.Product.Internal/.microi-db-schema.md`
 
 
 ---

@@ -13,11 +13,9 @@ x86/
 !Microi.Server/Microi.net.Api/bin/Release/
 !Microi.Server/Microi.net.Api/bin/Release/Dockerfile
 !Microi.Server/Microi.net.Api/bin/Release/publish-demo.sh
-
 Microi.Server/Microi.net.Api/bin/Release/*
 !Microi.Server/Microi.net.Api/bin/Release/Dockerfile
 !Microi.Server/Microi.net.Api/bin/Release/publish-demo.sh
-
 # 允许跟踪 Microi.Client/bin/Release 下的特定配置文件
 !/Microi.Client/bin/
 !/Microi.Client/bin/Release/
@@ -26,7 +24,6 @@ Microi.Server/Microi.net.Api/bin/Release/*
 !/Microi.Client/bin/Release/.gitignore
 !/Microi.Client/bin/Release/itdos-heart
 !/Microi.Client/bin/Release/publish-demo.sh
-
 Microi.Client/bin/*
 !/Microi.Client/bin/Release/
 [Bb]in/
@@ -96,3 +93,5 @@ unpackage/release/
 
 .vscode
 .cursor/mcp.json
+
+/Microi.Server/logs/
