@@ -937,7 +937,13 @@ export default {
     },
     mounted() {
         var self = this;
-        self.PageType = self.$route.query.PageType;
+        // 2026-03-25 修复：只在通过 TableId 加载时使用路由的 PageType
+        // 通过 TableName 加载的系统表(diy_field、diy_table)不应进入 Report 模式
+        // 避免 diy-design 右侧属性面板的 DiyForm 在 Report 模式下
+        // 因无 TableId 过滤条件而加载全部 diy_field 记录，导致死循环
+        if (self.TableId) {
+            self.PageType = self.$route.query.PageType || '';
+        }
         self.$nextTick(function () {
             // removed debug log
         });
