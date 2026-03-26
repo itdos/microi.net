@@ -558,9 +558,10 @@ if [ "$PUSH_NUGET" = true ]; then
             if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
 
             local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
+            local nupkg_before_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
             local enc_bytes=$(stat -f%z "$encrypted_dll" 2>/dev/null || stat -c%s "$encrypted_dll" 2>/dev/null)
 
-            print_step "替换 $(basename "$latest_package") 中的 ${project_name}.dll（加密DLL: $((enc_bytes/1024))KB）"
+            print_step "替换 $(basename "$latest_package") 中的 ${project_name}.dll（加密DLL: $((enc_bytes/1024))KB，nupkg替换前: $((nupkg_before_bytes/1024))KB）"
 
             local temp_dir=$(mktemp -d)
             local dll_path="lib/netstandard2.1/${project_name}.dll"
@@ -575,10 +576,11 @@ if [ "$PUSH_NUGET" = true ]; then
             rm -rf "$temp_dir"
 
             local nupkg_after_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
+            local nupkg_after_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
             if [ "$nupkg_before_md5" = "$nupkg_after_md5" ]; then
                 print_fail "$(basename "$latest_package") 替换后MD5未变化，替换未生效！"
             fi
-            print_success "${project_name}.dll 替换成功（MD5已变更）"
+            print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，MD5已变更）"
         }
 
         _replace_error=0
