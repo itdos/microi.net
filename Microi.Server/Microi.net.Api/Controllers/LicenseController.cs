@@ -1,4 +1,5 @@
 using Dos.Common;
+using Lazy.Captcha.Core;
 using Microi.License;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +21,34 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class LicenseController : Controller
     {
+        private readonly ICaptcha _captcha;
+
+        public LicenseController(ICaptcha captcha)
+        {
+            _captcha = captcha;
+        }
+
+        /// <summary>
+        /// 获取License申请验证码（匹名可访问）
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult GetCaptcha()
+        {
+            try
+            {
+                var captchaId = "license:Captcha:" + Guid.NewGuid().ToString("N");
+                var info = _captcha.Generate(captchaId);
+                if (info == null)
+                    return Json(new DosResult(0, null, "获取验证码失败"));
+                return Json(new DosResult(1, new { CaptchaId = info.Id, Image = Convert.ToBase64String(info.Bytes) }));
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "获取验证码失败: " + ex.Message));
+            }
+        }
+
         /// <summary>
         /// 客户申请License（提交HID和公司信息，写入diy_license表）
         /// 仅在License服务器（有私钥）上可用
@@ -31,6 +60,14 @@ namespace Microi.net.Api
         {
             try
             {
+                // 验证码校验
+                if (string.IsNullOrWhiteSpace(request?.CaptchaId))
+                    return Json(new DosResult(0, null, "请先获取验证码"));
+                if (string.IsNullOrWhiteSpace(request?.CaptchaValue))
+                    return Json(new DosResult(0, null, "请输入验证码"));
+                if (!_captcha.Validate(request.CaptchaId, request.CaptchaValue, true, true))
+                    return Json(new DosResult(0, null, "验证码错误，请重新输入"));
+
                 // 自动获取客户端IP（优先X-Forwarded-For，适配反向代理/Docker环境）
                 var clientIP = request?.IP;
                 if (string.IsNullOrWhiteSpace(clientIP))
@@ -153,6 +190,25 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 return Json(new DosResult(0, null, "查询License状态失败: " + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 查询License申请状态（根据HID查询是否已提交申请及当前状态）
+        /// 不返回LicenseContent，仅返回申请元数据，匿名可访问
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<JsonResult> QueryApplication([FromBody] LicenseCheckRequest request)
+        {
+            try
+            {
+                var result = await LicenseService.QueryApplicationAsync(request?.HID);
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "查询申请状态失败: " + ex.Message));
             }
         }
 
@@ -282,6 +338,10 @@ namespace Microi.net.Api
         public string Account { get; set; }
         /// <summary>License服务器的 sys_user 密码</summary>
         public string Password { get; set; }
+        /// <summary>验证码ID</summary>
+        public string CaptchaId { get; set; }
+        /// <summary>验证码值</summary>
+        public string CaptchaValue { get; set; }
     }
 
     /// <summary>

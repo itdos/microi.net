@@ -65,6 +65,35 @@
                         <p class="status-hint">当前服务器未检测到有效的License授权，AI相关高级功能受限。请提交授权申请或部署已签发的License文件。</p>
                     </el-card>
 
+                    <!-- 已提交过申请的状态提示 -->
+                    <el-card v-if="existingApp" class="status-card" shadow="hover" :style="{ borderTop: '3px solid ' + existingAppBorderColor }">
+                        <div class="status-row">
+                            <div class="status-badge" :class="existingAppBadgeClass">
+                                <svg v-if="existingApp.Status === 'Issued'" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                                <svg v-else-if="existingApp.Status === 'Rejected'" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
+                                <svg v-else viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                            </div>
+                            <span class="status-label" :style="{ color: existingAppBorderColor }">
+                                {{ existingApp.Status === 'Pending' ? '申请待审核' : existingApp.Status === 'Rejected' ? '申请已驳回' : existingApp.Status === 'Issued' ? (existingApp.Revoked ? 'License已作废' : 'License已签发') : '已提交申请' }}
+                            </span>
+                        </div>
+                        <el-descriptions :column="2" border :label-style="{ width: '120px', fontWeight: 600 }">
+                            <el-descriptions-item label="公司名称">{{ existingApp.Company }}</el-descriptions-item>
+                            <el-descriptions-item label="联系人">{{ existingApp.Name }}</el-descriptions-item>
+                            <el-descriptions-item label="联系电话">{{ existingApp.Phone }}</el-descriptions-item>
+                            <el-descriptions-item label="产品版本">{{ existingApp.ProductType === 'Enterprise' ? '企业版' : '个人版' }}</el-descriptions-item>
+                        </el-descriptions>
+                        <el-alert v-if="existingApp.Status === 'Rejected' && existingApp.RejectReason" type="error" :closable="false" style="margin-top: 12px">
+                            <template #title>驳回原因：{{ existingApp.RejectReason }}</template>
+                        </el-alert>
+                        <p v-if="existingApp.Status === 'Pending'" style="margin: 12px 0 0; color: #909399; font-size: 13px;">
+                            您的申请正在等待管理员审核，您也可以修改信息后重新提交。
+                        </p>
+                        <p v-if="existingApp.Status === 'Issued' && !existingApp.Revoked" style="margin: 12px 0 0; color: #67c23a; font-size: 13px;">
+                            License已签发，请切换到「检查并部署License」选项卡进行部署。
+                        </p>
+                    </el-card>
+
                     <!-- 服务器信息 -->
                     <el-card class="info-card" shadow="hover">
                         <template #header>
@@ -84,7 +113,7 @@
 
                     <!-- 主操作区：Tabs -->
                     <el-card class="main-card" shadow="hover">
-                        <el-tabs v-model="activeTab" type="border-card">
+                        <el-tabs v-model="activeTab" type="border-card" @tab-change="onTabChange">
                             <!-- TAB 1: 提交申请 -->
                             <el-tab-pane name="apply">
                                 <template #label>
@@ -128,12 +157,15 @@
                                                 <el-input v-model="applyForm.Phone" placeholder="联系电话" clearable />
                                             </el-form-item>
                                         </el-col>
+                                    </el-row>
+                                    <el-row :gutter="20">
                                         <el-col :span="12" :xs="24">
-                                            <el-form-item label="产品类型" required>
-                                                <el-radio-group v-model="applyForm.ProductType">
-                                                    <el-radio-button label="Personal">个人版 Personal</el-radio-button>
-                                                    <el-radio-button label="Enterprise">企业版 Enterprise</el-radio-button>
-                                                </el-radio-group>
+                                            <el-form-item label="验证码" required>
+                                                <div style="display:flex;gap:8px;align-items:center;width:100%">
+                                                    <el-input v-model="applyForm.CaptchaValue" placeholder="请输入验证码计算结果" maxlength="6" clearable style="flex:1" @keyup.enter="submitApply" />
+                                                    <img v-if="captchaSrc" :src="captchaSrc" class="captcha-img" @click="loadCaptcha" title="点击刷新验证码" style="height:40px;cursor:pointer;border:1px solid #dcdfe6;border-radius:4px" />
+                                                    <el-button v-else size="small" @click="loadCaptcha">获取验证码</el-button>
+                                                </div>
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
@@ -142,7 +174,7 @@
                                     </el-form-item>
                                     <el-form-item>
                                         <el-button type="primary" size="large" :loading="applying" @click="submitApply">
-                                            <el-icon><Promotion /></el-icon> 提交授权申请
+                                            <el-icon><Promotion /></el-icon> {{ existingApp ? '重新提交申请' : '提交授权申请' }}
                                         </el-button>
                                     </el-form-item>
                                 </el-form>
@@ -242,9 +274,14 @@ export default {
                 Company: "",
                 Name: "",
                 Phone: "",
-                ProductType: "Enterprise",
+                CaptchaValue: "",
                 Remark: "",
             },
+            // 验证码
+            captchaId: "",
+            captchaSrc: "",
+            // 已提交的申请记录（从License服务器查询）
+            existingApp: null,
             // 检查结果
             checkResult: null,
         };
@@ -252,13 +289,36 @@ export default {
     mounted() {
         this.init();
     },
+    computed: {
+        existingAppBorderColor() {
+            if (!this.existingApp) return '#909399';
+            const s = this.existingApp.Status;
+            if (s === 'Issued' && !this.existingApp.Revoked) return '#67c23a';
+            if (s === 'Rejected' || this.existingApp.Revoked) return '#f56c6c';
+            if (s === 'Pending') return '#409eff';
+            return '#909399';
+        },
+        existingAppBadgeClass() {
+            if (!this.existingApp) return '';
+            const s = this.existingApp.Status;
+            if (s === 'Issued' && !this.existingApp.Revoked) return 'success';
+            if (s === 'Rejected' || this.existingApp.Revoked) return 'danger';
+            return 'info';
+        },
+    },
     methods: {
         async init() {
             this.pageLoading = true;
+            const self = this;
             // 先获取HID，再验证License
             this.loadHID(() => {
-                this.loadVerify(() => {
-                    this.pageLoading = false;
+                self.loadVerify(() => {
+                    self.pageLoading = false;
+                    // 如果未授权，向License服务器查询是否已提交过申请
+                    if (!self.isLicensed && self.hid) {
+                        self.queryExistingApplication();
+                        self.loadCaptcha();
+                    }
                 });
             });
         },
@@ -270,6 +330,8 @@ export default {
                 if (result && result.Code === 1 && result.Data) {
                     self.hid = result.Data.HID || "";
                 }
+                if (done) done();
+            }, function () {
                 if (done) done();
             });
         },
@@ -295,10 +357,66 @@ export default {
                     self.isLicensed = false;
                 }
                 if (done) done();
+            }, function () {
+                self.verifying = false;
+                self.isLicensed = false;
+                if (done) done();
             });
         },
 
-        // 提交申请到 api.itdos.com
+        // 查询License服务器上是否已有该HID的申请记录
+        queryExistingApplication() {
+            const self = this;
+            fetch(LICENSE_API_BASE + "/api/License/QueryApplication", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ HID: self.hid }),
+            })
+                .then(r => r.json())
+                .then(result => {
+                    if (result && result.Code === 1 && result.Data && result.Data.HasApplication) {
+                        self.existingApp = result.Data;
+                        // 预填表单
+                        if (result.Data.Company) self.applyForm.Company = result.Data.Company;
+                        if (result.Data.Name) self.applyForm.Name = result.Data.Name;
+                        if (result.Data.Phone) self.applyForm.Phone = result.Data.Phone;
+                        if (result.Data.Remark) self.applyForm.Remark = result.Data.Remark;
+                        // 如果已签发且未作废，自动切换到部署tab并获取LicenseContent
+                        if (result.Data.Status === 'Issued' && !result.Data.Revoked) {
+                            self.activeTab = "deploy";
+                            self.checkLicense();
+                        }
+                    }
+                })
+                .catch(() => { /* 静默失败，不影响正常使用 */ });
+        },
+
+        // Tab切换事件
+        onTabChange(name) {
+            if (name === "deploy" && this.hid && this.checkResult === null) {
+                this.checkLicense();
+            }
+        },
+
+        // 加载验证码（从License服务器）
+        loadCaptcha() {
+            const self = this;
+            fetch(LICENSE_API_BASE + "/api/License/GetCaptcha", { method: "GET" })
+                .then(r => r.json())
+                .then(result => {
+                    if (result && result.Code === 1 && result.Data) {
+                        self.captchaId = result.Data.CaptchaId || "";
+                        self.captchaSrc = "data:image/gif;base64," + result.Data.Image;
+                    } else {
+                        ElMessage.warning("获取验证码失败，请重试");
+                    }
+                })
+                .catch(() => {
+                    ElMessage.error("获取验证码失败，请检查网络连接");
+                });
+        },
+
+        // 提交申请到 api.itdos.com（不发送authorization报文）
         submitApply() {
             const self = this;
             if (!self.hid) {
@@ -325,8 +443,12 @@ export default {
                 ElMessage.warning("请填写联系电话");
                 return;
             }
-            if (!self.applyForm.ProductType) {
-                ElMessage.warning("请选择产品类型");
+            if (!self.applyForm.CaptchaValue.trim()) {
+                ElMessage.warning("请输入验证码");
+                return;
+            }
+            if (!self.captchaId) {
+                ElMessage.warning("请先获取验证码");
                 return;
             }
 
@@ -338,32 +460,48 @@ export default {
                 Company: self.applyForm.Company.trim(),
                 Name: self.applyForm.Name.trim(),
                 Phone: self.applyForm.Phone.trim(),
-                ProductType: self.applyForm.ProductType,
+                CaptchaId: self.captchaId,
+                CaptchaValue: self.applyForm.CaptchaValue.trim(),
                 Remark: self.applyForm.Remark.trim(),
             };
 
-            self.DiyCommon.Post(LICENSE_API_BASE + "/api/License/Apply", param, function (result) {
-                self.applying = false;
-                if (result && result.Code === 1) {
-                    // 检查是否自动签发（返回了 LicenseContent）
-                    if (result.Data && result.Data.LicenseContent) {
-                        ElMessage.success(result.Msg || "License已自动签发！");
-                        self.checkResult = result.Data;
-                        self.activeTab = "deploy";
+            fetch(LICENSE_API_BASE + "/api/License/Apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(param),
+            })
+                .then(r => r.json())
+                .then(result => {
+                    self.applying = false;
+                    if (result && result.Code === 1) {
+                        if (result.Data && result.Data.LicenseContent) {
+                            ElMessage.success(result.Msg || "License已自动签发！");
+                            self.checkResult = result.Data;
+                            self.activeTab = "deploy";
+                        } else {
+                            ElMessage.success(result.Msg || "授权申请已提交，等待管理员审核");
+                            self.queryExistingApplication();
+                            self.activeTab = "deploy";
+                        }
+                        // 重置验证码
+                        self.applyForm.CaptchaValue = "";
+                        self.loadCaptcha();
                     } else {
-                        ElMessage.success(result.Msg || "授权申请已提交，等待管理员审核");
-                        self.activeTab = "deploy";
+                        ElMessage.error((result && result.Msg) || "申请提交失败");
+                        // 验证码可能已失效，刷新验证码
+                        self.loadCaptcha();
+                        self.applyForm.CaptchaValue = "";
                     }
-                } else {
-                    ElMessage.error((result && result.Msg) || "申请提交失败");
-                }
-            }, function () {
-                self.applying = false;
-                ElMessage.error("网络请求失败，请检查网络连接");
-            });
+                })
+                .catch(() => {
+                    self.applying = false;
+                    ElMessage.error("网络请求失败，请检查网络连接");
+                    self.loadCaptcha();
+                    self.applyForm.CaptchaValue = "";
+                });
         },
 
-        // 检查授权状态（从 api.itdos.com）
+        // 检查授权状态（从 api.itdos.com，不发送authorization报文）
         checkLicense() {
             const self = this;
             if (!self.hid) {
@@ -374,17 +512,24 @@ export default {
             self.checking = true;
             self.checkResult = null;
 
-            self.DiyCommon.Post(LICENSE_API_BASE + "/api/License/Check", { HID: self.hid }, function (result) {
-                self.checking = false;
-                if (result && result.Code === 1 && result.Data) {
-                    self.checkResult = result.Data;
-                } else {
-                    ElMessage.warning((result && result.Msg) || "未找到License记录");
-                }
-            }, function () {
-                self.checking = false;
-                ElMessage.error("网络请求失败，请检查网络连接");
-            });
+            fetch(LICENSE_API_BASE + "/api/License/Check", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ HID: self.hid }),
+            })
+                .then(r => r.json())
+                .then(result => {
+                    self.checking = false;
+                    if (result && result.Code === 1 && result.Data) {
+                        self.checkResult = result.Data;
+                    } else {
+                        ElMessage.warning((result && result.Msg) || "未找到License记录");
+                    }
+                })
+                .catch(() => {
+                    self.checking = false;
+                    ElMessage.error("网络请求失败，请检查网络连接");
+                });
         },
 
         // 自动部署到本地服务器
@@ -552,6 +697,14 @@ export default {
 .status-badge.warning {
     background: #fffbe6;
     color: #faad14;
+}
+.status-badge.danger {
+    background: #fef0f0;
+    color: #f56c6c;
+}
+.status-badge.info {
+    background: #ecf5ff;
+    color: #409eff;
 }
 .status-label {
     font-size: 22px;
