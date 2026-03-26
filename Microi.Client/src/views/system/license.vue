@@ -117,29 +117,26 @@
                                             </el-form-item>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
-                                            <el-form-item label="服务器IP">
-                                                <el-input v-model="applyForm.IP" placeholder="部署服务器的公网IP" clearable />
+                                            <el-form-item label="联系人" required>
+                                                <el-input v-model="applyForm.Name" placeholder="联系人姓名" clearable />
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
                                     <el-row :gutter="20">
                                         <el-col :span="12" :xs="24">
-                                            <el-form-item label="联系人" required>
-                                                <el-input v-model="applyForm.Name" placeholder="联系人姓名" clearable />
-                                            </el-form-item>
-                                        </el-col>
-                                        <el-col :span="12" :xs="24">
                                             <el-form-item label="联系电话" required>
                                                 <el-input v-model="applyForm.Phone" placeholder="联系电话" clearable />
                                             </el-form-item>
                                         </el-col>
+                                        <el-col :span="12" :xs="24">
+                                            <el-form-item label="产品类型" required>
+                                                <el-radio-group v-model="applyForm.ProductType">
+                                                    <el-radio-button label="Personal">个人版 Personal</el-radio-button>
+                                                    <el-radio-button label="Enterprise">企业版 Enterprise</el-radio-button>
+                                                </el-radio-group>
+                                            </el-form-item>
+                                        </el-col>
                                     </el-row>
-                                    <el-form-item label="产品类型" required>
-                                        <el-radio-group v-model="applyForm.ProductType">
-                                            <el-radio-button label="Personal">个人版 Personal</el-radio-button>
-                                            <el-radio-button label="Enterprise">企业版 Enterprise</el-radio-button>
-                                        </el-radio-group>
-                                    </el-form-item>
                                     <el-form-item label="备注">
                                         <el-input v-model="applyForm.Remark" type="textarea" :rows="3" placeholder="附加说明" />
                                     </el-form-item>
@@ -245,7 +242,6 @@ export default {
                 Company: "",
                 Name: "",
                 Phone: "",
-                IP: "",
                 ProductType: "Enterprise",
                 Remark: "",
             },
@@ -342,7 +338,6 @@ export default {
                 Company: self.applyForm.Company.trim(),
                 Name: self.applyForm.Name.trim(),
                 Phone: self.applyForm.Phone.trim(),
-                IP: self.applyForm.IP.trim(),
                 ProductType: self.applyForm.ProductType,
                 Remark: self.applyForm.Remark.trim(),
             };
