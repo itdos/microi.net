@@ -101,12 +101,12 @@
                                     <el-row :gutter="20">
                                         <el-col :span="12" :xs="24">
                                             <el-form-item label="授权账号" required>
-                                                <el-input v-model="applyForm.Account" placeholder="Microi平台账号" clearable />
+                                                <el-input v-model="applyForm.Account" placeholder="平台账号" clearable />
                                             </el-form-item>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <el-form-item label="授权密码" required>
-                                                <el-input v-model="applyForm.Password" type="password" placeholder="Microi平台密码" show-password clearable />
+                                                <el-input v-model="applyForm.Password" type="password" placeholder="平台密码" show-password clearable />
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
@@ -474,7 +474,7 @@ export default {
     border-bottom: 3px solid #e94560;
 }
 .header-content {
-    max-width: 960px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     align-items: center;
@@ -509,7 +509,7 @@ export default {
 
 /* ===== 主体区域 ===== */
 .license-body {
-    max-width: 960px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: 24px;
 }

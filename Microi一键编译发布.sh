@@ -3,7 +3,7 @@
 #  Microi 一键编译发布助手
 #  适用于 Microi 低代码平台的后端 (.NET) 和前端 (Vue3) 一键编译发布
 #  初次使用：chmod +x Microi一键编译发布.sh
-#  开源地址: https://gitee.com/microi/Microi.net
+#  开源地址: https://gitee.com/ITdos/microi.net
 # ════════════════════════════════════════════════════════════════
 set -e
 set -o pipefail
