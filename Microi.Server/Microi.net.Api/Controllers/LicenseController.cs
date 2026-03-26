@@ -23,6 +23,7 @@ namespace Microi.net.Api
         /// <summary>
         /// 客户申请License（提交HID和公司信息，写入diy_license表）
         /// 仅在License服务器（有私钥）上可用
+        /// 服务器IP自动从请求中获取，无需客户手动填写
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
@@ -30,9 +31,19 @@ namespace Microi.net.Api
         {
             try
             {
+                // 自动获取客户端IP（优先X-Forwarded-For，适配反向代理/Docker环境）
+                var clientIP = request?.IP;
+                if (string.IsNullOrWhiteSpace(clientIP))
+                {
+                    clientIP = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',').FirstOrDefault()?.Trim()
+                        ?? HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault()
+                        ?? HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString()
+                        ?? "";
+                }
+
                 var result = await LicenseService.ApplyAsync(
                     request?.HID, request?.Company, request?.Name, request?.Phone,
-                    request?.IP, request?.ProductType, request?.ExpirationDate,
+                    clientIP, request?.ProductType, request?.ExpirationDate,
                     request?.UpdateExpirationDate, request?.Remark,
                     request?.Account, request?.Password);
                 return Json(result);
@@ -128,7 +139,7 @@ namespace Microi.net.Api
 
         /// <summary>
         /// 查询License状态（根据HID查询是否已签发、是否被作废）
-        /// 仅在License服务器（有私钥）上可用
+        /// 仅查询数据库，不需要私钥
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
