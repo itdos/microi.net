@@ -134,15 +134,21 @@ namespace Microi.net.Api
                 }
                 catch { stats["RecentLogins"] = new JArray(); }
 
-                // 接口引擎调用频率排行（取前10）
+                // 接口引擎调用频率排行（取前10，从 MongoDB 读取）
                 try
                 {
-                    var apiRankSql = "SELECT ApiEngineKey, Name, RequestCount FROM sys_apiengine WHERE IsDeleted<>1 AND RequestCount>0 ORDER BY RequestCount DESC LIMIT 10";
-                    dynamic[] apiRank = db.FromSql(apiRankSql).ToArray();
-                    var apiRankArr = new JArray();
-                    foreach (var item in apiRank)
+                    var rankResult = await MicroiEngine.MongoDB.GetApiCallCountRank(new ApiCallCountParam()
                     {
-                        apiRankArr.Add(JObject.FromObject(item));
+                        OsClient = sysUser?.OsClient,
+                        _Top = 10
+                    });
+                    var apiRankArr = new JArray();
+                    if (rankResult.Code == 1 && rankResult.Data != null)
+                    {
+                        foreach (var item in rankResult.Data)
+                        {
+                            apiRankArr.Add(JObject.FromObject(item));
+                        }
                     }
                     stats["ApiEngineRank"] = apiRankArr;
                 }

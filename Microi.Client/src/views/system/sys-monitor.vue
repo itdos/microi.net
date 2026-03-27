@@ -44,28 +44,28 @@
 
         <!-- 第一行：3个仪表盘(各25%) + 运行时间(25%) -->
         <el-row :gutter="10" class="section-row">
-            <el-col :span="6" :sm="12" :xs="12">
+            <el-col :span="6" :sm="6" :xs="12">
                 <div class="gauge-card">
                     <div ref="cpuChart" class="gauge-chart"></div>
                     <div class="gauge-label">CPU</div>
                     <div class="gauge-sub">{{ processorCount }} 核心</div>
                 </div>
             </el-col>
-            <el-col :span="6" :sm="12" :xs="12">
+            <el-col :span="6" :sm="6" :xs="12">
                 <div class="gauge-card">
                     <div ref="memChart" class="gauge-chart"></div>
                     <div class="gauge-label">内存</div>
                     <div class="gauge-sub">{{ memUsedMB }} / {{ memTotalMB }} MB</div>
                 </div>
             </el-col>
-            <el-col :span="6" :sm="12" :xs="12">
+            <el-col :span="6" :sm="6" :xs="12">
                 <div class="gauge-card">
                     <div ref="diskChart" class="gauge-chart"></div>
                     <div class="gauge-label">磁盘</div>
                     <div class="gauge-sub">{{ diskUsed }} / {{ diskTotal }} GB</div>
                 </div>
             </el-col>
-            <el-col :span="6" :sm="12" :xs="12">
+            <el-col :span="6" :sm="6" :xs="12">
                 <div class="neon-card uptime-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
@@ -85,7 +85,7 @@
 
         <!-- 第二行：运行环境(50%) + 平台统计(50%) -->
         <el-row :gutter="10" class="section-row">
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card env-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -101,7 +101,7 @@
                     </div>
                 </div>
             </el-col>
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="stat-cards-wrap">
                     <div class="stat-card" v-for="s in platformStatCards" :key="s.key">
                         <div class="stat-icon" :style="{ background: s.bg }">
@@ -116,7 +116,7 @@
 
         <!-- 第三行：CPU/内存趋势(50%) + 网络趋势(50%) -->
         <el-row :gutter="10" class="section-row">
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -125,7 +125,7 @@
                     <div ref="trendChart" class="chart-area" style="height:180px"></div>
                 </div>
             </el-col>
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -139,7 +139,7 @@
 
         <!-- 第四行：接口引擎排行(50%) + 表数据量排行(50%) -->
         <el-row :gutter="10" class="section-row">
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
@@ -148,7 +148,7 @@
                     <div ref="apiRankChart" class="chart-area" style="height:240px"></div>
                 </div>
             </el-col>
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
@@ -161,7 +161,7 @@
 
         <!-- 第五行：最近登录(50%) + 磁盘分区(25%) + 磁盘IO(25%) -->
         <el-row :gutter="10" class="section-row">
-            <el-col :span="12" :sm="24">
+            <el-col :span="12" :sm="12">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -184,7 +184,7 @@
                     </div>
                 </div>
             </el-col>
-            <el-col :span="6" :sm="12" :xs="24">
+            <el-col :span="6" :sm="6" :xs="24">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
@@ -202,7 +202,7 @@
                     </div>
                 </div>
             </el-col>
-            <el-col :span="6" :sm="12" :xs="24">
+            <el-col :span="6" :sm="6" :xs="24">
                 <div class="neon-card">
                     <div class="neon-card-title">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
@@ -483,10 +483,10 @@ export default {
                 this._trendChart.setOption({
                     animation: false,
                     tooltip: { trigger: "axis", backgroundColor: "rgba(10,20,40,0.9)", borderColor: "#00d4ff22", textStyle: { color: "#c9d1d9", fontSize: 11 } },
-                    legend: { data: ["CPU%", "内存%"], textStyle: { color: "#586069", fontSize: 11 }, top: 0, right: 8 },
+                    legend: { data: ["CPU%", "内存%"], textStyle: { color: "#d5d5d5", fontSize: 11 }, top: 0, right: 8 },
                     grid: { left: 36, right: 10, top: 28, bottom: 20 },
-                    xAxis: { type: "category", data: this.trendLabels, axisLabel: { color: "#3d444d", fontSize: 10 }, axisLine: { lineStyle: { color: "#161b22" } }, splitLine: { show: false } },
-                    yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: "#3d444d", formatter: "{value}%" }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
+                    xAxis: { type: "category", data: this.trendLabels, axisLabel: { color: "#d3d3d3", fontSize: 10 }, axisLine: { lineStyle: { color: "#161b22" } }, splitLine: { show: false } },
+                    yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: "#d3d3d3", formatter: "{value}%" }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
                     series: [
                         { name: "CPU%", type: "line", data: this.cpuHistory, smooth: true, symbol: "none", lineStyle: { width: 1.5, color: "#00d4ff" }, areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:"rgba(0,212,255,0.2)"},{offset:1,color:"rgba(0,212,255,0)"}]) } },
                         { name: "内存%", type: "line", data: this.memHistory, smooth: true, symbol: "none", lineStyle: { width: 1.5, color: "#00ff88" }, areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:"rgba(0,255,136,0.2)"},{offset:1,color:"rgba(0,255,136,0)"}]) } }
@@ -505,10 +505,10 @@ export default {
                 this._networkChart.setOption({
                     animation: false,
                     tooltip: { trigger: "axis", backgroundColor: "rgba(10,20,40,0.9)", borderColor: "#00d4ff22", textStyle: { color: "#c9d1d9", fontSize: 11 } },
-                    legend: { data: ["入站KB/s", "出站KB/s"], textStyle: { color: "#586069", fontSize: 11 }, top: 0, right: 8 },
+                    legend: { data: ["入站KB/s", "出站KB/s"], textStyle: { color: "#d5d5d5", fontSize: 11 }, top: 0, right: 8 },
                     grid: { left: 42, right: 10, top: 28, bottom: 20 },
-                    xAxis: { type: "category", data: this.trendLabels, axisLabel: { color: "#3d444d", fontSize: 10 }, axisLine: { lineStyle: { color: "#161b22" } }, splitLine: { show: false } },
-                    yAxis: { type: "value", min: 0, axisLabel: { color: "#3d444d" }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
+                    xAxis: { type: "category", data: this.trendLabels, axisLabel: { color: "#d3d3d3", fontSize: 10 }, axisLine: { lineStyle: { color: "#161b22" } }, splitLine: { show: false } },
+                    yAxis: { type: "value", min: 0, axisLabel: { color: "#d3d3d3" }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
                     series: [
                         { name: "入站KB/s", type: "line", data: this.rxHistory, smooth: true, symbol: "none", lineStyle: { width: 1.5, color: "#36d399" }, areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:"rgba(54,211,153,0.18)"},{offset:1,color:"rgba(54,211,153,0)"}]) } },
                         { name: "出站KB/s", type: "line", data: this.txHistory, smooth: true, symbol: "none", lineStyle: { width: 1.5, color: "#f7768e" }, areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:"rgba(247,118,142,0.18)"},{offset:1,color:"rgba(247,118,142,0)"}]) } }
@@ -523,15 +523,15 @@ export default {
             var el = this.$refs.apiRankChart;
             if (!el) return;
             if (!this._apiRankChart) this._apiRankChart = echarts.init(el, null, { renderer: "svg" });
-            var names = this.apiEngineRank.map(function(r) { return r.Name || r.ApiEngineKey || ""; }).reverse();
+            var names = this.apiEngineRank.map(function(r) { return (r.Name + '(' + r.ApiEngineKey + ')') || ""; }).reverse();
             var vals  = this.apiEngineRank.map(function(r) { return r.RequestCount || 0; }).reverse();
             this._apiRankChart.setOption({
                 animation: false,
                 tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, backgroundColor: "rgba(10,20,40,0.9)", borderColor: "#00d4ff22", textStyle: { color: "#c9d1d9", fontSize: 11 } },
                 grid: { left: 100, right: 26, top: 8, bottom: 8 },
-                xAxis: { type: "value", axisLabel: { color: "#3d444d", fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
-                yAxis: { type: "category", data: names, axisLabel: { color: "#8b949e", fontSize: 11, width: 88, overflow: "truncate" }, axisLine: { show: false }, axisTick: { show: false } },
-                series: [{ type: "bar", data: vals, barWidth: 12, itemStyle: { borderRadius: [0,4,4,0], color: new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:"#4facfe"},{offset:1,color:"#00f2fe"}]) }, label: { show: true, position: "right", color: "#586069", fontSize: 10 } }]
+                xAxis: { type: "value", axisLabel: { color: "#d3d3d3", fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
+                yAxis: { type: "category", data: names, axisLabel: { color: "#fff", fontSize: 11, width: 88, overflow: "truncate" }, axisLine: { show: false }, axisTick: { show: false } },
+                series: [{ type: "bar", data: vals, barWidth: 12, itemStyle: { borderRadius: [0,4,4,0], color: new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:"#4facfe"},{offset:1,color:"#00f2fe"}]) }, label: { show: true, position: "right", color: "#d5d5d5", fontSize: 10 } }]
             });
         },
 
@@ -545,9 +545,9 @@ export default {
                 animation: false,
                 tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, backgroundColor: "rgba(10,20,40,0.9)", borderColor: "#00d4ff22", textStyle: { color: "#c9d1d9", fontSize: 11 } },
                 grid: { left: 100, right: 26, top: 8, bottom: 8 },
-                xAxis: { type: "value", axisLabel: { color: "#3d444d", fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
-                yAxis: { type: "category", data: names, axisLabel: { color: "#8b949e", fontSize: 11, width: 88, overflow: "truncate" }, axisLine: { show: false }, axisTick: { show: false } },
-                series: [{ type: "bar", data: vals, barWidth: 12, itemStyle: { borderRadius: [0,4,4,0], color: new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:"#f093fb"},{offset:1,color:"#f5576c"}]) }, label: { show: true, position: "right", color: "#586069", fontSize: 10 } }]
+                xAxis: { type: "value", axisLabel: { color: "#d3d3d3", fontSize: 10 }, axisLine: { show: false }, splitLine: { lineStyle: { color: "#0d1117" } } },
+                yAxis: { type: "category", data: names, axisLabel: { color: "#fff", fontSize: 11, width: 88, overflow: "truncate" }, axisLine: { show: false }, axisTick: { show: false } },
+                series: [{ type: "bar", data: vals, barWidth: 12, itemStyle: { borderRadius: [0,4,4,0], color: new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:"#f093fb"},{offset:1,color:"#f5576c"}]) }, label: { show: true, position: "right", color: "#d5d5d5", fontSize: 10 } }]
             });
         },
 
@@ -603,7 +603,7 @@ export default {
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .banner-sub {
-    font-size: 10px; color: #3d444d; letter-spacing: 1.5px;
+    font-size: 10px; color: #d3d3d3; letter-spacing: 1.5px;
     font-family: "SF Mono", monospace; text-transform: uppercase;
 }
 .edition-badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
@@ -615,19 +615,19 @@ export default {
 /* 双时钟 */
 .clock-box { display: flex; flex-direction: column; gap: 2px; }
 .clock-row { display: flex; align-items: center; gap: 5px; line-height: 1.4; }
-.clock-lbl { font-size: 10px; color: #484f58; width: 36px; font-family: "SF Mono", monospace; }
-.clock-val { font-size: 12px; font-family: "SF Mono", monospace; color: #8b949e; letter-spacing: 0.3px; }
+.clock-lbl { font-size: 10px; color: #999; width: 36px; font-family: "SF Mono", monospace; }
+.clock-val { font-size: 12px; font-family: "SF Mono", monospace; color: #fff; letter-spacing: 0.3px; }
 .clock-warn { color: #f56c6c !important; }
 .banner-sep { width: 1px; height: 28px; background: rgba(0,212,255,0.12); flex-shrink: 0; }
 
 /* 版本上下排列 */
 .version-stack { display: flex; flex-direction: column; gap: 1px; }
-.ver-line { font-size: 10px; color: #484f58; font-family: "SF Mono", monospace; white-space: nowrap; }
+.ver-line { font-size: 10px; color: #999; font-family: "SF Mono", monospace; white-space: nowrap; }
 
 /* 刷新状态 */
 .refresh-info { display: flex; flex-direction: column; gap: 1px; text-align: right; }
-.refresh-label { font-size: 10px; color: #3d444d; white-space: nowrap; }
-.refresh-ts { font-size: 10px; color: #484f58; font-family: "SF Mono", monospace; white-space: nowrap; }
+.refresh-label { font-size: 10px; color: #d3d3d3; white-space: nowrap; }
+.refresh-ts { font-size: 10px; color: #999; font-family: "SF Mono", monospace; white-space: nowrap; }
 
 .refresh-btn {
     background: rgba(0,212,255,0.07) !important;
@@ -645,7 +645,7 @@ export default {
 }
 .neon-card-title {
     display: flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 600; color: #586069;
+    font-size: 11px; font-weight: 600; color: #d5d5d5;
     margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
 }
 .neon-card-title svg { color: #00d4ff; opacity: 0.7; flex-shrink: 0; }
@@ -659,20 +659,20 @@ export default {
     box-sizing: border-box;
 }
 .gauge-chart { width: 100%; height: 90px; }
-.gauge-label { font-size: 12px; font-weight: 600; color: #586069; margin-top: 0; }
-.gauge-sub { font-size: 10px; color: #3d444d; font-family: "SF Mono", monospace; }
+.gauge-label { font-size: 12px; font-weight: 600; color: #d5d5d5; margin-top: 0; }
+.gauge-sub { font-size: 10px; color: #d3d3d3; font-family: "SF Mono", monospace; }
 
 /* ===== 运行时间 ===== */
 .uptime-card { display: flex; flex-direction: column; }
 .uptime-value { font-size: 16px; font-weight: 700; color: #c9d1d9; margin-bottom: 1px; }
-.uptime-sub { font-size: 10px; color: #484f58; margin-bottom: 8px; }
+.uptime-sub { font-size: 10px; color: #999; margin-bottom: 8px; }
 .info-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .mini-item {
     display: flex; justify-content: space-between;
     padding: 2px 5px; background: rgba(0,212,255,0.04); border-radius: 3px;
 }
-.mini-label { font-size: 10px; color: #3d444d; }
-.mini-val { font-size: 10px; color: #8b949e; font-family: "SF Mono", monospace; }
+.mini-label { font-size: 10px; color: #d3d3d3; }
+.mini-val { font-size: 10px; color: #fff; font-family: "SF Mono", monospace; }
 
 /* ===== 运行环境 ===== */
 .env-card .env-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; }
@@ -680,9 +680,9 @@ export default {
     display: flex; justify-content: space-between; align-items: center;
     padding: 4px 0; border-bottom: 1px solid rgba(0,212,255,0.04);
 }
-.env-lbl { font-size: 11px; color: #484f58; flex-shrink: 0; }
+.env-lbl { font-size: 11px; color: #999; flex-shrink: 0; }
 .env-val {
-    font-size: 11px; color: #8b949e; font-family: "SF Mono", monospace;
+    font-size: 11px; color: #fff; font-family: "SF Mono", monospace;
     max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
 }
 
@@ -702,7 +702,7 @@ export default {
 }
 .stat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
 .stat-num { font-size: 18px; font-weight: 700; color: #e6edf3; font-family: "SF Mono", monospace; line-height: 1; }
-.stat-label { font-size: 10px; color: #484f58; }
+.stat-label { font-size: 10px; color: #999; }
 
 /* ===== 网络内联统计 ===== */
 .net-inline { margin-left: auto; display: flex; gap: 10px; }
@@ -716,25 +716,25 @@ export default {
 .login-table { font-size: 12px; }
 .login-row { display: flex; padding: 5px 0; border-bottom: 1px solid rgba(0,212,255,0.04); align-items: center; }
 .login-row:last-child { border-bottom: none; }
-.login-header { font-weight: 600; color: #3d444d; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+.login-header { font-weight: 600; color: #d3d3d3; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
 .lc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lc-name { flex: 0 0 64px; color: #c9d1d9; }
-.lc-acc  { flex: 0 0 84px; color: #8b949e; font-family: "SF Mono", monospace; }
-.lc-ip   { flex: 0 0 104px; color: #586069; font-family: "SF Mono", monospace; font-size: 11px; }
-.lc-time { flex: 1; color: #484f58; font-size: 11px; text-align: right; }
+.lc-acc  { flex: 0 0 84px; color: #fff; font-family: "SF Mono", monospace; }
+.lc-ip   { flex: 0 0 104px; color: #d5d5d5; font-family: "SF Mono", monospace; font-size: 11px; }
+.lc-time { flex: 1; color: #999; font-size: 11px; text-align: right; }
 
 /* ===== 磁盘 ===== */
 .disk-list { display: flex; flex-direction: column; gap: 10px; }
 .disk-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
-.disk-name { font-size: 11px; color: #8b949e; font-family: "SF Mono", monospace; }
-.disk-size { font-size: 10px; color: #484f58; }
+.disk-name { font-size: 11px; color: #fff; font-family: "SF Mono", monospace; }
+.disk-size { font-size: 10px; color: #999; }
 
 /* ===== IO ===== */
 .io-list { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
 .io-item { text-align: center; }
-.io-lbl { font-size: 10px; color: #484f58; margin-bottom: 3px; }
+.io-lbl { font-size: 10px; color: #999; margin-bottom: 3px; }
 .io-val { font-size: 22px; font-weight: 700; font-family: "SF Mono", monospace; }
-.io-val small { font-size: 10px; font-weight: 400; color: #484f58; }
+.io-val small { font-size: 10px; font-weight: 400; color: #999; }
 .io-r { color: #36d399; }
 .io-w { color: #f7768e; }
 
@@ -743,7 +743,7 @@ export default {
 
 /* ===== Element Plus overrides ===== */
 .sys-monitor :deep(.el-progress-bar__outer) { background: rgba(0,212,255,0.06) !important; border-radius: 4px; }
-.sys-monitor :deep(.el-progress__text) { color: #8b949e !important; font-size: 10px !important; }
+.sys-monitor :deep(.el-progress__text) { color: #fff !important; font-size: 10px !important; }
 .sys-monitor :deep(.el-switch__core) { background: #21262d; }
 .sys-monitor :deep(.el-switch.is-checked .el-switch__core) { background: #0070f3; }
 </style>
