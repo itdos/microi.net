@@ -689,32 +689,9 @@ export default {
                 // 确保已经 mounted 过
                 if (!self._isMounted) return;
                 
-                // 路由确实发生了变化（防止初始化时触发）
-                if (oldRoute && newRoute.path !== oldRoute.path) {
-                    self.$nextTick(() => {
-                        // 重置状态
-                        self._isMounted = false;
-                        self.CallbackSetFormDataFinish = false;
-                        self.CallbackSetDiyTableModelFinish = false;
-                        
-                        // 重新从路由参数初始化
-                        self.TableId = newRoute.params.TableId;
-                        self.TableRowId = newRoute.params.TableRowId;
-                        self.FormMode = newRoute.query.FormMode;
-                        self.SysMenuId = newRoute.query.SysMenuId;
-                        
-                        // 标记为已 mounted
-                        self._isMounted = true;
-                        
-                        // 如果需要生成新 GUID
-                        if (!self.TableRowId && self.FormMode === 'Add') {
-                            self.DiyCommon.PostAsync("/api/DiyTable/NewGuid").then(guidResult => {
-                                if (guidResult.Code == 1) {
-                                    self.TableRowId = guidResult.Data;
-                                }
-                            });
-                        }
-                    });
+                // 路由确实发生了变化（比较 fullPath 以包含 query 参数的变化）
+                if (oldRoute && newRoute.fullPath !== oldRoute.fullPath) {
+                    self.reinitPageForm();
                 }
             },
             immediate: false
@@ -818,6 +795,11 @@ export default {
     },
     activated() {
         this._isDeactivated = false;
+        // Page模式下，如果之前已保存/关闭过表单（Go_1被调用），重新激活时需要完全初始化
+        if (this._isDirectPageMode && this._needsReinit) {
+            this._needsReinit = false;
+            this.reinitPageForm();
+        }
     },
     deactivated() {
         this._isDeactivated = true;
@@ -840,7 +822,7 @@ export default {
             self.TableId = self.$route.params.TableId;
             self.TableRowId = self.$route.params.TableRowId;
             if (!self.TableRowId) {
-                var guidResult = await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid");
+                var guidResult = await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid");
                 if (guidResult.Code == 1) {
                     self.TableRowId = guidResult.Data;
                 }
@@ -925,7 +907,7 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
+                self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {
@@ -1771,8 +1753,42 @@ export default {
         },
 
         // ========== 页面模式专用方法 ==========
+
+        /**
+         * Page模式下重新初始化表单（销毁旧的 DiyForm 并重建）
+         * 通过清空 TableRowId 使 v-if 条件为 false，销毁整个 DiyForm 组件树（包括子表），
+         * 然后在下一个 tick 重新设置参数，触发 DiyForm 重新创建和初始化。
+         */
+        reinitPageForm() {
+            var self = this;
+            // 清空 TableRowId，通过 v-if="TableId && TableRowId" 销毁 DiyForm 组件树
+            self.TableRowId = '';
+            self.CallbackSetFormDataFinish = false;
+            self.CallbackSetDiyTableModelFinish = false;
+
+            self.$nextTick(function () {
+                // 重新从路由参数读取
+                self.TableId = self.$route.params.TableId;
+                self.FormMode = self.$route.query.FormMode;
+                self.SysMenuId = self.$route.query.SysMenuId;
+
+                var newTableRowId = self.$route.params.TableRowId;
+                if (newTableRowId) {
+                    self.TableRowId = newTableRowId;
+                } else if (self.FormMode === 'Add' || self.FormMode === 'Insert') {
+                    self.DiyCommon.PostAsync("/api/FormEngine/NewGuid").then(guidResult => {
+                        if (guidResult.Code == 1) {
+                            self.TableRowId = guidResult.Data;
+                        }
+                    });
+                }
+            });
+        },
+
         Go_1() {
             var self = this;
+            // 标记需要重新初始化，以便 keep-alive 重新激活时能正确重置表单状态
+            self._needsReinit = true;
             if (!self.diyStore.IsPhoneView) {
                 self.tagsViewStore.delView(self.$route);
             }

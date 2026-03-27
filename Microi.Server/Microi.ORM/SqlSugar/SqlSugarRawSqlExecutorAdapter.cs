@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Linq;
 using SqlSugar;
 
@@ -24,11 +25,72 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 记录慢SQL日志
+        /// </summary>
+        private void LogSlowSql(long elapsedMs, string method)
+        {
+            if (elapsedMs >= DiyCommon.SlowSqlThresholdMs)
+            {
+                var sqlText = _sql ?? "(unknown)";
+                if (sqlText.Length > 2000) sqlText = sqlText.Substring(0, 2000) + "...";
+
+                // 序列化参数值
+                string paramText = null;
+                string executableSql = null;
+                if (_parameters != null && _parameters.Count > 0)
+                {
+                    try
+                    {
+                        var paramDict = new Dictionary<string, string>();
+                        foreach (var p in _parameters)
+                        {
+                            paramDict[p.ParameterName] = p.Value?.ToString() ?? "NULL";
+                        }
+                        paramText = System.Text.Json.JsonSerializer.Serialize(paramDict);
+
+                        // 构建可直接执行的SQL（替换参数占位符）
+                        executableSql = _sql ?? "";
+                        // 按参数名长度降序替换，避免 @p10 被 @p1 部分替换
+                        foreach (var p in _parameters.OrderByDescending(x => x.ParameterName.Length))
+                        {
+                            var val = p.Value;
+                            string replacement;
+                            if (val == null || val == DBNull.Value) replacement = "NULL";
+                            else if (val is string || val is DateTime || val is Guid) replacement = $"'{val.ToString().Replace("'", "''")}'";
+                            else replacement = val.ToString();
+                            executableSql = executableSql.Replace(p.ParameterName, replacement);
+                        }
+                        if (executableSql.Length > 4000) executableSql = executableSql.Substring(0, 4000) + "...";
+                    }
+                    catch { }
+                }
+
+                var msg = $"慢SQL[{method}] 耗时{elapsedMs}ms（阈值{DiyCommon.SlowSqlThresholdMs}ms）: {sqlText}";
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{msg}");
+                _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                {
+                    Type = "数据库慢SQL",
+                    Title = $"慢SQL[{method}] {elapsedMs}ms",
+                    Content = sqlText,
+                    Param = paramText,
+                    OtherInfo = executableSql,
+                    Timer = (int)elapsedMs,
+                    Level = elapsedMs >= DiyCommon.SlowSqlThresholdMs * 5 ? 3 : 2,
+                    Remark = method
+                });
+            }
+        }
+
+        /// <summary>
         /// 执行 SQL，返回受影响的行数
         /// </summary>
         public int ExecuteNonQuery()
         {
-            return _client.Ado.ExecuteCommand(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.ExecuteCommand(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ExecuteNonQuery");
+            return result;
         }
 
         /// <summary>
@@ -36,17 +98,27 @@ namespace Microi.net
         /// </summary>
         public T ToFirst<T>()
         {
-            // SqlQuerySingle 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
-            return _client.Ado.SqlQuerySingle<T>(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.SqlQuerySingle<T>(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToFirst");
+            return result;
         }
         public dynamic ToFirst()
         {
-            // SqlQuerySingle 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
-            return _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToFirst");
+            return result;
         }
         public dynamic First()
         {
-            return _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "First");
+            return result;
         }
 
         /// <summary>
@@ -54,8 +126,11 @@ namespace Microi.net
         /// </summary>
         public List<T> ToList<T>()
         {
-            // SqlQuery 已经物化数据到 List，IsAutoCloseConnection = true 会自动关闭连接
-            return _client.Ado.SqlQuery<T>(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.SqlQuery<T>(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToList");
+            return result;
         }
         
         /// <summary>
@@ -71,7 +146,10 @@ namespace Microi.net
         /// </summary>
         public T ToScalar<T>()
         {
+            var sw = Stopwatch.StartNew();
             var result = _client.Ado.GetScalar(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToScalar");
             if (result == null || result == DBNull.Value)
                 return default(T);
 
@@ -143,8 +221,11 @@ namespace Microi.net
         /// </summary>
         public DataTable ToDataTable()
         {
-            // GetDataTable 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
-            return _client.Ado.GetDataTable(_sql, _parameters);
+            var sw = Stopwatch.StartNew();
+            var result = _client.Ado.GetDataTable(_sql, _parameters);
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToDataTable");
+            return result;
         }
     }
 }

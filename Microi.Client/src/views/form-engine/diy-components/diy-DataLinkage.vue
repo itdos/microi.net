@@ -141,7 +141,7 @@ export default {
             txt =
                 "V8.Post('" +
                 this.https +
-                "/api/DiyTable/GetDiyTableRow',{\n TableId:'" +
+                "/api/FormEngine/GetDiyTableRow',{\n TableId:'" +
                 this.table +
                 "',\n" +
                 " _SearchEqual:{\n  " +
@@ -201,7 +201,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    self.https + "/api/DiyField/GetDiyField",
+                    self.https + "/api/FormEngine/GetDiyField",
                     qs.stringify({
                         TableId: id
                     }),
@@ -226,7 +226,7 @@ export default {
             let self = this;
             this.$axios
                 .post(
-                    this.https + "/api/DiyTable/GetDiyTable",
+                    this.https + "/api/FormEngine/GetDiyTableList",
                     qs.stringify({
                         // _PageSize: 50,
                         // _PageIndex: 1,

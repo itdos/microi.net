@@ -53,7 +53,7 @@ namespace Microi.net
         public ISqlExecutor FromSql(string sql)
         {
             var dosExecutor = _dosSession.FromSql(sql);
-            return new DosORMExecutorAdapter(dosExecutor);
+            return new DosORMExecutorAdapter(dosExecutor, sql);
         }
 
         /// <summary>

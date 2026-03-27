@@ -11,7 +11,13 @@ namespace Microi.net
     {
         private readonly IMicroiDbTransaction _inner;
 
-        public SafeTransactionProxy(IMicroiDbTransaction inner)
+        /// <summary>
+        /// 事务来源描述（用于日志输出），例如：
+        /// "接口引擎[GetUserInfo]" 或 "表单引擎[sys_user].SubmitBeforeServerV8(Insert)"
+        /// </summary>
+        public string Source { get; set; }
+
+        public SafeTransactionProxy(IMicroiDbTransaction inner, string source = null)
         {
             // 避免重复包装：如果已经是 SafeTransactionProxy，则直接取内部真实事务
             if (inner is SafeTransactionProxy existing)
@@ -22,6 +28,7 @@ namespace Microi.net
             {
                 _inner = inner ?? throw new ArgumentNullException(nameof(inner));
             }
+            Source = source;
         }
 
         /// <summary>
@@ -42,7 +49,7 @@ namespace Microi.net
             set
             {
                 // 不允许V8代码通过设置此属性影响框架的事务提交/回滚决策
-                Console.WriteLine($"[SafeTransactionProxy] 警告：V8脚本代码设置了IsCommitOrRollback={value}，已拦截忽略。");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码设置了IsCommitOrRollback={value}，已拦截忽略。来源: {Source ?? "未知"}");
             }
         }
 
@@ -53,7 +60,7 @@ namespace Microi.net
         /// </summary>
         public void Commit()
         {
-            Console.WriteLine($"[SafeTransactionProxy] 警告：V8脚本代码调用了Commit()，已拦截忽略。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
+            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Commit()，已拦截忽略。来源: {Source ?? "未知"}。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
         }
 
         /// <summary>
@@ -61,7 +68,7 @@ namespace Microi.net
         /// </summary>
         public void Rollback()
         {
-            Console.WriteLine($"[SafeTransactionProxy] 警告：V8脚本代码调用了Rollback()，已拦截忽略。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
+            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Rollback()，已拦截忽略。来源: {Source ?? "未知"}。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
         }
 
         /// <summary>
@@ -69,7 +76,7 @@ namespace Microi.net
         /// </summary>
         public void Close()
         {
-            Console.WriteLine($"[SafeTransactionProxy] 警告：V8脚本代码调用了Close()，已拦截忽略。");
+            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Close()，已拦截忽略。来源: {Source ?? "未知"}");
         }
 
         public void Dispose()

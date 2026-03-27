@@ -316,7 +316,7 @@ namespace Dos.Common
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine($"Microi：【警告】JToken.Val<{typeof(T).Name}>() 转换失败: {ex.Message}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】JToken.Val<{typeof(T).Name}>() 转换失败: {ex.Message}");
                 return default(T);
             }
         }
@@ -335,7 +335,7 @@ namespace Dos.Common
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine($"Microi：【警告】ToJToken() 转换失败: {ex.Message}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】ToJToken() 转换失败: {ex.Message}");
                 return JValue.CreateNull();
             }
         }
@@ -365,7 +365,7 @@ namespace Dos.Common
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine($"Microi：【警告】JTokenEx.FromObj() 转换失败: {ex.Message}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】JTokenEx.FromObj() 转换失败: {ex.Message}");
                 return null;
                 return JValue.CreateNull();
             }

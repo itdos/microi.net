@@ -470,7 +470,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
         try {
             self.DiyCommon.PostAsync(
-                "/api/DiyTable/GetSysConfig",
+                "/api/FormEngine/GetSysConfig",
                 {
                     _SearchEqual: {
                         IsEnable: 1

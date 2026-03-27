@@ -46,5 +46,18 @@ namespace Microi.net
         public OsClientSecret OsClientModel { get; set; }
         public IMicroiDbSession DbSession { get; set; }
         public string _Lang = DiyMessage.Lang;
+
+        /// <summary>
+        /// 索引名称
+        /// </summary>
+        public string IndexName { get; set; }
+        /// <summary>
+        /// 索引字段列表（逗号分隔）
+        /// </summary>
+        public string IndexColumns { get; set; }
+        /// <summary>
+        /// 是否唯一索引
+        /// </summary>
+        public bool IndexUnique { get; set; }
     }
 }

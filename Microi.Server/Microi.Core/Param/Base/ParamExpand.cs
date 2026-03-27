@@ -229,6 +229,21 @@ namespace Microi.net
         public string _TableRowId { get; set; }
         public List<string> _TableRowIds { get; set; }
         public string _FieldId { get; set; }
+
+        /// <summary>
+        /// 索引名称
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string IndexName { get; set; }
+        /// <summary>
+        /// 索引字段（逗号分隔）
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string IndexColumns { get; set; }
+        /// <summary>
+        /// 是否唯一索引
+        /// </summary>
+        public bool? IndexUnique { get; set; }
     }
     /// <summary>
     /// 2021-11-01新增：Id的类型从string修改为String，为了兼容非string的老数据库
