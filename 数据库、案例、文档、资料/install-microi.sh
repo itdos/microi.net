@@ -1218,9 +1218,9 @@ services:
         max-size: "10m"
         max-file: "10"
 
-  microi-install-web:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-web-dev:latest
-    container_name: microi-install-web
+  microi-install-client:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest
+    container_name: microi-install-client
     restart: always
     tty: true
     stdin_open: true
@@ -1258,7 +1258,7 @@ echo '------------------------------------------------------------------'
 
 WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
 
-echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-web"
+echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-client"
 
 mkdir -p "${WATCHTOWER_DIR}"
 cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<'EOF'
@@ -1273,7 +1273,7 @@ services:
     stdin_open: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: microi-install-api microi-install-web
+    command: microi-install-api microi-install-client
     logging:
       driver: "json-file"
       options:
@@ -1351,11 +1351,11 @@ echo "             数据目录: /microi/qdrant/storage"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-qdrant/"
 echo ""
 echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
-echo "Web:         容器 microi-install-web,        端口 ${VUE_PORT}"
+echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"
 echo ""
 echo "Watchtower:  容器 microi-install-watchtower"
-echo "             监控: microi-install-api, microi-install-web"
+echo "             监控: microi-install-api, microi-install-client"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
 echo ''
 echo '------------------------------------------------------------------'
