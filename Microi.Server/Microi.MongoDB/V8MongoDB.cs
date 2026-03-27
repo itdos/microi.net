@@ -365,6 +365,10 @@ namespace Microi.net
             {
                 list.Add(Builders<SysLog>.Filter.Where(d => d.Level == param.Level));
             }
+            if (!param.Type.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Where(d => d.Type == param.Type));
+            }
             //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
             //DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
             //var fs = dbSession.From<SysLog>()
@@ -413,6 +417,37 @@ namespace Microi.net
             //fs.OrderBy(orderBy);
             //var list = fs.ToList();
             return new DosResultList<SysLog>(1, result, "", int.Parse(dataCount.ToString()));
+        }
+
+        public async Task<DosResult> GetSysLogTypes(SysLogParam param)
+        {
+            try
+            {
+                var tableName = "log_";
+                if (param._SearchMonth.DosIsNullOrWhiteSpace())
+                {
+                    tableName += DateTime.Now.ToString("yyyyMM");
+                }
+                else
+                {
+                    tableName += param._SearchMonth;
+                }
+                var host = new MongodbHost()
+                {
+                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
+                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
+                    Table = tableName
+                };
+                var client = MongodbClient<SysLog>.MongodbInfoClient(host);
+                var types = await client.DistinctAsync<string>("Type", Builders<SysLog>.Filter.Ne("Type", (string)null));
+                var typeList = await types.ToListAsync();
+                typeList.Sort();
+                return new DosResult(1, typeList);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
         }
 
         /// <summary>

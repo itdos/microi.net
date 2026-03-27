@@ -27,7 +27,7 @@ namespace Microi.net
         {
             try
             {
-                Console.WriteLine("Microi：【成功】MQTT服务启动中...");
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动中...");
                 if (IsRunning) return;
 
                 var port = 1883;
@@ -54,7 +54,7 @@ namespace Microi.net
                 await _mqttServer.StartAsync();
                 IsRunning = true;
 
-                Console.WriteLine($"Microi：【成功】MQTT服务启动成功！TCP端口:{port}");
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动成功！TCP端口:{port}");
 
                 //触发接口引擎
                 if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
@@ -117,7 +117,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】MQTT服务启动失败：" + ex.Message);
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动失败：{ex.Message}");
             }
         }
 
@@ -136,11 +136,11 @@ namespace Microi.net
         {
             try
             {
-                Console.WriteLine($"Microi：MQTT连接开始验证！ ClientId：{args.ClientId}");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接开始验证！ ClientId：{args.ClientId}");
                 // 放宽验证条件（根据实际需求调整）
                 if (string.IsNullOrEmpty(args.ClientId))
                 {
-                    Console.WriteLine("Microi：MQTT验证失败：ClientId为空");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId为空");
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
                     return Task.CompletedTask;
                 }
@@ -158,7 +158,7 @@ namespace Microi.net
                 }
                 if (clientModel == null)
                 {
-                    Console.WriteLine("Microi：MQTT验证失败：未找到OsClient配置");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未找到OsClient配置");
                     args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                     return Task.CompletedTask;
                 }
@@ -172,18 +172,18 @@ namespace Microi.net
                 {
                     if (args.Password != mqttPwd || args.UserName != mqttAccount)
                     {
-                        Console.WriteLine($"Microi：MQTT验证失败：用户名或密码不匹配 ClientId：{args.ClientId}, UserName：{args.UserName}");
+                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：用户名或密码不匹配 ClientId：{args.ClientId}, UserName：{args.UserName}");
                         args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                         return Task.CompletedTask;
                     }
                 }
 
                 args.ReasonCode = MqttConnectReasonCode.Success;
-                Console.WriteLine($"Microi：MQTT连接验证成功！ ClientId：{args.ClientId}");
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接验证成功！ ClientId：{args.ClientId}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】MQTT连接验证异常：{ex.Message}\n{ex.StackTrace}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接验证异常：{ex.Message}\n{ex.StackTrace}");
                 args.ReasonCode = MqttConnectReasonCode.UnspecifiedError;
             }
             return Task.CompletedTask;
@@ -192,7 +192,7 @@ namespace Microi.net
         // 4. 客户端连接事件
         private async Task<Task> OnClientConnected(ClientConnectedEventArgs args)
         {
-            Console.WriteLine($"Microi：【成功】MQTT连接成功！ ClientId：{args.ClientId}");
+            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接成功！ ClientId：{args.ClientId}");
             //获取OsClient值
             var osClient = args.UserProperties?.Find(d => d.Name == "OsClient")?.Value;
             if (osClient.DosIsNullOrWhiteSpace())
@@ -214,7 +214,7 @@ namespace Microi.net
             OsClientSecret clientModel = OsClient.GetClient(osClient);
             if (clientModel == null)
             {
-                Console.WriteLine($"Microi：MQTT连接事件：未找到OsClient配置 osClient={osClient}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接事件：未找到OsClient配置 osClient={osClient}");
                 return Task.CompletedTask;
             }
             //触发接口引擎
@@ -282,7 +282,7 @@ namespace Microi.net
         // 5. 客户端断开事件
         private async Task<Task> OnClientDisconnected(ClientDisconnectedEventArgs args)
         {
-            Console.WriteLine($"Microi：MQTT断开连接！ ClientId：{args.ClientId}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT断开连接！ ClientId：{args.ClientId}");
 
             // 清理连接记录
             ConnectedClients.Remove(args.ClientId);
@@ -358,7 +358,7 @@ namespace Microi.net
 
         private async Task<Task> OnRetainedMessageChanged(RetainedMessageChangedEventArgs args)
         {
-            Console.WriteLine($"Microi：MQTT消息变更！ ClientId：{args.ClientId}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT消息变更！ ClientId：{args.ClientId}");
             //获取OsClient值，根据ClientId获取OsClient值
             ConnectedClients.TryGetValue(args.ClientId, out var osClient);
             //获取clientModel
@@ -372,7 +372,7 @@ namespace Microi.net
                 : string.Empty;
             var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ChangedRetainedMessage.Topic;
-            Console.WriteLine($"Microi：MQTT消息变更！ payload：{payload}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT消息变更！ payload：{payload}");
             //触发接口引擎
             if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
@@ -431,7 +431,7 @@ namespace Microi.net
         // 6. 消息接收处理（替代ApplicationMessageInterceptor）
         private async Task<Task> OnMessageReceived(InterceptingPublishEventArgs args)
         {
-            Console.WriteLine($"Microi：MQTT接收消息！ ClientId：{args.ClientId}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ ClientId：{args.ClientId}");
             //获取OsClient值，根据ClientId获取OsClient值
             ConnectedClients.TryGetValue(args.ClientId, out var osClient);
             //获取clientModel
@@ -445,7 +445,7 @@ namespace Microi.net
                 : string.Empty;
             var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ApplicationMessage.Topic;
-            Console.WriteLine($"Microi：MQTT接收消息！ payload：{payload}、topic：{topic}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ payload：{payload}、topic：{topic}");
             //触发接口引擎
             if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {

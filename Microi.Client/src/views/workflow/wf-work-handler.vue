@@ -485,7 +485,7 @@ export default {
             });
 
             self.CurrentHideFields = [];
-            self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
+            self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, function (result) {
                 if (self.DiyCommon.Result(result)) {
                     self.CurrentTableRowId = result.Data;
                     //获取字段设置

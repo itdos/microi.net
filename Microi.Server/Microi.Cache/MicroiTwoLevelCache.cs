@@ -81,7 +81,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Warning】二级缓存初始化 Pub/Sub 失败，将降级为纯Redis模式：{ex.Message}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】二级缓存初始化 Pub/Sub 失败，将降级为纯Redis模式：{ex.Message}");
             }
         }
 
@@ -124,7 +124,7 @@ namespace Microi.net
                             {
                                 if (MicroiTwoLevelCacheConfig.VerboseLogging)
                                 {
-                                    Console.WriteLine($"Microi：【本地缓存】忽略自己发布的失效通知: {key}");
+                                    Console.WriteLine($"Microi：【🔧调试】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【本地缓存】忽略自己发布的失效通知: {key}");
                                 }
                                 return;
                             }
@@ -134,12 +134,12 @@ namespace Microi.net
 
                             if (MicroiTwoLevelCacheConfig.VerboseLogging)
                             {
-                                Console.WriteLine($"Microi：【本地缓存】收到其他节点失效通知，清除: {key}");
+                                Console.WriteLine($"Microi：【🔧调试】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【本地缓存】收到其他节点失效通知，清除: {key}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Microi：【Error】处理缓存失效消息异常：{ex.Message}");
+                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】处理缓存失效消息异常：{ex.Message}");
                         }
                     });
 

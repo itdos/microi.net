@@ -3411,7 +3411,7 @@ export default {
                         }
                         return;
                     }
-                    await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {}, function (result) {
+                    await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid", {}, function (result) {
                         if (self.DiyCommon.Result(result)) {
                             formParam.TableRowId = result.Data;
                             self.$nextTick(async function () {
@@ -3443,7 +3443,7 @@ export default {
                     return;
                 }
                 //如果是新增模式，按理说外部要传入NewGuid，但是为了外部使用方便，这里自动生成，问题来了，你又不能在子组件里面修改props的值？
-                await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {}, function (result) {
+                await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         formParam.TableRowId = result.Data;
                         self.$nextTick(async function () {
@@ -3653,7 +3653,7 @@ export default {
                             if (formParam.SavedType == "Insert" || formParam.SavedType == "Add") {
                                 formParam.TableRowId = "";
                                 formParam.FormMode = "Add";
-                                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, async function (result) {
+                                self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, async function (result) {
                                     if (self.DiyCommon.Result(result)) {
                                         formParam.TableRowId = result.Data;
                                         // self.FormOutAction(formParam.SavedType, formParam.TableRowId, formParam.V8Callback);

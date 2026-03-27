@@ -3610,7 +3610,7 @@ var DiyCommon = {
         }
     },
     async NewServerGuid() {
-        return (await DiyCommon.PostAsync("/api/DiyTable/NewGuid")).Data;
+        return (await DiyCommon.PostAsync("/api/FormEngine/NewGuid")).Data;
     },
     /**
      * 必传：DataSourceKey

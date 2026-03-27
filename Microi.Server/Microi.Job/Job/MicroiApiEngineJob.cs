@@ -35,7 +35,7 @@ namespace Microi.net
                     });
                     if (addResult.Code != 1)
                     {
-                        Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎后写入日志出错：" + addResult.Msg);
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】定时任务执行接口引擎后写入日志出错：{addResult.Msg}");
                     }
                 }
             }
@@ -48,7 +48,7 @@ namespace Microi.net
                 }
                 errorMsg += $"\n\u5806\u6808\u8ddf\u8e2a: {ex.StackTrace}";
                 
-                Console.WriteLine($"Microi\uff1a\u3010Error\u5f02\u5e38\u3011{errorMsg}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{errorMsg}");
                 
                 try
                 {
@@ -65,7 +65,7 @@ namespace Microi.net
                 }
                 catch (Exception logEx)
                 {
-                    Console.WriteLine($"Microi\uff1a\u3010Error\u5f02\u5e38\u3011\u5199\u5165\u65e5\u5fd7\u5931\u8d25: {logEx.Message}");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】写入日志失败: {logEx.Message}");
                 }
             }
             //2025-12-12 注释 by anderson

@@ -486,7 +486,7 @@ export default {
         RecoverDiyField() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/DiyField/RecoverDiyField",
+                "/api/FormEngine/RecoverDiyField",
                 {
                     Id: self.CurrentDeletedFieldModel.Id,
                     TableId: self.CurrentDeletedFieldModel.TableId
@@ -505,7 +505,7 @@ export default {
             //数据库中有的字段，但DiyField中没有
             if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DbField") {
                 self.DiyCommon.Post(
-                    "/api/DiyField/AddDiyField",
+                    "/api/FormEngine/AddDiyField",
                     {
                         TableId: self.TableId,
                         _NotAddDbField: true,
@@ -523,7 +523,7 @@ export default {
             //数据库中没有的字段，但DiyField中有
             else if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DiyField") {
                 self.DiyCommon.Post(
-                    "/api/DiyField/AddDbField",
+                    "/api/FormEngine/AddDbField",
                     {
                         TableId: self.TableId,
                         Name: self.CurrentErrorFieldModel.Name,
@@ -543,7 +543,7 @@ export default {
         GetDeletedDiyField() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/DiyField/GetDeletedDiyField",
+                "/api/FormEngine/GetDeletedDiyField",
                 {
                     TableId: self.TableId
                 },
@@ -557,7 +557,7 @@ export default {
         GetExceptionFieldList() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/DiyField/GetExceptionFieldList",
+                "/api/FormEngine/GetExceptionFieldList",
                 {
                     TableId: self.TableId
                 },

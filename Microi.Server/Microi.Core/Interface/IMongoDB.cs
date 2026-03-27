@@ -51,5 +51,6 @@ namespace Microi.net
         DosResultList<dynamic> GetTableData(dynamic dynamicParam);
         Task<DosResult> AddSysLog(SysLogParam param);
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
+        Task<DosResult> GetSysLogTypes(SysLogParam param);
     }
 }

@@ -207,11 +207,27 @@
                         $t('Msg.SwitchTableDisplay')
                     }}</el-button>
                     <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
-                        <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
-                            $t('Msg.FormDesign')
-                        }}</el-button>
-                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled" @click="OpenMenuForm()">{{ $t('Msg.ModuleDesign') }}</el-button>
-                        <el-button type="primary" :icon="CircleCheck" @click="$refs.refDiyPermissionDialog.show()">{{ $t('Msg.FormPermission') }}</el-button>
+                        <el-dropdown trigger="click">
+                            <el-button type="primary">
+                                <el-icon style="margin-right: 4px"><Setting /></el-icon>{{ $t('Msg.DevDesign') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                            </el-button>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">
+                                        <el-icon><List /></el-icon>{{ $t('Msg.FormDesign') }}
+                                    </el-dropdown-item>
+                                    <el-dropdown-item @click="OpenMenuForm()">
+                                        <el-icon><QuestionFilled /></el-icon>{{ $t('Msg.ModuleDesign') }}
+                                    </el-dropdown-item>
+                                    <el-dropdown-item @click="$refs.refDiyPermissionDialog.show()">
+                                        <el-icon><CircleCheck /></el-icon>{{ $t('Msg.FormPermission') }}
+                                    </el-dropdown-item>
+                                    <el-dropdown-item divided @click="ShowIndexManager = true">
+                                        <el-icon><Grid /></el-icon>索引管理
+                                    </el-dropdown-item>
+                                </el-dropdown-menu>
+                            </template>
+                        </el-dropdown>
                     </div>
                 </div>
 
@@ -963,6 +979,16 @@
             :sysMenuModel="SysMenuModel"
         />
 
+        <!-- 索引管理弹窗 -->
+        <DiyIndexManager
+            v-if="ShowIndexManager"
+            :visible="ShowIndexManager"
+            :tableName="CurrentDiyTableModel.Name"
+            :diyFieldList="DiyFieldList"
+            :sysMenuId="SysMenuModel ? SysMenuModel.Id : ''"
+            @close="ShowIndexManager = false"
+        />
+
         <!-- 移动端搜索抽屉 -->
         <el-drawer
             v-model="showMobileSearch"
@@ -1016,6 +1042,7 @@ import { tableUtilsMixin, diyCommonMixin } from "./mixins";
 // 独立组件
 import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.vue";
 import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissionDialog.vue";
+import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.vue";
 import DiySearch from "@/views/form-engine/diy-search.vue";
 export default {
     name: "DiyTableRowlist",
@@ -1026,6 +1053,7 @@ export default {
         PanThumb,
         DiyImportDialog,
         DiyPermissionDialog,
+        DiyIndexManager,
         DiySearch,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
@@ -1656,6 +1684,8 @@ export default {
             _moreMenuPosition: { top: 0, left: 0 },
             // 移动端搜索弹窗状态
             showMobileSearch: false,
+            // 索引管理弹窗
+            ShowIndexManager: false,
             // BtnLoading:false,
             BtnV8Loading: false,
             ShowAllSearch: false,
@@ -1683,7 +1713,7 @@ export default {
             TableName: "",
             TableRowId: "",
             CurrentRowModel: {},
-            DiyTableRowPageSize: 15,
+            DiyTableRowPageSize: this.DiyCommon.DefaultPageSize || 15,
             DiyTableRowPageIndex: 1,
             ShowDiyFieldList: null,
             // 🔥 性能优化：分批渲染表格列
@@ -2434,7 +2464,7 @@ export default {
                     self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
                 }
             } catch (error) {
-                self.DiyTableRowPageSize = 10;
+                self.DiyTableRowPageSize = self.DiyCommon.DefaultPageSize || 10;
             }
             //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
             self.GetAllData({ IsInit: true });
@@ -4109,7 +4139,7 @@ export default {
         ExportDiyTableRow(btn) {
             var self = this;
             self.BtnExportLoading = true;
-            var url = self.DiyCommon.GetApiBase() + "/api/DiyTable/ExportDiyTableRow";
+            var url = self.DiyCommon.GetApiBase() + "/api/FormEngine/ExportDiyTableRow";
             var paramType = "json";
             if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
                 url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ExportApi);
@@ -4213,7 +4243,7 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
+                self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {
@@ -4306,7 +4336,7 @@ export default {
                 //2021-10-29新增，如果是行内新增
                 if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.AddBtnType == "InTable" && formMode == "Add") {
                     //2022-02-13 提前将Id赋值好，以便删除
-                    var newIdResult = await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {});
+                    var newIdResult = await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid", {});
                     //加入回写默认值  2021-12-06
                     var defaultModel = { ...self.FieldFormDefaultValues };
                     defaultModel.Id = newIdResult.Data;

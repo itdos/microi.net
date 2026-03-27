@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics;
+using System.Linq;
 using Dos.ORM;
 
 
@@ -14,14 +16,74 @@ namespace Microi.net
     public class DosORMExecutorAdapter : ISqlExecutor
     {
         private readonly dynamic _dosSection;
+        private string _sql;
+        private readonly List<KeyValuePair<string, object>> _parameterValues = new List<KeyValuePair<string, object>>();
 
         /// <summary>
         /// 构造函数
         /// </summary>
         /// <param name="dosSection">Dos.ORM原生Section对象（动态类型）</param>
-        public DosORMExecutorAdapter(dynamic dosSection)
+        /// <param name="sql">原始SQL文本（用于慢SQL日志记录）</param>
+        public DosORMExecutorAdapter(dynamic dosSection, string sql = null)
         {
             _dosSection = dosSection ?? throw new ArgumentNullException(nameof(dosSection));
+            _sql = sql;
+        }
+
+        /// <summary>
+        /// 记录慢SQL日志
+        /// </summary>
+        private void LogSlowSql(long elapsedMs, string method)
+        {
+            if (elapsedMs >= DiyCommon.SlowSqlThresholdMs)
+            {
+                var sqlText = _sql ?? "(unknown)";
+                if (sqlText.Length > 2000) sqlText = sqlText.Substring(0, 2000) + "...";
+
+                // 序列化参数值
+                string paramText = null;
+                string executableSql = null;
+                if (_parameterValues != null && _parameterValues.Count > 0)
+                {
+                    try
+                    {
+                        var paramDict = new Dictionary<string, string>();
+                        foreach (var p in _parameterValues)
+                        {
+                            paramDict[p.Key] = p.Value?.ToString() ?? "NULL";
+                        }
+                        paramText = System.Text.Json.JsonSerializer.Serialize(paramDict);
+
+                        // 构建可直接执行的SQL（替换参数占位符）
+                        executableSql = _sql ?? "";
+                        foreach (var p in _parameterValues.OrderByDescending(x => x.Key.Length))
+                        {
+                            var val = p.Value;
+                            string replacement;
+                            if (val == null || val == DBNull.Value) replacement = "NULL";
+                            else if (val is string || val is DateTime || val is Guid) replacement = $"'{val.ToString().Replace("'", "''")}'";
+                            else replacement = val.ToString();
+                            executableSql = executableSql.Replace(p.Key, replacement);
+                        }
+                        if (executableSql.Length > 4000) executableSql = executableSql.Substring(0, 4000) + "...";
+                    }
+                    catch { }
+                }
+
+                var msg = $"慢SQL[{method}] 耗时{elapsedMs}ms（阈值{DiyCommon.SlowSqlThresholdMs}ms）: {sqlText}";
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{msg}");
+                _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                {
+                    Type = "数据库慢SQL",
+                    Title = $"慢SQL[{method}] {elapsedMs}ms",
+                    Content = sqlText,
+                    Param = paramText,
+                    OtherInfo = executableSql,
+                    Timer = (int)elapsedMs,
+                    Level = elapsedMs >= DiyCommon.SlowSqlThresholdMs * 5 ? 3 : 2,
+                    Remark = method
+                });
+            }
         }
 
         /// <summary>
@@ -29,7 +91,11 @@ namespace Microi.net
         /// </summary>
         public int ExecuteNonQuery()
         {
-            return _dosSection.ExecuteNonQuery();
+            var sw = Stopwatch.StartNew();
+            var result = _dosSection.ExecuteNonQuery();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ExecuteNonQuery");
+            return result;
         }
 
         /// <summary>
@@ -37,15 +103,27 @@ namespace Microi.net
         /// </summary>
         public T ToFirst<T>()
         {
-            return _dosSection.ToFirst<T>();
+            var sw = Stopwatch.StartNew();
+            T result = _dosSection.ToFirst<T>();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToFirst");
+            return result;
         }
         public dynamic ToFirst()
         {
-            return _dosSection.ToFirst<dynamic>();
+            var sw = Stopwatch.StartNew();
+            dynamic result = _dosSection.ToFirst<dynamic>();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToFirst");
+            return result;
         }
         public dynamic First()
         {
-            return _dosSection.ToFirst<dynamic>();
+            var sw = Stopwatch.StartNew();
+            dynamic result = _dosSection.ToFirst<dynamic>();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "First");
+            return result;
         }
 
         /// <summary>
@@ -53,11 +131,19 @@ namespace Microi.net
         /// </summary>
         public List<T> ToList<T>()
         {
-            return _dosSection.ToList<T>();
+            var sw = Stopwatch.StartNew();
+            List<T> result = _dosSection.ToList<T>();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToList");
+            return result;
         }
         public dynamic[] ToArray()
         {
-            return ToList<dynamic>().ToArray();
+            var sw = Stopwatch.StartNew();
+            dynamic[] result = ToList<dynamic>().ToArray();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToArray");
+            return result;
         }
 
         /// <summary>
@@ -65,7 +151,11 @@ namespace Microi.net
         /// </summary>
         public T ToScalar<T>()
         {
-            return _dosSection.ToScalar<T>();
+            var sw = Stopwatch.StartNew();
+            T result = _dosSection.ToScalar<T>();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToScalar");
+            return result;
         }
 
         /// <summary>
@@ -75,6 +165,7 @@ namespace Microi.net
         {
             // Dos.ORM 没有 (string, object) 重载，自动推断类型为 String
             _dosSection.AddInParameter(name, DbType.String, value);
+            _parameterValues.Add(new KeyValuePair<string, object>(name, value));
             return this; // 链式调用
         }
 
@@ -85,6 +176,7 @@ namespace Microi.net
         {
             // Dos.ORM 要求参数顺序：name, dbType, value
             _dosSection.AddInParameter(name, dbType, value);
+            _parameterValues.Add(new KeyValuePair<string, object>(name, value));
             return this;
         }
 
@@ -95,6 +187,7 @@ namespace Microi.net
         {
             // 直接传递，参数顺序已经正确
             _dosSection.AddInParameter(name, dbType, value);
+            _parameterValues.Add(new KeyValuePair<string, object>(name, value));
             return this;
         }
 
@@ -109,6 +202,7 @@ namespace Microi.net
                 {
                     // 修正参数顺序：name, dbType, value
                     _dosSection.AddInParameter(param.ParameterName, param.DbType, param.Value);
+                    _parameterValues.Add(new KeyValuePair<string, object>(param.ParameterName, param.Value));
                 }
             }
             return this;
@@ -119,7 +213,11 @@ namespace Microi.net
         /// </summary>
         public DataTable ToDataTable()
         {
-            return _dosSection.ToDataTable();
+            var sw = Stopwatch.StartNew();
+            var result = _dosSection.ToDataTable();
+            sw.Stop();
+            LogSlowSql(sw.ElapsedMilliseconds, "ToDataTable");
+            return result;
         }
 
         /// <summary>
@@ -129,6 +227,7 @@ namespace Microi.net
         {
             // Dos.ORM 需要 DbType，默认使用 String
             _dosSection.AddInParameter(name, DbType.String, value);
+            _parameterValues.Add(new KeyValuePair<string, object>(name, value));
             return this;
         }
 
@@ -143,6 +242,7 @@ namespace Microi.net
                 {
                     // 修正参数顺序：name, dbType, value
                     _dosSection.AddInParameter(param.ParameterName, param.DbType, param.Value);
+                    _parameterValues.Add(new KeyValuePair<string, object>(param.ParameterName, param.Value));
                 }
             }
             return this;

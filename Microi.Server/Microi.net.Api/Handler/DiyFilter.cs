@@ -46,7 +46,7 @@ namespace Microi.net.Api
         {
             var timer = context.HttpContext.Items[TimerKey] as Stopwatch;
             timer?.Stop();
-            if (timer != null && timer.ElapsedMilliseconds >= 1000)
+            if (timer != null && timer.ElapsedMilliseconds >= DiyCommon.SlowExecutionThresholdMs)
             {
                 try
                 {

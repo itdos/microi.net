@@ -154,6 +154,27 @@ export const useDiyStore = defineStore("diy", {
         setSysConfig(val) {
             this.SysConfig = val;
             LocalStorageManager.set("SysConfig", val);
+
+            // 从SysConfig同步PageSizes和DefaultPageSize
+            if (val?.PageSizes) {
+                try {
+                    const configPageSizes = typeof val.PageSizes === 'string' ? JSON.parse(val.PageSizes) : val.PageSizes;
+                    if (Array.isArray(configPageSizes) && configPageSizes.length > 0) {
+                        DiyCommon.PageSizes = configPageSizes.map(Number).filter(n => n > 0).sort((a, b) => a - b);
+                    }
+                } catch (e) {}
+            }
+            if (val?.DefaultPageSize) {
+                const defaultSize = Number(val.DefaultPageSize);
+                if (defaultSize > 0) {
+                    DiyCommon.DefaultPageSize = defaultSize;
+                    if (!DiyCommon.PageSizes.includes(defaultSize)) {
+                        DiyCommon.PageSizes.push(defaultSize);
+                        DiyCommon.PageSizes.sort((a, b) => a - b);
+                    }
+                }
+            }
+
             // APK (5+App) 环境：同时写入 plus.storage（原生 App 级全局存储，不受域名隔离）
             // 这样 hbuilder-app 壳页面下次启动时能通过 plus.storage 读到标题和公司名
             if (typeof window !== 'undefined' && window.plus) {

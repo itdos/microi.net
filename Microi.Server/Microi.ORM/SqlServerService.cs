@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Dos.Common;
 using Dos.ORM;
 using Microi.net;
@@ -265,6 +266,65 @@ namespace Microi.net
             if (string.IsNullOrWhiteSpace(identifier))
                 return false;
             return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+        }
+
+        public DosResult GetTableIndexes(DbServiceParam param)
+        {
+            try
+            {
+                if (param.TableName.DosIsNullOrWhiteSpace() || param.DbSession == null)
+                    return new DosResult(0, null, "参数错误");
+                if (!IsValidIdentifier(param.TableName))
+                    return new DosResult(0, null, "表名不合法");
+                var sql = $"SELECT i.name AS Key_name, c.name AS Column_name, i.is_unique AS Non_unique, i.type_desc AS Index_type FROM sys.indexes i JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id WHERE i.object_id = OBJECT_ID('{param.TableName}')";
+                var list = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToArray();
+                return new DosResult(1, list);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, $"获取索引失败: {ex.Message}");
+            }
+        }
+
+        public DosResult AddIndex(DbServiceParam param)
+        {
+            try
+            {
+                if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace() || param.IndexColumns.DosIsNullOrWhiteSpace() || param.DbSession == null)
+                    return new DosResult(0, null, "参数错误");
+                if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.IndexName))
+                    return new DosResult(0, null, "表名或索引名不合法");
+                var columns = param.IndexColumns.Split(',').Select(c => c.Trim()).ToArray();
+                foreach (var col in columns)
+                    if (!IsValidIdentifier(col)) return new DosResult(0, null, $"字段名不合法: {col}");
+                var columnsSql = string.Join(", ", columns.Select(c => $"[{c}]"));
+                var uniqueStr = param.IndexUnique ? "UNIQUE " : "";
+                var sql = $"CREATE {uniqueStr}NONCLUSTERED INDEX [{param.IndexName}] ON [{param.TableName}] ({columnsSql})";
+                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1, null, "索引创建成功");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, $"创建索引失败: {ex.Message}");
+            }
+        }
+
+        public DosResult DropIndex(DbServiceParam param)
+        {
+            try
+            {
+                if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace() || param.DbSession == null)
+                    return new DosResult(0, null, "参数错误");
+                if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.IndexName))
+                    return new DosResult(0, null, "表名或索引名不合法");
+                var sql = $"DROP INDEX [{param.IndexName}] ON [{param.TableName}]";
+                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1, null, "索引删除成功");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, $"删除索引失败: {ex.Message}");
+            }
         }
     }
 }

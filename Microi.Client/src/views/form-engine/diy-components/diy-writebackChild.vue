@@ -147,7 +147,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    this.https + "/api/DiyField/GetDiyField",
+                    this.https + "/api/FormEngine/GetDiyField",
                     qs.stringify({
                         TableId: this.childTableId
                     }),

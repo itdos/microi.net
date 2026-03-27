@@ -22,6 +22,10 @@ namespace Microi.net
         /// V8引擎/接口引擎慢执行日志阈值（毫秒），超过此值将输出警告日志并写入MongoDB。默认5000ms（5秒）
         /// </summary>
         public const int SlowExecutionThresholdMs = 5000;
+        /// <summary>
+        /// 数据库SQL慢查询阈值（毫秒），超过此值将记录慢SQL日志。默认5000ms（5秒）
+        /// </summary>
+        public const int SlowSqlThresholdMs = 5000;
         public static DbInfo GetDbInfo(string dbType)
         {
             if (dbType.ToLower() == "mysql")

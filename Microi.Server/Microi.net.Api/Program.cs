@@ -22,13 +22,16 @@ using StackExchange.Redis;
 using Newtonsoft.Json.Linq;
 #endregion
 
+// ⚙️ 注册Console输出拦截器，捕获所有Console.WriteLine到内存环形缓冲区（用于系统监控-应用日志）
+Console.SetOut(new Microi.net.ConsoleLogInterceptor(Console.Out));
+
 // ⚙️ 启用gRPC over HTTP/2（非TLS）支持 - 必须在最开始设置！
 // 用于Qdrant向量数据库的gRPC连接（允许HTTP协议使用HTTP/2）
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 // 额外配置：允许不安全的HTTP连接使用HTTP/2
 Environment.SetEnvironmentVariable("DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2SUPPORT", "1");
 
-Console.WriteLine($"[系统] HTTP/2非加密支持已启用");
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】HTTP/2非加密支持已启用");
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,7 +55,7 @@ services.Configure<FormOptions>(options =>
 });
 Console.WriteLine($"------------------------------------------------------------------------------");
 Console.WriteLine($"------------------------------------------------------------------------------");
-Console.WriteLine("Microi：【成功】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始初始化！");
 Stopwatch timer = new Stopwatch();
 timer.Start();
 var dbConn = Environment.GetEnvironmentVariable("OsClientDbConn", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientDbConn") ?? "";
@@ -69,7 +72,7 @@ catch (Exception ex)
 {
     microiNetDllVersion = ex.Message;
 }
-Console.WriteLine("Microi：【成功】您的平台服务器端版本号：v" + microiNetDllVersion);
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】您的平台服务器端版本号：v{microiNetDllVersion}");
 // 读取 ORM 配置（Dos.ORM 或 SqlSugar）
 var ormType = Environment.GetEnvironmentVariable("OsClientORM", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientORM") ?? "Dos.ORM";
 services.AddMicroi();//【必须】Microi初始化
@@ -135,7 +138,7 @@ services.AddControllersWithViews(options =>
     options.SerializerSettings.Converters.Add(new IntegerDoubleConverter());
 });
 //services.AddGrpc();
-Console.WriteLine("Microi：【成功】Microi所有初始化成功！");
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi所有初始化成功！");
 #endregion
 
 #region SignalR、Redis
@@ -291,11 +294,11 @@ try
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}/{param5}");
-    Console.WriteLine("Microi：【成功】接口引擎、数据源引擎动态接口地址配置成功！");
+    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】接口引擎、数据源引擎动态接口地址配置成功！");
 }
 catch (Exception ex)
 {
-    Console.WriteLine("Microi：【Error异常】接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
+    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】接口引擎、数据源引擎动态接口地址配置失败：{ex.Message}");
 }
 #endregion
 
@@ -319,28 +322,10 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 }
 #endregion
 
-#region 异常诊断端点（开发/测试环境）
+#region 诊断端点（开发/测试环境）
 if (app.Environment.IsDevelopment())
 {
-    // 获取异常统计报告
-    app.MapGet("/api/diagnostics/exceptions", () => 
-    {
-        return Results.Ok(new
-        {
-            Code = 1,
-            Data = ExceptionDiagnostics.GetReport(),
-            Msg = "异常诊断报告"
-        });
-    }).WithTags("Diagnostics");
-
-    // 清除异常统计
-    app.MapPost("/api/diagnostics/exceptions/clear", () => 
-    {
-        ExceptionDiagnostics.Clear();
-        return Results.Ok(new { Code = 1, Msg = "已清除异常统计" });
-    }).WithTags("Diagnostics");
-
-    Console.WriteLine("Microi：【成功】异常诊断端点已启用：GET /api/diagnostics/exceptions");
+    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开发环境诊断模式已启用");
 }
 #endregion
 
@@ -359,24 +344,24 @@ Task.Run(async () =>
                 var initResult = await microiAI.InitializeSchemaCache(osClientName);
                 if (initResult.Code == 1)
                 {
-                    Console.WriteLine($"Microi：【AI插件成功】{initResult.Msg}");
+                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
                 }
                 else
                 {
-                    Console.WriteLine($"Microi：【AI插件警告】{initResult.Msg}");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
                 }
             }
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Microi：【AI插件警告】AI Schema缓存初始化失败: {ex.Message}");
+        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】AI Schema缓存初始化失败: {ex.Message}");
     }
 });
 
-Console.WriteLine($"Microi：【成功】Microi全部启动成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。总耗时：{timer.ElapsedMilliseconds}ms");
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
-Console.WriteLine($"Microi：【成功】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
 Console.WriteLine($"------------------------------------------------------------------------------");
 Console.WriteLine($"------------------------------------------------------------------------------");
 
