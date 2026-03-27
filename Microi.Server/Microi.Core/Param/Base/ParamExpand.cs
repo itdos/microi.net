@@ -67,6 +67,17 @@ namespace Microi.net
         public string Result { get; set; }
     }
     /// <summary>
+    /// 接口引擎调用次数统计参数
+    /// </summary>
+    public class ApiCallCountParam : BaseParam
+    {
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ApiEngineKey { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Name { get; set; }
+        public int? _Top { get; set; }
+    }
+    /// <summary>
     /// 
     /// </summary>
     public partial class DiyTableParam : BaseParam
