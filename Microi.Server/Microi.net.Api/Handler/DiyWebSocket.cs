@@ -93,7 +93,7 @@ namespace Microi.net
                 userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
                 osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
                 
-                Console.WriteLine($"[WebSocket] 从 Claims 获取用户信息 - UserId: {userId}, OsClient: {osClient}");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 从 Claims 获取用户信息 - UserId: {userId}, OsClient: {osClient}");
                 
                 if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
                 {
@@ -104,19 +104,20 @@ namespace Microi.net
                     if (currentToken != null && currentToken.CurrentUser != null)
                     {
                         currentToken.OsClient = osClient;
-                        Console.WriteLine($"[WebSocket] 从缓存重新获取用户信息成功");
+                        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 从缓存重新获取用户信息成功");
                     }
                     else
                     {
-                        Console.WriteLine($"[WebSocket] 缓存中未找到用户信息: Microi:{osClient}:LoginTokenSysUser:{userId}");
+                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 缓存中未找到用户信息: Microi:{osClient}:LoginTokenSysUser:{userId}");
                     }
                 }
             }
             
             if(currentToken?.CurrentUser == null)
             {
-                Console.WriteLine($"[WebSocket] 身份验证失败 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
-                throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 身份验证失败 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
+                return;
+                // throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
             }
             HttpContext httpContext = base.Context.GetHttpContext();
             httpContext.Request.Query.TryGetValue("groupName", out var groupName);
@@ -222,13 +223,13 @@ namespace Microi.net
                             // 没有活跃连接了，移除在线记录
                             await diyCacheBase.RemoveAsync($"Microi:{osClient}:ChatOnline:{userId}");
                         }
-                        Console.WriteLine($"[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
+                        Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WebSocket] OnDisconnectedAsync 错误: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] OnDisconnectedAsync 错误: {ex.Message}");
             }
             
             await base.OnDisconnectedAsync(exception);
@@ -409,18 +410,18 @@ namespace Microi.net
                 // 如果接收者是AI用户，自动触发AI回复
                 if (msg.ToUserId == "AI")
                 {
-                    Console.WriteLine($"[WebSocket] 检测到发送给AI的消息: {msg.Content}");
+                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 检测到发送给AI的消息: {msg.Content}");
                     _ = Task.Run(async () =>
                     {
                         try
                         {
-                            Console.WriteLine($"[WebSocket] 开始处理AI回复...");
+                            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 开始处理AI回复...");
                             await HandleAIResponse(msg);
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"AI自动回复失败: {ex.Message}");
-                            Console.WriteLine($"堆栈跟踪: {ex.StackTrace}");
+                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】AI自动回复失败: {ex.Message}");
+                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】堆栈跟踪: {ex.StackTrace}");
                         }
                     });
                 }
@@ -442,7 +443,7 @@ namespace Microi.net
             return _mongoConnectionCache.GetOrAdd(osClient, key =>
             {
                 var connection = Microi.net.OsClient.GetClient(key).OsClientModel["DbMongoConnection"].Val<string>();
-                Console.WriteLine($"[MongoDB] 缓存连接配置: {key}");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[MongoDB] 缓存连接配置: {key}");
                 return connection;
             });
         }
@@ -506,7 +507,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WebSocket] 发送消息失败: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 发送消息失败: {ex.Message}");
             }
         }
 
@@ -515,10 +516,9 @@ namespace Microi.net
         /// </summary>
         private async Task HandleAIResponse(MessageBodyParam originalMsg)
         {
-            Console.WriteLine($"========== AI自动回复开始 ==========");
-            Console.WriteLine($"[AI] 用户: {originalMsg.FromUserName} (ID: {originalMsg.FromUserId})");
-            Console.WriteLine($"[AI] 问题: {originalMsg.Content}");
-            Console.WriteLine($"[AI] 时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复开始 ==========");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 用户: {originalMsg.FromUserName} (ID: {originalMsg.FromUserId})");
+            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 问题: {originalMsg.Content}");
             
             try
             {
@@ -531,7 +531,7 @@ namespace Microi.net
                 };
 
                 // 获取AI配置
-                Console.WriteLine($"[AI] 正在获取AI模型配置...");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 正在获取AI模型配置...");
                 var aiModelConfig = await MicroiEngine.FormEngine.GetFormDataAsync("mic_ai", new
                 {
                     _Where = new List<List<object>>()
@@ -547,7 +547,7 @@ namespace Microi.net
                 {
                     aiModel = aiModelConfig.Data.AiModel ?? aiModel;
                 }
-                Console.WriteLine($"[AI] 使用模型: {aiModel}");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 使用模型: {aiModel}");
 
                 // 获取用户连接信息
                 var clientInfoTo = await GetOnlineUserInfo(originalMsg.OsClient, originalMsg.FromUserId);
@@ -572,7 +572,7 @@ namespace Microi.net
                             
                             if (isFirstChunk)
                             {
-                                Console.WriteLine($"[AI流式] ✅ 开始发送流式数据...");
+                                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 开始发送流式数据...");
                                 isFirstChunk = false;
                             }
                         }
@@ -580,7 +580,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[AI流式] ❌ 发送数据块失败: {ex.Message}");
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 发送数据块失败: {ex.Message}");
                     }
                 };
                 
@@ -602,7 +602,7 @@ namespace Microi.net
                         originalMsg.FromUserId, 
                         true  // 已完成
                     );
-                    Console.WriteLine($"[AI流式] ✅ 流式输出完成");
+                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 流式输出完成");
                 }
 
                 // 如果是NL2SQL查询且有详细数据，额外发送一条包含QueryResult的消息
@@ -637,12 +637,12 @@ namespace Microi.net
                             
                             await SendMessageToClient(clientInfoTo, dataMessageDto, originalMsg._iHubContext);
                             await TMongodbHelper<MessageBodyDto>.InsertAsync(chatHost, dataMessageDto);
-                            Console.WriteLine($"[AI] ✅ 详细数据已发送到前端（{queryResultArray.Length}条记录）");
+                            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 详细数据已发送到前端（{queryResultArray.Length}条记录）");
                         }
                     }
                     catch (Exception dataEx)
                     {
-                        Console.WriteLine($"[AI] ⚠️ 发送详细数据失败: {dataEx.Message}");
+                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 发送详细数据失败: {dataEx.Message}");
                     }
                 }
 
@@ -664,28 +664,21 @@ namespace Microi.net
                     };
                     
                     await TMongodbHelper<MessageBody>.InsertAsync(chatHost, aiReplyMsg);
-                    Console.WriteLine($"[AI] 数据库: {chatHost.DataBase}, 表: {chatHost.Table}");
+                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 数据库: {chatHost.DataBase}, 表: {chatHost.Table}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[AI] ⚠️ 保存聊天记录失败: {ex.Message}");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 保存聊天记录失败: {ex.Message}");
                 }
 
-                Console.WriteLine($"========== AI自动回复完成 ==========");
-                Console.WriteLine($"[AI] 📊 回复统计:");
-                Console.WriteLine($"[AI]   - 模式: {aiResult.ResponseType}");
-                Console.WriteLine($"[AI]   - 用户: {originalMsg.FromUserName}");
-                Console.WriteLine($"[AI]   - 回复长度: {aiResult.Content?.Length ?? 0}字符");
-                Console.WriteLine($"");
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复完成 ==========");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 回复统计 - 模式: {aiResult.ResponseType}, 用户: {originalMsg.FromUserName}, 回复长度: {aiResult.Content?.Length ?? 0}字符");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"========== AI自动回复异常 ==========");
-                Console.WriteLine($"[AI] ❌ 异常类型: {ex.GetType().Name}");
-                Console.WriteLine($"[AI] ❌ 异常消息: {ex.Message}");
-                Console.WriteLine($"[AI] ❌ 堆栈跟踪:");
-                Console.WriteLine(ex.StackTrace);
-                Console.WriteLine($"========================================");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复异常 ==========");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 异常类型: {ex.GetType().Name}, 消息: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 堆栈跟踪: {ex.StackTrace}");
             }
         }
         /// <summary>
@@ -742,7 +735,7 @@ namespace Microi.net
                 ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom2 == null)
                 {
-                    Console.WriteLine($"[WebSocket] SendChatRecordToUser: 用户 {msg.FromUserId} 不在线");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] SendChatRecordToUser: 用户 {msg.FromUserId} 不在线");
                     return;
                 }
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();

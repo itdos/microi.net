@@ -10,12 +10,12 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMongoDB, V8MongoDB>();
-                Console.WriteLine("Microi：【成功】注入【MongoDB】插件成功！");
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【MongoDB】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入【MongoDB】插件失败：" + ex.Message);
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【MongoDB】插件失败：{ex.Message}");
                 return services;
             }
         }

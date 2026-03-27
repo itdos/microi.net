@@ -364,7 +364,7 @@ namespace Microi.net
                     timeSpanInterval = new TimeSpan(int.Parse(numUnits), 0, 0, 0);
                     break;
                 default:
-                    Console.WriteLine("Invalid time units; use seconds, minutes, hours, or days");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Invalid time units; use seconds, minutes, hours, or days");
                     break;
             }
             return timeSpanInterval;

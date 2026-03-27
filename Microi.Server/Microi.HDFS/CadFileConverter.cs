@@ -97,12 +97,12 @@ namespace Microi.net
                     }
                 }
 
-                Console.WriteLine("CadFileConverter: DwgConverter类未找到，请确保Microi.V8Engine已加载");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] DwgConverter类未找到，请确保Microi.V8Engine已加载");
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"CadFileConverter: DWG→DXF转换失败: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] DWG→DXF转换失败: {ex.Message}");
                 return null;
             }
         }
@@ -181,7 +181,7 @@ print('STEP_TO_STL_OK')
                 var freecadPath = FindFreecadExecutable();
                 if (freecadPath == null)
                 {
-                    Console.WriteLine("CadFileConverter: 未找到FreeCAD，STEP/STP文件将不会被转换。请安装FreeCAD以启用STEP预览功能。");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 未找到FreeCAD，STEP/STP文件将不会被转换。请安装FreeCAD以启用STEP预览功能。");
                     return null;
                 }
 
@@ -209,13 +209,13 @@ print('STEP_TO_STL_OK')
                 if (process.ExitCode != 0 || !output.Contains("STEP_TO_STL_OK"))
                 {
                     // FreeCAD方式失败，尝试使用Python + OCC方式
-                    Console.WriteLine($"CadFileConverter: FreeCAD转换失败(ExitCode={process.ExitCode}), stderr={errorOutput}");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] FreeCAD转换失败(ExitCode={process.ExitCode}), stderr={errorOutput}");
 
                     // 尝试直接用python3 + pythonocc调用
                     var convertResult = TryPythonOccConvert(inputFile, stlFile);
                     if (!convertResult)
                     {
-                        Console.WriteLine("CadFileConverter: 所有STEP转换方式均失败");
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 所有STEP转换方式均失败");
                         return null;
                     }
                 }
@@ -232,7 +232,7 @@ print('STEP_TO_STL_OK')
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"CadFileConverter: STEP→GLB转换异常: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] STEP→GLB转换异常: {ex.Message}");
                 return null;
             }
             finally
@@ -436,7 +436,7 @@ except ImportError:
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"CadFileConverter: 复制文件流失败: {ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 复制文件流失败: {ex.Message}");
                 return;
             }
 
@@ -449,7 +449,7 @@ except ImportError:
             {
                 try
                 {
-                    Console.WriteLine($"CadFileConverter: 开始异步转换 {ext} 文件: {originalPath}");
+                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 开始异步转换 {ext} 文件: {originalPath}");
 
                     byte[] convertedBytes = null;
                     string actualTargetExt = GetTargetExtension(ext);
@@ -481,7 +481,7 @@ except ImportError:
 
                     if (convertedBytes == null || convertedBytes.Length == 0)
                     {
-                        Console.WriteLine($"CadFileConverter: 转换失败或无输出: {originalPath}");
+                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换失败或无输出: {originalPath}");
                         return;
                     }
 
@@ -512,17 +512,17 @@ except ImportError:
 
                         if (putResult.Code == 1)
                         {
-                            Console.WriteLine($"CadFileConverter: 转换完成并上传成功: {originalPath} → {convertedPath}");
+                            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换完成并上传成功: {originalPath} → {convertedPath}");
                         }
                         else
                         {
-                            Console.WriteLine($"CadFileConverter: 转换文件上传失败: {putResult.Msg}");
+                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换文件上传失败: {putResult.Msg}");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"CadFileConverter: 异步转换异常: {ex.Message}");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 异步转换异常: {ex.Message}");
                 }
             });
         }

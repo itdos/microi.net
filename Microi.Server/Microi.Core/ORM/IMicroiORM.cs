@@ -38,5 +38,18 @@ namespace Microi.net
         string GetFieldAsName(string fieldName);
         string GetDatetimeFieldValue(string datetime);
         string GetPaginationSql(string tableName, string sql, int pageIndex, int pageSize, string dbVersion = "");
+
+        /// <summary>
+        /// 获取表索引列表
+        /// </summary>
+        DosResult GetTableIndexes(DbServiceParam param);
+        /// <summary>
+        /// 创建索引
+        /// </summary>
+        DosResult AddIndex(DbServiceParam param);
+        /// <summary>
+        /// 删除索引
+        /// </summary>
+        DosResult DropIndex(DbServiceParam param);
     }
 }

@@ -103,11 +103,11 @@ namespace Microi.net
                     // 启动新的 Scheduler
                     await _scheduler.Start();
                     _isInitialized = true;
-                    Console.WriteLine("Microi：【成功】【分布式任务调度】 Scheduler 启动成功！");
+                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【分布式任务调度】 Scheduler 启动成功！");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Microi：【Error异常】【分布式任务调度】 Scheduler 启动失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【分布式任务调度】 Scheduler 启动失败：{ex.Message}");
                 }
             }
             finally
@@ -123,7 +123,7 @@ namespace Microi.net
         {
             if (!_isInitialized)
             {
-                Console.WriteLine("Microi：【Error异常】Scheduler 未初始化，请先调用 InitializeAsync 方法");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Scheduler 未初始化，请先调用 InitializeAsync 方法");
             }
         }
         /// <summary>
@@ -174,7 +174,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("获取所有job异常:" + ex);
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】获取所有job异常：{ex}");
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -224,7 +224,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("依据任务名称列表获取job异常:" + ex);
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】依据任务名称列表获取job异常：{ex}");
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -253,7 +253,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】依据任务名称获取job异常:" + ex.Message);
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】依据任务名称获取job异常：{ex.Message}");
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -692,22 +692,22 @@ namespace Microi.net
                                     }
                                     else
                                     {
-                                        Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现问题：" + detailResult.Msg);
+                                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现问题：{detailResult.Msg}");
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现异常：" + ex.Message);
+                                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常：{ex.Message}");
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现异常：" + ex.Message);
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常：{ex.Message}");
                     }
                 }
-                Console.WriteLine("Microi：【信息】任务调度后台同步任务已停止");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度后台同步任务已停止");
             }, _cts.Token);
         }
         
@@ -719,11 +719,11 @@ namespace Microi.net
             try
             {
                 _cts.Cancel();
-                Console.WriteLine("Microi：【信息】任务调度引擎正在停止...");
+                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎正在停止...");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】任务调度引擎停止失败：{ex.Message}");
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎停止失败：{ex.Message}");
             }
         }
     }

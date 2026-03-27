@@ -116,7 +116,7 @@ export default {
             ) {
                 return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi || this.sysMenuModel.DiyConfig.ImportApi);
             }
-            return this.DiyCommon.GetApiBase() + "/api/DiyTable/ImportDiyTableRow";
+            return this.DiyCommon.GetApiBase() + "/api/FormEngine/ImportDiyTableRow";
         },
         importProgressApi() {
             if (this.sysMenuModel && this.sysMenuModel.DiyConfig && this.sysMenuModel.DiyConfig.ImportProgressApi) {
@@ -174,7 +174,7 @@ export default {
         delImportProgress() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/DiyTable/DelImportDiyTableRowStep",
+                "/api/FormEngine/DelImportDiyTableRowStep",
                 { TableId: self.tableId },
                 function(result) {
                     if (self.DiyCommon.Result(result)) {

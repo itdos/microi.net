@@ -40,12 +40,22 @@ namespace Microi.net.Api
 
         private async Task HandleExceptionAsync(HttpContext context, Exception ex)
         {
-            // 自动追踪异常到诊断系统
+            // 标准化日志输出 + 异步写MongoDB
             var exceptionContext = $"{context.Request.Method} {context.Request.Path}";
-            ExceptionDiagnostics.TrackException(ex, exceptionContext);
-
-            // 记录日志
+            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】全局异常捕获 [{exceptionContext}]: {ex.Message}");
             _logger.LogError(ex, $"全局异常捕获: {exceptionContext}");
+
+            // 异步写日志到MongoDB
+            _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+            {
+                Type = "全局异常",
+                Title = $"全局异常捕获: {exceptionContext}",
+                Content = ex.Message,
+                OtherInfo = ex.StackTrace?.Length > 2000 ? ex.StackTrace.Substring(0, 2000) : ex.StackTrace,
+                Level = 3,
+                Api = context.Request.Path.ToString(),
+                IP = context.Connection?.RemoteIpAddress?.ToString()
+            });
 
             // 根据异常类型返回不同的错误信息
             var (statusCode, userMessage) = GetErrorResponse(ex);

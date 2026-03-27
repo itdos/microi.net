@@ -225,7 +225,7 @@ export default {
                 var ShuxingGLCD = JSON.parse(self.LeftTreeData.ShuxingGLCD);
                 const res = await new Promise((resolve, reject) => {
                     self.DiyCommon.Post(
-                        self.DiyCommon.GetApiBase() + "/api/DiyTable/GetDiyTableRowTree",
+                        self.DiyCommon.GetApiBase() + "/api/FormEngine/GetDiyTableRowTree",
                         {
                             ModuleEngineKey: ShuxingGLCD[ShuxingGLCD.length - 1]
                         },
