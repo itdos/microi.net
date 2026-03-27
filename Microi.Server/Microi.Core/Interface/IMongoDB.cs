@@ -52,5 +52,13 @@ namespace Microi.net
         Task<DosResult> AddSysLog(SysLogParam param);
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
         Task<DosResult> GetSysLogTypes(SysLogParam param);
+        /// <summary>
+        /// 异步写接口调用次数（首次插入，之后累加 CallCount）
+        /// </summary>
+        Task<DosResult> AddApiCallCount(ApiCallCountParam param);
+        /// <summary>
+        /// 获取接口调用次数排行
+        /// </summary>
+        Task<DosResultList<ApiCallCount>> GetApiCallCountRank(ApiCallCountParam param);
     }
 }

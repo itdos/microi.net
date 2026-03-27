@@ -153,6 +153,14 @@ namespace Microi.net.Api
                     SysMenuHomePage = SysMenuHomePage,
                     SysConfig = sysConfig
                 };
+                //异步更新用户登录Id、最后登录时间
+                _= MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                {
+                    Id = sysUser["Id"].Val<string>(),
+                    LastLoginIP = param.LastLoginIP,
+                    LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    OsClient = param.OsClient
+                });
             }
             return Json(result);
         }

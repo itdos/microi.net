@@ -450,6 +450,86 @@ namespace Microi.net
             }
         }
 
+        public async Task<DosResult> AddApiCallCount(ApiCallCountParam param)
+        {
+            try
+            {
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    param.OsClient = DiyToken.GetCurrentOsClient();
+                }
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, "OsClient不能为空");
+                }
+
+                var host = new MongodbHost()
+                {
+                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
+                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
+                    Table = "api_call_count"
+                };
+
+                var client = MongodbClient<MongoDB.Bson.BsonDocument>.MongodbInfoClient(host);
+
+                var filter = Builders<MongoDB.Bson.BsonDocument>.Filter.And(
+                    Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("ApiEngineKey", param.ApiEngineKey),
+                    Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("OsClient", param.OsClient)
+                );
+
+                var update = Builders<MongoDB.Bson.BsonDocument>.Update
+                    .Inc("CallCount", 1L)
+                    .Set("LastCallTime", DateTime.Now)
+                    .SetOnInsert("ApiEngineKey", param.ApiEngineKey)
+                    .SetOnInsert("Name", param.Name ?? param.ApiEngineKey)
+                    .SetOnInsert("OsClient", param.OsClient)
+                    .SetOnInsert("CreateTime", DateTime.Now);
+
+                var options = new UpdateOptions { IsUpsert = true };
+                await client.UpdateOneAsync(filter, update, options);
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResultList<ApiCallCount>> GetApiCallCountRank(ApiCallCountParam param)
+        {
+            try
+            {
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    param.OsClient = DiyToken.GetCurrentOsClient();
+                }
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResultList<ApiCallCount>(0, null, "OsClient不能为空");
+                }
+
+                var host = new MongodbHost()
+                {
+                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
+                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
+                    Table = "api_call_count"
+                };
+
+                var top = param._Top ?? 10;
+                var sort = Builders<ApiCallCount>.Sort.Descending("CallCount");
+                var filter = Builders<ApiCallCount>.Filter.Eq("OsClient", param.OsClient);
+
+                var result = await TMongodbHelper<ApiCallCount>.FindListByPageAsync(host, filter, 1, top, null, sort);
+
+                return new DosResultList<ApiCallCount>(1, result, "", result.Count);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<ApiCallCount>(0, null, ex.Message);
+            }
+        }
+
         /// <summary>
         /// 将 JToken/JValue/JObject 转换为原生 .NET 类型
         /// 避免 MongoDB 序列化时报错：Type Newtonsoft.Json.Linq.JValue is not configured
