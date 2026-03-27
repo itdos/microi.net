@@ -520,9 +520,9 @@ services:
     tty: true
     stdin_open: true
 
-  microi-web:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-web:latest
-    container_name: microi-web
+  microi-client:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client:latest
+    container_name: microi-client
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
