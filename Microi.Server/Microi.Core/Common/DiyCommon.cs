@@ -17,7 +17,11 @@ namespace Microi.net
         public const int MaxRoleLevel = 9999;
         // 定义一个与Guid.Empty类似的概念性“空ULID”常量
         // 格式：所有字符为'0'的26位有效ULID字符串
-        public const string UlidEmpty = "00000000000000000000000000";
+        public const string UlidEmpty = "00000000000000000000000000";        
+        /// <summary>
+        /// V8引擎/接口引擎慢执行日志阈值（毫秒），超过此值将输出警告日志并写入MongoDB。默认5000ms（5秒）
+        /// </summary>
+        public const int SlowExecutionThresholdMs = 5000;
         public static DbInfo GetDbInfo(string dbType)
         {
             if (dbType.ToLower() == "mysql")
