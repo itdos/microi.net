@@ -431,7 +431,7 @@ namespace Microi.net
         // 6. 消息接收处理（替代ApplicationMessageInterceptor）
         private async Task<Task> OnMessageReceived(InterceptingPublishEventArgs args)
         {
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ ClientId：{args.ClientId}");
+            // Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ ClientId：{args.ClientId}");
             //获取OsClient值，根据ClientId获取OsClient值
             ConnectedClients.TryGetValue(args.ClientId, out var osClient);
             //获取clientModel
@@ -445,7 +445,7 @@ namespace Microi.net
                 : string.Empty;
             var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ApplicationMessage.Topic;
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ payload：{payload}、topic：{topic}");
+            // Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT接收消息！ payload：{payload}、topic：{topic}");
             //触发接口引擎
             if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
