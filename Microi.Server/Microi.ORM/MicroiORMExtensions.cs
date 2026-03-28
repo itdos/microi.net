@@ -32,6 +32,9 @@ namespace Microi.net
                     DatabaseType.MySql => _serviceProvider.GetRequiredService<MySqlService>(),
                     DatabaseType.Oracle => _serviceProvider.GetRequiredService<OracleService>(),
                     DatabaseType.SqlServer => _serviceProvider.GetRequiredService<SqlServerService>(),
+                    DatabaseType.PostgreSql => _serviceProvider.GetRequiredService<PostgreSqlService>(),
+                    DatabaseType.DaMeng => _serviceProvider.GetRequiredService<DaMengService>(),
+                    DatabaseType.KingBase => _serviceProvider.GetRequiredService<KingBaseService>(),
                     _ => throw new ArgumentException($"不支持的数据库类型: {dbType}", nameof(dbType))
                 };
 
@@ -62,6 +65,9 @@ namespace Microi.net
                 services.AddSingleton<MySqlService>();
                 services.AddSingleton<OracleService>();
                 services.AddSingleton<SqlServerService>();
+                services.AddSingleton<PostgreSqlService>();
+                services.AddSingleton<DaMengService>();
+                services.AddSingleton<KingBaseService>();
 
                 // 注册 ORM 会话工厂（根据配置选择 Dos.ORM 或 SqlSugar）
                 var sessionFactory = new MicroiORMSessionFactory(ormType);

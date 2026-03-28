@@ -56,7 +56,19 @@ namespace Dos.ORM
         /// <summary>
         /// MySql
         /// </summary>
-        MySql = 5
+        MySql = 5,
+        /// <summary>
+        /// PostgreSql
+        /// </summary>
+        PostgreSql = 6,
+        /// <summary>
+        /// 达梦 DaMeng
+        /// </summary>
+        DaMeng = 7,
+        /// <summary>
+        /// 人大金仓 KingBase
+        /// </summary>
+        KingBase = 8
     }
 
     #endregion
@@ -199,6 +211,15 @@ namespace Dos.ORM
                     break;
                 case DatabaseType.MsAccess:
                     provider = ProviderFactory.CreateDbProvider(null, typeof(MsAccess.MsAccessProvider).FullName, connStr, dt);
+                    break;
+                case DatabaseType.PostgreSql:
+                    provider = ProviderFactory.CreateDbProvider(null, "Dos.ORM.PostgreSql.PostgreSqlProvider", connStr, dt);
+                    break;
+                case DatabaseType.DaMeng:
+                    provider = ProviderFactory.CreateDbProvider(null, "Dos.ORM.DaMeng.DaMengProvider", connStr, dt);
+                    break;
+                case DatabaseType.KingBase:
+                    provider = ProviderFactory.CreateDbProvider(null, "Dos.ORM.KingBase.KingBaseProvider", connStr, dt);
                     break;
             }
             //2015-08-12新增

@@ -40,6 +40,16 @@ namespace Microi.net
         string GetPaginationSql(string tableName, string sql, int pageIndex, int pageSize, string dbVersion = "");
 
         /// <summary>
+        /// 是否需要在SELECT中为每个字段添加显式别名（如Oracle/达梦返回全大写字段名，需要AS "FieldName"）
+        /// </summary>
+        bool NeedsExplicitSelectAlias { get; }
+
+        /// <summary>
+        /// 是否使用ROW_NUMBER分页（如SqlServer非首页需要ROW_NUMBER() OVER(...)）
+        /// </summary>
+        bool UsesRowNumberPagination { get; }
+
+        /// <summary>
         /// 获取表索引列表
         /// </summary>
         DosResult GetTableIndexes(DbServiceParam param);

@@ -21,6 +21,9 @@ namespace Microi.net
             "Unique", "Level", "Column", "Lock"
         };
 
+        public bool NeedsExplicitSelectAlias => true;
+        public bool UsesRowNumberPagination => false;
+
         /// <summary>
         /// 特殊处理datetime类型的CreateTime字段
         /// </summary>

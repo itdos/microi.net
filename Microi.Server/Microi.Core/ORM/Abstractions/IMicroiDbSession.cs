@@ -80,6 +80,18 @@ namespace Microi.net
         /// <summary>
         /// MySql
         /// </summary>
-        MySql = 5
+        MySql = 5,
+        /// <summary>
+        /// PostgreSql
+        /// </summary>
+        PostgreSql = 6,
+        /// <summary>
+        /// 达梦 DaMeng
+        /// </summary>
+        DaMeng = 7,
+        /// <summary>
+        /// 人大金仓 KingBase
+        /// </summary>
+        KingBase = 8
     }
 }
