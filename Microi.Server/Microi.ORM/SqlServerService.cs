@@ -9,6 +9,9 @@ namespace Microi.net
 {
     public class SqlServerService : IMicroiORM
     {
+        public bool NeedsExplicitSelectAlias => false;
+        public bool UsesRowNumberPagination => true;
+
         public string GetDatetimeFieldValue(string datetime)
         {
             return "'" + datetime + "'";

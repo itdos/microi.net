@@ -141,6 +141,33 @@ namespace Dos.ORM
                     databaseType = DatabaseType.Sqlite3;
                 }
             }
+            else if (className.IndexOf("postgresql", StringComparison.OrdinalIgnoreCase) >= 0 || className.IndexOf("npgsql", StringComparison.OrdinalIgnoreCase) >= 0 || className.IndexOf("pgsql", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                className = "Dos.ORM.PostgreSql.PostgreSqlProvider";
+                assemblyName = null;
+                if (databaseType == null)
+                {
+                    databaseType = DatabaseType.PostgreSql;
+                }
+            }
+            else if (className.IndexOf("dameng", StringComparison.OrdinalIgnoreCase) >= 0 || className.IndexOf("dm", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                className = "Dos.ORM.DaMeng.DaMengProvider";
+                assemblyName = null;
+                if (databaseType == null)
+                {
+                    databaseType = DatabaseType.DaMeng;
+                }
+            }
+            else if (className.IndexOf("kingbase", StringComparison.OrdinalIgnoreCase) >= 0 || className.IndexOf("kdbndp", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                className = "Dos.ORM.KingBase.KingBaseProvider";
+                assemblyName = null;
+                if (databaseType == null)
+                {
+                    databaseType = DatabaseType.KingBase;
+                }
+            }
 
             string cacheKey = string.Concat(assemblyName, className, connectionString);
             if (providerCache.ContainsKey(cacheKey))
