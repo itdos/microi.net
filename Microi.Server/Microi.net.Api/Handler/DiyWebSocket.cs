@@ -443,7 +443,7 @@ namespace Microi.net
             return _mongoConnectionCache.GetOrAdd(osClient, key =>
             {
                 var connection = Microi.net.OsClient.GetClient(key).OsClientModel["DbMongoConnection"].Val<string>();
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[MongoDB] 缓存连接配置: {key}");
+                // Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[MongoDB] 缓存连接配置: {key}");
                 return connection;
             });
         }

@@ -58,7 +58,10 @@ namespace Microi.net
                             if (val == null || val == DBNull.Value) replacement = "NULL";
                             else if (val is string || val is DateTime || val is Guid) replacement = $"'{val.ToString().Replace("'", "''")}'";
                             else replacement = val.ToString();
-                            executableSql = executableSql.Replace(p.ParameterName, replacement);
+                            executableSql = System.Text.RegularExpressions.Regex.Replace(
+                                executableSql,
+                                "[?@:]" + System.Text.RegularExpressions.Regex.Escape(p.ParameterName.TrimStart('@', '?', ':')) + @"\b",
+                                _ => replacement);
                         }
                         if (executableSql.Length > 4000) executableSql = executableSql.Substring(0, 4000) + "...";
                     }
