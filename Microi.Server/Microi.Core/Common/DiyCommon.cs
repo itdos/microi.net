@@ -35,7 +35,6 @@ namespace Microi.net
                     R = '`',
                     P = '?',
                     DbType = DatabaseType.MySql,
-                    // DbService = _mySqlService
                 };
             else if (dbType.ToLower().DosContains("sqlserver"))
                 return new DbInfo()
@@ -44,7 +43,6 @@ namespace Microi.net
                     R = ']',
                     P = '@',
                     DbType = DatabaseType.SqlServer,
-                    // DbService = _sqlServerService
                 };
             else if (dbType.ToLower().DosContains("oracle"))
                 return new DbInfo()
@@ -53,7 +51,30 @@ namespace Microi.net
                     R = '"',
                     P = ':',
                     DbType = DatabaseType.Oracle,
-                    // DbService = _oracleService
+                };
+            else if (dbType.ToLower().DosContains("postgresql") || dbType.ToLower().DosContains("pgsql"))
+                return new DbInfo()
+                {
+                    L = '"',
+                    R = '"',
+                    P = '@',
+                    DbType = DatabaseType.PostgreSql,
+                };
+            else if (dbType.ToLower().DosContains("dameng") || dbType.ToLower() == "dm")
+                return new DbInfo()
+                {
+                    L = '"',
+                    R = '"',
+                    P = ':',
+                    DbType = DatabaseType.DaMeng,
+                };
+            else if (dbType.ToLower().DosContains("kingbase") || dbType.ToLower().DosContains("kdbndp"))
+                return new DbInfo()
+                {
+                    L = '"',
+                    R = '"',
+                    P = ':',
+                    DbType = DatabaseType.KingBase,
                 };
             throw new Exception("DbType value error.");
         }

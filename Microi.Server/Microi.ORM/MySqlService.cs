@@ -43,6 +43,9 @@ namespace Microi.net
             }
         }
 
+        public bool NeedsExplicitSelectAlias => false;
+        public bool UsesRowNumberPagination => false;
+
         public string GetDatetimeFieldValue(string datetime)
         {
             return "'" + datetime + "'";
