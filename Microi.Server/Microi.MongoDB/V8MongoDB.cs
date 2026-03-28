@@ -330,27 +330,25 @@ namespace Microi.net
                 DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
                 Table = tableName//表名
             };
+
+            // 确保范围索引存在（CreateTime/Type/Level），提升排序和筛选性能
+            await EnsureSysLogIndexesAsync(host);
             string[] field = null;//new SysLog().GetFields().Select(d => d.Name).ToArray();
             var sort = Builders<SysLog>.Sort.Descending("CreateTime");
             var list = new List<FilterDefinition<SysLog>>();
+            var hasKeyword = false;
 
             // var where = new Where<SysLog>();
             if (!param._Keyword.DosIsNullOrWhiteSpace())
             {
-                list.Add(
-                        Builders<SysLog>.Filter.Where(d => d.Title.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Content.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Type.Contains(param._Keyword))
-                        //| Builders<SysLog>.Filter.Where(d => d.UserId != null && d.UserId.Value.ToString().Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.UserName.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.IP.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Mac.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.OtherInfo.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Api.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.AppId.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Param.Contains(param._Keyword))
-                        | Builders<SysLog>.Filter.Where(d => d.Remark.Contains(param._Keyword))
-                    );
+                hasKeyword = true;
+                // Regex 搜索 Title + Content（中文无法用 $text 分词，Regex 正确匹配子串）
+                // 仅搜 2 个关键字段，比原先 11 字段 OR 快很多
+                var rx = new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(param._Keyword), "i");
+                list.Add(Builders<SysLog>.Filter.Or(
+                    Builders<SysLog>.Filter.Regex(d => d.Title, rx),
+                    Builders<SysLog>.Filter.Regex(d => d.Content, rx)
+                ));
                 //where.And(d => d.Title.Like(param._Keyword)
                 //                || d.Content.Like(param._Keyword)
                 //                || d.Type.Like(param._Keyword)
@@ -375,18 +373,65 @@ namespace Microi.net
             //    .Where(where);
             //var dataCount = fs.Count();
             var filter = list.Count > 0 ? Builders<SysLog>.Filter.And(list) : Builders<SysLog>.Filter.Empty;
-            var dataCount = await TMongodbHelper<SysLog>.CountAsync(host, filter);
-            var result = new List<SysLog>();
-            if (param._PageSize != null && param._PageIndex != null)
+
+            // ========== 关键字搜索：Hint 强制走 CreateTime 降序索引 ==========
+            // Regex 无法使用 B-Tree 索引，默认 COLLSCAN + 内存排序 ＝ 全表扫描 39 万条要 3 分钟。
+            // Hint 让 MongoDB 按 CreateTime DESC 索引顺序逐条扫描，
+            // 每条文档检查 Regex，找到 pageSize 条就停。第一页几乎瞬间返回。
+            // Count 用"多取 1 条"判断是否有下一页，不再做独立计数。
+            if (hasKeyword)
             {
-                //fs.Page(param._PageSize.Value, param._PageIndex.Value);
-                result = await TMongodbHelper<SysLog>.FindListByPageAsync(host, filter, param._PageIndex.Value, param._PageSize.Value, field, sort);
+                var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                var pageIndex = param._PageIndex ?? 1;
+                var pageSize = param._Top ?? param._PageSize ?? 20;
+                var hintValue = new BsonString("idx_CreateTime_desc");
+
+                // 多取 1 条：判断是否有下一页
+                var data = await collection.Find(filter, new FindOptions(){
+                        Hint = hintValue,
+                    })
+                    .Sort(sort)
+                    // .Hint(hintValue)
+                    .Skip((pageIndex - 1) * pageSize)
+                    .Limit(pageSize + 1)
+                    .ToListAsync();
+
+                bool hasMore = data.Count > pageSize;
+                if (hasMore) data.RemoveAt(data.Count - 1);
+
+                // DataCount：若有更多则返回 (当前页位置 + pageSize + 1)，前端显示"N+"；否则返回精确值
+                int dataCount2 = hasMore
+                    ? (int)pageIndex * pageSize + 1
+                    : (int)(pageIndex - 1) * pageSize + data.Count;
+
+                return new DosResultList<SysLog>(1, data, "", dataCount2);
             }
+
+            // ========== 非关键字查询（走索引，性能正常） ==========
+            Task<long> countTask;
+            if (list.Count == 0)
+                countTask = TMongodbHelper<SysLog>.CountEstimatedAsync(host);
+            else
+                countTask = TMongodbHelper<SysLog>.CountAsync(host, filter);
+
+            // Count 和分页查询并行执行，减少总等待时间
+            Task<List<SysLog>> dataTask;
             if (param._Top != null)
             {
-                //fs.Top(param._Top.Value);
-                result = await TMongodbHelper<SysLog>.FindListByPageAsync(host, filter, 1, param._Top.Value, field, sort);
+                dataTask = TMongodbHelper<SysLog>.FindListByPageAsync(host, filter, 1, param._Top.Value, field, sort);
             }
+            else if (param._PageSize != null && param._PageIndex != null)
+            {
+                dataTask = TMongodbHelper<SysLog>.FindListByPageAsync(host, filter, param._PageIndex.Value, param._PageSize.Value, field, sort);
+            }
+            else
+            {
+                dataTask = TMongodbHelper<SysLog>.FindListByPageAsync(host, filter, 1, 20, field, sort);
+            }
+
+            await Task.WhenAll(countTask, dataTask);
+            var dataCount = countTask.Result;
+            var result = dataTask.Result;
             #region 自定义排序，默认 desc
             ////如果传入了排序字段名参数
             //var orderBy = OrderByClip.None;
@@ -567,6 +612,170 @@ namespace Microi.net
             }
 
             return value;
+        }
+
+        /// <summary>
+        /// 带上限的 Count（用 CountDocumentsAsync + CountOptions.Limit）。
+        /// Regex 无法走索引，39万条全表扫描要3分钟；加上限后最多扫描 maxCount 条就停止。
+        /// 前端对超过上限的部分显示为 "10000+" 即可。
+        /// </summary>
+        private static async Task<long> CountCappedAsync(MongodbHost host, FilterDefinition<SysLog> filter, long maxCount)
+        {
+            var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+            // return await collection.CountDocumentsAsync(filter, new CountOptions { Limit = maxCount });
+            return await collection.CountAsync(filter, new CountOptions { Limit = maxCount });
+        }
+
+        // 范围索引是否已确认（DataBase.Table → true）
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _indexEnsured
+            = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+
+        /// <summary>
+        /// 确保 SysLog 集合存在范围查询索引（CreateTime/Type/Level）。
+        /// 内存缓存控制：每个集合生命周期内只创建一次，幂等安全。
+        /// </summary>
+        private static async Task EnsureSysLogIndexesAsync(MongodbHost host)
+        {
+            var cacheKey = host.DataBase + "." + host.Table;
+            if (_indexEnsured.ContainsKey(cacheKey)) return;
+
+            try
+            {
+                var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+
+                var existingIndexNames = new System.Collections.Generic.HashSet<string>();
+                using (var cursor = await collection.Indexes.ListAsync())
+                {
+                    var existing = await cursor.ToListAsync();
+                    foreach (var idx in existing)
+                        if (idx.TryGetValue("name", out var nameVal))
+                            existingIndexNames.Add(nameVal.AsString);
+                }
+
+                var toCreate = new System.Collections.Generic.List<CreateIndexModel<SysLog>>();
+                if (!existingIndexNames.Contains("idx_CreateTime_desc"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_CreateTime_desc" }));
+                if (!existingIndexNames.Contains("idx_Type_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.Type).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_Type_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_Level_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.Level).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_Level_CreateTime" }));
+
+                if (toCreate.Count > 0)
+                    await collection.Indexes.CreateManyAsync(toCreate);
+
+                _indexEnsured.TryAdd(cacheKey, true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Microi] MongoDB 创建SysLog索引失败({host.DataBase}.{host.Table}): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 一次性并行返回当前月份 5 类日志的数量统计，支持关键字过滤。
+        /// 前端用一个请求替换原来 5 个独立统计请求，减少网络开销。
+        /// </summary>
+        public async Task<DosResult> GetSysLogStats(SysLogParam param)
+        {
+            try
+            {
+                var tableName = "log_" + (param._SearchMonth.DosIsNullOrWhiteSpace()
+                    ? DateTime.Now.ToString("yyyyMM") : param._SearchMonth);
+                var host = new MongodbHost()
+                {
+                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
+                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
+                    Table = tableName
+                };
+
+                // 关键字过滤（同 GetSysLog 逻辑，Regex 搜 Title + Content）
+                FilterDefinition<SysLog> kwFilter = null;
+                if (!param._Keyword.DosIsNullOrWhiteSpace())
+                {
+                    var rx = new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(param._Keyword), "i");
+                    kwFilter = Builders<SysLog>.Filter.Or(
+                        Builders<SysLog>.Filter.Regex(d => d.Title, rx),
+                        Builders<SysLog>.Filter.Regex(d => d.Content, rx)
+                    );
+                }
+
+                const long MAX_STAT_COUNT = 10000;
+
+                if (kwFilter != null)
+                {
+                    // ===== 有关键字：单次聚合流水线代替 5 次独立扫描 =====
+                    // $match → $limit(10000) → $group：只扫一遍即可统计所有分类
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var agg = collection.Aggregate()
+                        .Match(kwFilter)
+                        .Limit((int)MAX_STAT_COUNT)
+                        .Group(new BsonDocument
+                        {
+                            { "_id", BsonNull.Value },
+                            { "Error", new BsonDocument("$sum", new BsonDocument("$cond",
+                                new BsonArray { new BsonDocument("$eq", new BsonArray { "$Level", 3 }), 1, 0 })) },
+                            { "Warn", new BsonDocument("$sum", new BsonDocument("$cond",
+                                new BsonArray { new BsonDocument("$eq", new BsonArray { "$Level", 2 }), 1, 0 })) },
+                            { "SlowSQL", new BsonDocument("$sum", new BsonDocument("$cond",
+                                new BsonArray { new BsonDocument("$eq", new BsonArray { "$Type", "数据库慢SQL" }), 1, 0 })) },
+                            { "SlowExec", new BsonDocument("$sum", new BsonDocument("$cond",
+                                new BsonArray { new BsonDocument("$eq", new BsonArray { "$Type", "表单V8慢日志" }), 1, 0 })) },
+                            { "Exception", new BsonDocument("$sum", new BsonDocument("$cond",
+                                new BsonArray { new BsonDocument("$eq", new BsonArray { "$Type", "Exception" }), 1, 0 })) }
+                        });
+                    var aggResult = await agg.FirstOrDefaultAsync();
+
+                    return new DosResult
+                    {
+                        Code = 1,
+                        Data = new
+                        {
+                            Error = aggResult?["Error"].ToInt64() ?? 0,
+                            Warn = aggResult?["Warn"].ToInt64() ?? 0,
+                            SlowSQL = aggResult?["SlowSQL"].ToInt64() ?? 0,
+                            SlowExec = aggResult?["SlowExec"].ToInt64() ?? 0,
+                            Exception = aggResult?["Exception"].ToInt64() ?? 0
+                        }
+                    };
+                }
+
+                // ===== 无关键字：直接计数（走索引，非常快） =====
+                FilterDefinition<SysLog> Combine(FilterDefinition<SysLog> extra) => extra;
+
+                Func<FilterDefinition<SysLog>, Task<long>> countFn;
+                countFn = f => TMongodbHelper<SysLog>.CountAsync(host, f);
+
+                // 5 个 Count 并行执行
+                var t1 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Level == 3)));
+                var t2 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Level == 2)));
+                var t3 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "数据库慢SQL")));
+                var t4 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "表单V8慢日志")));
+                var t5 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "Exception")));
+                await Task.WhenAll(t1, t2, t3, t4, t5);
+
+                return new DosResult
+                {
+                    Code = 1,
+                    Data = new
+                    {
+                        Error = t1.Result,
+                        Warn = t2.Result,
+                        SlowSQL = t3.Result,
+                        SlowExec = t4.Result,
+                        Exception = t5.Result
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new DosResult { Code = 0, Msg = ex.Message };
+            }
         }
 
     }

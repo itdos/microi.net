@@ -56,6 +56,21 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 一次性返回当前月 5 类日志的数量统计（Error/Warn/SlowSQL/SlowExec/Exception）。
+        /// 支持 _Keyword 过滤，不需要分页参数。
+        /// 前端用此接口替换原来 5 个独立统计请求。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetSysLogStats(SysLogParam paramLog)
+        {
+            var param = paramLog;
+            var sysUser = await DiyToken.GetCurrentToken();
+            param.OsClient = sysUser?.OsClient;
+            var result = await MicroiEngine.MongoDB.GetSysLogStats(param);
+            return Json(result);
+        }
+
+        /// <summary>
         /// 传入Type、Title、Content、
         /// </summary>
         /// <returns></returns>

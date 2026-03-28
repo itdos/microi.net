@@ -384,7 +384,7 @@ namespace Microi.net
                 var client = MongodbClient<T>.MongodbInfoClient(host);
                 if (field == null || field.Length == 0)
                 {
-                    //注意坑：在1千多万数据量下，CountDocumentsAsync性能极低（EstimatedDocumentCountAsync不支持搜索条件），CountAsync性能极高，应该是mongodb官方的Bug。
+                    //Anderson：注意坑：在1千多万数据量下， CountDocumentsAsync 性能极低（EstimatedDocumentCountAsync不支持搜索条件），CountAsync性能极高，应该是mongodb官方的Bug。
                     //Use CountDocumentsAsync or EstimatedDocumentCountAsync instead
                     return await client.CountAsync(filter);
                     //return await client.CountDocumentsAsync(filter);
@@ -397,7 +397,7 @@ namespace Microi.net
                 }
                 var projection = Builders<T>.Projection.Combine(fieldList);
                 fieldList?.Clear();
-                //注意坑：在1千多万数据量下，CountDocumentsAsync性能极低（EstimatedDocumentCountAsync不支持搜索条件），CountAsync性能极高，应该是mongodb官方的Bug。
+                //Anderson：注意坑：在1千多万数据量下，CountDocumentsAsync性能极低（EstimatedDocumentCountAsync不支持搜索条件），CountAsync性能极高，应该是mongodb官方的Bug。
                 //Use CountDocumentsAsync or EstimatedDocumentCountAsync instead
                 return await client.Find(filter).Project<T>(projection).CountAsync();
                 //return await client.Find(filter).Project<T>(projection).CountDocumentsAsync();

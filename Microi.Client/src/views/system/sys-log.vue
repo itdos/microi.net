@@ -522,52 +522,27 @@ export default {
                     }
                 }
             );
-            // 获取错误/警告统计
+            // 统计卡片：搜索条件变化时（含自动刷新）更新，分页翻页不触发
+            if (initPageIndex !== undefined) {
+                self.GetSysLogStats();
+            }
+        },
+        // 获取5类统计（1次请求代替原来5次），支持关键词过滤
+        GetSysLogStats() {
+            var self = this;
             self.DiyCommon.Post(
-                "/api/syslog/GetSysLog",
-                { _SearchMonth: self.SearchModel.Month, Level: 3, _PageSize: 1, _PageIndex: 1 },
+                "/api/syslog/GetSysLogStats",
+                {
+                    _SearchMonth: self.SearchModel.Month,
+                    _Keyword: self.SearchModel.Keyword
+                },
                 function (result) {
-                    if (result && result.Code === 1) {
-                        self.StatsError = result.DataCount || 0;
-                    }
-                }
-            );
-            self.DiyCommon.Post(
-                "/api/syslog/GetSysLog",
-                { _SearchMonth: self.SearchModel.Month, Level: 2, _PageSize: 1, _PageIndex: 1 },
-                function (result) {
-                    if (result && result.Code === 1) {
-                        self.StatsWarn = result.DataCount || 0;
-                    }
-                }
-            );
-            // 慢SQL统计
-            self.DiyCommon.Post(
-                "/api/syslog/GetSysLog",
-                { _SearchMonth: self.SearchModel.Month, Type: '数据库慢SQL', _PageSize: 1, _PageIndex: 1 },
-                function (result) {
-                    if (result && result.Code === 1) {
-                        self.StatsSlowSQL = result.DataCount || 0;
-                    }
-                }
-            );
-            // 慢执行统计
-            self.DiyCommon.Post(
-                "/api/syslog/GetSysLog",
-                { _SearchMonth: self.SearchModel.Month, Type: '表单V8慢日志', _PageSize: 1, _PageIndex: 1 },
-                function (result) {
-                    if (result && result.Code === 1) {
-                        self.StatsSlowExec = result.DataCount || 0;
-                    }
-                }
-            );
-            // 异常统计
-            self.DiyCommon.Post(
-                "/api/syslog/GetSysLog",
-                { _SearchMonth: self.SearchModel.Month, Type: 'Exception', _PageSize: 1, _PageIndex: 1 },
-                function (result) {
-                    if (result && result.Code === 1) {
-                        self.StatsException = result.DataCount || 0;
+                    if (result && result.Code === 1 && result.Data) {
+                        self.StatsError = result.Data.Error || 0;
+                        self.StatsWarn = result.Data.Warn || 0;
+                        self.StatsSlowSQL = result.Data.SlowSQL || 0;
+                        self.StatsSlowExec = result.Data.SlowExec || 0;
+                        self.StatsException = result.Data.Exception || 0;
                     }
                 }
             );

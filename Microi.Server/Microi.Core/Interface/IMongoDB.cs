@@ -53,6 +53,10 @@ namespace Microi.net
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
         Task<DosResult> GetSysLogTypes(SysLogParam param);
         /// <summary>
+        /// 一次性返回当前月 5 类日志的并行数量统计（Error/Warn/SlowSQL/SlowExec/Exception）
+        /// </summary>
+        Task<DosResult> GetSysLogStats(SysLogParam param);
+        /// <summary>
         /// 异步写接口调用次数（首次插入，之后累加 CallCount）
         /// </summary>
         Task<DosResult> AddApiCallCount(ApiCallCountParam param);

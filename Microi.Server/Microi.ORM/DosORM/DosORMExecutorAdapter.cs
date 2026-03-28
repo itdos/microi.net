@@ -63,7 +63,11 @@ namespace Microi.net
                             if (val == null || val == DBNull.Value) replacement = "NULL";
                             else if (val is string || val is DateTime || val is Guid) replacement = $"'{val.ToString().Replace("'", "''")}'";
                             else replacement = val.ToString();
-                            executableSql = executableSql.Replace(p.Key, replacement);
+                            // 使用正则匹配 [?@:]paramName\b，只替换参数占位符（?Id/@Id/:Id），而不是列名等单独出现的同名字符串
+                            executableSql = System.Text.RegularExpressions.Regex.Replace(
+                                executableSql,
+                                "[?@:]" + System.Text.RegularExpressions.Regex.Escape(p.Key.TrimStart('@', '?', ':')) + @"\b",
+                                _ => replacement);
                         }
                         if (executableSql.Length > 4000) executableSql = executableSql.Substring(0, 4000) + "...";
                     }

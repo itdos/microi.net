@@ -1,5 +1,6 @@
 ﻿using MongoDB.Driver;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,15 +13,18 @@ namespace Microi.net
     /// <typeparam name="T"></typeparam>
     public static partial class MongodbClient<T> where T : class
     {
+        // MongoClient 必须全局单例复用，内部管理连接池。每次 new MongoClient 等于每次重建连接池，性能极差。
+        private static readonly ConcurrentDictionary<string, MongoClient> _clientCache = new ConcurrentDictionary<string, MongoClient>();
+
         #region +MongodbInfoClient 获取mongodb实例
         /// <summary>
-        /// 获取mongodb实例
+        /// 获取mongodb实例（MongoClient 按连接字符串单例缓存，复用连接池）
         /// </summary>
         /// <param name="host">连接字符串，库，表</param>
         /// <returns></returns>
         public static IMongoCollection<T> MongodbInfoClient(MongodbHost host)
         {
-            MongoClient client = new MongoClient(host.Connection);
+            var client = _clientCache.GetOrAdd(host.Connection, conn => new MongoClient(conn));
             var dataBase = client.GetDatabase(host.DataBase);
             return dataBase.GetCollection<T>(host.Table);
         }
