@@ -882,6 +882,8 @@ export default {
                         dataSourceAllOptions.value = options;
                     }
                     dataSourceLoaded.value = true;
+                    // 同步已在表格中的数据为选中状态
+                    syncDataSourceSelected();
                 } else {
                     dataSourceOptions.value = [];
                     if (res && res.Code !== 1) {
@@ -934,6 +936,25 @@ export default {
                     dataSourceOptions.value = [...dataSourceAllOptions.value];
                 }
             }
+        };
+
+        // 同步已选中的数据源项（将已在表格中的数据标记为选中）
+        const syncDataSourceSelected = () => {
+            if (!dataSourceOptions.value.length) return;
+            const columnKeys = columnConfig.value.map(col => col.Key);
+            const selected = dataSourceOptions.value.filter(option => {
+                // 优先通过 Id 匹配
+                if (option.Id) {
+                    return tableData.value.some(row => row.Id === option.Id);
+                }
+                // 无 Id 时通过列字段值全匹配
+                if (!columnKeys.length) return false;
+                return tableData.value.some(row =>
+                    columnKeys.some(key => option.hasOwnProperty(key)) &&
+                    columnKeys.every(key => !option.hasOwnProperty(key) || row[key] === option[key])
+                );
+            });
+            dataSourceSelected.value = selected;
         };
 
         // 批量添加数据
@@ -1409,6 +1430,17 @@ export default {
             return JSON.stringify(val);
         };
 
+        // 监听 tableData 变化，同步数据源已选中状态（如删除行后取消选中）
+        watch(
+            tableData,
+            () => {
+                if (dataSourceLoaded.value) {
+                    syncDataSourceSelected();
+                }
+            },
+            { deep: true }
+        );
+
         // 监听 modelValue 变化
         watch(
             () => props.modelValue,
@@ -1492,6 +1524,7 @@ export default {
             filterDataSourceOptions,
             handleDataSourceVisibleChange,
             handleBatchAdd,
+            syncDataSourceSelected,
             // 复杂组件
             isComplexComponent,
             getComplexPreview,
