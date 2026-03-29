@@ -166,10 +166,10 @@
             <el-form-item label="模板简介">
               <el-input v-model="pageInfo.remoteData.Desc" placeholder="" type="textarea" :rows="2" size="small"></el-input>
             </el-form-item>
-            <el-form-item label="数据接口">
+            <el-form-item label="接口引擎">
               <el-select
-                v-model="pageInfo.remoteData.DataApi"
-                placeholder="选择接口引擎"
+                v-model="selectedApiEngineId"
+                placeholder="选择接口引擎快速填充"
                 size="small"
                 filterable
                 clearable
@@ -183,9 +183,9 @@
                   :value="item.Id"
                 />
               </el-select>
-              <div v-if="selectedApiEngineInfo" class="mpe-api-info">
-                <span>Key: {{ selectedApiEngineInfo.ApiEngineKey }}</span>
-              </div>
+            </el-form-item>
+            <el-form-item label="数据接口">
+              <el-input v-model="pageInfo.remoteData.DataApi" placeholder="请输入动态数据webapi接口地址" type="textarea" :rows="2" size="small"></el-input>
             </el-form-item>
           </el-form>
           <div class="mpe-element-options">
@@ -415,21 +415,22 @@ const loadApiEngines = async () => {
     console.error('[PrintEngine] 加载接口引擎列表失败:', e)
   }
 }
-const selectedApiEngineInfo = ref(null)
+const selectedApiEngineId = ref(null)
 const onApiEngineChange = (val) => {
-  selectedApiEngineInfo.value = apiEngineList.value.find(item => item.Id === val) || null
+  if (!val) return
+  const engine = apiEngineList.value.find(item => item.Id === val)
+  if (engine) {
+    // 用接口引擎的地址填充数据接口输入框
+    pageInfo.remoteData.DataApi = engine.ApiAddress || ('/apiengine/' + engine.ApiEngineKey)
+  }
 }
 loadApiEngines()
 
 // ═══════════════════════════════
 // 代码编辑器增强 (替换hiprint函数类textarea)
 // ═══════════════════════════════
-const CODE_FIELD_NAMES = [
-  'formatter', 'styler', 'onRendered',
-  'formatter2', 'styler2', 'renderFormatter',
-  'stylerHeader', 'tableSummaryFormatter', 'rowStyler',
-  'footerFormatter', 'groupFormatter', 'groupFooterFormatter',
-]
+// hiprint 函数字段的中文标签关键词（用于识别函数类 textarea）
+const FUNC_LABEL_KEYWORDS = /格式化|样式|渲染|合并|聚合|onRendered/
 
 const codeEditorState = reactive({
   visible: false,
@@ -450,14 +451,19 @@ const openCodeEditor = (textarea, fieldName) => {
 const saveCodeEditorValue = () => {
   if (codeEditorState.targetTextarea) {
     const textarea = codeEditorState.targetTextarea
-    // 设置原生 textarea 的值
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype, 'value'
-    ).set
-    nativeInputValueSetter.call(textarea, codeEditorState.code)
-    // 触发 input 和 change 事件让 hiprint 感知变化
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+    // 使用 jQuery 触发以兼容 hiprint 的事件监听
+    if (window.$ || window.jQuery) {
+      const $ = window.$ || window.jQuery
+      $(textarea).val(codeEditorState.code).trigger('change')
+    } else {
+      // 回退：原生方式
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype, 'value'
+      ).set
+      nativeInputValueSetter.call(textarea, codeEditorState.code)
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      textarea.dispatchEvent(new Event('change', { bubbles: true }))
+    }
   }
   codeEditorState.visible = false
 }
@@ -468,30 +474,49 @@ const onCodeEditorClosed = () => {
   codeEditorState.code = ''
 }
 
+/**
+ * 判断一个 textarea 是否是 hiprint 的函数配置项
+ * hiprint 的函数 textarea 特征：class="auto-submit", style含height:80px, 父级label含函数关键词
+ */
+const isFuncTextarea = (textarea) => {
+  if (!textarea.classList.contains('auto-submit')) return null
+  const row = textarea.closest('.hiprint-option-item-row') || textarea.closest('.hiprint-option-item')
+  if (!row) return null
+  const label = row.querySelector('.hiprint-option-item-label')
+  if (!label) return null
+  const labelText = label.textContent.trim()
+  if (FUNC_LABEL_KEYWORDS.test(labelText)) return labelText
+  // 也检查 placeholder 是否包含 function 关键字
+  const placeholder = textarea.getAttribute('placeholder') || ''
+  if (placeholder.startsWith('function')) return labelText || '函数'
+  return null
+}
+
 const enhanceTextarea = (textarea) => {
   if (textarea.dataset.codeEnhanced) return
-  textarea.dataset.codeEnhanced = 'true'
 
-  const fieldName = textarea.getAttribute('name')
-  if (!fieldName || !CODE_FIELD_NAMES.includes(fieldName)) return
+  const labelText = isFuncTextarea(textarea)
+  if (!labelText) return
+
+  textarea.dataset.codeEnhanced = 'true'
 
   // 创建编辑按钮
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mpe-code-edit-btn'
-  btn.textContent = '编辑代码'
+  btn.innerHTML = '<svg viewBox="0 0 1024 1024" width="14" height="14" style="vertical-align:-2px;margin-right:4px;fill:currentColor"><path d="M149.6 904.8h64.8l534.4-534.4-64.8-64.8-534.4 534.4v64.8zm-80 80v-113.6l614.4-614.4 113.6 113.6-614.4 614.4H69.6zm693.2-693.2l-48-48 50.4-50.4c13.2-13.2 34.8-13.2 48 0l0.8 0.8c13.2 13.2 13.2 34.8 0 48l-51.2 49.6z"/></svg>编辑代码'
   btn.addEventListener('click', (e) => {
     e.preventDefault()
     e.stopPropagation()
-    openCodeEditor(textarea, fieldName)
+    openCodeEditor(textarea, labelText)
   })
 
   // 插入到 textarea 后面
   textarea.parentNode.insertBefore(btn, textarea.nextSibling)
-  // 缩小原生 textarea 高度
-  textarea.style.height = '30px'
-  textarea.style.fontSize = '11px'
-  textarea.style.fontFamily = 'monospace'
+}
+
+const enhanceAllTextareas = (root) => {
+  root.querySelectorAll('textarea.auto-submit').forEach(enhanceTextarea)
 }
 
 const setupOptionObserver = () => {
@@ -499,20 +524,12 @@ const setupOptionObserver = () => {
   if (!container) return
 
   // 增强已存在的 textarea
-  container.querySelectorAll('textarea').forEach(enhanceTextarea)
+  enhanceAllTextareas(container)
 
-  // 监听未来添加的 textarea
-  optionObserver = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (node.nodeType !== 1) continue
-        if (node.tagName === 'TEXTAREA') {
-          enhanceTextarea(node)
-        } else {
-          node.querySelectorAll?.('textarea')?.forEach(enhanceTextarea)
-        }
-      }
-    }
+  // 监听未来添加的 textarea（hiprint 在点击元素时会重新渲染整个 option panel）
+  optionObserver = new MutationObserver(() => {
+    // 使用 requestAnimationFrame 合并频繁的 DOM 变化
+    requestAnimationFrame(() => enhanceAllTextareas(container))
   })
   optionObserver.observe(container, { childList: true, subtree: true })
 }
@@ -849,11 +866,6 @@ onMounted(async () => {
   //如果是组件方式集成
   if (props.remoteObj && Object.keys(props.remoteObj).length > 0) {
     pageInfo.remoteData = props.remoteObj
-
-    // 同步选中的接口引擎信息
-    if (pageInfo.remoteData.DataApi && apiEngineList.value.length) {
-      selectedApiEngineInfo.value = apiEngineList.value.find(item => item.Id === pageInfo.remoteData.DataApi) || null
-    }
 
     if (pageInfo.remoteData.DataApi) {
       loadDataApi(pageInfo.remoteData.DataApi)
@@ -1562,20 +1574,6 @@ $text-secondary: #718096;
     :deep(.hiprint-printPaper) {
       box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
       border-radius: 2px;
-    }
-  }
-
-  .mpe-api-info {
-    font-size: 11px;
-    color: $text-secondary;
-    margin-top: 4px;
-    line-height: 1.4;
-    span {
-      display: inline-block;
-      background: #f7fafc;
-      padding: 1px 6px;
-      border-radius: 3px;
-      border: 1px solid $border;
     }
   }
 
