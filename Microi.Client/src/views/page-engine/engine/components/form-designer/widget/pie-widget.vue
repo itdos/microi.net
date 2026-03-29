@@ -91,6 +91,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 
 const resetData = () => {

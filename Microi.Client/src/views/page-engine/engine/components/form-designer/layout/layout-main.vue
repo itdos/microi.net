@@ -19,7 +19,8 @@
             v-for="(wrapper, index) in formData.JsonObj.wrapperList"
             :key="wrapper.type + index"
           >
-            <pannel-wrapper :wrapperObj="wrapper"> </pannel-wrapper>
+            <pannel-tabs v-if="wrapper.type === 'tabs'" :wrapperObj="wrapper"></pannel-tabs>
+            <pannel-wrapper v-else :wrapperObj="wrapper"> </pannel-wrapper>
           </template>
         </el-row>
       </div>
@@ -32,6 +33,7 @@ import { nextTick, toRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import containerGrid from './container-grid.vue'
 import pannelWrapper from '../wrapper/pannel-wrapper.vue'
+import pannelTabs from '../wrapper/pannel-tabs.vue'
 import vueCustomScrollbar from 'vue-custom-scrollbar/src/vue-scrollbar.vue'
 import 'vue-custom-scrollbar/dist/vueScrollbar.css'
 import { buildDefaultWrapperJson, buildDefaultWidgetJson } from '../../../utils/util'
@@ -101,16 +103,19 @@ const handleDragOver = (e) => {
   .el-card.is-always-shadow,
   .el-card.is-hover-shadow:focus,
   .el-card.is-hover-shadow:hover {
-    box-shadow: 0 0px 4px 0px rgba(0, 0, 0, 0.1);
-    // border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.3s;
   }
 }
 </style>
 
 <style lang="scss" scoped>
 .layout-main {
-  margin: 12px 8px;
+  margin: 8px 6px;
   height: calc(80vh + 28px);
+  background: var(--el-bg-color-page);
+  border-radius: 8px;
+  transition: background-color 0.3s;
 
   .scroll-area {
     position: relative;

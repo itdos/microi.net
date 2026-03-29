@@ -110,8 +110,8 @@ import interactionPlugin from "@fullcalendar/interaction";
 import zhLocale from "@fullcalendar/core/locales/zh-cn";
 
 const TABLE_KEY = "microi_calendar";
-const COLOR_PENDING = "#409eff";
-const COLOR_DONE = "#67c23a";
+const COLOR_PENDING = "#3b82f6";
+const COLOR_DONE = "#10b981";
 
 export default {
     name: "MicroiCalendar",
@@ -144,6 +144,7 @@ export default {
                 weekends: true,
                 height: "auto",
                 contentHeight: "auto",
+                expandRows: true,
                 events: this.fetchEvents,
                 select: this.handleDateSelect,
                 eventClick: this.handleEventClick,
@@ -386,24 +387,32 @@ export default {
     border-radius: 8px;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    // 让日历充满剩余高度
+    height: calc(100vh - 160px);
+    min-height: 500px;
 
     :deep(.fc) {
         flex: 1;
+        min-height: 0;
+
         .fc-toolbar {
             flex-wrap: wrap;
             gap: 8px;
+            margin-bottom: 16px !important;
         }
         .fc-toolbar-title {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #303133;
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #1d2129;
+            letter-spacing: 0.5px;
         }
         .fc-button {
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             font-size: 13px;
-            padding: 5px 14px;
-            transition: all 0.2s;
+            padding: 6px 16px;
+            transition: all 0.25s;
+            font-weight: 500;
+            box-shadow: none !important;
         }
         .fc-button-primary {
             background-color: var(--el-color-primary, #409eff);
@@ -413,26 +422,90 @@ export default {
         .fc-button-primary:not(:disabled):hover {
             background-color: var(--el-color-primary, #409eff);
             border-color: var(--el-color-primary, #409eff);
-            filter: brightness(0.9);
+            filter: brightness(0.88);
         }
+
+        // 表格样式
+        .fc-scrollgrid {
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e8ecf1 !important;
+        }
+        .fc-scrollgrid td,
+        .fc-scrollgrid th {
+            border-color: #e8ecf1 !important;
+        }
+        .fc-col-header-cell {
+            padding: 10px 0;
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+            background: linear-gradient(180deg, #f8faff 0%, #f1f5fb 100%);
+        }
+        .fc-daygrid-day-number {
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            padding: 6px 10px;
+        }
+        .fc-day-today {
+            background: linear-gradient(135deg, rgba(64, 158, 255, 0.06) 0%, rgba(64, 158, 255, 0.02) 100%) !important;
+            .fc-daygrid-day-number {
+                color: var(--el-color-primary, #409eff);
+                font-weight: 700;
+            }
+        }
+        .fc-day-today .fc-daygrid-day-frame {
+            position: relative;
+            &::before {
+                content: '';
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--el-color-primary, #409eff);
+            }
+        }
+
+        // 事件样式 — 鲜明可见
         .fc-daygrid-event {
-            border-radius: 4px;
-            padding: 1px 4px;
+            border-radius: 6px;
+            padding: 2px 6px;
+            margin: 1px 2px;
+            border: none !important;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .fc-h-event {
+            border: none !important;
         }
         .fc-event {
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
             &:hover {
-                opacity: 0.85;
+                transform: scale(1.02);
+                box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+                z-index: 5;
             }
         }
-        .fc-day-today {
-            background: rgba(64, 158, 255, 0.04) !important;
+        // timeGrid 视图中的事件
+        .fc-timegrid-event {
+            border-radius: 6px;
+            border: none !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
         }
-        .fc-col-header-cell {
-            padding: 8px 0;
-            font-weight: 500;
-            color: #606266;
+        .fc-timegrid-slot {
+            height: 40px;
+        }
+
+        // 多事件 +more 按钮
+        .fc-daygrid-more-link {
+            color: var(--el-color-primary, #409eff);
+            font-weight: 600;
+            font-size: 12px;
         }
     }
 }
@@ -454,29 +527,43 @@ export default {
     gap: 12px;
     color: #fff;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: -20%;
+        right: -15%;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+    }
 
     &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     }
 }
 
-.today-card { background: linear-gradient(135deg, #409eff 0%, #53a8ff 50%, #66b1ff 100%); }
-.week-card { background: linear-gradient(135deg, #67c23a 0%, #85ce61 50%, #95d475 100%); }
-.month-card { background: linear-gradient(135deg, #e6a23c 0%, #ebb563 50%, #f0c78a 100%); }
-.pending-card { background: linear-gradient(135deg, #f56c6c 0%, #f78989 50%, #fab6b6 100%); }
+.today-card { background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); }
+.week-card { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); }
+.month-card { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+.pending-card { background: linear-gradient(135deg, #ef4444 0%, #f87171 100%); }
 
 .cal-stat-icon {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.22);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 19px;
     flex-shrink: 0;
+    backdrop-filter: blur(4px);
 }
 
 .cal-stat-body {
@@ -484,53 +571,65 @@ export default {
 }
 
 .cal-stat-value {
-    font-size: 26px;
-    font-weight: 700;
+    font-size: 28px;
+    font-weight: 800;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .cal-stat-label {
     font-size: 12px;
-    opacity: 0.85;
+    opacity: 0.9;
     margin-top: 2px;
     white-space: nowrap;
+    font-weight: 500;
 }
 
+// ====== 事件自定义渲染 ======
 .fc-custom-event {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-size: 12px;
     overflow: hidden;
     color: #fff;
+    font-weight: 500;
 
     .event-dot {
-        width: 6px;
-        height: 6px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
         flex-shrink: 0;
+        box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
     }
     .dot-pending {
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: #fff;
+        animation: dot-pulse 2s infinite;
     }
     .dot-done {
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.85);
     }
     &.is-completed .event-title {
         text-decoration: line-through;
-        opacity: 0.75;
+        opacity: 0.7;
     }
     .event-time {
         font-size: 11px;
-        opacity: 0.9;
+        opacity: 0.92;
         flex-shrink: 0;
+        font-weight: 600;
     }
     .event-title {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+}
+
+@keyframes dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
 }
 
 .dialog-footer {
@@ -542,6 +641,7 @@ export default {
 @media (max-width: 768px) {
     .microi-calendar {
         padding: 8px;
+        height: calc(100vh - 120px);
     }
     .cal-stats {
         grid-template-columns: repeat(2, 1fr);
@@ -554,13 +654,13 @@ export default {
         border-radius: 10px;
     }
     .cal-stat-icon {
-        width: 34px;
-        height: 34px;
-        font-size: 14px;
+        width: 36px;
+        height: 36px;
+        font-size: 15px;
         border-radius: 8px;
     }
     .cal-stat-value {
-        font-size: 20px;
+        font-size: 22px;
     }
     :deep(.fc) {
         .fc-toolbar {

@@ -196,7 +196,7 @@ const doRouter = (label, linkUrl) => {
   padding: 30px 0;
 
   position: relative;
-  $bnoe-color: #409eff;
+  $bnoe-color: var(--el-color-primary);
   max-width: 100%;
 
   width: 100%;
@@ -250,7 +250,7 @@ const doRouter = (label, linkUrl) => {
           bottom: -6px;
           content: ' ';
           border: 5px solid transparent;
-          border-left: 5px solid #409eff;
+          border-left: 5px solid var(--el-color-primary);
           transform: skewx(-45deg);
         }
       }
@@ -297,7 +297,7 @@ const doRouter = (label, linkUrl) => {
             bottom: -6px;
             content: ' ';
             border: 5px solid transparent;
-            border-left: 5px solid #409eff !important;
+            border-left: 5px solid var(--el-color-primary) !important;
             transform: skewx(45deg);
           }
         }

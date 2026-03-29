@@ -47,6 +47,11 @@ export const usePageEngineStore = defineStore('pageEngine', {
         curWidgetIdx
         ]
     },
+    //直接设置当前选中组件（用于Tab容器内的组件）
+    setCurWidgetDirect(widget) {
+      this.curWidgetIdx = 0
+      this.curWidget = widget
+    },
 
     //添加容器
     addWrapper(newWrapper) {
