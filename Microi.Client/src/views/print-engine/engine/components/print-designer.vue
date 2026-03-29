@@ -1,363 +1,248 @@
 <template>
   <div class="microi-print-engine">
-    <el-container>
-      <el-header class="elheader">
-        <el-row>
-          <el-col :span="4">
-            <div class="leftlogo">
-              <span>{{ pageInfo.setting.title }}</span>
-              <el-icon class="spin-icon" :size="20">
-                <Tools />
-              </el-icon>
-            </div>
-          </el-col>
-          <el-col :span="12">
-            <el-button-group>
-              <el-button
-                size="small"
-                @click.stop="rotatePaper"
-                plain
-                :icon="RefreshRight"
-                >旋转</el-button
-              >
-              <el-popconfirm
-                width="200"
-                confirm-button-text="确定"
-                cancel-button-text="再想想"
-                title="您确定要清空纸张吗?"
-                @confirm="clearPaper"
-              >
-                <template #reference>
-                  <el-button size="small" plain :icon="Delete">清空</el-button>
-                </template>
-              </el-popconfirm>
-
-              <el-button
-                @click.stop="exportJson"
-                plain
-                :icon="Memo"
-                size="small"
-                >JSON</el-button
-              >
-
-              <el-popconfirm
-                width="200"
-                confirm-button-text="确定"
-                cancel-button-text="再想想"
-                title="加载模拟数据会覆盖当前纸张,您确定操作吗?"
-                @confirm="loadMockData"
-              >
-                <template #reference>
-                  <el-button plain size="small" :icon="Star">模板</el-button>
-                </template>
-              </el-popconfirm>
-
-              <el-button
-                size="small"
-                @click.stop="showDataDialog"
-                plain
-                :icon="Tickets"
-                >数据</el-button
-              >
-              <!-- <el-popconfirm
-                  width="200"
-                  confirm-button-text="确定"
-                  cancel-button-text="再想想"
-                  title="每隔10秒自动缓存JSON，您确定要关闭吗?"
-                  @confirm="unLockClick"
-                >
-                  <template #reference>
-                    <el-button size="small" plain :icon="Clock"
-                      >关闭自动缓存</el-button
-                    >
-                  </template>
-                </el-popconfirm> -->
-            </el-button-group>
-          </el-col>
-          <el-col :span="8">
-            <el-button
-              type="success"
-              size="small"
-              @click.stop="getHtml"
-              round
-              :icon="Monitor"
-              >预览</el-button
-            >
-            <el-button
-              @click.stop="doPrint"
-              round
-              type="primary"
-              :icon="Printer"
-              size="small"
-              >打印</el-button
-            >
-
-            <el-popconfirm
-              class="box-item"
-              title="确定直接打印吗?"
-              placement="top-start"
-              @confirm="onlyPrint2"
-              confirm-button-text="确定"
-              cancel-button-text="取消"
-            >
-              <template #reference>
-                <el-button size="small" round type="primary" :icon="Printer"
-                  >直接打印</el-button
-                >
-              </template>
-            </el-popconfirm>
-
-            <el-button
-              @click.stop="saveFormData"
-              size="small"
-              round
-              type="warning"
-              :icon="Collection"
-              >保存</el-button
-            >
-
-            <!-- <el-switch
-              @change="darkChange"
-              v-model="isDark"
-              style="
-                --el-switch-on-color: #e6a23c;
-                --el-switch-off-color: #409eff;
-                margin-left: 10px;
-              "
-              :active-action-icon="Moon"
-              :inactive-action-icon="Sunny"
-            /> -->
-          </el-col>
-        </el-row>
-      </el-header>
-      <el-container>
-        <el-aside width="280px" style="padding: 10px 10px 0 0;">
-          <el-card style="height: 85vh; overflow-y: auto">
-            <el-tabs v-model="pageInfo.setting.activeName" class="demo-tabs">
-              <el-tab-pane name="first">
-                <template #label>
-                  <span class="custom-tabs-label">
-                    <el-link
-                      style="font-size: 13px"
-                      :icon="Rank"
-                      :underline="false"
-                      >基础组件</el-link
-                    >
-                  </span>
-                </template>
-                <div
-                  ref="providerContainer1"
-                  class="container custom-style-types"
-                ></div>
-              </el-tab-pane>
-              <el-tab-pane name="second">
-                <template #label>
-                  <span class="custom-tabs-label">
-                    <el-link
-                      style="font-size: 13px"
-                      :icon="Cpu"
-                      :underline="false"
-                      >扩展组件</el-link
-                    >
-                  </span>
-                </template>
-                <!-- 这里自定义显示样式 custom-style-types -->
-                <div
-                  ref="providerContainer2"
-                  class="container custom-style-types"
-                ></div>
-              </el-tab-pane>
-            </el-tabs>
-          </el-card>
-        </el-aside>
-        <el-container>
-          <el-header style="text-align: center">
-            <el-row>
-              <el-col :span="24">
-                <el-space wrap :size="10">
-                  <el-button-group>
-                    <template v-for="(value, type) in paperTypes" :key="type">
-                      <el-button
-                        size="small"
-                        :type="curPaperType === type ? 'primary' : ''"
-                        @click="setPaper(type, value)"
-                      >
-                        {{ type }}</el-button
-                      >
-                    </template>
-                    <el-button
-                      size="small"
-                      auto-insert-space
-                      @click="showPaperPop"
-                      >自定义</el-button
-                    >
-                  </el-button-group>
-                  <div class="popover">
-                    <div class="popover-content mpe-flex-col" v-show="paperPopVisible">
-                      <div>设置纸张宽高(mm)</div>
-                      <div class="mpe-flex-row mpe-mt-10" style="line-height: 30px">
-                        <el-input
-                          size="small"
-                          v-model="paperWidth"
-                          placeholder="宽(mm)"
-                        />
-                        <span class="mpe-ml-10 mpe-mr-10">x</span>
-
-                        <el-input
-                          size="small"
-                          v-model="paperHeight"
-                          placeholder="高(mm)"
-                        />
-                      </div>
-                      <el-row :gutter="20" style="margin-top: 10px">
-                        <el-col :span="12">
-                          <el-button
-                            style="width: 100%"
-                            type="primary"
-                            @click.stop="setPaperOther"
-                            >确定</el-button
-                          >
-                        </el-col>
-                        <el-col :span="12">
-                          <el-button
-                            style="width: 100%"
-                            type="info"
-                            plain
-                            @click.stop="paperPopVisible = false"
-                            >取消</el-button
-                          >
-                        </el-col>
-                      </el-row>
-                    </div>
-                  </div>
-                  <div>
-                    <el-space wrap>
-                      <el-icon
-                        style="cursor: pointer"
-                        @click="changeScale(false)"
-                        :size="20"
-                      >
-                        <ZoomOut />
-                      </el-icon>
-                      <el-text>{{ (scaleValue * 100).toFixed(0) }}%</el-text>
-                      <el-icon
-                        style="cursor: pointer"
-                        @click="changeScale(true)"
-                        :size="20"
-                      >
-                        <ZoomIn />
-                      </el-icon>
-                    </el-space>
-                  </div>
-
-                  <!-- 多面板的容器 -->
-                  <div class="hiprint-printPagination"></div>
-                </el-space>
-              </el-col>
-            </el-row>
-          </el-header>
-          <el-main style="padding: 10px 0">
-            <el-card
-              style="padding: 5px; height: calc(85vh - 10px); overflow-y: auto"
-            >
-              <!-- 设计器的 容器 -->
-              <div ref="hiprintPrintContainer"></div>
-            </el-card>
-          </el-main>
-        </el-container>
-
-        <el-aside width="300px" style="padding: 10px 0 0 10px;">
-          <el-card style="padding: 0px; height: 85vh; overflow-y: auto">
-            <template #header>
-              <div class="card-header">
-                <el-link
-                  style="font-size: 13px"
-                  :icon="Operation"
-                  :underline="false"
-                  >属性面板</el-link
-                >
-              </div>
+    <!-- 顶部工具栏 -->
+    <div class="mpe-toolbar">
+      <div class="mpe-toolbar__left">
+        <div class="mpe-brand">
+          <div class="mpe-brand-icon">
+            <el-icon class="mpe-brand-spin" :size="18"><Tools /></el-icon>
+          </div>
+          <span class="mpe-brand-text">{{ pageInfo.setting.title }}</span>
+        </div>
+      </div>
+      <div class="mpe-toolbar__center">
+        <div class="mpe-btn-group">
+          <button class="mpe-btn" @click.stop="undo" title="撤销 (Ctrl+Z)">
+            <el-icon :size="15"><Back /></el-icon>
+            <span>撤销</span>
+          </button>
+          <button class="mpe-btn" @click.stop="redo" title="重做 (Ctrl+Y)">
+            <el-icon :size="15"><Right /></el-icon>
+            <span>重做</span>
+          </button>
+        </div>
+        <div class="mpe-divider-v"></div>
+        <div class="mpe-btn-group">
+          <button class="mpe-btn" @click.stop="rotatePaper" title="旋转纸张">
+            <el-icon :size="15"><RefreshRight /></el-icon>
+            <span>旋转</span>
+          </button>
+          <el-popconfirm width="200" confirm-button-text="确定" cancel-button-text="再想想" title="您确定要清空纸张吗?" @confirm="clearPaper">
+            <template #reference>
+              <button class="mpe-btn" title="清空纸张">
+                <el-icon :size="15"><Delete /></el-icon>
+                <span>清空</span>
+              </button>
             </template>
+          </el-popconfirm>
+          <button class="mpe-btn" @click.stop="exportJson" title="导出JSON">
+            <el-icon :size="15"><Memo /></el-icon>
+            <span>JSON</span>
+          </button>
+          <el-popconfirm width="200" confirm-button-text="确定" cancel-button-text="再想想" title="加载模拟数据会覆盖当前纸张,您确定操作吗?" @confirm="loadMockData">
+            <template #reference>
+              <button class="mpe-btn" title="加载模板">
+                <el-icon :size="15"><Star /></el-icon>
+                <span>模板</span>
+              </button>
+            </template>
+          </el-popconfirm>
+          <button class="mpe-btn" @click.stop="showDataDialog" title="数据管理">
+            <el-icon :size="15"><Tickets /></el-icon>
+            <span>数据</span>
+          </button>
+        </div>
+        <div class="mpe-divider-v"></div>
+        <div class="mpe-btn-group">
+          <button class="mpe-btn mpe-btn--success" @click.stop="getHtml" title="预览">
+            <el-icon :size="15"><Monitor /></el-icon>
+            <span>预览</span>
+          </button>
+          <button class="mpe-btn mpe-btn--primary" @click.stop="doPrint" title="浏览器打印">
+            <el-icon :size="15"><Printer /></el-icon>
+            <span>打印</span>
+          </button>
+          <el-popconfirm class="box-item" title="确定直接打印吗?" placement="top-start" @confirm="onlyPrint2" confirm-button-text="确定" cancel-button-text="取消">
+            <template #reference>
+              <button class="mpe-btn mpe-btn--primary" title="直接打印">
+                <el-icon :size="15"><Printer /></el-icon>
+                <span>直接打印</span>
+              </button>
+            </template>
+          </el-popconfirm>
+        </div>
+      </div>
+      <div class="mpe-toolbar__right">
+        <button class="mpe-btn mpe-btn--warning" @click.stop="saveFormData" title="保存模板">
+          <el-icon :size="15"><Collection /></el-icon>
+          <span>保存</span>
+        </button>
+      </div>
+    </div>
 
-            <el-form label-position="left">
-              <el-form-item label="模板编号">
-                <el-input
-                  disabled=""
-                  v-model="pageInfo.remoteData.Number"
-                  placeholder=""
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="模板标题">
-                <el-input
-                  v-model="pageInfo.remoteData.Title"
-                  placeholder=""
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="模板简介">
-                <el-input
-                  v-model="pageInfo.remoteData.Desc"
-                  placeholder=""
-                  type="textarea"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="数据接口">
-                <el-input
-                  v-model="pageInfo.remoteData.DataApi"
-                  placeholder="请输入动态数据webapi接口地址"
-                  type="textarea"
-                ></el-input>
-              </el-form-item>
-            </el-form>
+    <!-- 主体区域 -->
+    <div class="mpe-body">
+      <!-- 左侧组件面板 -->
+      <div class="mpe-sidebar mpe-sidebar--left">
+        <div class="mpe-sidebar__header">
+          <el-tabs v-model="pageInfo.setting.activeName" class="mpe-tabs">
+            <el-tab-pane name="first">
+              <template #label>
+                <span class="mpe-tab-label">
+                  <el-icon :size="14"><Rank /></el-icon>
+                  基础组件
+                </span>
+              </template>
+            </el-tab-pane>
+            <el-tab-pane name="second">
+              <template #label>
+                <span class="mpe-tab-label">
+                  <el-icon :size="14"><Cpu /></el-icon>
+                  扩展组件
+                </span>
+              </template>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+        <div class="mpe-sidebar__body">
+          <div v-show="pageInfo.setting.activeName === 'first'" ref="providerContainer1" class="container custom-style-types"></div>
+          <div v-show="pageInfo.setting.activeName === 'second'" ref="providerContainer2" class="container custom-style-types"></div>
+        </div>
+      </div>
 
-            <!-- 元素参数的 容器 -->
+      <!-- 中间设计区域 -->
+      <div class="mpe-canvas-wrapper">
+        <!-- 纸张/缩放工具条 -->
+        <div class="mpe-canvas-toolbar">
+          <div class="mpe-paper-btns">
+            <template v-for="(value, type) in paperTypes" :key="type">
+              <button class="mpe-paper-btn" :class="{ 'mpe-paper-btn--active': curPaperType === type }" @click="setPaper(type, value)">{{ type }}</button>
+            </template>
+            <button class="mpe-paper-btn" @click="showPaperPop">自定义</button>
+          </div>
+          <div class="mpe-popover-anchor">
+            <div class="mpe-popover" v-show="paperPopVisible">
+              <div class="mpe-popover__title">设置纸张宽高(mm)</div>
+              <div class="mpe-popover__row">
+                <el-input size="small" v-model="paperWidth" placeholder="宽(mm)" />
+                <span class="mpe-popover__sep">×</span>
+                <el-input size="small" v-model="paperHeight" placeholder="高(mm)" />
+              </div>
+              <div class="mpe-popover__actions">
+                <el-button size="small" type="primary" @click.stop="setPaperOther">确定</el-button>
+                <el-button size="small" @click.stop="paperPopVisible = false">取消</el-button>
+              </div>
+            </div>
+          </div>
+          <div class="mpe-zoom-ctrl">
+            <el-icon class="mpe-zoom-btn" @click="changeScale(false)" :size="16"><ZoomOut /></el-icon>
+            <span class="mpe-zoom-value">{{ (scaleValue * 100).toFixed(0) }}%</span>
+            <el-icon class="mpe-zoom-btn" @click="changeScale(true)" :size="16"><ZoomIn /></el-icon>
+          </div>
+          <div class="hiprint-printPagination"></div>
+        </div>
+        <!-- 设计器画布 -->
+        <div class="mpe-canvas">
+          <div ref="hiprintPrintContainer"></div>
+        </div>
+      </div>
+
+      <!-- 右侧属性面板 -->
+      <div class="mpe-sidebar mpe-sidebar--right">
+        <div class="mpe-sidebar__header">
+          <div class="mpe-panel-title">
+            <el-icon :size="14"><Operation /></el-icon>
+            <span>属性面板</span>
+          </div>
+        </div>
+        <div class="mpe-sidebar__body">
+          <el-form label-position="top" class="mpe-prop-form">
+            <el-form-item label="模板编号">
+              <el-input disabled v-model="pageInfo.remoteData.Number" placeholder="" size="small"></el-input>
+            </el-form-item>
+            <el-form-item label="模板标题">
+              <el-input v-model="pageInfo.remoteData.Title" placeholder="" size="small"></el-input>
+            </el-form-item>
+            <el-form-item label="模板简介">
+              <el-input v-model="pageInfo.remoteData.Desc" placeholder="" type="textarea" :rows="2" size="small"></el-input>
+            </el-form-item>
+            <el-form-item label="数据接口">
+              <el-select
+                v-model="pageInfo.remoteData.DataApi"
+                placeholder="选择接口引擎"
+                size="small"
+                filterable
+                clearable
+                style="width: 100%"
+                @change="onApiEngineChange"
+              >
+                <el-option
+                  v-for="item in apiEngineList"
+                  :key="item.Id"
+                  :label="item.ApiName + ' (' + item.ApiEngineKey + ')'"
+                  :value="item.Id"
+                />
+              </el-select>
+              <div v-if="selectedApiEngineInfo" class="mpe-api-info">
+                <span>Key: {{ selectedApiEngineInfo.ApiEngineKey }}</span>
+              </div>
+            </el-form-item>
+          </el-form>
+          <div class="mpe-element-options">
             <div id="PrintElementOptionSetting"></div>
-          </el-card>
-        </el-aside>
-      </el-container>
-    </el-container>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <print-preview ref="previewDialog" />
 
-  <el-drawer
-    size="50%"
-    title="页面数据"
-    v-model="pageInfo.pageDialog"
-    direction="ltr"
-  >
+  <el-drawer size="50%" title="页面数据" v-model="pageInfo.pageDialog" direction="ltr">
     <el-form>
       <el-form-item label="">
-        <JsonEditor
-          v-if="pageInfo.pageDialog"
-          height="600px"
-          v-model="pageInfo.pageStr"
-          :option="jsonEditorOption"
-        />
+        <JsonEditor v-if="pageInfo.pageDialog" height="600px" v-model="pageInfo.pageStr" :option="jsonEditorOption" />
       </el-form-item>
     </el-form>
   </el-drawer>
 
-  <el-drawer
-    size="50%"
-    title="动态数据"
-    v-model="pageInfo.dataDialog"
-    direction="ltr"
-    @closed="updateData"
-  >
+  <el-drawer size="50%" title="动态数据" v-model="pageInfo.dataDialog" direction="ltr" @closed="updateData">
     <el-form>
       <el-form-item label="">
         <el-button @click="getDataTemp">查看动态数据JSON结构</el-button>
       </el-form-item>
       <el-form-item label="">
-        <JsonEditor
-          v-if="pageInfo.dataDialog"
-          height="600px"
-          v-model="pageInfo.printStr"
-          :option="jsonEditorOption"
-        />
+        <JsonEditor v-if="pageInfo.dataDialog" height="600px" v-model="pageInfo.printStr" :option="jsonEditorOption" />
       </el-form-item>
     </el-form>
   </el-drawer>
+
+  <!-- 代码编辑器弹窗 (用于增强hiprint函数类配置项) -->
+  <el-dialog
+    v-model="codeEditorState.visible"
+    :title="'编辑代码 - ' + codeEditorState.fieldName"
+    width="70%"
+    top="5vh"
+    destroy-on-close
+    append-to-body
+    @closed="onCodeEditorClosed"
+  >
+    <DiyCodeEditor
+      v-if="codeEditorState.visible"
+      v-model="codeEditorState.code"
+      :field="{
+        Name: codeEditorState.fieldName,
+        Component: 'CodeEditor',
+        Config: { CodeEditor: { Language: 'javascript', Theme: 'vs-dark' } }
+      }"
+      :FormMode="'Edit'"
+      height="500px"
+    />
+    <template #footer>
+      <el-button @click="codeEditorState.visible = false">取 消</el-button>
+      <el-button type="primary" @click="saveCodeEditorValue">确 定</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup name="print-designer">
@@ -368,9 +253,11 @@ import {
   getCurrentInstance,
   reactive,
   nextTick,
+  defineAsyncComponent,
 } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { hiprint } from 'vue-plugin-hiprint'
+import { DiyCommon } from '@/utils/diy.common'
 import { buildDefaultRemoteData } from '../utils/util.js'
 import { EventBus } from '../utils/eventBus.js'
 import { usePrintEngineStore } from '../stores/printEngine'
@@ -378,8 +265,6 @@ import { get } from '../utils/axiosInstance'
 import { useDark, useToggle } from '@vueuse/core'
 import { isObjectOrArray } from '../utils/util'
 const printEngineStore = usePrintEngineStore()
-
-let intervalId = null
 
 import {
   Moon,
@@ -399,6 +284,9 @@ import {
   Clock,
   Delete,
   Star,
+  Back,
+  Right,
+  Tools,
 } from '@element-plus/icons-vue'
 
 //预览组件
@@ -418,11 +306,16 @@ import { usePaper } from '../hooks/use-paper'
 import { useZoom } from '../hooks/use-zoom'
 
 // 工具
-import { newHiprintPrintTemplate } from '../utils/template-helper'
+import { newHiprintPrintTemplate, removeHiprintPrintTemplate } from '../utils/template-helper'
 
 // json编辑器
 import JsonEditor from 'ceel-json-editor'
 import 'jsoneditor/dist/jsoneditor.css'
+
+// 代码编辑器 (异步加载)
+const DiyCodeEditor = defineAsyncComponent(() =>
+  import('@/views/form-engine/diy-field-component/diy-code-editor.vue')
+)
 
 //是否暗黑模式
 const isDark = useDark()
@@ -444,7 +337,7 @@ const props = defineProps({
 //页面配置信息
 const pageInfo = reactive({
   setting: {
-    title: 'Microi.Net-打印引擎',
+    title: 'Microi 打印引擎',
     version: 'V1.0.0',
     activeName: 'first', //选项卡索引
   },
@@ -489,7 +382,7 @@ const nodeTransition = {
 }
 //如果开启中转服务，采用默认地址
 if (nodeTransition.isOpen) {
-  nodeTransition.serverUrl('https://v5.printjs.cn:17521')
+  nodeTransition.serverUrl = 'https://v5.printjs.cn:17521'
 }
 
 // 初始化 provider
@@ -504,6 +397,125 @@ const loadRemoteData = async () => {
   pageInfo.remoteData = buildDefaultRemoteData() //默认渲染初始数据
 }
 loadRemoteData()
+
+// 接口引擎列表
+const apiEngineList = ref([])
+const loadApiEngines = async () => {
+  try {
+    const res = await DiyCommon.FormEngine.GetTableData('sys_apiengine', {
+      _SelectFields: ['Id', 'ApiName', 'ApiEngineKey', 'IsEnable'],
+      _Where: [['IsEnable', '=', 1]],
+      _PageSize: 500,
+      _OrderBy: 'ApiName',
+    })
+    if (res.Code === 1) {
+      apiEngineList.value = res.Data || []
+    }
+  } catch (e) {
+    console.error('[PrintEngine] 加载接口引擎列表失败:', e)
+  }
+}
+const selectedApiEngineInfo = ref(null)
+const onApiEngineChange = (val) => {
+  selectedApiEngineInfo.value = apiEngineList.value.find(item => item.Id === val) || null
+}
+loadApiEngines()
+
+// ═══════════════════════════════
+// 代码编辑器增强 (替换hiprint函数类textarea)
+// ═══════════════════════════════
+const CODE_FIELD_NAMES = [
+  'formatter', 'styler', 'onRendered',
+  'formatter2', 'styler2', 'renderFormatter',
+  'stylerHeader', 'tableSummaryFormatter', 'rowStyler',
+  'footerFormatter', 'groupFormatter', 'groupFooterFormatter',
+]
+
+const codeEditorState = reactive({
+  visible: false,
+  fieldName: '',
+  code: '',
+  targetTextarea: null,
+})
+
+let optionObserver = null
+
+const openCodeEditor = (textarea, fieldName) => {
+  codeEditorState.targetTextarea = textarea
+  codeEditorState.fieldName = fieldName
+  codeEditorState.code = textarea.value || ''
+  codeEditorState.visible = true
+}
+
+const saveCodeEditorValue = () => {
+  if (codeEditorState.targetTextarea) {
+    const textarea = codeEditorState.targetTextarea
+    // 设置原生 textarea 的值
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, 'value'
+    ).set
+    nativeInputValueSetter.call(textarea, codeEditorState.code)
+    // 触发 input 和 change 事件让 hiprint 感知变化
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  codeEditorState.visible = false
+}
+
+const onCodeEditorClosed = () => {
+  codeEditorState.targetTextarea = null
+  codeEditorState.fieldName = ''
+  codeEditorState.code = ''
+}
+
+const enhanceTextarea = (textarea) => {
+  if (textarea.dataset.codeEnhanced) return
+  textarea.dataset.codeEnhanced = 'true'
+
+  const fieldName = textarea.getAttribute('name')
+  if (!fieldName || !CODE_FIELD_NAMES.includes(fieldName)) return
+
+  // 创建编辑按钮
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mpe-code-edit-btn'
+  btn.textContent = '编辑代码'
+  btn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    openCodeEditor(textarea, fieldName)
+  })
+
+  // 插入到 textarea 后面
+  textarea.parentNode.insertBefore(btn, textarea.nextSibling)
+  // 缩小原生 textarea 高度
+  textarea.style.height = '30px'
+  textarea.style.fontSize = '11px'
+  textarea.style.fontFamily = 'monospace'
+}
+
+const setupOptionObserver = () => {
+  const container = document.getElementById('PrintElementOptionSetting')
+  if (!container) return
+
+  // 增强已存在的 textarea
+  container.querySelectorAll('textarea').forEach(enhanceTextarea)
+
+  // 监听未来添加的 textarea
+  optionObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue
+        if (node.tagName === 'TEXTAREA') {
+          enhanceTextarea(node)
+        } else {
+          node.querySelectorAll?.('textarea')?.forEach(enhanceTextarea)
+        }
+      }
+    }
+  })
+  optionObserver.observe(container, { childList: true, subtree: true })
+}
 
 /**
  * 构建左侧可拖拽元素
@@ -542,6 +554,10 @@ const buildDesigner = () => {
     settingContainer: '#PrintElementOptionSetting', // 元素参数容器
     paginationContainer: '.hiprint-printPagination',
     defaultPanelName: '默认面板名称',
+    history: true, // 启用撤销/重做功能
+    onDataChanged: (type, json) => {
+      console.log('[PrintEngine] 模板变更:', type)
+    },
     onPanelAddClick: (panel, createPanel) => {
       panel.name = '新面板' + (panel.index + 1)
 
@@ -700,6 +716,8 @@ const onlyPrint2 = () => {
       })
     }
 
+    // 先移除旧监听再添加，避免事件监听累积
+    hiprintTemplate.off && hiprintTemplate.off('printSuccess')
     hiprintTemplate.on('printSuccess', function () {
       ElNotification({
         title: '打印回调',
@@ -788,20 +806,38 @@ const getDataTemp = () => {
 
 // ----------------- 自定义业务逻辑处理 -----------------
 
+// 撤销/重做
+const undo = () => {
+  hiprintTemplate && hiprintTemplate.undo && hiprintTemplate.undo()
+}
+const redo = () => {
+  hiprintTemplate && hiprintTemplate.redo && hiprintTemplate.redo()
+}
+
 //动态加载数据接口
-const loadDataApi = async (apiUrl) => {
-  const response = await get(pageInfo.remoteData.DataApi, {})
+const loadDataApi = async (url) => {
   try {
+    const response = await get(url || pageInfo.remoteData.DataApi, {})
     if (response) {
       pageInfo.remoteData.PrintObj = response //替换动态数据源
       buildDesigner()
     }
   } catch (error) {
-    console.log(error)
+    console.error('[PrintEngine] 加载数据接口失败:', error)
+    ElMessage.error('加载数据接口失败')
   }
 }
 
 let messageHandler = null
+// 键盘快捷键处理
+const keyboardHandler = (e) => {
+  // Ctrl+Z 撤销 / Ctrl+Y 重做 / Ctrl+S 保存
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+    if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
+    if (e.key === 's') { e.preventDefault(); saveFormData() }
+  }
+}
 /**
  * 这里必须要在 onMounted 中去构建 左侧可拖拽元素 或者 设计器
  * 因为都是把元素挂载到对应容器中, 必须要先找到该容器
@@ -813,6 +849,11 @@ onMounted(async () => {
   //如果是组件方式集成
   if (props.remoteObj && Object.keys(props.remoteObj).length > 0) {
     pageInfo.remoteData = props.remoteObj
+
+    // 同步选中的接口引擎信息
+    if (pageInfo.remoteData.DataApi && apiEngineList.value.length) {
+      selectedApiEngineInfo.value = apiEngineList.value.find(item => item.Id === pageInfo.remoteData.DataApi) || null
+    }
 
     if (pageInfo.remoteData.DataApi) {
       loadDataApi(pageInfo.remoteData.DataApi)
@@ -858,21 +899,32 @@ onMounted(async () => {
 
   //接收父窗体跨域token
   window.addEventListener('message', messageHandler)
+  // 注册键盘快捷键
+  window.addEventListener('keydown', keyboardHandler)
+  // 启动代码编辑器增强 (监听hiprint函数textarea)
+  nextTick(() => setupOptionObserver())
 })
 
 onBeforeUnmount(() => {
   console.log('销毁')
   // 取消监听事件
   window.removeEventListener('message', messageHandler)
+  window.removeEventListener('keydown', keyboardHandler)
+  // 清理代码编辑器观察器
+  if (optionObserver) {
+    optionObserver.disconnect()
+    optionObserver = null
+  }
+  // 清理打印模板，释放内存
+  removeHiprintPrintTemplate(TEMPLATE_KEY)
+  hiprintTemplate = null
+  // 清理打印 iframe
+  const oldFrame = document.getElementById('hiwprint_iframe')
+  if (oldFrame) oldFrame.parentNode.removeChild(oldFrame)
 })
 
 //保存页面数据
 const saveFormData = async () => {
-  ElMessage({
-    message: '操作成功',
-    type: 'success',
-  })
-
   let tempData = {
     Id: pageInfo.remoteData.Id,
     Title: pageInfo.remoteData.Title,
@@ -889,6 +941,11 @@ const saveFormData = async () => {
   // [iframe] 通过 postMessage 方式向父窗口通信
   const dataToSend = JSON.stringify(tempData)
   window.parent.postMessage({ key: 'savePrintJson', value: dataToSend }, '*')
+
+  ElMessage({
+    message: '保存成功',
+    type: 'success',
+  })
 
   console.log('savePrintJson', JSON.stringify(tempData, null, '  '))
 }
@@ -910,56 +967,133 @@ const saveFormData = async () => {
   .custom-style-types {
     .hiprint-printElement-type {
       display: block;
-      padding: 0 0 0 0;
+      padding: 0;
       list-style: none;
 
-      li {
-        //组件标题样式
+      > li {
         .title {
           display: block;
-          padding: 4px 0px;
+          padding: 6px 0 4px;
           clear: both;
-          margin-bottom: 10px;
-          font-size: 13px;
+          margin-bottom: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #606266;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          border-bottom: 1px solid #f0f0f0;
         }
       }
 
       ul {
-        padding: 0 0 0 0;
-        display: block;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
         list-style: none;
+        gap: 6px;
+        margin-bottom: 6px;
 
-        //组件按钮样式
         li {
-          display: block;
-          width: 50%;
-          float: left;
-          max-width: 100px;
+          width: calc(50% - 3px);
+          max-width: none;
+          float: none;
 
           a {
-            padding: 8px;
+            padding: 8px 8px;
             text-decoration: none;
-            border: 1px solid #ddd;
-            width: 90%;
-            max-width: 100px;
-            display: inline-block;
-            text-align: center;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: left;
             box-sizing: border-box;
-            border: 1px solid #dcdfe6;
-            border-radius: 5px;
-            box-shadow: 0 0px 4px 0 rgba(0, 0, 0, 0.1);
-            font-size: 13px !important;
-            transition: background-color 0.3s ease;
-            margin-right: 10px;
-            margin-bottom: 10px;
-          }
-          a:hover {
-            color: #fff;
-            background-color: #409eff;
+            border: 1px solid #e4e7ed;
+            border-radius: 8px;
+            font-size: 12px !important;
+            color: #606266;
+            background: #fafafa;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: move;
+            gap: 6px;
+
+            &::before {
+              flex-shrink: 0;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 20px;
+              height: 20px;
+              font-size: 13px;
+              border-radius: 4px;
+              background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
+              color: #667eea;
+              transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            &:hover {
+              color: #fff;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              border-color: transparent;
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+              transform: translateY(-1px);
+
+              &::before {
+                background: rgba(255, 255, 255, 0.2);
+                color: #fff;
+              }
+            }
           }
         }
       }
     }
+
+    /* ===== Provider1 基础组件图标 ===== */
+    /* 表格/文本 */
+    a[tid="providerModule1.customText"]::before { content: "T"; font-weight: 700; }
+    a[tid="providerModule1.customText1"]::before { content: "⚿"; }
+    a[tid="providerModule1.longText"]::before { content: "¶"; }
+    a[tid="providerModule1.html"]::before { content: "⬚"; }
+    a[tid="providerModule1.table"]::before { content: "⊞"; }
+    a[tid="providerModule1.image"]::before { content: "🖼"; font-size: 12px; }
+    a[tid="providerModule1.barcode"]::before { content: "⦀"; font-weight: 700; letter-spacing: -2px; }
+    a[tid="providerModule1.qrcode"]::before { content: "⊟"; }
+
+    /* 辅助/图形 */
+    a[tid="providerModule1.hline"]::before { content: "─"; }
+    a[tid="providerModule1.vline"]::before { content: "│"; }
+    a[tid="providerModule1.rect"]::before { content: "▭"; }
+    a[tid="providerModule1.oval"]::before { content: "◯"; }
+
+    /* 高级 */
+    a[tid="providerModule1.emptyTable"]::before { content: "⊞"; }
+    a[tid="providerModule1.customText"]::before { content: "✎"; }
+    a[tid="providerModule1.barcodeSvg"]::before { content: "⦀"; font-weight: 700; }
+    a[tid="providerModule1.qrcodeSvg"]::before { content: "⊟"; }
+
+    /* ===== Provider2 扩展组件图标 ===== */
+    /* 常规 */
+    a[tid="providerModule2.header"]::before { content: "H"; font-weight: 700; }
+    a[tid="providerModule2.type"]::before { content: "☰"; }
+    a[tid="providerModule2.order"]::before { content: "#"; font-weight: 700; }
+    a[tid="providerModule2.date"]::before { content: "📅"; font-size: 12px; }
+    a[tid="providerModule2.platform"]::before { content: "⚑"; }
+    a[tid="providerModule2.bindingline"]::before { content: "⋮"; font-weight: 700; }
+    a[tid="providerModule2.iframe"]::before { content: "⧉"; }
+
+    /* 客户 */
+    a[tid="providerModule2.khname"]::before { content: "👤"; font-size: 12px; }
+    a[tid="providerModule2.tel"]::before { content: "📞"; font-size: 12px; }
+    a[tid="providerModule2.address"]::before { content: "📍"; font-size: 12px; }
+
+    /* 财务 */
+    a[tid="providerModule2.amount"]::before { content: "¥"; font-weight: 700; }
+    a[tid="providerModule2.amountUpper"]::before { content: "壹"; font-size: 11px; }
+    a[tid="providerModule2.taxRate"]::before { content: "%"; font-weight: 700; }
+
+    /* 签章 */
+    a[tid="providerModule2.signLine"]::before { content: "✍"; }
+    a[tid="providerModule2.sealImage"]::before { content: "㊞"; }
+    a[tid="providerModule2.dateLine"]::before { content: "📆"; font-size: 12px; }
   }
 
   .hiprint-option-item-field {
@@ -973,9 +1107,10 @@ const saveFormData = async () => {
   }
 
   .design .hiprint-printElement-table-handle {
-    background: #409eff !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
     height: 18pt !important;
     width: 18pt !important;
+    border-radius: 4px;
   }
 
   .design .hiprint-printElement-table-handle::before {
@@ -988,8 +1123,10 @@ const saveFormData = async () => {
   }
 
   .hiprint-option-item-label {
-    font-size: 13px !important;
-    margin-bottom: 10px !important;
+    font-size: 12px !important;
+    margin-bottom: 8px !important;
+    color: #909399;
+    font-weight: 500;
   }
 
   .el-drawer__header {
@@ -997,14 +1134,20 @@ const saveFormData = async () => {
   }
 
   .hiprint-option-item-settingBtn {
-    background: #409eff !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
     cursor: pointer;
-    border-radius: var(--el-border-radius-base);
+    border-radius: 6px;
+    border: none;
+    transition: all 0.2s;
+    &:hover { opacity: 0.85; }
   }
   .hiprint-option-item-deleteBtn {
-    background: #f56c6c !important;
+    background: linear-gradient(135deg, #f5576c 0%, #ff6b6b 100%) !important;
     cursor: pointer;
-    border-radius: var(--el-border-radius-base);
+    border-radius: 6px;
+    border: none;
+    transition: all 0.2s;
+    &:hover { opacity: 0.85; }
   }
 
   .prop-tabs,
@@ -1014,39 +1157,36 @@ const saveFormData = async () => {
   }
 
   .hiprint-option-items {
-    padding-top: 15px !important;
+    padding-top: 12px !important;
   }
 
-  .custom-tabs-label .el-icon {
-    margin-right: 5px !important;
-  }
   .hiprint-option-item-field input,
-  select,
-  textarea {
+  .hiprint-option-item-field select,
+  .hiprint-option-item-field textarea {
     color: var(--el-input-text-color, var(--el-text-color-regular)) !important;
     flex-grow: 1 !important;
-    font-size: inherit !important;
-    height: var(--el-input-inner-height) !important;
-    line-height: var(--el-input-inner-height) !important;
-    padding: 8px 10px !important;
-    border-radius: var(--el-border-radius-base) !important;
-    border-color: var(
-      --el-input-border-color,
-      var(--el-border-color)
-    ) !important;
+    font-size: 12px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--el-input-border-color, var(--el-border-color)) !important;
+    transition: all 0.2s;
   }
 
   .hiprint-option-item-field input:focus,
-  select:focus,
-  textarea:focus {
-    outline: none; /* 先移除默认的边框 */
-    border: 1.2px solid #409eff !important; /* 设置新的边框颜色 */
+  .hiprint-option-item-field select:focus,
+  .hiprint-option-item-field textarea:focus {
+    outline: none;
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15) !important;
   }
 
   .hiprint-pagination .selected {
-    border: #2196f3 2px solid !important;
-    background: #409eff !important;
+    border: 2px solid #667eea !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
     color: #fff;
+    border-radius: 6px;
   }
   .hiprint-pagination .selected a {
     color: #fff;
@@ -1055,53 +1195,406 @@ const saveFormData = async () => {
 </style>
 
 <style lang="scss" scoped>
+$primary: #667eea;
+$primary-dark: #764ba2;
+$accent: #5a67d8;
+$success: #48bb78;
+$warning: #ed8936;
+$danger: #f56565;
+$bg-dark: #1a1c2e;
+$bg-sidebar: #ffffff;
+$border: #e2e8f0;
+$text: #2d3748;
+$text-secondary: #718096;
+
 .microi-print-engine {
-  .elheader {
-    line-height: 55px;
-    text-align: center;
-    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.1);
-    // margin-top: 15px;
-    background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f0f2f5;
+  overflow: hidden;
 
-    .leftlogo {
-      span {
-        font-size: 14px;
-        letter-spacing: 4px;
+  // ═══════════════════════════════
+  //  顶部工具栏
+  // ═══════════════════════════════
+  .mpe-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    padding: 0 16px;
+    background: $bg-dark;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    position: relative;
+    z-index: 100;
+    flex-shrink: 0;
 
-        text-align: center;
-        line-height: 1em;
-        color: #409eff;
-        outline: none;
+    &__left, &__right {
+      display: flex;
+      align-items: center;
+    }
+    &__center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
 
-        // text-shadow: 0 0 4px #409eff;
+  .mpe-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mpe-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, $primary 0%, $primary-dark 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mpe-brand-spin {
+    color: #fff;
+    animation: mpe-spin 6s infinite linear;
+  }
+
+  @keyframes mpe-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .mpe-brand-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .mpe-divider-v {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 4px;
+  }
+
+  .mpe-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .mpe-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+
+    &--primary {
+      background: linear-gradient(135deg, $primary 0%, $primary-dark 100%);
+      color: #fff;
+      &:hover {
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        transform: translateY(-1px);
       }
+    }
 
-      @keyframes mpe-spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
+    &--success {
+      background: linear-gradient(135deg, $success 0%, #38a169 100%);
+      color: #fff;
+      &:hover {
+        box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+        transform: translateY(-1px);
       }
+    }
 
-      .spin-icon {
-        animation: mpe-spin 4s infinite linear;
-        color: #409eff;
-        margin-left: 5px;
+    &--warning {
+      background: linear-gradient(135deg, $warning 0%, #dd6b20 100%);
+      color: #fff;
+      &:hover {
+        box-shadow: 0 4px 12px rgba(237, 137, 54, 0.4);
+        transform: translateY(-1px);
       }
     }
   }
-  .popover {
-    position: absolute;
-    margin-top: 10px;
-    z-index: 10;
 
-    .popover-content {
-      background: white;
+  // ═══════════════════════════════
+  //  主体区域
+  // ═══════════════════════════════
+  .mpe-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  // ═══════════════════════════════
+  //  侧边栏（左/右共用）
+  // ═══════════════════════════════
+  .mpe-sidebar {
+    display: flex;
+    flex-direction: column;
+    background: $bg-sidebar;
+    border-right: 1px solid $border;
+    flex-shrink: 0;
+
+    &--left {
+      width: 260px;
+    }
+    &--right {
+      width: 280px;
+      border-right: none;
+      border-left: 1px solid $border;
+    }
+
+    &__header {
+      flex-shrink: 0;
+      padding: 0 12px;
+      border-bottom: 1px solid $border;
+    }
+
+    &__body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+  }
+
+  .mpe-tabs {
+    :deep(.el-tabs__header) {
+      margin-bottom: 0;
+    }
+    :deep(.el-tabs__nav-wrap::after) {
+      display: none;
+    }
+    :deep(.el-tabs__active-bar) {
+      background: linear-gradient(90deg, $primary, $primary-dark);
+      height: 2px;
+      border-radius: 1px;
+    }
+    :deep(.el-tabs__item) {
+      height: 44px;
+      line-height: 44px;
+      font-size: 13px;
+      color: $text-secondary;
+      &.is-active { color: $primary; font-weight: 600; }
+    }
+  }
+
+  .mpe-tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mpe-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    font-size: 13px;
+    font-weight: 600;
+    color: $text;
+  }
+
+  .mpe-prop-form {
+    :deep(.el-form-item) {
+      margin-bottom: 12px;
+    }
+    :deep(.el-form-item__label) {
+      font-size: 12px;
+      color: $text-secondary;
+      font-weight: 500;
+      padding-bottom: 4px !important;
+    }
+  }
+
+  .mpe-element-options {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid $border;
+  }
+
+  // ═══════════════════════════════
+  //  中间画布区域
+  // ═══════════════════════════════
+  .mpe-canvas-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .mpe-canvas-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #fff;
+    border-bottom: 1px solid $border;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .mpe-paper-btns {
+    display: flex;
+    gap: 4px;
+  }
+
+  .mpe-paper-btn {
+    padding: 4px 12px;
+    border: 1px solid $border;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: $text-secondary;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: $primary;
+      color: $primary;
+    }
+
+    &--active {
+      background: linear-gradient(135deg, $primary 0%, $primary-dark 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+  }
+
+  .mpe-popover-anchor {
+    position: relative;
+  }
+
+  .mpe-popover {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    min-width: 240px;
+    border: 1px solid $border;
+
+    &__title {
+      font-size: 12px;
+      color: $text-secondary;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    &__row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    &__sep {
+      color: $text-secondary;
+      font-size: 14px;
+    }
+    &__actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+  }
+
+  .mpe-zoom-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .mpe-zoom-btn {
+    cursor: pointer;
+    color: $text-secondary;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    &:hover {
+      color: $primary;
+      background: rgba(102, 126, 234, 0.08);
+    }
+  }
+
+  .mpe-zoom-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: $text;
+    min-width: 38px;
+    text-align: center;
+  }
+
+  .mpe-canvas {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(118, 75, 162, 0.03) 0%, transparent 50%),
+      #f0f2f5;
+
+    // 给 hiprint 画布添加阴影效果
+    :deep(.hiprint-printPaper) {
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+      border-radius: 2px;
+    }
+  }
+
+  .mpe-api-info {
+    font-size: 11px;
+    color: $text-secondary;
+    margin-top: 4px;
+    line-height: 1.4;
+    span {
+      display: inline-block;
+      background: #f7fafc;
+      padding: 1px 6px;
+      border-radius: 3px;
+      border: 1px solid $border;
+    }
+  }
+
+  .mpe-element-options {
+    :deep(.mpe-code-edit-btn) {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #fff;
+      background: linear-gradient(135deg, $primary 0%, $primary-dark 100%);
+      border: none;
       border-radius: 4px;
-      padding: 10px 20px;
-      box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: opacity 0.2s;
+      &:hover {
+        opacity: 0.85;
+      }
     }
   }
 }

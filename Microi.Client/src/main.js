@@ -12,21 +12,8 @@ import "normalize.css/normalize.css"; // a modern alternative to CSS resets
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
 import zhCn from "element-plus/dist/locale/zh-cn.mjs";
-// Element Plus 图标 - 按需导入常用图标，其他图标异步加载
-import {
-    ArrowDown, ArrowRight, ArrowLeft, ArrowUp,
-    Search, Plus, Edit, Delete, Close, Check,
-    Refresh, Setting, User, Lock, View, Hide,
-    Download, Upload, Document, Folder, Menu,
-    MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
-    Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
-    CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled, 
-    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound, Position, DArrowRight,
-    Operation, ZoomIn, ZoomOut  // workflow designer 需要的图标
-} from "@element-plus/icons-vue";
-// 其他图标懒加载
-const ElementPlusIconsVueLazy = () => import("@element-plus/icons-vue");
+// Element Plus 图标 - 直接加载所有图标，避免延迟加载导致部分图标不显示
+import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 import "./styles/element-variables.scss";
 // Bootstrap 兼容样式（替代已移除的 Bootstrap）
 import "@/styles/bootstrap-compat.scss";
@@ -82,40 +69,9 @@ app.use(ElementPlus, {
     locale: zhCn,
     size: Cookies.get("size") || "default"
 });
-// 首先注册常用图标（同步导入的）
-const commonIcons = {
-    ArrowDown, ArrowRight, ArrowLeft, ArrowUp,
-    Search, Plus, Edit, Delete, Close, Check,
-    Refresh, Setting, User, Lock, View, Hide,
-    Download, Upload, Document, Folder, Menu,
-    MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
-    Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
-    CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
-    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound, Position, DArrowRight,
-    Operation, ZoomIn, ZoomOut  // workflow designer 需要的图标
-};
-for (const [key, component] of Object.entries(commonIcons)) {
+// 注册所有 Element Plus 图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     app.component(key, component);
-}
-// 延迟加载其他图标（在空闲时加载）
-const loadAllIcons = async () => {
-    const allIcons = await ElementPlusIconsVueLazy();
-    for (const [key, component] of Object.entries(allIcons)) {
-        if (!commonIcons[key]) {
-            app.component(key, component);
-        }
-    }
-    // 更新全局图标对象
-    for (const [key, component] of Object.entries(allIcons)) {
-        icons[key] = markRaw(component);
-    }
-};
-// 使用 requestIdleCallback 在浏览器空闲时加载其他图标
-if (typeof requestIdleCallback !== 'undefined') {
-    requestIdleCallback(loadAllIcons, { timeout: 3000 });
-} else {
-    setTimeout(loadAllIcons, 1000);
 }
 // 注册动态图标组件
 import DynamicIcon from "./components/DynamicIcon/index.vue";
@@ -123,19 +79,18 @@ app.component("DynamicIcon", DynamicIcon);
 // 注册 FontAwesome 兼容图标组件
 import FaIcon from "./components/FaIcon/index.vue";
 app.component("FaIcon", FaIcon);
-// 将常用图标先添加到全局属性
+// 将所有图标添加到全局属性
 import { markRaw } from "vue";
 const icons = {};
-for (const [key, component] of Object.entries(commonIcons)) {
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     icons[key] = markRaw(component);
 }
 app.config.globalProperties.$icons = icons;
 // 全局混入：让所有组件都能在模板中使用图标
 app.mixin({
     computed: {
-        // 使用计算属性将图标暴露到模板中
         ...Object.fromEntries(
-            Object.entries(commonIcons).map(([key, value]) => [
+            Object.entries(ElementPlusIconsVue).map(([key, value]) => [
                 key,
                 function () {
                     return value;

@@ -24,13 +24,13 @@
                   :draggable="true"
                   :data-index="index"
                 >
-                  <span class="iconfont">
-                    <el-icon v-if="item.icon">
+                  <span class="list-icon">
+                    <el-icon v-if="item.icon" :size="15">
                       <component :is="item.icon"></component>
                     </el-icon>
                     <img
                       v-else
-                      height="25"
+                      height="18"
                       :src="item.img == '' ? getAssetUrl(item.type) : item.img"
                       draggable="false"
                     />
@@ -58,13 +58,13 @@
                 :draggable="true"
                 :data-index="index"
               >
-                <span class="iconfont">
-                  <el-icon v-if="item.icon">
+                <span class="list-icon">
+                  <el-icon v-if="item.icon" :size="15">
                     <component :is="item.icon"></component>
                   </el-icon>
                   <img
                     v-else
-                    height="25"
+                    height="18"
                     :src="item.img == '' ? getAssetUrl(item.type) : item.img"
                     draggable="false"
                   />
@@ -115,12 +115,23 @@ const handleDragWrapperStart = (e) => {
     .el-card.is-always-shadow,
     .el-card.is-hover-shadow:focus,
     .el-card.is-hover-shadow:hover {
-      box-shadow: 0 0 0px 0 rgba(0, 0, 0, 0.1) !important;
+      box-shadow: none !important;
     }
-    // background-color: #fff;
+    .el-card {
+      border: none;
+      background-color: var(--el-bg-color);
+      transition: background-color 0.3s;
+    }
     .el-card__body,
     .el-main {
-      padding: 10px 0 20px 20px;
+      padding: 8px 8px 10px 10px;
+    }
+    .el-tabs__header {
+      margin-bottom: 8px;
+    }
+    .el-tabs__item {
+      font-size: 13px;
+      padding: 0 12px;
     }
   }
   .iconfont {
@@ -132,52 +143,87 @@ const handleDragWrapperStart = (e) => {
 <style lang="scss">
 .microi-page-engine {
   .layout-left {
-    padding: 10px 0;
+    padding: 0;
+    border-right: 1px solid var(--el-border-color-lighter);
+    transition: border-color 0.3s;
     .box-card {
       .scroll-area {
         position: relative;
         margin: auto;
         width: 100%;
-        height: 80vh;
+        height: calc(100vh - 80px);
       }
       .component-list {
-        padding-bottom: 10px;
-        display: grid;
-        grid-gap: 12px;
-        grid-template-columns: repeat(auto-fill, 74px);
-        grid-template-rows: repeat(auto-fill, 70px);
+        padding: 0 4px 8px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        overflow-y: scroll;
+
         .list {
-          height: 68px;
-          border: 2px dotted #409eff;
+          width: calc(50% - 3px);
+          border: 1px solid var(--el-border-color-lighter);
           cursor: grab;
-          text-align: center;
           border-radius: 8px;
-          // box-shadow: 0 0px 4px 0 rgba(0, 0, 0, 0.1);
+          background: var(--el-fill-color-blank);
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: flex-start;
+          padding: 8px 8px;
+          gap: 7px;
+          box-sizing: border-box;
+
           &:active {
             cursor: grabbing;
+            transform: scale(0.96);
           }
 
           &:hover {
-            color: hsl(210, 100%, 63%);
+            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+            transform: translateY(-1px);
+
+            .list-icon {
+              background: rgba(255, 255, 255, 0.2);
+              color: #fff;
+              img {
+                filter: brightness(0) invert(1);
+              }
+            }
+            .btn_name {
+              color: #fff;
+            }
           }
 
-          .iconfont {
-            display: block;
-            // font-size: 20px;
-            margin-top: 10px;
-            margin-bottom: 0px;
+          .list-icon {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
             height: 24px;
+            border-radius: 5px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
+            color: #667eea;
+            font-size: 14px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            img {
+              transition: filter 0.25s;
+            }
           }
 
           .btn_name {
             font-size: 12px;
-            line-height: 20px;
-            width: 56px;
-            padding: 0px 5px;
-            word-break: keep-all;
+            line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--el-text-color-regular);
+            transition: color 0.25s;
           }
         }
       }

@@ -25,3 +25,6 @@ export { areamap } from './areamap';
 export { fullcalendar } from './fullcalendar';
 export { html } from './html';
 export { descriptions } from './descriptions';
+export { diytable } from './diytable';
+export { diyform } from './diyform';
+export { diycalendar } from './diycalendar';

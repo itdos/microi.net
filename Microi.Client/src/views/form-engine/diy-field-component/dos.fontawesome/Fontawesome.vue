@@ -4,6 +4,10 @@
         align-center>
         <template #header>
             <div style="display: flex; align-items: center">
+                <el-radio-group v-model="iconSource" size="small" style="margin-right: 12px" @change="changeIconSource">
+                    <el-radio-button label="fa">FontAwesome</el-radio-button>
+                    <el-radio-button label="ep">Element Plus</el-radio-button>
+                </el-radio-group>
                 <el-input style="width: 200px" v-model="searchIcon" placeholder="搜索图标" @input="changeSearchIcon" clearable>
                     <template #suffix>
                         <el-icon class="el-input__icon"><Search /></el-icon>
@@ -11,14 +15,24 @@
                 </el-input>
                 <div v-if="showIcon && selectedIcon" style="margin-left: 20px; display: flex; align-items: center">
                     <span style="margin-right: 10px">当前选择：</span>
-                    <el-icon :size="24">
-                        <component :is="getIconComponent(selectedIcon)" />
-                    </el-icon>
+                    <template v-if="selectedIconSource === 'fa'">
+                        <font-awesome-icon :icon="parseFaIcon(selectedIcon)" style="font-size: 24px" />
+                    </template>
+                    <template v-else>
+                        <el-icon :size="24"><component :is="getEpComponent(selectedIcon)" /></el-icon>
+                    </template>
                     <span style="margin-left: 8px; color: #666">{{ selectedIcon }}</span>
                 </div>
             </div>
         </template>
         
+        <!-- FontAwesome 分类 Tab -->
+        <el-radio-group v-if="iconSource === 'fa'" v-model="faCategory" size="small" style="margin-bottom: 12px" @change="changeFaCategory">
+            <el-radio-button label="solid">Solid</el-radio-button>
+            <el-radio-button label="regular">Regular</el-radio-button>
+            <el-radio-button label="brands">Brands</el-radio-button>
+        </el-radio-group>
+
         <el-row class="list-box" :gutter="8">
             <el-col
                 v-for="item in displayList"
@@ -33,11 +47,14 @@
                 :class="{ active: selectedIcon === item.name }"
             >
                 <div class="icon-box">
-                    <el-icon :size="32">
-                        <component :is="item.component" />
-                    </el-icon>
+                    <template v-if="item.source === 'fa'">
+                        <font-awesome-icon :icon="item.faDef" style="font-size: 28px" />
+                    </template>
+                    <template v-else>
+                        <el-icon :size="32"><component :is="item.component" /></el-icon>
+                    </template>
                 </div>
-                <span class="text" :title="item.name">{{ item.name }}</span>
+                <span class="text" :title="item.displayName || item.name">{{ item.displayName || item.name }}</span>
             </el-col>
         </el-row>
         
@@ -65,10 +82,39 @@
 
 <script>
 import * as ElementPlusIcons from "@element-plus/icons-vue";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { fas } from "@fortawesome/free-solid-svg-icons";
+import { far } from "@fortawesome/free-regular-svg-icons";
+import { fab } from "@fortawesome/free-brands-svg-icons";
 
-// 获取所有 Element Plus 图标列表
-const iconList = Object.keys(ElementPlusIcons).map((name) => ({
-    name,
+// 确保图标库已加载
+library.add(fas, far, fab);
+
+// 构建 FontAwesome 图标列表
+function buildFaIconList(prefix, categoryDefs) {
+    const list = [];
+    if (!categoryDefs) return list;
+    for (const [iconName, def] of Object.entries(categoryDefs)) {
+        if (!iconName || !def) continue;
+        list.push({
+            name: prefix + " fa-" + iconName,
+            displayName: iconName,
+            source: "fa",
+            faDef: [prefix, iconName]
+        });
+    }
+    return list.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+const faSolidList = buildFaIconList("fas", library.definitions.fas);
+const faRegularList = buildFaIconList("far", library.definitions.far);
+const faBrandsList = buildFaIconList("fab", library.definitions.fab);
+
+// Element Plus 图标列表
+const epIconList = Object.keys(ElementPlusIcons).map((name) => ({
+    name: name,
+    displayName: name,
+    source: "ep",
     component: ElementPlusIcons[name]
 }));
 
@@ -76,7 +122,7 @@ const iconList = Object.keys(ElementPlusIcons).map((name) => ({
 function fuzzyQuery(list, keyword) {
     if (!keyword) return list;
     const lowerKeyword = keyword.toLowerCase();
-    return list.filter((item) => item.name.toLowerCase().includes(lowerKeyword));
+    return list.filter((item) => (item.displayName || item.name).toLowerCase().includes(lowerKeyword));
 }
 
 // 分页
@@ -105,32 +151,71 @@ export default {
             dialogShow: false,
             searchIcon: "",
             selectedIcon: "",
+            selectedIconSource: "fa",
             showIcon: false,
-            filteredList: []
+            filteredList: [],
+            iconSource: "fa",     // "fa" | "ep"
+            faCategory: "solid"   // "solid" | "regular" | "brands"
         };
     },
     computed: {
+        currentSourceList() {
+            if (this.iconSource === "ep") return epIconList;
+            if (this.faCategory === "regular") return faRegularList;
+            if (this.faCategory === "brands") return faBrandsList;
+            return faSolidList;
+        },
         total() {
-            return this.searchIcon ? this.filteredList.length : iconList.length;
+            return this.searchIcon ? this.filteredList.length : this.currentSourceList.length;
         },
         displayList() {
-            const sourceList = this.searchIcon ? this.filteredList : iconList;
+            const sourceList = this.searchIcon ? this.filteredList : this.currentSourceList;
             return listPage(sourceList, this.currentPage, this.pageSize);
         }
     },
     methods: {
-        getIconComponent(name) {
+        getEpComponent(name) {
             return ElementPlusIcons[name] || ElementPlusIcons.Document;
+        },
+        parseFaIcon(iconStr) {
+            let prefix = "fas";
+            if (/\bfar\b/.test(iconStr)) prefix = "far";
+            else if (/\bfab\b/.test(iconStr)) prefix = "fab";
+            const match = iconStr.match(/fa-([\w-]+)/);
+            return match ? [prefix, match[1]] : ["fas", "question"];
         },
         show() {
             this.dialogShow = true;
             this.selectedIcon = this.model || "";
             this.showIcon = !!this.model;
+            // 自动检测当前图标类型
+            if (this.selectedIcon) {
+                if (/\bfa[srb]?\s+fa-/.test(this.selectedIcon) || /^fa-/.test(this.selectedIcon)) {
+                    this.iconSource = "fa";
+                    this.selectedIconSource = "fa";
+                } else {
+                    this.iconSource = "ep";
+                    this.selectedIconSource = "ep";
+                }
+            }
+        },
+        changeIconSource() {
+            this.currentPage = 1;
+            this.searchIcon = "";
+            this.filteredList = [];
+        },
+        changeFaCategory() {
+            this.currentPage = 1;
+            if (this.searchIcon) {
+                this.filteredList = fuzzyQuery(this.currentSourceList, this.searchIcon);
+            } else {
+                this.filteredList = [];
+            }
         },
         changeSearchIcon() {
             this.currentPage = 1;
             if (this.searchIcon) {
-                this.filteredList = fuzzyQuery(iconList, this.searchIcon);
+                this.filteredList = fuzzyQuery(this.currentSourceList, this.searchIcon);
             } else {
                 this.filteredList = [];
             }
@@ -141,6 +226,7 @@ export default {
         chooseIcon(item) {
             this.showIcon = false;
             this.selectedIcon = item.name;
+            this.selectedIconSource = item.source;
             this.$nextTick(() => {
                 this.showIcon = true;
             });
@@ -171,7 +257,7 @@ export default {
 
 <style lang="scss" scoped>
 .list-box {
-    height: 500px;
+    height: auto;
     overflow: auto;
 }
 .w-icon {
