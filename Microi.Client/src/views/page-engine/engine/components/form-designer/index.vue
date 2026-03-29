@@ -1,13 +1,13 @@
 <template>
   <div class="microi-page-engine pageengine">
     <el-container>
-      <el-header ref="ref1" height="60px">
+      <el-header ref="ref1" height="56px">
         <layout-header></layout-header>
       </el-header>
       <el-container>
         <el-aside
           ref="ref2"
-          width="200px"
+          width="250px"
           v-show="formData?.JsonObj?.formConfig?.left"
         >
           <layout-left></layout-left>
@@ -43,7 +43,7 @@
       placement="left"
       :mask="{
         style: {
-          boxShadow: 'inset 0 0 15px #fff',
+          boxShadow: 'inset 0 0 15px rgba(255,255,255,0.5)',
         },
         color: 'rgba(121.3, 187.1, 255, .4)',
       }"
@@ -55,7 +55,7 @@
       placement="right"
       :mask="{
         style: {
-          boxShadow: 'inset 0 0 15px #fff',
+          boxShadow: 'inset 0 0 15px rgba(255,255,255,0.5)',
         },
         color: 'rgba(121.3, 187.1, 255, .4)',
       }"
@@ -78,6 +78,7 @@ import {
 } from '../../utils/util'
 import { widgetList, widgetOption } from '../../utils/builtWidget'
 import { usePageEngineStore } from '../../stores/pageEngine'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
@@ -226,15 +227,37 @@ loadFormData()
   // 使用 & 来表示同一元素的复合选择器
   .el-aside {
     padding: 0;
-    // background: #fff;
   }
   .el-header {
     padding: 0;
-    background-color: #fff;
+    background-color: var(--el-bg-color);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    transition: background-color 0.3s, border-color 0.3s;
   }
   .el-main {
     margin: 0;
     padding: 0;
+  }
+}
+
+/* ===== 暗色/浅色主题适配 ===== */
+.microi-page-engine {
+  /* 左侧面板 */
+  .layout-left .el-card,
+  .layout-right .el-card {
+    background-color: var(--el-bg-color);
+    border-color: var(--el-border-color-lighter);
+    transition: background-color 0.3s, border-color 0.3s;
+  }
+  /* 容器卡片 */
+  .box-card {
+    background-color: var(--el-bg-color);
+    transition: background-color 0.3s;
+  }
+  /* 暗色模式下额外覆盖 */
+  .el-aside {
+    background-color: var(--el-bg-color);
+    transition: background-color 0.3s;
   }
 }
 </style>

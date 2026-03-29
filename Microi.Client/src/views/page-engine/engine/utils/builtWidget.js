@@ -25,7 +25,10 @@ import {
   areamap,
   fullcalendar,
   html,
-  descriptions
+  descriptions,
+  diytable,
+  diyform,
+  diycalendar
 } from './builtWidget/index.js';
 
 
@@ -61,7 +64,10 @@ export const widgetList = [
   areamap,
   fullcalendar,
   html,
-  descriptions
+  descriptions,
+  diytable,
+  diyform,
+  diycalendar
 ]
 
 //组件配置 四级

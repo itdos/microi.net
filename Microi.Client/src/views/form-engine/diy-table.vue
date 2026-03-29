@@ -37,15 +37,20 @@
             </template>
             <!--DIY子表-->
             <el-card :class="'box-card box-card-table-row-list' + ((diyStore.IsPhoneView || TableDisplayMode == 'Card') ? ' mobile-box-card' : '')">
-                <!-- <template v-if="(_IsTableChild && TableChildField.Label) || (PropsIsJoinTable && JoinTableField.Label)" #header>
-                    <div class="clearfix">
-                        <span style="font-weight: bold">
-                            <el-icon class="mr-2"><Grid /></el-icon>
-                            {{ PropsIsJoinTable && JoinTableField.Label ? JoinTableField.Label : TableChildField.Label }}
-                        </span>
+
+                <!-- 统计面板（数据来自 sys_menu.TableReport） -->
+                <div v-if="tableReportItems && tableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
+                    <div v-for="item in tableReportItems" :key="item.Id || item.Label" class="table-report-card" :style="{ '--report-color': item.Color || '#409eff' }">
+                        <div class="table-report-icon">
+                            <fa-icon :icon="item.Icon || 'fas fa-chart-bar'" />
+                        </div>
+                        <div class="table-report-body">
+                            <div class="table-report-value">{{ item.Value }}</div>
+                            <div class="table-report-label">{{ item.Label }}</div>
+                        </div>
                     </div>
-                </template> -->
-                
+                </div>
+
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
                 <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-header">
                     <div class="mobile-header-left">
@@ -154,7 +159,7 @@
                         </el-input>
                     </div>
 
-                    <!-- <template v-if="IsPermission('NoSearch')">
+                    <template v-if="IsPermission('NoSearch')">
                         <DiySearch
                             v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                             :ref="'refDiySearch1'"
@@ -167,7 +172,7 @@
                             @CallbackGetDiyTableRow="GetDiyTableRow"
                             @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                         ></DiySearch>
-                    </template> -->
+                    </template>
                     <!--清除搜索-->
                     <div class="search-clear-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch')">
                         <el-button
@@ -285,23 +290,19 @@
                             :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                             :label="field.Label"
                             :width="GetColWidth(field, fieldIndex)"
-                            :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
                             :class-name="GetColClassName(field)"
                             :fixed="ColIsFixed(field.Id)"
                             show-overflow-tooltip
                         >
-                            <!-- Bug6新增：列头搜索功能 - 为可搜索列添加搜索图标 -->
                             <template #header>
-                                <span>{{ field.Label }}</span>
-                                <el-icon 
-                                    v-if="SearchFieldIds.indexOf(field.Id) > -1"
-                                    class="column-search-icon" 
-                                    @click.stop="showColumnSearch(field, $event)"
-                                    style="margin-left: 4px; cursor: pointer; color: #409EFF; vertical-align: middle;"
-                                    :title="$t('Msg.SearchField') + field.Label"
-                                >
-                                    <Search />
-                                </el-icon>
+                                <div class="col-header-cell" @click.stop="showColHeaderMenu(field, $event)">
+                                    <span>{{ field.Label }}</span>
+                                    <span class="col-header-sort-indicator" v-if="getColSortState(field)">
+                                        <el-icon v-if="getColSortState(field) === 'asc'" :size="12"><SortUp /></el-icon>
+                                        <el-icon v-else :size="12"><SortDown /></el-icon>
+                                    </span>
+                                    <el-icon class="col-header-menu-icon" :size="14"><Search /></el-icon>
+                                </div>
                             </template>
                             <template #default="scope">
                                 <!--如果使用了模板引擎-->
@@ -449,11 +450,10 @@
                             </template>
                         </el-table-column>
                     </template>
-
+                    <!-- :sortable="IsSortField('CreateTime') ? 'custom' : false" -->
                     <el-table-column
                         v-if="ColIsDisplay('CreateTime')"
                         :label="$t('Msg.CreateTime')"
-                        :sortable="SortFieldIds.indexOf('CreateTime') > -1 ? 'custom' : false"
                         :prop="'CreateTime'"
                         width="150"
                     >
@@ -462,10 +462,10 @@
                             <span>{{ scope.row.CreateTime }}</span>
                         </template>
                     </el-table-column>
+                    <!-- :sortable="IsSortField('UserName') ? 'custom' : false" -->
                     <el-table-column
                         v-if="ColIsDisplay('UserName')"
                         :label="$t('Msg.Creator')"
-                        :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false"
                         :prop="'UserName'"
                         width="110"
                     >
@@ -474,10 +474,10 @@
                             <span>{{ scope.row.UserName }}</span>
                         </template>
                     </el-table-column>
+                    <!-- :sortable="IsSortField('UpdateTime') ? 'custom' : false" -->
                     <el-table-column
                         v-if="ColIsDisplay('UpdateTime')"
                         :label="$t('Msg.UpdateTime')"
-                        :sortable="SortFieldIds.indexOf('UpdateTime') > -1 ? 'custom' : false"
                         :prop="'UpdateTime'"
                         width="150"
                     >
@@ -885,6 +885,126 @@
 
         <!--弹窗/抽屉/全新页面 打开Form（已迁移到 diy-form-full.vue）-->
         <!--抽屉或弹窗打开完整的Form-->
+
+        <!-- 列头右键菜单 -->
+        <teleport to="body">
+            <div
+                v-show="_colMenuVisible"
+                ref="globalColMenu"
+                class="global-col-header-menu"
+                :style="{ top: _colMenuPosition.top + 'px', left: _colMenuPosition.left + 'px' }"
+                @click.stop
+            >
+                <!-- 升序 -->
+                <div class="global-col-menu-item" :class="{ 'is-active': _colMenuSortState === 'asc' }" @click="colMenuSort('asc')">
+                    <el-icon><SortUp /></el-icon>
+                    <span>升序排列</span>
+                    <el-icon v-if="_colMenuSortState === 'asc'" class="col-menu-check"><Check /></el-icon>
+                </div>
+                <!-- 降序 -->
+                <div class="global-col-menu-item" :class="{ 'is-active': _colMenuSortState === 'desc' }" @click="colMenuSort('desc')">
+                    <el-icon><SortDown /></el-icon>
+                    <span>降序排列</span>
+                    <el-icon v-if="_colMenuSortState === 'desc'" class="col-menu-check"><Check /></el-icon>
+                </div>
+                <div class="global-col-menu-divider"></div>
+                <!-- 冻结列 -->
+                <div class="global-col-menu-item" @click="colMenuToggleFixed()">
+                    <el-icon><Lock /></el-icon>
+                    <span>{{ _colMenuField && FixedFields.indexOf(_colMenuField.Id) > -1 ? '取消冻结列' : '冻结此列' }}</span>
+                    <el-icon v-if="_colMenuField && FixedFields.indexOf(_colMenuField.Id) > -1" class="col-menu-check"><Check /></el-icon>
+                </div>
+                <!-- 隐藏此列 -->
+                <div class="global-col-menu-item" @click="colMenuHideColumn()">
+                    <el-icon><Hide /></el-icon>
+                    <span>隐藏此列</span>
+                </div>
+                <!-- 恢复隐藏列（当有隐藏列时显示） -->
+                <div v-if="_runtimeHiddenFields.length > 0" class="global-col-menu-item" @click="colMenuRestoreColumns()">
+                    <el-icon><View /></el-icon>
+                    <span>恢复隐藏列 ({{ _runtimeHiddenFields.length }})</span>
+                </div>
+                <div class="global-col-menu-divider"></div>
+                <!-- 筛选 -->
+                <div class="global-col-menu-section-title">
+                    <el-icon><Filter /></el-icon>
+                    <span>筛选条件</span>
+                </div>
+                <div class="global-col-menu-filter" @click.stop>
+                    <div v-if="_colMenuField" class="col-filter-body">
+                        <!-- 操作符选择 -->
+                        <el-select v-model="_colFilterOperator" size="small" style="width: 100%; margin-bottom: 8px;" placeholder="条件">
+                            <el-option v-for="op in getColFilterOperators()" :key="op.value" :label="op.label" :value="op.value" />
+                        </el-select>
+                        <!-- 根据字段类型显示不同输入 -->
+                        <!-- 日期时间 -->
+                        <el-date-picker
+                            v-if="_colMenuField.Component === 'DateTime'"
+                            v-model="_colFilterValue"
+                            :type="getColFilterDateType()"
+                            :value-format="getColFilterDateFormat()"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            placeholder="选择日期"
+                            clearable
+                        />
+                        <!-- 数字 -->
+                        <el-input-number
+                            v-else-if="_colMenuField.Type && (_colMenuField.Type.toLowerCase().indexOf('int') > -1 || _colMenuField.Type.toLowerCase().indexOf('decimal') > -1)"
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            controls-position="right"
+                            placeholder="输入数值"
+                        />
+                        <!-- 下拉选择 -->
+                        <el-select
+                            v-else-if="(_colMenuField.Component === 'Select' || _colMenuField.Component === 'MultipleSelect') && Array.isArray(_colMenuField.Data) && _colMenuField.Data.length > 0"
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            clearable
+                            filterable
+                            placeholder="选择"
+                        >
+                            <el-option
+                                v-for="(opt, optIdx) in _colMenuField.Data"
+                                :key="'col_filter_opt_' + optIdx"
+                                :label="typeof opt === 'string' ? opt : (opt[_colMenuField.Config.SelectLabel || 'Name'] || opt.Name || '')"
+                                :value="typeof opt === 'string' ? opt : (opt[_colMenuField.Config.SelectSaveField || _colMenuField.Config.SelectLabel || 'Id'] || opt.Id || '')"
+                            />
+                        </el-select>
+                        <!-- 开关 -->
+                        <el-select
+                            v-else-if="_colMenuField.Component === 'Switch'"
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            clearable
+                            placeholder="选择"
+                        >
+                            <el-option label="打开" value="1" />
+                            <el-option label="关闭" value="0" />
+                        </el-select>
+                        <!-- 默认文本输入 -->
+                        <el-input
+                            v-else
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            clearable
+                            placeholder="输入筛选值"
+                            @keyup.enter="colMenuApplyFilter()"
+                        />
+                        <div class="col-filter-actions">
+                            <el-button size="small" @click="colMenuClearFilter()">清除</el-button>
+                            <el-button size="small" type="primary" @click="colMenuApplyFilter()">筛选</el-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </teleport>
+
         <DiyFormDialog v-if="_shouldRenderDiyFormDialog" 
             @CallbackGetDiyTableRow="GetDiyTableRow" 
             :FatherFormModel="FatherFormModel"
@@ -1239,12 +1359,44 @@ export default {
         
         // ========== 10. 清理全局菜单事件监听器 ==========
         document.removeEventListener('click', self.hideMoreMenu);
+        document.removeEventListener('click', self.hideColHeaderMenu);
         self._moreMenuVisible = false;
         self._moreMenuRow = null;
+        self._colMenuVisible = false;
+        self._colMenuField = null;
 
         console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
+        // 统计面板数据（来自 SysMenuModel.TableReport JSON）
+        tableReportItems() {
+            var self = this;
+            if (!self.SysMenuModel || self.DiyCommon.IsNull(self.SysMenuModel.TableReport)) return [];
+            try {
+                var items = typeof self.SysMenuModel.TableReport === 'string'
+                    ? JSON.parse(self.SysMenuModel.TableReport)
+                    : self.SysMenuModel.TableReport;
+                return Array.isArray(items) ? items : [];
+            } catch (e) {
+                return [];
+            }
+        },
+        // 自适应列数
+        tableReportGridCols() {
+            var n = this.tableReportItems.length;
+            if (n <= 0) return '';
+            if (n <= 4) return 'repeat(' + n + ', 1fr)';
+            if (n <= 6) return 'repeat(' + n + ', 1fr)';
+            return 'repeat(auto-fill, minmax(180px, 1fr))';
+        },
+        // 列头菜单当前排序状态
+        _colMenuSortState() {
+            var self = this;
+            if (!self._colMenuField) return '';
+            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            if (self._OrderBy === fieldName) return self._OrderByType.toLowerCase() || '';
+            return '';
+        },
         // 性能优化：将频繁调用的方法转换为计算属性
         _IsTableChild() {
             return !this.DiyCommon.IsNull(this.TableChildTableId);
@@ -1682,6 +1834,14 @@ export default {
             _moreMenuVisible: false,
             _moreMenuRow: null,
             _moreMenuPosition: { top: 0, left: 0 },
+            // 列头菜单状态
+            _colMenuVisible: false,
+            _colMenuField: null,
+            _colMenuPosition: { top: 0, left: 0 },
+            _colFilterOperator: 'Like',
+            _colFilterValue: '',
+            _colFilters: {}, // { fieldName: { operator, value } }
+            _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
             // 移动端搜索弹窗状态
             showMobileSearch: false,
             // 索引管理弹窗
@@ -2136,6 +2296,198 @@ export default {
             }
         },
         // ========== 性能优化V3 END ==========
+
+        // ========== 列头菜单方法 ==========
+        showColHeaderMenu(field, event) {
+            var self = this;
+            event.stopPropagation();
+            // 先关闭行更多菜单
+            self.hideMoreMenu();
+            
+            var rect = event.currentTarget.getBoundingClientRect();
+            var menuWidth = 260;
+            var menuLeft = rect.left;
+            // 如果超出右边界，向左调整
+            if (menuLeft + menuWidth > window.innerWidth) {
+                menuLeft = window.innerWidth - menuWidth - 10;
+            }
+            self._colMenuPosition = {
+                top: rect.bottom + 4,
+                left: menuLeft
+            };
+            
+            self._colMenuField = field;
+            // 初始化筛选值
+            var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+            if (self._colFilters[fieldName]) {
+                self._colFilterOperator = self._colFilters[fieldName].operator;
+                self._colFilterValue = self._colFilters[fieldName].value;
+            } else {
+                // 根据字段类型设置默认操作符
+                self._colFilterOperator = self._getDefaultOperator(field);
+                self._colFilterValue = '';
+            }
+            self._colMenuVisible = true;
+            
+            setTimeout(() => {
+                document.addEventListener('click', self.hideColHeaderMenu, { once: true });
+            }, 0);
+        },
+        hideColHeaderMenu() {
+            var self = this;
+            self._colMenuVisible = false;
+            document.removeEventListener('click', self.hideColHeaderMenu);
+        },
+        _getDefaultOperator(field) {
+            if (!field) return 'Like';
+            var comp = field.Component;
+            if (comp === 'Select' || comp === 'MultipleSelect' || comp === 'Switch' || comp === 'Radio') return '=';
+            if (comp === 'DateTime') return '>=';
+            if (field.Type && (field.Type.toLowerCase().indexOf('int') > -1 || field.Type.toLowerCase().indexOf('decimal') > -1)) return '=';
+            return 'Like';
+        },
+        getColSortState(field) {
+            var self = this;
+            var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+            if (self._OrderBy === fieldName && self._OrderByType) return self._OrderByType.toLowerCase();
+            return '';
+        },
+        colMenuSort(direction) {
+            var self = this;
+            if (!self._colMenuField) return;
+            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            // 如果已经是当前排序，再次点击取消
+            if (self._OrderBy === fieldName && self._OrderByType.toLowerCase() === direction) {
+                self._OrderBy = '';
+                self._OrderByType = '';
+                self.LastOrderBy = '';
+            } else {
+                self._OrderBy = fieldName;
+                self._OrderByType = direction;
+                self.LastOrderBy = direction + '|' + fieldName;
+            }
+            self.hideColHeaderMenu();
+            self.GetDiyTableRow();
+        },
+        colMenuToggleFixed() {
+            var self = this;
+            if (!self._colMenuField) return;
+            var idx = self.FixedFields.indexOf(self._colMenuField.Id);
+            if (idx > -1) {
+                self.FixedFields.splice(idx, 1);
+            } else {
+                self.FixedFields.push(self._colMenuField.Id);
+            }
+            self.hideColHeaderMenu();
+        },
+        colMenuHideColumn() {
+            var self = this;
+            if (!self._colMenuField) return;
+            self._runtimeHiddenFields.push(self._colMenuField.Id);
+            // 从 ShowDiyFieldList 中移除
+            if (self.ShowDiyFieldList) {
+                var idx = self.ShowDiyFieldList.findIndex(f => f.Id === self._colMenuField.Id);
+                if (idx > -1) {
+                    self.ShowDiyFieldList.splice(idx, 1);
+                }
+            }
+            self.hideColHeaderMenu();
+        },
+        colMenuRestoreColumns() {
+            var self = this;
+            // 恢复所有运行时隐藏的列
+            self._runtimeHiddenFields = [];
+            // 重新生成显示列
+            self.GetShowDiyFieldList();
+            self.hideColHeaderMenu();
+        },
+        getColFilterOperators() {
+            var self = this;
+            var field = self._colMenuField;
+            if (!field) return [];
+            var comp = field.Component;
+            var isNum = field.Type && (field.Type.toLowerCase().indexOf('int') > -1 || field.Type.toLowerCase().indexOf('decimal') > -1);
+            var isDate = comp === 'DateTime';
+            
+            if (isDate || isNum) {
+                return [
+                    { label: '等于 (=)', value: '=' },
+                    { label: '不等于 (≠)', value: '<>' },
+                    { label: '大于 (>)', value: '>' },
+                    { label: '大于等于 (≥)', value: '>=' },
+                    { label: '小于 (<)', value: '<' },
+                    { label: '小于等于 (≤)', value: '<=' }
+                ];
+            }
+            if (comp === 'Select' || comp === 'MultipleSelect' || comp === 'Switch' || comp === 'Radio') {
+                return [
+                    { label: '等于 (=)', value: '=' },
+                    { label: '不等于 (≠)', value: '<>' },
+                    { label: '包含', value: 'Like' }
+                ];
+            }
+            return [
+                { label: '包含', value: 'Like' },
+                { label: '等于 (=)', value: '=' },
+                { label: '不等于 (≠)', value: '<>' },
+                { label: '开头是', value: 'StartLike' },
+                { label: '结尾是', value: 'EndLike' },
+                { label: '不包含', value: 'NotLike' }
+            ];
+        },
+        getColFilterDateType() {
+            var self = this;
+            if (!self._colMenuField || !self._colMenuField.Config || !self._colMenuField.Config.DateTimeType) return 'date';
+            var mapping = { datetime: 'datetime', date: 'date', month: 'month', year: 'year' };
+            return mapping[self._colMenuField.Config.DateTimeType] || 'date';
+        },
+        getColFilterDateFormat() {
+            var self = this;
+            if (!self._colMenuField || !self._colMenuField.Config || !self._colMenuField.Config.DateTimeType) return 'YYYY-MM-DD';
+            var mapping = { datetime: 'YYYY-MM-DD HH:mm:ss', date: 'YYYY-MM-DD', month: 'YYYY-MM', year: 'YYYY' };
+            return mapping[self._colMenuField.Config.DateTimeType] || 'YYYY-MM-DD';
+        },
+        colMenuApplyFilter() {
+            var self = this;
+            if (!self._colMenuField) return;
+            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            
+            if (self._colFilterValue === '' || self._colFilterValue === null || self._colFilterValue === undefined) {
+                // 清除该列筛选
+                delete self._colFilters[fieldName];
+            } else {
+                self._colFilters[fieldName] = {
+                    operator: self._colFilterOperator,
+                    value: self._colFilterValue
+                };
+            }
+            self._rebuildColFilterWhere();
+            self.hideColHeaderMenu();
+            self.GetDiyTableRow({ _PageIndex: 1 });
+        },
+        colMenuClearFilter() {
+            var self = this;
+            if (!self._colMenuField) return;
+            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            delete self._colFilters[fieldName];
+            self._colFilterValue = '';
+            self._rebuildColFilterWhere();
+            self.hideColHeaderMenu();
+            self.GetDiyTableRow({ _PageIndex: 1 });
+        },
+        _rebuildColFilterWhere() {
+            var self = this;
+            // 从 Where 中移除所有列筛选相关条件（用 _colFilter_ 前缀标记）
+            self.Where = self.Where.filter(item => !item._isColFilter);
+            // 重建
+            for (var fieldName in self._colFilters) {
+                var filter = self._colFilters[fieldName];
+                var condition = [fieldName, filter.operator, filter.value];
+                condition._isColFilter = true;
+                self.Where.push(condition);
+            }
+        },
+        // ========== 列头菜单方法 END ==========
         
         // ========== 卡片模式辅助方法 ==========
         getCardIndex(index) {
@@ -2177,193 +2529,6 @@ export default {
         isMuban(field, scope) {
             // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
             return !this.DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + "_TmpEngineResult"] !== undefined;
-        },
-        /**
-         * Bug6新增：显示列头搜索功能
-         * @param {Object} field - 字段对象
-         * @param {Event} event - 点击事件
-         */
-        showColumnSearch(field, event) {
-            const self = this;
-            
-            // 阻止事件冒泡，避免触发排序
-            event.stopPropagation();
-            
-            // 根据不同组件类型显示不同的搜索方式
-            const component = field.Component;
-            
-            // 使用 ElMessageBox 作为快速搜索入口
-            if (component === 'Select' || component === 'MultipleSelect') {
-                // 下拉选择类字段：显示选项列表供快速筛选
-                this.showSelectSearch(field);
-            } else if (component === 'DateTime' || component === 'Date' || component === 'Time') {
-                // 日期时间类字段：显示日期范围选择
-                this.showDateTimeSearch(field);
-            } else if (component === 'NumberText' || component === 'Number') {
-                // 数字类字段：显示范围输入
-                this.showNumberRangeSearch(field);
-            } else if (component === 'Switch') {
-                // 开关类字段：显示是/否选项
-                this.showSwitchSearch(field);
-            } else {
-                // 其他文本类字段：显示简单输入框
-                this.showTextSearch(field);
-            }
-        },
-        /**
-         * 文本搜索
-         */
-        async showTextSearch(field) {
-            const self = this;
-            const currentValue = self.SearchModel[field.Name] || '';
-            
-            try {
-                const value = await this.$prompt('请输入搜索内容', field.Label, {
-                    confirmButtonText: '搜索',
-                    cancelButtonText: '清除',
-                    inputValue: currentValue,
-                    inputPlaceholder: `请输入${field.Label}`
-                }).catch(() => null);
-                
-                if (value === null) {
-                    // 点击取消 - 清除搜索
-                    delete self.SearchModel[field.Name];
-                } else if (value.value) {
-                    self.SearchModel[field.Name] = value.value;
-                } else {
-                    delete self.SearchModel[field.Name];
-                }
-                
-                self.GetDiyTableRow({ _PageIndex: 1 });
-            } catch (error) {
-                console.log('取消搜索');
-            }
-        },
-        /**
-         * 下拉选择搜索
-         */
-        async showSelectSearch(field) {
-            const self = this;
-            
-            // 创建一个简单的选择界面
-            const options = field.Data || [];
-            const html = `
-                <div style="max-height: 300px; overflow-y: auto;">
-                    ${options.map(opt => {
-                        const label = typeof opt === 'string' ? opt : (opt[field.Config.SelectLabel || 'Name'] || opt.Name);
-                        const value = typeof opt === 'string' ? opt : (opt[field.Config.SelectValue || 'Id'] || opt.Id);
-                        return `<div class="search-option-item" data-value="${value}" style="padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;">${label}</div>`;
-                    }).join('')}
-                </div>
-            `;
-            
-            try {
-                await this.$alert(html, field.Label + ' - 选择搜索', {
-                    dangerouslyUseHTMLString: true,
-                    confirmButtonText: '清除搜索',
-                    callback: () => {
-                        delete self.SearchEqual[field.Name];
-                        self.GetDiyTableRow({ _PageIndex: 1 });
-                    }
-                });
-                
-                // 添加点击事件监听
-                setTimeout(() => {
-                    document.querySelectorAll('.search-option-item').forEach(item => {
-                        item.addEventListener('click', function() {
-                            self.SearchEqual[field.Name] = this.dataset.value;
-                            self.GetDiyTableRow({ _PageIndex: 1 });
-                            // 关闭弹窗
-                            document.querySelector('.el-message-box__headerbtn').click();
-                        });
-                    });
-                }, 100);
-            } catch (error) {
-                console.log('取消搜索');
-            }
-        },
-        /**
-         * 日期时间搜索
-         */
-        async showDateTimeSearch(field) {
-            const self = this;
-            
-            // 简化版：使用输入框输入日期范围
-            try {
-                const result = await this.$prompt('请输入日期范围（格式：2024-01-01 至 2024-12-31）', field.Label, {
-                    confirmButtonText: '搜索',
-                    cancelButtonText: '清除',
-                    inputPlaceholder: 'YYYY-MM-DD 至 YYYY-MM-DD'
-                }).catch(() => null);
-                
-                if (result === null) {
-                    delete self.SearchDateTime[field.Name];
-                } else if (result.value) {
-                    const dates = result.value.split('至').map(d => d.trim());
-                    if (dates.length === 2) {
-                        self.SearchDateTime[field.Name] = dates;
-                    }
-                } else {
-                    delete self.SearchDateTime[field.Name];
-                }
-                
-                self.GetDiyTableRow({ _PageIndex: 1 });
-            } catch (error) {
-                console.log('取消搜索');
-            }
-        },
-        /**
-         * 数字范围搜索
-         */
-        async showNumberRangeSearch(field) {
-            const self = this;
-            
-            try {
-                const result = await this.$prompt('请输入数字范围（格式：100-500 或 >100 或 <500）', field.Label, {
-                    confirmButtonText: '搜索',
-                    cancelButtonText: '清除',
-                    inputPlaceholder: '例如：100-500'
-                }).catch(() => null);
-                
-                if (result === null) {
-                    delete self.SearchNumber[field.Name];
-                } else if (result.value) {
-                    self.SearchNumber[field.Name] = result.value;
-                } else {
-                    delete self.SearchNumber[field.Name];
-                }
-                
-                self.GetDiyTableRow({ _PageIndex: 1 });
-            } catch (error) {
-                console.log('取消搜索');
-            }
-        },
-        /**
-         * 开关搜索
-         */
-        async showSwitchSearch(field) {
-            const self = this;
-            
-            try {
-                const result = await this.$confirm(field.Label, '选择状态', {
-                    distinguishCancelAndClose: true,
-                    confirmButtonText: '是',
-                    cancelButtonText: '否',
-                    type: 'info'
-                }).catch(action => action);
-                
-                if (result === 'confirm') {
-                    self.SearchEqual[field.Name] = true;
-                } else if (result === 'cancel') {
-                    self.SearchEqual[field.Name] = false;
-                } else {
-                    delete self.SearchEqual[field.Name];
-                }
-                
-                self.GetDiyTableRow({ _PageIndex: 1 });
-            } catch (error) {
-                console.log('取消搜索');
-            }
         },
         //可传入外键Id值 、父表model
         async Init(parentFormModel, v8) {
@@ -4523,6 +4688,17 @@ export default {
             }
         },
 
+        // IsSortField(fieldId) {
+        //     var self = this;
+        //     if (self.SortFieldIds && Array.isArray(self.SortFieldIds)) {
+        //         return self.SortFieldIds.includes(fieldId) 
+        //                 || self.SortFieldIds.find(item => item.Id === fieldId)
+        //                 || self.SortFieldIds.find(item => item.Name === fieldId)
+        //                 ;
+        //     }
+        //     return false;
+        // },
+
         // 其实这里应该改成Axios去同时请求多个接口，然后再渲染，这样性能更高！
         GetShowDiyFieldList: function () {
             var self = this;
@@ -4574,6 +4750,10 @@ export default {
                     
                     // 🔥 性能优化：分批渲染表格列
                     self._allFieldList = tempArr;
+                    // 过滤运行时隐藏的列
+                    if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
+                        tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
+                    }
                     self.ShowDiyFieldList = [];
                     
                     // 首批只渲染前10列
@@ -4655,6 +4835,10 @@ export default {
                     
                     // 🔥 性能优化：分批渲染表格列（第二个分支 - 无指定查询列）
                     self._allFieldList = tempArr;
+                    // 过滤运行时隐藏的列
+                    if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
+                        tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
+                    }
                     self.ShowDiyFieldList = [];
                     
                     // 首批只渲染前10列

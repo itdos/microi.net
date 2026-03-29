@@ -34,7 +34,8 @@
             v-for="(wrapper, index) in formData.JsonObj.wrapperList"
             :key="wrapper.type + index"
           >
-            <pannel-wrapper :wrapperObj="wrapper"> </pannel-wrapper>
+            <pannel-tabs v-if="wrapper.type === 'tabs'" :wrapperObj="wrapper"></pannel-tabs>
+            <pannel-wrapper v-else :wrapperObj="wrapper"> </pannel-wrapper>
           </template>
         </el-row>
       </el-watermark>
@@ -51,7 +52,8 @@
           v-for="(wrapper, index) in formData.JsonObj.wrapperList"
           :key="wrapper.type + index"
         >
-          <pannel-wrapper :wrapperObj="wrapper"> </pannel-wrapper>
+          <pannel-tabs v-if="wrapper.type === 'tabs'" :wrapperObj="wrapper"></pannel-tabs>
+          <pannel-wrapper v-else :wrapperObj="wrapper"> </pannel-wrapper>
         </template>
       </el-row>
     </template>
@@ -60,6 +62,7 @@
 
 <script setup name="from-renderer">
 import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
+import pannelTabs from '../form-designer/wrapper/pannel-tabs.vue'
 import { computed, onMounted, onBeforeUnmount, onActivated } from 'vue'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'

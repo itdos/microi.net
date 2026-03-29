@@ -340,6 +340,72 @@
           </el-form-item>
         </el-form>
       </el-collapse-item>
+
+      <!-- 选项卡配置（仅tabs容器显示） -->
+      <el-collapse-item v-if="curWrapperIdx > -1 && curWrapper?.type === 'tabs'" title="选项卡配置" name="2">
+        <el-form v-if="curWrapper.wrapperOption">
+          <el-form-item label="选项卡风格">
+            <el-select
+              size="small"
+              v-model="curWrapper.wrapperOption.tabType"
+              placeholder="请选择"
+            >
+              <el-option label="默认" value=""> </el-option>
+              <el-option label="卡片" value="card"> </el-option>
+              <el-option label="边框卡片" value="border-card"> </el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="选项卡位置">
+            <el-select
+              size="small"
+              v-model="curWrapper.wrapperOption.tabPosition"
+              placeholder="请选择"
+            >
+              <el-option label="顶部" value="top"> </el-option>
+              <el-option label="底部" value="bottom"> </el-option>
+              <el-option label="左侧" value="left"> </el-option>
+              <el-option label="右侧" value="right"> </el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="标签页列表">
+            <div style="width: 100%">
+              <div
+                v-for="(tab, idx) in curWrapper.wrapperOption.tabs"
+                :key="tab.key"
+                style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;"
+              >
+                <el-input
+                  size="small"
+                  v-model="tab.label"
+                  style="flex: 1"
+                  placeholder="标签名称"
+                ></el-input>
+                <el-button
+                  size="small"
+                  type="danger"
+                  :icon="Delete"
+                  circle
+                  :disabled="curWrapper.wrapperOption.tabs.length <= 1"
+                  @click="removeTab(idx)"
+                />
+              </div>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                style="width: 100%; margin-top: 4px;"
+                @click="addTab"
+              >
+                <el-icon><Plus /></el-icon>
+                添加标签页
+              </el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+      </el-collapse-item>
+
     </el-collapse>
 
     <el-drawer size="60%" title="组件JSON" v-model="drawerjson" direction="ltr">
@@ -357,12 +423,39 @@
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePageEngineStore } from '../../../stores/pageEngine'
+import { generateId } from '../../../utils/util'
+import { Delete, Plus } from '@element-plus/icons-vue'
 const pageEngineStore = usePageEngineStore()
 import JsonEditor from 'ceel-json-editor'
 import 'jsoneditor/dist/jsoneditor.css'
 const { curWrapper, curWrapperIdx } = storeToRefs(pageEngineStore)
 const drawerjson = ref(false)
 const activeName = ref('1')
+
+// 添加标签页
+const addTab = () => {
+  if (!curWrapper.value?.wrapperOption?.tabs) return
+  const newKey = 'tab_' + generateId()
+  curWrapper.value.wrapperOption.tabs.push({
+    key: newKey,
+    label: '新标签页',
+  })
+}
+
+// 删除标签页
+const removeTab = (idx) => {
+  if (!curWrapper.value?.wrapperOption?.tabs) return
+  const tab = curWrapper.value.wrapperOption.tabs[idx]
+  curWrapper.value.wrapperOption.tabs.splice(idx, 1)
+  // 清除对应的组件数据
+  if (curWrapper.value.tabWidgetMap && tab) {
+    delete curWrapper.value.tabWidgetMap[tab.key]
+  }
+  // 如果删除的是当前激活tab，切换到第一个
+  if (curWrapper.value.wrapperOption.activeTab === tab?.key && curWrapper.value.wrapperOption.tabs.length > 0) {
+    curWrapper.value.wrapperOption.activeTab = curWrapper.value.wrapperOption.tabs[0].key
+  }
+}
 
 //当前容器json
 const curWrapperJson = computed({

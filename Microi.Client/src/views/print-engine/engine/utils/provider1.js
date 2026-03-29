@@ -185,6 +185,62 @@ export const provider1 = function () {
           type: "oval",
         },
       ]),
+      new hiprint.PrintElementTypeGroup("高级", [
+        {
+          tid: "providerModule1.emptyTable",
+          title: "空白表格",
+          type: "table",
+          columns: [
+            [
+              { title: "", field: "", width: 100 },
+              { title: "", field: "", width: 100 },
+              { title: "", field: "", width: 100 },
+            ],
+          ],
+          editable: true,
+          columnDisplayEditable: true,
+          columnDisplayIndexEditable: true,
+          columnTitleEditable: true,
+          columnResizable: true,
+          columnAlignEditable: true,
+          isEnableEditField: true,
+          isEnableContextMenu: true,
+          isEnableInsertRow: true,
+          isEnableDeleteRow: true,
+          isEnableInsertColumn: true,
+          isEnableDeleteColumn: true,
+          isEnableMergeCell: true,
+        },
+        {
+          tid: "providerModule1.customText",
+          title: "自定义文本",
+          customText: "自定义文本",
+          custom: true,
+          type: "text",
+        },
+        {
+          tid: "providerModule1.barcodeSvg",
+          title: "条形码SVG",
+          type: "barcode",
+          options: {
+            field: "barcodeSvg_01",
+            testData: "XS888888888",
+            width: 140,
+            height: 40,
+          },
+        },
+        {
+          tid: "providerModule1.qrcodeSvg",
+          title: "二维码SVG",
+          type: "qrcode",
+          options: {
+            field: "qrcodeSvg_01",
+            testData: "https://microi.net",
+            width: 80,
+            height: 80,
+          },
+        },
+      ]),
     ]);
   };
   return {

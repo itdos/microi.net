@@ -88,11 +88,11 @@ const chartSet = ref({
 })
 
 // 防抖工具函数
+let _debounceTimerId = null
 const debounce = (func, delay) => {
-  let timeoutId
   return function (...args) {
-    clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => func.apply(this, args), delay)
+    if (_debounceTimerId) clearTimeout(_debounceTimerId)
+    _debounceTimerId = setTimeout(() => func.apply(this, args), delay)
   }
 }
 
@@ -102,6 +102,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (_debounceTimerId) clearTimeout(_debounceTimerId)
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 
 // //初始化

@@ -86,13 +86,18 @@ onBeforeUnmount(() => {
   .layout-right {
     .el-card__body,
     .el-main {
-      padding: 10px 10px 10px 20px;
+      padding: 10px 10px 10px 14px;
     }
 
     .el-card.is-always-shadow,
     .el-card.is-hover-shadow:focus,
     .el-card.is-hover-shadow:hover {
-      box-shadow: 0 0 0px 0 rgba(0, 0, 0, 0.1) !important;
+      box-shadow: none !important;
+    }
+    .el-card {
+      border: none;
+      background-color: var(--el-bg-color);
+      transition: background-color 0.3s;
     }
 
     .el-select,
@@ -108,11 +113,13 @@ onBeforeUnmount(() => {
       padding-bottom: 0;
     }
     .el-collapse-item__header {
-      color: #409eff;
+      color: var(--el-color-primary);
       font-size: 14px !important;
+      transition: color 0.3s;
     }
     .el-form-item__label {
       font-size: 13px !important;
+      color: var(--el-text-color-regular);
     }
 
     .el-textarea__inner {
@@ -124,7 +131,9 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .layout-right {
-  padding: 10px 0;
+  padding: 4px 0;
+  border-left: 1px solid var(--el-border-color-lighter);
+  transition: border-color 0.3s;
   .box-card {
     .scroll-area {
       position: relative;

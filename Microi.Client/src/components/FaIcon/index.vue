@@ -1,22 +1,37 @@
 <template>
-    <el-icon :class="otherClasses" :style="iconStyle">
+    <!-- Element Plus 图标模式 -->
+    <el-icon v-if="isElementPlusIcon" :class="otherClasses" :style="iconStyle">
         <component :is="elementIcon" />
+    </el-icon>
+    <!-- FontAwesome 图标模式 -->
+    <font-awesome-icon v-else-if="faIconDef" :icon="faIconDef" :class="otherClasses" :style="iconStyle" />
+    <!-- 兜底：Element Plus 默认图标 -->
+    <el-icon v-else :class="otherClasses" :style="iconStyle">
+        <component :is="fallbackIcon" />
     </el-icon>
 </template>
 
 <script>
 /**
- * FontAwesome 到 Element Plus 图标兼容组件
- * 支持动态 FontAwesome class 绑定，自动转换为 Element Plus 图标
+ * 通用图标兼容组件 — 同时支持 FontAwesome 和 Element Plus 图标
+ *
+ * 识别规则（按优先级）：
+ *   1. 直接匹配 Element Plus 图标名（如 "Search", "Edit"）→ 渲染 <el-icon>
+ *   2. FontAwesome 格式（如 "fas fa-table", "far fa-check-circle"）→ 渲染 <font-awesome-icon>
+ *   3. 都不匹配 → 渲染 Element Plus Document 图标作为兜底
  *
  * 用法：
- * <fa-icon :class="'fas fa-table'" />
- * <fa-icon :icon="someIcon" />
- * <fa-icon :class="btn.Icon || 'far fa-check-circle'" />
+ * <fa-icon :icon="'fas fa-table'" />               FontAwesome 图标
+ * <fa-icon :icon="'Search'" />                     Element Plus 图标
+ * <fa-icon :icon="btn.Icon || 'far fa-check-circle'" />
  */
 import * as ElementPlusIcons from "@element-plus/icons-vue";
+import { library } from "@fortawesome/fontawesome-svg-core";
 
-// FontAwesome 到 Element Plus 图标映射
+// Element Plus 图标名集合（用于快速判断）
+const elIconNames = new Set(Object.keys(ElementPlusIcons));
+
+// FontAwesome 到 Element Plus 图标映射（供数据库中存的旧 FA 名称也能用 EP 显示；但现在优先用真实 FA 渲染）
 const faToElMapping = {
     "fa-plus": "Plus",
     "fa-edit": "Edit",
@@ -195,46 +210,79 @@ export default {
         }
     },
     computed: {
-        // 解析传入的class或icon prop
-        parsedIcon() {
-            const iconStr = this.icon || "";
-            // 提取 fa-xxx 部分
-            const match = iconStr.match(/fa-[\w-]+/);
-            return match ? match[0] : "";
+        // 清理后的图标字符串
+        _iconStr() {
+            return (this.icon || "").trim();
         },
-        // 获取除了 fa 图标相关的其他 class (如 mr-1, marginRight5 等)
+        // 获取除了 fa 图标相关和 Element Plus 图标名的其他 class (如 mr-1, marginRight5, more-btn 等)
         otherClasses() {
-            const iconStr = this.icon || "";
-            // 移除 fas, far, fa 和 fa-xxx 部分，保留其他class
-            return iconStr
-                .replace(/\b(fas?|far?)\b/g, "")
+            const s = this._iconStr;
+            return s
+                .replace(/\b(fas?|far?|fab?)\b/g, "")
                 .replace(/fa-[\w-]+/g, "")
+                .replace(/\b[A-Z][a-zA-Z]+\b/g, "")   // 去掉 PascalCase 的 EP 图标名
                 .trim();
         },
-        // 尝试获取 Element Plus 图标组件（始终返回有效图标）
+        // 判断是否为 Element Plus 图标（直接以 PascalCase 名称传入，如 "Search"、"Edit"）
+        _epIconName() {
+            const s = this._iconStr;
+            // 取出第一个 PascalCase 单词
+            const parts = s.split(/\s+/);
+            for (const p of parts) {
+                if (elIconNames.has(p)) return p;
+            }
+            return null;
+        },
+        // 是否为 Element Plus 图标
+        isElementPlusIcon() {
+            return !!this._epIconName && !this._hasFaPrefix;
+        },
+        // 是否含 fa- 前缀
+        _hasFaPrefix() {
+            return /\bfa[srb]?\s+fa-/.test(this._iconStr) || /\bfa-[\w-]+/.test(this._iconStr);
+        },
+        // Element Plus 图标组件
         elementIcon() {
-            const faIcon = this.parsedIcon;
-            if (!faIcon) {
-                // 没有图标时返回默认图标
-                return ElementPlusIcons.Document;
+            const name = this._epIconName;
+            return name ? ElementPlusIcons[name] : null;
+        },
+        // FontAwesome 图标定义（prefix + iconName 数组，如 ["fas", "table"]）
+        faIconDef() {
+            if (!this._hasFaPrefix) return null;
+            const s = this._iconStr;
+            // 提取前缀 fas/far/fab，默认 fas
+            let prefix = "fas";
+            if (/\bfar\b/.test(s)) prefix = "far";
+            else if (/\bfab\b/.test(s)) prefix = "fab";
+            // 提取 fa-xxx 图标名
+            const match = s.match(/fa-([\w-]+)/);
+            if (!match) return null;
+            const iconName = match[1];
+            // 检查该图标是否在 FontAwesome 库中已注册
+            const def = library.definitions[prefix] && library.definitions[prefix][iconName];
+            if (def) return [prefix, iconName];
+            // 尝试在其他前缀中查找
+            for (const tryPrefix of ["fas", "far", "fab"]) {
+                if (library.definitions[tryPrefix] && library.definitions[tryPrefix][iconName]) {
+                    return [tryPrefix, iconName];
+                }
             }
-            
-            const elIconName = faToElMapping[faIcon];
-            if (elIconName && ElementPlusIcons[elIconName]) {
-                return ElementPlusIcons[elIconName];
+            return null;
+        },
+        // 兜底图标
+        fallbackIcon() {
+            // 如果是 fa- 格式但 FA 库没找到，尝试映射到 EP 图标
+            if (this._hasFaPrefix) {
+                const match = this._iconStr.match(/fa-([\w-]+)/);
+                if (match) {
+                    const faKey = "fa-" + match[1];
+                    const elName = faToElMapping[faKey];
+                    if (elName && ElementPlusIcons[elName]) return ElementPlusIcons[elName];
+                    // 自动转换
+                    const autoName = match[1].split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+                    if (ElementPlusIcons[autoName]) return ElementPlusIcons[autoName];
+                }
             }
-            
-            // 尝试自动转换：fa-xxx-yyy -> XxxYyy
-            const autoName = faIcon
-                .replace("fa-", "")
-                .split("-")
-                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                .join("");
-            if (ElementPlusIcons[autoName]) {
-                return ElementPlusIcons[autoName];
-            }
-            
-            // 如果没有映射，返回默认图标
             return ElementPlusIcons.Document;
         }
     }

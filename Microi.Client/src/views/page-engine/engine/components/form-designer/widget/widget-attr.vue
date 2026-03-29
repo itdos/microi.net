@@ -186,7 +186,7 @@
           </el-form-item>
         </el-form>
       </el-collapse-item>
-      <el-collapse-item title="特色配置" name="2">
+      <el-collapse-item title="组件配置" name="2">
         <el-form label-position="left" label-width="80px">
           <el-form-item label="组件JSON"> </el-form-item>
         </el-form>
@@ -199,13 +199,40 @@
           >
             <el-form-item :label="item.label">
               <template v-if="item.type === 'textarea'">
+                <!-- 数据来源：接口引擎选择 + 手动输入 -->
+                <template v-if="index === 0">
+                  <el-select
+                    style="width: 166px; margin-bottom: 6px"
+                    size="small"
+                    :model-value="getApiEngineSelectValue(item.value)"
+                    @update:model-value="(val) => handleApiEngineSelect(index, val)"
+                    placeholder="选择接口引擎"
+                    filterable
+                    clearable
+                    @clear="handleInputChange(index, '')"
+                    :loading="apiEngineLoading"
+                    @visible-change="(visible) => visible && loadApiEngineList()"
+                  >
+                    <el-option
+                      v-for="eng in apiEngineList"
+                      :key="eng.Id"
+                      :label="eng.Title || eng.ApiEngineKey"
+                      :value="eng.ApiEngineKey"
+                    >
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span>{{ eng.Title || eng.ApiEngineKey }}</span>
+                        <span style="color:var(--el-text-color-secondary);font-size:11px;margin-left:8px">{{ eng.ApiEngineKey }}</span>
+                      </div>
+                    </el-option>
+                  </el-select>
+                </template>
                 <el-input
                   style="width: 166px"
                   :model-value="localInputValues[index] || item.value"
                   @input="handleInputChange(index, $event)"
                   type="textarea"
                   :rows="item.typeOptions.rows"
-                  placeholder="请输入webapi地址"
+                  :placeholder="index === 0 ? '选择接口引擎或输入API地址' : '请输入webapi地址'"
                 />
                 <template v-if="index === 0">
                   <el-button
@@ -345,9 +372,10 @@
 </template>
 
 <script setup name="widget-attr">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePageEngineStore } from '../../../stores/pageEngine'
+import { DiyCommon } from '@/utils/diy.common'
 import JsonEditor from 'ceel-json-editor'
 import 'jsoneditor/dist/jsoneditor.css'
 import { ElMessage } from 'element-plus'
@@ -365,13 +393,19 @@ const activeName1 = ref('first')
 const updateIndex = ref(0)
 
 // 防抖工具函数
+const _debounceTimerIds = []
 const debounce = (func, delay) => {
   let timeoutId
   return function (...args) {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     timeoutId = setTimeout(() => func.apply(this, args), delay)
+    _debounceTimerIds.push(timeoutId)
   }
 }
+
+onBeforeUnmount(() => {
+  _debounceTimerIds.forEach(id => clearTimeout(id))
+})
 
 // 本地输入值缓存，用于防抖
 const localInputValues = ref({})
@@ -422,6 +456,54 @@ const handleInputChange = (index, value) => {
 // 处理通用配置输入变化
 const handleGeneralInputChange = (path, value) => {
   debouncedUpdateGeneral(path, value)
+}
+
+// ===== 接口引擎选择 =====
+const API_ENGINE_URL_PREFIX = '$ApiBase$/apiengine/'
+const API_ENGINE_URL_SUFFIX = '--OsClient--$OsClient$--'
+const apiEngineList = ref([])
+const apiEngineLoading = ref(false)
+let apiEngineLoaded = false
+
+const loadApiEngineList = async () => {
+  if (apiEngineLoaded && apiEngineList.value.length > 0) return
+  apiEngineLoading.value = true
+  try {
+    const res = await DiyCommon.FormEngine.GetTableData({
+      FormEngineKey: 'sys_apiengine',
+      _PageSize: 500,
+      _SelectFields: ['Id', 'ApiEngineKey', 'Title'],
+      _OrderBy: 'Title'
+    })
+    if (res && res.Code === 1 && res.Data) {
+      apiEngineList.value = res.Data
+      apiEngineLoaded = true
+    }
+  } catch (e) {
+    console.error('加载接口引擎列表失败:', e)
+  } finally {
+    apiEngineLoading.value = false
+  }
+}
+
+// 从value中解析出ApiEngineKey（兼容旧数据）
+const getApiEngineSelectValue = (value) => {
+  if (!value) return ''
+  if (value.startsWith(API_ENGINE_URL_PREFIX)) {
+    const key = value.replace(API_ENGINE_URL_PREFIX, '').replace(API_ENGINE_URL_SUFFIX, '')
+    return key
+  }
+  return ''
+}
+
+// 选择接口引擎
+const handleApiEngineSelect = (index, apiEngineKey) => {
+  if (!apiEngineKey) {
+    handleInputChange(index, '')
+    return
+  }
+  const url = `${API_ENGINE_URL_PREFIX}${apiEngineKey}${API_ENGINE_URL_SUFFIX}`
+  handleInputChange(index, url)
 }
 
 //当前组件json

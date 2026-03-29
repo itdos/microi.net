@@ -93,7 +93,7 @@
 <script setup name="common-widget">
 import { computed, defineProps, toRaw } from 'vue'
 import { EventBus } from '../../../utils/eventBus.js'
-import { deepClone, buildDefaultWidgetJson } from '../../../utils/util'
+import { deepClone, buildDefaultWidgetJson, generateId } from '../../../utils/util'
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
@@ -162,11 +162,29 @@ const thisWrapperIdx = computed(() => {
 })
 //当前组件的索引信息
 const thisWidgetIdx = computed(() => {
+  if (thisWrapperIdx.value < 0) return -1
   return formData.value.JsonObj.wrapperList[
     thisWrapperIdx.value
   ].widgetList.findIndex(
     (item) => item.widgetOption.number === props.widgetObj.widgetOption.number
   )
+})
+
+// 检测组件是否在Tab容器的tabWidgetMap中
+const tabLocation = computed(() => {
+  if (thisWrapperIdx.value < 0) return null
+  const wrapper = formData.value.JsonObj.wrapperList[thisWrapperIdx.value]
+  if (!wrapper || !wrapper.tabWidgetMap) return null
+  for (const tabKey of Object.keys(wrapper.tabWidgetMap)) {
+    const widgets = wrapper.tabWidgetMap[tabKey]
+    const idx = widgets.findIndex(
+      (item) => item.widgetOption.number === props.widgetObj.widgetOption.number
+    )
+    if (idx > -1) {
+      return { tabKey, widgetIdx: idx }
+    }
+  }
+  return null
 })
 
 //点击该组件,设置当前组件为选中状态
@@ -183,6 +201,9 @@ const handleSetCurWidget = (e) => {
   if (thisWidgetIdx.value > -1) {
     //修改状态机
     pageEngineStore.setCurWidgetIdx(thisWidgetIdx.value)
+  } else if (tabLocation.value) {
+    // 组件在Tab容器内，直接设置
+    pageEngineStore.setCurWidgetDirect(props.widgetObj)
   }
 }
 
@@ -194,7 +215,14 @@ const handleDelClick = () => {
     type: 'warning',
   })
     .then(() => {
-      pageEngineStore.delWidget(thisWrapperIdx.value, thisWidgetIdx.value)
+      if (thisWidgetIdx.value > -1) {
+        pageEngineStore.delWidget(thisWrapperIdx.value, thisWidgetIdx.value)
+      } else if (tabLocation.value) {
+        const wrapper = formData.value.JsonObj.wrapperList[thisWrapperIdx.value]
+        wrapper.tabWidgetMap[tabLocation.value.tabKey].splice(tabLocation.value.widgetIdx, 1)
+        pageEngineStore.setCurWidgetDirect(null)
+        pageEngineStore.curWidgetIdx = -1
+      }
       ElNotification({
         type: 'success',
         title: '提示',
@@ -218,7 +246,14 @@ const handleCopyClick = () => {
     type: 'warning',
   })
     .then(() => {
-      pageEngineStore.copyWidget(curWrapper.value, curWidget.value)
+      if (tabLocation.value) {
+        const wrapper = formData.value.JsonObj.wrapperList[thisWrapperIdx.value]
+        const cloneWidget = deepClone(props.widgetObj)
+        cloneWidget.widgetOption.number = generateId()
+        wrapper.tabWidgetMap[tabLocation.value.tabKey].push(cloneWidget)
+      } else {
+        pageEngineStore.copyWidget(curWrapper.value, curWidget.value)
+      }
       ElNotification({
         type: 'success',
         title: '提示',
@@ -343,9 +378,7 @@ const startResizeMargin = useResizable(curWidget, 'marginTop').startResize
 .resize-handle {
   position: absolute;
   border-radius: 4px;
-  background-color: #67c23a;
-  background-color: #67c23a;
-  border-radius: 4px;
+  background-color: var(--el-color-success);
 }
 
 .resize-handle-top {

@@ -1,131 +1,58 @@
 <template>
   <div class="layout-headerPanel">
-    <el-row>
-      <el-col :span="2">
+    <div class="header-accent-bar"></div>
+    <div class="header-body">
+      <div class="header-section header-left">
         <el-icon class="lefticon" @click="pageEngineStore.changeLeft">
           <component
             :is="formData.JsonObj.formConfig.left == true ? Fold : Expand"
           ></component>
         </el-icon>
-      </el-col>
-      <el-col :span="6" class="colleft">
-        <div contenteditable="false">
-          <span>{{ title }} </span>
-          <el-icon style="margin-left: 5px; color: #67c23a" :size="16">
-            <MagicStick />
-          </el-icon></div
-      ></el-col>
-      <el-col :span="8" class="main">
-        <el-button-group>
-          <el-tooltip content="页面数据可视化">
-            <el-button size="small" :icon="Tickets" @click="showJsonClick"
-              >查看JSON</el-button
-            >
-          </el-tooltip>
-          <el-tooltip content="清空当前页面所有容器和组件">
-            <el-button size="small" :icon="Delete" @click="clearClick"
-              >清空画布</el-button
-            >
-          </el-tooltip>
-          <el-tooltip content="简单排版，供参考学习">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Star"
-              @click="mockClick(0)"
-              >模板1</el-button
-            >
-          </el-tooltip>
-          <el-tooltip content="简单排版，供参考学习">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Star"
-              @click="mockClick(1)"
-              >模板2</el-button
-            >
-          </el-tooltip>
-          <el-tooltip content="简单排版，供参考学习">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Star"
-              @click="mockClick(2)"
-              >模板3</el-button
-            >
-          </el-tooltip>
-          <!-- <el-tooltip content="简单排版，供参考学习">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Star"
-              @click="mockClick(3)"
-              >模板4</el-button
-            >
-          </el-tooltip> -->
-          <!-- <el-tooltip content="临时保存页面数据到缓存">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Lock"
-              @click="lockClick()"
-              >锁定</el-button
-            >
-          </el-tooltip>
-          <el-tooltip content="清除数据缓存">
-            <el-button
-              size="small"
-              :loading="btnLoading"
-              :icon="Unlock"
-              @click="unLockClick()"
-              >解锁</el-button
-            >
-          </el-tooltip> -->
-        </el-button-group>
-      </el-col>
-      <el-col :span="4">
-        <div>
-          <el-button
-            type="success"
-            size="small"
-            plain
-            :icon="View"
-            round
-            @click="previewClick"
-            >预览</el-button
-          >
-          <el-button
-            type="primary"
-            size="small"
-            plain
-            :loading="btnLoading"
-            @click="saveClick"
-            :icon="Collection"
-            >保存</el-button
-          >
+        <div class="header-brand">
+          <span class="brand-text">{{ title }}</span>
+          <el-icon class="brand-icon" :size="15"><MagicStick /></el-icon>
         </div>
-      </el-col>
-      <el-col :span="4" style="text-align: right">
-        <el-tooltip content="切换主题模式">
+      </div>
+      <div class="header-section header-center">
+        <div class="toolbar-group">
+          <el-tooltip content="页面数据可视化" placement="bottom">
+            <el-button size="small" text :icon="Tickets" @click="showJsonClick">JSON</el-button>
+          </el-tooltip>
+          <el-tooltip content="清空所有容器和组件" placement="bottom">
+            <el-button size="small" text :icon="Delete" @click="clearClick">清空</el-button>
+          </el-tooltip>
+          <el-dropdown trigger="click" @command="mockClick" :teleported="true">
+            <el-button size="small" text :loading="btnLoading" :icon="Star">
+              模板<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item :command="0"><el-icon><Star /></el-icon>模板 1</el-dropdown-item>
+                <el-dropdown-item :command="1"><el-icon><Star /></el-icon>模板 2</el-dropdown-item>
+                <el-dropdown-item :command="2"><el-icon><Star /></el-icon>模板 3</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+        <el-divider direction="vertical" class="header-divider" />
+        <el-button type="success" size="small" plain :icon="View" @click="previewClick" round>预览</el-button>
+        <el-button type="primary" size="small" :loading="btnLoading" @click="saveClick" :icon="Collection" round>保存</el-button>
+      </div>
+      <div class="header-section header-right">
+        <el-tooltip content="切换主题模式" placement="bottom">
           <el-switch
             @change="darkChange"
             v-model="isDark"
-            style="
-              --el-switch-on-color: #e6a23c;
-              --el-switch-off-color: #409eff;
-              margin-right: 10px;
-            "
+            class="theme-switch"
             :active-action-icon="Moon"
             :inactive-action-icon="Sunny"
           />
         </el-tooltip>
-        <el-tooltip content="会清除页面所有缓存和自定义设置">
-          <el-button size="small" type="info" text @click="setIni"
-            >初始化配置 <el-icon class="el-icon--right"><Setting /></el-icon
-          ></el-button>
+        <el-tooltip content="初始化页面配置" placement="bottom">
+          <el-button size="small" type="info" text :icon="Setting" @click="setIni" circle />
         </el-tooltip>
-      </el-col>
-    </el-row>
+      </div>
+    </div>
   </div>
   <el-drawer title="页面JSON" v-model="jsonDrawer" direction="ltr">
     <el-form>
@@ -181,6 +108,7 @@ import {
   Star,
   Lock,
   Unlock,
+  ArrowDown,
 } from '@element-plus/icons-vue'
 import JsonEditor from 'ceel-json-editor'
 import 'jsoneditor/dist/jsoneditor.css'
@@ -204,7 +132,7 @@ const { formData } = storeToRefs(pageEngineStore)
 const btnLoading = ref(false)
 
 //页面标题
-const title = ref('界面设计引擎 v1.3.7')
+const title = ref('Microi 界面引擎')
 
 //是否暗黑模式
 const isDark = useDark()
@@ -361,34 +289,103 @@ const mockClick = (index) => {
 
 <style lang="scss" scoped>
 .layout-headerPanel {
-  line-height: 60px;
-  // background-color: #fff;
-  box-shadow: 0 0px 1px 0 #999;
-  text-align: center;
+  position: relative;
+
+  .header-accent-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--el-color-primary), var(--el-color-success), var(--el-color-warning));
+  }
+
+  .header-body {
+    display: flex;
+    align-items: center;
+    height: 53px;
+    padding: 0 16px;
+    background-color: var(--el-bg-color);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s;
+    gap: 12px;
+  }
+
+  .header-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-left {
+    flex: 0 0 auto;
+    gap: 12px;
+  }
+
+  .header-center {
+    flex: 1;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .header-right {
+    flex: 0 0 auto;
+    gap: 12px;
+  }
+
   .lefticon {
     font-size: 18px;
     cursor: pointer;
-    color: #66b1ff;
+    color: var(--el-text-color-secondary);
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    &:hover {
+      color: var(--el-color-primary);
+      background-color: var(--el-color-primary-light-9);
+    }
   }
-  .colleft {
-    text-align: left;
-    span {
-      font-size: 0.9rem;
-      letter-spacing: 1px;
-      text-align: center;
-      line-height: 1em;
-      background-image: linear-gradient(90deg, #409eff, #67c23a);
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    .brand-text {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background-image: linear-gradient(135deg, var(--el-color-primary), var(--el-color-success));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      outline: none;
-      // text-shadow: 0 0 4px #409eff;
+      white-space: nowrap;
     }
-    i {
-      font-size: 14px;
-      font-weight: 500;
-      margin-right: 5px;
+    .brand-icon {
+      color: var(--el-color-success);
+      animation: sparkle 2s ease-in-out infinite;
     }
   }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    background: var(--el-fill-color-lighter);
+    border-radius: 8px;
+    padding: 2px 4px;
+    gap: 2px;
+    transition: background-color 0.3s;
+  }
+
+  .header-divider {
+    height: 20px;
+    margin: 0 4px;
+  }
+
+  .theme-switch {
+    --el-switch-on-color: #e6a23c;
+    --el-switch-off-color: #409eff;
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: rotate(0deg); }
+  50% { opacity: 0.6; transform: rotate(15deg); }
 }
 </style>

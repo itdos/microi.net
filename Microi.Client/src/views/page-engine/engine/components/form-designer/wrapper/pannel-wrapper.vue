@@ -527,20 +527,20 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
 
   .effect {
     border: 2px solid transparent;
+    transition: border-color 0.2s, box-shadow 0.3s;
   }
 
   .hover-effect-blue {
-    border: 2px dashed #66b1ff;
+    border: 2px dashed var(--el-color-primary-light-3);
   }
   .hover-effect-green {
-    border: 2px dashed #67c23a;
+    border: 2px dashed var(--el-color-success-light-3);
   }
 
   .hover-effect {
     transition: box-shadow 0.3s;
     cursor: pointer;
-
-    border-radius: 2px;
+    border-radius: 6px;
     .drag-top {
       top: 4px;
       cursor: move;
@@ -551,18 +551,18 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
     }
     .drag-center {
       left: 120px;
-      background: #66b1ff;
+      background: var(--el-color-primary);
     }
 
     .drag-left {
       left: 4px;
-      background: #66b1ff;
-      // opacity: 0.9;
+      background: var(--el-color-primary);
+      border-radius: 4px;
     }
     .drag-right {
       right: 4px;
-      background: #67c23a;
-      // opacity: 0.9;
+      background: var(--el-color-success);
+      border-radius: 4px;
     }
 
     .drag-handler {
@@ -597,9 +597,7 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
 .resize-handle {
   position: absolute;
   border-radius: 4px;
-  background-color: #66b1ff;
-  background-color: #66b1ff;
-  border-radius: 4px;
+  background-color: var(--el-color-primary);
   z-index: 999;
 }
 

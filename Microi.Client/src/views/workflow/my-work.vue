@@ -65,8 +65,9 @@
                         </el-button>
                     </div>
 
-                    <!-- 工作流表格 -->
+                    <!-- 我的待办表格（wf_work） -->
                     <el-table
+                        v-show="WorkType == 'Todo'"
                         v-loading="TableLoading"
                         :data="MyWorkList"
                         @selection-change="TableRowSelectionChange"
@@ -88,9 +89,61 @@
                                 <span v-html="GetNotice(scope.row)"></span>
                             </template>
                         </el-table-column>
-                        <el-table-column v-if="WorkType == 'Todo'" :label="'发送人'" width="100">
+                        <el-table-column :label="'发送人'" width="100">
                             <template #default="scope">
                                 <span :title="scope.row.Sender">{{ scope.row.Sender }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="'节点名称'" show-overflow-tooltip width="120">
+                            <template #default="scope">
+                                <span v-html="GetNodeName(scope.row)"></span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="'发起人'" width="100">
+                            <template #default="scope">
+                                <span :title="scope.row.FirstSender">{{ scope.row.FirstSender || scope.row.Sender }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.CreateTime')" width="150">
+                            <template #default="scope">
+                                <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" width="240">
+                            <template #default="scope">
+                                <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'Edit')">
+                                    {{ "去处理" }}
+                                </el-button>
+                                <el-button :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'View', 'Cancel')">
+                                    {{ "作废" }}
+                                </el-button>
+                            </template>
+                        </el-table-column>
+                        <template #empty>
+                            <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'" />
+                        </template>
+                    </el-table>
+
+                    <!-- 我发起的/我处理的/抄送我的/我相关的表格（wf_flow） -->
+                    <el-table
+                        v-show="WorkType != 'Todo'"
+                        v-loading="TableLoading"
+                        :data="MyWorkList"
+                        style="width: 100%"
+                        class="work-table"
+                        stripe
+                        border
+                        highlight-current-row
+                    >
+                        <el-table-column type="index" width="40" />
+                        <el-table-column :label="'标题'" show-overflow-tooltip width="200">
+                            <template #default="scope">
+                                <span :title="scope.row.FlowTitle">{{ scope.row.FlowTitle }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="'内容'" show-overflow-tooltip>
+                            <template #default="scope">
+                                <span v-html="GetNotice(scope.row)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column v-if="WorkType != 'Sender'" :label="'节点名称'" show-overflow-tooltip width="120">
@@ -103,7 +156,7 @@
                                 <span :title="scope.row.FirstSender">{{ scope.row.FirstSender || scope.row.Sender }}</span>
                             </template>
                         </el-table-column>
-                        <el-table-column v-if="WorkType != 'Todo'" :label="'流程状态'" width="100">
+                        <el-table-column :label="'流程状态'" width="100">
                             <template #default="scope">
                                 <span v-html="GetFlowState(scope.row.FlowState)"></span>
                             </template>
@@ -113,13 +166,10 @@
                                 <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="GetRightBtnsWidth()">
+                        <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="GetFlowRightBtnsWidth()">
                             <template #default="scope">
-                                <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, WorkType == 'Todo' ? 'Edit' : 'View')">
-                                    {{ WorkType == "Todo" ? "去处理" : "查看" }}
-                                </el-button>
-                                <el-button v-if="WorkType == 'Todo'" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'View', 'Cancel')">
-                                    {{ "作废" }}
+                                <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'View')">
+                                    {{ "查看" }}
                                 </el-button>
                                 <el-button
                                     v-if="(WorkType == 'Done' || WorkType == 'Sender') && scope.row.FlowState != 'End' && scope.row.FlowState != 'Cancel'"
@@ -385,6 +435,13 @@ export default {
         GetRightBtnsWidth() {
             var self = this;
             if (self.WorkType == "Done" || self.WorkType == "Todo" || self.WorkType == "Sender") {
+                return 240;
+            }
+            return 120;
+        },
+        GetFlowRightBtnsWidth() {
+            var self = this;
+            if (self.WorkType == "Done" || self.WorkType == "Sender") {
                 return 240;
             }
             return 120;

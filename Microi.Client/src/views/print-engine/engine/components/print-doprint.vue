@@ -1,15 +1,8 @@
 <template>
   <div class="microi-print-engine" v-loading="loading">
-    <el-container>
-      <el-main style="padding: 15px 0">
-        <el-card
-          style="padding: 5px; height: calc(85vh - 10px); overflow-y: auto"
-        >
-          <!-- 设计器的 容器 -->
-          <div ref="hiprintPrintContainer"></div>
-        </el-card>
-      </el-main>
-    </el-container>
+    <div class="mpe-print-canvas">
+      <div ref="hiprintPrintContainer"></div>
+    </div>
   </div>
 </template>
 
@@ -28,7 +21,7 @@ import { usePrintEngineStore } from '../stores/printEngine'
 import { get } from '../utils/axiosInstance'
 const printEngineStore = usePrintEngineStore()
 // 工具
-import { newHiprintPrintTemplate } from '../utils/template-helper'
+import { newHiprintPrintTemplate, removeHiprintPrintTemplate } from '../utils/template-helper'
 
 const loading = ref(true)
 const props = defineProps({
@@ -295,209 +288,29 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   // 取消监听事件
   window.removeEventListener('message', messageHandler)
+  // 清理打印模板，释放内存
+  removeHiprintPrintTemplate(TEMPLATE_KEY)
+  hiprintTemplate = null
+  // 清理打印 iframe
+  const oldFrame = document.getElementById('hiwprint_iframe')
+  if (oldFrame) oldFrame.parentNode.removeChild(oldFrame)
 })
 </script>
 
-<style lang="scss">
-.microi-print-engine {
-  .el-textarea__inner {
-    font-size: 13px !important;
-  }
-  .el-form-item__label {
-    font-size: 13px !important;
-  }
-
-  /* 自定义 provider 构建样式 */
-  .jsoneditor-poweredBy {
-    display: none !important;
-  }
-  .custom-style-types {
-    .hiprint-printElement-type {
-      display: block;
-      padding: 0 0 0 0;
-      list-style: none;
-
-      li {
-        //组件标题样式
-        .title {
-          display: block;
-          padding: 4px 0px;
-          clear: both;
-          margin-bottom: 10px;
-          font-size: 13px;
-        }
-      }
-
-      ul {
-        padding: 0 0 0 0;
-        display: block;
-        list-style: none;
-
-        //组件按钮样式
-        li {
-          display: block;
-          width: 50%;
-          float: left;
-          max-width: 100px;
-
-          a {
-            padding: 8px;
-            text-decoration: none;
-            border: 1px solid #ddd;
-            width: 90%;
-            max-width: 100px;
-            display: inline-block;
-            text-align: center;
-            box-sizing: border-box;
-            border: 1px solid #dcdfe6;
-            border-radius: 5px;
-            box-shadow: 0 0px 4px 0 rgba(0, 0, 0, 0.1);
-            font-size: 13px !important;
-            transition: background-color 0.3s ease;
-            margin-right: 10px;
-            margin-bottom: 10px;
-            color: #000;
-          }
-          a:hover {
-            color: #000;
-            background-color: #409eff;
-          }
-        }
-      }
-    }
-  }
-
-  .hiprint-option-item-field {
-    font-size: 12px !important;
-    margin-top: 10px !important;
-  }
-
-  .minicolors-swatch {
-    width: 25px !important;
-    height: 25px !important;
-  }
-
-  .design .hiprint-printElement-table-handle {
-    background: #409eff !important;
-    height: 18pt !important;
-    width: 18pt !important;
-  }
-
-  .design .hiprint-printElement-table-handle::before {
-    content: '\e849';
-    font-family: mpe-iconfont;
-    font-size: 16px;
-    color: #fff;
-    margin: 5px;
-    display: block;
-  }
-
-  .hiprint-option-item-label {
-    font-size: 13px !important;
-    margin-bottom: 10px !important;
-  }
-
-  .el-drawer__header {
-    margin-bottom: 0 !important;
-  }
-
-  .hiprint-option-item-settingBtn {
-    background: #409eff !important;
-    cursor: pointer;
-    border-radius: var(--el-border-radius-base);
-  }
-  .hiprint-option-item-deleteBtn {
-    background: #f56c6c !important;
-    cursor: pointer;
-    border-radius: var(--el-border-radius-base);
-  }
-
-  .prop-tabs,
-  .prop-tab-item,
-  .hiprint-option-items {
-    background: transparent !important;
-  }
-
-  .hiprint-option-items {
-    padding-top: 15px !important;
-  }
-
-  .custom-tabs-label .el-icon {
-    margin-right: 5px !important;
-  }
-  .hiprint-option-item-field input,
-  select,
-  textarea {
-    color: var(--el-input-text-color, var(--el-text-color-regular)) !important;
-    flex-grow: 1 !important;
-    font-size: inherit !important;
-    height: var(--el-input-inner-height) !important;
-    line-height: var(--el-input-inner-height) !important;
-    padding: 8px 10px !important;
-    border-radius: var(--el-border-radius-base) !important;
-    border-color: var(
-      --el-input-border-color,
-      var(--el-border-color)
-    ) !important;
-  }
-
-  .hiprint-option-item-field input:focus,
-  select:focus,
-  textarea:focus {
-    outline: none; /* 先移除默认的边框 */
-    border: 1.2px solid #409eff !important; /* 设置新的边框颜色 */
-  }
-}
-</style>
-
 <style lang="scss" scoped>
 .microi-print-engine {
-  .elheader {
-    line-height: 60px;
-    text-align: center;
-    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.1);
-    margin-top: 15px;
+  .mpe-print-canvas {
+    padding: 16px;
+    height: calc(100vh - 32px);
+    overflow-y: auto;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(118, 75, 162, 0.03) 0%, transparent 50%),
+      #f0f2f5;
 
-    .leftlogo {
-      span {
-        font-size: 14px;
-        letter-spacing: 4px;
-
-        text-align: center;
-        line-height: 1em;
-        color: #409eff;
-        outline: none;
-
-        // text-shadow: 0 0 4px #409eff;
-      }
-
-      @keyframes mpe-spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      .spin-icon {
-        animation: mpe-spin 4s infinite linear;
-        color: #409eff;
-        margin-left: 10px;
-      }
-    }
-
-    .popover {
-      position: absolute;
-      margin-top: 10px;
-      z-index: 10;
-
-      .popover-content {
-        background: white;
-        border-radius: 4px;
-        padding: 10px 20px;
-        box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.1);
-      }
+    :deep(.hiprint-printPaper) {
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+      border-radius: 2px;
     }
   }
 }

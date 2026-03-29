@@ -684,6 +684,108 @@
     color: #f56c6c;
 }
 
+/* 列头菜单样式 */
+.col-header-cell {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    width: 100%;
+    user-select: none;
+    margin: 0;
+    padding: 0;
+    .col-header-sort-indicator {
+        margin-left: 4px;
+        display: flex;
+        align-items: center;
+        // color: var(--color-primary, #409eff);
+    }
+    .col-header-menu-icon {
+        margin-left: auto;
+        opacity: 0;
+        color: #000000;
+        transition: opacity 0.2s, color 0.2s;
+        // flex-shrink: 0;
+        margin:0px;
+        padding:0px;
+        justify-content: right;
+    }
+    &:hover .col-header-menu-icon {
+        opacity: 1;
+        // color: var(--color-primary, #409eff);
+    }
+}
+/* 表头鼠标手型 */
+.el-table th.el-table__cell {
+    cursor: pointer;
+}
+
+.global-col-header-menu {
+    position: fixed;
+    z-index: 10;
+    background: #fff;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    min-width: 240px;
+    max-width: 300px;
+    padding: 6px 0;
+    animation: colMenuFadeIn 0.15s ease-out;
+}
+@keyframes colMenuFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.global-col-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #303133;
+    transition: background-color 0.15s;
+    position: relative;
+    &:hover {
+        background-color: #f5f7fa;
+        color: var(--color-primary, #409eff);
+    }
+    &.is-active {
+        color: var(--color-primary, #409eff);
+        font-weight: 500;
+    }
+    .col-menu-check {
+        margin-left: auto;
+        color: var(--color-primary, #409eff);
+        width: auto;
+    }
+}
+.global-col-menu-divider {
+    height: 1px;
+    background: #ebeef5;
+    margin: 4px 12px;
+}
+.global-col-menu-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px 4px;
+    font-size: 12px;
+    color: #909399;
+    font-weight: 500;
+}
+.global-col-menu-filter {
+    padding: 4px 12px 8px;
+    .col-filter-body {
+        display: flex;
+        flex-direction: column;
+    }
+    .col-filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+}
+
 /* 移动端样式优化 */
 .mobile-header {
     display: flex;
@@ -1360,5 +1462,83 @@
             box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.12),
                         0 4px 12px rgba(0, 0, 0, 0.04);
         }
+    }
+}
+
+// ====== 统计面板 ======
+.table-report-panel {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 16px;
+    padding: 0 2px;
+}
+
+.table-report-card {
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--report-color) 0%, color-mix(in srgb, var(--report-color) 70%, #fff) 100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: default;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+}
+
+.table-report-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.table-report-body {
+    min-width: 0;
+}
+
+.table-report-value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.table-report-label {
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .table-report-panel {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .table-report-card {
+        padding: 12px;
+        gap: 10px;
+        border-radius: 10px;
+    }
+    .table-report-icon {
+        width: 34px;
+        height: 34px;
+        font-size: 14px;
+        border-radius: 8px;
+    }
+    .table-report-value {
+        font-size: 20px;
     }
 }

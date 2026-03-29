@@ -55,6 +55,25 @@ export const wrapperList = [
     wrapperOption: {},
     widgetList: []
   },
+  {
+    type: 'tabs',
+    label: '选项卡',
+    hidden: false,
+    icon: 'Menu',
+    img: '',  //图片图标
+    wrapperOption: {
+      tabType: '', // '' | 'card' | 'border-card'
+      tabPosition: 'top', // 'top' | 'right' | 'bottom' | 'left'
+      tabs: [
+        { key: 'tab_1', label: '标签页1' },
+        { key: 'tab_2', label: '标签页2' },
+      ],
+      activeTab: 'tab_1',
+    },
+    // tabs容器使用 tabWidgetMap: { tab_key: [widgetList] } 来存储每个tab的组件
+    tabWidgetMap: {},
+    widgetList: []
+  },
 ]
 
 //容器配置 ## 三级
