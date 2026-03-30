@@ -22,6 +22,7 @@
                     v-model="dataSourceSelected"
                     multiple
                     filterable
+                    clearable
                     :remote="isRemoteSearch"
                     :remote-method="isRemoteSearch ? loadDataSourceOptions : undefined"
                     :filter-method="isRemoteSearch ? undefined : filterDataSourceOptions"
@@ -957,7 +958,7 @@ export default {
             dataSourceSelected.value = selected;
         };
 
-        // 批量添加数据
+        // 批量添加数据（已存在的按Id更新，不存在的新增）
         const handleBatchAdd = () => {
             if (!dataSourceSelected.value || dataSourceSelected.value.length === 0) {
                 DiyCommon.Tips('请先选择要添加的数据', false);
@@ -966,29 +967,48 @@ export default {
             
             // 获取当前列配置的Key列表
             const columnKeys = columnConfig.value.map(col => col.Key);
+            let addCount = 0;
+            let uptCount = 0;
             
-            // 遍历选中的数据，添加到表格
+            // 遍历选中的数据，已存在则更新，不存在则新增
             dataSourceSelected.value.forEach(item => {
-                const newRow = {
-                    Id: item.Id || DiyCommon.NewGuid(),
-                    _rowKey: `row_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                };
-                // 只添加列配置中存在的字段
-                columnKeys.forEach(key => {
-                    if (item.hasOwnProperty(key)) {
-                        newRow[key] = item[key];
-                    } else {
-                        // 使用默认值
-                        const col = columnConfig.value.find(c => c.Key === key);
-                        newRow[key] = col?.DefaultValue !== undefined ? col.DefaultValue : '';
-                    }
-                });
-                tableData.value.push(newRow);
+                // 查找表格中是否已存在该条数据（按Id匹配）
+                const existingRow = item.Id
+                    ? tableData.value.find(row => row.Id === item.Id)
+                    : null;
+                
+                if (existingRow) {
+                    // 已存在：更新列字段值
+                    columnKeys.forEach(key => {
+                        if (item.hasOwnProperty(key)) {
+                            existingRow[key] = item[key];
+                        }
+                    });
+                    uptCount++;
+                } else {
+                    // 不存在：新增行
+                    const newRow = {
+                        Id: item.Id || DiyCommon.NewGuid(),
+                        _rowKey: `row_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                    };
+                    columnKeys.forEach(key => {
+                        if (item.hasOwnProperty(key)) {
+                            newRow[key] = item[key];
+                        } else {
+                            const col = columnConfig.value.find(c => c.Key === key);
+                            newRow[key] = col?.DefaultValue !== undefined ? col.DefaultValue : '';
+                        }
+                    });
+                    tableData.value.push(newRow);
+                    addCount++;
+                }
             });
             
             syncToParent();
-            DiyCommon.Tips('已添加 ' + dataSourceSelected.value.length + ' 条数据', true);
-            dataSourceSelected.value = [];
+            const msgs = [];
+            if (addCount > 0) msgs.push('新增 ' + addCount + ' 条');
+            if (uptCount > 0) msgs.push('更新 ' + uptCount + ' 条');
+            DiyCommon.Tips(msgs.join('，'), true);
         };
 
         // ==================== 复杂组件编辑 ====================

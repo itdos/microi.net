@@ -331,6 +331,34 @@
                   ></el-radio>
                 </el-radio-group>
               </template>
+
+              <template v-else-if="item.type === 'sysmenu'">
+                <el-popover placement="bottom" trigger="click" :width="400" @show="loadSysMenuList">
+                  <el-input
+                    v-model="sysMenuFilterText"
+                    size="small"
+                    placeholder="搜索菜单"
+                    clearable
+                    style="margin-bottom: 8px"
+                  />
+                  <el-tree
+                    ref="sysMenuTreeRef"
+                    :data="sysMenuList"
+                    node-key="Id"
+                    :props="{ label: 'Name', children: '_Child' }"
+                    :filter-node-method="filterSysMenuNode"
+                    @node-click="(data) => handleSysMenuSelect(data, index)"
+                    default-expand-all
+                    highlight-current
+                    style="max-height: 400px; overflow: auto"
+                  />
+                  <template #reference>
+                    <el-button size="small" style="width: 166px; text-align: left; justify-content: flex-start;">
+                      {{ sysMenuSelectedName || item.value || '请选择菜单' }}
+                    </el-button>
+                  </template>
+                </el-popover>
+              </template>
             </el-form-item>
           </template>
           <!-- ####在这里面添加新组件代码属性,代码结束##### -->
@@ -504,6 +532,94 @@ const handleApiEngineSelect = (index, apiEngineKey) => {
   }
   const url = `${API_ENGINE_URL_PREFIX}${apiEngineKey}${API_ENGINE_URL_SUFFIX}`
   handleInputChange(index, url)
+}
+
+// ===== 系统菜单树选择（SysMenuId） =====
+const sysMenuList = ref([])
+const sysMenuFilterText = ref('')
+const sysMenuSelectedName = ref('')
+const sysMenuTreeRef = ref(null)
+let sysMenuLoaded = false
+
+// 搜索过滤
+watch(sysMenuFilterText, (val) => {
+  sysMenuTreeRef.value?.filter(val)
+})
+
+const filterSysMenuNode = (value, data) => {
+  if (!value) return true
+  return data.Name?.includes(value)
+}
+
+// 组件切换时，根据已有value回显菜单名称
+watch(
+  () => curWidget.value?.widgetParams,
+  () => {
+    const sysMenuParam = curWidget.value?.widgetParams?.find(p => p.type === 'sysmenu')
+    if (sysMenuParam?.value && sysMenuList.value.length > 0) {
+      const found = findMenuById(sysMenuList.value, sysMenuParam.value)
+      sysMenuSelectedName.value = found ? found.Name : ''
+    } else {
+      sysMenuSelectedName.value = ''
+    }
+  },
+  { immediate: true }
+)
+
+const findMenuById = (list, id) => {
+  for (const item of list) {
+    if (item.Id === id) return item
+    if (item._Child?.length) {
+      const found = findMenuById(item._Child, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const loadSysMenuList = () => {
+  if (sysMenuLoaded && sysMenuList.value.length > 0) {
+    // 回显已选菜单名称
+    const sysMenuParam = curWidget.value?.widgetParams?.find(p => p.type === 'sysmenu')
+    if (sysMenuParam?.value) {
+      const found = findMenuById(sysMenuList.value, sysMenuParam.value)
+      if (found) sysMenuSelectedName.value = found.Name
+    }
+    return
+  }
+  DiyCommon.Post(
+    '/api/SysMenu/GetSysMenuStep',
+    {
+      _SelectFields: ['Id', 'Name', 'Icon', 'IconClass', 'Display', 'OpenType', 'DiyTableId', 'ParentId', 'Sort'],
+      TableName: 'Sys_Menu',
+      _OrderBy: 'Sort',
+      _OrderByType: 'ASC'
+    },
+    (result) => {
+      if (result && result.Code === 1 && result.Data) {
+        sysMenuList.value = result.Data
+        sysMenuLoaded = true
+        // 回显已选菜单名称
+        const sysMenuParam = curWidget.value?.widgetParams?.find(p => p.type === 'sysmenu')
+        if (sysMenuParam?.value) {
+          const found = findMenuById(sysMenuList.value, sysMenuParam.value)
+          if (found) sysMenuSelectedName.value = found.Name
+        }
+      }
+    }
+  )
+}
+
+const handleSysMenuSelect = (data, index) => {
+  if (data.OpenType === 'Diy' && data.DiyTableId) {
+    // 设置菜单ID（当前 widgetParams[index]）
+    handleInputChange(index, data.Id)
+    sysMenuSelectedName.value = data.Name
+    // 同时自动填充模块ID（widgetParams[0]，即 DiyTableId）
+    if (curWidget.value?.widgetParams?.[0]) {
+      handleInputChange(0, data.DiyTableId)
+    }
+  }
 }
 
 //当前组件json
