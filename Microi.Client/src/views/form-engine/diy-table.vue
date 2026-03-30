@@ -7,6 +7,7 @@
             paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '0px' }"
     >
         <!-- type="border-card" -->
+        <!-- 设备tabs(设备、服务数据) -->
         <el-tabs
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
@@ -52,7 +53,7 @@
                 </div>
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
-                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-header">
+                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram&&ShowAddByRoute" class="mobile-header">
                     <div class="mobile-header-left">
                         <el-icon class="back-icon" @click="$router.back()">
                             <ArrowLeft />
@@ -81,7 +82,7 @@
                             {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
                         </el-button>
                         <!-- 全部分享按钮 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0&& !diyStore.IsPhoneView">
                             <!-- HandlerBtns(SysMenuModel.PageBtns) -->
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
@@ -97,7 +98,7 @@
                             </template>
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0&& !diyStore.IsPhoneView">
                             <el-checkbox
                                 v-if="TableDisplayMode == 'Card' && TableEnableBatch"
                                 v-model="cardSelectAll"
@@ -154,14 +155,13 @@
                         </template>
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
-
+                    <!-- 通用搜索 -->
                     <div class="search-input-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
                     </div>
-
-                    <template v-if="IsPermission('NoSearch')">
+                    <!-- <template v-if="IsPermission('NoSearch')">
                         <DiySearch
                             v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                             :ref="'refDiySearch1'"
@@ -174,7 +174,7 @@
                             @CallbackGetDiyTableRow="GetDiyTableRow"
                             @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                         ></DiySearch>
-                    </template>
+                    </template> -->
                     <!--清除搜索-->
                     <div class="search-clear-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch')">
                         <el-button
@@ -244,7 +244,7 @@
                 </div>
 
                 <!--DIY移动端顶部搜索-->
-                <div class="keyword-search" v-if="diyStore.IsPhoneView&&ShowAddByRoute">
+                <div class="keyword-search" v-if="diyStore.IsPhoneView">
                   <div class="search-box">
                     <div class="search-input-group" style="max-width:240px;"
                       v-if=" IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" >
@@ -254,7 +254,7 @@
                             @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                       </el-input>
                     </div>
-                    <div class="more-search" @click="showMobileSearch=true">
+                    <div v-if="ShowAddByRoute" class="more-search" @click="showMobileSearch=true">
                       <el-icon><Operation /></el-icon>
                     </div>
                   </div>

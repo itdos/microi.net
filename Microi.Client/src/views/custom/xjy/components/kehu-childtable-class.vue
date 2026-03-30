@@ -84,7 +84,7 @@
   import { useDiyStore } from '@/pinia';
   import { computed } from 'vue';
 export default {
-    name: "khChildtable",
+    name: "KehuChildtableClass",
      setup() {
             const diyStore = useDiyStore();
             const isPhoneView = computed(() => diyStore.IsPhoneView);
