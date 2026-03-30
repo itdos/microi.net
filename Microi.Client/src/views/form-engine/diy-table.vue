@@ -69,7 +69,7 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
-                <div class="keyword-search" v-if="!ShowAddByRoute">
+                <div class="keyword-search" v-if="!(diyStore.IsPhoneView&&ShowAddByRoute)">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
@@ -239,7 +239,7 @@
                 </div>
 
                 <!--DIY移动端新增按钮-->
-                <div class="addBtn" v-if="ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
+                <div class="addBtn" v-if="diyStore.IsPhoneView&&ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
                   <el-icon class="addIcon"><Plus /></el-icon>
                 </div>
 
