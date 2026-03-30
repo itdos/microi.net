@@ -59,7 +59,7 @@ export const wrapperList = [
     type: 'tabs',
     label: '选项卡',
     hidden: false,
-    icon: 'Menu',
+    icon: 'Document',
     img: '',  //图片图标
     wrapperOption: {
       tabType: '', // '' | 'card' | 'border-card'

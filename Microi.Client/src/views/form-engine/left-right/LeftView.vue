@@ -59,7 +59,7 @@
             {{ LeftTreeData.ShubiaoT || "分类" }}
         </div>
         <div style="float: right">
-            <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level === 999">页面配置 </el-button>
+            <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level >= 9999">页面配置 </el-button>
             <el-button type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
             <el-button style="margin-left: 5px" @click="refreshTree" v-if="LeftTreeData.ShushuaX === 1">刷新 </el-button>
         </div>

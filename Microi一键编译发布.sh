@@ -260,7 +260,7 @@ echo -e "  ${BOLD}【发布模式】${NC}"
 echo "    1) 只编译前端和后端（不推送Docker、不推送NuGet、版本号不变）"
 echo "    2) 只发布后端（推送Docker、推送NuGet、版本号+1）"
 if [ "$HAS_CLIENT" = true ]; then
-    echo "    3) 只发布前端（推送Docker、不推送NuGet、版本号+1）"
+    echo "    3) 只发布前端（推送Docker、不推送NuGet、版本号不变）"
     echo "    4) 发布前端和后端（推送Docker、推送NuGet、版本号+1）"
 else
     echo -e "    ${DIM}3) 只发布前端（未检测到前端源码，不可用）${NC}"
@@ -295,8 +295,8 @@ case "$DEPLOY_MODE" in
         BUMP_VERSION=true; BUILD_BACKEND=true; PUBLISH_BACKEND=true
         PUSH_NUGET=true; PUSH_DOCKER=true
         ;;
-    3)  # 只发布前端
-        BUMP_VERSION=true; BUILD_CLIENT=true; PUSH_DOCKER=true
+    3)  # 只发布前端（版本号不变）
+        BUILD_CLIENT=true; PUSH_DOCKER=true
         ;;
     4)  # 发布前端和后端
         BUMP_VERSION=true; BUILD_BACKEND=true; PUBLISH_BACKEND=true

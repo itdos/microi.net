@@ -337,7 +337,7 @@ const props = defineProps({
 //页面配置信息
 const pageInfo = reactive({
   setting: {
-    title: 'Microi 打印引擎',
+    title: '打印引擎',
     version: 'V1.0.0',
     activeName: 'first', //选项卡索引
   },

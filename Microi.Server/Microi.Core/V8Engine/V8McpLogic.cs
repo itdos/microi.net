@@ -1131,7 +1131,8 @@ namespace Microi.net
         /// <summary>
         /// 新增自定义表（diy_table）
         /// </summary>
-        public static async Task<DosResult<object>> CreateTable(string osClient, string name, string description)
+        public static async Task<DosResult<object>> CreateTable(string osClient, string name, string description,
+            string tabs = null, int isTree = 0, int column = 1, string formOpenType = null, string formOpenWidth = null)
         {
             try
             {
@@ -1151,7 +1152,7 @@ namespace Microi.net
                 }
 
                 var id = Ulid.NewUlid().ToString();
-                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_table", new JObject
+                var tableData = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["Id"] = id,
@@ -1159,7 +1160,14 @@ namespace Microi.net
                     ["Description"] = description ?? "",
                     ["IsDeleted"] = 0,
                     ["_InvokeType"] = "Client"
-                });
+                };
+                if (!string.IsNullOrWhiteSpace(tabs)) tableData["Tabs"] = tabs;
+                if (isTree > 0) tableData["IsTree"] = isTree;
+                if (column > 1) tableData["Column"] = column;
+                if (!string.IsNullOrWhiteSpace(formOpenType)) tableData["FormOpenType"] = formOpenType;
+                if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData["FormOpenWidth"] = formOpenWidth;
+
+                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_table", tableData);
 
                 if (addResult.Code == 1)
                 {
@@ -1218,7 +1226,10 @@ namespace Microi.net
         public static async Task<DosResult<object>> AddField(
             string osClient, string tableId, string name, string label,
             string type, string component, int visible, int appVisible,
-            string tab, int tableWidth, int sort, int nameConfirm, int readonlyVal)
+            string tab, int tableWidth, int sort, int nameConfirm, int readonlyVal,
+            int notEmpty = 0, int unique = 0, string defaultValue = null, string placeholder = null,
+            int formWidth = 24, string data = null, string config = null, string description = null,
+            int encrypt = 0, int inTableEdit = 0)
         {
             try
             {
@@ -1238,6 +1249,16 @@ namespace Microi.net
                     Sort = sort > 0 ? sort : 100,
                     NameConfirm = nameConfirm,
                     Readonly = readonlyVal,
+                    NotEmpty = notEmpty,
+                    Unique = unique,
+                    DefaultValue = defaultValue ?? "",
+                    Placeholder = placeholder ?? "",
+                    FormWidth = formWidth > 0 ? formWidth : 24,
+                    Data = data ?? "",
+                    Config = config ?? "",
+                    Description = description ?? "",
+                    Encrypt = encrypt,
+                    InTableEdit = inTableEdit,
                     IsDeleted = 0,
                     _InvokeType = InvokeType.Client.ToString()
                 };
@@ -1273,7 +1294,10 @@ namespace Microi.net
             string osClient, string name, string diyTableId,
             string componentName, string componentPath,
             int display, int appDisplay, string openType, string url,
-            string parentId = null, int sort = 100)
+            string parentId = null, int sort = 100,
+            string icon = null, string searchFieldIds = null,
+            string tableDiyFieldIds = null, string defaultOrderBy = null,
+            string sqlWhere = null, string diyConfig = null)
         {
             try
             {
@@ -1309,7 +1333,7 @@ namespace Microi.net
                 }
 
                 var id = Ulid.NewUlid().ToString();
-                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_menu", new JObject
+                var menuData = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["Id"] = id,
@@ -1326,7 +1350,15 @@ namespace Microi.net
                     ["Url"] = url ?? "",
                     ["IsDeleted"] = 0,
                     ["_InvokeType"] = "Client"
-                });
+                };
+                if (!string.IsNullOrWhiteSpace(icon)) menuData["Icon"] = icon;
+                if (!string.IsNullOrWhiteSpace(searchFieldIds)) menuData["SearchFieldIds"] = searchFieldIds;
+                if (!string.IsNullOrWhiteSpace(tableDiyFieldIds)) menuData["TableDiyFieldIds"] = tableDiyFieldIds;
+                if (!string.IsNullOrWhiteSpace(defaultOrderBy)) menuData["DefaultOrderBy"] = defaultOrderBy;
+                if (!string.IsNullOrWhiteSpace(sqlWhere)) menuData["SqlWhere"] = sqlWhere;
+                if (!string.IsNullOrWhiteSpace(diyConfig)) menuData["DiyConfig"] = diyConfig;
+
+                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_menu", menuData);
 
                 if (addResult.Code == 1)
                 {
@@ -1360,6 +1392,152 @@ namespace Microi.net
                 osClient = currentToken.OsClient ?? ConfigHelper.GetAppSettings("OsClient");
             }
             return osClient;
+        }
+
+        #endregion
+
+        #region GetPageEngineList
+
+        /// <summary>
+        /// 获取界面引擎列表（mic_page）
+        /// </summary>
+        public static async Task<DosResult<object>> GetPageEngineList(string osClient, string keyword = null)
+        {
+            try
+            {
+                var where = new List<object>()
+                {
+                    new List<object>() { "IsDeleted", "=", "0" }
+                };
+                if (!string.IsNullOrWhiteSpace(keyword))
+                {
+                    where.Add(new List<object>() { "AND", "(", "Title", "Like", keyword });
+                    where.Add(new List<object>() { "OR", "Number", "Like", keyword });
+                    where.Add(new List<object>() { "OR", "Desc", "Like", keyword, ")" });
+                }
+
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mic_page", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "Title", "Number", "Desc", "RoutePath", "ComponentPath", "CreateTime", "UpdateTime" },
+                    _Where = where,
+                    _OrderBy = "UpdateTime",
+                    _OrderByType = "DESC",
+                    _PageSize = 100
+                });
+
+                if (result.Code != 1)
+                {
+                    return new DosResult<object>(result.Code, null, result.Msg);
+                }
+
+                return new DosResult<object>(1, result.Data);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取界面引擎列表失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
+        #region GetPageEngineDetail
+
+        /// <summary>
+        /// 获取界面引擎详情（含 JsonObj）
+        /// </summary>
+        public static async Task<DosResult<object>> GetPageEngineDetail(string osClient, string pageId)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mic_page", new
+                {
+                    OsClient = osClient,
+                    Id = pageId
+                });
+
+                if (result.Code != 1 || result.Data == null)
+                {
+                    return new DosResult<object>(result.Code == 1 ? 2 : result.Code, null, result.Code == 1 ? "页面不存在" : result.Msg);
+                }
+
+                return new DosResult<object>(1, result.Data);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取界面引擎详情失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
+        #region SavePageEngine
+
+        /// <summary>
+        /// 保存界面引擎（新增或更新 mic_page）
+        /// </summary>
+        public static async Task<DosResult<object>> SavePageEngine(string osClient, string pageId, string title, string number, string desc, string jsonStr)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(pageId))
+                {
+                    // 更新
+                    var uptData = new JObject
+                    {
+                        ["Id"] = pageId,
+                        ["Title"] = title,
+                        ["JsonObj"] = jsonStr,
+                        ["_InvokeType"] = "Client"
+                    };
+                    if (!string.IsNullOrWhiteSpace(number)) uptData["Number"] = number;
+                    if (!string.IsNullOrWhiteSpace(desc)) uptData["Desc"] = desc;
+
+                    var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("mic_page", uptData);
+                    if (uptResult.Code != 1)
+                    {
+                        return new DosResult<object>(uptResult.Code, null, uptResult.Msg);
+                    }
+
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"界面引擎 [{title}] 更新成功",
+                        PageId = pageId
+                    });
+                }
+                else
+                {
+                    // 新增
+                    var id = Ulid.NewUlid().ToString();
+                    var addData = new JObject
+                    {
+                        ["OsClient"] = osClient,
+                        ["Id"] = id,
+                        ["Title"] = title,
+                        ["JsonObj"] = jsonStr,
+                        ["IsDeleted"] = 0,
+                        ["_InvokeType"] = "Client"
+                    };
+                    if (!string.IsNullOrWhiteSpace(number)) addData["Number"] = number;
+                    if (!string.IsNullOrWhiteSpace(desc)) addData["Desc"] = desc;
+
+                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("mic_page", addData);
+                    if (addResult.Code != 1)
+                    {
+                        return new DosResult<object>(addResult.Code, null, addResult.Msg);
+                    }
+
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"界面引擎 [{title}] 创建成功",
+                        PageId = id
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存界面引擎失败：" + ex.Message);
+            }
         }
 
         #endregion
