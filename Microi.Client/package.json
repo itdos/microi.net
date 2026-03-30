@@ -120,7 +120,7 @@
     "@types/keymaster": "^1.6.33",
     "@types/lodash": "^4.17.24",
     "@vitejs/plugin-vue": "^6.0.3",
-    "autoprefixer": "^10.4.24",
+    "autoprefixer": "^10.4.27",
     "fast-glob": "^3.3.3",
     "rollup-plugin-visualizer": "^6.0.5",
     "sass": "^1.83.0",
