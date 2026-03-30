@@ -300,11 +300,15 @@ export class MicroiClient {
 
   // ---------- 低代码系统设计 API 方法 ----------
 
-  async createTable(name: string, description?: string): Promise<ApiResponse> {
+  async createTable(name: string, description?: string, options?: {
+    Tabs?: string; IsTree?: number; Column?: number;
+    FormOpenType?: string; FormOpenWidth?: string;
+  }): Promise<ApiResponse> {
     return this.post(API.CREATE_TABLE, {
       OsClient: this.config.osClient,
       Name: name,
       Description: description || '',
+      ...options,
     });
   }
 
@@ -314,6 +318,10 @@ export class MicroiClient {
     Visible?: number; AppVisible?: number;
     Tab?: string; TableWidth?: number; Sort?: number;
     NameConfirm?: number; Readonly?: number;
+    NotEmpty?: number; Unique?: number;
+    DefaultValue?: string; Placeholder?: string;
+    FormWidth?: string; Data?: string; Config?: string;
+    Description?: string; Encrypt?: number; InTableEdit?: number;
   }): Promise<ApiResponse> {
     return this.post(API.ADD_FIELD, {
       OsClient: this.config.osClient,
@@ -326,6 +334,8 @@ export class MicroiClient {
     ComponentName?: string; ComponentPath?: string;
     Display?: number; AppDisplay?: number;
     OpenType?: string; Url?: string; Sort?: number;
+    Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
+    DefaultOrderBy?: string; SqlWhere?: string; DiyConfig?: string;
   }): Promise<ApiResponse> {
     return this.post(API.CREATE_MODULE, {
       OsClient: this.config.osClient,
@@ -338,6 +348,32 @@ export class MicroiClient {
       OsClient: this.config.osClient,
       RoleId: roleId,
       MenuIds: menuIds,
+    });
+  }
+
+  // ---------- 界面引擎 API 方法 ----------
+
+  async getPageEngineList(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.GET_PAGE_ENGINE_LIST, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async getPageEngineDetail(pageId: string): Promise<ApiResponse> {
+    return this.post(API.GET_PAGE_ENGINE_DETAIL, {
+      OsClient: this.config.osClient,
+      PageId: pageId,
+    });
+  }
+
+  async savePageEngine(data: {
+    PageId?: string; Title: string; Number?: string;
+    Desc?: string; JsonStr: string;
+  }): Promise<ApiResponse> {
+    return this.post(API.SAVE_PAGE_ENGINE, {
+      OsClient: this.config.osClient,
+      ...data,
     });
   }
 

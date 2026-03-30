@@ -220,7 +220,10 @@ namespace Microi.net.Api
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
             var name = param["Name"].Val<string>();
             if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
-            var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>());
+            var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>(),
+                param["Tabs"].Val<string>(), param["IsTree"]?.Val<int>() ?? 0,
+                param["Column"]?.Val<int>() ?? 1, param["FormOpenType"].Val<string>(),
+                param["FormOpenWidth"].Val<string>());
             return Ok(result);
         }
 
@@ -242,7 +245,12 @@ namespace Microi.net.Api
                 param["Visible"]?.Val<int>() ?? 1, param["AppVisible"]?.Val<int>() ?? 1,
                 param["Tab"].Val<string>(), param["TableWidth"]?.Val<int>() ?? 120,
                 param["Sort"]?.Val<int>() ?? 100, param["NameConfirm"]?.Val<int>() ?? 0,
-                param["Readonly"]?.Val<int>() ?? 0);
+                param["Readonly"]?.Val<int>() ?? 0,
+                param["NotEmpty"]?.Val<int>() ?? 0, param["Unique"]?.Val<int>() ?? 0,
+                param["DefaultValue"].Val<string>(), param["Placeholder"].Val<string>(),
+                param["FormWidth"]?.Val<int>() ?? 24, param["Data"].Val<string>(),
+                param["Config"].Val<string>(), param["Description"].Val<string>(),
+                param["Encrypt"]?.Val<int>() ?? 0, param["InTableEdit"]?.Val<int>() ?? 0);
             return Ok(result);
         }
 
@@ -260,7 +268,10 @@ namespace Microi.net.Api
                 param["ComponentName"].Val<string>(), param["ComponentPath"].Val<string>(),
                 param["Display"]?.Val<int>() ?? 1, param["AppDisplay"]?.Val<int>() ?? 1,
                 param["OpenType"].Val<string>(), param["Url"].Val<string>(),
-                param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100);
+                param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100,
+                param["Icon"].Val<string>(), param["SearchFieldIds"].Val<string>(),
+                param["TableDiyFieldIds"].Val<string>(), param["DefaultOrderBy"].Val<string>(),
+                param["SqlWhere"].Val<string>(), param["DiyConfig"].Val<string>());
             return Ok(result);
         }
 
@@ -307,5 +318,52 @@ namespace Microi.net.Api
             var result = await V8McpLogic.SetRolePermission(osClient, roleId, menuIds);
             return Ok(result);
         }
+
+        #region 界面引擎（Page Engine）
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetPageEngineList(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var keyword = param?["Keyword"].Val<string>();
+            var result = await V8McpLogic.GetPageEngineList(osClient, keyword);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetPageEngineDetail(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var pageId = param?["PageId"].Val<string>();
+            if (pageId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "PageId 不能为空"));
+            var result = await V8McpLogic.GetPageEngineDetail(osClient, pageId);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SavePageEngine([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var title = param["Title"].Val<string>();
+            if (title.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Title 不能为空"));
+            var jsonStr = param["JsonStr"].Val<string>();
+            if (jsonStr.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "JsonStr 不能为空"));
+            var result = await V8McpLogic.SavePageEngine(
+                osClient, param["PageId"].Val<string>(), title,
+                param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr);
+            return Ok(result);
+        }
+
+        #endregion
     }
 }

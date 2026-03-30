@@ -3,7 +3,7 @@ export const diytable = {
   label: 'DIY表格',
   category: 0,
   show: 1,
-  icon: 'Grid',
+  icon: 'Document',
   img: '',
   widgetOption: {
     height: 500,

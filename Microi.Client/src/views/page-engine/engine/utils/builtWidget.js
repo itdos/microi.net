@@ -1,4 +1,6 @@
 import {
+  diytable,
+  diyform,
   workbench,
   progress,
   links,
@@ -6,6 +8,8 @@ import {
   statistic,
   tabel,
   calendar,
+  fullcalendar,
+  diycalendar,
   collapse,
   image,
   video,
@@ -23,12 +27,8 @@ import {
   webgl,
   office,
   areamap,
-  fullcalendar,
   html,
-  descriptions,
-  diytable,
-  diyform,
-  diycalendar
+  descriptions
 } from './builtWidget/index.js';
 
 
@@ -38,6 +38,8 @@ import {
  * 组件列表 ## 三级 
  */
 export const widgetList = [
+  diytable,
+  diyform,
   workbench,
   progress,
   links,
@@ -45,6 +47,8 @@ export const widgetList = [
   statistic,
   tabel,
   calendar,
+  fullcalendar,
+  diycalendar,
   collapse,
   image,
   video,
@@ -62,12 +66,8 @@ export const widgetList = [
   webgl,
   office,
   areamap,
-  fullcalendar,
   html,
-  descriptions,
-  diytable,
-  diyform,
-  diycalendar
+  descriptions
 ]
 
 //组件配置 四级
