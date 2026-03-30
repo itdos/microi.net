@@ -2,11 +2,12 @@
     <div
         id="diy-table"
         :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
-        :style="{ 
-            padding: _IsTableChild ? '0px' : '0px', 
+        :style="{
+            padding: _IsTableChild ? '0px' : '0px',
             paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '0px' }"
     >
         <!-- type="border-card" -->
+        <!-- 设备tabs(设备、服务数据) -->
         <el-tabs
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
@@ -52,7 +53,7 @@
                 </div>
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
-                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-header">
+                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram&&ShowAddByRoute" class="mobile-header">
                     <div class="mobile-header-left">
                         <el-icon class="back-icon" @click="$router.back()">
                             <ArrowLeft />
@@ -67,9 +68,9 @@
                         </el-icon>
                     </div>
                 </div>
-                
-                <!--DIY功能按钮 新版-->
-                <div class="keyword-search">
+
+                <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
+                <div class="keyword-search" v-if="!(diyStore.IsPhoneView&&ShowAddByRoute)">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
@@ -80,7 +81,8 @@
                         >
                             {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
                         </el-button>
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
+                        <!-- 全部分享按钮 -->
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0&& !diyStore.IsPhoneView">
                             <!-- HandlerBtns(SysMenuModel.PageBtns) -->
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
@@ -95,7 +97,8 @@
                                 </el-button>
                             </template>
                         </template>
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                        <!-- 全选，批量分享，批量删除 -->
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0&& !diyStore.IsPhoneView">
                             <el-checkbox
                                 v-if="TableDisplayMode == 'Card' && TableEnableBatch"
                                 v-model="cardSelectAll"
@@ -152,14 +155,13 @@
                         </template>
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
-
+                    <!-- 通用搜索 -->
                     <div class="search-input-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
                     </div>
-
-                    <template v-if="IsPermission('NoSearch')">
+                    <!-- <template v-if="IsPermission('NoSearch')">
                         <DiySearch
                             v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                             :ref="'refDiySearch1'"
@@ -172,7 +174,7 @@
                             @CallbackGetDiyTableRow="GetDiyTableRow"
                             @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                         ></DiySearch>
-                    </template>
+                    </template> -->
                     <!--清除搜索-->
                     <div class="search-clear-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch')">
                         <el-button
@@ -207,8 +209,8 @@
                             >
                         </el-popover>
                     </div>
-                    <el-button v-if="!diyStore.IsPhoneView" type="primary" :icon="List" 
-                        @click="ShiftTableDisplayMode()">{{  
+                    <el-button v-if="!diyStore.IsPhoneView" type="primary" :icon="List"
+                        @click="ShiftTableDisplayMode()">{{
                         $t('Msg.SwitchTableDisplay')
                     }}</el-button>
                     <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
@@ -234,6 +236,34 @@
                             </template>
                         </el-dropdown>
                     </div>
+                </div>
+
+                <!--DIY移动端新增按钮-->
+                <div class="addBtn" v-if="diyStore.IsPhoneView&&ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
+                  <el-icon class="addIcon"><Plus /></el-icon>
+                </div>
+
+                <!--DIY移动端顶部搜索-->
+                <div class="keyword-search" v-if="diyStore.IsPhoneView">
+                  <div class="search-box">
+                    <div class="search-input-group" style="max-width:240px;"
+                      v-if=" IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" >
+                      <el-input class="keyword-input"   v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })"
+                        :placeholder="$t('Msg.Search')">
+                        <template #append><el-button :icon="Search"
+                            @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
+                      </el-input>
+                    </div>
+                    <div v-if="ShowAddByRoute" class="more-search" @click="showMobileSearch=true">
+                      <el-icon><Operation /></el-icon>
+                    </div>
+                  </div>
+                  <!-- 筛选下拉列表和清除搜索 -->
+                  <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
+                   <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
+                    :SearchFieldIds="SearchFieldIds" :DiyFieldList="DiyFieldList" :SearchType="'Out'"
+                    @clearSearch="childClearSearch" @CallbackGetDiyTableRow="GetDiyTableRow" @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"></DiyModleSearch >
+                  </div>
                 </div>
 
                 <!--DIY搜索  【外部】搜索-->
@@ -619,7 +649,7 @@
                                 @click="CardItemClick(item)"
                             >
                                 <!-- 卡片图片区域 -->
-                                <div 
+                                <div
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
                                 >
                                     <img
@@ -632,7 +662,7 @@
                                         class="preview"
                                         :style="
                                             SysMenuModel.TableCardImgStyle ||
-                                            (SysMenuModel.TableCardImgPosition === 'Left' 
+                                            (SysMenuModel.TableCardImgPosition === 'Left'
                                                 ? 'width:120px;height:100%;object-fit:cover;flex-shrink:0;'
                                                 : 'height:100px;width:100%;object-fit:cover;')
                                         "
@@ -644,7 +674,7 @@
                                             <!-- 序号 -->
                                             <span class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             <!-- 批量选择复选框 -->
-                                            <div v-if="TableEnableBatch" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
+                                            <div v-if="TableEnableBatch&&!diyStore.IsPhoneView" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
                                                 <el-checkbox :model-value="isCardSelected(item)" />
                                             </div>
                                             <!-- 标题内容（第一个字段） -->
@@ -1005,8 +1035,8 @@
             </div>
         </teleport>
 
-        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" 
-            @CallbackGetDiyTableRow="GetDiyTableRow" 
+        <DiyFormDialog v-if="_shouldRenderDiyFormDialog"
+            @CallbackGetDiyTableRow="GetDiyTableRow"
             :FatherFormModel="FatherFormModel"
             :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
             ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
@@ -1164,6 +1194,7 @@ import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.
 import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissionDialog.vue";
 import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.vue";
 import DiySearch from "@/views/form-engine/diy-search.vue";
+import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -1175,6 +1206,7 @@ export default {
         DiyPermissionDialog,
         DiyIndexManager,
         DiySearch,
+        DiyModleSearch,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
     },
@@ -1182,11 +1214,11 @@ export default {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const SysConfig = computed(() => diyStore.SysConfig);
-        
+
         // 调试：检查 props 是否正确传递
         console.log('[DiyTableRowlist setup] ContainerClass:', props.ContainerClass);
         console.log('[DiyTableRowlist setup] PropsTableType:', props.PropsTableType);
-        
+
         return {
             diyStore,
             GetCurrentUser,
@@ -1197,22 +1229,22 @@ export default {
     // Vue 3: 使用 beforeUnmount 替代 beforeDestroy（这是最关键的修复！）
     beforeUnmount() {
         var self = this;
-        
+
         // 🔥 添加明显的日志，确认被调用
         // console.log('%c[DiyTableRowlist] ========== beforeUnmount 被触发 ==========', 'color: red; font-size: 16px; font-weight: bold');
         // console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
         // console.log('[DiyTableRowlist] SysMenuId:', self.SysMenuId);
         // console.log('[DiyTableRowlist] TableId:', self.TableId);
-        
+
         // 标记组件已销毁
         self._isDestroyed = true;
-        
+
         // 🔥 移除全局刷新事件监听
         if (self._handlePageRefresh) {
             window.removeEventListener('page-refresh', self._handlePageRefresh);
             self._handlePageRefresh = null;
         }
-        
+
         // ========== 1. 清理定时器 ==========
         if (self._importStepTimer) {
             clearTimeout(self._importStepTimer);
@@ -1254,7 +1286,7 @@ export default {
             self.DiyTableRowList.length = 0;
         }
         self.DiyTableRowList = [];
-        
+
         if (self.OldDiyTableRowList && self.OldDiyTableRowList.length > 0) {
             self.OldDiyTableRowList.forEach(row => {
                 if (row) {
@@ -1271,7 +1303,7 @@ export default {
             self.OldDiyTableRowList.length = 0;
         }
         self.OldDiyTableRowList = [];
-        
+
         // 清理字段列表中的配置
         if (self.DiyFieldList && self.DiyFieldList.length > 0) {
             self.DiyFieldList.forEach(field => {
@@ -1356,7 +1388,7 @@ export default {
         // ========== 9. 清理权限模拟数据 ==========
         self.MockPermissionRoleList = [];
         self.MockPermissionBtnList = [];
-        
+
         // ========== 10. 清理全局菜单事件监听器 ==========
         document.removeEventListener('click', self.hideMoreMenu);
         document.removeEventListener('click', self.hideColHeaderMenu);
@@ -1368,6 +1400,16 @@ export default {
         console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
+      // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
+        ShowAddByRoute() {
+          const route = this.$route || {};
+          const path = route.path || '';
+          // 方案 A：排除表单页面（当路由包含 /diy/form-page 时隐藏新增）
+          if (path.includes('/diy/form-page')) return false;
+          // 方案 B：只在特定列表路由显示（可按需修改）
+          // return path.startsWith('/diy/table') || path.startsWith('/diy/list');
+          return true;
+        },
         // 统计面板数据（来自 SysMenuModel.TableReport JSON）
         tableReportItems() {
             var self = this;
@@ -1931,27 +1973,27 @@ export default {
     },
     mounted() {
         var self = this;
-        
+
         // 🔥 添加明显的日志，确认组件挂载
         console.log('%c[DiyTableRowlist] ========== mounted 被触发 ==========', 'color: blue; font-size: 16px; font-weight: bold');
         console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
         console.log('[DiyTableRowlist] ContainerClass prop 值:', self.ContainerClass);
         console.log('[DiyTableRowlist] PropsTableType 值:', self.PropsTableType);
-        console.log('[DiyTableRowlist] 所有 props:', { 
+        console.log('[DiyTableRowlist] 所有 props:', {
             ContainerClass: self.ContainerClass,
             PropsTableType: self.PropsTableType,
             TableChildTableId: self.TableChildTableId,
             TableChildSysMenuId: self.TableChildSysMenuId
         });
-        
+
         // 记录当前加载的路由，用于 activated 时判断
         self._lastLoadedRoute = self.$route.fullPath;
-        
+
         self.PageType = self.$route.query.PageType;
         if (self.ParentFormLoadFinish !== false) {
             self.Init();
         }
-        
+
         // 🔥 监听全局刷新事件
         self._handlePageRefresh = (event) => {
             // 使用 SysMenuId 精确匹配，避免同一个组件的不同实例都被刷新
@@ -1966,7 +2008,7 @@ export default {
             }
         };
         window.addEventListener('page-refresh', self._handlePageRefresh);
-        
+
         // 移动端无限滚动监听
         if (self.diyStore.IsPhoneView) {
             self.initMobileScroll();
@@ -1979,7 +2021,7 @@ export default {
         // console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
         // console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
         // console.log('[DiyTableRowlist] 是否移动端模式:', self.diyStore.IsPhoneView);
-        
+
         // 🔥 移动端特殊处理：从详情页返回列表页时不刷新数据
         // 移动端使用路由跳转方式打开详情页，返回时应保持列表页状态
         // PC端使用 TagsView，需要检查路由变化以支持多标签切换
@@ -1999,7 +2041,7 @@ export default {
             }
             return;
         }
-        
+
         // PC端：检查路由是否发生变化（这种情况发生在标签数超过 max 时，组件被销毁后又被重用）
         if (self._lastLoadedRoute && self._lastLoadedRoute !== self.$route.fullPath) {
             console.log('%c[DiyTableRowlist] 检测到路由变化，重新初始化', 'color: orange; font-size: 14px; font-weight: bold');
@@ -2014,13 +2056,13 @@ export default {
     deactivated() {
         var self = this;
         console.log('%c[DiyTableRowlist] ========== deactivated 被触发 ==========', 'color: orange; font-size: 14px; font-weight: bold');
-        
+
         // 保存当前滚动位置（移动端）
         if (self.diyStore.IsPhoneView) {
             self._savedScrollTop = window.pageYOffset || document.documentElement.scrollTop;
             console.log('[DiyTableRowlist] 保存滚动位置:', self._savedScrollTop);
         }
-        
+
         // 移除滚动监听
         if (self.mobileScrollHandler) {
             window.removeEventListener('scroll', self.mobileScrollHandler);
@@ -2030,6 +2072,11 @@ export default {
         var self = this;
     },
     methods: {
+      // 移动端清楚复选框数据
+      childClearSearch(e){
+        this.InitSearch()
+        this.GetDiyTableRow({_PageIndex: 1 })
+      },
         /**
          * 判断某个字段Id是否在 InTableEditFields 中
          * InTableEditFields 可能是：
@@ -2057,16 +2104,16 @@ export default {
          */
         initMobileScroll() {
             var self = this;
-            
+
             // 移除旧的监听器
             if (self.mobileScrollHandler) {
                 window.removeEventListener('scroll', self.mobileScrollHandler);
             }
-            
+
             // 创建新的监听器（使用 underscore 的 debounce）
             self.mobileScrollHandler = _u.debounce(function() {
                 if (self.mobileLoadingMore || self._isDestroyed) return;
-                
+
                 // 🔥 防止频繁触发：距离上次加载完成不足2秒时不触发新加载
                 // 这可以避免移除顶部数据后页面高度变短导致的连续触发
                 const now = Date.now();
@@ -2074,12 +2121,12 @@ export default {
                     console.log('[防抖] 距离上次加载不足1秒，跳过本次触发');
                     return;
                 }
-                
+
                 // 获取滚动位置
                 const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
                 const windowHeight = window.innerHeight;
                 const documentHeight = document.documentElement.scrollHeight;
-                
+
                 // 到达底部前 300px 开始加载（从200增加到300，更早触发）
                 if (scrollTop + windowHeight >= documentHeight - 300) {
                     // 🔥 检查是否还有更多数据（使用双向滚动的_mobileTotalLoaded）
@@ -2092,55 +2139,55 @@ export default {
                     }
                 }
             }, 300);
-            
+
             window.addEventListener('scroll', self.mobileScrollHandler);
         },
-        
+
         /**
          * 移动端向上加载前面的数据（双向滚动）
          */
         async loadPrevMobileData() {
             var self = this;
-            
+
             if (self.mobileLoadingPrev) return;
-            
+
             self.mobileLoadingPrev = true;
             console.log('[向上加载] 开始，当前窗口起始位置:', self._mobileWindowStart);
-            
+
             try {
                 // 🔥 记录当前第一个元素的ID，用于恢复滚动位置
                 const firstItemId = self.DiyTableRowList.length > 0 ? self.DiyTableRowList[0].Id : null;
                 const oldScrollHeight = document.documentElement.scrollHeight;
-                
+
                 // 计算要加载多少条：一次加载15条
                 const loadCount = Math.min(15, self._mobileWindowStart);
-                
+
                 // 计算新的窗口起始位置
                 const newWindowStart = self._mobileWindowStart - loadCount;
-                
+
                 // 🔥 模拟加载前面的数据（实际应该从缓存或重新计算）
                 // 这里简化处理：向前移动窗口
                 self._mobileWindowStart = newWindowStart;
-                
+
                 // 如果当前窗口+新数据超过30条，移除底部数据
                 if (self.DiyTableRowList.length + loadCount > self._mobileMaxRenderCount) {
                     const removeCount = self.DiyTableRowList.length + loadCount - self._mobileMaxRenderCount;
                     self.DiyTableRowList = self.DiyTableRowList.slice(0, -removeCount);
                     console.log(`[向上加载] 移除底部 ${removeCount} 条数据`);
                 }
-                
+
                 // 🔥 这里需要重新加载数据，使用新的窗口位置
                 // 由于数据已经从服务器加载过，这里应该从全局缓存获取
                 // 简化实现：重新请求服务器（实际应该优化为本地缓存）
                 const startIndex = newWindowStart;
                 const pageSize = self._mobileMaxRenderCount;
-                
+
                 // 重新加载当前窗口的数据
-                await self.GetDiyTableRow({ 
+                await self.GetDiyTableRow({
                     _PageIndex: Math.floor(startIndex / self.DiyTableRowPageSize) + 1,
-                    _customWindowLoad: true 
+                    _customWindowLoad: true
                 });
-                
+
                 // 🔥 恢复滚动位置：找到之前的第一个元素
                 self.$nextTick(() => {
                     if (firstItemId) {
@@ -2154,33 +2201,33 @@ export default {
                     }
                     self._lastLoadTime = Date.now();
                 });
-                
+
             } catch (error) {
                 console.error('[向上加载] 失败:', error);
             } finally {
                 self.mobileLoadingPrev = false;
             }
         },
-        
+
         /**
          * 移动端向下加载更多数据（双向滚动）
          */
         async loadMoreMobileData() {
             var self = this;
-            
+
             if (self.mobileLoadingMore) return;
-            
+
             console.log('[向下加载] 开始');
             self.mobileLoadingMore = true;
-            
+
             try {
                 // 计算下一页
                 self.DiyTableRowPageIndex += 1;
-                
+
                 // 获取新数据
                 await self.GetDiyTableRow({ _append: true, _bidirectional: true });
                 // 注意：mobileLoadingMore 会在 GetDiyTableRow 的 nextTick 中延迟重置
-                
+
             } catch (error) {
                 console.error('[向下加载] 失败:', error);
                 // 恢复 pageIndex
@@ -2189,7 +2236,7 @@ export default {
                 self.mobileLoadingMore = false;
             }
         },
-        
+
         /**
          * 重置移动端窗口到顶部
          */
@@ -2201,12 +2248,12 @@ export default {
             // 滚动到顶部
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
-        
+
         // ========== Clear 方法：供父组件调用清理数据 ==========
         Clear() {
             var self = this;
             console.log('[DiyTableRowlist] Clear 被调用');
-            
+
             // 清理表格数据及其内部引用
             if (self.DiyTableRowList && self.DiyTableRowList.length > 0) {
                 self.DiyTableRowList.forEach(row => {
@@ -2224,44 +2271,44 @@ export default {
                 self.DiyTableRowList.length = 0;
             }
             self.DiyTableRowList = [];
-            
+
             // 清理选择状态
             if (self.TableMultipleSelection) {
                 self.TableMultipleSelection.length = 0;
             }
             self.TableMultipleSelection = [];
             self.TableSelectedRow = {};
-            
+
             // 清理搜索状态
             self.SearchModel = {};
             self.SearchEqual = {};
             self.V8SearchModel = {};
-            
+
             // 清理全局菜单状态
             self._moreMenuVisible = false;
             self._moreMenuRow = null;
-            
+
             // 重置分页
             self.PageIndex = 1;
             self.Total = 0;
         },
-        
+
         // ========== 性能优化V3：全局共享菜单方法 ==========
         showMoreMenu(event, row) {
             var self = this;
             event.stopPropagation();
-            
+
             // 计算菜单位置
             const rect = event.target.getBoundingClientRect();
             self._moreMenuPosition = {
                 top: rect.bottom + 5,
                 left: rect.right - 150 // 菜单宽度约150px，右对齐
             };
-            
+
             // 设置当前行数据并显示菜单
             self._moreMenuRow = row;
             self._moreMenuVisible = true;
-            
+
             // 添加全局点击事件监听，点击其他地方关闭菜单
             setTimeout(() => {
                 document.addEventListener('click', self.hideMoreMenu, { once: true });
@@ -2278,9 +2325,9 @@ export default {
             var self = this;
             const row = self._moreMenuRow;
             self.hideMoreMenu();
-            
+
             if (!row) return;
-            
+
             switch (action) {
                 case 'edit':
                     self.OpenDetail(row, 'Edit');
@@ -2303,7 +2350,7 @@ export default {
             event.stopPropagation();
             // 先关闭行更多菜单
             self.hideMoreMenu();
-            
+
             var rect = event.currentTarget.getBoundingClientRect();
             var menuWidth = 260;
             var menuLeft = rect.left;
@@ -2315,7 +2362,7 @@ export default {
                 top: rect.bottom + 4,
                 left: menuLeft
             };
-            
+
             self._colMenuField = field;
             // 初始化筛选值
             var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
@@ -2328,7 +2375,7 @@ export default {
                 self._colFilterValue = '';
             }
             self._colMenuVisible = true;
-            
+
             setTimeout(() => {
                 document.addEventListener('click', self.hideColHeaderMenu, { once: true });
             }, 0);
@@ -2408,7 +2455,7 @@ export default {
             var comp = field.Component;
             var isNum = field.Type && (field.Type.toLowerCase().indexOf('int') > -1 || field.Type.toLowerCase().indexOf('decimal') > -1);
             var isDate = comp === 'DateTime';
-            
+
             if (isDate || isNum) {
                 return [
                     { label: '等于 (=)', value: '=' },
@@ -2451,7 +2498,7 @@ export default {
             var self = this;
             if (!self._colMenuField) return;
             var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
-            
+
             if (self._colFilterValue === '' || self._colFilterValue === null || self._colFilterValue === undefined) {
                 // 清除该列筛选
                 delete self._colFilters[fieldName];
@@ -2488,7 +2535,7 @@ export default {
             }
         },
         // ========== 列头菜单方法 END ==========
-        
+
         // ========== 卡片模式辅助方法 ==========
         getCardIndex(index) {
             var self = this;
@@ -2515,7 +2562,7 @@ export default {
             }
         },
         // ========== 卡片模式辅助方法 END ==========
-        
+
         GetColWidth(field, fieldIndex) {
             var self = this;
             if (fieldIndex == self.ShowDiyFieldList.length - 1) {
@@ -2658,14 +2705,14 @@ export default {
                 V8.Rows = self.DiyTableRowList;
                 V8.SetCurrentRow = self.DiyTableSetCurrentRow;
                 self.SetV8DefaultValue(V8);
-                
+
                 try {
                     // eval(field.KeyupV8Code)
                     await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.KeyupV8Code + " \n})()");
                 } catch (error) {
                     self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    
+
                 }
             }
         },
@@ -2743,13 +2790,13 @@ export default {
                             } else {
                                 row.IsVisibleDetail = true;
                             }
-                            
+
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
                                 row.IsVisibleEdit = self.LimitMoreBtn1Sync(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
                             } else {
                                 row.IsVisibleEdit = true;
                             }
-                            
+
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
                                 row.IsVisibleDel = self.LimitMoreBtn1Sync(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
                             } else {
@@ -2782,7 +2829,7 @@ export default {
             var self = this;
             if (self.SysMenuModel.Id) {
                 self.BtnLoading = true;
-                
+
                 // 守卫语句：延迟渲染DiyFormDialog（异步组件需要重试等待加载完成）
                 const tryOpenForm = () => {
                     if (!self._shouldRenderDiyFormDialog) {
@@ -2807,7 +2854,7 @@ export default {
                         self.$nextTick(tryInit);
                     }
                 };
-                
+
                 const openForm = () => {
                     try {
                         self.$refs.refDiyTable_DiyFormDialog.Init({
@@ -2831,7 +2878,7 @@ export default {
                         self.BtnLoading = false;
                     }
                 };
-                
+
                 tryOpenForm();
             }
         },
@@ -2912,7 +2959,7 @@ export default {
                     }; // 给Form表单其它字段赋值
                     V8.EventName = "FormIn";
                     self.SetV8DefaultValue(V8);
-                    
+
                     try {
                         // eval(self.DiyTableModel.InFormV8)
                         await eval(
@@ -2923,7 +2970,7 @@ export default {
                         self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
                         console.log(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
                     } finally {
-                        
+
                     }
                 }
             }
@@ -2945,7 +2992,7 @@ export default {
                     }
                     V8.EventName = "TableRowClick";
                     self.SetV8DefaultValue(V8);
-                    
+
                     V8.RefreshChildTable = (field, parentFormModel) => {
                         return self.RefreshChildTable(field, parentFormModel, V8);
                     };
@@ -2957,7 +3004,7 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
             } finally {
-                
+
             }
             // 为了卡片而实现，因为<el-table>有 @current-change="DiyTableCurrentChange"
             self.DiyTableCurrentChange(row);
@@ -3061,7 +3108,7 @@ export default {
             var self = this;
             var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
-                if (field 
+                if (field
                     && (field.V8Code || field.Config.V8Code)) {
                     var form = { ...row };
                     // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
@@ -3075,7 +3122,7 @@ export default {
                     V8.RefreshChildTable = self.RefreshChildTable;
                     V8.EventName = "FieldValueChange";
                     self.SetV8DefaultValue(V8, field);
-                    
+
                     // eval(btn.V8Code)
                     var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + (field.V8Code || field.Config.V8Code) + " \n})()");
                     if (V8Result !== undefined) {
@@ -3092,7 +3139,7 @@ export default {
                 callback && callback(null);
                 return null;
             } finally {
-                
+
             }
         },
         //showRow:是否行外显示按钮，而不是更多里面
@@ -3137,6 +3184,9 @@ export default {
             }
             if (self.$refs.refDiySearch3) {
                 self.$refs.refDiySearch3.InitSearch();
+            }
+            if (self.$refs.refDiySearch4) {
+                self.$refs.refDiySearch4.InitSearch();
             }
         },
         IsPermission(type) {
@@ -3259,11 +3309,11 @@ export default {
                 if (self.DiyCommon.IsNull(row)) {
                     row = {};
                 }
-                
+
                 // 性能优化：为同一行的所有按钮复用同一个V8对象，减少InitV8CodeSync调用
                 var sharedV8 = v8 || self.DiyCommon.InitV8CodeSync({}, self.$router);
                 var isInternalV8 = !v8; // 标记是否是内部创建的V8
-                
+
                 // 性能优化：只为外部传入的V8设置一次基础属性
                 if (!v8) {
                     // 设置共享的V8属性（只设置一次）
@@ -3278,12 +3328,12 @@ export default {
                     sharedV8.EventName = "V8BtnLimit";
                     self.SetV8DefaultValue(sharedV8);
                 }
-                
+
                 // 初始化按钮统计（如果不存在）
                 if (!self._btnPerfStats) {
                     self._btnPerfStats = {};
                 }
-                
+
                 for (let index = 0; index < btns.length; index++) {
                     var btn = btns[index];
                     var isVisible = self.LimitMoreBtn(btn, row, sharedV8);
@@ -3299,14 +3349,14 @@ export default {
         //LimitMoreBtn：执行按钮显示条件V8代码（同步版本）
         LimitMoreBtn(btn, row, v8) {
             var self = this;
-            
+
             // 性能优化：直接使用传入的V8对象
             var V8 = v8;
             V8.Result = null;
-            
+
             var hasV8Code = !self.DiyCommon.IsNull(btn.V8CodeShow);
             var btnStartTime = performance.now();
-            
+
             try {
                 if (hasV8Code) {
                     eval("//" + btn.Name + "(按钮显示条件)\n" + btn.V8CodeShow);
@@ -3314,11 +3364,11 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
             }
-            
+
             // 性能监控：记录每个按钮的执行时间
             if (hasV8Code) {
                 var btnDuration = performance.now() - btnStartTime;
-                
+
                 // 初始化统计对象
                 if (!self._btnPerfStats) {
                     self._btnPerfStats = {};
@@ -3329,18 +3379,18 @@ export default {
                         totalTime: 0
                     };
                 }
-                
+
                 // 更新统计数据
                 var stats = self._btnPerfStats[btn.Name];
                 stats.count++;
                 stats.totalTime += btnDuration;
-                
+
                 // 如果单次执行时间超过50ms，警告
                 if (btnDuration > 50) {
                     console.warn(`【性能警告】按钮[${btn.Name}]执行耗时: ${btnDuration.toFixed(2)}ms (超过50ms阈值)`);
                 }
             }
-            
+
             if (V8.Result === false) {
                 return false;
             }
@@ -3348,13 +3398,13 @@ export default {
             if (self.GetCurrentUser._IsAdmin === true) {
                 return true;
             }
-            
+
             // 性能优化：优先使用缓存的权限数据
             var roleLimitModel = V8._cachedRoleLimit;
             if (!roleLimitModel) {
                 roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             }
-            
+
             if (roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3409,7 +3459,7 @@ export default {
                     };
                     V8.EventName = "V8BtnRun";
                     self.SetV8DefaultValue(V8);
-                    
+
                     // eval(btn.V8Code)
                     await eval("(async () => {\n " + btn.V8Code + " \n})()");
                     // if(!(btn.V8Code.indexOf('V8.BtnV8Loading') > -1)){
@@ -3426,7 +3476,7 @@ export default {
             } finally {
                 // 只在内部创建V8时清理，外部传入的v8由调用方负责清理
                 if (!v8) {
-                    
+
                 }
             }
         },
@@ -3772,7 +3822,7 @@ export default {
                 EventName: "PageTab"
             };
             self.SetV8DefaultValue(V8);
-            
+
             try {
                 // eval(tabModel.V8Code)
                 // eval(v8code)
@@ -3780,7 +3830,7 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行多Tab页签V8引擎代码出现错误：" + error.message, false);
             } finally {
-                
+
             }
         },
         ParentFormSet(fieldName, value) {
@@ -3885,13 +3935,13 @@ export default {
             self.SetV8DefaultValue(V8);
             V8.Form = row;
             V8.Row = row;
-            
+
             var result = null;
             var returnValue = null;
             try {
                 // 执行V8代码，同时捕获return返回值（同步版本）
                 returnValue = eval("(function() {\n " + field.V8TmpEngineTable + " \n})()");
-                
+
                 // 优先使用V8.Result，当V8.Result为undefined或null时使用return返回值
                 if (V8.Result !== undefined && V8.Result !== null) {
                     result = V8.Result;
@@ -3904,8 +3954,8 @@ export default {
                 self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                 result = self.GetColValue({ row: row }, field);
             } finally {
-                
-                
+
+
             }
             return result;
         },
@@ -4072,7 +4122,7 @@ export default {
                         var componentName = field.Config.DevComponentName;
                         var componentPath = field.Config.DevComponentPath;
                         var component = DynamicComponentCache.getOrCreate(componentName, componentPath);
-                        
+
                         // Vue 3: 使用全局 app 实例注册组件
                         const app = window.__VUE_APP__;
                         if (app && !app._context.components[componentName]) {
@@ -4435,13 +4485,13 @@ export default {
                 V8.GetDiyTableRow = self.GetDiyTableRow;
                 V8.EventName = "BtnFormDetailRun";
                 self.SetV8DefaultValue(V8);
-                
+
                 try {
                     await eval("(async () => {\n " + self.SysMenuModel.AddPageV8 + " \n})()");
                 } catch (error) {
                     self.DiyCommon.Tips("执行新增按钮V8代码出现错误：" + error.message, false);
                 } finally {
-                    
+
                 }
                 self.BtnLoading = false;
                 return;
@@ -4454,7 +4504,7 @@ export default {
                 V8.GetDiyTableRow = self.GetDiyTableRow;
                 V8.EventName = "BtnFormDetailRun";
                 self.SetV8DefaultValue(V8);
-                
+
                 if (!self.DiyCommon.IsNull(self.TableRowId)) {
                     V8.Form.Id = self.TableRowId;
                     //liucheng升级左右导航结构页面赋值 2025-7-15
@@ -4468,7 +4518,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
                 } finally {
-                    
+
                 }
                 self.BtnLoading = false;
                 return;
@@ -4534,7 +4584,7 @@ export default {
                         });
                         self.BtnLoading = false;
                     };
-                    
+
                     if (!self._shouldRenderDiyFormDialog) {
                         self._shouldRenderDiyFormDialog = true;
                     }
@@ -4691,7 +4741,7 @@ export default {
         // IsSortField(fieldId) {
         //     var self = this;
         //     if (self.SortFieldIds && Array.isArray(self.SortFieldIds)) {
-        //         return self.SortFieldIds.includes(fieldId) 
+        //         return self.SortFieldIds.includes(fieldId)
         //                 || self.SortFieldIds.find(item => item.Id === fieldId)
         //                 || self.SortFieldIds.find(item => item.Name === fieldId)
         //                 ;
@@ -4721,8 +4771,8 @@ export default {
                         if (
                             search1 &&
                             !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-                            (!(self.NotShowFields.indexOf(element) > -1 
-                                || self.NotShowFields.indexOf(element.Name) > -1 
+                            (!(self.NotShowFields.indexOf(element) > -1
+                                || self.NotShowFields.indexOf(element.Name) > -1
                                 || self.NotShowFields.indexOf(element.Id) > -1
                                 || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
                             )
@@ -4747,7 +4797,7 @@ export default {
                     // tempArr.push(_u.where(self.DiyFieldList, {Name : 'CreateTime'})[0]);
                     //调整ShowHideFieldsList排序
                     // self.SortShowHideFieldsList(tempArr);
-                    
+
                     // 🔥 性能优化：分批渲染表格列
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
@@ -4755,15 +4805,15 @@ export default {
                         tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
                     }
                     self.ShowDiyFieldList = [];
-                    
+
                     // 首批只渲染前10列
                     var initialCount = Math.min(10, tempArr.length);
                     var initialColumns = tempArr.slice(0, initialCount);
-                    
+
                     // 立即渲染首批列
                     self.$nextTick(function () {
                         self.ShowDiyFieldList = initialColumns;
-                        
+
                         // 如果还有剩余列，延迟渲染
                         if (tempArr.length > initialCount) {
                             var renderRemaining = () => {
@@ -4773,7 +4823,7 @@ export default {
                                     // 每次添加5列
                                     var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
                                     self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
-                                    
+
                                     // 继续渲染
                                     if (self.ShowDiyFieldList.length < tempArr.length) {
                                         if (window.requestIdleCallback) {
@@ -4804,8 +4854,8 @@ export default {
                         //2021-10-26 新增排序 ShowHideFieldsList
                         if (
                             !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-                            (!(self.NotShowFields.indexOf(element) > -1 
-                                || self.NotShowFields.indexOf(element.Name) > -1 
+                            (!(self.NotShowFields.indexOf(element) > -1
+                                || self.NotShowFields.indexOf(element.Name) > -1
                                 || self.NotShowFields.indexOf(element.Id) > -1
                                 || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
                                 )
@@ -4832,7 +4882,7 @@ export default {
                     });
                     //调整ShowHideFieldsList排序
                     // self.SortShowHideFieldsList(tempArr);
-                    
+
                     // 🔥 性能优化：分批渲染表格列（第二个分支 - 无指定查询列）
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
@@ -4840,15 +4890,15 @@ export default {
                         tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
                     }
                     self.ShowDiyFieldList = [];
-                    
+
                     // 首批只渲染前10列
                     var initialCount = Math.min(10, tempArr.length);
                     var initialColumns = tempArr.slice(0, initialCount);
-                    
+
                     // 立即渲染首批列
                     self.$nextTick(function () {
                         self.ShowDiyFieldList = initialColumns;
-                        
+
                         // 如果还有剩余列，延迟渲染
                         if (tempArr.length > initialCount) {
                             var renderRemaining = () => {
@@ -4858,7 +4908,7 @@ export default {
                                     // 每次添加5列
                                     var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
                                     self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
-                                    
+
                                     // 继续渲染
                                     if (self.ShowDiyFieldList.length < tempArr.length) {
                                         if (window.requestIdleCallback) {
@@ -4927,31 +4977,31 @@ export default {
 
         GetDiyTableRow(recParam) {
             let self = this;
-            
+
             // ========== 关键：立即递增版本号取消所有旧操作 ==========
             self._paginationVersion++;
             const currentVersion = self._paginationVersion;
-            
+
             // 检查是否是移动端追加模式
             var isAppendMode = recParam && recParam._append === true;
-            
+
             // ========== 关键：取消正在进行的HTTP请求 ==========
             if (self._currentAbortController) {
                 self._currentAbortController.abort();
             }
             self._currentAbortController = new AbortController();
             const abortSignal = self._currentAbortController.signal;
-            
+
             // 🔥 移动端追加模式不显示加载状态，避免骨架屏闪烁
             if (!(isAppendMode && self.diyStore.IsPhoneView)) {
                 self.tableLoading = true;
             }
-            
+
             // ========== 内存优化：不再清空数据，避免二次渲染 ==========
             // 注意：移除了 self.DiyTableRowList = [] 因为这会触发一次无意义的DOM渲染
             self.OldDiyTableRowList = [];
             // ========== 内存优化 END ==========
-            
+
             //2023-06-29：如果是表单设计模式，无需获取数据
             if (self.LoadMode == "Design") {
                 //---------处理需要真实显示的字段
@@ -5146,7 +5196,7 @@ export default {
                 paramType = "json";
             }
             // url = '/api/diytable/getDiyTableRowTree';
-            if (self.SysMenuModel 
+            if (self.SysMenuModel
                 && (self.SysMenuModel.SelectApi || (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi))
             ) {
                 url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.SelectApi || self.SysMenuModel.DiyConfig.SelectApi);
@@ -5164,14 +5214,14 @@ export default {
                     if (self._isDestroyed || self._paginationVersion !== currentVersion) {
                         return;
                     }
-                    
+
                     self.tableLoading = false;
-                    
+
                     if (self.DiyCommon.Result(result)) {
                         console.log('[数据加载调试] 返回数据条数:', result.Data?.length, '总数:', result.DataCount);
                         console.log('[数据加载调试] isAppendMode:', isAppendMode, 'IsPhoneView:', self.diyStore.IsPhoneView);
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
-                        
+
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
 
@@ -5205,8 +5255,8 @@ export default {
                         if (!isAppendMode) {
                             self.DiyTableRowCount = result.DataCount;
                         }
-                        
-                        
+
+
                         // ========== 同步处理V8按钮和模板引擎 ==========
                         // 版本检查，确保没有新的分页请求
                         if (!self._isDestroyed && self._paginationVersion === currentVersion) {
@@ -5217,28 +5267,28 @@ export default {
                             var moreBtnsInTemplate = moreBtns.filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
                             self.MaxRowBtnsOut = 0;
                             self.HasVisibleMoreBtnsIn = false;
-                            
+
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
-                            
+
                             // 初始化统计
                             self._btnPerfStats = {};
-                            
+
                             // 预先缓存权限查询结果
                             var cachedRoleLimit = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-                            
+
                             // 初始化共享V8
                             var sharedV8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
                             sharedV8.EventName = "V8BtnLimit";
                             sharedV8._cachedRoleLimit = cachedRoleLimit;
                             self.SetV8DefaultValue(sharedV8);
-                            
+
                             for (var i = 0; i < result.Data.length; i++) {
                                 if (self._paginationVersion !== currentVersion) break;
-                                
+
                                 var row = result.Data[i];
                                 var rowBtnsOut = moreBtnsOutTemplate.map(btn => ({ ...btn }));
                                 var rowBtnsIn = moreBtnsInTemplate.map(btn => ({ ...btn }));
-                                
+
                                 // 为每行更新Form属性
                                 var form = { ...row };
                                 // sharedV8.Form = self.DeleteFormProperty(form);
@@ -5246,35 +5296,35 @@ export default {
                                 sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
                                 sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
                                 sharedV8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
-                                
+
                                 // 同步执行按钮处理
                                 self.HandlerBtns(rowBtnsOut, row, sharedV8);
                                 self.HandlerBtns(rowBtnsIn, row, sharedV8);
-                                
+
                                 row._RowMoreBtnsOut = rowBtnsOut;
                                 row._RowMoreBtnsIn = rowBtnsIn;
-                                
+
                                 // 计算操作列宽度
                                 var allOutBtn = row._RowMoreBtnsOut.filter(item => item.IsVisible === true || item.IsVisible === 1);
                                 var allOutBtnLength = 0;
                                 allOutBtn.forEach(el => { allOutBtnLength += el.Name.length; });
                                 var newWidth = allOutBtnLength * 15 + allOutBtn.length * 45;
                                 if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
-                                
+
                                 // 追踪是否有可见的内部按钮（用于动态计算操作列宽度）
                                 if (!self.HasVisibleMoreBtnsIn && rowBtnsIn.some(btn => btn.IsVisible)) {
                                     self.HasVisibleMoreBtnsIn = true;
                                 }
                             }
-                            
+
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
-                            
+
                             if (templateEngineFields.length > 0) {
                                 console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
-                                
+
                                 for (var i = 0; i < result.Data.length; i++) {
                                     if (self._paginationVersion !== currentVersion) break;
-                                    
+
                                     var row = result.Data[i];
                                     for (var j = 0; j < templateEngineFields.length; j++) {
                                         var field = templateEngineFields[j];
@@ -5286,19 +5336,19 @@ export default {
                                         }
                                     }
                                 }
-                                
+
                                 console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
                             }
-                            
+
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             // 移动端追加模式：将新数据追加到现有列表
                             if (isAppendMode && self.diyStore.IsPhoneView && recParam._bidirectional) {
                                 // 🔥 双向无限滚动模式：维护30条窗口
                                 const newList = self.DiyTableRowList.concat(result.Data);
-                                
+
                                 // 更新已加载总数
                                 self._mobileTotalLoaded += result.Data.length;
-                                
+
                                 if (newList.length > self._mobileMaxRenderCount) {
                                     // 移除顶部旧数据，保持30条窗口
                                     const removeCount = newList.length - self._mobileMaxRenderCount;
@@ -5398,7 +5448,7 @@ export default {
                 result = false;
             } finally {
                 // 内存优化：清理V8对象引用
-                
+
             }
             return result;
         },
@@ -5418,19 +5468,19 @@ export default {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
                 result = false;
             } finally {
-                
+
             }
             return result;
         },
 
         DiguiDiyTableRowDataList(firsrtData, paginationVersion) {
             var self = this;
-            
+
             // 内存优化：检查版本号，如果不匹配则中断处理
             if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
                 return;
             }
-            
+
             // 内存优化：缓存按钮模板，避免每行都重新查询
             // 注意：每次分页都重新获取，确保模板是最新的
             var moreBtnsOutTemplate = (self.SysMenuModel.MoreBtns || []).filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
@@ -5442,13 +5492,13 @@ export default {
                 if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
                     return;
                 }
-                
+
                 //result.Data
                 let row = firsrtData[index]; //result.Data
                 if (!row.Id && (row.id || row.ID)) {
                     row.Id = row.id || row.ID;
                 }
-                
+
                 // 使用模板创建副本
                 let _rowMoreBtnsOutCopy = moreBtnsOutTemplate.map(element => ({ ...element }));
 
@@ -5476,7 +5526,7 @@ export default {
 
                 self.HandlerBtns(_rowMoreBtnsInCopy, row);
                 row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
-                
+
                 // 追踪是否有可见的内部按钮
                 if (!self.HasVisibleMoreBtnsIn && _rowMoreBtnsInCopy.some(btn => btn.IsVisible)) {
                     self.HasVisibleMoreBtnsIn = true;
@@ -5621,7 +5671,7 @@ export default {
                 V8.GetDiyTableRow = self.GetDiyTableRow;
                 V8.EventName = "FormSubmitBefore";
                 self.SetV8DefaultValue(V8);
-                
+
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -5633,7 +5683,7 @@ export default {
                     self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
                     return false;
                 } finally {
-                    
+
                 }
             }
             return;
@@ -5656,7 +5706,7 @@ export default {
                 V8.V8Callback = V8Callback;
                 V8.EventName = "FormOut";
                 self.SetV8DefaultValue(V8);
-                
+
                 V8.Form.Id = rowModel.Id;
                 try {
                     // eval(self.CurrentDiyTableModel.OutFormV8);
@@ -5664,7 +5714,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行表单离开V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    
+
                 }
             }
         },
@@ -5727,4 +5777,38 @@ export default {
 
 <style lang="scss" scoped>
 @import "@/styles/diy-table.scss";
+.search-box{
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     padding-right: 10px;
+     // padding:0 10px ;
+     .more-search{
+       display: flex;
+       align-items: center;
+       font-size: 28px;
+       font-weight: 400;
+       color: #3f3f3f;
+     }
+     .more-search:active {
+       opacity: 0.5;
+     }
+  }
+  .addBtn{
+    width:46px;
+    height:46px;
+    border-radius: 100%;
+    position: fixed;
+    bottom:200px;
+    right:30px;
+    border-color: var(--color-primary, #409eff);
+    background:var(--color-primary, #409eff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color:#fff;
+    font-size: 30px;
+    z-index: 999;
+    box-shadow: 0 0 10px #ccc;
+  }
 </style>
