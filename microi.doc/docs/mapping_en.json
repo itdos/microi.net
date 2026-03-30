@@ -56,6 +56,10 @@
   "mq.md": "Message Queue",
   "model-engine.md" : "Template Engine",
 
+  "ai-integrate": "AI Programming",
+  "ai-skills-integrate.md": "AI Skills Integration Guide",
+  "ai-mcp-integrate.md": "AI MCP Integration Guide",
+
   "copy-module.md": "Module Copy",
   "hdfs.md": "Distributed Storage",
   "dos-result.md": "DosResult Explanation",

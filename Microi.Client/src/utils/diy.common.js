@@ -12,6 +12,7 @@ import i18n from "@/lang";
 import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "./api.itdos";
+import packageInfo from "../../package.json";
 import $ from "jquery";
 import _ from "underscore";
 import LocalStorageManager from "./localStorage-manager.js";
@@ -3822,6 +3823,7 @@ var DiyCommon = {
     InitV8CodeSync(V8, router, execGlobalV8Code = true) {
         if(DiyCommon._V8BaseInstance == null){
             DiyCommon._V8BaseInstance = {
+                ClientVersion : packageInfo.version,
                 ClientType : DiyCommon.GetClientType(), //PC、IOS、Android、H5、WeChat
                 OsClient : DiyCommon.GetOsClient(),
                 DiyCommon : DiyCommon,
