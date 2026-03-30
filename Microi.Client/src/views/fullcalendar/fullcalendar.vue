@@ -46,10 +46,12 @@
         <el-dialog
             v-model="dialogVisible"
             :title="editingEventId ? '编辑日程' : '新建日程'"
-            width="500px"
+            width="700px"
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body
+            draggable
+            align-center
             class="calendar-event-dialog"
         >
             <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
@@ -129,8 +131,14 @@ export default {
             calStats: { Today: 0, Week: 0, Month: 0, Pending: 0 },
             calendarOptions: {
                 plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+                customButtons: {
+                    addEvent: {
+                        text: '＋ 新增',
+                        click: this.handleAddEvent
+                    }
+                },
                 headerToolbar: {
-                    left: "prev,next today",
+                    left: "addEvent prev,next today",
                     center: "title",
                     right: "dayGridMonth,timeGridWeek,timeGridDay"
                 },
@@ -145,6 +153,10 @@ export default {
                 height: "auto",
                 contentHeight: "auto",
                 expandRows: true,
+                eventDisplay: "block",
+                eventResizableFromStart: true,
+                nowIndicator: true,
+                navLinks: true,
                 events: this.fetchEvents,
                 select: this.handleDateSelect,
                 eventClick: this.handleEventClick,
@@ -279,7 +291,10 @@ export default {
                     StartTime: self.formatDate(info.event.start),
                     EndTime: info.event.end ? self.formatDate(info.event.end) : self.formatDate(info.event.start)
                 });
-                if (!result || result.Code !== 1) {
+                if (result && result.Code === 1) {
+                    self.DiyCommon.Tips("更新成功", true);
+                    self.loadCalendarStats();
+                } else {
                     info.revert();
                     self.DiyCommon.Tips("更新日程失败", false);
                 }
@@ -298,7 +313,10 @@ export default {
                     StartTime: self.formatDate(info.event.start),
                     EndTime: info.event.end ? self.formatDate(info.event.end) : self.formatDate(info.event.start)
                 });
-                if (!result || result.Code !== 1) {
+                if (result && result.Code === 1) {
+                    self.DiyCommon.Tips("更新成功", true);
+                    self.loadCalendarStats();
+                } else {
                     info.revert();
                     self.DiyCommon.Tips("更新日程失败", false);
                 }
@@ -375,6 +393,20 @@ export default {
             if (calendarApi) {
                 calendarApi.refetchEvents();
             }
+        },
+
+        // 新增日程（工具栏按钮）
+        handleAddEvent() {
+            var self = this;
+            self.editingEventId = null;
+            self.form = {
+                Title: "",
+                StartTime: self.formatDate(new Date()),
+                EndTime: "",
+                State: "未完成",
+                Beizhu: ""
+            };
+            self.dialogVisible = true;
         }
     }
 };
@@ -382,7 +414,7 @@ export default {
 
 <style lang="scss" scoped>
 .microi-calendar {
-    padding: 16px;
+    padding: 0px;
     background: #fff;
     border-radius: 8px;
     display: flex;
@@ -394,6 +426,9 @@ export default {
     :deep(.fc) {
         flex: 1;
         min-height: 0;
+        .fc-button-group{
+            gap: 10px !important;
+        }
 
         .fc-toolbar {
             flex-wrap: wrap;
@@ -507,6 +542,41 @@ export default {
             font-weight: 600;
             font-size: 12px;
         }
+
+        // 新增按钮样式
+        .fc-addEvent-button {
+            background: linear-gradient(135deg, var(--el-color-primary, #409eff), #66b1ff) !important;
+            border: none !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3) !important;
+            &:hover {
+                filter: brightness(1.08) !important;
+                box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4) !important;
+            }
+        }
+
+        // 确保事件文字在彩色背景上可见
+        .fc-event-main {
+            color: #fff !important;
+        }
+
+        // 当前时间指示线
+        .fc-now-indicator {
+            border-color: #ef4444 !important;
+            &::before {
+                background: #ef4444;
+            }
+        }
+
+        // 事件 resize 手柄优化
+        .fc-event-resizer {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .fc-event:hover .fc-event-resizer {
+            opacity: 1;
+        }
     }
 }
 
@@ -595,24 +665,29 @@ export default {
     overflow: hidden;
     color: #fff;
     font-weight: 500;
+    padding: 1px 2px;
+    line-height: 1.6;
 
     .event-dot {
         width: 7px;
         height: 7px;
         border-radius: 50%;
         flex-shrink: 0;
-        box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
     }
     .dot-pending {
         background-color: #fff;
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
         animation: dot-pulse 2s infinite;
     }
     .dot-done {
-        background-color: rgba(255, 255, 255, 0.85);
+        background-color: rgba(255, 255, 255, 0.7);
     }
-    &.is-completed .event-title {
-        text-decoration: line-through;
-        opacity: 0.7;
+    &.is-completed {
+        opacity: 0.8;
+        .event-title {
+            text-decoration: line-through;
+            opacity: 0.75;
+        }
     }
     .event-time {
         font-size: 11px;
@@ -672,6 +747,9 @@ export default {
         .fc-button {
             padding: 3px 8px;
             font-size: 12px;
+        }
+        .fc-button-group{
+            gap: 10px !important;
         }
     }
 }

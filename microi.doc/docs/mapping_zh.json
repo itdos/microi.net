@@ -24,11 +24,12 @@
   "other" : "其它",
   "other-case1.md" : "迈巴赫物性",
 
+  "getting-started" : "入门部署",
+  "start-use.md" : "快速开始使用",
   "docker-run.md" : "Docker部署（一键安装）",
+  "win-install-microi.md" : "Windows部署",
   "local-run-server.md" : "源码本地运行-后端",
   "local-run-client.md" : "源码本地运行-前端",
-  "win-install-microi.md" : "Windows部署",
-  "start-use.md" : "快速开始使用",
 
   "v8-engine":"V8引擎",
   "api-engine.md" : "API 接口引擎",
@@ -38,7 +39,6 @@
   "form-engine.md" : "FormEngine用法",
   "where.md" : "Where条件",
   "apiengine-index.md" : "接口引擎实战",
-
 
   "form-engine":"表单引擎",
   "form-engine-info.md" : "表单引擎介绍",
@@ -64,36 +64,39 @@
   "report-engine.md" : "报表引擎",
   "datasource-engine.md" : "数据源引擎",
   "databases.md" : "数据库扩展",
+  "web-plug-engine.md" : "前端插件引擎",
 
   "ai-integrate": "AI 编程",
   "ai-skills-integrate.md": "AI Skills 集成指南",
   "ai-mcp-integrate.md": "AI MCP 集成指南",
 
+  "advanced" : "进阶功能",
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
   "office.md" : "Office在线编辑",
   "dos-result.md" : "DosResult说明",
-  "partner.md" : "成为合伙人",
-  "template.md": "CSDN文章模板",
   "db-dictionary.md" : "平台数据库表说明",
+
+  "about" : "关于",
+  "partner.md" : "成为合伙人",
   "microi-training-syllabus.md" : "吾码培训大纲",
   "update-log.md" : "📤 更新日志",
-  
+  "template.md": "CSDN文章模板",
+
   "export-excel.md":"自定义导出Excel",
   "file-receive-download-upload.md": "文件的接收、下载、上传",
   "js-float-error.md": "JS处理浮点数计算精度问题",
   "datetime.md": "日期相关处理",
 
-	"web": "前端文档",
-	"advanced": "进阶",
+  "web": "前端文档",
 
   "start_web": "开始",
-	"quick_web.md": "快速上手",
+  "quick_web.md": "快速上手",
 
-	"api": "后端文档",
-	"api_api": "接口文档",
-	"v8.md": "v8函数列表",
+  "api": "后端文档",
+  "api_api": "接口文档",
+  "v8.md": "v8函数列表",
   "v8formengine.md": "V8.FormEngine用法",
   "dosresult.md": "DosResult说明",
 
@@ -104,7 +107,7 @@
   "saas_engine.md": "saas引擎",
   "gather_engine.md": "采集引擎",
 
-	"build": "构建部署",
+  "build": "构建部署",
   "cloud": "云部署",
   "quick_build.md": "一键部署",
   "docker_build.md": "docker部署",
