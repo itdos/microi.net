@@ -26,7 +26,7 @@
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-vue": "^1.0.2",
     "animate.css": "^4.1.1",
-    "axios": "^0.28.0",
+    "axios": "^0.30.2",
     "babel-polyfill": "^6.26.0",
     "bootstrap": "^4.6.0",
     "clipboard": "2.0.4",
