@@ -44,9 +44,9 @@
                 <span class="empty-sub">请联系管理员配置菜单</span>
             </div>
 
-            <div 
-                v-for="menu in menuList" 
-                :key="menu.Id" 
+            <div
+                v-for="menu in menuList"
+                :key="menu.Id"
                 class="menu-card"
             >
                 <div class="card-header">
@@ -57,8 +57,8 @@
                     <span class="card-title">{{ menu.meta?.title || menu.name }}</span>
                 </div>
                 <div class="card-content">
-                    <div 
-                        v-for="child in getVisibleChildren(menu.children)" 
+                    <div
+                        v-for="child in getVisibleChildren(menu.children)"
                         :key="child.Id"
                         class="menu-item"
                         @click="handleMenuClick(child)"
@@ -68,7 +68,7 @@
                             <el-icon v-else class="item-icon"><Document /></el-icon>
                         </div>
                         <span class="item-name">{{ child.meta?.title || child.name }}</span>
-                        <el-icon v-if="child.children && child.children.length > 0" class="item-arrow"><ArrowRight /></el-icon>
+                        <el-icon v-if="child.children && child.children.length > 0&&!isPhoneView" class="item-arrow"><ArrowRight /></el-icon>
                     </div>
                 </div>
             </div>
@@ -90,8 +90,8 @@
             align-center
         >
             <div class="submenu-list">
-                <div 
-                    v-for="item in getVisibleChildren(currentSubMenuItems)" 
+                <div
+                    v-for="item in getVisibleChildren(currentSubMenuItems)"
                     :key="item.Id"
                     class="submenu-item"
                     @click="handleSubMenuClick(item)"
@@ -114,7 +114,6 @@ import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight } from '@element-plus/icons-vue';
 import { DiyCommon } from '@/utils/diy.common';
-
 // 定义组件名称，用于 keep-alive 缓存
 defineOptions({
     name: 'mobile_workspace'
@@ -128,6 +127,7 @@ const diyStore = useDiyStore();
 const loading = ref(true);
 
 // 系统配置信息
+const isPhoneView = computed(() => diyStore.IsPhoneView);
 const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const logoUrl = computed(() => {
@@ -405,7 +405,7 @@ const getVisibleChildren = (children) => {
     &:active {
         transform: scale(0.98);
     }
-    
+
     .card-header {
         display: flex;
         align-items: center;
@@ -431,7 +431,7 @@ const getVisibleChildren = (children) => {
                 font-size: 14px;
             }
         }
-        
+
         .card-title {
             font-size: 15px;
             font-weight: 600;
@@ -439,14 +439,14 @@ const getVisibleChildren = (children) => {
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
         }
     }
-    
+
     .card-content {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 4px;
         padding: 14px 10px;
     }
-    
+
     .menu-item {
         display: flex;
         flex-direction: column;
@@ -456,12 +456,12 @@ const getVisibleChildren = (children) => {
         cursor: pointer;
         transition: all 0.2s ease;
         position: relative;
-        
+
         &:active {
             background: #f5f7fa;
             transform: scale(0.95);
         }
-        
+
         .item-icon-wrapper {
             width: 40px;
             height: 40px;
@@ -472,12 +472,12 @@ const getVisibleChildren = (children) => {
             border-radius: 10px;
             margin-bottom: 6px;
         }
-        
+
         .item-icon {
             font-size: 20px;
             color: var(--color-primary, #409eff);
         }
-        
+
         .item-name {
             font-size: 12px;
             color: #606266;
@@ -491,7 +491,7 @@ const getVisibleChildren = (children) => {
             line-clamp: 2;
             -webkit-box-orient: vertical;
         }
-        
+
         .item-arrow {
             position: absolute;
             top: 6px;
@@ -544,13 +544,13 @@ const getVisibleChildren = (children) => {
         padding: 16px;
         border-bottom: 1px solid #ebeef5;
         margin-right: 0;
-        
+
         .el-dialog__title {
             font-size: 16px;
             font-weight: 600;
         }
     }
-    
+
     .el-dialog__body {
         padding: 0;
         max-height: 60vh;
@@ -566,15 +566,15 @@ const getVisibleChildren = (children) => {
         border-bottom: 1px solid #f5f7fa;
         cursor: pointer;
         transition: background 0.2s;
-        
+
         &:active {
             background: #f5f7fa;
         }
-        
+
         &:last-child {
             border-bottom: none;
         }
-        
+
         .submenu-icon-wrapper {
             width: 36px;
             height: 36px;
@@ -585,18 +585,18 @@ const getVisibleChildren = (children) => {
             border-radius: 8px;
             margin-right: 12px;
         }
-        
+
         .submenu-icon {
             font-size: 18px;
             color: var(--color-primary, #409eff);
         }
-        
+
         .submenu-name {
             flex: 1;
             font-size: 15px;
             color: #303133;
         }
-        
+
         .submenu-arrow {
             font-size: 14px;
             color: #c0c4cc;
