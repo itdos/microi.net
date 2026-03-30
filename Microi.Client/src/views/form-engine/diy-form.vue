@@ -29,9 +29,9 @@
                     </div>
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
-                    <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id" 
-                        :id="'field-form-' + tabIndex" 
-                        :data-tab="FieldActiveTab" 
+                    <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id"
+                        :id="'field-form-' + tabIndex"
+                        :data-tab="FieldActiveTab"
                         :class="formContainerClass">
                         <el-form
                             :rules="FormRules"
@@ -94,8 +94,8 @@
                                             <el-icon><Rank /></el-icon>
                                         </div>
                                         <!-- 宽度调整手柄 -->
-                                        <div 
-                                            class="width-resize-handle" 
+                                        <div
+                                            class="width-resize-handle"
                                             :class="{ resizing: resizingField && resizingField.Id === field.Id }"
                                             :title="$t('Msg.DragResizeWidth') + ': ' + field._span + '/24'"
                                             @mousedown="startResizeWidth(field, $event)"
@@ -155,7 +155,7 @@
                                     </el-col>
                                 </template>
                             </draggable>
-                            
+
                             <!-- 普通模式：使用原生 el-row 以获得最佳性能 -->
                             <el-row v-else :gutter="10" @click="handleFieldClick">
                                 <el-col
@@ -172,7 +172,7 @@
                                             v-show="GetFieldIsShow(field)"
                                             :label-position="GetLabelPosition(field)"
                                             :prop="field.Name"
-                                            :class="'form-item' 
+                                            :class="'form-item'
                                                     + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
                                                     + (shouldShowLabel(field) ? '' : ' hide-label ')"
                                         >
@@ -226,8 +226,8 @@
                         </el-form>
                     </div>
                 </el-tab-pane>
-                <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false" 
-                    :key="'div_' + tab.Name" 
+                <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false"
+                    :key="'div_' + tab.Name"
                     class="not-field">
                     <div style="margin-top: -40px">
                         <img :src="'./static/img/no-data.svg'" style="width: 200px" />
@@ -298,7 +298,7 @@ export default {
         // ==================== 性能优化：预计算 tabs class ====================
         tabsClass() {
             var self = this;
-            if (self.FormTabs.length == 1 && 
+            if (self.FormTabs.length == 1 &&
                 (self.FormTabs[0].Name == 'none' || self.FormTabs[0].Name == 'info' || !self.FormTabs[0].Name)) {
                 return 'field-form-tabs tab-pane-hide';
             }
@@ -376,7 +376,7 @@ export default {
 
             // 预计算常用值，避免循环中重复计算
             var isDesignMode = self.LoadMode === "Design";
-            
+
             // 防御性检查：确保所有必要的数据都已准备好
             if (!self.DiyTableModel || typeof self.DiyTableModel !== 'object' || self.DiyTableModel instanceof Promise) {
                 return grouped;
@@ -384,7 +384,7 @@ export default {
             if (!self.DiyCommon || !self.GetCurrentUser) {
                 return grouped;
             }
-            
+
             var displayDefaultField = self.DiyTableModel.DisplayDefaultField;
             var defaultFieldNames = self.DiyCommon.DefaultFieldNames || [];
             var isAdmin = self.GetCurrentUser._IsAdmin === true;
@@ -401,8 +401,8 @@ export default {
                 }
 
                 // 判断字段是否应该显示（在 ShowFields/HideFields 中）
-                var shouldShow = self.ShowHideField === true || 
-                    ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) && 
+                var shouldShow = self.ShowHideField === true ||
+                    ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
                      self.HideFields.indexOf(field.Name) === -1);
 
                 if (!shouldShow) return;
@@ -490,7 +490,7 @@ export default {
                     var renderedCount = self.renderedFieldCounts[key] || self.BATCH_SIZE_FIRST;
                     // 限制返回的字段数量
                     limitedGrouped[key] = allFields.slice(0, renderedCount);
-                    
+
                     // 如果还有未渲染的字段，安排下一批渲染
                     if (renderedCount < allFields.length && !self._isDestroyed) {
                         self.safeTimeout(() => {
@@ -665,7 +665,7 @@ export default {
             resizingField: null,
             resizeStartX: 0,
             resizeStartWidth: 0,
-            
+
             currentTabIndex: 0,
             PageType: "", //可以是Report
             FormTabs: [],
@@ -750,7 +750,7 @@ export default {
             isResizingWidth: false,
             resizeStartX: 0,
             resizeStartWidth: 0,
-            
+
             // 延迟渲染 DiyFormDialog，防止 Page 模式下无限嵌套
             _shouldRenderDiyFormDialog: false
         };
@@ -767,7 +767,7 @@ export default {
         var self = this;
         // 标记组件已销毁
         self._isDestroyed = true;
-        
+
         // ========== 0. 清理所有待执行的定时器 ==========
         if (self.DiyFieldList && self.DiyFieldList.length > 0) {
             self.DiyFieldList.forEach((field) => {
@@ -868,14 +868,14 @@ export default {
 
         // ========== 10. 清理当前字段模型 ==========
         self.CurrentDiyFieldModel = {};
-        
+
         // ========== 10.5 🔥 真正的内存泄漏修复：清理全局事件监听器 ==========
         // 清理全局点击事件（如果有绑定的话）
         if (self._globalClickHandler) {
             document.removeEventListener('click', self._globalClickHandler);
             self._globalClickHandler = null;
         }
-        
+
         // ========== 10.6 清理 V8 基础实例（但不清理 V8 对象本身） ==========
         // 注意：_V8BaseInstance 是组件级别的缓存，需要清理
         // 但不清理用户代码中的 V8 对象（那些会自动GC）
@@ -893,7 +893,7 @@ export default {
             });
             self._V8BaseInstance = null;
         }
-        
+
         // ========== 11. 清理已渲染标签页记录 ==========
         if (self.renderedTabs) {
             self.renderedTabs.clear();
@@ -964,16 +964,16 @@ export default {
             var self = this;
             var refKey = 'ref_' + fieldName;
             var refValue = self.$refs[refKey];
-            
+
             if (!refValue) {
                 return null;
             }
-            
+
             // Vue 3 中可能是数组或直接是组件实例
             if (Array.isArray(refValue)) {
                 return refValue.length > 0 ? refValue[0] : null;
             }
-            
+
             return refValue;
         },
         /**
@@ -1001,7 +1001,7 @@ export default {
             var self = this;
             // 只在设计模式下处理字段选择
             if (self.LoadMode !== 'Design') return;
-            
+
             // 向上查找带有 data-field-id 属性的元素
             var target = event.target;
             var fieldId = null;
@@ -1012,7 +1012,7 @@ export default {
                 }
                 target = target.parentElement;
             }
-            
+
             if (fieldId) {
                 // 根据 fieldId 查找字段并选中
                 var field = self.DiyFieldList.find(f => f && f.Id === fieldId);
@@ -1102,14 +1102,14 @@ export default {
             if (evt.oldIndex === evt.newIndex) return;
             // 非设计模式不处理
             if (self.LoadMode !== 'Design') return;
-            
+
             // 获取当前 tab 标识
             var currentTab = self.FieldActiveTab;
-            
+
             // 从 DiyFieldListGrouped 获取当前 tab 的字段列表（这是 computed 属性的副本）
             var tabFieldsFromGrouped = self.DiyFieldListGrouped[currentTab] || [];
             if (tabFieldsFromGrouped.length === 0) return;
-            
+
             // 由于 :list 绑定，draggable 已经修改了 tabFieldsFromGrouped 的顺序
             // 我们需要按新顺序更新每个字段的 Sort 值
             tabFieldsFromGrouped.forEach((field, index) => {
@@ -1119,19 +1119,19 @@ export default {
                     originalField.Sort = (index + 1) * 100;
                 }
             });
-            
+
             // 强制触发 Vue 响应式更新
             // 通过创建新数组引用来触发 computed 重新计算
             self.DiyFieldList = [...self.DiyFieldList];
-            
+
             console.log('字段顺序已改变:', { oldIndex: evt.oldIndex, newIndex: evt.newIndex });
-            
+
             // 通知父组件字段顺序已改变
             self.$emit('CallbackFieldOrderChanged', {
                 oldIndex: evt.oldIndex,
                 newIndex: evt.newIndex
             });
-            
+
             // 通知父组件更新字段列表
             self.$emit('CallbackGetDiyField', self.DiyFieldList);
         },
@@ -1146,29 +1146,29 @@ export default {
             if (self.LoadMode !== 'Design') return;
             // 位置没变化不处理
             if (evt.oldIndex === evt.newIndex) return;
-            
+
             // 获取当前 tab 标识
             var currentTab = self.FieldActiveTab;
-            
+
             // 获取 v-model 绑定的数组（已经被 draggable 更新了顺序）
             var tabFields = self.DiyFieldListGrouped[currentTab] || [];
-            
+
             if (tabFields.length === 0) return;
-            
+
             // 重新计算该 tab 下所有字段的 Sort 值
             tabFields.forEach((field, index) => {
                 field.Sort = (index + 1) * 100;
             });
-            
+
             // 强制触发 Vue 响应式更新
             self.DiyFieldList = [...self.DiyFieldList];
-            
+
             // 通知父组件字段顺序已改变
             self.$emit('CallbackFieldOrderChanged', {
                 oldIndex: evt.oldIndex,
                 newIndex: evt.newIndex
             });
-            
+
             // 通知父组件更新字段列表
             self.$emit('CallbackGetDiyField', self.DiyFieldList);
         },
@@ -1177,23 +1177,23 @@ export default {
             // 获取当前 tab 的字段列表
             var currentTab = self.FieldActiveTab;
             var tabFields = self.DiyFieldListGrouped[currentTab] || [];
-            
+
             if (tabFields.length === 0) return;
-            
+
             // 在 DiyFieldList 中找到这些字段并更新顺序
             var movedField = tabFields[oldIndex];
             if (!movedField) return;
-            
+
             // 移除原位置的字段
             var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === movedField.Id);
             if (fieldIndex === -1) return;
-            
+
             self.DiyFieldList.splice(fieldIndex, 1);
-            
+
             // 计算新位置
             var targetField = tabFields[newIndex];
             var targetIndex = targetField ? self.DiyFieldList.findIndex(f => f.Id === targetField.Id) : self.DiyFieldList.length;
-            
+
             // 插入到新位置
             if (oldIndex < newIndex) {
                 // 向后移动，插入到目标位置之后
@@ -1202,12 +1202,12 @@ export default {
                 // 向前移动，插入到目标位置
                 self.DiyFieldList.splice(targetIndex, 0, movedField);
             }
-            
+
             // 重新分配 Sort 值（100递增）
             self.DiyFieldList.forEach((field, index) => {
                 field.Sort = (index + 1) * 100;
             });
-            
+
             // 通知父组件更新字段列表
             self.$emit('CallbackGetDiyField', self.DiyFieldList);
         },
@@ -1217,7 +1217,7 @@ export default {
         showFieldToolbar(field, event) {
             var self = this;
             if (self.LoadMode !== 'Design') return;
-            
+
             self.selectedFieldForToolbar = field;
         },
         /**
@@ -1277,11 +1277,11 @@ export default {
             var self = this;
             var newWidth = field.FormWidth || field._span;
             newWidth = Math.max(1, Math.min(24, newWidth + delta));
-            
+
             // 更新字段宽度
             field.FormWidth = newWidth;
             field._span = newWidth;
-            
+
             // 通知父组件字段已更新
             self.$emit('CallbackFieldWidthChanged', {
                 field: field,
@@ -1294,16 +1294,16 @@ export default {
         startResizeWidth(field, event) {
             var self = this;
             if (self.LoadMode !== 'Design') return;
-            
+
             self.resizingField = field;
             self.resizeStartX = event.clientX;
             self.resizeStartWidth = field.FormWidth || field._span;
             self.isResizingWidth = true;
-            
+
             // 添加全局事件监听
             document.addEventListener('mousemove', self.onResizeWidthMove);
             document.addEventListener('mouseup', self.stopResizeWidth);
-            
+
             // 阻止默认行为
             event.preventDefault();
             event.stopPropagation();
@@ -1314,16 +1314,16 @@ export default {
         onResizeWidthMove(event) {
             var self = this;
             if (!self.resizingField) return;
-            
+
             // 计算鼠标移动距离（像素）
             var deltaX = event.clientX - self.resizeStartX;
-            
+
             // 每50像素增加1个栅格
             var deltaSpan = Math.round(deltaX / 50);
-            
+
             // 计算新宽度
             var newWidth = Math.max(1, Math.min(24, self.resizeStartWidth + deltaSpan));
-            
+
             // 更新字段宽度
             self.resizingField.FormWidth = newWidth;
             self.resizingField._span = newWidth;
@@ -1334,17 +1334,17 @@ export default {
         stopResizeWidth(event) {
             var self = this;
             if (!self.resizingField) return;
-            
+
             // 通知父组件字段已更新
             self.$emit('CallbackFieldWidthChanged', {
                 field: self.resizingField,
                 width: self.resizingField.FormWidth || self.resizingField._span
             });
-            
+
             // 移除全局事件监听
             document.removeEventListener('mousemove', self.onResizeWidthMove);
             document.removeEventListener('mouseup', self.stopResizeWidth);
-            
+
             // 重置状态
             self.resizingField = null;
             self.isResizingWidth = false;
@@ -1402,7 +1402,7 @@ export default {
             V8.Row = row;
             V8.EventName = "FormTemplateEngine";
             self.SetV8DefaultValue(V8);
-            
+
             var result = null;
             try {
                 // eval(field.V8TmpEngineForm);
@@ -1417,8 +1417,8 @@ export default {
                 // return error.message;
                 self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
             } finally {
-                
-                
+
+
             }
             return result;
         },
@@ -1553,17 +1553,17 @@ export default {
                         var formMode = self.FormMode;//field.Config.JoinForm.FormMode
                         if(formMode == "Add" || formMode == "Insert")
                         {
-                            self.DiyCommon.FormEngine.AddFormData(field.Config.JoinForm.TableId 
+                            self.DiyCommon.FormEngine.AddFormData(field.Config.JoinForm.TableId
                                 || field.Config.JoinForm.TableName, {
                                 ...joinFormData
                             });
                         }
-                        else if(formMode == "Edit" 
+                        else if(formMode == "Edit"
                                 || formMode == "Update"
                                 || formMode == "Upt"
                             )
                         {
-                            self.DiyCommon.FormEngine.UptFormData(field.Config.JoinForm.TableId 
+                            self.DiyCommon.FormEngine.UptFormData(field.Config.JoinForm.TableId
                                 || field.Config.JoinForm.TableName, {
                                 ...joinFormData
                             });
@@ -1574,8 +1574,8 @@ export default {
                         //     {
                         //         FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
                         //         //这里获取关联表单的Id
-                        //         TableRowId: field.Config.JoinForm.Id 
-                        //             || (field.Config.JoinForm.JoinFieldName 
+                        //         TableRowId: field.Config.JoinForm.Id
+                        //             || (field.Config.JoinForm.JoinFieldName
                         //                 && self.FormDiyTableModel[field.Config.JoinForm.JoinFieldName]),
                         //         // SaveLoading: self.SaveDiyTableLoding,
                         //         //这里获取当前表单是保存并关闭还是什么状态
@@ -1617,14 +1617,14 @@ export default {
                     V8.AppendSearchChildTable = self.AppendSearchChildTable;
                     V8.OpenTableSetWhere = self.OpenTableSetWhere;
                     self.SetV8DefaultValue(V8);
-                    
+
                     await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.BeforeOpenV8 + " \n})()");
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行弹出表格弹出前V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
             } finally {
-                
-                
+
+
             }
             self.$nextTick(function () {
                 field.Config.OpenTable.ShowDialog = true;
@@ -1656,7 +1656,7 @@ export default {
             // 1. ReloadJoinForm(fieldModel) - 传入字段对象
             // 2. ReloadJoinForm({ FieldName, TableId, TableName, Id, FormMode }) - 传入配置对象
             let fieldModel;
-            
+
             if (fieldModelOrParams.Name && fieldModelOrParams.Config) {
                 // 方式1：传入的是字段对象
                 fieldModel = fieldModelOrParams;
@@ -1664,12 +1664,12 @@ export default {
                 // 方式2：传入的是配置对象
                 const params = fieldModelOrParams;
                 fieldModel = self.DiyFieldList.find(item => item.Name === params.FieldName);
-                
+
                 if (!fieldModel) {
                     console.error(`ReloadJoinForm: 字段 ${params.FieldName} 不存在`);
                     return;
                 }
-                
+
                 // 更新字段配置
                 if (!fieldModel.Config) {
                     fieldModel.Config = {};
@@ -1677,24 +1677,24 @@ export default {
                 if (!fieldModel.Config.JoinForm) {
                     fieldModel.Config.JoinForm = {};
                 }
-                
+
                 fieldModel.Config.JoinForm.TableId = params.TableId || '';
                 fieldModel.Config.JoinForm.TableName = params.TableName || '';
                 fieldModel.Config.JoinForm.Id = params.Id;
                 fieldModel.Config.JoinForm.FormMode = params.FormMode;
-                
+
                 // 触发 FieldSet 确保响应式更新
                 self.FieldSet(params.FieldName, 'Config', fieldModel.Config);
             } else {
                 console.error('ReloadJoinForm: 参数错误', fieldModelOrParams);
                 return;
             }
-            
+
             console.log(`ReloadJoinForm 被调用: ${fieldModel.Name}`, {
                 fieldConfig: fieldModel.Config?.JoinForm,
                 currentTime: new Date().toISOString()
             });
-            
+
             self.$nextTick(function () {
                 // 延迟时间改为 500ms，给组件更多时间初始化
                 setTimeout(async () => {
@@ -1703,7 +1703,7 @@ export default {
                         console.error(`ReloadJoinForm: 组件 ${fieldModel.Name} 的 ref 未找到`);
                         return;
                     }
-                    
+
                     // 调试信息：检查组件状态
                     var componentState = {
                         hasInit: typeof refComponent.Init === 'function',
@@ -1711,15 +1711,15 @@ export default {
                         hasInstance: !!refComponent._joinFormInstance,
                         instanceMethods: refComponent._joinFormInstance ? Object.keys(refComponent._joinFormInstance).filter(k => typeof refComponent._joinFormInstance[k] === 'function') : []
                     };
-                    
+
                     console.log(`ReloadJoinForm: 组件 ${fieldModel.Name}`, componentState);
-                    
+
                     // 如果组件未渲染，尝试更新配置触发渲染
                     if (!componentState.shouldRender) {
                         console.warn(`ReloadJoinForm: 组件 ${fieldModel.Name} 未满足渲染条件`);
                         return;
                     }
-                    
+
                     // 调用 Init 方法（内部已经有等待逻辑）
                     if (typeof refComponent.Init === 'function') {
                         console.log(`ReloadJoinForm: 正在执行 ${fieldModel.Name}.Init()`);
@@ -1801,15 +1801,15 @@ export default {
                 V8.KeyCode = keyCode;
                 V8.EventName = "FieldOnKeyup";
                 self.SetV8DefaultValue(V8);
-                
+
                 try {
                     // eval(field.KeyupV8Code)
                     await eval("(async () => {\n " + field.KeyupV8Code + " \n})()");
                 } catch (error) {
                     self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    
-                    
+
+
                 }
             }
         },
@@ -1905,7 +1905,7 @@ export default {
                 } else {
                     var checkForm = true;
                     var checkFailField = {};
-                    
+
                     // 【调试】检查FileUpload和ImgUpload字段的存储格式
                     self.DiyFieldList.forEach((field) => {
                         if (field.Component === 'FileUpload' || field.Component === 'ImgUpload') {
@@ -1921,7 +1921,7 @@ export default {
                             }
                         }
                     });
-                    
+
                     self.DiyFieldList.forEach((field) => {
                         //再手动判断一下必填等验证
                         if (
@@ -1976,7 +1976,7 @@ export default {
                 V8.V8Callback = V8Callback;
                 V8.EventName = "FormOut";
                 self.SetV8DefaultValue(V8);
-                
+
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -1989,8 +1989,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行表单离开V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    
-                    
+
+
                 }
                 return result;
             }
@@ -2043,7 +2043,7 @@ export default {
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
-            
+
             // 首次创建基础实例：初始化所有通用函数（只执行一次）
             if (!self._V8BaseInstance) {
                 self._V8BaseInstance = {
@@ -2079,27 +2079,27 @@ export default {
                     FormClose: self.FormClose
                 };
             }
-            
+
             // 【修复】从基础实例显式复制所有通用函数引用（不使用原型链，避免 eval 中访问失败）
             // if (!V8.DiyCommon) {
                 // 复制所有通用函数到当前 V8 对象
                 Object.assign(V8, self._V8BaseInstance);
             // }
-            
+
             // 注册 V8.Method.ScanCode 扫码功能（闭包绑定当前 V8 实例）
             initV8ScanCode(V8);
             // 注册 V8.Print 蓝牙打印功能（闭包绑定当前 V8 实例）
             initV8Print(V8);
-            
+
             // 设置动态属性（每次调用都可能变化的数据）
             V8.DataAppend = self.DataAppend;
             V8.FormWF = self.FormWf;
-            
+
             //2022-04-09修改V8.Form.Id
             if (!self.DiyCommon.IsNull(self.TableRowId) && self.DiyCommon.IsNull(self.FormDiyTableModel.Id)) {
                 self.FormDiyTableModel["Id"] = self.TableRowId;
             }
-            
+
             // 动态数据（依赖当前表单状态）
             V8.Form = self.FormDiyTableModel;
             V8.OldForm = self.OldForm;
@@ -2114,7 +2114,7 @@ export default {
             V8.TableName = self.TableName;
             V8.TableModel = self.DiyTableModel;
             V8.CurrentTableData = self.CurrentTableData;
-            
+
             return V8;
         },
         FormClose() {
@@ -2153,7 +2153,7 @@ export default {
                 V8.FormSubmitAction = actionType;
                 V8.EventName = "FormSubmitBefore";
                 self.SetV8DefaultValue(V8);
-                
+
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -2172,8 +2172,8 @@ export default {
                     self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
                     result = false;
                 } finally {
-                    
-                    
+
+
                 }
                 return result;
             }
@@ -2301,7 +2301,7 @@ export default {
                             self.FieldActiveTab = self.FormTabs[self.currentTabIndex]?.Id || self.FormTabs[self.currentTabIndex]?.Name;
                         }
                     }
-                    
+
                     // 性能优化：初始化第一个 tab 为已渲染（懒加载优化）
                     self.renderedTabs.clear(); // 清空之前的记录
                     if (self.FormTabs && self.FormTabs.length > 0) {
@@ -2309,7 +2309,7 @@ export default {
                         const firstTab = self.FormTabs[0];
                         const firstTabKey = firstTab.Id || firstTab.Name;
                         self.renderedTabs.add(firstTabKey);
-                        
+
                         // 如果当前激活的不是第一个tab，也要标记为已渲染
                         if (self.FieldActiveTab && self.FieldActiveTab !== firstTabKey) {
                             self.renderedTabs.add(self.FieldActiveTab);
@@ -2424,14 +2424,14 @@ export default {
 
                         // 字段数据源新位置
                         self.DiyCommon.SetFieldsData(self.DiyFieldList, formData);
-                        
+
                         // 初始化每个字段的属性（从计算属性移到这里，避免副作用）
                         self.DiyFieldList.forEach((field) => {
                             if (field) {
                                 self.DiyCommon.EnsureFieldProperties(field, self.FormDiyTableModel, null);
                             }
                         });
-                        
+
                         self.LoadDiyFieldList = true;
                         self.$emit("CallbackGetDiyField", self.DiyFieldList);
                         //注意：2020-11-02发现，当初为什么这里要0.3秒后执行？
@@ -2459,12 +2459,12 @@ export default {
                                 var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                                 V8.V8From = "DiyForm";
                                 V8.EventName = "FormIn";
-                                
+
                                 // 设置通用函数和动态属性
                                 self.SetV8DefaultValue(V8);
 
-                                
-                                
+
+
                                 try {
                                     // 执行用户的 InFormV8 代码
                                     await eval("(async () => {\n " + self.DiyTableModel.InFormV8 + " \n})();");
@@ -2529,7 +2529,7 @@ export default {
                         // ==================== 使用组件缓存池替代全局注册 ====================
                         var componentName = field.Config.DevComponentName;
                         var componentPath = field.Config.DevComponentPath;
-                        
+
                         // 从缓存池获取或创建组件
                         var cachedComponent;
                         if (!self.DiyCommon.IsNull(self.CustomComponent[componentName])) {
@@ -2539,14 +2539,14 @@ export default {
                             // 动态加载组件
                             cachedComponent = DynamicComponentCache.getOrCreate(componentName, componentPath);
                         }
-                        
+
                         // 仍然需要全局注册以便在模板中使用 :is 动态组件
                         // 但现在组件实例是缓存的，不会重复创建
                         const app = window.__VUE_APP__;
                         if (app && !app._context.components[componentName]) {
                             app.component(componentName, cachedComponent);
                         }
-                        
+
                         // 记录到本地 DevComponents 用于模板条件判断
                         if (self.DiyCommon.IsNull(self.DevComponents[componentName])) {
                             self.DevComponents[componentName] = {
@@ -2588,7 +2588,7 @@ export default {
             var tabKey = tab.props?.name || tab.name || tab.Id;
             this.FieldActiveTab = tabKey; //切换索引
             this.currentTabIndex = tab.index; //当前索引lisaisai
-            
+
             // 标记该 tab 已渲染（懒加载）
             if (!self.renderedTabs.has(tabKey)) {
                 self.renderedTabs.add(tabKey);
@@ -2598,9 +2598,9 @@ export default {
         },
         CommonV8CodeChange(item, field, v8codeKey) {
             var self = this;
-            if (field.Config 
+            if (field.Config
                 && (field.V8Code
-                    ||field.Config.V8Code 
+                    ||field.Config.V8Code
                     || (v8codeKey && field.Config[v8codeKey])
                     )
                 ) {
@@ -2609,9 +2609,9 @@ export default {
         },
         SelectChange(item, field) {
             var self = this;
-            if ((field.Component == "Select" 
-                    || field.Component == "SelectTree" 
-                    || field.Component == "MultipleSelect") 
+            if ((field.Component == "Select"
+                    || field.Component == "SelectTree"
+                    || field.Component == "MultipleSelect")
                 && (field.V8Code || field.Config.V8Code)) {
                 self.RunV8Code({ field: field, thisValue: item });
             }
@@ -2646,7 +2646,7 @@ export default {
                 V8.ThisValue = self.DiyCommon.IsNull(thisValue) ? "" : thisValue; // 这个是Select控制选择后的回调对象
                 V8.EventName = "FieldValueChange";
                 self.SetV8DefaultValue(V8, field);
-                
+
                 var result = null;
                 try {
                     //eval(field.Config.V8Code)
@@ -2661,8 +2661,8 @@ export default {
                     self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                     callback && callback(null);
                 } finally {
-                    
-                    
+
+
                 }
                 return result;
             }
@@ -2913,7 +2913,7 @@ export default {
          */
         DiyFieldStrToJson(field, formData, isPostSql) {
             var self = this;
-            
+
             // 1. 归一化 Multiple 配置：支持字符串或布尔，统一为布尔值
             try {
                 if (field && field.Config) {
@@ -2927,7 +2927,7 @@ export default {
                     }
                 }
             } catch (e) {}
-            
+
             // 2. 设置表单验证规则
             if (self.FormMode != "View" && field.NotEmpty && field.Visible) {
                 if (!self.FormRules[field.Name]) {
@@ -2942,7 +2942,7 @@ export default {
             } else if (self.FormMode == "View") {
                 self.FormRules = {};
             }
-            
+
             // 3. 使用配置驱动的处理器系统处理字段值
             var ctx = {
                 formMode: self.FormMode,
@@ -2955,25 +2955,25 @@ export default {
                     return self.GetFormDataJsonValue(field, formData, isArray);
                 }
             };
-            
+
             // 检查是否有注册的处理器
             var handler = self.DiyCommon.FieldValueHandlers[field.Component];
-            
+
             if (handler) {
                 try {
                     // 使用处理器处理值
                     var value = self.DiyCommon.ProcessFieldValue(field, formData, ctx);
-                    
+
                     // 对于不需要值的组件（如 Divider、Button），跳过赋值
                     if (handler.valueType !== "none") {
                         self.FormDiyTableModel[field.Name] = value;
                     }
-                    
+
                     // 特殊处理：ImgUpload 多图需要加载私有文件
                     if (field.Component === "ImgUpload" && self.getMultipleFlag(field, "ImgUpload")) {
                         self._loadPrivateFilesForField(field, value, "ImgUpload");
                     }
-                    
+
                     return;
                 } catch (error) {
                     console.warn("FieldValueHandler error for:", field.Name, error);
@@ -2982,21 +2982,21 @@ export default {
                     return;
                 }
             }
-            
+
             // 4. 如果没有注册处理器，使用默认处理（文本类）
-            self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) 
+            self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name])
                 ? "" : formData[field.Name];
         },
-        
+
         /**
          * 加载多图/多文件的私有文件 URL
          */
         _loadPrivateFilesForField(field, arr, configKey) {
             var self = this;
             if (!Array.isArray(arr)) return;
-            
+
             var limitCfg = (field.Config && field.Config[configKey] && field.Config[configKey].Limit) || false;
-            
+
             arr.forEach(function(fileObj) {
                 try {
                     if (!fileObj) return;
@@ -3004,10 +3004,10 @@ export default {
                     if (!fileId) return;
                     var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
                     var realKey = field.Name + "_" + fileId + "_RealPath";
-                    
+
                     // 如果已经有值则跳过
                     if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
-                    
+
                     if (!filePath) {
                         self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
                     } else if (limitCfg !== true) {
@@ -3040,7 +3040,7 @@ export default {
                 } catch (e) {}
             });
         },
-        
+
         GetFormDataJsonValue(field, formData, isArray) {
             var self = this;
             if (self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name])) {
@@ -3205,7 +3205,7 @@ export default {
             console.log('[diy-form] 添加前的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
             console.log('[diy-form] 当前活动Tab:', self.FieldActiveTab);
             console.log('[diy-form] 新字段的Tab:', field.Tab);
-            
+
             // 如果有指定位置，就插入到该位置；否则添加到末尾
             if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= self.DiyFieldList.length) {
                 console.log('[diy-form] 插入到位置:', insertIndex);
@@ -3214,10 +3214,10 @@ export default {
                 console.log('[diy-form] 添加到末尾');
                 self.DiyFieldList.push(field);
             }
-            
+
             console.log('[diy-form] 添加后的DiyFieldList长度:', self.DiyFieldList.length);
             console.log('[diy-form] 添加后的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
-            
+
             // 🔥 强制触发computed重新计算：修改renderedFieldCounts
             console.log('[diy-form] 触发computed重新计算...');
             self.$nextTick(() => {
@@ -3230,7 +3230,7 @@ export default {
                 console.log('[diy-form] 更新renderedFieldCounts:', JSON.parse(JSON.stringify(self.renderedFieldCounts)));
                 console.log('[diy-form] DiyFieldListGrouped已重新计算');
             });
-            
+
             console.log('[diy-form] ========== AddDiyFieldArr 结束 ==========');
         },
         // 外部可能需要更新内部的字段对象
@@ -3549,7 +3549,7 @@ export default {
                     }
 
                     var formDiyTableModel = formData;
-                    
+
                     self.DiyCommon.ForRowModelHandler(formDiyTableModel, self.DiyFieldList);
 
                     //DIY架构修改，_RowModel不再传入string，而是{}
@@ -3695,7 +3695,7 @@ export default {
                                         self.Init(true);
                                     });
                                 }
-                                
+
                             }
                         } else {
                             callback(false);
@@ -3705,7 +3705,7 @@ export default {
                         var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                         V8.EventName = "FormSubmitBefore";
                         self.SetV8DefaultValue(V8);
-                        
+
                         //传入V8、Param、callback,  必须执行SubmitCallback(DosResult)
                         let result = self.EventReplace.Submit(V8, param, SubmitCallback);
                     } else {
@@ -3951,7 +3951,7 @@ export default {
         display: flex;
         gap: 20px;
         margin-bottom: 24px;
-        
+
         .skeleton-field {
             flex: 1;
             min-width: 0;
@@ -3968,14 +3968,14 @@ export default {
     margin-bottom: 0px;
     transition: all 0.3s ease;
     cursor: pointer;
-    
+
     &:hover {
         background-color: #f5f7fa;
-        
+
         .drag-handle {
             opacity: 1;
         }
-        
+
         .width-resize-handle {
             opacity: 1;
         }
@@ -4014,18 +4014,18 @@ export default {
     border-radius: 6px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
     z-index: 1000;
-    
+
     :deep(.el-button) {
         padding: 6px;
         height: 28px;
         width: 28px;
-        
+
         &:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
     }
-    
+
     .width-control {
         display: flex;
         align-items: center;
@@ -4033,7 +4033,7 @@ export default {
         padding: 4px 8px;
         background-color: #f5f7fa;
         border-radius: 4px;
-        
+
         .width-display {
             font-weight: bold;
             min-width: 30px;
@@ -4041,7 +4041,7 @@ export default {
             color: #409EFF;
             font-size: 14px;
         }
-        
+
         :deep(.el-button) {
             padding: 4px;
             min-height: 24px;
@@ -4061,7 +4061,7 @@ export default {
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 10;
-    
+
     :deep(.el-icon) {
         display: block;
         width: 24px;
@@ -4071,7 +4071,7 @@ export default {
         background: white;
         border-radius: 4px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        
+
         &:hover {
             color: #66b1ff;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -4091,11 +4091,11 @@ export default {
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 10;
-    
+
     &:hover {
         background: #409EFF;
     }
-    
+
     &.resizing {
         opacity: 1 !important;
         background: #66b1ff;
@@ -4119,5 +4119,21 @@ export default {
 /* 拖拽时的占位符 */
 :deep(.sortable-chosen) {
     cursor: move;
+}
+/* 针对移动端，启用原生滚动 */
+@media (max-width: 768px) {
+  :deep(.el-tabs__nav-scroll) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+    scrollbar-width: none; /* Firefox 隐藏滚动条 */
+  }
+
+  :deep(.el-tabs__nav-scroll::-webkit-scrollbar) {
+    display: none; /* Chrome/Safari 隐藏滚动条 */
+  }
+
+  :deep(.el-tabs__nav) {
+    flex-wrap: nowrap;
+  }
 }
 </style>

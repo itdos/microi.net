@@ -17,7 +17,7 @@ const DiyFormPage = defineAsyncComponent(() => import("@/views/form-engine/diy-f
 const DiyDesignList = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
 const DiyCustomDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog"));
 const DiySearch = defineAsyncComponent(() => import("@/views/form-engine/diy-search"));
-
+const DiyModleSearch = defineAsyncComponent(() => import("@/views/form-engine/diy-mobile-search"));
 // 聊天模块
 const DiyChat = defineAsyncComponent(() => import("@/views/chat/index"));
 
@@ -116,6 +116,7 @@ function RegMicroiComponents(app) {
     app.component("DiyDesignList", DiyDesignList);
     app.component("DiyCustomDialog", DiyCustomDialog);
     app.component("DiySearch", DiySearch);
+    app.component("DiyModleSearch", DiyModleSearch);
 
     // 聊天模块
     app.component("DiyChat", DiyChat);
