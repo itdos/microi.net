@@ -230,7 +230,7 @@ AI：（调用 microi_run_engine）返回了 20 条订单数据...
 |------|---------|---------|
 | **VS Code 插件** | V8 API 知识 + 数据库表结构 + 代码拉取/推送 + 断点调试 | 日常开发 |
 | **MCP Server**（本文档） | 实时查询数据库、读取/保存引擎代码、远程执行 | AI 实时操作平台 |
-| **[Skills](/doc/ai-skills-integrate)** | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
+| **[Skills](/doc/ai-integrate/ai-skills-integrate)** | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
 
 ::: tip 推荐三者搭配使用
 VS Code 插件提供 API 知识和表结构 → MCP 提供实时数据查询和远程执行 → Skills 提供编码最佳实践。
