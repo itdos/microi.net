@@ -1,5 +1,5 @@
 <template>
-    <div class="xjy-kehu-childtable-class">
+    <div v-if="!isPhoneView" class="xjy-kehu-childtable-class">
         <div class="item" style="color: rgb(255, 163, 96); background: rgba(255, 163, 96, 0.2); border-top: 2px solid rgb(255, 163, 96)" @click="scrollIntoView('.field_LianxiRLine')">
             <el-icon><Avatar /></el-icon>
             <div class="info">
@@ -81,8 +81,15 @@
 </template>
 
 <script>
+  import { useDiyStore } from '@/pinia';
+  import { computed } from 'vue';
 export default {
-    name: "loudong",
+    name: "khChildtable",
+     setup() {
+            const diyStore = useDiyStore();
+            const isPhoneView = computed(() => diyStore.IsPhoneView);
+            return { isPhoneView };
+        },
     props: {
         /**
          * 固定接收数据的对象，由V8代码传过来
