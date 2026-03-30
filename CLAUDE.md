@@ -458,6 +458,16 @@ console.log('调试信息')                                  // 控制台输出�
 
 ---
 
+## 数据库结构
+
+编写 `V8.FormEngine` 或 `V8.Db` 代码时，请参考当前编辑文件所属 OsClient 目录下的 `.microi-db-schema.md` 获取表名和字段信息。
+
+数据库结构文件列表：
+- `microi-v8-engine/浙江任亿科技有限公司 (api.renyikj.cn)/renyi.Product.Internal/.microi-db-schema.md`
+
+
+---
+
 ## V8 引擎编码最佳实践（Skills）
 
 编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范：
