@@ -637,12 +637,12 @@ export default {
                     SelectSaveFormat: col.Config?.SelectSaveFormat || 'Text'  // 默认保存文本值，而非JSON
                 };
                 
-                console.log('[JSON表格] GetColumnField - KeyValueList转换:', {
-                    columnKey: col.Key,
-                    originalKeyValueList: col.KeyValueList,
-                    convertedDataList: dataList,
-                    config: config
-                });
+                // console.log('[JSON表格] GetColumnField - KeyValueList转换:', {
+                //     columnKey: col.Key,
+                //     originalKeyValueList: col.KeyValueList,
+                //     convertedDataList: dataList,
+                //     config: config
+                // });
             } else if (col.Data && col.Data.length > 0) {
                 // 使用Config中的字段配置
                 if (!config.SelectLabel) {
