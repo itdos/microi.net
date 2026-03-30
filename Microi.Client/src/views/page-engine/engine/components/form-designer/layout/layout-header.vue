@@ -132,7 +132,7 @@ const { formData } = storeToRefs(pageEngineStore)
 const btnLoading = ref(false)
 
 //页面标题
-const title = ref('Microi 界面引擎')
+const title = ref('界面引擎')
 
 //是否暗黑模式
 const isDark = useDark()
@@ -328,6 +328,10 @@ const mockClick = (index) => {
   .header-right {
     flex: 0 0 auto;
     gap: 12px;
+    .ve__button.is-circle{
+      width: 32px;
+      height: 32px;
+    }
   }
 
   .lefticon {

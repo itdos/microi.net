@@ -89,6 +89,7 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 | sys_rolelimit | 角色-菜单权限关联表 |
 | sys_apiengine | 接口引擎 |
 | Sys_User | 用户表 |
+| mic_page | 界面引擎（页面配置） |
 
 ## 字段类型（type 参数）→ 必须是 MySQL 列类型
 | 用途 | 正确的 type 值 | 错误示例 |
@@ -145,7 +146,43 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | SubmitBeforeServerV8 | 后端 | 数据写入DB前（事务中） |
 | SubmitAfterServerV8 | 后端 | 数据写入DB后（仍在事务中） |
 | OutFormV8 | 前端 | 表单关闭后 |
-| DataFilterV8 | 后端 | 获取数据后每行执行 |`;
+| DataFilterV8 | 后端 | 获取数据后每行执行 |
+
+## 界面引擎（Page Engine）
+界面引擎用于创建自定义页面（仪表盘、数据概览、报表等），数据存储在 mic_page 表。
+- **microi_list_pages** — 列出已有页面
+- **microi_get_page** — 获取页面JSON配置
+- **microi_save_page** — 创建或更新页面
+
+### 页面JSON结构
+\`\`\`json
+{
+  "formData": {
+    "Id": "", "Title": "页面标题",
+    "formConfig": { "gridNum": 12, "mask": false, "watermark": false },
+    "wrapperList": [
+      {
+        "type": "pannel", "title": "卡片标题",
+        "widgetList": [
+          { "type": "chart-bar", "title": "柱状图", "config": { "apiEngineKey": "xxx" } }
+        ]
+      }
+    ]
+  }
+}
+\`\`\`
+
+### 常用组件类型
+| type | 说明 |
+|------|------|
+| chart-bar | 柱状图 |
+| chart-pie | 饼图 |
+| chart-line | 折线图 |
+| chart-number | 统计数值 |
+| data-table | 数据表格 |
+| map-binddata | 地图 |
+| html | 自定义HTML |
+| iframe | 内嵌页面 |`;
 }
 
 /**
@@ -482,10 +519,18 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
       description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
+      tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Name":"基本信息"},{"Name":"详细信息"}]\'). Groups fields into tabs.'),
+      isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
+      column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 1'),
+      formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
+      formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
     },
-    async ({ name, description }) => {
+    async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth }) => {
       try {
-        const result = await client.createTable(name, description);
+        const result = await client.createTable(name, description, {
+          Tabs: tabs, IsTree: isTree, Column: column,
+          FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+        });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
@@ -508,15 +553,26 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       name: z.string().describe('Field name in English (e.g. "CustomerName", "Phone", "Amount")'),
       label: z.string().describe('Chinese display label (e.g. "客户名称", "手机号", "金额")'),
       type: z.string().optional().describe('MySQL column type. Default: varchar(500). Valid examples: varchar(50), varchar(200), varchar(500), int, bigint, decimal(18,2), datetime, mediumtext, longtext. NEVER use: string, number, boolean, float, date — these are NOT valid MySQL types.'),
-      component: z.string().optional().describe('UI component type. Default: Text. Options: Text (单行文本), Textarea (多行文本), NumberText (数字), Select (下拉选择), Radio (单选), Switch (开关), DatePicker (日期), RichText (富文本), Upload (文件上传), Image (图片)'),
+      component: z.string().optional().describe('UI component type. Default: Text. Options: Text, Textarea, NumberText, Select, MultipleSelect, Radio, Checkbox, Switch, DateTime, RichText, ImgUpload, FileUpload, AutoNumber, JoinForm, OpenTable, SelectTree, Cascader, Department, Address, Map, Rate, TableChild'),
       visible: z.number().optional().describe('Is visible in form (1=yes, 0=no). Default: 1'),
       appVisible: z.number().optional().describe('Is visible in mobile app (1=yes, 0=no). Default: 1'),
       tab: z.string().optional().describe('Form tab group name (for organizing fields into tabs)'),
       tableWidth: z.number().optional().describe('Column width in list view (pixels). Default: 120'),
       sort: z.number().optional().describe('Field display order. Default: 100'),
       readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
+      notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
+      unique: z.number().optional().describe('Unique constraint (1=unique, 0=allow duplicates). Default: 0'),
+      defaultValue: z.string().optional().describe('Default value for the field'),
+      placeholder: z.string().optional().describe('Placeholder text shown in form input'),
+      formWidth: z.string().optional().describe('Field width in form (e.g. "100%", "50%"). Default: "100%"'),
+      data: z.string().optional().describe('Options data for Select/Radio/Checkbox/MultipleSelect components. Format: "value1|label1,value2|label2" (e.g. "1|启用,0|禁用" or "male|男,female|女"). REQUIRED for Select/Radio/Checkbox/MultipleSelect components.'),
+      config: z.string().optional().describe('Advanced component config JSON string. Used for AutoNumber pattern, JoinForm/OpenTable binding, etc.'),
+      description: z.string().optional().describe('Field description / help text'),
+      encrypt: z.number().optional().describe('Enable encryption storage (1=encrypt, 0=plain). Default: 0. For sensitive data like phone/ID number.'),
+      inTableEdit: z.number().optional().describe('Enable inline editing in table list view (1=yes, 0=no). Default: 0'),
     },
-    async ({ tableId, name, label, type, component, visible, appVisible, tab, tableWidth, sort, readonly: readonlyVal }) => {
+    async ({ tableId, name, label, type, component, visible, appVisible, tab, tableWidth, sort,
+      readonly: readonlyVal, notEmpty, unique, defaultValue, placeholder, formWidth, data, config, description, encrypt, inTableEdit }) => {
       try {
         // 自动映射编程语言类型为 MySQL 类型
         const normalizedType = normalizeFieldType(type);
@@ -530,6 +586,10 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           Visible: visible, AppVisible: appVisible,
           Tab: tab, TableWidth: tableWidth, Sort: sort,
           Readonly: readonlyVal,
+          NotEmpty: notEmpty, Unique: unique,
+          DefaultValue: defaultValue, Placeholder: placeholder,
+          FormWidth: formWidth, Data: data, Config: config,
+          Description: description, Encrypt: encrypt, InTableEdit: inTableEdit,
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -558,14 +618,23 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page"'),
       url: z.string().optional().describe('URL if openType is "Url"'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
+      icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
+      searchFieldIds: z.string().optional().describe('Comma-separated field Ids to show in search bar (e.g. "fieldId1,fieldId2")'),
+      tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
+      defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
+      sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
+      diyConfig: z.string().optional().describe('Advanced module config JSON string'),
     },
-    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort }) => {
+    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort,
+      icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, diyConfig }) => {
       try {
         const result = await client.createModule({
           Name: name, DiyTableId: diyTableId, ParentId: parentId,
           ComponentName: componentName, ComponentPath: componentPath,
           Display: display, AppDisplay: appDisplay,
           OpenType: openType, Url: url, Sort: sort,
+          Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
+          DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere, DiyConfig: diyConfig,
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -596,6 +665,108 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
         const data = result.Data as { AddedCount?: number; SkippedCount?: number; Message?: string };
         return { content: [{ type: 'text', text: `✅ ${data?.Message || 'Permissions set successfully.'}` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 列出界面引擎页面
+  // ========================
+  server.tool(
+    'microi_list_pages',
+    `List page engine (界面引擎) pages for OsClient "${osClient}". Pages are stored in mic_page table and define custom UI layouts with charts, tables, maps, and other dashboard components.`,
+    {
+      keyword: z.string().optional().describe('Search keyword to filter pages by title, number, or description'),
+    },
+    async ({ keyword }) => {
+      try {
+        const result = await client.getPageEngineList(keyword);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+
+        const pages = Array.isArray(result.Data) ? result.Data : [];
+        if (!pages.length) {
+          return { content: [{ type: 'text', text: 'No pages found.' }] };
+        }
+
+        const lines = [
+          `# Page Engine Pages (${pages.length})\n`,
+          '| # | Title | Number | Description | Updated |',
+          '|---|-------|--------|-------------|---------|',
+        ];
+        pages.forEach((p: Record<string, string>, i: number) => {
+          lines.push(`| ${i + 1} | ${p.Title || ''} | ${p.Number || ''} | ${p.Desc || ''} | ${p.UpdateTime || ''} |`);
+        });
+
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 获取界面引擎页面详情
+  // ========================
+  server.tool(
+    'microi_get_page',
+    `Get page engine detail including full JSON configuration for OsClient "${osClient}". The JsonObj field contains the complete page structure with formData, wrapperList, and widgetList.`,
+    {
+      pageId: z.string().describe('The page Id to retrieve'),
+    },
+    async ({ pageId }) => {
+      try {
+        const result = await client.getPageEngineDetail(pageId);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+
+        const page = result.Data as Record<string, unknown>;
+        const lines = [
+          `## Page: ${page?.Title || pageId}`,
+          page?.Number ? `- **Number**: ${page.Number}` : '',
+          page?.Desc ? `- **Description**: ${page.Desc}` : '',
+          '',
+          '### JSON Configuration',
+          '```json',
+          typeof page?.JsonObj === 'string' ? page.JsonObj : JSON.stringify(page?.JsonObj, null, 2),
+          '```',
+        ].filter(Boolean);
+
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 保存界面引擎页面
+  // ========================
+  server.tool(
+    'microi_save_page',
+    `Create or update a page engine page for OsClient "${osClient}". The jsonStr must be a valid page engine JSON with formData/wrapperList/widgetList structure. Pass pageId to update an existing page, or omit to create a new one.`,
+    {
+      pageId: z.string().optional().describe('Page Id to update. Omit to create a new page.'),
+      title: z.string().describe('Page title (e.g. "销售仪表盘", "数据概览")'),
+      number: z.string().optional().describe('Page number/code (auto-generated if omitted)'),
+      desc: z.string().optional().describe('Page description'),
+      jsonStr: z.string().describe('Complete page JSON configuration string. Must contain formData with wrapperList and widgetList structure. Refer to page engine documentation for the JSON schema.'),
+    },
+    async ({ pageId, title, number, desc, jsonStr }) => {
+      try {
+        const result = await client.savePageEngine({
+          PageId: pageId, Title: title, Number: number,
+          Desc: desc, JsonStr: jsonStr,
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        const data = result.Data as { PageId?: string; Message?: string };
+        return { content: [{ type: 'text', text: `✅ ${data?.Message || 'Page saved successfully.'}\n- PageId: ${data?.PageId}` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

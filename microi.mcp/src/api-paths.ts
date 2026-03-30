@@ -30,4 +30,9 @@ export const API = {
   ADD_FIELD: '/api/V8Engine/AddField',
   CREATE_MODULE: '/api/V8Engine/CreateModule',
   SET_ROLE_PERMISSION: '/api/V8Engine/SetRolePermission',
+
+  // 界面引擎（Page Engine）
+  GET_PAGE_ENGINE_LIST: '/api/V8Engine/GetPageEngineList',
+  GET_PAGE_ENGINE_DETAIL: '/api/V8Engine/GetPageEngineDetail',
+  SAVE_PAGE_ENGINE: '/api/V8Engine/SavePageEngine',
 } as const;
