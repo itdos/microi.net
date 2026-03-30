@@ -16,6 +16,8 @@
 | **v8-http-integration** | 调用外部 HTTP API（微信、支付、短信等） | `v8-http-integration/SKILL.md` |
 | **v8-cache-pattern** | Redis 缓存模式（防缓存穿透、过期策略） | `v8-cache-pattern/SKILL.md` |
 | **v8-security** | 安全最佳实践（权限校验、输入验证、防注入） | `v8-security/SKILL.md` |
+| **page-engine** | 界面引擎页面 JSON 生成 | `page-engine/SKILL.md` |
+| **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
 
 ---
 

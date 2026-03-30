@@ -65,6 +65,10 @@
   "datasource-engine.md" : "数据源引擎",
   "databases.md" : "数据库扩展",
 
+  "ai-integrate": "AI 编程",
+  "ai-skills-integrate.md": "AI Skills 集成指南",
+  "ai-mcp-integrate.md": "AI MCP 集成指南",
+
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
