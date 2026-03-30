@@ -310,7 +310,7 @@ import {
     useDiyStore
   } from "@/pinia";
 export default {
-    name: "DiySearch",
+    name: "DiyModleSearch",
     props: {
         diyIsPhoneView:{
           type: Boolean,
