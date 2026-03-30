@@ -22,7 +22,7 @@ export const diytable = {
     {
       sort: 1,
       label: '菜单ID',
-      type: 'input',
+      type: 'sysmenu',
       value: '',
     },
     {
