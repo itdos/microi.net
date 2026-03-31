@@ -1,8 +1,8 @@
 <template>
     <div>
         <!--以全新页面形式打开Form（路由页面模式）-->
-        <div v-if="IsPageMode" class="pluginPage" 
-            :class="{ 'mobile-form-page': diyStore.IsPhoneView, 'mini-program' : diyStore.IsMiniProgram }" 
+        <div v-if="IsPageMode" class="pluginPage"
+            :class="{ 'mobile-form-page': diyStore.IsPhoneView, 'mini-program' : diyStore.IsMiniProgram }"
             style="margin-top: 10px;">
             <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
             <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-form-header-bar">
@@ -46,18 +46,28 @@
             </div>
 
             <div>
-                <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
+                <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }"
                     style="margin-bottom: 10px;">
                     <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView || diyStore.IsMiniProgram">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
                     </div>
                     <div class="form-actions " :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
-                        <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                        <!-- <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.SaveBack") }}
+                        </el-button> -->
+                        <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                            {{ $t("Msg.Save") }}
                         </el-button>
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
+                        </el-button>
+                        <el-button
+                            v-if="FormMode == 'Edit'"
+                            type="info"
+                            @click="FormMode = 'View'"
+                        >
+                            {{ $t('Msg.Cancel')}}
                         </el-button>
                         <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -73,9 +83,9 @@
                                 </el-button>
                             </template>
                         </template>
-                        <el-button type="default" :icon="Back" @click="Go_1()">
+                        <!-- <el-button type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
-                        </el-button>
+                        </el-button> -->
                     </div>
                 </div>
                 <DiyForm
@@ -92,7 +102,7 @@
                     @CallbackReloadForm="CallbackReloadFormPage"
                     @CallbackHideFormBtn="CallbackHideFormBtn"
                     @CallbackFormValueChange="CallbackFormValueChange"
-                    
+
                     :FormWF="FormWF"
                     :TableChildFormMode="TableChildFormMode"
                     :TableName="TableName"
@@ -224,9 +234,9 @@
                                     @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
                                     >{{ $t("Msg.Delete") }}</el-dropdown-item
                                 >
-                                <el-dropdown-item 
-                                    v-if="GetCurrentUser._IsAdmin" 
-                                    :icon="View" 
+                                <el-dropdown-item
+                                    v-if="GetCurrentUser._IsAdmin"
+                                    :icon="View"
                                     @click="ShowHideField = !ShowHideField">
                                     {{ $t("Msg.ShowHideField") }}
                                 </el-dropdown-item>
@@ -463,9 +473,9 @@
                                     @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
                                     >{{ $t("Msg.Delete") }}</el-dropdown-item
                                 >
-                                <el-dropdown-item 
-                                    v-if="GetCurrentUser._IsAdmin" 
-                                    :icon="View" 
+                                <el-dropdown-item
+                                    v-if="GetCurrentUser._IsAdmin"
+                                    :icon="View"
                                     @click="ShowHideField = !ShowHideField">
                                     {{ $t("Msg.ShowHideField") }}
                                 </el-dropdown-item>
@@ -676,19 +686,19 @@ export default {
         $route: {
             handler(newRoute, oldRoute) {
                 var self = this;
-                
+
                 // 检查是否为表单页面路由
                 var isFormPageRoute = newRoute && newRoute.params && newRoute.params.TableId && newRoute.path.indexOf('/diy/form-page') > -1;
-                
+
                 // 只在直接页面模式下处理路由变化
                 if (!self._isDirectPageMode || !isFormPageRoute) return;
-                
+
                 // keep-alive 停用状态下不处理路由变化，防止缓存实例干扰新实例
                 if (self._isDeactivated) return;
-                
+
                 // 确保已经 mounted 过
                 if (!self._isMounted) return;
-                
+
                 // 路由确实发生了变化（比较 fullPath 以包含 query 参数的变化）
                 if (oldRoute && newRoute.fullPath !== oldRoute.fullPath) {
                     self.reinitPageForm();
@@ -812,13 +822,13 @@ export default {
             return;
         }
         self._isMounted = true;
-        
+
         // 判断是否为直接通过路由访问的页面模式
         var isFormPageRoute = self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
         if (isFormPageRoute) {
             // 标记为直接页面访问模式
             self._isDirectPageMode = true;
-            
+
             self.TableId = self.$route.params.TableId;
             self.TableRowId = self.$route.params.TableRowId;
             if (!self.TableRowId) {
@@ -853,22 +863,22 @@ export default {
          */
         Init(param) {
             var self = this;
-            
+
             // 通过 Init 方法打开的表单，明确标记为非直接页面模式（即使在页面路由下也是弹窗/抽屉）
             self._isDirectPageMode = false;
-            
+
             self.TableId = param.TableId;
             self.TableName = param.TableName;
             self.FormMode = param.FormMode;
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
-            
+
             // 设置表单相关参数，优先使用 param 传入的值，其次使用 props，最后使用默认值
             self.FieldFormSelectFields = param.SelectFields || self.SelectFields || [];
             self.FieldFormDefaultValues = param.DefaultValues || self.DefaultValues || {};
             self.FieldFormFixedTabs = param.FixedTabs || self.FixedTabs || [];
             self.FieldFormHideFields = param.HideFields || self.HideFields || [];
-            
+
             self.ApiReplace = param.ApiReplace || {};
             self.EventReplace = param.EventReplace || {};
             self.Width = param.Width;
@@ -1093,7 +1103,7 @@ export default {
             if (self.Width) {
                 return self.Width;
             }
-            
+
             var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
@@ -1844,12 +1854,12 @@ export default {
                 console.warn('[diy-form-full] CallbackReloadFormPage: 正在重载中，跳过本次调用以防止死循环');
                 return;
             }
-            
+
             self._isReloadingForm = true;
             if (self.$refs.fieldFormPage) {
                 self.$refs.fieldFormPage.Init();
             }
-            
+
             // 延迟重置标志，确保 Init 完成
             self.$nextTick(() => {
                 setTimeout(() => {
@@ -1893,45 +1903,45 @@ export default {
     background: #f5f7fa;
     min-height: 100vh;
     padding-top: calc(45px + var(--status-bar-height, 0px)) !important;
-    
+
     .el-row {
         margin: 0 !important;
     }
-    
+
     .el-col {
         padding: 0 !important;
     }
-    
+
     .mobile-form-header {
         // PC端头部样式（在移动端可隐藏）
         display: block;
     }
-    
+
     .mobile-form-actions {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
         justify-content: flex-end;
-        
+
         .el-button {
             margin: 0 !important;
             padding: 8px 16px;
             font-size: 14px;
         }
     }
-    
+
     :deep(.el-form) {
         padding: 10px;
-        
+
         .el-form-item {
             margin-bottom: 16px;
         }
-        
+
         .el-form-item__label {
             font-size: 14px;
             color: #606266;
         }
-        
+
         .el-input,
         .el-select,
         .el-textarea {
@@ -1975,30 +1985,30 @@ export default {
     left: 0;
     right: 0;
     z-index: 1000;
-    
+
     .mobile-header-left,
     .mobile-header-right {
         flex: 0 0 40px;
         display: flex;
         align-items: center;
-        
+
         .back-icon,
         .more-icon {
             font-size: 20px;
             cursor: pointer;
             color: #333;
-            
+
             &:active {
                 opacity: 0.6;
             }
         }
     }
-    
+
     .mobile-header-center {
         flex: 1;
         text-align: center;
         overflow: hidden;
-        
+
         .mobile-title {
             font-size: 16px;
             font-weight: 600;
@@ -2009,7 +2019,7 @@ export default {
             display: block;
         }
     }
-    
+
     .mobile-header-right {
         justify-content: flex-end;
     }
