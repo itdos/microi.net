@@ -6,7 +6,8 @@
             "type" : "5+app:android"
         },
         {
-            "playground" : "standard",
+            "customPlaygroundType" : "device",
+            "playground" : "custom",
             "type" : "uni-app:app-android"
         }
     ]

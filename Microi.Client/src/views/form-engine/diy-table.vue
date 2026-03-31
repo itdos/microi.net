@@ -70,10 +70,18 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
-                <div class="keyword-search" v-if="!(diyStore.IsPhoneView && ShowAddByRoute)">
+                <!-- <div class="keyword-search" v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"> -->
+                <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，
+                    移动端也需要各种V8按钮功能！！！-->
+                <div class="keyword-search" style="margin-bottom:10px;">
                     <div class="search-action-group">
                         <el-button
-                            v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
+                            v-if="_LimitAdd
+                                    && !TableChildField.Readonly
+                                    && PropsIsJoinTable !== true
+                                    && IsVisibleAdd == true
+                                    && !(diyStore.IsPhoneView && ShowAddByRoute)
+                                "
                             :loading="BtnLoading"
                             type="primary"
                             :icon="BtnLoading ? '' : CirclePlusFilled"
@@ -98,7 +106,8 @@
                             </template>
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0&& !diyStore.IsPhoneView">
+                        <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
                                 v-if="TableDisplayMode == 'Card' && TableEnableBatch"
                                 v-model="cardSelectAll"
@@ -674,9 +683,7 @@
                                             <!-- 序号 -->
                                             <span class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             <!-- 批量选择复选框 -->
-                                            <div v-if="TableEnableBatch&&!diyStore.IsPhoneView" class="card-checkbox-wrapper" @click.stop="toggleCardSelection(item)">
-                                                <el-checkbox :model-value="isCardSelected(item)" />
-                                            </div>
+
                                             <!-- 标题内容（第一个字段） -->
                                             <span class="card-title-text">
                                                 <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardShowDiyFieldList[0].Id) && NeedDiyTemplateFieldLst.indexOf(CardShowDiyFieldList[0].Component) === -1">
@@ -786,6 +793,13 @@
                                 </div>
                                 <!-- ====== 操作按钮区域 ====== -->
                                 <div class="card-actions" @click.stop>
+                                    <!--Fix by Anderson for 小赵：移动端也需要选中功能以便V8按钮操作，下面不能增加【&&!diyStore.IsPhoneView】-->
+                                    <div v-if="TableEnableBatch"
+                                        class="card-checkbox-wrapper"
+                                        @click.stop="toggleCardSelection(item)"
+                                        style="flex:1;justify-content:left;">
+                                        <el-checkbox :model-value="isCardSelected(item)" />
+                                    </div>
                                     <el-button
                                         v-for="(btn, btnIndex) in item._RowMoreBtnsOut"
                                         :key="TypeFieldName + 'card_btn_out_' + item.Id + btnIndex"
