@@ -53,7 +53,7 @@
                 </div>
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
-                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram&&ShowAddByRoute" class="mobile-header">
+                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && ShowAddByRoute" class="mobile-header">
                     <div class="mobile-header-left">
                         <el-icon class="back-icon" @click="$router.back()">
                             <ArrowLeft />
@@ -70,7 +70,7 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
-                <div class="keyword-search" v-if="!(diyStore.IsPhoneView&&ShowAddByRoute)">
+                <div class="keyword-search" v-if="!(diyStore.IsPhoneView && ShowAddByRoute)">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
@@ -82,7 +82,7 @@
                             {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
                         </el-button>
                         <!-- 全部分享按钮 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0&& !diyStore.IsPhoneView">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0 && !diyStore.IsPhoneView">
                             <!-- HandlerBtns(SysMenuModel.PageBtns) -->
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
@@ -117,7 +117,7 @@
                                 </el-button>
                             </template>
                         </template>
-                        <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
+                        <!--如果子表是只读状态或预览模式，不显示导入导出按钮-->
                         <template v-if="!diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
                             <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
@@ -239,7 +239,7 @@
                 </div>
 
                 <!--DIY移动端新增按钮-->
-                <div class="addBtn" v-if="diyStore.IsPhoneView&&ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
+                <div class="addBtn" v-if="diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
                   <el-icon class="addIcon"><Plus /></el-icon>
                 </div>
 
