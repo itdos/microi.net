@@ -272,7 +272,22 @@
                     <el-descriptions-item v-if="DetailModel.RequestMethod" label="请求方式" :span="1">{{ DetailModel.RequestMethod }}</el-descriptions-item>
                     <el-descriptions-item label="内容" :span="3">
                         <div class="detail-content-block">
-                            {{ DetailModel.Content || '-' }}
+                            <template v-if="HasPerfSteps(DetailModel.Content)">
+                                <div class="detail-summary">{{ GetContentSummary(DetailModel.Content) }}</div>
+                                <div class="detail-perf-steps">
+                                    <div class="perf-steps-header">分步耗时</div>
+                                    <div v-for="(step, idx) in ParsePerfSteps(DetailModel.Content)" :key="idx" class="perf-step-row">
+                                        <span class="perf-step-name">{{ step.name }}</span>
+                                        <span class="perf-step-bar-wrap">
+                                            <span class="perf-step-bar" :class="step.level" :style="{ width: step.percent + '%' }"></span>
+                                        </span>
+                                        <span class="perf-step-ms" :class="step.level">{{ step.ms }}ms</span>
+                                    </div>
+                                </div>
+                            </template>
+                            <template v-else>
+                                {{ DetailModel.Content || '-' }}
+                            </template>
                             <el-button v-if="DetailModel.Content" size="small" type="primary" link style="float:right;margin-top:4px" @click="CopyText(DetailModel.Content)">复制</el-button>
                         </div>
                     </el-descriptions-item>
@@ -382,6 +397,42 @@ export default {
         if (this.dockerAutoRefreshTimer) clearInterval(this.dockerAutoRefreshTimer);
     },
     methods: {
+        // ========== 分步耗时解析 ==========
+        HasPerfSteps(content) {
+            return content && content.includes('── 分步耗时 ──');
+        },
+        GetContentSummary(content) {
+            if (!content) return '-';
+            var idx = content.indexOf('\n── 分步耗时 ──');
+            if (idx === -1) idx = content.indexOf('── 分步耗时 ──');
+            return idx > 0 ? content.substring(0, idx).trim() : content.split('\n')[0];
+        },
+        ParsePerfSteps(content) {
+            if (!content) return [];
+            var lines = content.split('\n');
+            var steps = [];
+            var inSteps = false;
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (line === '── 分步耗时 ──') { inSteps = true; continue; }
+                if (!inSteps) continue;
+                var match = line.match(/^(.+?):\s*(\d+)ms/);
+                if (match) {
+                    steps.push({ name: match[1].trim(), ms: parseInt(match[2]) });
+                }
+            }
+            // 计算百分比和级别
+            var maxMs = 1;
+            for (var j = 0; j < steps.length; j++) {
+                if (steps[j].ms > maxMs) maxMs = steps[j].ms;
+            }
+            for (var k = 0; k < steps.length; k++) {
+                steps[k].percent = Math.max(2, Math.round(steps[k].ms / maxMs * 100));
+                steps[k].level = steps[k].ms >= 3000 ? 'perf-danger' : steps[k].ms >= 1000 ? 'perf-warn' : 'perf-ok';
+            }
+            return steps;
+        },
+
         // ========== 通用 ==========
         GetLevelTag(level) {
             var map = {
@@ -752,6 +803,70 @@ export default {
     font-family: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
     font-size: 13px;
 }
+
+/* 分步耗时样式 */
+.detail-summary {
+    margin-bottom: 12px;
+    font-weight: 500;
+    color: #303133;
+}
+.detail-perf-steps {
+    background: #f5f7fa;
+    border-radius: 6px;
+    padding: 10px 14px;
+}
+.perf-steps-header {
+    font-size: 12px;
+    color: #909399;
+    margin-bottom: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.perf-step-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
+}
+.perf-step-name {
+    min-width: 130px;
+    max-width: 180px;
+    color: #606266;
+    text-align: right;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.perf-step-bar-wrap {
+    flex: 1;
+    height: 16px;
+    background: #e4e7ed;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.perf-step-bar {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+    min-width: 2px;
+}
+.perf-step-bar.perf-ok { background: #67c23a; }
+.perf-step-bar.perf-warn { background: #e6a23c; }
+.perf-step-bar.perf-danger { background: #f56c6c; }
+.perf-step-ms {
+    min-width: 70px;
+    text-align: right;
+    flex-shrink: 0;
+    font-weight: 600;
+}
+.perf-step-ms.perf-ok { color: #67c23a; }
+.perf-step-ms.perf-warn { color: #e6a23c; }
+.perf-step-ms.perf-danger { color: #f56c6c; }
 
 /* Docker终端样式 */
 .docker-card {
