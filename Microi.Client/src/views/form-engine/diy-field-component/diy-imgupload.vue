@@ -30,7 +30,7 @@
         </el-upload>
 
         <!-- 单图片显示 - 编辑/新增模式 -->
-        <div v-if="FormMode != 'View' && field.Visible && !getMultipleFlag && isValidSingleImgValue(modelValue)" 
+        <div v-if="FormMode != 'View' && field.Visible && !getMultipleFlag && isValidSingleImgValue(modelValue)"
             class="single-img-display">
             <el-image
                 :src="getImageDisplayPath()"
@@ -39,19 +39,19 @@
                 class="preview-image"
             />
             <div class="img-actions">
-                <el-input 
+                <el-input
                     v-if="FormMode == 'Edit' || FormMode == 'Add'"
-                    v-model="singleImageName" 
+                    v-model="singleImageName"
                     size="small"
                     class="img-name-input"
                     @change="updateSingleImageName"
                 />
                 <span v-else class="img-name">{{ GetFileName(modelValue) }}</span>
                 <span class="img-size">{{ getSingleImgSize() }}</span>
-                <el-button 
-                    type="danger" 
-                    size="small" 
-                    :icon="Delete" 
+                <el-button
+                    type="danger"
+                    size="small"
+                    :icon="Delete"
                     @click="ConfirmDelSingleUpload()"
                     link
                 >
@@ -61,7 +61,7 @@
         </div>
 
         <!-- 查看模式 - 单图片 -->
-        <div v-if="FormMode == 'View' && !getMultipleFlag && isValidSingleImgValue(modelValue)" 
+        <div v-if="FormMode == 'View' && !getMultipleFlag && isValidSingleImgValue(modelValue)"
             class="single-img-display view-mode">
             <el-image
                 :src="getImageDisplayPath()"
@@ -89,20 +89,21 @@
                 :body-style="{ padding: '0px' }"
             >
                 <el-icon class="drag-handle"><Rank /></el-icon>
+                <!-- zhy取消浏览器图片预览@click="openImagePreview(img)" ，开通遮罩层取消图片预览:hide-on-click-modal='true'-->
                 <el-image
                     :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
                     :preview-src-list="GetImgUploadImgs()"
                     fit="cover"
+                    :hide-on-click-modal='true'
                     class="card-image"
-                    @click="openImagePreview(img)"
                     style="cursor: pointer;"
                 />
                 <div class="card-footer">
                     <div class="img-detail">
                         <div class="img-name" :title="img.Name">
-                            <el-input 
-                                v-if="FormMode == 'Edit' || FormMode == 'Add'" 
-                                v-model="img.Name" 
+                            <el-input
+                                v-if="FormMode == 'Edit' || FormMode == 'Add'"
+                                v-model="img.Name"
                                 size="small"
                             />
                             <span v-else>{{ img.Name }}</span>
@@ -111,29 +112,29 @@
                             <span class="img-size">{{ formatFileSize(img.Size) }}</span>
                             <time v-if="img.CreateTime" class="img-time">{{ img.CreateTime }}</time>
                         </div>
-                        <el-tag 
-                            v-if="img.State == 0" 
-                            type="info" 
+                        <el-tag
+                            v-if="img.State == 0"
+                            type="info"
                             size="small"
                         >
                             待上传
                         </el-tag>
-                        <el-tag 
-                            v-else-if="img.State == 1" 
-                            type="success" 
+                        <!-- zhy关闭”已上传“字段预览@click="openImagePreview(img)" -->
+                        <el-tag
+                            v-else-if="img.State == 1"
+                            type="success"
                             size="small"
                             style="cursor: pointer;"
-                            @click="openImagePreview(img)"
                         >
                             已上传
                         </el-tag>
                         <el-tag v-else type="danger" size="small">失败</el-tag>
                     </div>
-                    <el-button 
-                        v-if="FormMode != 'View'" 
-                        type="danger" 
+                    <el-button
+                        v-if="FormMode != 'View'"
+                        type="danger"
                         size="small"
-                        :icon="Delete" 
+                        :icon="Delete"
                         @click="ConfirmDelUploadImgs(img)"
                         link
                     />
@@ -156,27 +157,27 @@
                     <el-switch v-model="configForm.Limit" active-color="#ff6c04" inactive-color="#ccc" />
                     <div class="form-item-tip">开启后图片将通过私有链接访问</div>
                 </el-form-item>
-                
+
                 <el-form-item label="多图片上传">
                     <el-switch v-model="configForm.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                     <div class="form-item-tip">开启后支持上传多张图片</div>
                 </el-form-item>
-                
+
                 <el-form-item label="最大允许上传个数">
                     <el-input-number v-model="configForm.MaxCount" :min="1" :max="100" />
                     <div class="form-item-tip">多图片上传时的最大数量限制</div>
                 </el-form-item>
-                
+
                 <el-form-item label="上传说明">
                     <el-input v-model="configForm.Tips" placeholder="如：支持jpg、png、gif格式" />
                     <div class="form-item-tip">显示在上传区域下方的提示文字</div>
                 </el-form-item>
-                
+
                 <el-form-item label="是否压缩">
                     <el-switch v-model="configForm.Preview" active-color="#ff6c04" inactive-color="#ccc" />
                     <div class="form-item-tip">开启后会自动生成压缩预览图</div>
                 </el-form-item>
-                
+
                 <el-form-item label="最大体积(M)">
                     <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
                     <div class="form-item-tip">单张图片的最大体积限制，单位MB</div>
@@ -190,9 +191,9 @@
                 <el-divider content-position="left">V8引擎代码</el-divider>
 
                 <el-form-item label="上传前V8引擎代码">
-                    <el-button 
-                        type="primary" 
-                        :icon="Edit" 
+                    <el-button
+                        type="primary"
+                        :icon="Edit"
                         @click="openCodeEditor('BeforeUploadV8', '上传前V8引擎代码')"
                     >
                         编辑代码{{ getCodeLength(configForm.BeforeUploadV8) }}
@@ -201,9 +202,9 @@
                 </el-form-item>
 
                 <el-form-item label="上传成功后V8引擎代码">
-                    <el-button 
-                        type="primary" 
-                        :icon="Edit" 
+                    <el-button
+                        type="primary"
+                        :icon="Edit"
                         @click="openCodeEditor('UploadSuccessV8', '上传成功后V8引擎代码')"
                     >
                         编辑代码{{ getCodeLength(configForm.UploadSuccessV8) }}
@@ -367,14 +368,14 @@ const saveConfig = () => {
     props.field.Config.ImgUpload.Preview = configForm.value.Preview;
     props.field.Config.ImgUpload.MaxSize = configForm.value.MaxSize;
     props.field.Config.ImgUpload.SaveFullPath = configForm.value.SaveFullPath;
-    
+
     // 保存Upload V8配置
     if (!props.field.Config.Upload) {
         props.field.Config.Upload = {};
     }
     props.field.Config.Upload.BeforeUploadV8 = configForm.value.BeforeUploadV8;
     props.field.Config.Upload.UploadSuccessV8 = configForm.value.UploadSuccessV8;
-    
+
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
 };
@@ -408,17 +409,17 @@ const normalizeValue = (value) => {
     if (DiyCommon.IsNull(value) || value === '正在上传中...') {
         return value;
     }
-    
+
     // 如果是数组，直接返回
     if (Array.isArray(value)) {
         return value;
     }
-    
+
     // 如果已经是对象，直接返回
     if (typeof value === 'object' && value !== null) {
         return value;
     }
-    
+
     // 如果是字符串
     if (typeof value === 'string') {
         // 如果以{开头，说明是JSON字符串，解析它
@@ -430,7 +431,7 @@ const normalizeValue = (value) => {
                 // 解析失败，按老数据处理
             }
         }
-        
+
         // 老数据（纯路径字符串），包装成新格式
         if (value && value !== '[]' && value !== '[ ]') {
             const fileName = value.split('/').pop();
@@ -444,7 +445,7 @@ const normalizeValue = (value) => {
             };
         }
     }
-    
+
     return value;
 };
 
@@ -471,7 +472,7 @@ const imageListComputed = computed(() => {
 const isValidSingleImgValue = (value) => {
     // 先规范化数据
     const normalized = normalizeValue(value);
-    
+
     if (DiyCommon.IsNull(normalized)) return false;
     if (normalized === '正在上传中...') return false;
     if (normalized === '[]' || normalized === '[ ]') return false;
@@ -488,11 +489,11 @@ const isValidSingleImgValue = (value) => {
 const getImageDisplayPath = () => {
     const pathKey = props.field.Name + '_' + props.field.Name + '_RealPath';
     const realPath = props.FormDiyTableModel[pathKey];
-    
+
     if (!DiyCommon.IsNull(realPath) && realPath !== './static/img/loading.gif') {
         return realPath;
     }
-    
+
     // 如果RealPath还未设置，返回loading图片
     return './static/img/loading.gif';
 };
@@ -503,13 +504,13 @@ const initSortable = () => {
     if (!sortableContainer.value || props.FormMode === 'View') {
         return;
     }
-    
+
     // 如果已经初始化过，先销毁
     if (sortableInstance) {
         sortableInstance.destroy();
         sortableInstance = null;
     }
-    
+
     // 使用nextTick确保DOM完全渲染
     nextTick(() => {
         if (sortableContainer.value) {
@@ -519,11 +520,11 @@ const initSortable = () => {
                 onEnd: (evt) => {
                     const { oldIndex, newIndex } = evt;
                     if (oldIndex === newIndex) return;
-                    
+
                     const images = [...props.modelValue];
                     const movedItem = images.splice(oldIndex, 1)[0];
                     images.splice(newIndex, 0, movedItem);
-                    
+
                     emit('update:modelValue', images);
                     console.log('图片排序更新:', images);
                 }
@@ -581,7 +582,7 @@ const BeforeImgUpload = (file) => {
         DiyCommon.Tips('只能上传图片文件！', false);
         return false;
     }
-    
+
     // 上传前V8事件
     if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.BeforeUploadV8) {
         return new Promise((resolve, reject) => {
@@ -600,7 +601,7 @@ const BeforeImgUpload = (file) => {
             });
         });
     }
-    
+
     setupBeforeImgUpload(file);
     return true;
 };
@@ -619,23 +620,23 @@ const ImgUploadSuccess = (result, file, fileList) => {
     console.log('原始 result:', result);
     console.log('原始 file:', file);
     console.log('原始 file.response:', file.response);
-    
+
     const isSuccess = DiyCommon.Result(result);
     console.log('DiyCommon.Result(result) 返回:', isSuccess);
-    
+
     if (isSuccess) {
         const responseData = file.response?.Data || result.Data;
         const uploadedImgId = responseData.Id || file.uid;
         const uploadedImgPath = responseData.Path;
-        
+
         if (getMultipleFlag.value) {
             // 多图片模式
             let imgsJson = props.FormDiyTableModel[props.field.Name];
             if (!Array.isArray(imgsJson)) imgsJson = [];
-            
+
             console.log('【多图片】当前图片列表:', JSON.parse(JSON.stringify(imgsJson)));
             console.log('【多图片】查找file.uid:', file.uid);
-            
+
             let isHave = false;
             imgsJson.forEach((element) => {
                 if (element.Id == file.uid) {
@@ -649,7 +650,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
                     isHave = true;
                 }
             });
-            
+
             if (!isHave) {
                 console.log('【多图片】× 未找到匹配图片，添加新图片');
                 const pushed = responseData || {};
@@ -657,7 +658,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
                 pushed.State = 1;
                 imgsJson.push(pushed);
             }
-            
+
             props.FormDiyTableModel[props.field.Name] = imgsJson;
             emit('update:modelValue', imgsJson);
             console.log('【多图片】更新后的图片列表:', JSON.parse(JSON.stringify(imgsJson)));
@@ -682,7 +683,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
             console.log('【单图片】存储的JSON字符串:', jsonString);
             console.log('【单图片】验证存储类型:', typeof props.FormDiyTableModel[props.field.Name]);
             console.log('【单图片】验证字符串是否正确:', props.FormDiyTableModel[props.field.Name].charAt ? '是字符串' : '不是字符串');
-            
+
             nextTick(() => {
                 console.log('【单图片】nextTick - modelValue已更新:', props.modelValue);
                 setRealPath(props.field.Name, uploadedImgPath, props.field.Config.ImgUpload.Limit);
@@ -698,7 +699,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
         }
         // 触发标准V8Code（兼容旧版行为）
         emit('CallbackRunV8Code', { field: props.field });
-        
+
         console.log('=== ImgUploadSuccess END ===');
     } else {
         console.error('【上传失败】接口返回失败:', result);
@@ -713,12 +714,12 @@ const setRealPath = (imgId, imgPath, isLimit) => {
     console.log('参数 imgPath:', imgPath);
     console.log('参数 isLimit:', isLimit);
     console.log('计算出的 pathKey:', pathKey);
-    
+
     if (isLimit === true) {
         // 私有图片，需要获取临时URL
         props.FormDiyTableModel[pathKey] = './static/img/loading.gif';
         console.log('【私有图片】设置loading状态');
-        
+
         DiyCommon.Post(
             '/api/HDFS/GetPrivateFileUrl',
             {
@@ -749,7 +750,7 @@ const setRealPath = (imgId, imgPath, isLimit) => {
         console.log('【公开图片】路径设置完成');
         console.log('【公开图片】serverPath:', serverPath);
     }
-    
+
     console.log('=== setRealPath END ===');
 };
 
@@ -796,17 +797,17 @@ const DelSingleUpload = () => {
     delete props.FormDiyTableModel[props.field.Name];
     delete props.FormDiyTableModel[props.field.Name + '_' + props.field.Name + '_RealPath'];
     delete props.FormDiyTableModel[props.field.Name + '_FileSize'];
-    
+
     props.FormDiyTableModel[props.field.Name] = '';
     props.FormDiyTableModel[props.field.Name + '_' + props.field.Name + '_RealPath'] = '';
-    
+
     if (uploadRef.value) {
         uploadRef.value.clearFiles();
     }
-    
+
     // 清空单图文件名
     singleImageName.value = '';
-    
+
     emit('update:modelValue', '');
 };
 
@@ -835,7 +836,7 @@ const openImagePreview = (img) => {
 const GetFileName = (path) => {
     // 先规范化数据
     const normalized = normalizeValue(path);
-    
+
     if (DiyCommon.IsNull(normalized)) {
         return '';
     }
@@ -862,7 +863,7 @@ const formatFileSize = (bytes) => {
 const getSingleImgSize = () => {
     // 先规范化数据
     const normalized = normalizeValue(props.modelValue);
-    
+
     // 如果是对象（单图片JSON格式），从对象中读取Size
     if (typeof normalized === 'object' && normalized !== null && normalized.Size) {
         return formatFileSize(normalized.Size);
@@ -877,7 +878,7 @@ const getSingleImgSize = () => {
 const GetImgUploadImgs = () => {
     const arr = props.FormDiyTableModel[props.field.Name];
     if (!Array.isArray(arr)) return [];
-    
+
     const result = [];
     arr.forEach((img) => {
         const path = props.FormDiyTableModel[props.field.Name + '_' + img.Id + '_RealPath'];
@@ -905,11 +906,11 @@ const GetUploadPath = (img) => {
     } else {
         imgPathName = img.Path;
     }
-    
+
     if (DiyCommon.IsNull(imgPathName) || Array.isArray(imgPathName)) {
         return;
     }
-    
+
     if (imgPathName === '[]' || imgPathName === '[ ]' || imgPathName === 'null' || imgPathName === 'undefined') {
         return;
     }
@@ -922,7 +923,7 @@ const GetUploadPath = (img) => {
         props.FormDiyTableModel[props.field.Name + '_' + imgId + '_RealPath'] = serverPath;
     } else {
         const nowPath = props.FormDiyTableModel[props.field.Name + '_' + imgId + '_RealPath'];
-        
+
         if (DiyCommon.IsNull(nowPath) || nowPath == './static/img/loading.gif') {
             props.FormDiyTableModel[props.field.Name + '_' + imgId + '_RealPath'] = './static/img/loading.gif';
             if (imgPathName != './static/img/loading.gif' && imgPathName != '正在上传中...') {
@@ -983,7 +984,7 @@ watch(
                     if (img && img.Id && img.Path) {
                         const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
                         // 只在 RealPath 未设置或为 loading.gif 时才设置
-                        if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                        if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) ||
                             props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
                             setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
                         }
@@ -1002,14 +1003,14 @@ onMounted(() => {
             initSortable();
         });
     }
-    
+
     // 为已有的多图片初始化 RealPath（编辑模式和查看模式都需要）
     if (getMultipleFlag.value && Array.isArray(props.modelValue) && props.modelValue.length > 0) {
         props.modelValue.forEach((img) => {
             if (img && img.Id && img.Path) {
                 const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
                 // 只在 RealPath 未设置或为 loading.gif 时才设置
-                if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) || 
+                if (DiyCommon.IsNull(props.FormDiyTableModel[pathKey]) ||
                     props.FormDiyTableModel[pathKey] === './static/img/loading.gif') {
                     setRealPath(img.Id, img.Path, props.field.Config.ImgUpload.Limit);
                 }
@@ -1110,7 +1111,7 @@ onBeforeUnmount(() => {
                 background: rgba(0, 0, 0, 0.5);
                 border-radius: 4px;
                 padding: 2px;
-                
+
                 &:hover {
                     background: rgba(0, 0, 0, 0.7);
                 }
@@ -1187,4 +1188,12 @@ onBeforeUnmount(() => {
     line-height: 1.5;
     margin-top: 4px;
 }
+
+/* zhy隐藏缩放旋转按钮，但保留左右切换按钮 */
+@media (max-width: 768px) {
+  :deep(.el-image-viewer__actions) {
+    display: none !important;
+    }
+}
+
 </style>
