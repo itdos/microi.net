@@ -53,6 +53,7 @@
                         {{ GetOpenTitlePage() }}
                     </div>
                     <div class="form-actions " :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
+                        <!-- zhy将移动端保存返回按钮改为保存 -->
                         <!-- <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.SaveBack") }}
                         </el-button> -->
@@ -62,6 +63,7 @@
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
+                        <!-- zhy增加取消编辑按钮，不然无法取消只能退出页面取消 -->
                         <el-button
                             v-if="FormMode == 'Edit'"
                             type="info"
@@ -83,6 +85,7 @@
                                 </el-button>
                             </template>
                         </template>
+                        <!-- zhy隐藏掉返回按钮，移动端自带的有返回上一页 -->
                         <!-- <el-button type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
                         </el-button> -->
