@@ -70,13 +70,14 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
+                <!-- <div class="keyword-search" v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"> -->
                 <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，
                     移动端也需要各种V8按钮功能！！！-->
                 <div class="keyword-search" style="margin-bottom:10px;">
                     <div class="search-action-group">
                         <el-button
-                            v-if="_LimitAdd 
-                                    && !TableChildField.Readonly 
+                            v-if="_LimitAdd
+                                    && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
                                     && IsVisibleAdd == true
                                     && !(diyStore.IsPhoneView && ShowAddByRoute)
@@ -89,7 +90,7 @@
                             {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
                         </el-button>
                         <!-- 全部分享按钮 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0&& !diyStore.IsPhoneView">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0 && !diyStore.IsPhoneView">
                             <!-- HandlerBtns(SysMenuModel.PageBtns) -->
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
@@ -125,7 +126,7 @@
                                 </el-button>
                             </template>
                         </template>
-                        <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
+                        <!--如果子表是只读状态或预览模式，不显示导入导出按钮-->
                         <template v-if="!diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
                             <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
@@ -682,7 +683,7 @@
                                             <!-- 序号 -->
                                             <span class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             <!-- 批量选择复选框 -->
-                                            
+
                                             <!-- 标题内容（第一个字段） -->
                                             <span class="card-title-text">
                                                 <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardShowDiyFieldList[0].Id) && NeedDiyTemplateFieldLst.indexOf(CardShowDiyFieldList[0].Component) === -1">
@@ -793,8 +794,8 @@
                                 <!-- ====== 操作按钮区域 ====== -->
                                 <div class="card-actions" @click.stop>
                                     <!--Fix by Anderson for 小赵：移动端也需要选中功能以便V8按钮操作，下面不能增加【&&!diyStore.IsPhoneView】-->
-                                    <div v-if="TableEnableBatch" 
-                                        class="card-checkbox-wrapper" 
+                                    <div v-if="TableEnableBatch"
+                                        class="card-checkbox-wrapper"
                                         @click.stop="toggleCardSelection(item)"
                                         style="flex:1;justify-content:left;">
                                         <el-checkbox :model-value="isCardSelected(item)" />
