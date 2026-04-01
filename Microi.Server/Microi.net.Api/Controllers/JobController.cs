@@ -24,6 +24,15 @@ namespace Microi.net.Api
     public class JobController : Controller
     {
         string jobTable = "diy_schedule_job";
+
+        /// <summary>
+        /// SaaS多租户：获取当前请求的OsClient
+        /// </summary>
+        private string GetCurrentOsClient()
+        {
+            return DiyToken.GetCurrentOsClient();
+        }
+
         /// <summary>
         /// 获取所有job信息
         /// </summary>
@@ -34,13 +43,14 @@ namespace Microi.net.Api
         {
             try
             {
+                var osClient = jobModel.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : jobModel.OsClient;
                 // 依据分页参数从数据库获取数据，然后依据job名称从quartz中获取相关job信息，并返回给前端
                 var param = new
                 {
                     FormEngineKey = jobTable,
                     _PageIndex = jobModel._PageIndex,
                     _PageSize = jobModel._PageSize,
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 };
                 DosResultList<dynamic> list = await MicroiEngine.FormEngine.GetTableDataAsync(param);
                 List<string> jobNameList = new List<string>();
@@ -97,12 +107,13 @@ namespace Microi.net.Api
         {
             try
             {
+                var osClient = jobModel.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : jobModel.OsClient;
                 // 依据ID从数据库获取数据，然后依据job名称从quartz中获取job信息，并返回给前端
                 var param = new
                 {
                     FormEngineKey = jobTable,
                     Id = jobModel.Id,
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 };
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<MicroiJobModel>(param);
                 if (result.Code == 1 && result.Data != null)
@@ -144,6 +155,12 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> AddJob([FromForm] MicroiAddJobModel addJobModel)
         {
+            // SaaS多租户：自动填充OsClient
+            if (addJobModel.OsClient.IsNullOrWhiteSpace())
+            {
+                addJobModel.OsClient = GetCurrentOsClient();
+            }
+            var osClient = addJobModel.OsClient;
             var jobResult = await MicroiEngine.Job.AddJob(addJobModel);
             if (jobResult.Code == 1)
             {
@@ -168,7 +185,7 @@ namespace Microi.net.Api
                                 { "NextTime",job.NextTime},
                                 { "Status","正常"}
                             },
-                        OsClient = OsClientDefault.OsClient
+                        OsClient = osClient
                     });
                     jobResult.DataAppend = new
                     {
@@ -189,7 +206,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", jobResult.Msg}
                             },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 });
                 jobResult.DataAppend = new
                 {
@@ -208,6 +225,12 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UpdateJob([FromForm] MicroiAddJobModel addJobModel)
         {
+            // SaaS多租户：自动填充OsClient
+            if (addJobModel.OsClient.IsNullOrWhiteSpace())
+            {
+                addJobModel.OsClient = GetCurrentOsClient();
+            }
+            var osClient = addJobModel.OsClient;
             var jobResult = await MicroiEngine.Job.UpdateJob(addJobModel);
             if (jobResult.Code == 1)
             {
@@ -231,7 +254,7 @@ namespace Microi.net.Api
                                 { "NextTime",job.NextTime},
                                 { "Status","正常"}
                         },
-                        OsClient = OsClientDefault.OsClient
+                        OsClient = osClient
                     });
                 }
             }
@@ -245,7 +268,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", jobResult.Msg}
                             },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 });
             }
             return Json(jobResult);
@@ -258,6 +281,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> PauseJob([FromForm] MicroiJobModel job)
         {
+            var osClient = job.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : job.OsClient;
             var result = await MicroiEngine.Job.PauseJob(job);
             if (result.Code == 1)
             {
@@ -269,7 +293,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", "暂停"}
                             },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 });
             }
             return Json(result);
@@ -283,6 +307,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> ResumeJob([FromForm] MicroiJobModel job)
         {
+            var osClient = job.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : job.OsClient;
             var result = await MicroiEngine.Job.ResumeJob(job);
             if (result.Code == 1)
             {
@@ -294,7 +319,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", "正常"}
                             },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = osClient
                 });
             }
             return Json(result);

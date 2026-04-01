@@ -40,6 +40,8 @@ namespace Microi.net
                 {
                     param.OsClient = DiyToken.GetCurrentOsClient();
                 }
+                // V8 租户隔离：非主库租户的 V8 代码不允许跨租户访问 MongoDB
+                param.OsClient = V8TenantContext.EnforceOsClient(param.OsClient);
 
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -103,6 +105,8 @@ namespace Microi.net
                 {
                     param.OsClient = DiyToken.GetCurrentOsClient();
                 }
+                // V8 租户隔离：非主库租户的 V8 代码不允许跨租户访问 MongoDB
+                param.OsClient = V8TenantContext.EnforceOsClient(param.OsClient);
 
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -154,6 +158,8 @@ namespace Microi.net
                 {
                     param.OsClient = DiyToken.GetCurrentOsClient();
                 }
+                // V8 租户隔离：非主库租户的 V8 代码不允许跨租户访问 MongoDB
+                param.OsClient = V8TenantContext.EnforceOsClient(param.OsClient);
 
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -191,6 +197,8 @@ namespace Microi.net
                 {
                     param.OsClient = DiyToken.GetCurrentOsClient();
                 }
+                // V8 租户隔离：非主库租户的 V8 代码不允许跨租户访问 MongoDB
+                param.OsClient = V8TenantContext.EnforceOsClient(param.OsClient);
 
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -222,6 +230,8 @@ namespace Microi.net
                 {
                     param.OsClient = DiyToken.GetCurrentOsClient();
                 }
+                // V8 租户隔离：非主库租户的 V8 代码不允许跨租户访问 MongoDB
+                param.OsClient = V8TenantContext.EnforceOsClient(param.OsClient);
 
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {

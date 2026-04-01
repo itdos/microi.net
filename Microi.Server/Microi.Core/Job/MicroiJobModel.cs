@@ -30,5 +30,7 @@ namespace Microi.net
         public string Id { get; set; }
         // job类型
         public string JobType { get; set; }
+        // SaaS租户标识
+        public string OsClient { get; set; }
     }
 }

@@ -25,6 +25,8 @@ namespace Microi.net
 
         // Job参数
         public const string JobParam = "JobParam";
+        // SaaS租户标识
+        public const string OsClient = "OsClient";
         //log表
         public const string logTable = "diy_schedule_job_log";
         //数据表
