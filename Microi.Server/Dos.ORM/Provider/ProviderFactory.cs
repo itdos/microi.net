@@ -150,7 +150,10 @@ namespace Dos.ORM
                     databaseType = DatabaseType.PostgreSql;
                 }
             }
-            else if (className.IndexOf("dameng", StringComparison.OrdinalIgnoreCase) >= 0 || className.IndexOf("dm", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (className.IndexOf("dameng", StringComparison.OrdinalIgnoreCase) >= 0
+                || String.Compare(className, "dm", StringComparison.OrdinalIgnoreCase) == 0
+                || className.IndexOf("Dos.ORM.DaMeng", StringComparison.OrdinalIgnoreCase) >= 0
+                || className.IndexOf("dmprovider", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 className = "Dos.ORM.DaMeng.DaMengProvider";
                 assemblyName = null;

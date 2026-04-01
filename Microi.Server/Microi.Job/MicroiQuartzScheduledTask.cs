@@ -307,6 +307,8 @@ namespace Microi.net
                 Dictionary<string, string> dic = new Dictionary<string, string>();
                 dic.Add(MicroiJobConst.Id, addJobModel.JobName);
                 dic.Add(MicroiJobConst.JobType, addJobModel.JobType);
+                // SaaS多租户：存储OsClient到JobDataMap，任务执行时据此确定租户上下文
+                dic.Add(MicroiJobConst.OsClient, addJobModel.OsClient.IsNullOrWhiteSpace() ? OsClientDefault.OsClient : addJobModel.OsClient);
                 if (!String.IsNullOrEmpty(addJobModel.JobParam))
                 {
                     dic.Add(MicroiJobConst.JobParam, addJobModel.JobParam);
@@ -620,6 +622,7 @@ namespace Microi.net
                 JobParam = jobParamStr,
                 Status = "未调度",
                 JobType = job.JobDataMap.GetString(MicroiJobConst.JobType),
+                OsClient = job.JobDataMap.ContainsKey(MicroiJobConst.OsClient) ? job.JobDataMap.GetString(MicroiJobConst.OsClient) : OsClientDefault.OsClient,
             };
             var triggerModelCollection = await _scheduler.GetTriggersOfJob(new JobKey(job.Name, job.Group));
             if (triggerModelCollection != null && triggerModelCollection.Count > 0)
@@ -654,51 +657,17 @@ namespace Microi.net
                     }
                     try
                     {
-                        // 获取所有定时任务
-                        var param = new
+                        // SaaS多租户：遍历所有租户，同步每个租户的定时任务
+                        var osClientKeys = OsClientExtend.ClientList.Keys.ToList();
+                        foreach (var osClient in osClientKeys)
                         {
-                            FormEngineKey = MicroiJobConst.dataTable,
-                            OsClient = OsClientDefault.OsClient,
-                            _Where = new List<DiyWhere>() {
-                                new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }//2024-10-04新增此条件 --by Anderson
-                            },
-                        };
-                        DosResultList<dynamic> result = MicroiEngine.FormEngine.GetTableData(param);
-                        if (result.Code == 1 && result.Data != null)
-                        {
-                            foreach (dynamic data in result.Data)
+                            try
                             {
-                                try
-                                {
-                                    MicroiSearchJobModel model = new MicroiSearchJobModel()
-                                    {
-                                        Name = data.JobName
-                                    };
-                                    var detailResult = GetJobDetail(model).GetAwaiter().GetResult();
-                                    if (detailResult.Code == 1)
-                                    {
-                                        string str = JsonHelper.Serialize(detailResult.Data);
-                                        MicroiJobModel jobModel = JsonHelper.Deserialize<MicroiJobModel>(str);
-                                        MicroiEngine.FormEngine.UptFormData(new
-                                        {
-                                            FormEngineKey = MicroiJobConst.dataTable,
-                                            Id = data.Id,
-                                            _RowModel = new Dictionary<string, string>() {
-                                                    { "LastTime",jobModel.LastTime},
-                                                    { "NextTime",jobModel.NextTime}
-                                            },
-                                            OsClient = OsClientDefault.OsClient
-                                        });
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现问题：{detailResult.Msg}");
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常：{ex.Message}");
-                                }
+                                await SyncTenantTaskTime(osClient);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时同步租户[{osClient}]任务出现异常：{ex.Message}");
                             }
                         }
                     }
@@ -709,6 +678,60 @@ namespace Microi.net
                 }
                 Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度后台同步任务已停止");
             }, _cts.Token);
+        }
+
+        /// <summary>
+        /// 同步单个租户的定时任务时间
+        /// </summary>
+        private async Task SyncTenantTaskTime(string osClient)
+        {
+            // 获取该租户的所有定时任务
+            var param = new
+            {
+                FormEngineKey = MicroiJobConst.dataTable,
+                OsClient = osClient,
+                _Where = new List<DiyWhere>() {
+                    new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }
+                },
+            };
+            DosResultList<dynamic> result = MicroiEngine.FormEngine.GetTableData(param);
+            if (result.Code == 1 && result.Data != null)
+            {
+                foreach (dynamic data in result.Data)
+                {
+                    try
+                    {
+                        MicroiSearchJobModel model = new MicroiSearchJobModel()
+                        {
+                            Name = data.JobName
+                        };
+                        var detailResult = GetJobDetail(model).GetAwaiter().GetResult();
+                        if (detailResult.Code == 1)
+                        {
+                            string str = JsonHelper.Serialize(detailResult.Data);
+                            MicroiJobModel jobModel = JsonHelper.Deserialize<MicroiJobModel>(str);
+                            MicroiEngine.FormEngine.UptFormData(new
+                            {
+                                FormEngineKey = MicroiJobConst.dataTable,
+                                Id = data.Id,
+                                _RowModel = new Dictionary<string, string>() {
+                                    { "LastTime",jobModel.LastTime},
+                                    { "NextTime",jobModel.NextTime}
+                                },
+                                OsClient = osClient
+                            });
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现问题（{osClient}）：{detailResult.Msg}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常（{osClient}）：{ex.Message}");
+                    }
+                }
+            }
         }
         
         /// <summary>

@@ -37,7 +37,7 @@
         <!-- 下拉菜单 -->
         <Transition name="dropdown">
           <div v-if="showMenu" class="dropdown-menu">
-            <a href="https://os.microi.net" target="_blank" rel="noopener noreferrer" class="menu-item primary">
+            <a :href="backendUrl" target="_blank" rel="noopener noreferrer" class="menu-item primary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                 <line x1="8" y1="21" x2="16" y2="21"/>
@@ -45,6 +45,13 @@
               </svg>
               进入后台
             </a>
+            <button class="menu-item" @click="openSetPwd">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              设置密码
+            </button>
             <div class="menu-divider"></div>
             <button class="menu-item" @click="handleLogout">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -60,7 +67,7 @@
 
       <!-- 进入后台按钮（无论登录与否都显示） -->
       <a 
-        href="https://os.microi.net" 
+        :href="backendUrl" 
         target="_blank" 
         rel="noopener noreferrer" 
         class="console-btn"
@@ -73,15 +80,60 @@
         </svg>
         <span>进入后台</span>
       </a>
+
+      <!-- 设置密码弹窗 -->
+      <Transition name="dropdown">
+        <div v-if="showSetPwd" class="pwd-overlay" @click.self="showSetPwd = false">
+          <div class="pwd-dialog">
+            <h3>设置登录密码</h3>
+            <p class="pwd-desc">设置密码后可以使用 账号+密码 方式登录</p>
+            <input
+              v-model="newPwd"
+              type="password"
+              placeholder="请输入密码（至少6位）"
+              maxlength="32"
+              class="pwd-input"
+            />
+            <input
+              v-model="confirmPwd"
+              type="password"
+              placeholder="请再次确认密码"
+              maxlength="32"
+              class="pwd-input"
+              @keyup.enter="submitSetPwd"
+            />
+            <div class="pwd-actions">
+              <button class="pwd-cancel" @click="showSetPwd = false">取消</button>
+              <button class="pwd-submit" :disabled="isSettingPwd" @click="submitSetPwd">
+                {{ isSettingPwd ? '设置中...' : '确认设置' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </div>
   </ClientOnly>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+const API_BASE = 'https://api.microi.net'
 
 const user = ref(null)
 const showMenu = ref(false)
+const showSetPwd = ref(false)
+const newPwd = ref('')
+const confirmPwd = ref('')
+const isSettingPwd = ref(false)
+
+const backendUrl = computed(() => {
+  const tenant = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant') : null
+  if (tenant) {
+    return `https://os.microi.net/#/?OsClient=${tenant}`
+  }
+  return 'https://os.microi.net'
+})
 
 function loadUser() {
   try {
@@ -97,6 +149,7 @@ function loadUser() {
 function handleLogout() {
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_token')
+  localStorage.removeItem('microi_doc_tenant')
   user.value = null
   showMenu.value = false
 }
@@ -104,6 +157,50 @@ function handleLogout() {
 function onLoginSuccess(e) {
   if (e.detail) {
     user.value = e.detail
+  }
+}
+
+function openSetPwd() {
+  showMenu.value = false
+  newPwd.value = ''
+  confirmPwd.value = ''
+  showSetPwd.value = true
+}
+
+async function submitSetPwd() {
+  if (!newPwd.value || newPwd.value.length < 6) {
+    alert('密码长度不能少于6位')
+    return
+  }
+  if (newPwd.value !== confirmPwd.value) {
+    alert('两次输入的密码不一致')
+    return
+  }
+  isSettingPwd.value = true
+  try {
+    const token = localStorage.getItem('microi_doc_token')
+    const resp = await fetch(API_BASE + '/api/SysUser/SetPassword', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        Pwd: newPwd.value,
+        OsClient: 'MicroiDoc'
+      })
+    })
+    const result = await resp.json()
+    if (result.Code === 1) {
+      alert('密码设置成功！')
+      showSetPwd.value = false
+    } else {
+      alert(result.Msg || '设置失败')
+    }
+  } catch {
+    alert('网络错误，请重试')
+  } finally {
+    isSettingPwd.value = false
   }
 }
 
@@ -293,5 +390,84 @@ onUnmounted(() => {
   .login-link {
     padding: 6px 8px;
   }
+}
+
+/* 设置密码弹窗 */
+.pwd-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.pwd-dialog {
+  background: rgba(30,30,50,0.98);
+  border: 1px solid rgba(138,43,226,0.2);
+  border-radius: 14px;
+  padding: 28px;
+  width: 360px;
+  max-width: 90vw;
+}
+.pwd-dialog h3 {
+  font-size: 17px;
+  color: rgba(240,240,255,0.95);
+  margin-bottom: 6px;
+}
+.pwd-desc {
+  font-size: 13px;
+  color: rgba(180,180,200,0.6);
+  margin-bottom: 18px;
+}
+.pwd-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(240,240,255,0.9);
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.pwd-input:focus {
+  border-color: rgba(138,43,226,0.4);
+}
+.pwd-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.pwd-cancel {
+  flex: 1;
+  padding: 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: rgba(200,200,220,0.8);
+  cursor: pointer;
+  font-size: 14px;
+}
+.pwd-submit {
+  flex: 1;
+  padding: 9px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #8a2be2, #6a1fb5);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+.pwd-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

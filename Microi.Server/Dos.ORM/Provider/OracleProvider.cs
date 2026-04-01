@@ -187,11 +187,27 @@ namespace Dos.ORM.Oracle
                 }
             }
 
+            // 处理 SQL 标准函数替换为 Oracle 函数
+            ProcessSqlFunctionReplacement(cmd);
+
             // 处理SQL函数替换（charindex -> instr）
             ProcessCharIndexFunction(cmd);
 
             // 处理TO_CHAR函数参数顺序
             ProcessToCharFunction(cmd);
+        }
+
+        /// <summary>
+        /// 处理 SQL 标准函数替换为 Oracle 函数
+        /// </summary>
+        private void ProcessSqlFunctionReplacement(DbCommand cmd)
+        {
+            cmd.CommandText = cmd.CommandText
+                .Replace("len(", "length(")
+                .Replace("getdate()", "SYSDATE")
+                .Replace("datepart(year,", "extract(year from ")
+                .Replace("datepart(month,", "extract(month from ")
+                .Replace("datepart(day,", "extract(day from ");
         }
 
         /// <summary>

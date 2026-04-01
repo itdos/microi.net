@@ -80,6 +80,8 @@ export const useDiyStore = defineStore("diy", {
         })(),
         ShowClassicTop: 1,
         ShowClassicLeft: 1,
+        IsTabFullScreen: false,
+        _beforeFullScreen: { ShowClassicTop: 1, ShowClassicLeft: 1 },
         themeColor: LocalStorageManager.get("themeColor") || "#409eff"
     }),
 
