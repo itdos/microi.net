@@ -361,7 +361,7 @@
             border-radius: 2px;
         }
     }
-    
+
     // 现代化表格样式
     :deep(.el-table) {
         border-radius: 0px;
@@ -374,11 +374,11 @@
                 th {
                     background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
                     border-bottom: 1px solid #e4e7ed;
-                    
+
                     &:first-child {
                         border-top-left-radius: 0px;
                     }
-                    
+
                     &:last-child {
                         border-top-right-radius: 0px;
                     }
@@ -436,7 +436,7 @@
             }
         }
     }
-    
+
     .el-table-column--selection .cell .el-checkbox {
         margin-bottom: 0;
         display: block;
@@ -525,7 +525,7 @@
         .no-border-outside.el-table--border {
             border: none;
         }
-        
+
         :deep(.el-card__body) {
             padding: 0 !important;
             overflow: visible;
@@ -800,36 +800,36 @@
     left: 0;
     right: 0;
     z-index: 1000;
-    
+
     .mobile-header-left,
     .mobile-header-right {
         flex: 0 0 40px;
         display: flex;
         align-items: center;
-        
+
         .back-icon,
         .search-icon {
             font-size: 20px;
             cursor: pointer;
             color: #333;
-            
+
             &:active {
                 opacity: 0.6;
             }
         }
     }
-    
+
     .mobile-header-center {
         flex: 1;
         text-align: center;
-        
+
         .mobile-title {
             font-size: 16px;
             font-weight: 600;
             color: #333;
         }
     }
-    
+
     .mobile-header-right {
         justify-content: flex-end;
     }
@@ -898,38 +898,38 @@
             letter-spacing: 1px;
         }
     }
-    
+
     // 一行5个卡片的特殊布局（el-col 不支持 span=4.8）
     .card-col-five {
         flex: 0 0 calc(20%) !important;
         max-width: calc(20%) !important;
         width: calc(20%) !important;
         // padding: 0 !important;
-        
+
         @media screen and (max-width: 1200px) {
             flex: 0 0 calc(25% - 12px) !important;
             max-width: calc(25% - 12px) !important;
             width: calc(25% - 12px) !important;
         }
-        
+
         @media screen and (max-width: 992px) {
             flex: 0 0 calc(33.33% - 11px) !important;
             max-width: calc(33.33% - 11px) !important;
             width: calc(33.33% - 11px) !important;
         }
-        
+
         @media screen and (max-width: 768px) {
             flex: 0 0 100% !important;
             max-width: 100% !important;
             width: 100% !important;
         }
     }
-    
+
     // PC端卡片容器 - 默认样式
     .card-wrapper-desktop {
         box-sizing: border-box;
         margin-bottom: 12px;
-        
+
         .box-card {
             height: 100%;
             border-radius: 12px;
@@ -937,27 +937,27 @@
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
         }
     }
-    
+
     // 移动端卡片容器 - 每行1个
     .card-wrapper-mobile {
         width: 100%;
         box-sizing: border-box;
     }
-    
+
     // 移动端卡片优化
     @media screen and (max-width: 768px) {
         padding: 0px;
         gap: 16px;
-        
+
         .card-wrapper-mobile {
             margin: 0;
         }
-        
+
         .el-col {
             padding: 0 !important;
             margin-top: 0 !important;
         }
-        
+
         .box-card {
             border-radius: 12px;
             overflow: hidden;
@@ -966,12 +966,12 @@
             background: #fff;
             margin-left: 10px;
             margin-right: 10px;
-            
+
             &:active {
                 transform: scale(0.98);
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             }
-            
+
             .preview {
                 border-radius: 0;
                 object-fit: cover;
@@ -988,7 +988,7 @@
         margin-bottom: 0;
         border-bottom: 1px solid #f0f0f0;
     }
-    
+
     .el-drawer__body {
         padding: 16px;
     }
@@ -1008,18 +1008,18 @@
     padding: 20px;
     color: #909399;
     font-size: 14px;
-    
+
     .loading-text {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        
+
         .el-icon {
             font-size: 16px;
         }
     }
-    
+
     .load-more-text {
         color: #409EFF;
         font-weight: 500;
@@ -1043,7 +1043,7 @@
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    
+
     .preview {
         height: auto;
         max-height: 100%;
@@ -1051,7 +1051,7 @@
         flex-shrink: 0;
         border-radius: 12px 0 0 0;
     }
-    
+
     .card-body {
         flex: 1;
         display: flex;
@@ -1066,12 +1066,12 @@
     font-weight: 500;
     color: #303133;
     user-select: none;
-    
+
     :deep(.el-checkbox__label) {
         font-size: 14px;
         padding-left: 8px;
     }
-    
+
     &.is-checked {
         :deep(.el-checkbox__label) {
             color: var(--el-color-primary);
@@ -1094,7 +1094,7 @@
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.05);
     cursor: pointer;
-    
+
     :deep(.el-card__body) {
         padding: 0;
     }
@@ -1104,7 +1104,7 @@
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: visible;
-    
+
     &:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.15),
@@ -1182,7 +1182,7 @@
 .card-tag-html {
     display: inline-flex;
     align-items: center;
-    
+
     :deep(.el-tag) {
         border-radius: 6px;
         font-size: 11px;
@@ -1199,7 +1199,7 @@
     font-size: 13px;
     line-height: 1.5;
     border-bottom: 1px dashed #f5f5f5;
-    
+
     &:last-of-type {
         border-bottom: none;
     }
@@ -1210,7 +1210,7 @@
     flex-shrink: 0;
     margin-right: 8px;
     font-size: 12px;
-    
+
     &::after {
         content: '：';
     }
@@ -1224,7 +1224,7 @@
     white-space: nowrap;
     font-weight: 400;
     word-break: break-all;
-    
+
     :deep(img) {
         max-width: 100%;
         height: auto;
@@ -1295,16 +1295,16 @@
     font-weight: 500;
     border-radius: 15px;
     transition: all 0.2s ease;
-    
+
     &:hover {
         transform: translateY(-1px);
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
     }
-    
+
     &:active {
         transform: translateY(0);
     }
-    
+
     .el-icon, svg {
         margin-right: 4px;
         font-size: 12px;
@@ -1344,7 +1344,7 @@
 
     .el-checkbox {
         margin: 0;
-        
+
         :deep(.el-checkbox__input) {
             .el-checkbox__inner {
                 width: 18px;
@@ -1352,7 +1352,7 @@
                 border-width: 2px;
                 border-radius: 4px;
                 transition: all 0.2s ease;
-                
+
                 &::after {
                     height: 9px;
                     left: 7px;
@@ -1361,13 +1361,13 @@
                     border-width: 2px;
                 }
             }
-            
+
             &.is-checked .el-checkbox__inner {
                 background-color: var(--el-color-primary);
                 border-color: var(--el-color-primary);
             }
         }
-        
+
         :deep(.el-checkbox__label) {
             display: none;
         }
@@ -1422,30 +1422,30 @@
     .card-body {
         padding: 12px 14px 6px 14px;
     }
-    
+
     .card-title-row {
         padding-bottom: 8px;
     }
-    
+
     .card-title-text {
         font-size: 15px;
     }
-    
+
     .card-field-row {
         padding: 5px 0;
     }
-    
+
     .card-actions {
         padding: 8px 14px 10px 14px;
         gap: 6px;
     }
-    
+
     .card-action-btn {
         height: 32px;
         padding: 0 12px;
         font-size: 12px;
     }
-    
+
     .card-index-badge {
         min-width: 22px;
         height: 22px;
@@ -1457,7 +1457,7 @@
 .card-wrapper-desktop {
     .box-card.card-redesign {
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-        
+
         &:hover {
             box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.12),
                         0 4px 12px rgba(0, 0, 0, 0.04);
