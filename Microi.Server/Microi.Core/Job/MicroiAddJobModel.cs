@@ -38,6 +38,8 @@ namespace Microi.net
         public string JobType { get; set; }
         // 接口引擎key
         public string ApiEngineKey { get; set; }
+        // SaaS租户标识（为空时使用当前请求的OsClient）
+        public string OsClient { get; set; }
     }
     public class FormData
     {

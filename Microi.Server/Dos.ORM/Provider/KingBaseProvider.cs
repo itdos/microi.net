@@ -137,8 +137,24 @@ namespace Dos.ORM.KingBase
                 }
             }
 
+            // 处理 SQL 标准函数替换为 KingBase 函数
+            ProcessSqlFunctionReplacement(cmd);
+
             // 处理 charindex -> position 函数替换
             ProcessCharIndexFunction(cmd);
+        }
+
+        /// <summary>
+        /// 处理 SQL 标准函数替换为 KingBase（兼容PostgreSQL）函数
+        /// </summary>
+        private void ProcessSqlFunctionReplacement(DbCommand cmd)
+        {
+            cmd.CommandText = cmd.CommandText
+                .Replace("len(", "length(")
+                .Replace("getdate()", "now()")
+                .Replace("datepart(year,", "extract(year from ")
+                .Replace("datepart(month,", "extract(month from ")
+                .Replace("datepart(day,", "extract(day from ");
         }
 
         /// <summary>

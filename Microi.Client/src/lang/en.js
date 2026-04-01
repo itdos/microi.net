@@ -685,7 +685,8 @@ export default {
         refresh: "Refresh",
         close: "Close",
         closeOthers: "Close Others",
-        closeAll: "Close All"
+        closeAll: "Close All",
+        fullScreen: "Full Screen"
     },
     settings: {
         title: "Page style setting",

@@ -243,13 +243,15 @@ namespace Microi.net
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
             var getAllFieldSql = @"SELECT 
-                                            COLUMN_NAME as ""column_name"", 
-                                            DATA_TYPE as ""data_type"",
-                                            COLUMN_NAME as ""column_comment"",
+                                            a.COLUMN_NAME as ""column_name"", 
+                                            a.DATA_TYPE as ""data_type"",
+                                            NVL(b.COMMENTS, a.COLUMN_NAME) as ""column_comment"",
                                             'YES' as ""is_nullable"",
-                                            DATA_TYPE as ""column_type""
-                                            FROM all_tab_columns
-                                            WHERE table_name = '{0}'";
+                                            a.DATA_TYPE as ""column_type""
+                                            FROM all_tab_columns a
+                                            LEFT JOIN all_col_comments b 
+                                                ON a.TABLE_NAME = b.TABLE_NAME AND a.COLUMN_NAME = b.COLUMN_NAME
+                                            WHERE a.table_name = '{0}'";
             var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
