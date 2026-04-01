@@ -81,7 +81,7 @@ namespace Microi.net
         public IDataSourceEngine DataSourceEngine { get; set; }
         public IModuleEngine ModuleEngine { get; set; }
         public IMongoDB MongoDb;//  = new V8MongoDB();
-        public ISms Sms;// = new V8EngineSms();
+        public ISms Sms = new SmsAliyun();
         public ITranslateEngine TranslateEngine;// = new V8EngineTranslate();
         public int? RowIndex { get; set; }
         public dynamic CacheData { get; set; }

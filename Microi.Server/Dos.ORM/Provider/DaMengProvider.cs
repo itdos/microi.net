@@ -75,16 +75,10 @@ namespace Dos.ORM.DaMeng
                 throw new ArgumentException("startIndex 和 endIndex 必须大于等于1，且startIndex <= endIndex");
             }
 
-            if (startIndex == 1 && endIndex == 1)
-            {
-                fromSection.LimitString = " AND ROWNUM = 1";
-            }
-            else
-            {
-                int offset = startIndex - 1;
-                int fetchCount = endIndex - startIndex + 1;
-                fromSection.LimitString = $" OFFSET {offset} ROWS FETCH NEXT {fetchCount} ROW ONLY";
-            }
+            // 达梦统一使用 OFFSET...FETCH 语法，兼容性更好
+            int offset = startIndex - 1;
+            int fetchCount = endIndex - startIndex + 1;
+            fromSection.LimitString = $" OFFSET {offset} ROWS FETCH NEXT {fetchCount} ROW ONLY";
 
             return fromSection;
         }
@@ -145,8 +139,27 @@ namespace Dos.ORM.DaMeng
                 }
             }
 
+            // 处理 SQL 标准函数替换为达梦函数
+            ProcessSqlFunctionReplacement(cmd);
+
             // 处理 charindex -> instr 函数替换（达梦兼容Oracle语法）
             ProcessCharIndexFunction(cmd);
+
+            // 处理 TO_CHAR 函数参数顺序（达梦兼容Oracle）
+            ProcessToCharFunction(cmd);
+        }
+
+        /// <summary>
+        /// 处理 SQL 标准函数替换为达梦函数
+        /// </summary>
+        private void ProcessSqlFunctionReplacement(DbCommand cmd)
+        {
+            cmd.CommandText = cmd.CommandText
+                .Replace("len(", "length(")
+                .Replace("getdate()", "SYSDATE")
+                .Replace("datepart(year,", "extract(year from ")
+                .Replace("datepart(month,", "extract(month from ")
+                .Replace("datepart(day,", "extract(day from ");
         }
 
         /// <summary>
@@ -173,6 +186,44 @@ namespace Dos.ORM.DaMeng
                         + (cmd.CommandText.Length - 1 > endPos ? cmd.CommandText.Substring(endPos + 1) : string.Empty);
 
                     charIndexPos = cmd.CommandText.IndexOf("charindex(", endPos, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 处理 to_char 函数参数顺序（达梦兼容Oracle）
+        /// to_char(format, value) -> to_char(value, format)
+        /// </summary>
+        private void ProcessToCharFunction(DbCommand cmd)
+        {
+            int toCharPos = cmd.CommandText.IndexOf("to_char(", StringComparison.OrdinalIgnoreCase);
+
+            if (toCharPos < 0)
+            {
+                return;
+            }
+
+            while (toCharPos > 0)
+            {
+                int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, toCharPos + "to_char(".Length);
+
+                if (endPos > 0)
+                {
+                    string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(
+                        cmd.CommandText.Substring(
+                            toCharPos + "to_char(".Length,
+                            endPos - toCharPos - "to_char(".Length));
+
+                    // 调整参数顺序：to_char(format, value) -> to_char(value, format)
+                    cmd.CommandText = cmd.CommandText.Substring(0, toCharPos)
+                        + $"to_char({params_arr[1]},{params_arr[0]})"
+                        + (cmd.CommandText.Length - 1 > endPos ? cmd.CommandText.Substring(endPos + 1) : string.Empty);
+
+                    toCharPos = cmd.CommandText.IndexOf("to_char(", endPos, StringComparison.OrdinalIgnoreCase);
                 }
                 else
                 {

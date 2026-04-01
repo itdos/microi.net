@@ -10,6 +10,8 @@ namespace Microi.net
         public string TableId { get; set; }
         // 表名称
         public string TableName { get; set; }
+        // 租户标识（SaaS引擎），不传则自动从当前请求上下文获取
+        public string OsClient { get; set; }
         // 查询条件
         public QueryParam Query { get; set; }
         //分页

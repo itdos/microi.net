@@ -16,9 +16,20 @@ namespace Microi.net
     {
         public async Task Execute(IJobExecutionContext context)
         {
+            // SaaS多租户：从JobDataMap读取OsClient，确定租户上下文
+            var osClient = context.JobDetail.JobDataMap.ContainsKey(MicroiJobConst.OsClient)
+                ? context.JobDetail.JobDataMap.GetString(MicroiJobConst.OsClient)
+                : OsClientDefault.OsClient;
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                osClient = OsClientDefault.OsClient;
+            }
+
             try
             {
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
+                // SaaS多租户：确保接口引擎使用正确的租户上下文
+                param["OsClient"] = osClient;
                 //调用接口引擎
                 var result = await MicroiEngine.ApiEngine.RunAsync(param);
                 if (result != null)
@@ -31,22 +42,22 @@ namespace Microi.net
                             { "JobName", context.JobDetail.Key.Name},
                             { "Message", JsonHelper.Serialize(result)}
                         },
-                        OsClient = OsClientDefault.OsClient
+                        OsClient = osClient
                     });
                     if (addResult.Code != 1)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】定时任务执行接口引擎后写入日志出错：{addResult.Msg}");
+                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】定时任务执行接口引擎后写入日志出错（{osClient}）：{addResult.Msg}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                var errorMsg = $"\u5b9a\u65f6\u4efb\u52a1\u6267\u884c\u63a5\u53e3\u5f15\u64ce\u51fa\u9519: {ex.Message}";
+                var errorMsg = $"定时任务执行接口引擎出错（{osClient}）: {ex.Message}";
                 if (ex.InnerException != null)
                 {
-                    errorMsg += $"\n\u5185\u90e8\u5f02\u5e38: {ex.InnerException.Message}";
+                    errorMsg += $"\n内部异常: {ex.InnerException.Message}";
                 }
-                errorMsg += $"\n\u5806\u6808\u8ddf\u8e2a: {ex.StackTrace}";
+                errorMsg += $"\n堆栈跟踪: {ex.StackTrace}";
                 
                 Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{errorMsg}");
                 
@@ -60,12 +71,12 @@ namespace Microi.net
                             { "JobName", context.JobDetail.Key.Name},
                             { "Message", errorMsg}
                         },
-                        OsClient = OsClientDefault.OsClient
+                        OsClient = osClient
                     });
                 }
                 catch (Exception logEx)
                 {
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】写入日志失败: {logEx.Message}");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】写入日志失败（{osClient}）: {logEx.Message}");
                 }
             }
             //2025-12-12 注释 by anderson

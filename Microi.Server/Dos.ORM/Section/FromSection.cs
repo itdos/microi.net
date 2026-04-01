@@ -1433,7 +1433,8 @@ namespace Dos.ORM
                 if (fields.Count == 0)
                 {
                     //2023-04-03  Oracle处理
-                    if (DbProvider.DatabaseType == DatabaseType.Oracle)
+                    if (DbProvider.DatabaseType == DatabaseType.Oracle
+                        || DbProvider.DatabaseType == DatabaseType.DaMeng)
                     {
                         var allFields = EntityCache.GetFields(tableName);
                     }
@@ -1446,7 +1447,8 @@ namespace Dos.ORM
                     columns.Append(",");
                     //2023-04-04注释
                     //columns.Append(filed.FullName);
-                    if (DbProvider.DatabaseType == DatabaseType.Oracle)
+                    if (DbProvider.DatabaseType == DatabaseType.Oracle
+                        || DbProvider.DatabaseType == DatabaseType.DaMeng)
                     {
                         if (DataUtils.OracleDefaultFieldNames.Any(d => d.ToLower() == filed.PropertyName.ToLower()))
                         {

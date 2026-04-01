@@ -166,6 +166,259 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 短信验证码登录（自动注册）。
+        /// 必传：Phone、_CaptchaValue（短信验证码）、OsClient
+        /// 流程：验证短信验证码 → 查询/创建用户 → 自动开通SaaS租户 → 返回Token
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<JsonResult> SmsLogin(SysUserParam param)
+        {
+            try
+            {
+                #region 参数校验
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(1003, null, "OsClient不能为空！"));
+                }
+                if (param.Phone.DosIsNullOrWhiteSpace() || param.Phone.Trim().Length != 11)
+                {
+                    return Json(new DosResult(0, null, "请输入正确的11位手机号！"));
+                }
+                if (param._CaptchaValue.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(0, null, "请输入短信验证码！"));
+                }
+                var phone = param.Phone.Trim();
+                #endregion
+
+                #region 验证短信验证码（从Redis缓存中获取）
+                var cacheKey = $"Microi:{param.OsClient}:SmsCaptcha:{phone}";
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
+                var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
+
+                if (cachedCode.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
+                }
+                if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
+                {
+                    return Json(new DosResult(0, null, "短信验证码错误！"));
+                }
+                #endregion
+
+                #region 查询用户是否已存在
+                var userResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
+                {
+                    _Where = new System.Collections.Generic.List<System.Collections.Generic.List<object>>()
+                    {
+                        new System.Collections.Generic.List<object> { "Phone", "=", phone }
+                    },
+                    OsClient = param.OsClient
+                });
+                #endregion
+
+                bool isNewUser = false;
+                string userId = null;
+
+                if (userResult.Code == 2 || (userResult.Code == 1 && userResult.Data == null))
+                {
+                    #region 用户不存在，自动注册
+                    isNewUser = true;
+                    var defaultPwd = phone.Substring(phone.Length - 6);
+                    var encryptedPwd = EncryptHelper.DESEncode(defaultPwd);
+
+                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_user", new
+                    {
+                        Account = phone,
+                        Phone = phone,
+                        Pwd = encryptedPwd,
+                        Name = phone,
+                        Level = 1,
+                        State = 1,
+                        RoleIds = "[]",
+                        OsClient = param.OsClient
+                    });
+
+                    if (addResult.Code != 1)
+                    {
+                        return Json(new DosResult(0, null, $"注册失败：{addResult.Msg}"));
+                    }
+
+                    userId = addResult.Data?.ToString();
+                    #endregion
+                }
+                else if (userResult.Code == 1)
+                {
+                    #region 用户已存在，验证状态
+                    var state = DynamicHelper.GetDynamicIntValue(userResult.Data, "State", 0);
+                    if (state != 1)
+                    {
+                        return Json(new DosResult(0, null, "账号已被禁用！"));
+                    }
+                    userId = userResult.Data.Id?.ToString();
+                    #endregion
+                }
+                else
+                {
+                    return Json(new DosResult(0, null, $"查询用户失败：{userResult.Msg}"));
+                }
+
+                #region 销毁验证码缓存
+                try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
+                #endregion
+
+                #region 获取完整用户信息用于登录
+                var loginResult = await _sysUserLogic.LoginByAccount(new SysUserParam()
+                {
+                    Account = phone,
+                    OsClient = param.OsClient,
+                });
+
+                if (loginResult.Code != 1)
+                {
+                    return Json(new DosResult(0, null, $"登录失败：{loginResult.Msg}"));
+                }
+
+                JObject sysUser = JObject.FromObject(loginResult.Data);
+
+                // 获取Token
+                var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
+                {
+                    CurrentUser = sysUser,
+                    OsClient = param.OsClient,
+                    _ClientType = param._ClientType
+                });
+                if (getTokenResult.Code != 1)
+                {
+                    return Json(getTokenResult);
+                }
+
+                sysUser["Pwd"] = "";
+                #endregion
+
+                #region 异步自动开通SaaS租户（仅新用户）
+                if (isNewUser)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var encryptedPwd = EncryptHelper.DESEncode(phone.Substring(phone.Length - 6));
+                            var provisioningService = new TenantProvisioningService();
+                            var provisionResult = await provisioningService.ProvisionTenantAsync(
+                                phone, userId, phone, encryptedPwd);
+
+                            if (provisionResult.Code == 1)
+                            {
+                                Console.WriteLine($"Microi：【成功】用户[{phone}]的SaaS租户自动开通完成！");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Microi：【警告】用户[{phone}]的SaaS租户开通失败：{provisionResult.Msg}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】SaaS租户自动开通异常：{ex.Message}");
+                        }
+                    });
+                }
+                #endregion
+
+                #region 获取系统配置
+                var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
+                dynamic sysConfig = sysConfigResult.Code == 1 ? sysConfigResult.Data : null;
+
+                dynamic SysMenuHomePage = null;
+                try
+                {
+                    SysMenuHomePage = (await new SysMenuLogic().GetSysMenuHomePage(new SysMenuParam() { OsClient = param.OsClient })).Data;
+                }
+                catch { }
+                #endregion
+
+                // 异步更新最后登录时间
+                _ = MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                {
+                    Id = sysUser["Id"].Val<string>(),
+                    LastLoginIP = IPHelper.GetClientIP(HttpContext).Data,
+                    LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    OsClient = param.OsClient
+                });
+
+                var smsLoginResult = new DosResult(1, sysUser, isNewUser ? "注册并登录成功" : "登录成功");
+                smsLoginResult.DataAppend = new
+                {
+                    SysMenuHomePage = SysMenuHomePage,
+                    SysConfig = sysConfig,
+                    IsNewUser = isNewUser,
+                    TenantOsClient = isNewUser ? "u" + phone : (string)null
+                };
+
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                {
+                    Type = "短信登录日志",
+                    Title = $"{phone}{(isNewUser ? "注册并登录" : "登录")}了系统",
+                    OsClient = param.OsClient
+                });
+
+                return Json(smsLoginResult);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, $"登录异常：{ex.Message}"));
+            }
+        }
+
+        /// <summary>
+        /// 设置登录密码（手机号验证码登录的用户可设置密码）
+        /// 必传：Pwd（新密码）、OsClient
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> SetPassword(SysUserParam param)
+        {
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken();
+                if (currentToken == null)
+                {
+                    return Json(new DosResult(1001, null, "请先登录！"));
+                }
+
+                if (param.Pwd.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(0, null, "新密码不能为空！"));
+                }
+                if (param.Pwd.Length < 6)
+                {
+                    return Json(new DosResult(0, null, "密码长度不能少于6位！"));
+                }
+
+                var userId = currentToken.CurrentUser["Id"]?.ToString();
+                var osClient = currentToken.OsClient;
+                var encryptedPwd = EncryptHelper.DESEncode(param.Pwd);
+
+                var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                {
+                    Id = userId,
+                    Pwd = encryptedPwd,
+                    OsClient = osClient
+                });
+
+                if (uptResult.Code == 1)
+                {
+                    return Json(new DosResult(1, null, "密码设置成功！"));
+                }
+                return Json(new DosResult(0, null, $"密码设置失败：{uptResult.Msg}"));
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, $"设置密码异常：{ex.Message}"));
+            }
+        }
+
+        /// <summary>
         /// Token以旧换新，传入authorization、OsClient
         /// </summary>
         /// <returns></returns>

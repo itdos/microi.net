@@ -277,6 +277,41 @@
         {{ toastMsg }}
       </div>
     </Transition>
+
+    <!-- 设置密码弹窗（新用户注册后） -->
+    <Transition name="toast-slide">
+      <div v-if="showSetPwdDialog" class="pwd-dialog-overlay" @click.self="skipSetPassword">
+        <div class="pwd-dialog">
+          <h3 class="pwd-dialog-title">设置登录密码</h3>
+          <p class="pwd-dialog-desc">设置密码后可以使用 账号+密码 方式登录</p>
+          <div class="input-group">
+            <input
+              v-model="newPwd"
+              type="password"
+              placeholder="请输入密码（至少6位）"
+              maxlength="32"
+              class="login-input"
+            />
+          </div>
+          <div class="input-group" style="margin-top: 12px;">
+            <input
+              v-model="confirmPwd"
+              type="password"
+              placeholder="请再次确认密码"
+              maxlength="32"
+              class="login-input"
+              @keyup.enter="handleSetPassword"
+            />
+          </div>
+          <div class="pwd-dialog-actions">
+            <button class="pwd-skip-btn" @click="skipSetPassword">暂时跳过</button>
+            <button class="pwd-confirm-btn" :disabled="isSettingPwd" @click="handleSetPassword">
+              {{ isSettingPwd ? '设置中...' : '确认设置' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -297,6 +332,10 @@ const isLogging = ref(false)
 const toastMsg = ref('')
 const toastType = ref('info')
 const particleCanvas = ref(null)
+const showSetPwdDialog = ref(false)
+const newPwd = ref('')
+const confirmPwd = ref('')
+const isSettingPwd = ref(false)
 
 let smsTimer = null
 let animFrame = null
@@ -343,7 +382,7 @@ async function sendSmsCode() {
     return
   }
   try {
-    const resp = await fetch(API_BASE + '/api/sms/send', {
+    const resp = await fetch(API_BASE + '/apiengine/send-sms-reg?OsClient=MicroiDoc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -392,23 +431,37 @@ async function handleLogin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         Phone: phone.value,
-        _SmsCaptchaValue: smsCode.value,
+        _CaptchaValue: smsCode.value,
         OsClient: 'MicroiDoc'
       })
     })
     const result = await resp.json()
     if (result.Code === 1) {
-      showToast('登录成功！', 'success')
+      // 从响应头获取 Token
+      const authToken = resp.headers.get('authorization') || ''
       // 保存用户信息到 localStorage
       const userData = result.Data || {}
       localStorage.setItem('microi_doc_user', JSON.stringify(userData))
-      localStorage.setItem('microi_doc_token', userData.Token || result.DataAppend?.Token || '')
+      localStorage.setItem('microi_doc_token', authToken)
+      // 保存租户OsClient（用于进入后台）
+      const tenantOsClient = result.DataAppend?.TenantOsClient
+      if (tenantOsClient) {
+        localStorage.setItem('microi_doc_tenant', tenantOsClient)
+      }
+      const isNewUser = result.DataAppend?.IsNewUser
       // 触发自定义事件，通知导航栏组件更新
       window.dispatchEvent(new CustomEvent('microi-login-success', { detail: userData }))
-      // 延迟跳转
-      setTimeout(() => {
-        window.location.href = '/'
-      }, 800)
+      if (isNewUser) {
+        // 新用户：提示设置密码
+        showToast('注册成功！建议设置登录密码', 'success')
+        showSetPwdDialog.value = true
+      } else {
+        showToast('登录成功！', 'success')
+        // 延迟跳转
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 800)
+      }
     } else {
       showToast(result.Msg || '登录失败，请重试', 'error')
       refreshCaptcha()
@@ -418,6 +471,54 @@ async function handleLogin() {
   } finally {
     isLogging.value = false
   }
+}
+
+// 设置密码
+async function handleSetPassword() {
+  if (!newPwd.value || newPwd.value.length < 6) {
+    showToast('密码长度不能少于6位', 'error')
+    return
+  }
+  if (newPwd.value !== confirmPwd.value) {
+    showToast('两次输入的密码不一致', 'error')
+    return
+  }
+  isSettingPwd.value = true
+  try {
+    const token = localStorage.getItem('microi_doc_token')
+    const resp = await fetch(API_BASE + '/api/SysUser/SetPassword', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        Pwd: newPwd.value,
+        OsClient: 'MicroiDoc'
+      })
+    })
+    const result = await resp.json()
+    if (result.Code === 1) {
+      showToast('密码设置成功！', 'success')
+      showSetPwdDialog.value = false
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 800)
+    } else {
+      showToast(result.Msg || '设置失败', 'error')
+    }
+  } catch {
+    showToast('网络错误，请重试', 'error')
+  } finally {
+    isSettingPwd.value = false
+  }
+}
+
+function skipSetPassword() {
+  showSetPwdDialog.value = false
+  setTimeout(() => {
+    window.location.href = '/'
+  }, 300)
 }
 
 // 粒子动画
@@ -1082,5 +1183,77 @@ onUnmounted(() => {
   .login-section {
     padding: 28px;
   }
+}
+
+/* 设置密码弹窗 */
+.pwd-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.pwd-dialog {
+  background: rgba(20,20,35,0.95);
+  border: 1px solid rgba(138,43,226,0.2);
+  border-radius: 16px;
+  padding: 32px;
+  width: 380px;
+  max-width: 90vw;
+}
+.pwd-dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(240,240,255,0.95);
+  margin-bottom: 8px;
+}
+.pwd-dialog-desc {
+  font-size: 13px;
+  color: rgba(180,180,200,0.7);
+  margin-bottom: 20px;
+}
+.pwd-dialog-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+.pwd-skip-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(200,200,220,0.8);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.pwd-skip-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+.pwd-confirm-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #8a2be2, #6a1fb5);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.pwd-confirm-btn:hover {
+  opacity: 0.9;
+}
+.pwd-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

@@ -228,16 +228,20 @@ namespace Microi.net
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
             var sql = $@"SELECT 
-                            column_name,
-                            data_type,
-                            '' AS column_comment,
+                            c.column_name,
+                            c.data_type,
+                            COALESCE(pgd.description, '') AS column_comment,
                             '' AS column_key,
                             '' AS extra,
-                            is_nullable,
-                            udt_name AS column_type
-                        FROM information_schema.columns
-                        WHERE table_name = '{param.TableName}'
-                        ORDER BY ordinal_position";
+                            c.is_nullable,
+                            c.udt_name AS column_type
+                        FROM information_schema.columns c
+                        LEFT JOIN pg_catalog.pg_statio_all_tables st 
+                            ON st.relname = c.table_name AND st.schemaname = c.table_schema
+                        LEFT JOIN pg_catalog.pg_description pgd 
+                            ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+                        WHERE c.table_name = '{param.TableName}'
+                        ORDER BY c.ordinal_position";
             var realFieldList = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
