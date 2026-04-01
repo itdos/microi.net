@@ -3910,6 +3910,23 @@ export default {
                 self.ModifiedFields.push(field.Name);
             }
             self.$emit("CallbackFormValueChange", field, thisValue);
+            // zhy修复单选按钮第一次点击了值却仍然弹出提示的问题（如果该字段存在校验规则，则主动触发 el-form 的 validateField）
+            try {
+                if (field && field.Name && self.FormRules && self.FormRules[field.Name]) {
+                    var formRef = self.$refs.FormDiyTableModel;
+                    if (Array.isArray(formRef)) {
+                        formRef.forEach(function (f) {
+                            try {
+                                if (f && typeof f.validateField === 'function') f.validateField(field.Name);
+                            } catch (e) {}
+                        });
+                    } else if (formRef && typeof formRef.validateField === 'function') {
+                        formRef.validateField(field.Name);
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
         },
         //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
         GoUrl(url) {
