@@ -12,9 +12,7 @@ using static Quartz.Logging.OperationName;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// 
-    /// </summary> <summary>
-    /// 
+    /// 搜索引擎（支持SaaS多租户）
     /// </summary>
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
@@ -51,7 +49,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> AddDocument([FromBody] MicroiSearchEngineParam param)
         {
-            return await searchEngineHelper.AddDocument(param.TableName, param.Id);
+            return await searchEngineHelper.AddDocument(param.TableName, param.Id, param.OsClient);
         }
 
         /// <summary>
@@ -61,7 +59,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> UpdateDocument([FromBody] MicroiSearchEngineParam param)
         {
-            return await searchEngineHelper.UpdateDocument(param.TableName, param.Id);
+            return await searchEngineHelper.UpdateDocument(param.TableName, param.Id, param.OsClient);
         }
 
         /// <summary>
@@ -71,7 +69,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> DeleteDocument([FromBody] MicroiSearchEngineParam param)
         {
-            return await searchEngineHelper.DeleteDocument(param.TableName, param.Id);
+            return await searchEngineHelper.DeleteDocument(param.TableName, param.Id, param.OsClient);
         }
 
         /// <summary>

@@ -683,7 +683,8 @@ export default {
         refresh: "刷新",
         close: "关闭",
         closeOthers: "关闭其它",
-        closeAll: "关闭所有"
+        closeAll: "关闭所有",
+        fullScreen: "全屏"
     },
     settings: {
         title: "系统布局配置",

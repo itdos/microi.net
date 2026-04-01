@@ -140,7 +140,7 @@ namespace Dos.ORM
 
                 colums.Append(",");
 
-                if (db.DbProvider.DatabaseType == DatabaseType.Oracle
+                if (NeedsQuoteReservedField()
                     && OracleDefaultFieldNames.Any(d => d.ToLower() == fields[i].FieldName.Replace("{0}", "").Replace("{1}", "").ToLower()))
                 {
                     colums.Append("\"" + fields[i].FieldName.Replace("{0}", "").Replace("{1}", "") + "\"");
@@ -227,6 +227,18 @@ namespace Dos.ORM
         private static List<string> OracleDefaultFieldNames = new List<string>() { "Unique", "Level", "Column", "Lock" };
 
         /// <summary>
+        /// 判断当前数据库是否需要对保留字段名加双引号
+        /// Oracle、达梦、PostgreSQL、人大金仓都需要
+        /// </summary>
+        private bool NeedsQuoteReservedField()
+        {
+            return db.DbProvider.DatabaseType == DatabaseType.Oracle
+                || db.DbProvider.DatabaseType == DatabaseType.DaMeng
+                || db.DbProvider.DatabaseType == DatabaseType.PostgreSql
+                || db.DbProvider.DatabaseType == DatabaseType.KingBase;
+        }
+
+        /// <summary>
         /// 创建添加DbCommand
         /// </summary>
         /// <typeparam name="TEntity"></typeparam>
@@ -286,7 +298,7 @@ namespace Dos.ORM
             foreach (var kv in insertFields)
             {
                 fs.Append(",");
-                if (db.DbProvider.DatabaseType == DatabaseType.Oracle && OracleDefaultFieldNames.Any(d => d.ToLower() == kv.Key.Replace("{0}", "").Replace("{1}", "").ToLower()))
+                if (NeedsQuoteReservedField() && OracleDefaultFieldNames.Any(d => d.ToLower() == kv.Key.Replace("{0}", "").Replace("{1}", "").ToLower()))
                 {
                     fs.Append("\"" + kv.Key.Replace("{0}", "").Replace("{1}", "") + "\"");
                 }

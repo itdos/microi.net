@@ -79,6 +79,16 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD
 5. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
 
+## ⚠️ 重要：不要创建不必要的接口引擎
+创建低代码系统时，**绑定了 diyTableId 的菜单模块已经自动具备完整的 CRUD 功能**（新增、编辑、删除、列表、搜索、导入、导出），
+**不需要** 额外创建接口引擎（API Engine）来实现基础增删改查。
+只有以下场景才需要创建接口引擎：
+- 复杂的自定义业务逻辑（如审批流程、数据计算、报表统计）
+- 第三方系统集成（如调用外部 API、数据同步）
+- 定时任务 / 消息队列消费
+- 数据脱敏、权限校验等高级功能
+普通的表单 CRUD 操作，由低代码平台自动处理，**禁止为每个表创建增删改查接口引擎**。
+
 ## 核心系统表名（请严格使用以下表名）
 | 表名 | 说明 |
 |------|------|
@@ -428,7 +438,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_engine',
-    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table.`,
+    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations.`,
     {
       apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
       apiName: z.string().describe('Display name of the engine'),
@@ -639,8 +649,8 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
-        const data = result.Data as { ModuleId?: string; Message?: string };
-        return { content: [{ type: 'text', text: `✅ Module "${name}" created.\n- ModuleId: ${data?.ModuleId}\n- Use this ModuleId when setting permissions via microi_set_role_permission` }] };
+        const data = result.Data as { ModuleId?: string; Message?: string; Url?: string };
+        return { content: [{ type: 'text', text: `✅ Module "${name}" created.\n- ModuleId: ${data?.ModuleId}\n- Url: ${data?.Url || '(auto-generated)'}\n- Use this ModuleId when setting permissions via microi_set_role_permission` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

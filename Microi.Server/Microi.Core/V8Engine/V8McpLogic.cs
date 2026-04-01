@@ -92,7 +92,7 @@ namespace Microi.net
                     _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" },
                     _Where = new List<object>()
                     {
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -153,7 +153,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -203,7 +203,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -313,7 +313,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -381,7 +381,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
@@ -463,7 +463,7 @@ namespace Microi.net
                         _Where = new List<object>()
                         {
                             new List<object>() { "ApiEngineKey", "=", item.ApiEngineKey },
-                            new List<object>() { "IsDeleted", "=", "0" }
+                            
                         }
                     });
 
@@ -533,7 +533,7 @@ namespace Microi.net
                         _Where = new List<object>()
                         {
                             new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                            new List<object>() { "IsDeleted", "=", "0" }
+                            
                         }
                     });
 
@@ -674,7 +674,7 @@ namespace Microi.net
                         .ToArray(),
                     _Where = new List<object>()
                     {
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -763,7 +763,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "Name", "=", formEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -837,7 +837,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "Name", "=", formEngineKey },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
 
@@ -1143,7 +1143,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "Name", "=", name },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
@@ -1308,7 +1308,7 @@ namespace Microi.net
                     _Where = new List<object>()
                     {
                         new List<object>() { "Name", "=", name },
-                        new List<object>() { "IsDeleted", "=", "0" }
+                        
                     }
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
@@ -1333,6 +1333,44 @@ namespace Microi.net
                 }
 
                 var id = Ulid.NewUlid().ToString();
+
+                // 当 OpenType 为 Diy 且未指定 Url 时，自动从表名生成路由路径
+                // 例如：Crm_Customer → /crm-customer, diy_lang → /diy-lang, Order_Main → /order-main
+                var effectiveUrl = url;
+                if (string.IsNullOrWhiteSpace(effectiveUrl) && (string.IsNullOrWhiteSpace(openType) || openType == "Diy"))
+                {
+                    if (!string.IsNullOrWhiteSpace(diyTableName))
+                    {
+                        // 将表名转换为 URL 路径：PascalCase → kebab-case，下划线 → 连字符
+                        var urlPath = System.Text.RegularExpressions.Regex.Replace(diyTableName, "([a-z])([A-Z])", "$1-$2");
+                        urlPath = urlPath.Replace("_", "-").ToLower();
+                        effectiveUrl = "/" + urlPath;
+                    }
+                    else
+                    {
+                        // 没有绑定表时，从菜单名称的拼音或 Id 生成
+                        effectiveUrl = "/menu-" + id.Substring(0, 8).ToLower();
+                    }
+                }
+
+                // 检查 URL 是否已被其他菜单占用，如果是则追加随机后缀
+                if (!string.IsNullOrWhiteSpace(effectiveUrl))
+                {
+                    var urlExistResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_menu", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>()
+                        {
+                            new List<object>() { "Url", "=", effectiveUrl },
+                            
+                        }
+                    });
+                    if (urlExistResult.Code == 1 && urlExistResult.Data != null)
+                    {
+                        effectiveUrl = effectiveUrl + "-" + id.Substring(0, 6).ToLower();
+                    }
+                }
+
                 var menuData = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -1347,7 +1385,7 @@ namespace Microi.net
                     ["Display"] = display,
                     ["AppDisplay"] = appDisplay,
                     ["OpenType"] = openType ?? "Diy",
-                    ["Url"] = url ?? "",
+                    ["Url"] = effectiveUrl ?? "",
                     ["IsDeleted"] = 0,
                     ["_InvokeType"] = "Client"
                 };
@@ -1366,7 +1404,8 @@ namespace Microi.net
                     {
                         Message = $"功能模块 [{name}] 创建成功",
                         ModuleId = id,
-                        DiyTableId = diyTableId
+                        DiyTableId = diyTableId,
+                        Url = effectiveUrl
                     });
                 }
 
@@ -1407,7 +1446,7 @@ namespace Microi.net
             {
                 var where = new List<object>()
                 {
-                    new List<object>() { "IsDeleted", "=", "0" }
+                    
                 };
                 if (!string.IsNullOrWhiteSpace(keyword))
                 {
@@ -1560,7 +1599,7 @@ namespace Microi.net
                         _SelectFields = new[] { "Id", "Name", "Level" },
                         _Where = new List<object>()
                         {
-                            new List<object>() { "IsDeleted", "=", "0" }
+                            
                         },
                         _OrderBy = "Level",
                         _OrderByType = "DESC",

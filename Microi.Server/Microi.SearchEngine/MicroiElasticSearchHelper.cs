@@ -14,9 +14,30 @@ namespace Microi.net
 {
     public class MicroiElasticSearchHelper : IMicroiSearchEngineHelper
     {
-        private ElasticClient GetEsClient()
+        /// <summary>
+        /// 获取当前租户的OsClient标识
+        /// 优先使用显式传入的osClient，其次从HTTP上下文获取
+        /// </summary>
+        private string GetOsClient(string explicitOsClient = null)
         {
-            var osClientName = DiyToken.GetCurrentOsClient();
+            if (!string.IsNullOrWhiteSpace(explicitOsClient))
+                return explicitOsClient;
+            return DiyToken.GetCurrentOsClient();
+        }
+
+        /// <summary>
+        /// 生成租户隔离的ES索引名称
+        /// 格式：{osClient}_{tableName}，全部转小写（ES索引名要求小写）
+        /// </summary>
+        private string GetIndexName(string tableName, string osClient = null)
+        {
+            var client = GetOsClient(osClient);
+            return $"{client}_{tableName}".ToLower();
+        }
+
+        private ElasticClient GetEsClient(string osClient = null)
+        {
+            var osClientName = GetOsClient(osClient);
             var clientModel = OsClient.GetClient(osClientName);
             string host = clientModel.OsClientModel["SearchEngineHost"].Val<string>();
             var hostArr = host.DosSplit(',');
@@ -35,13 +56,14 @@ namespace Microi.net
         /// <summary>
         /// 同步表字段到es
         /// </summary>
-        /// <param name="indexName">表名称</param>
         /// <param name="tableId">表id</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> AsyncIndex(string tableId)
+        public async Task<MicroiSearchEngineResult> AsyncIndex(string tableId, string osClient = null)
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
                 var fieldParam = new
                 {
                     FormEngineKey = MicroiSearchEngineConst.fieldTableName,
@@ -52,7 +74,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 };
                 var tableParam = new
                 {
@@ -64,7 +86,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 };
                 // 依据tableId获取到表名称
                 var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
@@ -79,16 +101,17 @@ namespace Microi.net
                     return new MicroiSearchEngineResult(0, "未获取到表字段信息");
                 }
                 // 如果不存在索引，直接创建索引，如果存在需要重建索引
-                bool exist = await IndexExist(tableResult.Data.Name);
+                string indexName = GetIndexName(tableResult.Data.Name, currentOsClient);
+                bool exist = await IndexExist(indexName, currentOsClient);
                 if (exist)
                 {
-                    DeleteIndexResponse deleteResponse = await GetEsClient().Indices.DeleteAsync(tableResult.Data.Name);
+                    DeleteIndexResponse deleteResponse = await GetEsClient(currentOsClient).Indices.DeleteAsync(indexName);
                     if (!deleteResponse.IsValid)
                     {
                         return new MicroiSearchEngineResult(0, "删除原index失败");
                     }
                 }
-                return await CreateIndex(tableResult.Data.Name, fielsResult.Data);
+                return await CreateIndex(indexName, fielsResult.Data, currentOsClient);
             }
             catch (Exception ex)
             {
@@ -102,23 +125,26 @@ namespace Microi.net
         /// </summary>
         /// <param name="tableName">表名称</param>
         /// <param name="id">数据Id</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> AddDocument(string tableName, string id)
+        public async Task<MicroiSearchEngineResult> AddDocument(string tableName, string id, string osClient = null)
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
                 // 依据表名称以及id获取数据
                 var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
                     FormEngineKey = tableName,
                     Id = id,
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 });
                 if (dataResult.Code == 1 && dataResult.Data != null)
                 {
                     string jsonStr = JsonConvert.SerializeObject(dataResult.Data);
                     Dictionary<string, object> dic = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonStr);
-                    var result = await GetEsClient().IndexAsync<Dictionary<string, object>>(dic, i => i.Index(tableName).Id(id));
+                    string indexName = GetIndexName(tableName, currentOsClient);
+                    var result = await GetEsClient(currentOsClient).IndexAsync<Dictionary<string, object>>(dic, i => i.Index(indexName).Id(id));
                     if (result == null || !result.IsValid)
                     {
                         return new MicroiSearchEngineResult(0, "新增失败");
@@ -140,27 +166,30 @@ namespace Microi.net
         /// </summary>
         /// <param name="tableName">表名称</param>
         /// <param name="id">数据Id</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> UpdateDocument(string tableName, string id)
+        public async Task<MicroiSearchEngineResult> UpdateDocument(string tableName, string id, string osClient = null)
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
                 // 依据表名称以及id获取数据
                 var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
                     FormEngineKey = tableName,
                     Id = id,
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 });
                 if (dataResult.Code == 1 && dataResult.Data != null)
                 {
                     string jsonStr = JsonConvert.SerializeObject(dataResult.Data);
                     Dictionary<string, object> dic = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonStr);
-                    IUpdateRequest<Dictionary<string, object>, Dictionary<string, object>> request = new UpdateRequest<Dictionary<string, object>, Dictionary<string, object>>(tableName, id)
+                    string indexName = GetIndexName(tableName, currentOsClient);
+                    IUpdateRequest<Dictionary<string, object>, Dictionary<string, object>> request = new UpdateRequest<Dictionary<string, object>, Dictionary<string, object>>(indexName, id)
                     {
                         Doc = dic,
                     };
-                    var result = await GetEsClient().UpdateAsync(request);
+                    var result = await GetEsClient(currentOsClient).UpdateAsync(request);
                     if (result == null || !result.IsValid)
                     {
                         return new MicroiSearchEngineResult(0, "更新失败");
@@ -181,13 +210,16 @@ namespace Microi.net
         /// </summary>
         /// <param name="tableName">表名称</param>
         /// <param name="id">数据id</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> DeleteDocument(string tableName, string id)
+        public async Task<MicroiSearchEngineResult> DeleteDocument(string tableName, string id, string osClient = null)
         {
             try
             {
-                IDeleteRequest request = new DeleteRequest(tableName, id);
-                var result = await GetEsClient().DeleteAsync(request);
+                var currentOsClient = GetOsClient(osClient);
+                string indexName = GetIndexName(tableName, currentOsClient);
+                IDeleteRequest request = new DeleteRequest(indexName, id);
+                var result = await GetEsClient(currentOsClient).DeleteAsync(request);
                 if (result == null || !result.IsValid)
                 {
                     return new MicroiSearchEngineResult(0, "删除失败");
@@ -206,11 +238,13 @@ namespace Microi.net
         /// 新增字段
         /// </summary>
         /// <param name="fieldModel"></param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> AddField(MicroiSearchEngineFieldModel fieldModel)
+        public async Task<MicroiSearchEngineResult> AddField(MicroiSearchEngineFieldModel fieldModel, string osClient = null)
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
                 PutMappingDescriptor<object> putMappingDescriptor = new PutMappingDescriptor<object>();
                 if (fieldModel.Type.IndexOf("varchar", StringComparison.OrdinalIgnoreCase) >= 0 && fieldModel.Participle)
                 {
@@ -248,8 +282,8 @@ namespace Microi.net
                 {
                     return new MicroiSearchEngineResult(0, "新增字段失败,找不到匹配的类型");
                 }
-                putMappingDescriptor.Index(fieldModel.IndexName);
-                var response = await GetEsClient().Indices.PutMappingAsync(putMappingDescriptor);
+                putMappingDescriptor.Index(GetIndexName(fieldModel.IndexName, currentOsClient));
+                var response = await GetEsClient(currentOsClient).Indices.PutMappingAsync(putMappingDescriptor);
                 if (!response.IsValid)
                 {
                     return new MicroiSearchEngineResult(0, "新增字段失败");
@@ -269,6 +303,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<MicroiSearchEngineResult> GetSearchResponse(MicroiSearchEngineParam searchParam)
         {
+            var currentOsClient = GetOsClient(searchParam.OsClient);
             List<QueryContainer> must = new List<QueryContainer>();
             BoolQuery boolQuery = new BoolQuery();
             boolQuery.Must = must;
@@ -284,7 +319,7 @@ namespace Microi.net
                     Type = "="
                   }
                 },
-                OsClient = OsClientDefault.OsClient
+                OsClient = currentOsClient
             };
             // 依据tableId获取到所有的字段
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
@@ -297,11 +332,11 @@ namespace Microi.net
                 must.Add(new MatchAllQuery());
                 if (searchParam.PageType == 1)
                 {
-                    return await Search<Dictionary<string, object>>(searchParam, boolQuery);
+                    return await Search<Dictionary<string, object>>(searchParam, boolQuery, currentOsClient);
                 }
                 else
                 {
-                    return await SearchBySearchAfter<Dictionary<string, object>>(searchParam, boolQuery);
+                    return await SearchBySearchAfter<Dictionary<string, object>>(searchParam, boolQuery, currentOsClient);
                 }
             }
             string dataStr = JsonConvert.SerializeObject(result.Data);
@@ -364,23 +399,25 @@ namespace Microi.net
 
             if (searchParam.PageType == MicroiSearchEngineConst.page_from_size)
             {
-                return await Search<Dictionary<string, object>>(searchParam, boolQuery);
+                return await Search<Dictionary<string, object>>(searchParam, boolQuery, currentOsClient);
             }
             else
             {
-                return await SearchBySearchAfter<Dictionary<string, object>>(searchParam, boolQuery);
+                return await SearchBySearchAfter<Dictionary<string, object>>(searchParam, boolQuery, currentOsClient);
             }
         }
 
         /// <summary>
         /// 同步表数据到index
         /// </summary>
-        /// <param name="tableName">表名称</param>
+        /// <param name="tableId">表id</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> AsyncTableDataToIndex(string tableId)
+        public async Task<MicroiSearchEngineResult> AsyncTableDataToIndex(string tableId, string osClient = null)
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
                 var tableParam = new
                 {
                     FormEngineKey = MicroiSearchEngineConst.tableName,
@@ -391,7 +428,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 };
                 // 依据tableId获取到表名称
                 var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
@@ -400,9 +437,10 @@ namespace Microi.net
                     return new MicroiSearchEngineResult(0, "未获取到表信息");
                 }
                 // 删除索引中所有数据
-                IDeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(tableResult.Data.Name);
+                string indexName = GetIndexName(tableResult.Data.Name, currentOsClient);
+                IDeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(indexName);
                 deleteByQueryRequest.Query = new MatchAllQuery();
-                var response = await GetEsClient().DeleteByQueryAsync(deleteByQueryRequest);
+                var response = await GetEsClient(currentOsClient).DeleteByQueryAsync(deleteByQueryRequest);
                 if (!response.IsValid)
                 {
                     return new MicroiSearchEngineResult(0, "同步失败：" + response.ServerError.ToString());
@@ -411,7 +449,7 @@ namespace Microi.net
                 var param = new
                 {
                     FormEngineKey = tableResult.Data.Name,
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 };
                 // 依据tableId获取到所有的字段
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
@@ -422,9 +460,10 @@ namespace Microi.net
                 // 插入表数据到index
                 var dataStr = JsonConvert.SerializeObject(result.Data);
                 List<Dictionary<string, object>> list = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(dataStr);
+                var esClient = GetEsClient(currentOsClient);
                 foreach (var item in list)
                 {
-                    await GetEsClient().IndexAsync<Dictionary<string, object>>(item, i => i.Index(tableResult.Data.Name).Id(item["Id"].ToString()));
+                    await esClient.IndexAsync<Dictionary<string, object>>(item, i => i.Index(indexName).Id(item["Id"].ToString()));
                 }
                 return new MicroiSearchEngineResult(1, "同步成功");
             }
@@ -438,14 +477,16 @@ namespace Microi.net
         /// <summary>
         /// 重建索引
         /// </summary>
-        /// <param name="indexName">索引名称</param>
+        /// <param name="indexName">索引名称（已含租户前缀）</param>
         /// <param name="data">表所属字段集合</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<MicroiSearchEngineResult> ReIndex(string indexName, List<dynamic> data)
+        private async Task<MicroiSearchEngineResult> ReIndex(string indexName, List<dynamic> data, string osClient = null)
         {
+            var currentOsClient = GetOsClient(osClient);
             // 创建新索引
             string destIndexName = $"{indexName}-{Ulid.NewUlid().ToString()}";
-            var createIndexResponse = await CreateIndex(destIndexName, data);
+            var createIndexResponse = await CreateIndex(destIndexName, data, currentOsClient);
             if (createIndexResponse.Code != 1)
             {
                 return new MicroiSearchEngineResult(0, "创建索引失败");
@@ -463,7 +504,7 @@ namespace Microi.net
                     Type = "="
                   }
                 },
-                OsClient = OsClientDefault.OsClient
+                OsClient = currentOsClient
             });
             string sourceIndexName = indexName;
             if (result != null && result.Data != null)
@@ -472,8 +513,9 @@ namespace Microi.net
                 id = result.Data.Id;
                 sourceIndexName = result.Data.IndexName;
             }
+            var esClient = GetEsClient(currentOsClient);
             // reindex 复制源index数据到新index
-            var reindexResponse = GetEsClient().ReindexOnServer(r => r
+            var reindexResponse = esClient.ReindexOnServer(r => r
                 .Source(sou => sou.Index(sourceIndexName))
                 .Destination(des => des.Index(destIndexName))
                 .WaitForCompletion(true)
@@ -481,19 +523,19 @@ namespace Microi.net
             if (!reindexResponse.IsValid)
             {
                 // 删除前面创建的新index
-                await GetEsClient().Indices.DeleteAsync(destIndexName);
+                await esClient.Indices.DeleteAsync(destIndexName);
                 return new MicroiSearchEngineResult(0, "同步数据失败");
             }
             // 删除原index
-            var deleteResponse = GetEsClient().Indices.Delete(sourceIndexName);
+            var deleteResponse = esClient.Indices.Delete(sourceIndexName);
             if (!deleteResponse.IsValid)
             {
                 // 删除前面创建的新index
-                await GetEsClient().Indices.DeleteAsync(destIndexName);
+                await esClient.Indices.DeleteAsync(destIndexName);
                 return new MicroiSearchEngineResult(0, "删除index失败");
             }
             // 更改别名
-            var putAliasResponse = await GetEsClient().Indices.PutAliasAsync(destIndexName, indexName);
+            var putAliasResponse = await esClient.Indices.PutAliasAsync(destIndexName, indexName);
             if (!putAliasResponse.IsValid)
             {
                 string message = $"更改别名失败，需要手动修改别名,源index名称为：{destIndexName},别名为：{indexName}";
@@ -512,7 +554,7 @@ namespace Microi.net
                         { "IndexName", destIndexName},
                         { "IndexAlias", indexName}
                     },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 });
                 if (updateResult == null || updateResult.Code != 1)
                 {
@@ -530,7 +572,7 @@ namespace Microi.net
                         { "IndexName", destIndexName},
                         { "IndexAlias", indexName}
                     },
-                    OsClient = OsClientDefault.OsClient
+                    OsClient = currentOsClient
                 });
                 if (addResult == null || addResult.Code != 1)
                 {
@@ -544,10 +586,11 @@ namespace Microi.net
         /// <summary>
         /// 创建索引
         /// </summary>
-        /// <param name="indexName">索引名称</param>
+        /// <param name="indexName">索引名称（已含租户前缀）</param>
         /// <param name="data">表所属字段集合</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<MicroiSearchEngineResult> CreateIndex(string indexName, List<dynamic> data)
+        private async Task<MicroiSearchEngineResult> CreateIndex(string indexName, List<dynamic> data, string osClient = null)
         {
 
             PropertiesDescriptor<object> propertiesDescriptor = new PropertiesDescriptor<object>();
@@ -574,7 +617,7 @@ namespace Microi.net
             var dateArr = new List<string>() { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy/MM/dd" };
             AliasesDescriptor aliasesDescriptor = new AliasesDescriptor();
             aliasesDescriptor.Alias(indexName);
-            var response = await GetEsClient().Indices.CreateAsync(indexName, i => i.Settings(s => s.NumberOfShards(3).NumberOfReplicas(1))
+            var response = await GetEsClient(osClient).Indices.CreateAsync(indexName, i => i.Settings(s => s.NumberOfShards(3).NumberOfReplicas(1))
                                                                                     .Map(m => m.AutoMap()
                                                                                                .Dynamic(true)
                                                                                                .NumericDetection()
@@ -591,10 +634,11 @@ namespace Microi.net
         /// 删除索引
         /// </summary>
         /// <param name="indexName">索引名称</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<MicroiSearchEngineResult> DeleteIndex(string indexName)
+        private async Task<MicroiSearchEngineResult> DeleteIndex(string indexName, string osClient = null)
         {
-            var result = await GetEsClient().Indices.DeleteAsync(indexName);
+            var result = await GetEsClient(osClient).Indices.DeleteAsync(indexName);
             if (!result.IsValid)
             {
                 return new MicroiSearchEngineResult(1, "删除失败");
@@ -606,10 +650,11 @@ namespace Microi.net
         /// 索引是否存在
         /// </summary>
         /// <param name="indexName">索引名称</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<bool> IndexExist(string indexName)
+        private async Task<bool> IndexExist(string indexName, string osClient = null)
         {
-            var response = await GetEsClient().Indices.ExistsAsync(indexName);
+            var response = await GetEsClient(osClient).Indices.ExistsAsync(indexName);
             return response.Exists;
             // 首先从关系表查找有无对应关系
             //var result = await MicroiEngine.FormEngine.GetFormDataAsync(new
@@ -643,12 +688,13 @@ namespace Microi.net
         /// <typeparam name="T"></typeparam>
         /// <param name="index">索引名称</param>
         /// <param name="queryContainer">查询条件</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<MicroiSearchEngineResult> GetSearchResponse<T>(string index, QueryContainer queryContainer) where T : class
+        private async Task<MicroiSearchEngineResult> GetSearchResponse<T>(string index, QueryContainer queryContainer, string osClient = null) where T : class
         {
             try
             {
-                var result = await GetEsClient().SearchAsync<T>(s => s.Index(index).Query(q => queryContainer));
+                var result = await GetEsClient(osClient).SearchAsync<T>(s => s.Index(index).Query(q => queryContainer));
                 if (result != null && result.IsValid)
                 {
                     return new MicroiSearchEngineResult()
@@ -675,13 +721,16 @@ namespace Microi.net
         /// <typeparam name="T"></typeparam>
         /// <param name="searchParam">查询参数</param>
         /// <param name="queryContainer">查询条件</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        private async Task<MicroiSearchEngineResult> Search<T>(MicroiSearchEngineParam searchParam, QueryContainer queryContainer) where T : class
+        private async Task<MicroiSearchEngineResult> Search<T>(MicroiSearchEngineParam searchParam, QueryContainer queryContainer, string osClient = null) where T : class
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
+                string indexName = GetIndexName(searchParam.TableName, currentOsClient);
                 SearchDescriptor<T> search = new SearchDescriptor<T>();
-                search.Index(searchParam.TableName).Query(q => queryContainer).From((searchParam.pageIndex - 1) * searchParam.pageSize).Size(searchParam.pageSize);
+                search.Index(indexName).Query(q => queryContainer).From((searchParam.pageIndex - 1) * searchParam.pageSize).Size(searchParam.pageSize);
                 if (searchParam.Sorts != null && searchParam.Sorts.Count > 0)
                 {
                     foreach (MicroiSearchEngineSortModel sort in searchParam.Sorts)
@@ -696,7 +745,7 @@ namespace Microi.net
                         }
                     }
                 }
-                var result = await GetEsClient().SearchAsync<T>(s => search);
+                var result = await GetEsClient(currentOsClient).SearchAsync<T>(s => search);
                 if (result != null && result.IsValid)
                 {
                     return new MicroiSearchEngineResult()
@@ -723,13 +772,16 @@ namespace Microi.net
         /// <typeparam name="T"></typeparam>
         /// <param name="searchParam">查询参数</param>
         /// <param name="queryContainer">查询条件</param>
+        /// <param name="osClient">租户标识</param>
         /// <returns></returns>
-        public async Task<MicroiSearchEngineResult> SearchBySearchAfter<T>(MicroiSearchEngineParam searchParam, QueryContainer queryContainer) where T : class
+        public async Task<MicroiSearchEngineResult> SearchBySearchAfter<T>(MicroiSearchEngineParam searchParam, QueryContainer queryContainer, string osClient = null) where T : class
         {
             try
             {
+                var currentOsClient = GetOsClient(osClient);
+                string indexName = GetIndexName(searchParam.TableName, currentOsClient);
                 SearchDescriptor<T> search = new SearchDescriptor<T>();
-                search.Index(searchParam.TableName).Query(q => queryContainer).Size(searchParam.pageSize);
+                search.Index(indexName).Query(q => queryContainer).Size(searchParam.pageSize);
                 if (searchParam.SearchAfter != null && searchParam.SearchAfter.Length > 0)
                 {
                     search.SearchAfter(searchParam.SearchAfter);
@@ -748,7 +800,7 @@ namespace Microi.net
                         }
                     }
                 }
-                var result = await GetEsClient().SearchAsync<T>(s => search);
+                var result = await GetEsClient(currentOsClient).SearchAsync<T>(s => search);
                 if (result != null && result.IsValid)
                 {
                     IReadOnlyCollection<object> sorts = null;

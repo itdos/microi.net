@@ -37,6 +37,9 @@
             <li @click="closeOthersTags">
                 <el-icon><CircleClose /></el-icon> {{ $t("tagsView.closeOthers") }}
             </li>
+            <li @click="toggleFullScreen(selectedTag)">
+                <el-icon><FullScreen /></el-icon> {{ $t("tagsView.fullScreen") }}
+            </li>
             <!-- <li @click="closeAllTags(selectedTag)"><el-icon><CircleCloseFilled /></el-icon> {{ $t('tagsView.closeAll') }}</li> -->
         </ul>
     </div>
@@ -228,6 +231,19 @@ export default {
         // 🔥 注释掉 initTags，不自动添加固定的首页标签
         // this.initTags();
         this.addTags();
+
+        // ESC 退出全屏
+        this._escHandler = (e) => {
+            if (e.key === 'Escape' && this.diyStore.IsTabFullScreen) {
+                this.exitFullScreen();
+            }
+        };
+        document.addEventListener('keydown', this._escHandler);
+    },
+    beforeUnmount() {
+        if (this._escHandler) {
+            document.removeEventListener('keydown', this._escHandler);
+        }
     },
     methods: {
         removeTab(targetName) {
@@ -421,7 +437,7 @@ export default {
             if (!tag) return;
 
             const menuMinWidth = 105;
-            const menuHeight = 120; // 预估菜单高度
+            const menuHeight = 155; // 预估菜单高度（4项）
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
             
@@ -444,6 +460,27 @@ export default {
         },
         closeMenu() {
             this.visible = false;
+        },
+        toggleFullScreen(view) {
+            // 先切换到该页签
+            if (this.$route.fullPath !== view.fullPath) {
+                this.$router.push(view.fullPath);
+            }
+            // 保存当前状态
+            this.diyStore.setState("_beforeFullScreen", {
+                ShowClassicTop: this.diyStore.ShowClassicTop,
+                ShowClassicLeft: this.diyStore.ShowClassicLeft
+            });
+            // 隐藏顶部和左侧
+            this.diyStore.setState("ShowClassicTop", 0);
+            this.diyStore.setState("ShowClassicLeft", 0);
+            this.diyStore.setState("IsTabFullScreen", true);
+        },
+        exitFullScreen() {
+            const before = this.diyStore._beforeFullScreen;
+            this.diyStore.setState("ShowClassicTop", before.ShowClassicTop);
+            this.diyStore.setState("ShowClassicLeft", before.ShowClassicLeft);
+            this.diyStore.setState("IsTabFullScreen", false);
         },
         handleScroll() {
             this.closeMenu();
