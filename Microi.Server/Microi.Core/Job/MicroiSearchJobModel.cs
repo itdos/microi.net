@@ -20,5 +20,7 @@ namespace Microi.net
 
         public string Id { get; set; }
         public string Name { get; set; }
+        // SaaS租户标识
+        public string OsClient { get; set; }
     }
 }

@@ -14,6 +14,11 @@ namespace Microi.net
     public interface IV8Method
     {
         /// <summary>
+        /// 重新加载指定 OsClient 的 SaaS 引擎配置
+        /// </summary>
+        DosResult ReloadOsClient(string osClient, IMicroiDbTransaction _trans = null);
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);
