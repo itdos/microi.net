@@ -245,6 +245,7 @@ export default {
             if (self.ModifiedFields && !(self.ModifiedFields.indexOf(fieldName) > -1)) {
                 self.ModifiedFields.push(fieldName);
             }
+            
         },
         
         /**
