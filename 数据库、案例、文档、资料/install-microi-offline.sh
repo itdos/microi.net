@@ -1,26 +1,10 @@
 #!/bin/bash
 
 # ============================================================
-# Microi吾码平台 Docker Compose 一键安装脚本
-# 支持宝塔面板 Docker 编排模块可视化管理
+# Microi吾码平台 Docker Compose 离线安装脚本
+# 功能与在线安装完全一致，但所有资源从本地加载
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：2026-03-22
-# ============================================================
-# 编排列表（每个编排在宝塔面板中独立可见）：
-#   microi-install-mysql      - MySQL 5.7 数据库
-#   microi-install-redis      - Redis 7.4.2 缓存
-#   microi-install-mongodb    - MongoDB 数据库
-#   microi-install-minio      - MinIO 对象存储
-#   microi-install-app        - 平台应用（API + Web）
-#   microi-install-watchtower - 自动更新服务
-#   microi-install-ollama     - Ollama AI 服务
-#   microi-install-qdrant     - Qdrant 向量数据库
-# ============================================================
-# 端口分配规则：
-#   从 7000 开始顺序 +1 分配 10 个端口（7000-7009）
-#   若存在端口被占用，则自动从 7100 开始重新检测，以此类推
-#   端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console,
-#            Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
+# 版本：2026-04-01
 # ============================================================
 
 set -e
@@ -29,19 +13,58 @@ set -e
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
 export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
 
+# 获取脚本所在目录（离线包解压目录）
+OFFLINE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 echo ''
 echo '=================================================================='
-echo 'Microi：Docker Compose 一键安装脚本 v2026-03-22'
+echo 'Microi：Docker Compose 离线安装脚本 v2026-04-01'
 echo '=================================================================='
 echo ''
+
+# ============================================================
+# 预检：验证离线包完整性
+# ============================================================
+echo '[预检] 验证离线安装包完整性'
+echo '------------------------------------------------------------------'
+
+IMAGES_TAR="${OFFLINE_DIR}/images/images.tar"
+SQL_DIR="${OFFLINE_DIR}/sql"
+
+if [ ! -f "${IMAGES_TAR}" ]; then
+  echo "Microi：错误：未找到镜像文件 ${IMAGES_TAR}"
+  echo "Microi：请确保离线包已正确解压，且 images/images.tar 文件存在。"
+  exit 1
+fi
+echo "Microi：镜像文件已找到 ✓"
+
+# 检查 SQL 文件
+HAS_DEMO_SQL=false
+HAS_EMPTY_SQL=false
+if [ -f "${SQL_DIR}/mysql5.6.50-demo.sql.zip" ]; then
+  HAS_DEMO_SQL=true
+  echo "Microi：Demo 数据库文件已找到 ✓"
+fi
+if [ -f "${SQL_DIR}/mysql5.6.50-empty.sql.zip" ]; then
+  HAS_EMPTY_SQL=true
+  echo "Microi：空数据库文件已找到 ✓"
+fi
+if [ "${HAS_DEMO_SQL}" = false ] && [ "${HAS_EMPTY_SQL}" = false ]; then
+  echo "Microi：错误：未找到任何数据库文件（sql/ 目录下应有 .sql.zip 文件）"
+  exit 1
+fi
+
+echo ''
+echo '[预检] 离线包验证通过 ✓'
 
 # ============================================================
 # 步骤1：环境检测与系统准备
 # ============================================================
+echo ''
 echo '[步骤1/11] 环境检测与系统准备'
 echo '------------------------------------------------------------------'
 
-# === 检测操作系统类型（全局变量，后续防火墙等操作依赖此变量） ===
+# === 检测操作系统类型 ===
 detect_os() {
   if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -58,7 +81,6 @@ detect_os() {
 }
 detect_os
 
-# 判断包管理器类型
 is_debian_based() {
   [[ "${OS_ID}" == "ubuntu" || "${OS_ID}" == "debian" ]]
 }
@@ -75,18 +97,24 @@ if [ -z "${LAN_IP}" ]; then
 fi
 echo "Microi：获取局域网IP: ${LAN_IP} ✓"
 
-PUBLIC_IP=$(curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || echo "")
+# 离线模式：尝试获取公网IP（可能失败）
+PUBLIC_IP=$(curl -s --connect-timeout 3 ifconfig.me 2>/dev/null || echo "")
 if [ -n "${PUBLIC_IP}" ]; then
   echo "Microi：获取公网IP: ${PUBLIC_IP}"
 else
-  echo "Microi：无法获取公网IP，将仅支持内网模式"
+  echo "Microi：无法获取公网IP（离线环境正常），将使用内网模式"
 fi
 
 # === 选择访问方式 ===
 echo ''
-echo 'Microi：您是想在公网访问系统还是内网访问？公网请做好端口开放。'
-echo 'Microi：输入 g 以公网IP安装，输入 n 以内网IP安装：'
-read -r install_type
+if [ -n "${PUBLIC_IP}" ]; then
+  echo 'Microi：您是想在公网访问系统还是内网访问？公网请做好端口开放。'
+  echo 'Microi：输入 g 以公网IP安装，输入 n 以内网IP安装：'
+  read -r install_type
+else
+  echo 'Microi：离线环境未检测到公网IP，将以内网IP安装。'
+  install_type="n"
+fi
 
 if [ "$install_type" == "g" ]; then
   if [ -z "${PUBLIC_IP}" ]; then
@@ -95,7 +123,7 @@ if [ "$install_type" == "g" ]; then
   fi
   ACCESS_IP=$PUBLIC_IP
   echo 'Microi：将以公网IP安装 ✓'
-elif [ "$install_type" == "n" ]; then
+elif [ "$install_type" == "n" ] || [ -z "$install_type" ]; then
   ACCESS_IP=$LAN_IP
   echo 'Microi：将以内网IP安装 ✓'
 else
@@ -105,129 +133,61 @@ fi
 
 # === 选择数据库类型 ===
 echo ''
-echo 'Microi：请选择要安装的数据库类型：'
-echo '  1) Demo示例数据库（包含示例数据，适合体验和学习）'
-echo '  2) 空数据库（干净数据库，适合正式项目）'
-echo 'Microi：请输入 1 或 2：'
-read -r db_type
-
-if [ "$db_type" == "1" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/mysql5.6.50-demo.sql.zip"
+if [ "${HAS_DEMO_SQL}" = true ] && [ "${HAS_EMPTY_SQL}" = true ]; then
+  echo 'Microi：请选择要安装的数据库类型：'
+  echo '  1) Demo示例数据库（包含示例数据，适合体验和学习）'
+  echo '  2) 空数据库（干净数据库，适合正式项目）'
+  echo 'Microi：请输入 1 或 2：'
+  read -r db_type
+  if [ "$db_type" == "1" ]; then
+    SQL_ZIP_FILE="${SQL_DIR}/mysql5.6.50-demo.sql.zip"
+    SQL_FILE_NAME="microi_demo_temp.sql"
+    echo 'Microi：将安装Demo示例数据库 ✓'
+  elif [ "$db_type" == "2" ]; then
+    SQL_ZIP_FILE="${SQL_DIR}/mysql5.6.50-empty.sql.zip"
+    SQL_FILE_NAME="microi_empty_temp.sql"
+    echo 'Microi：将安装空数据库 ✓'
+  else
+    echo 'Microi：错误：无效的输入，脚本退出。'
+    exit 1
+  fi
+elif [ "${HAS_DEMO_SQL}" = true ]; then
+  SQL_ZIP_FILE="${SQL_DIR}/mysql5.6.50-demo.sql.zip"
   SQL_FILE_NAME="microi_demo_temp.sql"
   echo 'Microi：将安装Demo示例数据库 ✓'
-elif [ "$db_type" == "2" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/mysql5.6.50-empty.sql.zip"
+else
+  SQL_ZIP_FILE="${SQL_DIR}/mysql5.6.50-empty.sql.zip"
   SQL_FILE_NAME="microi_empty_temp.sql"
   echo 'Microi：将安装空数据库 ✓'
-else
-  echo 'Microi：错误：无效的输入，脚本退出。'
-  exit 1
 fi
 
 echo ''
 echo '[步骤1/11] 环境检测完成 ✓'
 
 # ============================================================
-# 步骤2：Docker 环境安装与检查
+# 步骤2：Docker 环境检查（离线模式不自动安装Docker）
 # ============================================================
 echo ''
-echo '[步骤2/11] Docker 环境安装与检查'
+echo '[步骤2/11] Docker 环境检查'
 echo '------------------------------------------------------------------'
 
-# === 自动安装Docker（无需确认） ===
-install_docker() {
-  echo 'Microi：未检测到Docker，正在自动安装...'
-  if is_debian_based; then
-    export DEBIAN_FRONTEND=noninteractive
-    sudo apt-get update -y -qq
-    sudo apt-get install -y -qq ca-certificates curl gnupg lsb-release
-    sudo install -m 0755 -d /etc/apt/keyrings
-    # 兼容Ubuntu和Debian的GPG密钥
-    if [ "${OS_ID}" == "ubuntu" ]; then
-      DISTRO_URL="ubuntu"
-    else
-      DISTRO_URL="debian"
-    fi
-    sudo rm -f /etc/apt/keyrings/docker.gpg
-    curl -fsSL "https://mirrors.aliyun.com/docker-ce/linux/${DISTRO_URL}/gpg" | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
-    # 获取正确的发行代号
-    CODENAME=""
-    if [ -n "${VERSION_CODENAME}" ]; then
-      CODENAME="${VERSION_CODENAME}"
-    elif [ -n "${UBUNTU_CODENAME}" ]; then
-      CODENAME="${UBUNTU_CODENAME}"
-    else
-      CODENAME=$(lsb_release -cs 2>/dev/null || echo "")
-    fi
-    if [ -z "${CODENAME}" ]; then
-      echo "Microi：无法获取发行代号，尝试使用stable分支..."
-      CODENAME="jammy"
-    fi
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/${DISTRO_URL} ${CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update -y -qq
-    sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
-  elif is_rhel_based; then
-    # CentOS 7 特殊处理（注意：CentOS 7 已于2024年6月EOL，基础源可能不可用）
-    if [[ "${OS_ID}" == "centos" && "${OS_VERSION_ID}" == "7" ]]; then
-      sudo yum install -y yum-utils
-      sudo yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-      sudo yum makecache fast
-      sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    else
-      # CentOS 8/9, Rocky, AlmaLinux, Fedora 等
-      if command -v dnf > /dev/null 2>&1; then
-        sudo dnf install -y dnf-plugins-core
-        sudo dnf config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-        sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-      else
-        sudo yum install -y yum-utils
-        sudo yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
-        sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-      fi
-    fi
-  else
-    echo "Microi：错误：不支持的操作系统 ${OS_ID}，请手动安装Docker后重试。"
-    exit 1
-  fi
-  sudo systemctl start docker
-  sudo systemctl enable docker
-  echo 'Microi：Docker 已成功安装 ✓'
-}
-
 if ! command -v docker > /dev/null 2>&1; then
-  install_docker
-else
-  echo "Microi：Docker 已安装: $(docker --version) ✓"
+  echo 'Microi：错误：未检测到 Docker。'
+  echo 'Microi：离线环境需要提前安装 Docker，请参考以下方式：'
+  echo '  方式一：在有网络的机器上下载 Docker 离线安装包后传输到本机安装'
+  echo '  方式二：临时连接网络执行 Docker 安装后断网'
+  echo '  Docker 离线安装参考：https://docs.docker.com/engine/install/binaries/'
+  exit 1
 fi
+echo "Microi：Docker 已安装: $(docker --version) ✓"
 
-# === 检查并安装 Docker Compose V2 ===
 if docker compose version > /dev/null 2>&1; then
   echo "Microi：Docker Compose 版本: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
 else
-  echo 'Microi：未检测到 Docker Compose V2 插件，正在自动安装...'
-  if is_debian_based; then
-    sudo apt-get install -y -qq docker-compose-plugin 2>/dev/null
-  elif is_rhel_based; then
-    if command -v dnf > /dev/null 2>&1; then
-      sudo dnf install -y docker-compose-plugin 2>/dev/null
-    else
-      sudo yum install -y docker-compose-plugin 2>/dev/null
-    fi
-  fi
-  if ! docker compose version > /dev/null 2>&1; then
-    # 手动安装 compose 插件
-    echo 'Microi：包管理器安装失败，尝试手动安装 Docker Compose 插件...'
-    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/' || echo "2.27.0")
-    sudo mkdir -p /usr/local/lib/docker/cli-plugins
-    sudo curl -SL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose 2>/dev/null
-    sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-    if ! docker compose version > /dev/null 2>&1; then
-      echo 'Microi：错误：Docker Compose V2 安装失败，请手动安装后重试。'
-      exit 1
-    fi
-  fi
-  echo "Microi：Docker Compose 安装成功: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
+  echo 'Microi：错误：未检测到 Docker Compose V2 插件。'
+  echo 'Microi：离线环境需要提前安装 Docker Compose V2 插件。'
+  echo 'Microi：安装方法：将 docker-compose 二进制文件放到 /usr/local/lib/docker/cli-plugins/ 并赋予执行权限'
+  exit 1
 fi
 
 # === 检查已有容器/编排 ===
@@ -241,33 +201,19 @@ if docker ps -a --format '{{.Names}}' | grep -q '^microi-install-'; then
   exit 1
 fi
 
-# === 安装依赖工具（unzip/curl/openssl） ===
-install_deps() {
-  local need_install=false
-  for cmd in unzip curl openssl; do
-    if ! command -v ${cmd} > /dev/null 2>&1; then
-      need_install=true
-      break
-    fi
-  done
-
-  if [ "${need_install}" = true ]; then
-    echo 'Microi：正在安装依赖工具（unzip/curl/openssl）...'
+# 检查 unzip 和 openssl
+for cmd in unzip openssl; do
+  if ! command -v ${cmd} > /dev/null 2>&1; then
+    echo "Microi：错误：未检测到 ${cmd} 命令，请先安装。"
     if is_debian_based; then
-      sudo apt-get install -y -qq unzip curl openssl
+      echo "  安装命令: sudo apt-get install -y ${cmd}"
     elif is_rhel_based; then
-      if command -v dnf > /dev/null 2>&1; then
-        sudo dnf install -y unzip curl openssl
-      else
-        sudo yum install -y unzip curl openssl
-      fi
+      echo "  安装命令: sudo yum install -y ${cmd}"
     fi
-    echo 'Microi：依赖工具安装完成 ✓'
-  else
-    echo 'Microi：依赖工具已存在（unzip/curl/openssl）✓'
+    exit 1
   fi
-}
-install_deps
+done
+echo 'Microi：依赖工具已存在（unzip/openssl）✓'
 
 echo ''
 echo '[步骤2/11] Docker 环境就绪 ✓'
@@ -283,7 +229,7 @@ ROOT_AVAIL_MB=$((ROOT_AVAIL_KB / 1024))
 echo "Microi：/home 分区可用空间: ${ROOT_AVAIL_MB}MB"
 if [ ${ROOT_AVAIL_MB} -lt 2048 ]; then
   echo "Microi：警告：磁盘可用空间不足 2GB（当前 ${ROOT_AVAIL_MB}MB）。"
-  echo "Microi：MySQL初始化、Docker镜像拉取等操作需要较多磁盘空间。"
+  echo "Microi：MySQL初始化、Docker镜像加载等操作需要较多磁盘空间。"
   echo "Microi：建议至少保留 5GB 以上可用空间。如空间不足可能导致安装失败。"
 fi
 
@@ -294,7 +240,6 @@ echo ''
 echo '[步骤3/11] 端口分配与占用检测'
 echo '------------------------------------------------------------------'
 
-# 工具函数
 generate_random_password() {
   openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c16
 }
@@ -306,27 +251,23 @@ generate_random_data_dir() {
   echo "${dir}"
 }
 
-# === 端口检测 ===
 PORT_COUNT=10
 PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
 
 check_port_in_use() {
   local port="$1"
-  # 使用 ss 检测 TCP 端口是否被监听
   if command -v ss > /dev/null 2>&1; then
     if ss -tln 2>/dev/null | awk '{print $4}' | grep -q ":${port}$"; then
       return 0
     fi
     return 1
   fi
-  # 降级到 netstat
   if command -v netstat > /dev/null 2>&1; then
     if netstat -tln 2>/dev/null | awk '{print $4}' | grep -q ":${port}$"; then
       return 0
     fi
     return 1
   fi
-  # 都不可用时假设端口空闲
   return 1
 }
 
@@ -365,7 +306,6 @@ if [ "${PORT_ALLOCATED}" = false ]; then
   exit 1
 fi
 
-# 分配端口
 MYSQL_PORT=$((PORT_BASE + 0))
 REDIS_PORT=$((PORT_BASE + 1))
 MONGO_PORT=$((PORT_BASE + 2))
@@ -411,7 +351,6 @@ MINIO_ACCESS_KEY=$(generate_random_password)
 MINIO_SECRET_KEY=$(generate_random_password)
 QDRANT_API_KEY=$(generate_random_password)
 
-# 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
 for _pw_var in MYSQL_ROOT_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY QDRANT_API_KEY; do
   eval _pw_val="\${${_pw_var}}"
   if [ -z "${_pw_val}" ]; then
@@ -431,10 +370,9 @@ echo ''
 echo '[步骤4/11] 密码与数据目录就绪 ✓'
 
 # ============================================================
-# 自动检测服务器内存并生成MySQL配置
+# MySQL 配置生成函数
 # ============================================================
 generate_mysql_config() {
-  # 获取服务器总内存（MB）
   local total_mem_kb
   total_mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "2097152")
   if [ -z "${total_mem_kb}" ]; then
@@ -444,104 +382,46 @@ generate_mysql_config() {
   local total_mem_mb=$((total_mem_kb / 1024))
   echo "Microi：检测到服务器内存: ${total_mem_mb}MB" >&2
 
-  # 根据内存分配MySQL参数
-  local innodb_buffer_pool_size
-  local innodb_log_buffer_size
-  local key_buffer_size
-  local tmp_table_size
-  local max_heap_table_size
-  local max_connections
-  local thread_cache_size
-  local table_open_cache
-  local sort_buffer_size
-  local read_buffer_size
-  local join_buffer_size
-  local innodb_log_file_size
+  local innodb_buffer_pool_size innodb_log_buffer_size key_buffer_size
+  local tmp_table_size max_heap_table_size max_connections thread_cache_size
+  local table_open_cache sort_buffer_size read_buffer_size join_buffer_size innodb_log_file_size
 
   if [ ${total_mem_mb} -le 1024 ]; then
     echo "Microi：MySQL配置模式: 极低配(≤1GB内存)" >&2
-    innodb_buffer_pool_size="128M"
-    innodb_log_buffer_size="16M"
-    innodb_log_file_size="48M"
-    key_buffer_size="16M"
-    tmp_table_size="16M"
-    max_heap_table_size="16M"
-    max_connections=100
-    thread_cache_size=16
-    table_open_cache=256
-    sort_buffer_size="256K"
-    read_buffer_size="256K"
-    join_buffer_size="256K"
+    innodb_buffer_pool_size="128M"; innodb_log_buffer_size="16M"; innodb_log_file_size="48M"
+    key_buffer_size="16M"; tmp_table_size="16M"; max_heap_table_size="16M"
+    max_connections=100; thread_cache_size=16; table_open_cache=256
+    sort_buffer_size="256K"; read_buffer_size="256K"; join_buffer_size="256K"
   elif [ ${total_mem_mb} -le 2048 ]; then
     echo "Microi：MySQL配置模式: 低配(2GB内存)" >&2
-    innodb_buffer_pool_size="256M"
-    innodb_log_buffer_size="32M"
-    innodb_log_file_size="64M"
-    key_buffer_size="32M"
-    tmp_table_size="32M"
-    max_heap_table_size="32M"
-    max_connections=200
-    thread_cache_size=32
-    table_open_cache=512
-    sort_buffer_size="512K"
-    read_buffer_size="512K"
-    join_buffer_size="512K"
+    innodb_buffer_pool_size="256M"; innodb_log_buffer_size="32M"; innodb_log_file_size="64M"
+    key_buffer_size="32M"; tmp_table_size="32M"; max_heap_table_size="32M"
+    max_connections=200; thread_cache_size=32; table_open_cache=512
+    sort_buffer_size="512K"; read_buffer_size="512K"; join_buffer_size="512K"
   elif [ ${total_mem_mb} -le 4096 ]; then
     echo "Microi：MySQL配置模式: 标准(4GB内存)" >&2
-    innodb_buffer_pool_size="512M"
-    innodb_log_buffer_size="64M"
-    innodb_log_file_size="128M"
-    key_buffer_size="64M"
-    tmp_table_size="64M"
-    max_heap_table_size="64M"
-    max_connections=300
-    thread_cache_size=64
-    table_open_cache=1024
-    sort_buffer_size="1M"
-    read_buffer_size="1M"
-    join_buffer_size="1M"
+    innodb_buffer_pool_size="512M"; innodb_log_buffer_size="64M"; innodb_log_file_size="128M"
+    key_buffer_size="64M"; tmp_table_size="64M"; max_heap_table_size="64M"
+    max_connections=300; thread_cache_size=64; table_open_cache=1024
+    sort_buffer_size="1M"; read_buffer_size="1M"; join_buffer_size="1M"
   elif [ ${total_mem_mb} -le 8192 ]; then
     echo "Microi：MySQL配置模式: 中配(8GB内存)" >&2
-    innodb_buffer_pool_size="1G"
-    innodb_log_buffer_size="128M"
-    innodb_log_file_size="256M"
-    key_buffer_size="128M"
-    tmp_table_size="128M"
-    max_heap_table_size="128M"
-    max_connections=500
-    thread_cache_size=128
-    table_open_cache=2048
-    sort_buffer_size="2M"
-    read_buffer_size="2M"
-    join_buffer_size="2M"
+    innodb_buffer_pool_size="1G"; innodb_log_buffer_size="128M"; innodb_log_file_size="256M"
+    key_buffer_size="128M"; tmp_table_size="128M"; max_heap_table_size="128M"
+    max_connections=500; thread_cache_size=128; table_open_cache=2048
+    sort_buffer_size="2M"; read_buffer_size="2M"; join_buffer_size="2M"
   elif [ ${total_mem_mb} -le 16384 ]; then
     echo "Microi：MySQL配置模式: 高配(16GB内存)" >&2
-    innodb_buffer_pool_size="3G"
-    innodb_log_buffer_size="256M"
-    innodb_log_file_size="256M"
-    key_buffer_size="256M"
-    tmp_table_size="256M"
-    max_heap_table_size="256M"
-    max_connections=800
-    thread_cache_size=192
-    table_open_cache=4096
-    sort_buffer_size="4M"
-    read_buffer_size="2M"
-    join_buffer_size="4M"
+    innodb_buffer_pool_size="3G"; innodb_log_buffer_size="256M"; innodb_log_file_size="256M"
+    key_buffer_size="256M"; tmp_table_size="256M"; max_heap_table_size="256M"
+    max_connections=800; thread_cache_size=192; table_open_cache=4096
+    sort_buffer_size="4M"; read_buffer_size="2M"; join_buffer_size="4M"
   else
     echo "Microi：MySQL配置模式: 超高配(>16GB内存)" >&2
-    innodb_buffer_pool_size="5G"
-    innodb_log_buffer_size="256M"
-    innodb_log_file_size="512M"
-    key_buffer_size="256M"
-    tmp_table_size="256M"
-    max_heap_table_size="256M"
-    max_connections=1000
-    thread_cache_size=256
-    table_open_cache=4096
-    sort_buffer_size="4M"
-    read_buffer_size="2M"
-    join_buffer_size="4M"
+    innodb_buffer_pool_size="5G"; innodb_log_buffer_size="256M"; innodb_log_file_size="512M"
+    key_buffer_size="256M"; tmp_table_size="256M"; max_heap_table_size="256M"
+    max_connections=1000; thread_cache_size=256; table_open_cache=4096
+    sort_buffer_size="4M"; read_buffer_size="2M"; join_buffer_size="4M"
   fi
 
   cat <<MYSQLCNF
@@ -552,13 +432,11 @@ collation_server = utf8mb4_unicode_ci
 max_allowed_packet = 512M
 skip_name_resolve = ON
 
-# 连接配置（根据${total_mem_mb}MB内存自动生成）
 max_connections = ${max_connections}
 max_connect_errors = 100000
 thread_cache_size = ${thread_cache_size}
 table_open_cache = ${table_open_cache}
 
-# 内存配置
 innodb_buffer_pool_size = ${innodb_buffer_pool_size}
 innodb_log_buffer_size = ${innodb_log_buffer_size}
 key_buffer_size = ${key_buffer_size}
@@ -567,7 +445,6 @@ query_cache_size = 0
 tmp_table_size = ${tmp_table_size}
 max_heap_table_size = ${max_heap_table_size}
 
-# InnoDB优化
 innodb_flush_method = O_DIRECT
 innodb_flush_neighbors = 0
 innodb_log_file_size = ${innodb_log_file_size}
@@ -577,7 +454,6 @@ innodb_write_io_threads = 4
 innodb_purge_threads = 2
 innodb_adaptive_flushing = ON
 
-# 缓冲配置
 sort_buffer_size = ${sort_buffer_size}
 read_buffer_size = ${read_buffer_size}
 read_rnd_buffer_size = ${read_buffer_size}
@@ -585,7 +461,6 @@ join_buffer_size = ${join_buffer_size}
 thread_stack = 512K
 binlog_cache_size = 196608
 
-# 持久化优化
 innodb_flush_log_at_trx_commit = 2
 sync_binlog = 1000
 innodb_doublewrite = 1
@@ -595,22 +470,18 @@ MYSQLCNF
 }
 
 # ============================================================
-# 防火墙端口开放函数
+# 防火墙函数
 # ============================================================
-# 注意：所有防火墙命令加 || true 防止 set -e 导致脚本退出（规则已存在时命令返回非0）
 firewall_open_port() {
   local port="$1"
-  # firewalld（CentOS 7/8/9, RHEL, Rocky 等）
   if command -v firewall-cmd > /dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
     sudo firewall-cmd --permanent --add-port=${port}/tcp > /dev/null 2>&1 || true
     return 0
   fi
-  # ufw（Ubuntu, Debian）
   if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
     sudo ufw allow ${port}/tcp > /dev/null 2>&1 || true
     return 0
   fi
-  # iptables 兜底（所有Linux）
   if command -v iptables > /dev/null 2>&1; then
     sudo iptables -C INPUT -p tcp --dport ${port} -j ACCEPT > /dev/null 2>&1 || \
     sudo iptables -I INPUT -p tcp --dport ${port} -j ACCEPT > /dev/null 2>&1 || true
@@ -627,7 +498,6 @@ firewall_reload() {
   if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
     echo "Microi：ufw 防火墙规则已生效 ✓"
   fi
-  # 持久化iptables规则
   if command -v iptables-save > /dev/null 2>&1; then
     if is_debian_based; then
       if command -v netfilter-persistent > /dev/null 2>&1; then
@@ -641,20 +511,17 @@ firewall_reload() {
   fi
 }
 
-# 启动编排项目
 compose_up() {
   local project_dir="$1"
   local project_name
   project_name=$(basename "${project_dir}")
   echo ""
   echo "Microi：正在部署编排 [${project_name}]..."
-  # 使用 if 包裹避免 set -e 在子shell失败时直接退出脚本
   if (cd "${project_dir}" && docker compose up -d); then
     echo "Microi：编排 [${project_name}] 部署成功 ✓"
   else
     echo "Microi：错误：编排 [${project_name}] 部署失败 ✗"
-    echo "Microi：请检查以上错误日志。常见原因：镜像拉取失败、端口冲突、磁盘空间不足。"
-    # 自动输出容器日志帮助排查
+    echo "Microi：请检查以上错误日志。常见原因：端口冲突、磁盘空间不足。"
     echo '------------------------------------------------------------------'
     echo 'Microi：尝试输出相关容器日志：'
     for cname in $(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null); do
@@ -667,7 +534,7 @@ compose_up() {
 }
 
 # ============================================================
-# 步骤5：开放防火墙端口（安装前先开放）
+# 步骤5：开放防火墙端口
 # ============================================================
 echo ''
 echo '[步骤5/11] 开放防火墙端口'
@@ -685,6 +552,26 @@ echo '        还需在云控制台的安全组中开放相同端口。'
 
 echo ''
 echo '[步骤5/11] 防火墙配置完成 ✓'
+
+# ============================================================
+# 步骤5.5：加载离线 Docker 镜像
+# ============================================================
+echo ''
+echo '[离线模式] 加载 Docker 镜像'
+echo '------------------------------------------------------------------'
+echo 'Microi：正在从离线包加载 Docker 镜像（这可能需要几分钟）...'
+
+if docker load -i "${IMAGES_TAR}"; then
+  echo 'Microi：所有 Docker 镜像加载完成 ✓'
+else
+  echo 'Microi：错误：Docker 镜像加载失败，请检查 images.tar 文件是否完整。'
+  exit 1
+fi
+
+echo ''
+echo 'Microi：已加载的镜像列表：'
+docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}" | grep microios || true
+echo ''
 
 # ============================================================
 # 检测宝塔面板编排目录
@@ -706,7 +593,6 @@ echo '=================================================================='
 echo 'Microi：开始部署所有编排项目...'
 echo '=================================================================='
 
-
 # ============================================================
 # 步骤6：部署 MySQL 5.7 编排
 # ============================================================
@@ -716,18 +602,14 @@ echo '------------------------------------------------------------------'
 
 MYSQL_DIR="${COMPOSE_BASE_DIR}/microi-install-mysql"
 
-# 检查磁盘可用空间（MySQL初始化至少需要1GB）
 MYSQL_DATA_MOUNT=$(df -P "${MYSQL_DATA_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
 if [ -n "${MYSQL_DATA_MOUNT}" ]; then
   DISK_AVAIL_MB=$((MYSQL_DATA_MOUNT / 1024))
   echo "Microi：MySQL 数据目录所在磁盘可用空间: ${DISK_AVAIL_MB}MB"
   if [ ${DISK_AVAIL_MB} -lt 1024 ]; then
     echo "Microi：错误：磁盘可用空间不足 1GB（当前 ${DISK_AVAIL_MB}MB），MySQL初始化可能失败。"
-    echo "Microi：请清理磁盘空间后重试，或更换数据目录至空间充足的磁盘。"
     exit 1
   fi
-else
-  echo "Microi：警告：无法检测磁盘可用空间，继续安装..."
 fi
 
 rm -rf "${MYSQL_DATA_DIR}"
@@ -737,11 +619,8 @@ sudo chmod 755 "${MYSQL_DATA_DIR}"
 echo "Microi：MySQL 数据目录已初始化: ${MYSQL_DATA_DIR} ✓"
 
 mkdir -p "${MYSQL_DIR}"
-
-# 根据服务器内存自动生成MySQL配置
 generate_mysql_config > "${MYSQL_DIR}/my_microi.cnf"
 echo "Microi：MySQL 配置文件已生成 ✓"
-
 echo "Microi：MySQL 端口: ${MYSQL_PORT}, Root密码: ${MYSQL_ROOT_PASSWORD}"
 
 cat > "${MYSQL_DIR}/docker-compose.yml" <<EOF
@@ -768,42 +647,31 @@ services:
         max-size: "10m"
         max-file: "10"
 EOF
-echo "Microi：MySQL 编排文件已生成: ${MYSQL_DIR}/docker-compose.yml ✓"
+echo "Microi：MySQL 编排文件已生成 ✓"
 
 compose_up "${MYSQL_DIR}"
 
-# === 等待MySQL启动并初始化数据 ===
 echo ''
 echo 'Microi：等待MySQL容器启动...'
 sleep 5
 
-# 先检查容器是否还在运行（避免空等60秒）
 if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
   echo 'Microi：错误：MySQL 容器启动后立即退出，以下是容器日志：'
-  echo '------------------------------------------------------------------'
   docker logs microi-install-mysql57 2>&1 | tail -50
-  echo '------------------------------------------------------------------'
-  echo 'Microi：正在清理失败的MySQL部署...'
   docker stop microi-install-mysql57 > /dev/null 2>&1 || true
   docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
   rm -rf "${MYSQL_DATA_DIR}"
-  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
   exit 1
 fi
 
 MYSQL_READY=false
 for i in $(seq 1 30); do
-  # 每轮检查容器是否仍在运行
   if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
-    echo 'Microi：错误：MySQL 容器在等待过程中退出，以下是容器日志：'
-    echo '------------------------------------------------------------------'
+    echo 'Microi：错误：MySQL 容器在等待过程中退出'
     docker logs microi-install-mysql57 2>&1 | tail -50
-    echo '------------------------------------------------------------------'
-    echo 'Microi：正在清理失败的MySQL部署...'
     docker stop microi-install-mysql57 > /dev/null 2>&1 || true
     docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
     rm -rf "${MYSQL_DATA_DIR}"
-    echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
     exit 1
   fi
   if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
@@ -815,15 +683,11 @@ for i in $(seq 1 30); do
 done
 
 if [ "${MYSQL_READY}" = false ]; then
-  echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪。以下是容器日志：'
-  echo '------------------------------------------------------------------'
+  echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪。'
   docker logs microi-install-mysql57 2>&1 | tail -50
-  echo '------------------------------------------------------------------'
-  echo 'Microi：正在清理失败的MySQL部署...'
   docker stop microi-install-mysql57 > /dev/null 2>&1 || true
   docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
   rm -rf "${MYSQL_DATA_DIR}"
-  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
   exit 1
 fi
 echo 'Microi：MySQL 容器已启动就绪 ✓'
@@ -836,21 +700,12 @@ else
 fi
 docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;" > /dev/null 2>&1 || true
 
-# 下载并还原数据库
-SQL_ZIP_FILE="/tmp/mysql_backup.zip"
+# 还原数据库（使用离线包中的 SQL 文件）
 SQL_TMP_DIR="/tmp/mysql_backup"
 SQL_FILE="${SQL_TMP_DIR}/${SQL_FILE_NAME}"
 
 mkdir -p "${SQL_TMP_DIR}"
-echo "Microi：下载数据库备份文件: ${SQL_ZIP_URL}"
-if curl -fSL -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"; then
-  echo 'Microi：数据库备份文件下载完成 ✓'
-else
-  echo 'Microi：错误：数据库备份文件下载失败，请检查网络连接。'
-  exit 1
-fi
-
-echo 'Microi：解压数据库备份文件...'
+echo "Microi：解压数据库备份文件..."
 if unzip -o -d "${SQL_TMP_DIR}" "${SQL_ZIP_FILE}"; then
   echo 'Microi：解压完成 ✓'
 else
@@ -881,8 +736,6 @@ else
   exit 1
 fi
 
-# 清理临时文件
-rm -f "${SQL_ZIP_FILE}"
 rm -rf "${SQL_TMP_DIR}"
 echo 'Microi：临时文件已清理 ✓'
 
@@ -899,7 +752,6 @@ echo '------------------------------------------------------------------'
 
 REDIS_DIR="${COMPOSE_BASE_DIR}/microi-install-redis"
 
-# 根据服务器内存动态设置Redis maxmemory（约占总内存的25%，最小128mb，最大8gb）
 TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
 if [ -z "${TOTAL_MEM_KB}" ]; then TOTAL_MEM_KB=2097152; fi
 TOTAL_MEM_MB=$((TOTAL_MEM_KB / 1024))
@@ -989,7 +841,6 @@ echo '[步骤8/11] 部署 MongoDB'
 echo '------------------------------------------------------------------'
 
 MONGO_DIR="${COMPOSE_BASE_DIR}/microi-install-mongodb"
-
 echo "Microi：MongoDB 端口: ${MONGO_PORT}, Root密码: ${MONGO_ROOT_PASSWORD}"
 
 mkdir -p "${MONGO_DIR}"
@@ -1033,7 +884,6 @@ echo '[步骤9/11] 部署 MinIO'
 echo '------------------------------------------------------------------'
 
 MINIO_DIR="${COMPOSE_BASE_DIR}/microi-install-minio"
-
 echo "Microi：MinIO API端口: ${MINIO_PORT}, Console端口: ${MINIO_CONSOLE_PORT}"
 
 mkdir -p "${MINIO_DIR}"
@@ -1079,7 +929,6 @@ echo '[步骤10/11] 部署 Ollama AI 服务'
 echo '------------------------------------------------------------------'
 
 OLLAMA_DIR="${COMPOSE_BASE_DIR}/microi-install-ollama"
-
 echo "Microi：Ollama 端口: ${OLLAMA_PORT}"
 
 mkdir -p "${OLLAMA_DIR}"
@@ -1121,7 +970,6 @@ echo 'Microi：部署 Qdrant 向量数据库'
 echo '------------------------------------------------------------------'
 
 QDRANT_DIR="${COMPOSE_BASE_DIR}/microi-install-qdrant"
-
 echo "Microi：Qdrant HTTP端口: ${QDRANT_HTTP_PORT}, gRPC端口: ${QDRANT_GRPC_PORT}, API Key: ${QDRANT_API_KEY}"
 
 mkdir -p "${QDRANT_DIR}"
@@ -1261,7 +1109,6 @@ echo '[步骤11/11] 部署 Watchtower 自动更新'
 echo '------------------------------------------------------------------'
 
 WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
-
 echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-client"
 
 mkdir -p "${WATCHTOWER_DIR}"
@@ -1298,7 +1145,7 @@ echo '[步骤11/11] Watchtower 部署完成 ✓'
 echo ''
 echo ''
 echo '=================================================================='
-echo 'Microi：所有服务已成功安装！'
+echo 'Microi：所有服务已成功安装！（离线模式）'
 echo '=================================================================='
 echo ''
 echo "编排文件目录: ${COMPOSE_BASE_DIR}"
@@ -1382,4 +1229,5 @@ echo ''
 echo '=================================================================='
 echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
 echo 'Microi：提示：请及时修改默认管理员密码（admin / demo123456）。'
+echo 'Microi：注意：Watchtower 需要联网才能实现自动更新。'
 echo '=================================================================='

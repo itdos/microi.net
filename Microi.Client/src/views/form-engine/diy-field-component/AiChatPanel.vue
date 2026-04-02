@@ -15,6 +15,7 @@
             <el-select
                 :model-value="selectedAiModel"
                 @update:model-value="$emit('update:selectedAiModel', $event)"
+                value-key="Id"
                 size="small"
                 placeholder="选择AI模型"
                 :loading="aiModelLoading"
@@ -23,7 +24,7 @@
                 <el-option
                     v-for="model in aiModelList"
                     :key="model.Id"
-                    :label="model.Name"
+                    :label="`${model.Name}（${model.AiModel}）`"
                     :value="model"
                 />
             </el-select>
@@ -76,6 +77,11 @@
                     </div>
                     <div class="ai-msg-content">
                         <div class="ai-msg-text">
+                            <!-- AI思考过程（可折叠） -->
+                            <details v-if="msg.thinking" class="ai-thinking-block">
+                                <summary>💭 AI思考过程</summary>
+                                <div class="ai-thinking-content">{{ msg.thinking }}</div>
+                            </details>
                             <span v-if="msg.status === 'generating'" class="ai-generating-text">
                                 {{ msg.content }}<span class="ai-cursor-blink">|</span>
                             </span>
@@ -99,6 +105,9 @@
                             <el-button size="small" text type="primary" @click="$emit('apply-code', msg.code)">
                                 <el-icon><DocumentChecked /></el-icon> 应用到编辑器
                             </el-button>
+                            <el-button v-if="editorHasCode" size="small" text type="success" @click="$emit('insert-at-cursor', msg.code)">
+                                <el-icon><Position /></el-icon> 插入到光标
+                            </el-button>
                             <el-button size="small" text @click="copyCode(msg.code)">
                                 <el-icon><CopyDocument /></el-icon> 复制代码
                             </el-button>
@@ -117,7 +126,7 @@
                     type="textarea"
                     :rows="2"
                     :autosize="{ minRows: 2, maxRows: 5 }"
-                    placeholder="描述你的业务需求，如：帮我获取最新的一条生产订单数据"
+                    :placeholder="editorHasCode ? '描述你的需求，或询问当前代码相关问题（如：这段代码有什么Bug？）' : '描述你的业务需求，如：帮我获取最新的一条生产订单数据'"
                     :disabled="aiGenerating"
                     @keydown.enter.exact="handleAiSend"
                     resize="none"
@@ -153,7 +162,8 @@ import {
     WarningFilled,
     DocumentChecked,
     CopyDocument,
-    VideoPause
+    VideoPause,
+    Position
 } from '@element-plus/icons-vue';
 
 defineProps({
@@ -162,7 +172,8 @@ defineProps({
     aiGenerating: { type: Boolean, default: false },
     selectedAiModel: { type: Object, default: null },
     aiModelList: { type: Array, default: () => [] },
-    aiModelLoading: { type: Boolean, default: false }
+    aiModelLoading: { type: Boolean, default: false },
+    editorHasCode: { type: Boolean, default: false }
 });
 
 const emits = defineEmits([
@@ -172,6 +183,7 @@ const emits = defineEmits([
     'send',
     'cancel',
     'apply-code',
+    'insert-at-cursor',
     'use-example'
 ]);
 

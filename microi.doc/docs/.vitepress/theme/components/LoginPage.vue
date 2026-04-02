@@ -93,7 +93,7 @@
           
           <div class="login-header">
             <h2 class="login-title">{{ loginMode === 'wechat' ? '微信扫码登录' : '手机号登录' }}</h2>
-            <p class="login-desc">{{ loginMode === 'wechat' ? '使用微信扫描下方二维码' : '输入手机号，获取验证码快捷登录' }}</p>
+            <p class="login-desc">{{ loginMode === 'wechat' ? '使用微信扫描下方二维码' : (phoneLoginType === 'sms' ? '输入手机号，获取验证码快捷登录' : '使用手机号和密码登录') }}</p>
           </div>
 
           <!-- 登录模式切换 -->
@@ -141,57 +141,123 @@
               />
             </div>
 
-            <!-- 图形验证码 -->
-            <div class="input-group captcha-group">
-              <div class="input-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </div>
-              <input 
-                v-model="captchaValue" 
-                type="text" 
-                placeholder="图形验证码" 
-                maxlength="6"
-                class="login-input captcha-input"
-                @keyup.enter="handleLogin"
-              />
-              <div class="captcha-img-wrapper" @click="refreshCaptcha">
-                <img 
-                  v-if="captchaImgSrc" 
-                  :src="captchaImgSrc" 
-                  alt="验证码" 
-                  class="captcha-img"
-                  title="点击刷新验证码"
+            <!-- 验证码登录模式 -->
+            <template v-if="phoneLoginType === 'sms'">
+              <!-- 图形验证码 -->
+              <div class="input-group captcha-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <input 
+                  v-model="captchaValue" 
+                  type="text" 
+                  placeholder="图形验证码" 
+                  maxlength="6"
+                  class="login-input captcha-input"
+                  @keyup.enter="handleLogin"
                 />
-                <div v-else class="captcha-loading">
-                  <div class="loading-spinner"></div>
+                <div class="captcha-img-wrapper" @click="refreshCaptcha">
+                  <img 
+                    v-if="captchaImgSrc" 
+                    :src="captchaImgSrc" 
+                    alt="验证码" 
+                    class="captcha-img"
+                    title="点击刷新验证码"
+                  />
+                  <div v-else class="captcha-loading">
+                    <div class="loading-spinner"></div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 短信验证码 -->
-            <div class="input-group">
-              <div class="input-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+              <!-- 短信验证码 -->
+              <div class="input-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <input 
+                  v-model="smsCode" 
+                  type="text" 
+                  placeholder="短信验证码" 
+                  maxlength="6"
+                  class="login-input sms-input"
+                  @keyup.enter="handleLogin"
+                />
+                <button 
+                  class="sms-btn" 
+                  :disabled="smsCooldown > 0 || !phone"
+                  @click="sendSmsCode"
+                >
+                  {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
+                </button>
               </div>
-              <input 
-                v-model="smsCode" 
-                type="text" 
-                placeholder="短信验证码" 
-                maxlength="6"
-                class="login-input sms-input"
-                @keyup.enter="handleLogin"
-              />
-              <button 
-                class="sms-btn" 
-                :disabled="smsCooldown > 0 || !phone"
-                @click="sendSmsCode"
-              >
-                {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
+            </template>
+
+            <!-- 密码登录模式 -->
+            <template v-else>
+              <div class="input-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <input 
+                  v-model="password" 
+                  type="password" 
+                  placeholder="请输入登录密码" 
+                  maxlength="32"
+                  class="login-input"
+                  @keyup.enter="handleLogin"
+                />
+              </div>
+
+              <!-- 图形验证码（密码登录模式） -->
+              <div class="input-group captcha-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <input 
+                  v-model="pwdCaptchaValue" 
+                  type="text" 
+                  placeholder="图形验证码" 
+                  maxlength="6"
+                  class="login-input captcha-input"
+                  @keyup.enter="handleLogin"
+                />
+                <div class="captcha-img-wrapper" @click="refreshPwdCaptcha">
+                  <img 
+                    v-if="pwdCaptchaImgSrc" 
+                    :src="pwdCaptchaImgSrc" 
+                    alt="验证码" 
+                    class="captcha-img"
+                    title="点击刷新验证码"
+                  />
+                  <div v-else class="captcha-loading">
+                    <div class="loading-spinner"></div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 切换登录方式 -->
+            <div class="login-type-switch">
+              <button class="switch-btn" @click="togglePhoneLoginType">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="17 1 21 5 17 9"/>
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                  <polyline points="7 23 3 19 7 15"/>
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                {{ phoneLoginType === 'sms' ? '使用密码登录' : '使用验证码登录' }}
               </button>
             </div>
 
@@ -216,11 +282,11 @@
                   <polyline points="10 17 15 12 10 7"/>
                   <line x1="15" y1="12" x2="3" y2="12"/>
                 </svg>
-                登录 / 注册
+                {{ phoneLoginType === 'sms' ? '登录 / 注册' : '登录' }}
               </span>
             </button>
 
-            <p class="login-tip">未注册的手机号将自动创建账户</p>
+            <p class="login-tip">{{ phoneLoginType === 'sms' ? '未注册的手机号将自动创建账户' : '仅限已注册用户，请先通过验证码登录注册' }}</p>
           </div>
 
           <!-- 微信扫码区域 -->
@@ -322,11 +388,16 @@ const API_BASE = 'https://api.microi.net'
 
 // 状态
 const loginMode = ref('phone')
+const phoneLoginType = ref('sms') // 'sms' 验证码登录 | 'pwd' 密码登录
 const phone = ref('')
 const captchaValue = ref('')
 const smsCode = ref('')
+const password = ref('')
 const captchaImgSrc = ref('')
 const captchaId = ref('')
+const pwdCaptchaValue = ref('')
+const pwdCaptchaImgSrc = ref('')
+const pwdCaptchaId = ref('')
 const smsCooldown = ref(0)
 const isLogging = ref(false)
 const toastMsg = ref('')
@@ -355,20 +426,50 @@ function showToast(msg, type = 'info') {
   setTimeout(() => { toastMsg.value = '' }, 3000)
 }
 
-// 获取图形验证码
-async function refreshCaptcha() {
+// 切换手机号登录方式
+function togglePhoneLoginType() {
+  phoneLoginType.value = phoneLoginType.value === 'sms' ? 'pwd' : 'sms'
+  if (phoneLoginType.value === 'pwd') {
+    refreshPwdCaptcha()
+  } else {
+    refreshCaptcha()
+  }
+}
+
+// 获取图形验证码（通用）
+async function fetchCaptcha(target) {
   try {
     const resp = await fetch(API_BASE + '/api/Captcha/GetCaptcha?OsClient=MicroiDoc&t=' + Date.now(), {
       method: 'GET'
     })
     if (!resp.ok) throw new Error('Failed')
     const cid = resp.headers.get('captchaid')
-    if (cid) captchaId.value = cid
     const blob = await resp.blob()
-    captchaImgSrc.value = URL.createObjectURL(blob)
+    const src = URL.createObjectURL(blob)
+    if (target === 'pwd') {
+      if (cid) pwdCaptchaId.value = cid
+      pwdCaptchaImgSrc.value = src
+    } else {
+      if (cid) captchaId.value = cid
+      captchaImgSrc.value = src
+    }
   } catch {
-    captchaImgSrc.value = ''
+    if (target === 'pwd') {
+      pwdCaptchaImgSrc.value = ''
+    } else {
+      captchaImgSrc.value = ''
+    }
   }
+}
+
+// 获取图形验证码（短信登录用）
+async function refreshCaptcha() {
+  await fetchCaptcha('sms')
+}
+
+// 获取图形验证码（密码登录用）
+async function refreshPwdCaptcha() {
+  await fetchCaptcha('pwd')
 }
 
 // 发送短信验证码（需先输入图形验证码）
@@ -412,64 +513,104 @@ async function sendSmsCode() {
   }
 }
 
-// 手机号验证码登录
+// 手机号登录（验证码/密码）
 async function handleLogin() {
   if (isLogging.value) return
   if (!phone.value || phone.value.length !== 11) {
     showToast('请输入正确的11位手机号', 'error')
     return
   }
-  if (!smsCode.value) {
-    showToast('请输入短信验证码', 'error')
-    return
-  }
   
-  isLogging.value = true
-  try {
-    const resp = await fetch(API_BASE + '/api/SysUser/SmsLogin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        Phone: phone.value,
-        _CaptchaValue: smsCode.value,
-        OsClient: 'MicroiDoc'
-      })
-    })
-    const result = await resp.json()
-    if (result.Code === 1) {
-      // 从响应头获取 Token
-      const authToken = resp.headers.get('authorization') || ''
-      // 保存用户信息到 localStorage
-      const userData = result.Data || {}
-      localStorage.setItem('microi_doc_user', JSON.stringify(userData))
-      localStorage.setItem('microi_doc_token', authToken)
-      // 保存租户OsClient（用于进入后台）
-      const tenantOsClient = result.DataAppend?.TenantOsClient
-      if (tenantOsClient) {
-        localStorage.setItem('microi_doc_tenant', tenantOsClient)
-      }
-      const isNewUser = result.DataAppend?.IsNewUser
-      // 触发自定义事件，通知导航栏组件更新
-      window.dispatchEvent(new CustomEvent('microi-login-success', { detail: userData }))
-      if (isNewUser) {
-        // 新用户：提示设置密码
-        showToast('注册成功！建议设置登录密码', 'success')
-        showSetPwdDialog.value = true
-      } else {
-        showToast('登录成功！', 'success')
-        // 延迟跳转
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 800)
-      }
-    } else {
-      showToast(result.Msg || '登录失败，请重试', 'error')
-      refreshCaptcha()
+  if (phoneLoginType.value === 'sms') {
+    // 验证码登录
+    if (!smsCode.value) {
+      showToast('请输入短信验证码', 'error')
+      return
     }
-  } catch {
-    showToast('网络错误，请重试', 'error')
-  } finally {
-    isLogging.value = false
+    isLogging.value = true
+    try {
+      const resp = await fetch(API_BASE + '/api/SysUser/SmsLogin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Phone: phone.value,
+          _CaptchaValue: smsCode.value,
+          OsClient: 'MicroiDoc'
+        })
+      })
+      const result = await resp.json()
+      if (result.Code === 1) {
+        handleLoginSuccess(resp, result)
+      } else {
+        showToast(result.Msg || '登录失败，请重试', 'error')
+        refreshCaptcha()
+      }
+    } catch {
+      showToast('网络错误，请重试', 'error')
+    } finally {
+      isLogging.value = false
+    }
+  } else {
+    // 密码登录
+    if (!password.value) {
+      showToast('请输入登录密码', 'error')
+      return
+    }
+    if (!pwdCaptchaValue.value) {
+      showToast('请输入图形验证码', 'error')
+      return
+    }
+    isLogging.value = true
+    try {
+      const resp = await fetch(API_BASE + '/api/SysUser/Login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Account: phone.value,
+          Pwd: password.value,
+          OsClient: 'MicroiDoc',
+          _CaptchaId: pwdCaptchaId.value,
+          _CaptchaValue: pwdCaptchaValue.value
+        })
+      })
+      const result = await resp.json()
+      if (result.Code === 1) {
+        handleLoginSuccess(resp, result)
+      } else {
+        showToast(result.Msg || '账号或密码错误', 'error')
+        refreshPwdCaptcha()
+        pwdCaptchaValue.value = ''
+      }
+    } catch {
+      showToast('网络错误，请重试', 'error')
+    } finally {
+      isLogging.value = false
+    }
+  }
+}
+
+// 登录成功统一处理
+function handleLoginSuccess(resp, result) {
+  const authToken = resp.headers.get('authorization') || ''
+  const userData = result.Data || {}
+  localStorage.setItem('microi_doc_user', JSON.stringify(userData))
+  localStorage.setItem('microi_doc_token', authToken)
+  // 保存手机号（用于进入后台地址拼接）
+  localStorage.setItem('microi_doc_phone', phone.value)
+  const tenantOsClient = result.DataAppend?.TenantOsClient
+  if (tenantOsClient) {
+    localStorage.setItem('microi_doc_tenant', tenantOsClient)
+  }
+  const isNewUser = result.DataAppend?.IsNewUser
+  window.dispatchEvent(new CustomEvent('microi-login-success', { detail: userData }))
+  if (isNewUser) {
+    showToast('注册成功！建议设置登录密码', 'success')
+    showSetPwdDialog.value = true
+  } else {
+    showToast('登录成功！', 'success')
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 800)
   }
 }
 
@@ -589,6 +730,7 @@ onMounted(() => {
   nextTick(() => {
     initParticles()
     refreshCaptcha()
+    refreshPwdCaptcha()
   })
 })
 
@@ -971,6 +1113,29 @@ onUnmounted(() => {
 .sms-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 切换登录方式 */
+.login-type-switch {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+  margin-top: -4px;
+}
+.switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(138,43,226,0.75);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.switch-btn:hover {
+  color: #b388ff;
 }
 
 /* 登录按钮 */

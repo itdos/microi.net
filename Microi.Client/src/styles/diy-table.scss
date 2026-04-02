@@ -701,17 +701,30 @@
     }
     .col-header-menu-icon {
         margin-left: auto;
-        opacity: 0;
         color: #000000;
         transition: opacity 0.2s, color 0.2s;
-        // flex-shrink: 0;
         margin:0px;
         padding:0px;
         justify-content: right;
     }
-    &:hover .col-header-menu-icon {
+    /* 竖排3点图标：默认显示（半透明），hover时隐藏 */
+    .col-header-menu-icon--dots {
+        opacity: 0.35;
+        display: inline-flex;
+    }
+    /* 搜索图标：默认隐藏，hover时显示 */
+    .col-header-menu-icon--search {
+        opacity: 0;
+        display: none;
+        margin-left: 0;
+    }
+    &:hover .col-header-menu-icon--dots {
+        opacity: 0;
+        display: none;
+    }
+    &:hover .col-header-menu-icon--search {
         opacity: 1;
-        // color: var(--color-primary, #409eff);
+        display: inline-flex;
     }
 }
 /* 表头鼠标手型 */
