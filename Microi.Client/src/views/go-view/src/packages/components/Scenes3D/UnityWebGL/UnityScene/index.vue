@@ -32,7 +32,7 @@
     <!-- Unity Canvas（销毁后需要重建，用 v-if 控制） -->
     <canvas
       v-if="canvasAlive"
-      :id="canvasId"
+      :id="currentCanvasId"
       ref="canvasRef"
       :style="{ display: loaderUrl && !errorMsg ? 'block' : 'none', width: '100%', height: '100%' }"
       tabindex="-1"
@@ -65,109 +65,174 @@ const {
 } = toRefs(props.chartConfig.option)
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-// Unity Emscripten 内部通过 canvas.id 做 querySelector，必须有唯一 id
-const canvasId = `unity-canvas-${props.chartConfig.id}`
-// 控制 canvas DOM 的创建/销毁（WebGL 上下文 lost 后无法恢复，必须新建 canvas）
-const canvasAlive = ref(true)
+// 每次 init 使用自增版本号生成唯一 canvas id，确保 Unity 拿到干净的 WebGL 上下文
+let _initVersion = 0
+const currentCanvasId = ref(`unity-canvas-${props.chartConfig.id}-0`)
+// 控制 canvas DOM 的创建/销毁（canvasAlive=false 时 Vue 会移除 canvas 元素）
+const canvasAlive = ref(false)
 const loading = ref(false)
 const progress = ref(0)
 const errorMsg = ref('')
 
 let unityInstance: any = null
-let loadedLoaderUrl = ''
 let loaderScript: HTMLScriptElement | null = null
+let loadedLoaderUrl = ''
+let blobUrls: string[] = []
+// 追踪正在进行的 destroy promise，用于防止 destroy / init 并发竞争
+let destroyPromise: Promise<void> | null = null
 
-// 清理 Unity 实例（不销毁 canvas DOM，用于 URL 变更时的重新加载）
-const cleanupUnity = async () => {
-  if (unityInstance) {
-    try {
-      await unityInstance.Quit()
-    } catch (_) {}
-    unityInstance = null
-  }
-
-  if (loaderScript) {
-    loaderScript.remove()
-    loaderScript = null
-  }
-
-  delete (window as any).createUnityInstance
-  loadedLoaderUrl = ''
+const cleanupBlobUrls = () => {
+  blobUrls.forEach(u => URL.revokeObjectURL(u))
+  blobUrls = []
 }
 
-// 完全销毁 Unity 并释放 GPU/WASM 内存（路由切走 / 组件卸载时调用）
-const destroyUnity = async () => {
-  if (unityInstance) {
-    try {
-      await unityInstance.Quit()
-    } catch (_) {}
+/**
+ * 针对 .gz 压缩构建的服务端双重解压问题：
+ * CDN/Nginx 见到 .js.gz 会自动加 Content-Encoding: gzip，浏览器解压一次，
+ * Unity loader 再解压一次，导致 "Unable to load file" 错误。
+ * 解决办法：预取文件 → 检测魔数 → 必要时手动解压 → 创建无扩展名 Blob URL 传给 Unity。
+ */
+const fetchGzAsBlob = async (url: string, mimeType: string): Promise<string> => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`无法获取文件 ${url}，状态码: ${response.status}`)
+  const buffer = await response.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
 
-    // 清理 Emscripten Module 引用，释放 WASM 堆内存
-    try {
-      const module = unityInstance.Module
-      if (module) {
-        if (module.ctx) {
-          const loseCtx = module.ctx.getExtension('WEBGL_lose_context')
-          if (loseCtx) loseCtx.loseContext()
-        }
-        if (module.HEAPU8) module.HEAPU8 = null
-        if (module.wasmMemory) module.wasmMemory = null
-      }
-    } catch (_) {}
+  // gzip 魔数: 0x1f 0x8b
+  // 若仍为 gzip（服务端未加 Content-Encoding）则手动解压；否则浏览器已自动解压，直接使用
+  const isStillGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
+  let finalBuffer: ArrayBuffer
 
-    unityInstance = null
+  if (isStillGzip) {
+    const ds = new DecompressionStream('gzip')
+    const writer = ds.writable.getWriter()
+    const reader = ds.readable.getReader()
+    writer.write(bytes)
+    writer.close()
+    const chunks: Uint8Array[] = []
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (value) chunks.push(value)
+    }
+    const total = chunks.reduce((n, c) => n + c.length, 0)
+    const merged = new Uint8Array(total)
+    let off = 0
+    for (const c of chunks) { merged.set(c, off); off += c.length }
+    finalBuffer = merged.buffer
+  } else {
+    finalBuffer = buffer
   }
 
-  if (loaderScript) {
-    loaderScript.remove()
-    loaderScript = null
-  }
+  const blob = new Blob([finalBuffer], { type: mimeType })
+  const blobUrl = URL.createObjectURL(blob)
+  blobUrls.push(blobUrl)
+  return blobUrl
+}
 
-  delete (window as any).createUnityInstance
+// .gz 文件返回解压后的 Blob URL；其他文件原样返回
+const getEffectiveUrl = async (url: string, mimeType: string): Promise<string> => {
+  if (url.endsWith('.gz')) return fetchGzAsBlob(url, mimeType)
+  return url
+}
 
-  // 销毁 canvas DOM（WebGL 上下文 lost 后不可复用，下次需新建）
-  canvasAlive.value = false
-
+/**
+ * 销毁 Unity 实例，释放 GPU/WASM 内存。
+ * 关键设计：所有状态清零必须在第一个 await 之前（同步阶段）完成，
+ * 防止 onActivated 的 initUnity 与本函数的 async 尾部产生竞争。
+ */
+const destroyUnity = (): Promise<void> => {
+  // === 同步阶段：立即捕获并清零所有模块状态 ===
+  const inst = unityInstance
+  const script = loaderScript
+  unityInstance = null
+  loaderScript = null
   loadedLoaderUrl = ''
-  console.log('[Unity3D] Instance destroyed and memory released')
+  canvasAlive.value = false   // 立即移除 canvas，不等 Quit 完成
+  cleanupBlobUrls()
+
+  // === 异步阶段：执行耗时的 Quit 和 GPU 释放 ===
+  return (async () => {
+    if (inst) {
+      try { await inst.Quit() } catch (_) {}
+      try {
+        const mod = inst.Module
+        if (mod) {
+          if (mod.ctx) {
+            const ext = mod.ctx.getExtension('WEBGL_lose_context')
+            if (ext) ext.loseContext()
+          }
+          if (mod.HEAPU8) mod.HEAPU8 = null
+          if (mod.wasmMemory) mod.wasmMemory = null
+        }
+      } catch (_) {}
+    }
+    // 移除捕获的旧脚本（新 initUnity 可能已添加新脚本，不能用模块变量）
+    if (script) script.remove()
+    console.log('[Unity3D] Instance destroyed and memory released')
+  })()
 }
 
 // 初始化 Unity
 const initUnity = async () => {
+  // 等待任何正在进行的 destroy 完成，防止并发竞争
+  if (destroyPromise) {
+    try { await destroyPromise } catch (_) {}
+    destroyPromise = null
+  }
+
   const url = loaderUrl.value
   if (!url || !dataUrl.value || !frameworkUrl.value || !codeUrl.value) return
-  if (!canvasRef.value) return
 
-  // 如果已加载相同 loader，先清理旧实例
-  await cleanupUnity()
+  // 每次 init 生成新唯一 canvas ID，保证 Unity 拿到全新 WebGL 上下文
+  _initVersion++
+  currentCanvasId.value = `unity-canvas-${props.chartConfig.id}-${_initVersion}`
+
+  // 重建 canvas DOM（false→nextTick→true，确保旧 canvas 完全移除后再创建新 canvas）
+  canvasAlive.value = false
+  await nextTick()
+  canvasAlive.value = true
+  await nextTick()
+
+  if (!canvasRef.value) return
 
   loading.value = true
   progress.value = 0
   errorMsg.value = ''
 
   try {
-    // 动态加载 loader.js
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script')
-      script.src = url
-      script.onload = () => resolve()
-      script.onerror = () => reject(new Error('Loader JS 加载失败'))
-      document.head.appendChild(script)
-      loaderScript = script
-    })
+    // 仅在 loaderUrl 变更时重新加载脚本，相同 URL 复用已执行的 createUnityInstance
+    if (loadedLoaderUrl !== url) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.onload = () => resolve()
+        script.onerror = () => reject(new Error('Loader JS 加载失败'))
+        document.head.appendChild(script)
+        loaderScript = script
+      })
+      loadedLoaderUrl = url
+    }
 
-    loadedLoaderUrl = url
-
-    // 调用 createUnityInstance
     const createFn = (window as any).createUnityInstance
     if (typeof createFn !== 'function') {
       throw new Error('createUnityInstance 未找到，请检查 Loader JS 地址')
     }
 
+    // 预处理 .gz 压缩资源：解压后生成 Blob URL，避免服务端双重压缩导致 Unity loader 解析失败
+    const [effectiveData, effectiveFramework, effectiveCode] = await Promise.all([
+      getEffectiveUrl(dataUrl.value, 'application/octet-stream'),
+      getEffectiveUrl(frameworkUrl.value, 'text/javascript'),
+      getEffectiveUrl(codeUrl.value, 'application/wasm')
+    ])
+
+    // 异步加载期间若用户已离开（canvas 已被销毁），则放弃
+    if (!canvasRef.value) return
+
     const config = {
-      dataUrl: dataUrl.value,
-      frameworkUrl: frameworkUrl.value,
-      codeUrl: codeUrl.value,
+      dataUrl: effectiveData,
+      frameworkUrl: effectiveFramework,
+      codeUrl: effectiveCode,
       streamingAssetsUrl: streamingAssetsUrl.value,
       companyName: companyName.value,
       productName: productName.value,
@@ -189,9 +254,12 @@ const initUnity = async () => {
 // 监听核心 URL 变化，重新加载 Unity
 watch(
   [loaderUrl, dataUrl, frameworkUrl, codeUrl],
-  async () => {
+  () => {
     if (loaderUrl.value && dataUrl.value && frameworkUrl.value && codeUrl.value) {
-      await nextTick()
+      // 有存量实例时先 destroy，initUnity 内部会 await destroyPromise
+      if (unityInstance || loaderScript || loadedLoaderUrl) {
+        destroyPromise = destroyUnity()
+      }
       initUnity()
     }
   },
@@ -199,18 +267,21 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  destroyUnity()
+  destroyPromise = destroyUnity()
 })
 
 // keep-alive 场景：路由切走时销毁 Unity 释放内存
 onDeactivated(() => {
-  destroyUnity()
+  destroyPromise = destroyUnity()
 })
 
-// keep-alive 场景：路由切回时重新创建 canvas 并初始化 Unity
+// keep-alive 场景：路由切回时重新初始化 Unity
 onActivated(async () => {
-  canvasAlive.value = true
-  await nextTick()
+  // 等待 onDeactivated 触发的 destroy 完成后再 init
+  if (destroyPromise) {
+    try { await destroyPromise } catch (_) {}
+    destroyPromise = null
+  }
   if (loaderUrl.value && dataUrl.value && frameworkUrl.value && codeUrl.value) {
     initUnity()
   }
