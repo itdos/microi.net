@@ -266,17 +266,18 @@ else
     echo -e "    ${DIM}3) 只发布前端（未检测到前端源码，不可用）${NC}"
     echo "    4) 只发布后端（推送Docker、推送NuGet、版本号+1）"
 fi
-echo ""
-read -p "  请输入选项 [1/2/3/4]: " DEPLOY_MODE
-case "$DEPLOY_MODE" in
-    1|2|3|4) ;;
-    *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4）" ;;
-esac
+    echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
+    echo ""
+    read -p "  请输入选项 [1/2/3/4/5]: " DEPLOY_MODE
+    case "$DEPLOY_MODE" in
+        1|2|3|4|5) ;;
+        *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5）" ;;
+    esac
 
-# 模式3需要前端源码
-if [ "$DEPLOY_MODE" = "3" ] && [ "$HAS_CLIENT" != true ]; then
-    print_fail "未找到 Microi.Client 目录，无法发布前端"
-fi
+    # 模式3需要前端源码
+    if [ "$DEPLOY_MODE" = "3" ] && [ "$HAS_CLIENT" != true ]; then
+        print_fail "未找到 Microi.Client 目录，无法发布前端"
+    fi
 
 # --- 根据模式设置执行标志 ---
 BUMP_VERSION=false      # 是否递增版本号
@@ -302,6 +303,9 @@ case "$DEPLOY_MODE" in
         BUMP_VERSION=true; BUILD_BACKEND=true; PUBLISH_BACKEND=true
         PUSH_NUGET=true; PUSH_DOCKER=true
         if [ "$HAS_CLIENT" = true ]; then BUILD_CLIENT=true; fi
+        ;;
+    5)  # 仅推送Docker镜像（跳过编译，使用已有产物）
+        PUSH_DOCKER=true
         ;;
 esac
 
@@ -349,8 +353,8 @@ if [ "$PUSH_DOCKER" = true ] && [ "$HAS_DOCKER" = true ] && [ ${#DOCKER_PLANS[@]
         fi
     fi
 
-    # 前端 Docker 方案（模式3和4）
-    if { [ "$DEPLOY_MODE" = "3" ] || [ "$DEPLOY_MODE" = "4" ]; } && [ "$BUILD_CLIENT" = true ] && [ ${#_client_plans[@]} -gt 0 ]; then
+    # 前端 Docker 方案（模式3、4、5）
+    if [ ${#_client_plans[@]} -gt 0 ] && { [ "$DEPLOY_MODE" = "3" ] || [ "$DEPLOY_MODE" = "4" ] || [ "$DEPLOY_MODE" = "5" ]; }; then
         echo ""
         echo -e "  ${BOLD}【前端Docker方案】${NC}"
         echo "    0) 跳过前端Docker推送"
@@ -377,10 +381,23 @@ if [ "$PUSH_NUGET" = true ] && [ "$HAS_NUGET" != true ]; then
     PUSH_NUGET=false
 fi
 
+# --- 官方网站文档发布选项 ---
+PUBLISH_DOC=false
+if [ -d "microi.doc" ]; then
+    echo ""
+    echo -e "  ${BOLD}【官方网站文档】${NC}"
+    echo "    是否同时发布官方网站文档（构建 VitePress 并推送 Docker 镜像）？"
+    read -p "  请输入 [y/N]: " _doc_choice
+    case "$_doc_choice" in
+        y|Y|yes|YES) PUBLISH_DOC=true ;;
+        *) PUBLISH_DOC=false ;;
+    esac
+fi
+
 # ──────────────────────────────────────────────────────────────
 # 打印执行摘要
 # ──────────────────────────────────────────────────────────────
-_mode_names=("" "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端")
+_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
 echo ""
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
 echo -e "  ${BOLD}✅ 选择完毕，即将开始全自动执行${NC}"
@@ -412,6 +429,9 @@ if [ "$PUSH_NUGET" = true ]; then
 fi
 if [ "$HAS_ENCRYPT" = true ] && [ "$PUBLISH_BACKEND" = true ]; then
     echo -e "  DLL加密:  ${GREEN}✔${NC} 自动加密"
+fi
+if [ "$PUBLISH_DOC" = true ]; then
+    echo -e "  文档发布: ${GREEN}✔${NC} 构建+推送Docker"
 fi
 echo ""
 sleep 1
@@ -709,6 +729,34 @@ if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]
     done
 fi
 
+# ─── 阶段（条件）: 发布官方网站文档 ──────────────────────
+if [ "$PUBLISH_DOC" = true ]; then
+    print_phase "发布官方网站文档"
+
+    print_step "构建 VitePress 文档..."
+    (cd microi.doc && pnpm docs:build)
+    print_success "VitePress 构建完成"
+
+    print_step "构建 Docker 镜像: microi.doc"
+    (cd microi.doc/docs/.vitepress && docker build -t microi.doc .)
+    print_success "Docker 镜像构建完成"
+
+    print_step "登录 registry.cn-beijing.aliyuncs.com..."
+    docker login --username=admin@itdos.com --password=iTdos#docker.publish registry.cn-beijing.aliyuncs.com
+
+    print_step "推送到北京仓库..."
+    docker tag microi.doc registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
+    docker push registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest
+    print_success "registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest"
+
+    print_step "推送到杭州仓库..."
+    docker tag microi.doc registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
+    docker push registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest
+    print_success "registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest"
+
+    print_success "官方网站文档发布成功"
+fi
+
 # ─── 本地产物路径提示 ─────────────────────────────────────
 if [ "$PUBLISH_BACKEND" != true ] && [ "$BUILD_BACKEND" = true ]; then
     echo ""
@@ -732,7 +780,7 @@ ELAPSED=$((END_TIME - START_TIME))
 MINUTES=$((ELAPSED / 60))
 SECONDS_REMAIN=$((ELAPSED % 60))
 
-_mode_names_final=("" "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端")
+_mode_names_final=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 printf "${BOLD}${GREEN}║${NC}  ${BOLD}${GREEN}🎉 全部完成！%-46s${NC}${BOLD}${GREEN}║${NC}\n" ""
@@ -765,5 +813,8 @@ fi
 for _p in "${SELECTED_CLIENT_PLANS[@]}"; do
     echo -e "  前端Docker: ${GREEN}✅${NC} $(echo "$_p" | cut -d'|' -f1)"
 done
+if [ "$PUBLISH_DOC" = true ]; then
+    echo -e "  文档发布: ${GREEN}✅${NC}"
+fi
 echo -e "  耗时:     ${BOLD}${MINUTES}分${SECONDS_REMAIN}秒${NC}"
 echo ""
