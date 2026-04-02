@@ -70,9 +70,9 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
-                <!-- <div class="keyword-search" v-if="!(!(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0)&&diyStore.IsPhoneView && ShowAddByRoute)"> 把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
+                <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，移动端也需要各种V8按钮功能！！！-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0&&diyStore.IsPhoneView)||!diyStore.IsPhoneView">
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 && diyStore.IsPhoneView) || !diyStore.IsPhoneView">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -207,7 +207,9 @@
                                 :SearchFieldIds="SearchFieldIds"
                                 :DiyFieldList="DiyFieldList"
                                 :SearchType="'In'"
-                                @CallbackGetDiyTableRow="GetDiyTableRow"
+                                @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,4);
+                    }"
                                 @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                             ></DiySearch>
                             <template #reference
@@ -266,11 +268,16 @@
                       <el-icon><Operation /></el-icon>
                     </div>
                   </div>
+                  <input
+                        type="date"
+                      />
                   <!-- 筛选下拉列表和清除搜索 -->
                   <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
                    <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
                     :SearchFieldIds="SearchFieldIds" :DiyFieldList="DiyFieldList" :SearchType="'Out'"
-                    @clearSearch="childClearSearch" @CallbackGetDiyTableRow="GetDiyTableRow" @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"></DiyModleSearch >
+                    @clearSearch="childClearSearch" @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,1);
+                    }" @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"></DiyModleSearch >
                       <!--清除搜索-->
                          <div class="reset-search" v-if="diyStore.IsPhoneView && ShowAddByRoute" @click="
                                   InitSearch();
@@ -290,7 +297,9 @@
                         :SearchFieldIds="SearchFieldIds"
                         :DiyFieldList="DiyFieldList"
                         :SearchType="'Out'"
-                        @CallbackGetDiyTableRow="GetDiyTableRow"
+                        @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,3);
+                    }"
                         @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                     ></DiySearch>
                 </div>
@@ -1168,7 +1177,7 @@
             class="mobile-search-drawer"
             :title="$t('Msg.Search')"
         >
-            <!-- 移动端关键词搜索 -->
+            <!-- 移动端更多搜索 -->
             <!-- zhy将点击选择单个值后弹框自动关闭改为点击遮罩层关闭或上方关闭按钮关闭，不然无法选中多个条件 @keyup.enter，@click，@CallbackGetDiyTableRow处的showMobileSearch = false移除-->
             <div class="mobile-keyword-search" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" style="margin-bottom: 12px;">
                 <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" clearable @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })">
@@ -1185,7 +1194,7 @@
                 :SearchType="'In'"
                 @CallbackGetDiyTableRow="
                     (params) => {
-                        GetDiyTableRow(params);
+                        GetDiyTableRow(params,2);
                     }
                 "
                 @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
@@ -1857,6 +1866,10 @@ export default {
     },
     data() {
         return {
+            hbParam1: [], //zhy合并移动端更多搜索和移动端下拉菜单diy-mobile-search组件的搜索参数
+            hbParam2: [], //zhy合并移动端更多搜索和移动端下拉菜单diy-mobile-search组件的搜索参数
+            hbParam3: [], //zhy合并PC端更多搜索和Pc端外部搜索diy-search组件的搜索参数
+            hbParam4: [], //zhy合并PC端更多搜索和Pc端外部搜索diy-search组件的搜索参数
             TableDisplayMode: "", //Table、Card
             ShowDiyModule: false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
@@ -3196,6 +3209,10 @@ export default {
             self.SearchDateTime = {};
             self.SearchNumber = {};
             self.SearchWhere = [];
+            self.hbParam1 = [];
+            self.hbParam2 = [];
+            self.hbParam3 = [];
+            self.hbParam4 = [];
             if (self.$refs.refDiySearch1) {
                 self.$refs.refDiySearch1.InitSearch();
             }
@@ -3904,125 +3921,6 @@ export default {
                     self.Where.push(tempWhere);
                 }
             }
-        },
-        /**
-         * 根据当前父组件的 SearchModel/SearchSelect/SearchCheckbox/SearchDateTime/SearchNumber 构建最终的 SearchWhere
-         * 以确保来自多个搜索区的条件能够合并并用于查询
-         */
-        BuildSearchWhere() {
-            var self = this;
-            var resultWhere = [];
-
-            // 处理 SearchModel（文本等）
-            if (self.SearchModel) {
-                for (const key in self.SearchModel) {
-                    const value = self.SearchModel[key];
-                    if (value === "" || value == null) continue;
-                    const fieldModel = self.findFieldModel(key);
-                    if (!fieldModel) continue;
-
-                    let searchType = "Like";
-                    const searchFieldModel = self.SearchFieldIds.find((d) => d.Id === fieldModel.Id);
-                    if (searchFieldModel && searchFieldModel.Equal) {
-                        searchType = "=";
-                    }
-                    if (fieldModel.Component === "Switch") {
-                        searchType = "=";
-                    }
-                    var tableName = self.GetTableName(fieldModel);
-                    resultWhere.push([tableName + fieldModel.Name, searchType, value]);
-                }
-            }
-
-            // 处理 SearchSelect
-            if (self.SearchSelect) {
-                for (const key in self.SearchSelect) {
-                    const arr = self.SearchSelect[key];
-                    if (!Array.isArray(arr) || arr.length === 0) continue;
-                    const fieldModel = self.findFieldModel(key);
-                    if (!fieldModel) continue;
-                    var tableName = self.GetTableName(fieldModel);
-
-                    const searchValue = arr.map((item) => {
-                        if (typeof item === "string") {
-                            return item;
-                        } else {
-                            return item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel];
-                        }
-                    });
-                    const filteredValues = searchValue.filter((val) => val != null && val !== "");
-                    if (filteredValues.length === 0) continue;
-
-                    let searchType = "In";
-                    if (fieldModel.Config && fieldModel.Config.SelectSaveFormat === "Json" || fieldModel.Component === "MultipleSelect") {
-                        searchType = "Like";
-                        filteredValues.forEach((item, index) => {
-                            const tempWhere = [];
-                            if (filteredValues.length > 1 && index <= filteredValues.length - 1 && index !== 0) {
-                                tempWhere.push("OR");
-                            }
-                            if (filteredValues.length > 1 && index === 0) {
-                                tempWhere.push("(");
-                            }
-                            tempWhere.push(tableName + fieldModel.Name);
-                            tempWhere.push(searchType);
-                            tempWhere.push(item);
-                            if (index === filteredValues.length - 1 && filteredValues.length > 1) {
-                                tempWhere.push(")");
-                            }
-                            resultWhere.push(tempWhere);
-                        });
-                    } else {
-                        resultWhere.push([tableName + fieldModel.Name, searchType, JSON.stringify(filteredValues)]);
-                    }
-                }
-            }
-
-            // 处理 SearchDateTime
-            if (self.SearchDateTime) {
-                for (const key in self.SearchDateTime) {
-                    const dateRange = self.SearchDateTime[key];
-                    if (Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
-                        const fieldModel = self.findFieldModel(key);
-                        if (!fieldModel) continue;
-                        var tableName = self.GetTableName(fieldModel);
-                        resultWhere.push([tableName + key, ">=", dateRange[0]]);
-                        resultWhere.push([tableName + key, "<=", dateRange[1]]);
-                    }
-                }
-            }
-
-            // 处理 SearchCheckbox
-            if (self.SearchCheckbox) {
-                for (const key in self.SearchCheckbox) {
-                    if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
-                        const fieldModel = self.findFieldModel(key);
-                        if (!fieldModel) continue;
-                        var tableName = self.GetTableName(fieldModel);
-                        resultWhere.push([tableName + key, "In", JSON.stringify(self.SearchCheckbox[key])]);
-                    }
-                }
-            }
-
-            // 处理 SearchNumber
-            if (self.SearchNumber) {
-                for (const key in self.SearchNumber) {
-                    const numberModel = self.SearchNumber[key];
-                    const fieldModel = self.findFieldModel(key);
-                    if (!fieldModel) continue;
-                    var tableName = self.GetTableName(fieldModel);
-                    if ((numberModel.Min || numberModel.Min === 0) && (numberModel.Max || numberModel.Max === 0)) {
-                        resultWhere.push(["(", tableName + key, ">=", numberModel.Min]);
-                        resultWhere.push([tableName + key, "<=", numberModel.Max, ")"]);
-                    } else if (numberModel.Min || numberModel.Min === 0) {
-                        resultWhere.push([tableName + key, ">=", numberModel.Min]);
-                    } else if (numberModel.Max || numberModel.Max === 0) {
-                        resultWhere.push([tableName + key, "<=", numberModel.Max]);
-                    }
-                }
-            }
-
-            self.SearchWhere = resultWhere;
         },
         /**
          * 注意传入的tableRowId并不一定是TableRowId，也可能是PrimaryTableFieldName的值
@@ -5118,9 +5016,37 @@ export default {
         //     }
         // },
 
-        GetDiyTableRow(recParam) {
+        GetDiyTableRow(recParam,type) {
             let self = this;
-
+            //zhy此处通过判断是pc或移动端的搜索条件，来决定如何合并搜索条件。type1,2为移动端下拉菜单搜索和更多搜索，3，4为PC端外部搜索和更多搜索
+            // console.log(recParam,type,666666)
+            if(recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2 || type == 3 || type == 4)){
+              if(type == 1 && self.hbParam1.length == 0){
+                self.hbParam1 = recParam._Where;
+              }else if(type == 1 && self.hbParam1.length > 0){
+                self.hbParam1 = [];
+                self.hbParam1 = recParam._Where;
+              }else if(type == 2 && self.hbParam2.length == 0){
+                self.hbParam2 = recParam._Where;
+              }else if(type == 2 && self.hbParam2.length > 0){
+                self.hbParam2 = [];
+                self.hbParam2 = recParam._Where;
+              }else if(type == 3 && self.hbParam3.length == 0){
+                self.hbParam3 = recParam._Where;
+              }else if(type == 3 && self.hbParam3.length > 0){
+                self.hbParam3 = [];
+                self.hbParam3 = recParam._Where;
+              }else if(type == 4 && self.hbParam4.length == 0){
+                self.hbParam4 = recParam._Where;
+              }else if(type == 4 && self.hbParam4.length > 0){
+                self.hbParam4 = [];
+                self.hbParam4 = recParam._Where;
+              }
+            }
+            let hbYdParams = [];
+            let hbPcParams = [];
+            hbYdParams=[...self.hbParam1,...self.hbParam2];
+            hbPcParams=[...self.hbParam3,...self.hbParam4];
             // ========== 关键：立即递增版本号取消所有旧操作 ==========
             self._paginationVersion++;
             const currentVersion = self._paginationVersion;
@@ -5161,23 +5087,11 @@ export default {
                 if (recParam.SearchModel) {
                     self.SearchModel = recParam.SearchModel;
                 }
-                if (recParam.SearchSelect) {
-                    self.SearchSelect = recParam.SearchSelect;
-                }
                 if (recParam.SearchNumber) {
                     self.SearchNumber = recParam.SearchNumber;
                 }
                 if (recParam.SearchDateTime) {
                     self.SearchDateTime = recParam.SearchDateTime;
-                }
-
-                // 重新根据父组件当前合并的搜索状态构建最终的 SearchWhere，保证多个搜索区域的条件被合并使用
-                try {
-                    if (typeof self.BuildSearchWhere === 'function') {
-                        self.BuildSearchWhere();
-                    }
-                } catch (e) {
-                    console.warn('BuildSearchWhere 失败:', e);
                 }
             }
 
@@ -5215,7 +5129,12 @@ export default {
                 param._PageSize = self.DiyTableRowPageSize;
             }
 
-            if (recParam && recParam._Where && recParam._Where.length > 0) {
+            //zhy此处添加移动和PC合并搜索的参数传接
+            if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2)){
+                param._Where = hbYdParams;
+            } else if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 3 || type == 4)){
+                param._Where = hbPcParams;
+            } else if (recParam && recParam._Where && recParam._Where.length > 0) {
                 param._Where = recParam._Where;
                 self.SearchWhere = param._Where;
             } else if (recParam && recParam._Where && recParam._Where.length == 0) {
@@ -5977,4 +5896,22 @@ export default {
   .reset-search:active {
     opacity: 0.5;
   }
+  // @media screen and (max-width: 768px) {
+  //   :deep(.el-picker__popper.el-date-range-picker) {
+  //     width: 90vw !important;
+  //     left: 5vw !important;
+  //   }
+
+  //   :deep(.el-picker-panel) {
+  //     width: 100% !important;
+  //   }
+
+  //   :deep(.el-date-range-picker__content) {
+  //     display: block !important;
+  //   }
+
+  //   :deep(.el-date-range-picker__time-header) {
+  //     display: none !important;
+  //   }
+  // }
 </style>
