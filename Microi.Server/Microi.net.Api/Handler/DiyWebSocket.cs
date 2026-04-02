@@ -552,6 +552,17 @@ namespace Microi.net
                 // 获取用户连接信息
                 var clientInfoTo = await GetOnlineUserInfo(originalMsg.OsClient, originalMsg.FromUserId);
                 
+                // 立即发送"思考中"信号，让前端马上显示AI正在响应
+                if (clientInfoTo != null)
+                {
+                    await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                        "[THINKING]", 
+                        aiUser.Id, 
+                        originalMsg.FromUserId, 
+                        false
+                    );
+                }
+                
                 // 创建流式输出回调函数
                 var fullResponse = new System.Text.StringBuilder();
                 var isFirstChunk = true;

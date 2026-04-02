@@ -4,11 +4,57 @@
  */
 
 /**
- * 格式化消息内容（处理换行）
+ * 格式化消息内容（支持基础Markdown渲染和AI思考过程）
  */
 export function formatMessageContent(content) {
     if (!content) return '';
-    return content.replace(/\n/g, '<br>');
+    
+    // 处理AI思考过程标签 <think>...</think>
+    // 将思考内容包裹在可折叠区域中
+    content = content.replace(/<think>([\s\S]*?)<\/think>/g, function(match, thinkContent) {
+        if (!thinkContent.trim()) return '';
+        var escapedContent = thinkContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+        return '<details class="ai-thinking-block"><summary>💭 AI思考过程</summary><div class="ai-thinking-content">' + escapedContent + '</div></details>';
+    });
+    
+    // 处理未闭合的 <think> 标签（流式输出中途）
+    content = content.replace(/<think>([\s\S]*)$/g, function(match, thinkContent) {
+        if (!thinkContent.trim()) return '';
+        var escapedContent = thinkContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+        return '<details class="ai-thinking-block" open><summary>💭 AI思考中...</summary><div class="ai-thinking-content">' + escapedContent + '</div></details>';
+    });
+    
+    // 处理代码块 ```lang\ncode\n```
+    content = content.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
+        var escapedCode = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        var langLabel = lang ? '<span class="code-lang">' + lang + '</span>' : '';
+        return '<div class="code-block">' + langLabel + '<pre><code>' + escapedCode + '</code></pre></div>';
+    });
+    
+    // 处理行内代码 `code`
+    content = content.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // 处理加粗 **text**
+    content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    
+    // 处理斜体 *text*（排除已处理的加粗）
+    content = content.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    
+    // 处理换行
+    content = content.replace(/\n/g, '<br>');
+    
+    return content;
 }
 
 /**

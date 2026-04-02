@@ -117,6 +117,11 @@ namespace Microi.net
         /// 租户标识
         /// </summary>
         public string? OsClient { get; set; }
+
+        /// <summary>
+        /// 用户编辑器中的当前代码（为空表示编辑器无代码，AI应生成新代码；有值表示用户在询问已有代码相关问题）
+        /// </summary>
+        public string? CurrentCode { get; set; }
     }
 
     /// <summary>

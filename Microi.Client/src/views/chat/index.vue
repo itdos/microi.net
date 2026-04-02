@@ -225,8 +225,11 @@
                                             </div>
                                             <!-- 普通消息 -->
                                             <div v-else class="msg" :class="{ 'streaming-message': chat.isStreaming }">
-                                                <span v-html="formatMessageContent(chat.Content)"></span>
-                                                <span v-if="chat.isStreaming" class="typing-cursor">▌</span>
+                                                <span v-if="chat.isThinking" class="thinking-indicator">
+                                                    <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> 正在思考
+                                                </span>
+                                                <span v-else v-html="formatMessageContent(chat.Content)"></span>
+                                                <span v-if="chat.isStreaming && !chat.isThinking" class="typing-cursor">▌</span>
                                             </div>
                                         </div>
                                         <router-link v-if="chat.FromUserId == GetCurrentUser.Id" class="avatar" to="">
@@ -1235,6 +1238,30 @@ export default {
                             return;
                         }
                         
+                        // 处理"思考中"信号 — 立即创建消息气泡显示思考状态
+                        if (chunk === '[THINKING]') {
+                            if (!self.currentStreamMessage) {
+                                console.log('[AI流式] 收到思考信号，创建思考中消息');
+                                self.currentStreamMessage = {
+                                    FromUserId: fromUserId,
+                                    FromUserName: 'AI助手',
+                                    FromUserAvatar: './static/img/icon/personal.png',
+                                    ToUserId: toUserId,
+                                    ToUserName: self.GetCurrentUser.Name,
+                                    ToUserAvatar: self.GetCurrentUser.Avatar,
+                                    Content: '',
+                                    CreateTime: new Date().toISOString(),
+                                    Type: 'text',
+                                    IsRead: false,
+                                    isStreaming: true,
+                                    isThinking: true  // 思考中状态
+                                };
+                                self.ChatRecord.push(self.currentStreamMessage);
+                                self.$nextTick(() => { self.wchat_ToBottom(); });
+                            }
+                            return;
+                        }
+                        
                         if (!self.currentStreamMessage) {
                             // 第一个数据块 - 创建新消息
                             console.log('[AI流式] 创建新消息');
@@ -1249,13 +1276,16 @@ export default {
                                 CreateTime: new Date().toISOString(),
                                 Type: 'text',
                                 IsRead: false,
-                                isStreaming: true  // 标记为流式消息
+                                isStreaming: true
                             };
                             
                             // 添加到聊天记录
                             self.ChatRecord.push(self.currentStreamMessage);
                         } else {
-                            // 后续数据块 - 追加内容
+                            // 后续数据块 - 追加内容，取消思考中状态
+                            if (self.currentStreamMessage.isThinking) {
+                                self.currentStreamMessage.isThinking = false;
+                            }
                             self.currentStreamMessage.Content += chunk;
                         }
                         
@@ -1926,6 +1956,34 @@ export default {
     vertical-align: text-bottom;
 }
 
+.thinking-indicator {
+    display: inline-flex;
+    align-items: center;
+    color: #999;
+    font-size: 13px;
+}
+
+.thinking-dots {
+    display: inline-flex;
+    margin-right: 4px;
+}
+
+.thinking-dots span {
+    animation: thinkingBounce 1.4s infinite ease-in-out both;
+    font-size: 20px;
+    line-height: 1;
+    color: #4CAF50;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinkingBounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-4px); }
+}
+
 @keyframes blink {
     0%, 50% { 
         opacity: 1; 
@@ -1933,5 +1991,77 @@ export default {
     51%, 100% { 
         opacity: 0; 
     }
+}
+
+/* AI思考过程样式 */
+.msg .ai-thinking-block {
+    margin: 6px 0;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fafafa;
+}
+
+.msg .ai-thinking-block summary {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #888;
+    user-select: none;
+    background: #f5f5f5;
+}
+
+.msg .ai-thinking-block summary:hover {
+    color: #666;
+    background: #eee;
+}
+
+.msg .ai-thinking-content {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* 代码块样式 */
+.msg .code-block {
+    margin: 6px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #1e1e1e;
+    position: relative;
+}
+
+.msg .code-block .code-lang {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 11px;
+    color: #858585;
+}
+
+.msg .code-block pre {
+    margin: 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+}
+
+.msg .code-block code {
+    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    color: #d4d4d4;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.msg .inline-code {
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #c7254e;
 }
 </style>

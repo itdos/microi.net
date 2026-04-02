@@ -23,6 +23,7 @@ url=https://static.itdos.com/install/install-microi.sh;if [ -f /usr/bin/curl ];t
 | 4 | 端口从 **7000 开始顺序 +1 分配**（7000-7009），安装前会自动检测端口占用，若有冲突则从 7100 开始重试 |
 | 5 | 安装前脚本会**先在防火墙中开放**所有端口，再部署服务（若使用云服务器，还需在云控制台安全组中开放） |
 | 6 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
+| 7 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 
 ### 📋 端口分配表（默认从 7000 开始）
 
@@ -50,6 +51,49 @@ url=https://static.itdos.com/install/install-microi.sh;if [ -f /usr/bin/curl ];t
 ```bash
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+:::
+
+### 🔌 离线安装（无互联网环境）
+
+适用于**无法访问互联网**的 Linux 服务器，需要在一台有网络的机器上提前制作离线安装包。
+
+#### 前置要求
+- 目标服务器已安装 **Docker** 和 **Docker Compose V2** 插件（离线 Docker 安装请参考 [Docker 官方文档](https://docs.docker.com/engine/install/binaries/)）
+- 目标服务器已安装 `unzip`、`openssl` 命令
+- 制作离线包的机器需要有互联网且已安装 Docker
+
+#### 第一步：在有网络的机器上制作离线包
+
+```bash
+# 下载制作脚本和离线安装脚本
+curl -sSO https://static.itdos.com/install/microi-offline-prepare.sh
+curl -sSO https://static.itdos.com/install/install-microi-offline.sh
+curl -sSO https://static.itdos.com/install/install-microi.sh
+
+# 执行制作脚本（会拉取 Docker 镜像并打包，约需 10-30 分钟）
+bash microi-offline-prepare.sh
+```
+
+执行完成后会在当前目录生成 `microi-offline.zip`（约 5-10GB，包含所有 Docker 镜像和数据库文件）。
+
+#### 第二步：上传到目标服务器并安装
+
+```bash
+# 1. 将 microi-offline.zip 上传到目标服务器（使用 scp、sftp 等工具）
+scp microi-offline.zip root@目标服务器IP:/root/
+
+# 2. 在目标服务器上解压
+unzip microi-offline.zip -d microi-offline
+
+# 3. 进入目录并执行离线安装
+cd microi-offline
+bash install-microi-offline.sh
+```
+
+::: tip 说明
+- 离线安装脚本与在线脚本功能**完全一致**（端口分配、MySQL 配置、防火墙开放等）
+- 唯一区别是镜像从本地 tar 文件加载，数据库文件从本地解压，不需要联网
+- 安装完成后 Watchtower 自动更新服务需要联网才能生效
 :::
 
 ---

@@ -65,8 +65,9 @@
         </Transition>
       </template>
 
-      <!-- 进入后台按钮（无论登录与否都显示） -->
+      <!-- 进入后台按钮（仅登录后显示） -->
       <a 
+        v-if="user"
         :href="backendUrl" 
         target="_blank" 
         rel="noopener noreferrer" 
@@ -128,11 +129,11 @@ const confirmPwd = ref('')
 const isSettingPwd = ref(false)
 
 const backendUrl = computed(() => {
-  const tenant = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant') : null
-  if (tenant) {
-    return `https://os.microi.net/#/?OsClient=${tenant}`
+  const storedPhone = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_phone') : null
+  if (storedPhone) {
+    return `https://microi.net/${storedPhone}`
   }
-  return 'https://os.microi.net'
+  return 'https://microi.net'
 })
 
 function loadUser() {
@@ -150,6 +151,7 @@ function handleLogout() {
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_tenant')
+  localStorage.removeItem('microi_doc_phone')
   user.value = null
   showMenu.value = false
 }
@@ -210,13 +212,54 @@ function closeMenu(e) {
   }
 }
 
+// Token以旧换新：如果有旧token，尝试刷新获取新token
+async function refreshToken() {
+  const token = localStorage.getItem('microi_doc_token')
+  if (!token) return
+  try {
+    const resp = await fetch(API_BASE + '/api/SysUser/refreshToken', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ authorization: 'Bearer ' + token })
+    })
+    const result = await resp.json()
+    if (result.Code === 1) {
+      // 更新token
+      const newToken = resp.headers.get('authorization') || ''
+      if (newToken) {
+        localStorage.setItem('microi_doc_token', newToken)
+      }
+      // 更新用户信息
+      if (result.Data) {
+        localStorage.setItem('microi_doc_user', JSON.stringify(result.Data))
+        user.value = result.Data
+      }
+    }
+  } catch {
+    // 刷新失败不做处理，保留旧token
+  }
+}
+
+let refreshTokenTimer = null
+
 onMounted(() => {
   loadUser()
+  // 以旧换新：页面加载时尝试刷新token
+  refreshToken()
+  // 定时刷新token（每60秒）
+  refreshTokenTimer = setInterval(refreshToken, 60 * 1000)
   window.addEventListener('microi-login-success', onLoginSuccess)
   document.addEventListener('click', closeMenu)
 })
 
 onUnmounted(() => {
+  if (refreshTokenTimer) {
+    clearInterval(refreshTokenTimer)
+    refreshTokenTimer = null
+  }
   window.removeEventListener('microi-login-success', onLoginSuccess)
   document.removeEventListener('click', closeMenu)
 })
