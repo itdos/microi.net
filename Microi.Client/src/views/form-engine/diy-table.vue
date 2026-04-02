@@ -268,9 +268,9 @@
                       <el-icon><Operation /></el-icon>
                     </div>
                   </div>
-                  <input
+                  <!-- <input
                         type="date"
-                      />
+                      /> -->
                   <!-- 筛选下拉列表和清除搜索 -->
                   <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
                    <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
