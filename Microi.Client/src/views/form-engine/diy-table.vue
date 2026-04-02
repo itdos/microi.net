@@ -340,7 +340,8 @@
                                         <el-icon v-if="getColSortState(field) === 'asc'" :size="12"><SortUp /></el-icon>
                                         <el-icon v-else :size="12"><SortDown /></el-icon>
                                     </span>
-                                    <el-icon class="col-header-menu-icon" :size="14"><Search /></el-icon>
+                                    <el-icon class="col-header-menu-icon col-header-menu-icon--dots" :size="14"><MoreFilled /></el-icon>
+                                    <el-icon class="col-header-menu-icon col-header-menu-icon--search" :size="14"><Search /></el-icon>
                                 </div>
                             </template>
                             <template #default="scope">
@@ -967,6 +968,11 @@
                 <div v-if="_runtimeHiddenFields.length > 0" class="global-col-menu-item" @click="colMenuRestoreColumns()">
                     <el-icon><View /></el-icon>
                     <span>恢复隐藏列 ({{ _runtimeHiddenFields.length }})</span>
+                </div>
+                <!-- 保存列宽（仅管理员可见） -->
+                <div v-if="GetCurrentUser._IsAdmin" class="global-col-menu-item" @click="colMenuSaveWidth()">
+                    <el-icon><Rank /></el-icon>
+                    <span>保存列宽</span>
                 </div>
                 <div class="global-col-menu-divider"></div>
                 <!-- 筛选 -->
@@ -2460,6 +2466,35 @@ export default {
             self._runtimeHiddenFields = [];
             // 重新生成显示列
             self.GetShowDiyFieldList();
+            self.hideColHeaderMenu();
+        },
+        colMenuSaveWidth() {
+            var self = this;
+            if (!self._colMenuField) return;
+            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            // 从 el-table 获取列的实际渲染宽度
+            var tableRef = self.$refs['diy-table-' + self.TableId];
+            var newWidth = 0;
+            if (tableRef) {
+                var columns = tableRef.columns || [];
+                var col = columns.find(function(c) { return c.property === fieldName; });
+                if (col) {
+                    newWidth = Math.round(col.realWidth || col.width || 0);
+                }
+            }
+            if (!newWidth) {
+                newWidth = self._colMenuField.TableWidth || 150;
+            }
+            self.DiyCommon.Post(self.DiyApi.FormEngine.UptFormData, {
+                FormEngineKey: 'Diy_Field',
+                Id: self._colMenuField.Id,
+                TableWidth: newWidth
+            }, function(result) {
+                if (self.DiyCommon.Result(result)) {
+                    self._colMenuField.TableWidth = newWidth;
+                    self.DiyCommon.Tips('列宽 ' + newWidth + 'px 保存成功');
+                }
+            });
             self.hideColHeaderMenu();
         },
         getColFilterOperators() {

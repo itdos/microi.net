@@ -120,8 +120,9 @@ namespace Microi.net.Api
                     var resultJson = JsonConvert.SerializeObject(result.Data);
                     await WriteSseEventAsync("result", resultJson);
                 }
-                else if (result.Code != 1)
+                else if (result.Code != 1 || (result.Data == null && !string.IsNullOrEmpty(result.Msg)))
                 {
+                    // Code!=1 明确失败，或 Code=1 但无数据且有提示信息（如License限制）
                     await WriteSseEventAsync("error", result.Msg ?? "生成失败");
                 }
 
@@ -625,7 +626,9 @@ namespace Microi.net.Api
         /// </summary>
         private async Task WriteSseEventAsync(string eventType, string data)
         {
-            var sseMessage = $"event: {eventType}\ndata: {data?.Replace("\n", "\ndata: ")}\n\n";
+            // SSE规范：data中的换行需拆分为多个data行，先统一换行符再替换
+            var safeData = data?.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\ndata: ");
+            var sseMessage = $"event: {eventType}\ndata: {safeData}\n\n";
             var bytes = Encoding.UTF8.GetBytes(sseMessage);
             await Response.Body.WriteAsync(bytes, 0, bytes.Length);
             await Response.Body.FlushAsync();

@@ -25,6 +25,10 @@
 
 set -e
 
+# === 修复中文显示：确保终端使用 UTF-8 编码 ===
+export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
+export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
+
 echo ''
 echo '=================================================================='
 echo 'Microi：Docker Compose 一键安装脚本 v2026-03-22'
