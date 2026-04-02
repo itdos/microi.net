@@ -20,6 +20,12 @@
             <div class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
                 <div class="monaco-toolbar">
                     <div class="toolbar-left">
+                        <button class="toolbar-btn" @click.prevent="undoCode" title="撤销 (Ctrl+Z)">
+                            <el-icon><RefreshLeft /></el-icon> 撤销
+                        </button>
+                        <button class="toolbar-btn" @click.prevent="redoCode" title="重做 (Ctrl+Shift+Z)">
+                            <el-icon><RefreshRight /></el-icon> 重做
+                        </button>
                         <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
                             <el-icon><MagicStick /></el-icon> 格式化
                         </button>
@@ -92,6 +98,12 @@
     <div v-else class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
         <div class="monaco-toolbar">
             <div class="toolbar-left">
+                <button class="toolbar-btn" @click.prevent="undoCode" title="撤销 (Ctrl+Z)">
+                    <el-icon><RefreshLeft /></el-icon> 撤销
+                </button>
+                <button class="toolbar-btn" @click.prevent="redoCode" title="重做 (Ctrl+Shift+Z)">
+                    <el-icon><RefreshRight /></el-icon> 重做
+                </button>
                 <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
                     <el-icon><MagicStick /></el-icon> 格式化
                 </button>
@@ -175,6 +187,7 @@
                 <h4>编辑操作</h4>
                 <ul class="shortcuts-list">
                     <li><kbd>Cmd/Ctrl</kbd> + <kbd>Z</kbd> <span>撤销</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> <span>重做</span></li>
                     <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>F</kbd> <span>格式化文档</span></li>
                     <li><kbd>Cmd/Ctrl</kbd> + <kbd>F</kbd> <span>查找</span></li>
                     <li><kbd>Cmd/Ctrl</kbd> + <kbd>H</kbd> <span>替换</span></li>
@@ -302,7 +315,9 @@ import {
     FullScreen,
     Rank,
     ChatDotSquare,
-    Edit
+    Edit,
+    RefreshLeft,
+    RefreshRight
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
@@ -590,6 +605,18 @@ onMounted(() => {
         Init();
     }
 });
+
+const undoCode = () => {
+    if (monacoEditor) {
+        monacoEditor.trigger('toolbar', 'undo', null);
+    }
+};
+
+const redoCode = () => {
+    if (monacoEditor) {
+        monacoEditor.trigger('toolbar', 'redo', null);
+    }
+};
 
 const formatCode = () => {
     if (monacoEditor) {
@@ -1236,7 +1263,14 @@ const sendAiQuestion = async () => {
                 AiModelId: selectedAiModel.value?.Id || '',
                 AiModel: selectedAiModel.value?.AiModel || '',
                 OsClient: osClient,
-                CurrentCode: currentEditorCode
+                CurrentCode: currentEditorCode,
+                ChatHistory: chatMessages.value
+                    .filter(m => m.status === 'done' && m.content)
+                    .slice(-10)
+                    .map(m => ({
+                        Role: m.role === 'ai' ? 'assistant' : m.role,
+                        Content: m.code ? (m.content + '\n```javascript\n' + m.code + '\n```') : m.content
+                    }))
             }),
             signal: aiAbortController.signal
         });

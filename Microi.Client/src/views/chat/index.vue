@@ -262,7 +262,25 @@
                                                 <Folder />
                                                 <input type="file" accept="*" id="J__chooseFile" class="hand" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
                                             </el-icon>
-                                            <!-- <i class="iconfont icon-zhendong btn btn-shake hand" title="向好友发送抖动窗口"></i> -->
+                                            <!-- AI聊天时显示模型选择器 -->
+                                            <span v-if="GetCurrentLastContact.ContactUserId === 'AI'" style="margin-left: 10px; display: inline-flex; align-items: center; vertical-align: middle;">
+                                                <span style="font-size: 12px; color: #999; margin-right: 4px;">AI模型：</span>
+                                                <el-select
+                                                    v-model="selectedAiModel"
+                                                    value-key="Id"
+                                                    size="small"
+                                                    placeholder="选择AI模型"
+                                                    :loading="aiModelLoading"
+                                                    style="width: 200px;"
+                                                >
+                                                    <el-option
+                                                        v-for="model in aiModelList"
+                                                        :key="model.Id"
+                                                        :label="`${model.Name}（${model.AiModel}）`"
+                                                        :value="model"
+                                                    />
+                                                </el-select>
+                                            </span>
                                         </div>
                                         <el-popover title="Tips" placement="top" width="200" trigger="hover" content="截屏、截图可直接粘贴至文本框进行发送！">
                                             <template #reference><el-icon class="btn btn-help" style="font-size: 20px;"><QuestionFilled /></el-icon></template>
@@ -444,7 +462,11 @@ export default {
             resizeStartX: 0,
             resizeStartY: 0,
             resizeStartWidth: 800,
-            resizeStartHeight: 500
+            resizeStartHeight: 500,
+            // AI模型选择
+            aiModelList: [],
+            selectedAiModel: null,
+            aiModelLoading: false
         };
     },
     watch: {
@@ -985,6 +1007,26 @@ export default {
         }
     },
     methods: {
+        // 加载AI模型列表
+        loadAiModelList() {
+            var self = this;
+            if (self.aiModelList.length > 0) return; // 已加载过
+            self.aiModelLoading = true;
+            self.DiyCommon.FormEngine.GetTableData('mic_ai', {
+                _Where: [['IsEnable', '=', '1']],
+                _OrderBy: 'CreateTime',
+                _OrderByType: 'DESC',
+                _PageSize: 100
+            }, function(result) {
+                self.aiModelLoading = false;
+                if (result && result.Code === 1 && result.Data && result.Data.length > 0) {
+                    self.aiModelList = result.Data;
+                    if (!self.selectedAiModel) {
+                        self.selectedAiModel = result.Data[0];
+                    }
+                }
+            });
+        },
         GetSysUserPublicInfo(isLoadMore = false) {
             var self = this;
             if (self.contactsLoading) return;
@@ -1072,6 +1114,11 @@ export default {
             
             // 重置流式消息状态（切换联系人时）
             self.currentStreamMessage = null;
+            
+            // 如果选择的是AI助手，加载AI模型列表
+            if (contact.ContactUserId === 'AI' || contact.Id === 'AI') {
+                self.loadAiModelList();
+            }
             
             //切换当前聊天人
             self.diyStore.setDiyChatCurrentLastContact(contact);
@@ -1503,7 +1550,8 @@ export default {
                         ToUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentLastContact.ContactUserAvatar),
                         FromUserId: self.GetCurrentUser.Id,
                         FromUserName: self.GetCurrentUser.Name,
-                        FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)
+                        FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
+                        OtherInfo: self.GetCurrentLastContact.ContactUserId === 'AI' && self.selectedAiModel ? JSON.stringify({ AiModel: self.selectedAiModel.AiModel }) : ''
                     }) //, self.GetCurrentUser.Id
                     .then((res) => {
                         console.log('[发送消息] ✅ 发送成功', { 
