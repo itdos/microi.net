@@ -32,6 +32,7 @@
                         v-model="SearchDateTime[field.AsName || field.Name]"
                         :type="GetDatePickerType(field)"
                         :value-format="GetDateTimeFormat(field)"
+                        :editable="false"
                         range-separator="至"
                         start-placeholder="开始日期"
                         end-placeholder="结束日期"
