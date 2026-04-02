@@ -21,6 +21,11 @@
       :scroll-into-view="scrollToId"
       :scroll-with-animation="true"
     >
+      <!-- 连接状态提示 -->
+      <view class="connection-hint" v-if="!wsConnected">
+        <text class="hint-text">⏳ {{ t('message.reconnecting') }}</text>
+      </view>
+
       <!-- 加载更多 -->
       <view class="load-more-hint" v-if="loadingMore">
         <text>{{ t('common.loading') }}</text>
@@ -48,12 +53,19 @@
           <view class="bubble-area">
             <text class="sender-label" v-if="!msg.isSelf && chatType === 'group'">{{ msg.senderName }}</text>
             <view class="bubble" :class="msg.isSelf ? 'bubble-self' : 'bubble-other'">
-              <text class="bubble-text">{{ msg.Content }}</text>
-              <text class="streaming-cursor" v-if="msg.isStreaming">▌</text>
+              <!-- 数据表格消息 -->
+              <view v-if="msg.Type === 'data'" class="bubble-data">
+                <text class="bubble-text">📊 {{ t('message.dataResult') || '查询结果' }}</text>
+              </view>
+              <!-- 普通文本消息 -->
+              <view v-else>
+                <rich-text :nodes="formatContent(msg.Content)" class="bubble-richtext"></rich-text>
+                <text class="streaming-cursor" v-if="msg.isStreaming">▌</text>
+              </view>
             </view>
             <view class="bubble-meta">
               <text class="bubble-time">{{ formatBubbleTime(msg.SendTime) }}</text>
-              <!-- Bug#5: 发送失败指示器 -->
+              <!-- 发送失败指示器 -->
               <text class="send-failed" v-if="msg.sendStatus === 'failed'" @tap="resendMessage(msg)">⚠ {{ t('message.sendFailed') }}</text>
             </view>
           </view>
@@ -65,7 +77,7 @@
         </view>
       </view>
 
-      <view :id="scrollToId || 'msg-bottom'"></view>
+      <view id="msg-bottom"></view>
     </scroll-view>
 
     <!-- 底部输入区域 -->
@@ -174,11 +186,14 @@ export default {
       loadingMore: false,
       scrollToId: '',
       currentStreamMessage: null,
+      wsConnected: false,
       _pollTimer: null,
       // SignalR 事件回调引用
       _onReceiveChatRecord: null,
       _onReceiveMessage: null,
-      _onReceiveAIChunk: null
+      _onReceiveAIChunk: null,
+      // 重连检查定时器
+      _wsCheckTimer: null
     }
   },
 
@@ -218,12 +233,28 @@ export default {
     // 监听 SignalR 重连事件，自动重新订阅
     this._onReconnected = () => {
       console.log('[Chat] SignalR 重连成功，重新加载聊天记录')
+      this.wsConnected = true
       this.loadChatRecord()
     }
     try {
       const client = getSignalR()
       if (client) client.on('_connected', this._onReconnected)
     } catch (e) {}
+
+    // 定期检查连接状态
+    this._wsCheckTimer = setInterval(() => {
+      try {
+        const client = getSignalR()
+        const connected = client && client.isConnected
+        if (connected !== this.wsConnected) {
+          this.wsConnected = connected
+          if (connected) {
+            console.log('[Chat] 连接恢复')
+            this.loadChatRecord()
+          }
+        }
+      } catch (e) {}
+    }, 5000)
   },
 
   onUnload() {
@@ -236,6 +267,11 @@ export default {
         if (client) client.off('_connected', this._onReconnected)
       } catch (e) {}
       this._onReconnected = null
+    }
+    // 清理连接检查定时器
+    if (this._wsCheckTimer) {
+      clearInterval(this._wsCheckTimer)
+      this._wsCheckTimer = null
     }
   },
 
@@ -261,6 +297,7 @@ export default {
           ])
         } catch (e) {
           console.warn('[Chat] 连接超时或失败:', e.message)
+          this.wsConnected = false
           if (this._loadRetryCount < 3) {
             this._loadRetryCount++
             setTimeout(() => this.loadChatRecord(), 3000)
@@ -270,6 +307,7 @@ export default {
 
         // Bug#12: 检查连接是否成功
         if (!client || !client.isConnected) {
+          this.wsConnected = false
           uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
           if (this._loadRetryCount < 3) {
             this._loadRetryCount++
@@ -280,6 +318,7 @@ export default {
 
         // 连接成功，重置重试计数
         this._loadRetryCount = 0
+        this.wsConnected = true
 
         // 清理旧事件
         this.cleanupSignalREvents()
@@ -347,9 +386,9 @@ export default {
 
         // 注册 AI 流式响应
         this._onReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
-          const userId = this.currentUser.Id // Bug#9: 使用computed属性
+          const userId = this.currentUser.Id
           if (toUserId !== userId) return
-          // Bug#1: isComplete类型容错
+          // isComplete类型容错
           const complete = isComplete === true || isComplete === 'true'
           if (!this.currentStreamMessage) {
             // 创建新的流式消息
@@ -366,10 +405,11 @@ export default {
             }
             this.messages.push(this.currentStreamMessage)
           } else {
-            // Bug#2: 使用$set确保Vue响应式更新
+            // 追加内容到现有消息
             const idx = this.messages.findIndex(m => m.id === this.currentStreamMessage.id)
             if (idx !== -1) {
-              this.$set(this.messages[idx], 'Content', (this.messages[idx].Content || '') + (chunk || ''))
+              this.messages[idx].Content = (this.messages[idx].Content || '') + (chunk || '')
+              // 保持引用同步
               this.currentStreamMessage = this.messages[idx]
             } else {
               this.currentStreamMessage.Content += chunk || ''
@@ -379,7 +419,7 @@ export default {
             if (this.currentStreamMessage) {
               const idx = this.messages.findIndex(m => m.id === this.currentStreamMessage.id)
               if (idx !== -1) {
-                this.$set(this.messages[idx], 'isStreaming', false)
+                this.messages[idx].isStreaming = false
               }
             }
             this.currentStreamMessage = null
@@ -407,7 +447,12 @@ export default {
       const content = this.inputMessage.trim()
       if (!content) return
 
-      const user = this.currentUser // Bug#9: 使用computed属性
+      const user = this.currentUser
+      if (!user || !user.Id) {
+        uni.showToast({ title: this.t('common.loginFirst'), icon: 'none' })
+        return
+      }
+
       const newMsg = {
         id: Date.now().toString(),
         Type: 'text',
@@ -418,7 +463,7 @@ export default {
         isSelf: true,
         senderName: this.t('message.me'),
         isStreaming: false,
-        sendStatus: 'sending' // Bug#5: 跟踪发送状态
+        sendStatus: 'sending'
       }
 
       this.messages.push(newMsg)
@@ -439,33 +484,35 @@ export default {
       }
 
       try {
-        const client = getSignalR()
-        if (client.isConnected) {
-          client.send('SendToUser', msgPayload)
-          // Bug#5: 标记发送成功
-          const idx = this.messages.findIndex(m => m.id === newMsg.id)
-          if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'sent')
-        } else {
-          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
-          // 尝试重连并重发
+        let client = getSignalR()
+        if (!client || !client.isConnected) {
+          // 尝试重连
           await connectSignalR()
-          const client2 = getSignalR()
-          if (client2.isConnected) {
-            client2.send('SendToUser', msgPayload)
-            const idx = this.messages.findIndex(m => m.id === newMsg.id)
-            if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'sent')
-          } else {
-            // Bug#5: 重连后仍然无法发送，标记失败
-            const idx = this.messages.findIndex(m => m.id === newMsg.id)
-            if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'failed')
-            uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
+          client = getSignalR()
+        }
+        
+        if (client && client.isConnected) {
+          client.send('SendToUser', msgPayload)
+          this.wsConnected = true
+          // 标记发送成功
+          const idx = this.messages.findIndex(m => m.id === newMsg.id)
+          if (idx !== -1) {
+            this.messages[idx].sendStatus = 'sent'
           }
+        } else {
+          this.wsConnected = false
+          const idx = this.messages.findIndex(m => m.id === newMsg.id)
+          if (idx !== -1) {
+            this.messages[idx].sendStatus = 'failed'
+          }
+          uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
         }
       } catch (e) {
         console.error('[Chat] sendMessage error:', e)
-        // Bug#5: 发送异常，标记失败
         const idx = this.messages.findIndex(m => m.id === newMsg.id)
-        if (idx !== -1) this.$set(this.messages[idx], 'sendStatus', 'failed')
+        if (idx !== -1) {
+          this.messages[idx].sendStatus = 'failed'
+        }
         uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
       }
     },
@@ -505,8 +552,25 @@ export default {
     scrollToBottom() {
       this.scrollToId = ''
       this.$nextTick(() => {
-        this.scrollToId = 'msg-bottom-' + Date.now()
+        // 先设置为空再设置为目标ID，强制scroll-view重新滚动
+        setTimeout(() => {
+          this.scrollToId = 'msg-bottom'
+        }, 50)
       })
+    },
+
+    // 格式化消息内容为 rich-text 节点（处理换行和基本HTML）
+    formatContent(content) {
+      if (!content) return ''
+      // 转义HTML特殊字符防止XSS，但保留换行
+      let safe = String(content)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+      // 将换行符转为<br>
+      safe = safe.replace(/\n/g, '<br/>')
+      return safe
     },
 
     shouldShowTime(msg, index) {
@@ -516,12 +580,12 @@ export default {
       return diff > 5 * 60 * 1000
     },
 
-    // Bug#5: 重发失败的消息
+    // 重发失败的消息
     async resendMessage(msg) {
       const idx = this.messages.findIndex(m => m.id === msg.id)
       if (idx === -1) return
 
-      this.$set(this.messages[idx], 'sendStatus', 'sending')
+      this.messages[idx].sendStatus = 'sending'
 
       const user = this.currentUser
       const msgPayload = {
@@ -537,20 +601,22 @@ export default {
 
       try {
         let client = getSignalR()
-        if (!client.isConnected) {
+        if (!client || !client.isConnected) {
           await connectSignalR()
           client = getSignalR()
         }
-        if (client.isConnected) {
+        if (client && client.isConnected) {
           client.send('SendToUser', msgPayload)
-          this.$set(this.messages[idx], 'sendStatus', 'sent')
+          this.messages[idx].sendStatus = 'sent'
+          this.wsConnected = true
         } else {
-          this.$set(this.messages[idx], 'sendStatus', 'failed')
+          this.messages[idx].sendStatus = 'failed'
+          this.wsConnected = false
           uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
         }
       } catch (e) {
         console.error('[Chat] resendMessage error:', e)
-        this.$set(this.messages[idx], 'sendStatus', 'failed')
+        this.messages[idx].sendStatus = 'failed'
         uni.showToast({ title: this.t('message.sendFailed'), icon: 'none' })
       }
     },
@@ -658,6 +724,31 @@ export default {
   flex: 1;
   height: 0;
   padding: 20rpx 24rpx;
+}
+
+/* 连接状态提示 */
+.connection-hint {
+  text-align: center;
+  padding: 12rpx 0 20rpx;
+}
+.hint-text {
+  font-size: 24rpx;
+  color: #e6a23c;
+  background: #fff3e0;
+  padding: 8rpx 24rpx;
+  border-radius: 20rpx;
+}
+
+/* rich-text 文本样式 */
+.bubble-richtext {
+  font-size: 28rpx;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* 数据表格气泡 */
+.bubble-data {
+  padding: 4rpx 0;
 }
 
 .load-more-hint {

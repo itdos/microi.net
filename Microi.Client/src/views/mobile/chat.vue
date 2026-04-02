@@ -9,6 +9,12 @@
 
         <!-- 聊天消息区域 -->
         <div class="chat-messages" ref="messagesContainer" @scroll="handleScroll">
+            <!-- 连接状态提示 -->
+            <div v-if="!wsConnected" class="connection-status disconnected">
+                <el-icon><Loading /></el-icon>
+                <span>连接中...</span>
+            </div>
+            
             <div class="messages-inner">
                 <!-- 加载更多提示 -->
                 <div v-if="loading" class="loading-more">
@@ -24,7 +30,7 @@
                 >
                     <!-- 时间分隔 -->
                     <div v-if="shouldShowTime(msg, index)" class="time-divider">
-                        {{ formatMessageTime(msg.time) }}
+                        {{ formatMessageTime(msg.SendTime) }}
                     </div>
                     
                     <!-- 消息气泡 -->
@@ -168,7 +174,7 @@ import {
     Picture, Camera, Folder, Location, Document, Loading, ArrowRight 
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser } from '@/utils/chat.common';
+import { formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser, isDuplicateMessage, clearMessageDuplicateCache } from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
 
 const router = useRouter();
@@ -193,15 +199,32 @@ const chatPinned = ref(false);
 const loading = ref(false);
 const messagesContainer = ref(null);
 const isComposing = ref(false); // IME输入法组合状态
+const wsConnected = ref(false); // WebSocket连接状态
 
 // 消息列表
 const messages = ref([]);
 
-// WebSocket实例
-let websocket = null;
-
 // 当前流式消息
 const currentStreamMessage = ref(null);
+
+// 事件回调引用（方便移除）
+let _onReceiveSendToUser = null;
+let _onReceiveAIChunk = null;
+let _onReceiveSendChatRecordToUser = null;
+let _onReceiveSendLastContacts = null;
+// WebSocket重连定时器
+let _wsCheckTimer = null;
+
+// 获取当前可用的WebSocket实例
+const getWebSocket = () => {
+    return window.__VUE_APP__?.config?.globalProperties?.$websocket;
+};
+
+// 检查WebSocket是否已连接
+const isWsConnected = () => {
+    const ws = getWebSocket();
+    return ws && ws.state === 'Connected';
+};
 
 // 返回上一页
 const goBack = () => {
@@ -226,18 +249,29 @@ const handleInputKeydown = (e) => {
 const shouldShowTime = (msg, index) => {
     if (index === 0) return true;
     const prevMsg = messages.value[index - 1];
-    const diff = new Date(msg.time) - new Date(prevMsg.time);
+    const msgTime = msg.SendTime || msg.time || msg.CreateTime;
+    const prevTime = prevMsg.SendTime || prevMsg.time || prevMsg.CreateTime;
+    if (!msgTime || !prevTime) return false;
+    const diff = new Date(msgTime) - new Date(prevTime);
     return diff > 5 * 60 * 1000; // 5分钟
 };
 
 // 格式化消息时间
 const formatMessageTime = (time) => {
+    if (!time) return '';
     const date = new Date(time);
+    if (isNaN(date.getTime())) return '';
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     
     if (isToday) {
         return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     }
     
     return date.toLocaleString('zh-CN', { 
@@ -250,15 +284,18 @@ const formatMessageTime = (time) => {
 
 // 格式化气泡时间
 const formatBubbleTime = (time) => {
-    return new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    if (!time) return '';
+    const date = new Date(time);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 };
 
 // 发送消息
 const sendMessage = async () => {
     if (!inputMessage.value.trim()) return;
     
-    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-    if (!websocket || websocket.state !== 'Connected') {
+    const ws = getWebSocket();
+    if (!ws || ws.state !== 'Connected') {
         ElMessage.error('连接已断开，请稍后重试');
         return;
     }
@@ -272,7 +309,7 @@ const sendMessage = async () => {
         FromUserId: currentUser.value.Id,
         ToUserId: chatId.value,
         isSelf: true,
-        senderName: currentUser.value.NickName || '我',
+        senderName: currentUser.value.NickName || currentUser.value.Name || '我',
         avatar: currentUser.value.Avatar
     };
     
@@ -287,11 +324,6 @@ const sendMessage = async () => {
     
     // 发送到服务器
     try {
-        const ws = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-        if (!ws || ws.state !== 'Connected') {
-            ElMessage.error('连接已断开，请稍后重试');
-            return;
-        }
         await sendMessageToUser(ws, {
             Content: content,
             OsClient: DiyCommon.GetOsClient(),
@@ -302,7 +334,7 @@ const sendMessage = async () => {
             FromUserName: currentUser.value.NickName || currentUser.value.Name,
             FromUserAvatar: currentUser.value.Avatar || ''
         });
-        console.log('[移动端聊天] 消息已发送:', content);
+        console.log('[移动端聊天] 消息已发送:', content.substring(0, 30));
     } catch (error) {
         console.error('[移动端聊天] 发送失败:', error);
         ElMessage.error('发送失败');
@@ -326,29 +358,26 @@ const handleScroll = () => {
 
 // 加载更多消息
 const loadMoreMessages = () => {
-    if (loading.value) return;
-    loading.value = true;
-    
-    // TODO: 实现加载更多历史消息
-    setTimeout(() => {
-        loading.value = false;
-    }, 1000);
+    // 滚动到顶部时触发，目前聊天记录由服务端一次返回，暂不支持分页加载
+    // 后续可扩展为分页请求历史记录
 };
 
 // 加载聊天记录
 const loadChatRecord = async () => {
-    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-    if (!websocket || websocket.state !== 'Connected') {
+    const ws = getWebSocket();
+    if (!ws || ws.state !== 'Connected') {
         console.log('[移动端聊天] WebSocket未连接，等待重试...');
         // 等待连接就绪
         let retryCount = 0;
         const waitForWs = () => {
             retryCount++;
-            websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-            if (websocket && websocket.state === 'Connected') {
+            const wsRetry = getWebSocket();
+            if (wsRetry && wsRetry.state === 'Connected') {
+                wsConnected.value = true;
                 doLoadChatRecord();
             } else if (retryCount >= 20) {
                 console.warn('[移动端聊天] WebSocket连接超时');
+                wsConnected.value = false;
             } else {
                 setTimeout(waitForWs, 500);
             }
@@ -357,13 +386,19 @@ const loadChatRecord = async () => {
         return;
     }
     
+    wsConnected.value = true;
     doLoadChatRecord();
 };
 
 const doLoadChatRecord = async () => {
     try {
+        const ws = getWebSocket();
+        if (!ws || ws.state !== 'Connected') {
+            console.warn('[移动端聊天] WebSocket不可用');
+            return;
+        }
         // 实际聊天记录通过 ReceiveSendChatRecordToUser 回调接收
-        await getChatRecord(websocket, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
+        await getChatRecord(ws, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
         console.log('[移动端聊天] SendChatRecordToUser请求已发送');
     } catch (error) {
         console.error('[移动端聊天] 加载聊天记录失败:', error);
@@ -372,9 +407,9 @@ const doLoadChatRecord = async () => {
 
 // WebSocket事件处理
 const handleReceiveSendToUser = (message) => {
-    console.log('[移动端聊天] 收到消息:', message);
+    if (!message) return;
     
-    // 只处理当前聊天的消息
+    // 只处理与当前聊天相关的消息
     if (message.FromUserId !== chatId.value && message.ToUserId !== chatId.value) {
         return;
     }
@@ -384,28 +419,24 @@ const handleReceiveSendToUser = (message) => {
         return;
     }
     
-    // 检查重复消息（基于内容+发送者+1秒内时间窗口）
-    const isDuplicate = messages.value.some(m => {
-        if (m.FromUserId !== message.FromUserId) return false;
-        if (m.Content !== message.Content) return false;
-        const timeDiff = Math.abs(new Date(m.SendTime) - new Date(message.CreateTime || message.SendTime || new Date()));
-        return timeDiff < 2000; // 2秒内相同内容视为重复
-    });
-    if (isDuplicate) {
+    console.log('[移动端聊天] 收到消息:', message.Content?.substring(0, 30));
+    
+    // 使用统一的消息去重检查
+    if (isDuplicateMessage(message)) {
         console.log('[移动端聊天] 重复消息，已忽略');
         return;
     }
     
     const newMsg = {
-        id: Date.now().toString(),
+        id: message.Id || Date.now().toString(),
         Type: message.Type || 'text',
         Content: message.Content,
         SendTime: message.CreateTime || message.SendTime || new Date().toISOString(),
         FromUserId: message.FromUserId,
         ToUserId: message.ToUserId,
-        isSelf: message.FromUserId === currentUser.value.Id,
-        senderName: message.FromUserId === currentUser.value.Id ? '我' : (message.FromUserName || chatName.value),
-        avatar: '',
+        isSelf: false,
+        senderName: message.FromUserName || chatName.value,
+        avatar: message.FromUserAvatar || '',
         isStreaming: false
     };
     
@@ -417,17 +448,19 @@ const handleReceiveSendToUser = (message) => {
 };
 
 const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
-    console.log('[移动端聊天] 收到AI流式消息:', { chunk: chunk?.substring?.(0, 30), fromUserId, toUserId, isComplete });
-    
     // 只处理发给当前用户且与当前聊天相关的消息
     if (toUserId !== currentUser.value.Id || fromUserId !== chatId.value) {
         return;
     }
     
+    // isComplete类型容错
+    const complete = isComplete === true || isComplete === 'true';
+    
     if (!currentStreamMessage.value) {
         // 创建新的流式消息
+        console.log('[移动端聊天] AI流式消息开始');
         currentStreamMessage.value = {
-            id: Date.now().toString(),
+            id: 'ai-stream-' + Date.now(),
             Type: 'text',
             Content: chunk || '',
             SendTime: new Date().toISOString(),
@@ -445,8 +478,11 @@ const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
     }
     
     // 检查是否完成
-    if (isComplete === true || isComplete === 'true') {
-        currentStreamMessage.value.isStreaming = false;
+    if (complete) {
+        console.log('[移动端聊天] AI流式消息完成');
+        if (currentStreamMessage.value) {
+            currentStreamMessage.value.isStreaming = false;
+        }
         currentStreamMessage.value = null;
     }
     
@@ -456,11 +492,11 @@ const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
 };
 
 const handleReceiveSendChatRecordToUser = (records) => {
-    console.log('[移动端聊天] 收到聊天记录:', records);
+    console.log('[移动端聊天] 收到聊天记录:', records?.length || 0);
     
-    if (records && records.length > 0) {
+    if (records && Array.isArray(records) && records.length > 0) {
         messages.value = records.map(r => ({
-            id: r.Id || Date.now().toString(),
+            id: r.Id || (Date.now().toString() + Math.random()),
             Type: r.Type || 'text',
             Content: r.Content,
             SendTime: r.CreateTime || r.SendTime,
@@ -468,40 +504,94 @@ const handleReceiveSendChatRecordToUser = (records) => {
             ToUserId: r.ToUserId,
             isSelf: r.FromUserId === currentUser.value.Id,
             senderName: r.FromUserId === currentUser.value.Id ? '我' : (r.FromUserName || chatName.value),
-            avatar: '',
+            avatar: r.FromUserAvatar || '',
             isStreaming: false
         }));
         
         nextTick(() => {
             scrollToBottom();
         });
+    } else if (records && Array.isArray(records) && records.length === 0) {
+        messages.value = [];
     }
+};
+
+// 接收最近联系人列表更新（保持侧边栏同步）
+const handleReceiveSendLastContacts = (contactList) => {
+    // 移动端不需要处理联系人列表，但需要接收以保持状态同步
+    console.log('[移动端聊天] 最近联系人更新:', contactList?.length || 0);
 };
 
 // 注册WebSocket事件
 const registerWebSocketEvents = () => {
-    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-    if (!websocket) {
-        console.log('[移动端聊天] WebSocket未初始化');
+    const ws = getWebSocket();
+    if (!ws) {
+        console.log('[移动端聊天] WebSocket未初始化，延迟注册');
         return;
     }
     
+    // 先清理旧事件
+    unregisterWebSocketEvents();
+    
+    // 保存回调引用
+    _onReceiveSendToUser = handleReceiveSendToUser;
+    _onReceiveAIChunk = handleReceiveAIChunk;
+    _onReceiveSendChatRecordToUser = handleReceiveSendChatRecordToUser;
+    _onReceiveSendLastContacts = handleReceiveSendLastContacts;
+    
     // 注册事件
-    websocket.on('ReceiveSendToUser', handleReceiveSendToUser);
-    websocket.on('ReceiveAIChunk', handleReceiveAIChunk);
-    websocket.on('ReceiveSendChatRecordToUser', handleReceiveSendChatRecordToUser);
+    ws.on('ReceiveSendToUser', _onReceiveSendToUser);
+    ws.on('ReceiveAIChunk', _onReceiveAIChunk);
+    ws.on('ReceiveSendChatRecordToUser', _onReceiveSendChatRecordToUser);
+    ws.on('ReceiveSendLastContacts', _onReceiveSendLastContacts);
+    
+    wsConnected.value = ws.state === 'Connected';
     
     console.log('[移动端聊天] WebSocket事件已注册');
 };
 
 // 注销WebSocket事件
 const unregisterWebSocketEvents = () => {
-    if (websocket) {
-        websocket.off('ReceiveSendToUser', handleReceiveSendToUser);
-        websocket.off('ReceiveAIChunk', handleReceiveAIChunk);
-        websocket.off('ReceiveSendChatRecordToUser', handleReceiveSendChatRecordToUser);
-        console.log('[移动端聊天] WebSocket事件已注销');
+    const ws = getWebSocket();
+    if (ws) {
+        if (_onReceiveSendToUser) {
+            ws.off('ReceiveSendToUser', _onReceiveSendToUser);
+        }
+        if (_onReceiveAIChunk) {
+            ws.off('ReceiveAIChunk', _onReceiveAIChunk);
+        }
+        if (_onReceiveSendChatRecordToUser) {
+            ws.off('ReceiveSendChatRecordToUser', _onReceiveSendChatRecordToUser);
+        }
+        if (_onReceiveSendLastContacts) {
+            ws.off('ReceiveSendLastContacts', _onReceiveSendLastContacts);
+        }
     }
+    _onReceiveSendToUser = null;
+    _onReceiveAIChunk = null;
+    _onReceiveSendChatRecordToUser = null;
+    _onReceiveSendLastContacts = null;
+    console.log('[移动端聊天] WebSocket事件已注销');
+};
+
+// 监听WebSocket重连事件
+const setupReconnectHandler = () => {
+    // 定期检查WebSocket状态
+    _wsCheckTimer = setInterval(() => {
+        const ws = getWebSocket();
+        const connected = ws && ws.state === 'Connected';
+        
+        if (connected && !wsConnected.value) {
+            // 从断开恢复为连接：重新注册事件并加载聊天记录
+            console.log('[移动端聊天] WebSocket重连成功，重新加载');
+            wsConnected.value = true;
+            registerWebSocketEvents();
+            doLoadChatRecord();
+        } else if (!connected && wsConnected.value) {
+            wsConnected.value = false;
+            console.log('[移动端聊天] WebSocket连接断开');
+        }
+    }, 3000);
 };
 
 // 处理更多操作
@@ -532,6 +622,7 @@ const clearHistory = () => {
 onMounted(() => {
     console.log('[移动端聊天] 组件已挂载, chatId:', chatId.value, 'chatName:', chatName.value);
     registerWebSocketEvents();
+    setupReconnectHandler();
     loadChatRecord();
 });
 
@@ -539,6 +630,11 @@ onBeforeUnmount(() => {
     console.log('[移动端聊天] 组件即将卸载');
     unregisterWebSocketEvents();
     currentStreamMessage.value = null;
+    clearMessageDuplicateCache();
+    if (_wsCheckTimer) {
+        clearInterval(_wsCheckTimer);
+        _wsCheckTimer = null;
+    }
 });
 </script>
 
@@ -550,6 +646,26 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     background: #ededed;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    
+    .el-icon {
+        margin-right: 4px;
+        animation: spin 1s linear infinite;
+    }
+    
+    &.disconnected {
+        background: #fff3e0;
+        color: #e6a23c;
+    }
 }
 
 .chat-header {
