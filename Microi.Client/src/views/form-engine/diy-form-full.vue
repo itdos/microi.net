@@ -85,10 +85,10 @@
                                 </el-button>
                             </template>
                         </template>
-                        <!-- zhy隐藏掉返回按钮，移动端自带的有返回上一页 -->
-                        <!-- <el-button type="default" :icon="Back" @click="Go_1()">
+                        <!-- zhy移动端隐藏掉返回按钮，移动端自带的有返回上一页 -->
+                        <el-button v-if="!diyStore.IsPhoneView" type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
-                        </el-button> -->
+                        </el-button>
                     </div>
                 </div>
                 <DiyForm

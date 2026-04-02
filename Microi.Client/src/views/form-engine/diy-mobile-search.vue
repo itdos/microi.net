@@ -33,11 +33,11 @@
           </div>
         </template>
         <!--清除搜索 v-if="IsPermission('NoSearch')"-->
-        <div class="search-clear-group"  style="margin-left: 20px;">
+        <!-- <div class="search-clear-group"  style="margin-left: 20px;">
           <el-button  @click="callParentMethod">
             {{ $t("Msg.ClearSearch") }}
           </el-button>
-        </div>
+        </div> -->
       </div>
 
     </section>

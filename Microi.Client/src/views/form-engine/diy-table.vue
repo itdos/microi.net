@@ -70,10 +70,9 @@
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
-                <!-- <div class="keyword-search" v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"> -->
-                <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，
-                    移动端也需要各种V8按钮功能！！！-->
-                <div class="keyword-search" style="margin-bottom:10px;">
+                <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
+                <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，移动端也需要各种V8按钮功能！！！-->
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 && diyStore.IsPhoneView) || !diyStore.IsPhoneView">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -208,7 +207,9 @@
                                 :SearchFieldIds="SearchFieldIds"
                                 :DiyFieldList="DiyFieldList"
                                 :SearchType="'In'"
-                                @CallbackGetDiyTableRow="GetDiyTableRow"
+                                @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,4);
+                    }"
                                 @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                             ></DiySearch>
                             <template #reference
@@ -267,11 +268,23 @@
                       <el-icon><Operation /></el-icon>
                     </div>
                   </div>
+                  <!-- <input
+                        type="date"
+                      /> -->
                   <!-- 筛选下拉列表和清除搜索 -->
                   <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
                    <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
                     :SearchFieldIds="SearchFieldIds" :DiyFieldList="DiyFieldList" :SearchType="'Out'"
-                    @clearSearch="childClearSearch" @CallbackGetDiyTableRow="GetDiyTableRow" @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"></DiyModleSearch >
+                    @clearSearch="childClearSearch" @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,1);
+                    }" @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"></DiyModleSearch >
+                      <!--清除搜索-->
+                         <div class="reset-search" v-if="diyStore.IsPhoneView && ShowAddByRoute" @click="
+                                  InitSearch();
+                                  GetDiyTableRow({ _PageIndex: 1 });
+                              ">
+                            {{ $t("重置搜索") }}
+                          </div>
                   </div>
                 </div>
 
@@ -284,7 +297,9 @@
                         :SearchFieldIds="SearchFieldIds"
                         :DiyFieldList="DiyFieldList"
                         :SearchType="'Out'"
-                        @CallbackGetDiyTableRow="GetDiyTableRow"
+                        @CallbackGetDiyTableRow="(params) => {
+                        GetDiyTableRow(params,3);
+                    }"
                         @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                     ></DiySearch>
                 </div>
@@ -1170,10 +1185,11 @@
             class="mobile-search-drawer"
             :title="$t('Msg.Search')"
         >
-            <!-- 移动端关键词搜索 -->
+            <!-- 移动端更多搜索 -->
+            <!-- zhy将点击选择单个值后弹框自动关闭改为点击遮罩层关闭或上方关闭按钮关闭，不然无法选中多个条件 @keyup.enter，@click，@CallbackGetDiyTableRow处的showMobileSearch = false移除-->
             <div class="mobile-keyword-search" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" style="margin-bottom: 12px;">
-                <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" clearable @keyup.enter="GetDiyTableRow({ _PageIndex: 1 }); showMobileSearch = false;">
-                    <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 }); showMobileSearch = false;"></el-button></template>
+                <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" clearable @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })">
+                    <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                 </el-input>
             </div>
             <DiySearch
@@ -1186,8 +1202,7 @@
                 :SearchType="'In'"
                 @CallbackGetDiyTableRow="
                     (params) => {
-                        GetDiyTableRow(params);
-                        showMobileSearch = false;
+                        GetDiyTableRow(params,2);
                     }
                 "
                 @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
@@ -1859,6 +1874,10 @@ export default {
     },
     data() {
         return {
+            hbParam1: [], //zhy合并移动端更多搜索和移动端下拉菜单diy-mobile-search组件的搜索参数
+            hbParam2: [], //zhy合并移动端更多搜索和移动端下拉菜单diy-mobile-search组件的搜索参数
+            hbParam3: [], //zhy合并PC端更多搜索和Pc端外部搜索diy-search组件的搜索参数
+            hbParam4: [], //zhy合并PC端更多搜索和Pc端外部搜索diy-search组件的搜索参数
             TableDisplayMode: "", //Table、Card
             ShowDiyModule: false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
@@ -3227,6 +3246,10 @@ export default {
             self.SearchDateTime = {};
             self.SearchNumber = {};
             self.SearchWhere = [];
+            self.hbParam1 = [];
+            self.hbParam2 = [];
+            self.hbParam3 = [];
+            self.hbParam4 = [];
             if (self.$refs.refDiySearch1) {
                 self.$refs.refDiySearch1.InitSearch();
             }
@@ -3238,6 +3261,10 @@ export default {
             }
             if (self.$refs.refDiySearch4) {
                 self.$refs.refDiySearch4.InitSearch();
+            }
+            // zhy点击重置按钮时可以一起清空移动端更多搜索弹窗内的数据（refDiySearchMobile）
+            if (self.$refs.refDiySearchMobile) {
+                try { self.$refs.refDiySearchMobile.InitSearch(); } catch (e) {}
             }
         },
         IsPermission(type) {
@@ -5026,9 +5053,37 @@ export default {
         //     }
         // },
 
-        GetDiyTableRow(recParam) {
+        GetDiyTableRow(recParam,type) {
             let self = this;
-
+            //zhy此处通过判断是pc或移动端的搜索条件，来决定如何合并搜索条件。type1,2为移动端下拉菜单搜索和更多搜索，3，4为PC端外部搜索和更多搜索
+            // console.log(recParam,type,666666)
+            if(recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2 || type == 3 || type == 4)){
+              if(type == 1 && self.hbParam1.length == 0){
+                self.hbParam1 = recParam._Where;
+              }else if(type == 1 && self.hbParam1.length > 0){
+                self.hbParam1 = [];
+                self.hbParam1 = recParam._Where;
+              }else if(type == 2 && self.hbParam2.length == 0){
+                self.hbParam2 = recParam._Where;
+              }else if(type == 2 && self.hbParam2.length > 0){
+                self.hbParam2 = [];
+                self.hbParam2 = recParam._Where;
+              }else if(type == 3 && self.hbParam3.length == 0){
+                self.hbParam3 = recParam._Where;
+              }else if(type == 3 && self.hbParam3.length > 0){
+                self.hbParam3 = [];
+                self.hbParam3 = recParam._Where;
+              }else if(type == 4 && self.hbParam4.length == 0){
+                self.hbParam4 = recParam._Where;
+              }else if(type == 4 && self.hbParam4.length > 0){
+                self.hbParam4 = [];
+                self.hbParam4 = recParam._Where;
+              }
+            }
+            let hbYdParams = [];
+            let hbPcParams = [];
+            hbYdParams=[...self.hbParam1,...self.hbParam2];
+            hbPcParams=[...self.hbParam3,...self.hbParam4];
             // ========== 关键：立即递增版本号取消所有旧操作 ==========
             self._paginationVersion++;
             const currentVersion = self._paginationVersion;
@@ -5111,7 +5166,12 @@ export default {
                 param._PageSize = self.DiyTableRowPageSize;
             }
 
-            if (recParam && recParam._Where && recParam._Where.length > 0) {
+            //zhy此处添加移动和PC合并搜索的参数传接
+            if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2)){
+                param._Where = hbYdParams;
+            } else if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 3 || type == 4)){
+                param._Where = hbPcParams;
+            } else if (recParam && recParam._Where && recParam._Where.length > 0) {
                 param._Where = recParam._Where;
                 self.SearchWhere = param._Where;
             } else if (recParam && recParam._Where && recParam._Where.length == 0) {
@@ -5862,4 +5922,33 @@ export default {
     z-index: 999;
     box-shadow: 0 0 10px #ccc;
   }
+  .reset-search{
+    margin-left:10px;
+    color:#626467;
+    padding: 3px 6px;
+    border: 1px solid #6f7174;
+    border-radius: 5px;
+
+  }
+  .reset-search:active {
+    opacity: 0.5;
+  }
+  // @media screen and (max-width: 768px) {
+  //   :deep(.el-picker__popper.el-date-range-picker) {
+  //     width: 90vw !important;
+  //     left: 5vw !important;
+  //   }
+
+  //   :deep(.el-picker-panel) {
+  //     width: 100% !important;
+  //   }
+
+  //   :deep(.el-date-range-picker__content) {
+  //     display: block !important;
+  //   }
+
+  //   :deep(.el-date-range-picker__time-header) {
+  //     display: none !important;
+  //   }
+  // }
 </style>
