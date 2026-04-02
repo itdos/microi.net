@@ -122,6 +122,27 @@ namespace Microi.net
         /// 用户编辑器中的当前代码（为空表示编辑器无代码，AI应生成新代码；有值表示用户在询问已有代码相关问题）
         /// </summary>
         public string? CurrentCode { get; set; }
+
+        /// <summary>
+        /// 对话历史（用于多轮对话上下文），按时间正序排列，最多传最近10条
+        /// </summary>
+        public List<ChatHistoryItem>? ChatHistory { get; set; }
+    }
+
+    /// <summary>
+    /// 对话历史消息项
+    /// </summary>
+    public class ChatHistoryItem
+    {
+        /// <summary>
+        /// 角色：user / ai / assistant
+        /// </summary>
+        public string Role { get; set; }
+
+        /// <summary>
+        /// 消息内容
+        /// </summary>
+        public string Content { get; set; }
     }
 
     /// <summary>

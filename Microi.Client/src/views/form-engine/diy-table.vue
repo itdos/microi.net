@@ -340,7 +340,9 @@
                                         <el-icon v-if="getColSortState(field) === 'asc'" :size="12"><SortUp /></el-icon>
                                         <el-icon v-else :size="12"><SortDown /></el-icon>
                                     </span>
-                                    <el-icon class="col-header-menu-icon col-header-menu-icon--dots" :size="14"><MoreFilled /></el-icon>
+                                    <span class="col-header-menu-icon col-header-menu-icon--dots">
+                                        <fa-icon icon="fas fa-ellipsis-v" style="font-size:14px;" />
+                                    </span>
                                     <el-icon class="col-header-menu-icon col-header-menu-icon--search" :size="14"><Search /></el-icon>
                                 </div>
                             </template>

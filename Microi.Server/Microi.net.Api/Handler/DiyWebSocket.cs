@@ -532,6 +532,23 @@ namespace Microi.net
 
                 // 获取AI配置
                 Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 正在获取AI模型配置...");
+                
+                // 优先使用客户端传递的AI模型（通过OtherInfo字段）
+                string clientAiModel = null;
+                if (!string.IsNullOrEmpty(originalMsg.OtherInfo))
+                {
+                    try
+                    {
+                        var otherInfo = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(originalMsg.OtherInfo);
+                        if (otherInfo != null && otherInfo.ContainsKey("AiModel"))
+                        {
+                            clientAiModel = otherInfo["AiModel"];
+                            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 客户端指定模型: {clientAiModel}");
+                        }
+                    }
+                    catch { }
+                }
+                
                 var aiModelConfig = await MicroiEngine.FormEngine.GetFormDataAsync("mic_ai", new
                 {
                     _Where = new List<List<object>>()
@@ -542,8 +559,8 @@ namespace Microi.net
                     OsClient = originalMsg.OsClient
                 });
 
-                string aiModel = "deepseek-r1:1.5b";
-                if (aiModelConfig.Code == 1 && aiModelConfig.Data != null)
+                string aiModel = clientAiModel ?? "deepseek-r1:1.5b";
+                if (string.IsNullOrEmpty(clientAiModel) && aiModelConfig.Code == 1 && aiModelConfig.Data != null)
                 {
                     aiModel = aiModelConfig.Data.AiModel ?? aiModel;
                 }
