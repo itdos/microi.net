@@ -232,6 +232,21 @@ export default {
         // this.initTags();
         this.addTags();
 
+        // 从 sessionStorage 恢复全屏状态（仅当前标签页有效，新开tab不会全屏）
+        var fsData = sessionStorage.getItem('microi_tab_fullscreen');
+        if (fsData) {
+            try {
+                var before = JSON.parse(fsData);
+                this.diyStore.setState("_beforeFullScreen", before);
+                this.diyStore.setState("ShowClassicTop", 0);
+                this.diyStore.setState("ShowClassicLeft", 0);
+                this.diyStore.setState("IsTabFullScreen", true);
+            } catch(e) {}
+        } else if (this.diyStore.IsTabFullScreen) {
+            // sessionStorage中没有全屏数据但Pinia状态却是全屏，说明是新tab，重置
+            this.exitFullScreen();
+        }
+
         // ESC 退出全屏
         this._escHandler = (e) => {
             if (e.key === 'Escape' && this.diyStore.IsTabFullScreen) {
@@ -466,11 +481,13 @@ export default {
             if (this.$route.fullPath !== view.fullPath) {
                 this.$router.push(view.fullPath);
             }
-            // 保存当前状态
-            this.diyStore.setState("_beforeFullScreen", {
+            // 保存当前状态到 sessionStorage（仅当前标签页有效，新开tab不会全屏）
+            var before = {
                 ShowClassicTop: this.diyStore.ShowClassicTop,
                 ShowClassicLeft: this.diyStore.ShowClassicLeft
-            });
+            };
+            sessionStorage.setItem('microi_tab_fullscreen', JSON.stringify(before));
+            this.diyStore.setState("_beforeFullScreen", before);
             // 隐藏顶部和左侧
             this.diyStore.setState("ShowClassicTop", 0);
             this.diyStore.setState("ShowClassicLeft", 0);
@@ -481,6 +498,7 @@ export default {
             this.diyStore.setState("ShowClassicTop", before.ShowClassicTop);
             this.diyStore.setState("ShowClassicLeft", before.ShowClassicLeft);
             this.diyStore.setState("IsTabFullScreen", false);
+            sessionStorage.removeItem('microi_tab_fullscreen');
         },
         handleScroll() {
             this.closeMenu();

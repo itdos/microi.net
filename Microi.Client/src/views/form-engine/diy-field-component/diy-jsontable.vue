@@ -351,7 +351,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, getCurrentInstance, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, nextTick } from 'vue';
 import { Search, Rank, Edit, Setting, Download, DocumentCopy } from '@element-plus/icons-vue';
 import Sortable from 'sortablejs';
 import DiyDataSourceConfig from './shared/DiyDataSourceConfig.vue';
@@ -1339,11 +1339,17 @@ export default {
         };
 
         // 初始化拖拽排序
+        let sortableInstance = null;
         const initSortable = () => {
             nextTick(() => {
+                // 先销毁旧实例
+                if (sortableInstance) {
+                    sortableInstance.destroy();
+                    sortableInstance = null;
+                }
                 const el = jsonTableRef.value?.$el?.querySelector('.el-table__body-wrapper tbody');
                 if (el) {
-                    Sortable.create(el, {
+                    sortableInstance = Sortable.create(el, {
                         handle: '.drag-handle',
                         animation: 150,
                         onEnd: (evt) => {
@@ -1451,14 +1457,14 @@ export default {
         };
 
         // 监听 tableData 变化，同步数据源已选中状态（如删除行后取消选中）
+        // 监听 tableData 变化（仅监听数组长度变化，不深度监听，减少性能开销）
         watch(
-            tableData,
+            () => tableData.value.length,
             () => {
                 if (dataSourceLoaded.value) {
                     syncDataSourceSelected();
                 }
-            },
-            { deep: true }
+            }
         );
 
         // 监听 modelValue 变化
@@ -1472,7 +1478,7 @@ export default {
                 tableData.value = parseData(newVal);
                 syncIfIdFixed();
             },
-            { immediate: true, deep: true }
+            { immediate: true }
         );
 
         // 监听 FormDiyTableModel 中对应字段的变化
@@ -1486,8 +1492,7 @@ export default {
                 }
                 tableData.value = parseData(newVal);
                 syncIfIdFixed();
-            },
-            { deep: true }
+            }
         );
 
         onMounted(() => {
@@ -1501,6 +1506,24 @@ export default {
             if (!GetFieldReadOnly(props.field)) {
                 initSortable();
             }
+        });
+
+        // 组件销毁时清理 Sortable 实例和数据引用，防止内存泄漏
+        onBeforeUnmount(() => {
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            if (configSortableInstance) {
+                configSortableInstance.destroy();
+                configSortableInstance = null;
+            }
+            // 清理大数据引用
+            tableData.value = [];
+            dataSourceOptions.value = [];
+            dataSourceAllOptions.value = [];
+            dataSourceSelected.value = [];
+            configColumns.value = [];
         });
 
         return {

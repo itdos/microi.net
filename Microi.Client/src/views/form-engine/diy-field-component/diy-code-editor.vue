@@ -56,24 +56,28 @@
                     </div>
 
                     <!-- AI 聊天面板 -->
-                    <transition name="ai-slide">
-                        <AiChatPanel
-                            v-if="aiPanelVisible"
-                            ref="aiPanelRef"
-                            :chatMessages="chatMessages"
-                            :aiQuestion="aiQuestion"
-                            :aiGenerating="aiGenerating"
-                            :selectedAiModel="selectedAiModel"
-                            :aiModelList="aiModelList"
-                            :aiModelLoading="aiModelLoading"
-                            @close="aiPanelVisible = false"
-                            @update:aiQuestion="v => aiQuestion = v"
-                            @update:selectedAiModel="v => selectedAiModel = v"
-                            @send="sendAiQuestion"
-                            @cancel="cancelAiGeneration"
-                            @apply-code="applyCodeToEditor"
-                            @use-example="useExample"
-                        />
+                    <transition name="ai-slide" @after-enter="onAiPanelTransitionEnd" @after-leave="onAiPanelTransitionEnd">
+                        <div v-if="aiPanelVisible" class="ai-panel-wrapper" :style="{ width: aiPanelWidth + 'px', minWidth: aiPanelWidth + 'px' }">
+                            <div class="ai-panel-resize-handle" @mousedown.prevent="startAiPanelResize"></div>
+                            <AiChatPanel
+                                ref="aiPanelRef"
+                                :chatMessages="chatMessages"
+                                :aiQuestion="aiQuestion"
+                                :aiGenerating="aiGenerating"
+                                :selectedAiModel="selectedAiModel"
+                                :aiModelList="aiModelList"
+                                :aiModelLoading="aiModelLoading"
+                                :editorHasCode="editorHasCode"
+                                @close="aiPanelVisible = false"
+                                @update:aiQuestion="v => aiQuestion = v"
+                                @update:selectedAiModel="v => selectedAiModel = v"
+                                @send="sendAiQuestion"
+                                @cancel="cancelAiGeneration"
+                                @apply-code="applyCodeToEditor"
+                                @insert-at-cursor="insertCodeAtCursor"
+                                @use-example="useExample"
+                            />
+                        </div>
                     </transition>
                 </div>
             </div>
@@ -130,24 +134,28 @@
             </div>
 
             <!-- AI 聊天面板 -->
-            <transition name="ai-slide">
-                <AiChatPanel
-                    v-if="aiPanelVisible"
-                    ref="aiPanelRef"
-                    :chatMessages="chatMessages"
-                    :aiQuestion="aiQuestion"
-                    :aiGenerating="aiGenerating"
-                    :selectedAiModel="selectedAiModel"
-                    :aiModelList="aiModelList"
-                    :aiModelLoading="aiModelLoading"
-                    @close="aiPanelVisible = false"
-                    @update:aiQuestion="v => aiQuestion = v"
-                    @update:selectedAiModel="v => selectedAiModel = v"
-                    @send="sendAiQuestion"
-                    @cancel="cancelAiGeneration"
-                    @apply-code="applyCodeToEditor"
-                    @use-example="useExample"
-                />
+            <transition name="ai-slide" @after-enter="onAiPanelTransitionEnd" @after-leave="onAiPanelTransitionEnd">
+                <div v-if="aiPanelVisible" class="ai-panel-wrapper" :style="{ width: aiPanelWidth + 'px', minWidth: aiPanelWidth + 'px' }">
+                    <div class="ai-panel-resize-handle" @mousedown.prevent="startAiPanelResize"></div>
+                    <AiChatPanel
+                        ref="aiPanelRef"
+                        :chatMessages="chatMessages"
+                        :aiQuestion="aiQuestion"
+                        :aiGenerating="aiGenerating"
+                        :selectedAiModel="selectedAiModel"
+                        :aiModelList="aiModelList"
+                        :aiModelLoading="aiModelLoading"
+                        :editorHasCode="editorHasCode"
+                        @close="aiPanelVisible = false"
+                        @update:aiQuestion="v => aiQuestion = v"
+                        @update:selectedAiModel="v => selectedAiModel = v"
+                        @send="sendAiQuestion"
+                        @cancel="cancelAiGeneration"
+                        @apply-code="applyCodeToEditor"
+                        @insert-at-cursor="insertCodeAtCursor"
+                        @use-example="useExample"
+                    />
+                </div>
             </transition>
         </div>
 
@@ -299,6 +307,15 @@ import {
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
 
+// 模块级常量，所有实例共享，避免重复创建
+const JS_KEYWORDS = [
+    'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete',
+    'do', 'else', 'export', 'extends', 'finally', 'for', 'function', 'if', 'import',
+    'in', 'instanceof', 'let', 'new', 'return', 'super', 'switch', 'this', 'throw',
+    'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'async', 'await',
+    'of', 'static', 'get', 'set', 'true', 'false', 'null', 'undefined'
+];
+
 // 禁用属性继承
 defineOptions({
     inheritAttrs: false
@@ -424,13 +441,6 @@ const RandomValue = ref(Math.random());
 // V8代码提示相关
 let completionProviderRegistered = false;
 let globalCompletionProvider = null;
-const keywords = [
-    'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete',
-    'do', 'else', 'export', 'extends', 'finally', 'for', 'function', 'if', 'import',
-    'in', 'instanceof', 'let', 'new', 'return', 'super', 'switch', 'this', 'throw',
-    'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'async', 'await',
-    'of', 'static', 'get', 'set', 'true', 'false', 'null', 'undefined'
-];
 const tables = {}; // 可根据需要填充表格数据
 
 onBeforeUnmount(() => {
@@ -445,11 +455,26 @@ onBeforeUnmount(() => {
         aiAbortController = null;
     }
     
-    // 清理编辑器实例
+    // 清理 ResizeObserver
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+    }
+    
+    // 清理编辑器实例：先销毁 Model 再销毁 Editor
     if (monacoEditor) {
+        const model = monacoEditor.getModel();
         monacoEditor.dispose();
+        if (model) {
+            model.dispose();
+        }
         monacoEditor = null;
     }
+    
+    // 清理聊天消息中的 reactive 对象引用，释放内存
+    chatMessages.value = [];
+    aiModelList.value = [];
+    selectedAiModel.value = null;
     
     // 注意: globalCompletionProvider是全局共享的，不在这里清理
     // 只有当所有编辑器实例都销毁时才清理，这里不做处理
@@ -492,15 +517,15 @@ const EditorOption = reactive({
     disableLayerHinting: true,
     emptySelectionClipboard: true,
     selectionClipboard: true,
-    automaticLayout: true,
-    codeLens: true,
+    automaticLayout: false,          // 关闭自动布局，避免每个实例创建 ResizeObserver，手动调用 layout()
+    codeLens: false,                  // 关闭 CodeLens 减少内存占用
     scrollBeyondLastLine: false,
-    colorDecorators: true,
-    accessibilitySupport: 'on',
+    colorDecorators: false,           // 关闭颜色装饰器减少内存占用
+    accessibilitySupport: 'off',      // 关闭无障碍支持，避免创建大量无障碍 DOM 树
     lineNumbers: 'on',
     lineNumbersMinChars: 5,
     enableSplitViewResizing: false,
-    wordBasedSuggestions: true,
+    wordBasedSuggestions: false,       // 关闭基于单词的建议，减少文档扫描内存
     autoIndex: true,
     lineHeight: 20,
     fontSize: 12,
@@ -509,15 +534,15 @@ const EditorOption = reactive({
     quickSuggestions: true,
     quickSuggestionsDelay: 500,
     cursorStyle: 'line',
-    glyphMargin: true,
+    glyphMargin: false,                // 关闭行号左侧边距区域
     wordWrap: true,
     contextmenu: true,
     lineDecorationsWidth: 0,
     minimap: {
-        enabled: true,
+        enabled: false,                // 关闭 minimap 减少内存占用（每个实例都会渲染缩略图）
     },
-    formatOnType: true,
-    formatOnPaste: true,
+    formatOnType: false,               // 关闭输入时自动格式化
+    formatOnPaste: false,              // 关闭粘贴时自动格式化
     largeFileOptimizations: true,
     mouseWheelZoom: true,
     // 强制从左到右显示，解决 RTL 环境下光标位置错误的问题
@@ -543,18 +568,21 @@ const applyLargeFileOptions = (text) => {
         });
     } else {
         monacoEditor.updateOptions({
-            minimap: { enabled: true },
+            minimap: { enabled: false },
             wordWrap: true,
-            codeLens: true,
-            colorDecorators: true,
+            codeLens: false,
+            colorDecorators: false,
             quickSuggestions: true,
-            wordBasedSuggestions: true,
-            formatOnType: true,
-            formatOnPaste: true,
+            wordBasedSuggestions: false,
+            formatOnType: false,
+            formatOnPaste: false,
             renderValidationDecorations: 'editable'
         });
     }
 };
+
+// 使用单个 ResizeObserver 替代 automaticLayout（后者每个实例都创建独立的 ResizeObserver）
+let resizeObserver = null;
 
 onMounted(() => {
     // Mini模式下不自动初始化编辑器，等用户点击按钮后再初始化
@@ -646,7 +674,7 @@ const Init = async () => {
     if (!window.__monacoV8CompletionRegistered) {
         window.__monacoV8CompletionRegistered = true;
         globalCompletionProvider = monaco.languages.registerCompletionItemProvider('javascript', {
-            triggerCharacters: ['.', ' ', ...keywords],
+            triggerCharacters: ['.', ' ', ...JS_KEYWORDS],
             provideCompletionItems: (model, position) => {
                 let suggestions = [];
                 const { lineNumber, column } = position;
@@ -695,7 +723,7 @@ const Init = async () => {
                     // JavaScript关键字
                     suggestions = [
                         ...suggestions,
-                        ...keywords.map((key) => ({
+                        ...JS_KEYWORDS.map((key) => ({
                             label: key,
                             kind: monaco.languages.CompletionItemKind.Keyword,
                             insertText: key,
@@ -797,6 +825,17 @@ const Init = async () => {
             emits('ModelChange', changeContent);
             emits('CallbackFormValueChange', props.field, changeContent);
         });
+        
+        // 使用 ResizeObserver 监听容器大小变化，替代 automaticLayout
+        const containerEl = document.getElementById('monaco-container-' + (props.field && props.field.Id) + '-' + RandomValue.value);
+        if (containerEl && typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(() => {
+                if (monacoEditor) {
+                    monacoEditor.layout();
+                }
+            });
+            resizeObserver.observe(containerEl);
+        }
     } else {
         UpdateInit();
     }
@@ -969,6 +1008,14 @@ const chatMessages = ref([]);
 const aiPanelRef = ref(null);
 let aiAbortController = null;
 
+// AI 面板宽度（可拖拽调整）
+const aiPanelWidth = ref(380);
+
+// 编辑器是否有代码（传给AiChatPanel用于切换提示文案）
+const editorHasCode = computed(() => {
+    return !!(ModelValue.value?.trim());
+});
+
 // AI 模型选择
 const aiModelList = ref([]);
 const selectedAiModel = ref(null);
@@ -1002,22 +1049,15 @@ const toggleAiPanel = () => {
     if (aiPanelVisible.value) {
         loadAiModelList();
         loadChatHistory();
-        nextTick(() => {
-            if (monacoEditor) monacoEditor.layout();
-        });
-    } else {
-        nextTick(() => {
-            if (monacoEditor) monacoEditor.layout();
-        });
     }
 };
 
-// 监听面板状态变化，重新布局编辑器
-watch(aiPanelVisible, () => {
+// 动画完成后重新layout编辑器（避免在动画过程中layout导致尺寸错误）
+const onAiPanelTransitionEnd = () => {
     nextTick(() => {
         if (monacoEditor) monacoEditor.layout();
     });
-});
+};
 
 const formatTime = () => {
     const now = new Date();
@@ -1036,7 +1076,7 @@ const useExample = (text) => {
 
 
 // 从AI完整响应中分离自然语言和代码
-const parseAiResponse = (text) => {
+const parseAiResponse = (text, hasExistingCode = false) => {
     if (!text) return { explanation: '', code: '' };
     
     // 匹配所有 ```xxx ... ``` 代码块
@@ -1055,14 +1095,23 @@ const parseAiResponse = (text) => {
     // 收拢多余空行
     explanation = explanation.replace(/\n{3,}/g, '\n\n').trim();
     
-    // 如果没找到代码块，可能AI没用围栏，整段当作代码
+    // 如果没找到代码块：
+    // - 编辑器有代码时，说明用户在问问题，整段视为自然语言回答
+    // - 编辑器无代码时，整段视为代码（向后兼容）
     if (!code) {
-        code = text.trim();
-        explanation = '';
+        if (hasExistingCode) {
+            explanation = text.trim();
+            code = '';
+        } else {
+            code = text.trim();
+            explanation = '';
+        }
     }
     
-    // 去除代码中所有空行，保持紧凑
-    code = code.replace(/\n{2,}/g, '\n').trim();
+    // 去除代码中多余空行，保持紧凑
+    if (code) {
+        code = code.replace(/\n{2,}/g, '\n').trim();
+    }
     
     return { explanation, code };
 };
@@ -1133,6 +1182,11 @@ const sendAiQuestion = async () => {
     const question = aiQuestion.value.trim();
     if (!question || aiGenerating.value) return;
     
+    if (!selectedAiModel.value || !selectedAiModel.value.AiModel) {
+        DiyCommon.Tips('请先选择AI模型', false);
+        return;
+    }
+    
     // 添加用户消息
     const userMsg = {
         role: 'user',
@@ -1165,6 +1219,10 @@ const sendAiQuestion = async () => {
         const osClient = DiyCommon.GetOsClient();
         const token = getToken();
         
+        // 捕获当前编辑器代码状态（发送前快照，用于判断是否自动应用）
+        const currentEditorCode = monacoEditor?.getValue()?.trim() || '';
+        const editorHadCode = currentEditorCode.length > 0;
+        
         aiAbortController = new AbortController();
         
         const response = await fetch(`${apiBase}/api/Ai/NL2V8Engine`, {
@@ -1177,7 +1235,8 @@ const sendAiQuestion = async () => {
                 Question: question,
                 AiModelId: selectedAiModel.value?.Id || '',
                 AiModel: selectedAiModel.value?.AiModel || '',
-                OsClient: osClient
+                OsClient: osClient,
+                CurrentCode: currentEditorCode
             }),
             signal: aiAbortController.signal
         });
@@ -1191,107 +1250,152 @@ const sendAiQuestion = async () => {
         let buffer = '';
         let fullCode = '';
         let currentEventType = '';
+        let currentDataLines = [];
         
-        while (true) {
+        // 处理一个完整的SSE事件（按SSE规范：空行触发事件派发）
+        let thinkingContent = ''; // AI思考过程内容
+        const dispatchSseEvent = () => {
+            if (!currentEventType && currentDataLines.length === 0) return;
+            // SSE规范：多个data行用\n连接
+            const data = currentDataLines.join('\n');
+            currentDataLines = [];
+            
+            switch (currentEventType) {
+                case 'message':
+                    fullCode += data;
+                    // 分离思考内容和代码内容
+                    // 已闭合的 <think>...</think>
+                    let displayContent = fullCode.replace(/<think>[\s\S]*?<\/think>/g, '');
+                    // 未闭合的 <think>...（流式中途）
+                    const unclosedMatch = displayContent.match(/<think>([\s\S]*)$/);
+                    if (unclosedMatch) {
+                        thinkingContent = unclosedMatch[1];
+                        displayContent = displayContent.replace(/<think>[\s\S]*$/, '');
+                    }
+                    // 提取所有已闭合的思考内容
+                    const thinkMatches = fullCode.match(/<think>([\s\S]*?)<\/think>/g);
+                    if (thinkMatches) {
+                        thinkingContent = thinkMatches.map(m => m.replace(/<\/?think>/g, '')).join('\n');
+                    }
+                    aiMsg.thinking = thinkingContent;
+                    aiMsg.content = displayContent.trim() || (thinkingContent ? '💭 AI正在思考中...' : '');
+                    scrollToBottom();
+                    break;
+                    
+                case 'result':
+                    try {
+                        const result = JSON.parse(data);
+                        aiMsg.metadata = {
+                            RelevantDocs: result.RelevantDocs || [],
+                            RelevantTables: result.RelevantTables || [],
+                            Source: result.Source || ''
+                        };
+                    } catch (e) {
+                        console.warn('[AI Chat] result JSON解析失败:', e.message);
+                    }
+                    break;
+                    
+                case 'error':
+                    aiMsg.content = data || '生成失败，请稍后重试';
+                    aiMsg.status = 'error';
+                    aiGenerating.value = false;
+                    scrollToBottom();
+                    return 'stop';
+                    
+                case 'done':
+                    aiGenerating.value = false;
+                    
+                    if (!fullCode.trim()) {
+                        // 没有收到任何代码内容（可能后端返回了错误但未通过error事件）
+                        aiMsg.content = aiMsg.content || '未收到有效响应，请检查AI模型配置';
+                        aiMsg.status = 'error';
+                        scrollToBottom();
+                        return 'stop';
+                    }
+                    
+                    aiMsg.status = 'done';
+                    // 解析前先去除 <think> 标签内容
+                    const codeWithoutThink = fullCode.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/, '').trim();
+                    const parsed = parseAiResponse(codeWithoutThink, editorHadCode);
+                    const cleanCode = parsed.code;
+                    const explanation = parsed.explanation;
+                    
+                    aiMsg.content = explanation || (cleanCode ? '代码生成完成' : fullCode);
+                    aiMsg.code = cleanCode;
+                    
+                    // 仅当编辑器为空时自动应用代码；编辑器有代码时需用户手动点击"应用到编辑器"
+                    if (cleanCode && monacoEditor && !editorHadCode) {
+                        isSelfUpdating = true;
+                        monacoEditor.setValue(cleanCode);
+                        ModelValue.value = cleanCode;
+                        emits('update:modelValue', cleanCode);
+                        emits('ModelChange', cleanCode);
+                        emits('CallbackFormValueChange', props.field, cleanCode);
+                    }
+                    
+                    saveChatRecord({
+                        role: 'ai',
+                        content: aiMsg.content,
+                        time: aiMsg.time,
+                        status: 'done',
+                        code: cleanCode,
+                        metadata: aiMsg.metadata
+                    });
+                    
+                    scrollToBottom();
+                    if (cleanCode && !editorHadCode) {
+                        DiyCommon.Tips('代码已自动应用到编辑器', true);
+                    } else if (cleanCode) {
+                        DiyCommon.Tips('代码生成完成，点击「应用到编辑器」按钮可替换当前代码', true);
+                    } else {
+                        DiyCommon.Tips('回答完成', true);
+                    }
+                    return 'stop';
+            }
+            
+            currentEventType = '';
+        };
+        
+        let stopped = false;
+        while (!stopped) {
             const { done, value } = await reader.read();
             if (done) break;
             
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop(); // 保留不完整的行
+            buffer = lines.pop();
             
             for (const line of lines) {
-                if (line.startsWith('event:')) {
-                    currentEventType = line.substring(6).trim();
-                } else if (line.startsWith('data:')) {
-                    // SSE规范：data:后的第一个空格应被忽略
-                    const rawData = line.substring(5);
+                const trimmedLine = line.replace(/\r$/, ''); // 处理\r\n
+                
+                if (trimmedLine === '') {
+                    // 空行 = 事件边界，派发当前累积的事件
+                    const result = dispatchSseEvent();
+                    if (result === 'stop') { stopped = true; break; }
+                } else if (trimmedLine.startsWith('event:')) {
+                    currentEventType = trimmedLine.substring(6).trim();
+                } else if (trimmedLine.startsWith('data:')) {
+                    const rawData = trimmedLine.substring(5);
                     const data = rawData.startsWith(' ') ? rawData.substring(1) : rawData;
-                    
-                    switch (currentEventType) {
-                        case 'message':
-                            // 后端SSE每条message是一个token
-                            // 当token是换行符\n时，它会被buffer.split('\n')消费，
-                            // 导致data为空字符串，因此空data应还原为\n
-                            const chunk = data === '' ? '\n' : data;
-                            fullCode += chunk;
-                            
-                            // 在聊天面板实时显示AI响应（打字机效果）
-                            aiMsg.content = fullCode;
-                            scrollToBottom();
-                            break;
-                            
-                        case 'result':
-                            // 最终元数据
-                            try {
-                                const result = JSON.parse(data);
-                                aiMsg.metadata = {
-                                    RelevantDocs: result.RelevantDocs || [],
-                                    RelevantTables: result.RelevantTables || [],
-                                    Source: result.Source || ''
-                                };
-                            } catch {}
-                            break;
-                            
-                        case 'error':
-                            aiMsg.content = data || '生成失败，请稍后重试';
-                            aiMsg.status = 'error';
-                            aiGenerating.value = false;
-                            scrollToBottom();
-                            return;
-                            
-                        case 'done':
-                            aiMsg.status = 'done';
-                            aiGenerating.value = false;
-                            
-                            // 分离自然语言和代码
-                            const parsed = parseAiResponse(fullCode);
-                            const cleanCode = parsed.code;
-                            const explanation = parsed.explanation;
-                            
-                            // 聊天面板显示自然语言说明（如果有的话）
-                            aiMsg.content = explanation || '代码生成完成';
-                            aiMsg.code = cleanCode;
-                            
-                            // 纯代码写入编辑器
-                            if (cleanCode && monacoEditor) {
-                                isSelfUpdating = true;
-                                monacoEditor.setValue(cleanCode);
-                                ModelValue.value = cleanCode;
-                                emits('update:modelValue', cleanCode);
-                                emits('ModelChange', cleanCode);
-                                emits('CallbackFormValueChange', props.field, cleanCode);
-                            }
-                            
-                            // 保存 AI 回复记录
-                            saveChatRecord({
-                                role: 'ai',
-                                content: aiMsg.content,
-                                time: aiMsg.time,
-                                status: 'done',
-                                code: cleanCode,
-                                metadata: aiMsg.metadata
-                            });
-                            
-                            scrollToBottom();
-                            DiyCommon.Tips('代码生成完成', true);
-                            return;
-                    }
+                    currentDataLines.push(data);
                 }
+                // 忽略其他行（注释行以:开头等）
             }
         }
         
         // 如果流正常结束但没收到 done 事件
         if (aiMsg.status === 'generating') {
-            const parsed = parseAiResponse(fullCode);
+            const codeWithoutThinkFallback = fullCode.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/, '').trim();
+            const parsed = parseAiResponse(codeWithoutThinkFallback, editorHadCode);
             const cleanCode = parsed.code;
             const explanation = parsed.explanation;
-            aiMsg.content = cleanCode ? (explanation || '代码生成完成') : '未收到有效响应';
-            aiMsg.status = cleanCode ? 'done' : 'error';
+            aiMsg.content = cleanCode ? (explanation || '代码生成完成') : (explanation || '未收到有效响应');
+            aiMsg.status = cleanCode ? 'done' : (explanation ? 'done' : 'error');
             aiMsg.code = cleanCode;
             aiGenerating.value = false;
             if (cleanCode) {
-                if (monacoEditor) {
+                // 仅当编辑器为空时自动应用
+                if (monacoEditor && !editorHadCode) {
                     monacoEditor.setValue(cleanCode);
                 }
                 isSelfUpdating = true;
@@ -1345,6 +1449,50 @@ const applyCodeToEditor = (code) => {
     }
 };
 
+// 插入代码到光标位置
+const insertCodeAtCursor = (code) => {
+    if (monacoEditor && code) {
+        const selection = monacoEditor.getSelection();
+        const id = { major: 1, minor: 1 };
+        const op = { identifier: id, range: selection, text: code, forceMoveMarkers: true };
+        monacoEditor.executeEdits('ai-insert', [op]);
+        // 同步值
+        const newValue = monacoEditor.getValue();
+        isSelfUpdating = true;
+        ModelValue.value = newValue;
+        emits('update:modelValue', newValue);
+        emits('ModelChange', newValue);
+        emits('CallbackFormValueChange', props.field, newValue);
+        DiyCommon.Tips('代码已插入到光标位置', true);
+    }
+};
+
+// AI 面板拖拽调整宽度
+const startAiPanelResize = (e) => {
+    const startX = e.clientX;
+    const startWidth = aiPanelWidth.value;
+    
+    const onMouseMove = (moveEvent) => {
+        // 向左拖动 = 增加宽度
+        const delta = startX - moveEvent.clientX;
+        const newWidth = Math.max(280, Math.min(800, startWidth + delta));
+        aiPanelWidth.value = newWidth;
+        if (monacoEditor) monacoEditor.layout();
+    };
+    
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    };
+    
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+};
+
 
 
 // ==================== Mini 模式 ====================
@@ -1360,8 +1508,16 @@ const miniCodeLength = computed(() => {
 
 // 销毁当前编辑器实例（Mini模式弹窗关闭时调用）
 const disposeEditor = () => {
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+    }
     if (monacoEditor) {
+        const model = monacoEditor.getModel();
         monacoEditor.dispose();
+        if (model) {
+            model.dispose();
+        }
         monacoEditor = null;
     }
 };
@@ -1557,9 +1713,33 @@ defineExpose({
     }
 
     // ==================== AI 聊天面板样式 ====================
+    .ai-panel-wrapper {
+        display: flex;
+        flex-shrink: 0;
+        height: 100%;
+        position: relative;
+    }
+
+    .ai-panel-resize-handle {
+        width: 4px;
+        cursor: col-resize;
+        background: transparent;
+        position: absolute;
+        left: -2px;
+        top: 0;
+        bottom: 0;
+        z-index: 10;
+        transition: background 0.2s;
+
+        &:hover,
+        &:active {
+            background: #667eea;
+        }
+    }
+
     .ai-chat-panel {
-        width: 380px;
-        min-width: 380px;
+        width: 100%;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         background: #1a1a2e;
@@ -1836,6 +2016,33 @@ defineExpose({
             }
         }
 
+        .ai-thinking-block {
+            margin: 0 0 8px 0;
+            border: 1px solid #30305a;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #1a1a2e;
+
+            summary {
+                padding: 4px 8px;
+                cursor: pointer;
+                font-size: 11px;
+                color: #a78bfa;
+                user-select: none;
+                background: #242445;
+            }
+
+            .ai-thinking-content {
+                padding: 6px 8px;
+                font-size: 11px;
+                color: #94a3b8;
+                line-height: 1.4;
+                max-height: 150px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+            }
+        }
+
         .ai-error-text {
             color: #f87171 !important;
             .el-icon {
@@ -1891,12 +2098,20 @@ defineExpose({
         }
     }
 
-    // AI 面板展开/收起动画
+    // AI 面板展开/收起动画（使用CSS transition适配动态宽度）
+    .ai-slide-enter-from,
+    .ai-slide-leave-to {
+        width: 0 !important;
+        min-width: 0 !important;
+        opacity: 0;
+    }
     .ai-slide-enter-active {
-        animation: ai-slide-in 0.3s ease;
+        transition: width 0.3s ease, min-width 0.3s ease, opacity 0.3s ease;
+        overflow: hidden;
     }
     .ai-slide-leave-active {
-        animation: ai-slide-in 0.25s ease reverse;
+        transition: width 0.25s ease, min-width 0.25s ease, opacity 0.25s ease;
+        overflow: hidden;
     }
 }
 
@@ -1912,11 +2127,6 @@ defineExpose({
 @keyframes ai-msg-in {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ai-slide-in {
-    from { width: 0; min-width: 0; opacity: 0; }
-    to { width: 380px; min-width: 380px; opacity: 1; }
 }
 
 // Mini模式按钮样式
