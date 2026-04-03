@@ -1,5 +1,5 @@
 <template>
-  <div class="go-view-editor-wrapper" v-loading="loading">
+  <div class="go-view-editor-wrapper" :style="wrapperStyle" v-loading="loading">
     <!-- NaiveUI 主题提供器 -->
     <n-config-provider :theme="darkTheme" :theme-overrides="overridesTheme">
       <n-message-provider>
@@ -15,11 +15,12 @@
 </template>
 
 <script>
-import { defineComponent, defineAsyncComponent, ref, onMounted, getCurrentInstance, nextTick } from 'vue'
+import { defineComponent, defineAsyncComponent, ref, onMounted, getCurrentInstance, nextTick, computed } from 'vue'
 import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { DiyCommon } from '@/utils/diy.common'
 import { setupGoView } from './setup.js'
 import GoViewMessageInject from './GoViewMessageInject.vue'
+import { useDiyStore } from '@/pinia'
 
 export default defineComponent({
   name: 'GoViewEditor',
@@ -30,6 +31,17 @@ export default defineComponent({
     NNotificationProvider,
     GoViewMessageInject,
     ChartEditor: defineAsyncComponent(() => import('./src/views/chart/index.vue'))
+  },
+  setup() {
+    const diyStore = useDiyStore()
+    const wrapperStyle = computed(() => {
+      // 根据导航栏和全屏状态动态计算高度
+      const navbarHeight = diyStore.ShowClassicTop !== 0 ? 50 : 0
+      const tabsHeight = 33
+      const offset = navbarHeight + tabsHeight
+      return { height: `calc(100vh - ${offset}px)` }
+    })
+    return { wrapperStyle }
   },
   data() {
     return {
@@ -122,9 +134,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .go-view-editor-wrapper {
-  --goview-top-offset: 82px;
   width: 100%;
-  height: calc(100vh - var(--goview-top-offset));
   overflow: hidden;
   position: relative;
   // 隔离宿主框架的全局样式对 go-view 的影响

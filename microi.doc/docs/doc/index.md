@@ -74,6 +74,11 @@
     <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg"/></td>
   </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg"/></td>
+  </tr>
 </table>
 
 ---

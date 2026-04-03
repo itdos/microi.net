@@ -79,6 +79,12 @@ namespace Microi.net.Api
                 {
                     return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", clientModel.OsClientModel["Lang"].Val<string>()) + "。 DynamicApiEngine.Init()。");
                 }
+                // 跳过没有数据库连接的租户
+                var dbConn = clientModel.OsClientModel?["DbConn"]?.ToString();
+                if (string.IsNullOrWhiteSpace(dbConn))
+                {
+                    return new DosResult(0, null, $"DynamicApiEngine.Init() 跳过租户 {clientModel.OsClient}：DbConn未配置。");
+                }
                 //取 Sys_ApiEngine 所有 ApiAddress
                 var _where = new List<DiyWhere>() {
                         new DiyWhere(){

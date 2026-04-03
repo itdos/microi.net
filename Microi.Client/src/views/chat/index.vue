@@ -294,6 +294,7 @@
                                         :placeholder="!DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? '输入文字或Ctrl+V粘贴图片...' : '请选择一个聊天对象！'"
                                         :contenteditable="!DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? true : false"
                                         style="user-select: text; -webkit-user-select: text"
+                                        @keydown="handleEditorKeydown"
                                     ></div>
                                 </div>
                                 <el-button
@@ -923,25 +924,7 @@ export default {
             });
         }
 
-        // 为输入框添加Enter键监听
-        self.$nextTick(function() {
-            const editor = document.getElementById('J__wcEditor');
-            if (editor) {
-                editor.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        if (e.shiftKey) {
-                            // Shift+Enter：换行（默认行为）
-                            return true;
-                        } else {
-                            // Enter：发送消息
-                            e.preventDefault();
-                            self.SendMessage();
-                            return false;
-                        }
-                    }
-                });
-            }
-        });
+        // Enter键监听已迁移到模板 @keydown="handleEditorKeydown"
 
         self.$nextTick(function () {
             // 检查设备类型：只有PC端才初始化聊天
@@ -1502,6 +1485,14 @@ export default {
         formatMessageContent,
         renderDataTable,
         escapeHtml,
+        handleEditorKeydown(e) {
+            // IME输入法正在组合中（如中文拼音选字），不处理
+            if (e.isComposing || e.keyCode === 229) return;
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.SendMessage();
+            }
+        },
         SendMessage() {
             var self = this;
             
