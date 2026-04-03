@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -296,6 +296,10 @@ namespace Microi.net.Api.Controllers
 
                 if (!string.IsNullOrEmpty(ReturnUrl))
                 {
+                    if (!CommonHelper.IsUrlSafe(ReturnUrl))
+                    {
+                        return Content("返回URL验证失败：不允许的URL格式");
+                    }
                     return Redirect(ReturnUrl);
                 }
                 if (uptSysUserResult.Code == 1)
