@@ -73,9 +73,8 @@ useInitVChartsTheme(chartEditStore)
 <style lang="scss" scoped>
 @include go('preview') {
   position: relative;
-  height: 100vh;
-  width: 100vw;
-  max-width: 100%;
+  height: 100%;
+  width: 100%;
   @include background-image('background-image');
   &.fit,
   &.full {

@@ -59,8 +59,11 @@
               </view>
               <!-- 普通文本消息 -->
               <view v-else>
+                <view v-if="msg.isThinking" class="thinking-indicator">
+                  <text>... 正在思考</text>
+                </view>
                 <rich-text :nodes="formatContent(msg.Content)" class="bubble-richtext"></rich-text>
-                <text class="streaming-cursor" v-if="msg.isStreaming">▌</text>
+                <text class="streaming-cursor" v-if="msg.isStreaming && !msg.isThinking">▌</text>
               </view>
             </view>
             <view class="bubble-meta">
@@ -82,6 +85,21 @@
 
     <!-- 底部输入区域 -->
     <view class="chat-input-area">
+      <!-- AI模型选择器 -->
+      <view v-if="isAIChat" class="ai-model-bar">
+        <text class="ai-model-label">AI模型：</text>
+        <picker
+          :range="aiModelList"
+          range-key="Name"
+          :value="selectedAiModelIndex"
+          @change="selectedAiModelIndex = $event.detail.value"
+        >
+          <view class="ai-model-picker">
+            <text>{{ selectedAiModel ? selectedAiModel.Name : '选择模型' }}</text>
+            <text class="picker-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
       <view class="input-row">
         <view class="input-wrap">
           <textarea
@@ -188,6 +206,10 @@ export default {
       currentStreamMessage: null,
       wsConnected: false,
       _pollTimer: null,
+      // AI模型选择
+      aiModelList: [],
+      selectedAiModelIndex: -1,
+      aiModelLoading: false,
       // SignalR 事件回调引用
       _onReceiveChatRecord: null,
       _onReceiveMessage: null,
@@ -200,6 +222,15 @@ export default {
   computed: {
     currentUser() {
       return getUser() || {}
+    },
+    isAIChat() {
+      return this.chatId === 'AI'
+    },
+    selectedAiModel() {
+      if (this.selectedAiModelIndex >= 0 && this.selectedAiModelIndex < this.aiModelList.length) {
+        return this.aiModelList[this.selectedAiModelIndex]
+      }
+      return null
     }
   },
 
@@ -229,6 +260,11 @@ export default {
     }
 
     this.loadChatRecord()
+
+    // AI聊天时加载模型列表
+    if (this.isAIChat) {
+      this.loadAiModelList()
+    }
 
     // 监听 SignalR 重连事件，自动重新订阅
     this._onReconnected = () => {
@@ -281,6 +317,27 @@ export default {
         fail: () => {
           uni.switchTab({ url: '/pages/message/index' })
         }
+      })
+    },
+
+    // 加载AI模型列表
+    loadAiModelList() {
+      this.aiModelLoading = true
+      post('/api/FormEngine/GetTableData/mic_ai', {
+        _Where: [['IsEnable', '=', '1']],
+        _OrderBy: 'CreateTime',
+        _OrderByType: 'DESC',
+        _PageSize: 100
+      }).then(result => {
+        this.aiModelLoading = false
+        if (result && result.Code === 1 && result.Data && result.Data.length > 0) {
+          this.aiModelList = result.Data
+          if (this.selectedAiModelIndex < 0) {
+            this.selectedAiModelIndex = 0
+          }
+        }
+      }).catch(() => {
+        this.aiModelLoading = false
       })
     },
 
@@ -390,6 +447,28 @@ export default {
           if (toUserId !== userId) return
           // isComplete类型容错
           const complete = isComplete === true || isComplete === 'true'
+
+          // [THINKING] 信号：创建"思考中"占位消息
+          if (chunk === '[THINKING]') {
+            if (!this.currentStreamMessage) {
+              this.currentStreamMessage = {
+                id: 'ai-stream-' + Date.now(),
+                Type: 'text',
+                Content: '',
+                SendTime: new Date().toISOString(),
+                FromUserId: fromUserId,
+                ToUserId: toUserId,
+                isSelf: false,
+                senderName: this.chatName,
+                isStreaming: true,
+                isThinking: true
+              }
+              this.messages.push(this.currentStreamMessage)
+              this.$nextTick(() => this.scrollToBottom())
+            }
+            return
+          }
+
           if (!this.currentStreamMessage) {
             // 创建新的流式消息
             this.currentStreamMessage = {
@@ -401,13 +480,17 @@ export default {
               ToUserId: toUserId,
               isSelf: false,
               senderName: this.chatName,
-              isStreaming: true
+              isStreaming: true,
+              isThinking: false
             }
             this.messages.push(this.currentStreamMessage)
           } else {
-            // 追加内容到现有消息
+            // 追加内容到现有消息，取消思考状态
             const idx = this.messages.findIndex(m => m.id === this.currentStreamMessage.id)
             if (idx !== -1) {
+              if (this.messages[idx].isThinking) {
+                this.messages[idx].isThinking = false
+              }
               this.messages[idx].Content = (this.messages[idx].Content || '') + (chunk || '')
               // 保持引用同步
               this.currentStreamMessage = this.messages[idx]
@@ -480,7 +563,8 @@ export default {
         ToUserAvatar: '',
         FromUserId: user.Id || '',
         FromUserName: user.Name || '',
-        FromUserAvatar: user.Avatar || ''
+        FromUserAvatar: user.Avatar || '',
+        OtherInfo: this.isAIChat && this.selectedAiModel ? JSON.stringify({ AiModel: this.selectedAiModel.AiModel }) : ''
       }
 
       try {
@@ -1038,5 +1122,42 @@ export default {
     font-size: 36rpx;
     color: #ccc;
   }
+}
+
+/* AI模型选择栏 */
+.ai-model-bar {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 24rpx;
+  background: #f8f8f8;
+  border-bottom: 1rpx solid #e8e8e8;
+}
+.ai-model-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-right: 12rpx;
+  white-space: nowrap;
+}
+.ai-model-picker {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  background: #fff;
+  border-radius: 8rpx;
+  border: 1rpx solid #ddd;
+  font-size: 26rpx;
+  color: #333;
+}
+.picker-arrow {
+  margin-left: 8rpx;
+  color: #999;
+  font-size: 22rpx;
+}
+
+/* 思考中指示器 */
+.thinking-indicator {
+  color: #999;
+  font-size: 26rpx;
+  padding: 4rpx 0;
 }
 </style>
