@@ -1,4 +1,4 @@
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：
 * Copyright(c) www.iTdos.com
@@ -19,6 +19,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 using Dos.Common.Helper;
+
 namespace Dos.Common
 {
     /// <summary>
@@ -44,6 +45,45 @@ namespace Dos.Common
             return "";
         }
 #endif
+        /// <summary>
+        /// 验证URL是否安全，防止开放重定向和SSRF攻击（CVE-2024-22262等）
+        /// </summary>
+        /// <param name="url">待验证的URL</param>
+        /// <param name="allowedHosts">允许的主机名列表（可选）</param>
+        /// <returns>如果URL安全返回true，否则返回false</returns>
+        public static bool IsUrlSafe(string url, IEnumerable<string> allowedHosts = null)
+        {
+            if (url.DosIsNullOrWhiteSpace())
+                return false;
+
+            try
+            {
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                    return false;
+
+                var scheme = uri.Scheme?.ToLower();
+                if (scheme != "http" && scheme != "https")
+                    return false;
+
+                var host = uri.Host;
+                if (host.DosIsNullOrWhiteSpace())
+                    return false;
+
+                if (allowedHosts != null && allowedHosts.Any())
+                {
+                    var allowedList = allowedHosts.Select(h => h.ToLower()).ToList();
+                    if (!allowedList.Contains(host.ToLower()))
+                        return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         #region 取首字母
         /// <summary>
         /// 获取汉字首字母（可包含多个汉字）
