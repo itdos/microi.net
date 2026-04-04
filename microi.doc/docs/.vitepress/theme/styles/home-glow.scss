@@ -228,14 +228,17 @@ body:has(.VPHome) {
 // 特色卡片增强
 .VPFeature {
   position: relative;
-  background: rgba(20, 20, 35, 0.8) !important;
-  border: 1px solid rgba(138, 43, 226, 0.2) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
   transform: translateY(0) !important;
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
   transition: transform 0.45s ease-out,
               box-shadow 0.45s ease-out,
               border-color 0.45s ease-out,
-              background 0.45s ease-out !important;
+              background 0.45s ease-out,
+              backdrop-filter 0.45s ease-out !important;
   overflow: hidden;
   
   // 光晕层
@@ -244,7 +247,7 @@ body:has(.VPHome) {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.15) 0%, transparent 70%);
+    background: radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.12) 0%, transparent 70%);
     opacity: 0;
     transition: opacity 0.45s ease-out;
     pointer-events: none;
@@ -252,10 +255,12 @@ body:has(.VPHome) {
   }
   
   &:hover {
-    background: rgba(30, 30, 50, 0.9) !important;
-    border-color: rgba(138, 43, 226, 0.5) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(138, 43, 226, 0.45) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
     transform: translateY(-8px) !important;
-    box-shadow: 0 20px 50px rgba(138, 43, 226, 0.25) !important;
+    box-shadow: 0 20px 50px rgba(138, 43, 226, 0.25), 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
     
     &::after {
       opacity: 1;
