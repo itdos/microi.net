@@ -16,6 +16,7 @@
 #endregion
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Configuration;
@@ -29,7 +30,7 @@ namespace Dos.ORM
     {
         #region Private Members
 
-        private static Dictionary<string, DbProvider> providerCache = new Dictionary<string, DbProvider>();
+        private static readonly ConcurrentDictionary<string, DbProvider> providerCache = new ConcurrentDictionary<string, DbProvider>();
 
         private ProviderFactory() { }
 
@@ -172,26 +173,28 @@ namespace Dos.ORM
                 }
             }
 
-            string cacheKey = string.Concat(assemblyName, className, connectionString);
-            if (providerCache.ContainsKey(cacheKey))
+            string cacheKey = string.Concat(className, connectionString);
+            return providerCache.GetOrAdd(cacheKey, _ =>
             {
-                return providerCache[cacheKey];
-            }
-            else
-            {
-                System.Reflection.Assembly ass;
-
-                ass = assemblyName == null ? typeof(DbProvider).Assembly
-                    : System.Reflection.Assembly.Load(assemblyName);
-
-                DbProvider retProvider = ass.CreateInstance(className, false, System.Reflection.BindingFlags.Default, null, new object[] { connectionString }, null, null) as DbProvider;
-                if (retProvider != null && databaseType != null)
+                DbProvider provider = databaseType switch
                 {
-                    retProvider.DatabaseType = databaseType.Value;
-                }
-                providerCache.Add(cacheKey, retProvider);
-                return retProvider;
-            }
+                    DatabaseType.MySql      => new MySql.MySqlProvider(connectionString),
+                    DatabaseType.Oracle     => new Oracle.OracleProvider(connectionString),
+                    DatabaseType.PostgreSql => new PostgreSql.PostgreSqlProvider(connectionString),
+                    DatabaseType.DaMeng    => new DaMeng.DaMengProvider(connectionString),
+                    DatabaseType.KingBase  => new KingBase.KingBaseProvider(connectionString),
+                    DatabaseType.MsAccess  => new MsAccess.MsAccessProvider(connectionString),
+                    DatabaseType.SqlServer9 => new SqlServer9.SqlServer9Provider(connectionString),
+                    DatabaseType.Sqlite3   => System.Reflection.Assembly.Load("Dos.ORM.Sqlite")
+                                                 .CreateInstance("Dos.ORM.Sqlite.SqliteProvider", false,
+                                                     System.Reflection.BindingFlags.Default, null,
+                                                     new object[] { connectionString }, null, null) as DbProvider,
+                    _                      => new SqlServer.SqlServerProvider(connectionString),
+                };
+                if (provider != null && databaseType.HasValue)
+                    provider.DatabaseType = databaseType.Value;
+                return provider;
+            });
         }
 
         /// <summary>
