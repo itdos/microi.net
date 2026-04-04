@@ -1217,10 +1217,8 @@ var DiyCommon = {
                 t = 10000;
             }
         } else {
-            if (b) {
-                t = t * 3000;
-            } else {
-                t = t * 10000;
+            if (t < 1000) {
+                t = t * 1000;
             }
         }
 
