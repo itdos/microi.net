@@ -10,15 +10,22 @@
     />
 
     <div class="engine-body">
-      <!-- 左面板 -->
+      <!-- 左面板（合并了预设+场景+材质） -->
       <div class="left-panel">
-        <div class="panel-tabs">
-          <button class="ptab" :class="{ active: leftTab==='scene' }" @click="leftTab='scene'">场景</button>
-          <button class="ptab" :class="{ active: leftTab==='preset' }" @click="leftTab='preset'">预设</button>
-        </div>
-        <div class="panel-body">
-          <SceneTree v-show="leftTab==='scene'" :objects="objects" :lights="lights" :selectedObject="selectedObject" @select="selectObject" />
-          <PresetGallery v-show="leftTab==='preset'" :currentPreset="currentPreset" @select="applyPreset" />
+        <div class="lp-scroll">
+          <!-- 场景预设 -->
+          <div class="lp-section">
+            <div class="lp-title">场景预设</div>
+            <PresetGallery :currentPreset="currentPreset" @select="applyPreset" />
+          </div>
+
+          <!-- 场景对象 -->
+          <div class="lp-section">
+            <div class="lp-title">场景对象</div>
+            <SceneTree :objects="objects" :lights="lights" :selectedObject="selectedObject" @select="selectObject" />
+          </div>
+
+
         </div>
       </div>
 
@@ -43,6 +50,11 @@
           :selectedObject="selectedObject"
           :sceneConfig="sceneConfig"
           :waypoints="waypoints"
+          :materials="materials"
+          :selectedMaterial="selectedMaterial"
+          :materialPresets="materialPresets"
+          :explodeInfo="explodeInfo"
+          :postProcessing="postProcessingConfig"
           @update:background="updateBackground"
           @update:exposure="updateExposure"
           @update:grid="updateGrid"
@@ -56,6 +68,15 @@
           @waypoint:play="togglePlay"
           @waypoint:update="updateWaypoint"
           @waypoint:autoGenerate="autoGenerateWaypoints"
+          @material:select="selectMaterial"
+          @material:prop="onMaterialProp"
+          @material:applyPreset="onMaterialPreset"
+          @material:texture="onMaterialTexture"
+          @hdr:upload="handleHDRUpload"
+          @postProcessing:update="onPostProcessingUpdate"
+          @explode:change="onExplodeChange"
+          @explode:reset="onExplodeReset"
+          @explode:full="onExplodeFull"
         />
       </div>
     </div>
@@ -77,7 +98,6 @@ import Viewport from './components/Viewport.vue';
 let engine = null;
 const viewportRef = ref(null);
 const fileInput = ref(null);
-const leftTab = ref('preset');
 
 const objects = ref([]);
 const lights = ref([]);
@@ -88,8 +108,14 @@ const isPlaying = ref(false);
 const isPaused = ref(false);
 const currentWpIndex = ref(0);
 const waypoints = ref([]);
+const materials = ref([]);
+const selectedMaterial = ref(null);
+const materialPresets = ref([]);
+
+const explodeInfo = ref({ hasTarget: false, partCount: 0 });
 
 const sceneConfig = reactive({ background: '#1a1a2e', exposure: 1.0, showGrid: true, shadows: true, fog: false });
+const postProcessingConfig = reactive({ enabled: false, bloom: { strength: 0.5, radius: 0.4, threshold: 0.85 }, smaa: true });
 
 onMounted(async () => {
   await nextTick();
@@ -98,6 +124,7 @@ onMounted(async () => {
   engine = new Engine(container);
   engine.applyPreset('outdoor');
   currentPreset.value = 'outdoor';
+  materialPresets.value = engine.materialManager.getPresets();
   bindEvents();
 });
 onBeforeUnmount(() => { if (engine) { engine.dispose(); engine = null; } });
@@ -109,6 +136,10 @@ function bindEvents() {
   engine.on('loadStart', () => { viewportRef.value?.setLoading(true); });
   engine.on('loadEnd', () => { viewportRef.value?.setLoading(false); syncScene(); });
   engine.on('loadError', (err) => { viewportRef.value?.setLoading(false); ElMessage.error('加载失败: ' + (err?.message || '')); });
+  engine.on('materialsChanged', (list) => {
+    materials.value = list || [];
+    selectedMaterial.value = null;
+  });
   engine.cameraPath.on('start', () => { isPlaying.value = true; isPaused.value = false; });
   engine.cameraPath.on('stop', () => { isPlaying.value = false; isPaused.value = false; currentWpIndex.value = 0; });
   engine.cameraPath.on('stateChanged', (s) => { isPlaying.value = s.playing; isPaused.value = s.paused; });
@@ -120,6 +151,10 @@ function syncScene() {
   if (!engine) return;
   objects.value = [...engine.objects];
   lights.value = [...engine.lights];
+  explodeInfo.value = {
+    hasTarget: engine?.modelExploder?.hasTarget || false,
+    partCount: engine?.modelExploder?.partCount || 0,
+  };
 }
 
 // 导入
@@ -150,6 +185,48 @@ function selectObject(obj) { engine?.selectObject(obj); }
 function focusSelected() { if (selectedObject.value) engine?.focusObject(selectedObject.value); }
 function deleteSelected() { if (selectedObject.value) engine?.removeObject(selectedObject.value); selectedObject.value = null; }
 function applyPreset(name) { engine?.applyPreset(name); syncScene(); }
+
+// 材质
+function selectMaterial(m) { selectedMaterial.value = selectedMaterial.value?.uuid === m.uuid ? null : m; }
+function onMaterialProp({ material, prop, value }) { engine?.materialManager.setProperty(material, prop, value); }
+function onMaterialPreset({ material, preset }) {
+  engine?.materialManager.applyPreset(material, preset);
+  // 触发材质UI刷新
+  selectedMaterial.value = { ...selectedMaterial.value };
+}
+async function onMaterialTexture({ material, file, mapType }) {
+  try {
+    await engine?.materialManager.applyTextureFromFile(material, file, mapType);
+    ElMessage.success('贴图已应用');
+  } catch (e) {
+    ElMessage.error('贴图加载失败');
+  }
+}
+
+// HDR 环境贴图
+async function handleHDRUpload(file) {
+  if (!engine) return;
+  try {
+    viewportRef.value?.setLoading(true);
+    await engine.loadHDR(file);
+    ElMessage.success('HDR 环境贴图已应用');
+  } catch (e) {
+    ElMessage.error('HDR 加载失败');
+  } finally {
+    viewportRef.value?.setLoading(false);
+  }
+}
+
+// 后处理
+function onPostProcessingUpdate(config) {
+  Object.assign(postProcessingConfig, config);
+  engine?.setPostProcessing(config);
+}
+
+// 模型分解
+function onExplodeChange(factor) { engine?.modelExploder.setFactor(factor); }
+function onExplodeReset() { engine?.modelExploder.animateTo(0); }
+function onExplodeFull() { engine?.modelExploder.animateTo(1); }
 
 // 相机路径
 function addWaypoint() { engine?.cameraPath.addWaypoint(); waypoints.value = [...engine.cameraPath.waypoints]; }
@@ -197,48 +274,47 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeyDown));
 }
 .engine-body { flex: 1; display: flex; overflow: hidden; }
 
-/* === 左面板 === */
+/* === 左面板（合并） === */
 .left-panel {
-  width: 220px;
-  min-width: 220px;
+  width: 230px;
+  min-width: 230px;
   background: linear-gradient(180deg, rgba(14,14,30,0.98), rgba(10,10,22,0.99));
   border-right: 1px solid rgba(56,189,248,0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.panel-tabs {
-  display: flex;
-  padding: 6px 6px 0;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.ptab {
+.lp-scroll {
   flex: 1;
-  padding: 6px 0;
-  border: none;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  color: #475569;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.ptab:hover { color: #94a3b8; }
-.ptab.active {
-  color: #e2e8f0;
-  background: rgba(255,255,255,0.03);
+.lp-scroll::-webkit-scrollbar { width: 3px; }
+.lp-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+.lp-section {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
-.ptab.active::after {
-  content: '';
-  position: absolute; bottom: 0; left: 20%; right: 20%;
-  height: 2px;
-  background: linear-gradient(90deg, #38bdf8, #8b5cf6);
-  border-radius: 2px;
+.lp-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 12px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.panel-body { flex: 1; overflow: hidden; }
+.lp-count {
+  font-size: 9px;
+  padding: 0 5px;
+  background: rgba(245,158,11,0.12);
+  color: #f59e0b;
+  border-radius: 8px;
+}
+
+
 
 /* === 中间视口 === */
 .center-viewport { flex: 1; overflow: hidden; position: relative; }
