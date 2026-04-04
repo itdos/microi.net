@@ -1,5 +1,6 @@
 /**
- * Microi 3D Engine V2 - 基于 Three.js 的轻量级 3D 渲染引擎
+ * Microi 3D Engine V3 - 基于 Three.js 的 3D 渲染引擎
+ * 新增：云层、材质管理、模型分解、相机视角修正
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -9,6 +10,14 @@ import { Sky } from 'three/examples/jsm/objects/Sky';
 import { PRESETS } from './Presets';
 import { ModelLoader } from './ModelLoader';
 import { CameraPath } from './CameraPath';
+import { MaterialManager } from './MaterialManager';
+import { ModelExploder } from './ModelExploder';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass';
 
 export class Engine {
   constructor(container, options = {}) {
@@ -18,13 +27,21 @@ export class Engine {
     this.selectedObject = null;
     this.ground = null;
     this.sky = null;
+    this.cloudLayer = null;
     this.envMap = null;
     this.animationId = null;
     this.isDisposed = false;
     this.currentPreset = null;
     this.modelLoader = new ModelLoader();
     this.cameraPath = new CameraPath(this);
+    this.materialManager = new MaterialManager(this);
+    this.modelExploder = new ModelExploder();
     this._callbacks = {};
+    this._materialList = []; // 当前场景中所有材质
+    this._postProcessing = { enabled: false, bloom: { strength: 0.5, radius: 0.4, threshold: 0.85 }, smaa: true };
+    this._hdrLoader = new RGBELoader();
+    this.composer = null;
+    this._hdrTexture = null;
 
     this._initRenderer();
     this._initScene();
@@ -32,6 +49,7 @@ export class Engine {
     this._initControls(options);
     this._initRaycaster();
     this._initResizeObserver();
+    this._initPostProcessing();
     this._startLoop();
   }
 
@@ -136,6 +154,7 @@ export class Engine {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
+      if (this.composer) this.composer.setSize(w, h);
     });
     this._resizeObserver.observe(this.container);
   }
@@ -145,9 +164,32 @@ export class Engine {
       if (this.isDisposed) return;
       this.animationId = requestAnimationFrame(animate);
       this.orbitControls.update();
-      this.renderer.render(this.scene, this.camera);
+      if (this._postProcessing.enabled && this.composer) {
+        this.composer.render();
+      } else {
+        this.renderer.render(this.scene, this.camera);
+      }
     };
     animate();
+  }
+
+  _initPostProcessing() {
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    this.composer = new EffectComposer(this.renderer);
+    this._renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this._renderPass);
+    this._bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(w, h),
+      this._postProcessing.bloom.strength,
+      this._postProcessing.bloom.radius,
+      this._postProcessing.bloom.threshold
+    );
+    this.composer.addPass(this._bloomPass);
+    this._smaaPass = new SMAAPass(w, h);
+    this.composer.addPass(this._smaaPass);
+    this._outputPass = new OutputPass();
+    this.composer.addPass(this._outputPass);
   }
 
   // === 模型 ===
@@ -181,15 +223,40 @@ export class Engine {
       this.scene.add(model);
       this.objects.push(model);
 
+      // 提取材质
+      this._refreshMaterialList();
+
+      // 分析模型分解
+      this.modelExploder.analyze(model);
+
       if (options.autoSetup !== false) this.focusObject(model);
       this._emit('loadEnd', model);
       this._emit('sceneChanged', null);
+      this._emit('materialsChanged', this._materialList);
       return model;
     } catch (err) {
       this._emit('loadError', err);
       throw err;
     }
   }
+
+  /** 刷新全场景材质列表 */
+  _refreshMaterialList() {
+    const allMats = [];
+    const seen = new Set();
+    this.objects.forEach(obj => {
+      const mats = this.materialManager.extractMaterials(obj);
+      mats.forEach(m => {
+        if (!seen.has(m.uuid)) {
+          seen.add(m.uuid);
+          allMats.push(m);
+        }
+      });
+    });
+    this._materialList = allMats;
+  }
+
+  getMaterialList() { return this._materialList; }
 
   removeObject(obj) {
     if (!obj) return;
@@ -198,7 +265,9 @@ export class Engine {
     if (idx !== -1) this.objects.splice(idx, 1);
     this.scene.remove(obj);
     this._disposeObject(obj);
+    this._refreshMaterialList();
     this._emit('sceneChanged', null);
+    this._emit('materialsChanged', this._materialList);
   }
 
   selectObject(obj) {
@@ -261,16 +330,20 @@ export class Engine {
     this.currentPreset = presetName;
     this.clearLights();
 
-    // 清理旧天空与环境
+    // 清理旧天空、云层、环境
     if (this.sky) { this.scene.remove(this.sky); this.sky = null; }
+    if (this.cloudLayer) { this.scene.remove(this.cloudLayer); this._disposeObject(this.cloudLayer); this.cloudLayer = null; }
     if (this.envMap) { this.envMap.dispose(); this.envMap = null; }
     this.scene.environment = null;
 
     // === 背景 ===
     if (this.scene.background && this.scene.background.isTexture) this.scene.background.dispose();
     if (preset.background.type === 'sky') {
-      // 天空作为背景 — 用 Sky 生成
       this._createSky(preset.skyParams, true);
+      // 天空类预设加云层
+      if (preset.clouds !== false) {
+        this._createCloudLayer(preset.skyParams);
+      }
     } else if (preset.background.type === 'gradient') {
       this.scene.background = this._createGradientTexture(preset.background.topColor, preset.background.bottomColor);
     } else if (preset.background.type === 'color') {
@@ -285,8 +358,6 @@ export class Engine {
       this.envMap = pmrem.fromScene(roomEnv, 0.04).texture;
       this.scene.environment = this.envMap;
       pmrem.dispose();
-    } else if (preset.environment === 'sky' && !this.envMap) {
-      // 如果 _createSky 已经设了 envMap 就跳过
     }
 
     // === 灯光 ===
@@ -346,7 +417,7 @@ export class Engine {
     sun.setFromSphericalCoords(1, phi, theta);
     uniforms['sunPosition'].value.copy(sun);
 
-    // 生成环境贴图 + 设为背景（far 必须足够大以包含 sky 球体）
+    // 生成环境贴图（far 必须覆盖 sky sphere）
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     pmrem.compileEquirectangularShader();
     const renderTarget = pmrem.fromScene(this.sky, 0, 0.1, 1000000);
@@ -356,6 +427,74 @@ export class Engine {
       this.scene.background = this.envMap;
     }
     pmrem.dispose();
+  }
+
+  /** 创建程序化云层 */
+  _createCloudLayer(skyParams = {}) {
+    const size = 1024;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // 生成多层 FBM 噪声作为云层
+    const imageData = ctx.createImageData(size, size);
+    const data = imageData.data;
+    const seed = 42;
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const nx = x / size, ny = y / size;
+        let val = 0, amp = 1, freq = 3, total = 0;
+        for (let oct = 0; oct < 6; oct++) {
+          val += _smoothNoise(nx * freq, ny * freq, seed + oct * 37) * amp;
+          total += amp;
+          amp *= 0.5;
+          freq *= 2.1;
+        }
+        val /= total;
+
+        // 阈值处理 → 云的密度
+        let cloud = (val - 0.42) / 0.35;
+        cloud = Math.max(0, Math.min(1, cloud));
+        // 边缘圆形渐隐（避免云层方形边界）
+        const dx = nx - 0.5, dy = ny - 0.5;
+        const dist = Math.sqrt(dx * dx + dy * dy) * 2;
+        const fade = 1 - Math.max(0, Math.min(1, (dist - 0.6) / 0.4));
+        cloud *= fade;
+
+        const idx = (y * size + x) * 4;
+        data[idx] = 255;     // R
+        data[idx + 1] = 255; // G
+        data[idx + 2] = 255; // B
+        data[idx + 3] = Math.round(cloud * 180); // Alpha
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+
+    const planeSize = 600;
+    const elevation = skyParams.elevation || 30;
+    // 云层高度根据天空参数调整
+    const cloudHeight = elevation > 20 ? 80 : 40;
+
+    const geo = new THREE.PlaneGeometry(planeSize, planeSize);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      opacity: 0.9,
+    });
+
+    this.cloudLayer = new THREE.Mesh(geo, mat);
+    this.cloudLayer.rotation.x = -Math.PI / 2;
+    this.cloudLayer.position.y = cloudHeight;
+    this.cloudLayer.renderOrder = -1;
+    this.cloudLayer.userData = { type: 'cloud', name: '云层' };
+    this.scene.add(this.cloudLayer);
   }
 
   // === 灯光 ===
@@ -471,7 +610,6 @@ export class Engine {
     ctx.fillRect(0, 0, size, size);
 
     if (type === 'concrete') {
-      // 混凝土纹理 — 细微噪点
       for (let i = 0; i < 8000; i++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
@@ -482,7 +620,6 @@ export class Engine {
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(x, y, 2, 2);
       }
-      // 一些细缝
       ctx.strokeStyle = altColor;
       ctx.lineWidth = 1;
       for (let i = 0; i < 5; i++) {
@@ -492,7 +629,6 @@ export class Engine {
         ctx.stroke();
       }
     } else if (type === 'grass') {
-      // 草地纹理 — 色块变化
       for (let i = 0; i < 10000; i++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
@@ -559,16 +695,77 @@ export class Engine {
     this.scene.traverse(c => { if (c.isMesh) { c.castShadow = v; c.receiveShadow = v; } });
   }
 
-  // === 相机 ===
+  /** 加载 HDR 环境贴图 */
+  loadHDR(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      this._hdrLoader.load(url, (texture) => {
+        URL.revokeObjectURL(url);
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        pmrem.compileEquirectangularShader();
+        const envMap = pmrem.fromEquirectangular(texture).texture;
+        texture.dispose();
+        pmrem.dispose();
+        // 清理旧环境
+        if (this.envMap) this.envMap.dispose();
+        if (this.sky) { this.scene.remove(this.sky); this.sky = null; }
+        if (this.cloudLayer) { this.scene.remove(this.cloudLayer); this._disposeObject(this.cloudLayer); this.cloudLayer = null; }
+        this.envMap = envMap;
+        this.scene.environment = envMap;
+        this.scene.background = envMap;
+        this._hdrTexture = envMap;
+        this._emit('hdrLoaded', null);
+        resolve(envMap);
+      }, undefined, (err) => {
+        URL.revokeObjectURL(url);
+        reject(err);
+      });
+    });
+  }
+
+  /** 设置后处理参数 */
+  setPostProcessing(config) {
+    if (config.enabled !== undefined) this._postProcessing.enabled = config.enabled;
+    if (config.bloom) {
+      Object.assign(this._postProcessing.bloom, config.bloom);
+      if (this._bloomPass) {
+        this._bloomPass.strength = this._postProcessing.bloom.strength;
+        this._bloomPass.radius = this._postProcessing.bloom.radius;
+        this._bloomPass.threshold = this._postProcessing.bloom.threshold;
+      }
+    }
+    if (config.smaa !== undefined) {
+      this._postProcessing.smaa = config.smaa;
+      if (this._smaaPass) this._smaaPass.enabled = config.smaa;
+    }
+  }
+
+  /** 获取后处理配置 */
+  getPostProcessingConfig() {
+    return { ...this._postProcessing, bloom: { ...this._postProcessing.bloom } };
+  }
+
+  // === 相机视角（基于模型包围盒）===
   setCameraView(view) {
-    const d = 8;
+    // 计算所有模型的包围盒
+    const box = new THREE.Box3();
+    if (this.objects.length > 0) {
+      this.objects.forEach(obj => box.expandByObject(obj));
+    } else {
+      box.setFromCenterAndSize(new THREE.Vector3(0, 0, 0), new THREE.Vector3(6, 6, 6));
+    }
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const d = maxDim * 2; // 距离模型足够远
+
     const views = {
-      front: { pos: [0, 1, d], target: [0, 1, 0] },
-      back: { pos: [0, 1, -d], target: [0, 1, 0] },
-      left: { pos: [-d, 1, 0], target: [0, 1, 0] },
-      right: { pos: [d, 1, 0], target: [0, 1, 0] },
-      top: { pos: [0, d, 0], target: [0, 0, 0] },
-      perspective: { pos: [8, 5, 8], target: [0, 0, 0] },
+      front:       { pos: [center.x, center.y + maxDim * 0.3, center.z + d], target: center.toArray() },
+      back:        { pos: [center.x, center.y + maxDim * 0.3, center.z - d], target: center.toArray() },
+      left:        { pos: [center.x - d, center.y + maxDim * 0.3, center.z], target: center.toArray() },
+      right:       { pos: [center.x + d, center.y + maxDim * 0.3, center.z], target: center.toArray() },
+      top:         { pos: [center.x, center.y + d, center.z + 0.01], target: center.toArray() },
+      perspective: { pos: [center.x + d * 0.6, center.y + d * 0.4, center.z + d * 0.6], target: center.toArray() },
     };
     const v = views[view];
     if (v) this._animateCamera(new THREE.Vector3(...v.pos), new THREE.Vector3(...v.target));
@@ -624,7 +821,11 @@ export class Engine {
     const pw = this.renderer.domElement.width;
     const ph = this.renderer.domElement.height;
     if (w && h) { this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
-    this.renderer.render(this.scene, this.camera);
+    if (this._postProcessing.enabled && this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
     const url = this.renderer.domElement.toDataURL('image/png');
     if (w && h) { this.renderer.setSize(pw, ph); this.camera.aspect = pw / ph; this.camera.updateProjectionMatrix(); }
     return url;
@@ -633,7 +834,7 @@ export class Engine {
   // === 导出配置 ===
   getSceneConfig() {
     return {
-      version: '2.0', preset: this.currentPreset,
+      version: '3.0', preset: this.currentPreset,
       background: '#' + (this.scene.background?.isColor ? this.scene.background.getHexString() : '1a1a2e'),
       exposure: this.renderer.toneMappingExposure,
       fog: this.scene.fog ? { enabled: true, color: '#' + this.scene.fog.color.getHexString(), near: this.scene.fog.near, far: this.scene.fog.far } : { enabled: false },
@@ -641,7 +842,8 @@ export class Engine {
       lights: this.lights.map(l => ({ type: l.userData.lightType, name: l.userData.name, color: '#' + l.color.getHexString(), intensity: l.intensity, position: l.position ? [l.position.x, l.position.y, l.position.z] : undefined, castShadow: l.castShadow || false })),
       camera: { position: [this.camera.position.x, this.camera.position.y, this.camera.position.z], target: [this.orbitControls.target.x, this.orbitControls.target.y, this.orbitControls.target.z], fov: this.camera.fov },
       objects: this.objects.map(o => ({ name: o.userData.name, position: [o.position.x, o.position.y, o.position.z], rotation: [o.rotation.x, o.rotation.y, o.rotation.z], scale: [o.scale.x, o.scale.y, o.scale.z], url: o.userData.url || '' })),
-      waypoints: this.cameraPath.waypoints.map(w => ({ position: [w.position.x, w.position.y, w.position.z], target: [w.target.x, w.target.y, w.target.z], name: w.name })),
+      waypoints: this.cameraPath.waypoints.map(w => ({ position: [w.position.x, w.position.y, w.position.z], target: [w.target.x, w.target.y, w.target.z], name: w.name, speed: w.speed, stayDuration: w.stayDuration })),
+      postProcessing: { ...this._postProcessing, bloom: { ...this._postProcessing.bloom } },
     };
   }
 
@@ -668,13 +870,19 @@ export class Engine {
     if (this.transformControls) { this.transformControls.detach(); this.transformControls.dispose(); }
 
     this.cameraPath.dispose();
+    this.materialManager.dispose();
+    this.modelExploder.dispose();
+
     [...this.objects].forEach(o => this._disposeObject(o));
     this.objects = [];
     this.clearLights();
     this.removeGround();
 
+    if (this.composer) { this.composer.dispose(); this.composer = null; }
+    if (this._hdrTexture) { this._hdrTexture.dispose(); this._hdrTexture = null; }
     if (this.envMap) { this.envMap.dispose(); this.envMap = null; }
     if (this.sky) { this.scene.remove(this.sky); this.sky = null; }
+    if (this.cloudLayer) { this.scene.remove(this.cloudLayer); this._disposeObject(this.cloudLayer); this.cloudLayer = null; }
     this.gridHelper.geometry.dispose();
     this.gridHelper.material.dispose();
     if (this.scene.background?.isTexture) this.scene.background.dispose();
@@ -686,4 +894,22 @@ export class Engine {
     this.modelLoader.dispose();
     this.scene = null; this.camera = null; this.renderer = null; this._callbacks = {};
   }
+}
+
+// === 噪声函数（用于云层生成）===
+function _hash(x, y, seed) {
+  const n = Math.sin(x * 127.1 + y * 311.7 + seed * 113.5) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function _smoothNoise(x, y, seed) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fy * fy * (3 - 2 * fy);
+  const a = _hash(ix, iy, seed);
+  const b = _hash(ix + 1, iy, seed);
+  const c = _hash(ix, iy + 1, seed);
+  const d = _hash(ix + 1, iy + 1, seed);
+  return a + u * (b - a) + v * (c - a) + u * v * (a - b - c + d);
 }
