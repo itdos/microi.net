@@ -4,6 +4,7 @@ import path from 'path';
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import { visualizer } from 'rollup-plugin-visualizer';
 import compression from 'vite-plugin-compression';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -40,7 +41,9 @@ export default defineConfig({
             ext: '.gz',
             threshold: 10240,
             deleteOriginFile: false
-        })
+        }),
+        // HTTPS 自签名证书（仅开发环境）
+        // basicSsl()
     ],
     resolve: {
         alias: {
@@ -87,6 +90,7 @@ export default defineConfig({
         port: 1988,
         open: true,
         host: '0.0.0.0',
+        https: false,
         proxy: {
             // 如果需要代理 API 请求，在这里配置
         },

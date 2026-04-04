@@ -119,6 +119,7 @@
     "@types/color": "^4.2.0",
     "@types/keymaster": "^1.6.33",
     "@types/lodash": "^4.17.24",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-vue": "^6.0.3",
     "autoprefixer": "^10.4.27",
     "fast-glob": "^3.3.3",
