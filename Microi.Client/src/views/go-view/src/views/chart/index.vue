@@ -72,7 +72,7 @@ const {
 
 <style lang="scss" scoped>
 @include go("chart") {
-  height: calc(100vh - var(--goview-top-offset, 0px));
+  height: 100%;
   width: 100%;
   overflow: hidden;
   @include background-image("background-image");
@@ -81,6 +81,6 @@ const {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  height: calc(100vh - var(--goview-top-offset, 0px) - #{$--header-height});
+  height: calc(100% - #{$--header-height});
 }
 </style>

@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "5.1.7",
+  "version": "5.1.8",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -90,7 +90,7 @@
     "monaco-editor": "^0.55.1",
     "naive-ui": "^2.44.1",
     "normalize.css": "^8.0.1",
-    "path-to-regexp": "^2.4.0",
+    "path-to-regexp": "^6.3.0",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
     "pinyin": "^3.1.0",
