@@ -267,11 +267,12 @@ else
     echo "    4) 只发布后端（推送Docker、推送NuGet、版本号+1）"
 fi
     echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
+    echo "    6) 只编译和推送【官方网站文档】"
     echo ""
-    read -p "  请输入选项 [1/2/3/4/5]: " DEPLOY_MODE
+    read -p "  请输入选项 [1/2/3/4/5/6]: " DEPLOY_MODE
     case "$DEPLOY_MODE" in
-        1|2|3|4|5) ;;
-        *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5）" ;;
+        1|2|3|4|5|6) ;;
+        *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5/6）" ;;
     esac
 
     # 模式3需要前端源码
@@ -306,6 +307,8 @@ case "$DEPLOY_MODE" in
         ;;
     5)  # 仅推送Docker镜像（跳过编译，使用已有产物）
         PUSH_DOCKER=true
+        ;;
+    6)  # 只编译和推送官方网站文档（由后续专属块处理）
         ;;
 esac
 
@@ -383,13 +386,15 @@ fi
 
 # --- 官方网站文档发布选项 ---
 PUBLISH_DOC=false
-if [ -d "microi.doc" ]; then
+if [ "$DEPLOY_MODE" = "6" ]; then
+    PUBLISH_DOC=true
+elif [ -d "microi.doc" ]; then
     echo ""
     echo -e "  ${BOLD}【官方网站文档】${NC}"
     echo "    是否同时发布官方网站文档（构建 VitePress 并推送 Docker 镜像）？"
-    read -p "  请输入 [y/N]: " _doc_choice
+    read -p "  请输入选项 [0=否/1=是]: " _doc_choice
     case "$_doc_choice" in
-        y|Y|yes|YES) PUBLISH_DOC=true ;;
+        1) PUBLISH_DOC=true ;;
         *) PUBLISH_DOC=false ;;
     esac
 fi
@@ -397,7 +402,7 @@ fi
 # ──────────────────────────────────────────────────────────────
 # 打印执行摘要
 # ──────────────────────────────────────────────────────────────
-_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
+_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
 echo ""
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
 echo -e "  ${BOLD}✅ 选择完毕，即将开始全自动执行${NC}"
@@ -780,7 +785,7 @@ ELAPSED=$((END_TIME - START_TIME))
 MINUTES=$((ELAPSED / 60))
 SECONDS_REMAIN=$((ELAPSED % 60))
 
-_mode_names_final=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
+_mode_names_final=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 printf "${BOLD}${GREEN}║${NC}  ${BOLD}${GREEN}🎉 全部完成！%-46s${NC}${BOLD}${GREEN}║${NC}\n" ""

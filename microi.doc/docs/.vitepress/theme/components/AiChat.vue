@@ -253,9 +253,11 @@ function sendMessage() {
   z-index: 2;
 }
 .chat-inner {
-  background: rgba(15,15,25,0.7);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(138,43,226,0.12);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   border-radius: 20px;
   padding: 20px;
   display: flex;
