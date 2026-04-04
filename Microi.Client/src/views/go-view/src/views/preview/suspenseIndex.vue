@@ -85,6 +85,7 @@ useInitVChartsTheme(chartEditStore)
     .go-preview-scale {
       transform-origin: center center;
       max-width: 100%;
+      // transform: none !important;
     }
   }
   &.scrollY {
