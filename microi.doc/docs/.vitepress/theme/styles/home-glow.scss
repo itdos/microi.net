@@ -82,8 +82,9 @@ div[class*="VPHome"] {
   .VPFeature .title {
     background: linear-gradient(135deg, #8a2be2 0%, #00bfff 100%);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-text-fill-color: #fff !important;
     background-clip: text;
+    color: #fff;
   }
 }
 
