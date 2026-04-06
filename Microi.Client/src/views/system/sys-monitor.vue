@@ -137,7 +137,93 @@
             </el-col>
         </el-row>
 
-        <!-- 第四行：接口引擎排行(50%) + 表数据量排行(50%) -->
+        <!-- 第四行：Docker容器监控 -->
+        <el-row :gutter="10" class="section-row" v-if="dockerAvailable">
+            <el-col :span="24">
+                <div class="neon-card docker-card">
+                    <div class="neon-card-title docker-title">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M13 3h-2v2h2V3zm4 0h-2v2h2V3zm0 4h-2v2h2V7zm-4 0h-2v2h2V7zm-4 0H7v2h2V7zm-4 0H3v2h2V7zm0-4H3v2h2V3zm4 0H7v2h2V3zm12 8.5c-.69-.73-2.18-1-3.32-.8-.48-1.68-1.82-2.5-3.18-2.7v-1h-2v1H9V9H7v1H3v1c0 3.87 3.13 7 7 7h4c2.5 0 4.7-1.3 5.93-3.27.81.15 2.07.07 2.57-1.23z" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="docker-title-text">Docker 容器监控</span>
+                        <div class="docker-badges">
+                            <span class="docker-badge docker-ver" v-if="dockerVersion">v{{ dockerVersion }}</span>
+                            <span class="docker-badge docker-running">
+                                <span class="docker-dot docker-dot-run"></span>
+                                {{ dockerContainersRunning }} 运行
+                            </span>
+                            <span class="docker-badge docker-stopped">
+                                <span class="docker-dot docker-dot-stop"></span>
+                                {{ dockerContainersStopped }} 停止
+                            </span>
+                            <span class="docker-badge docker-images">
+                                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M2 12h20M12 2v20"/></svg>
+                                {{ dockerImages }} 镜像
+                            </span>
+                        </div>
+                        <el-button size="small" :icon="Refresh" circle class="docker-refresh-btn" @click="loadDockerStats" :loading="dockerLoading" />
+                    </div>
+                    <div class="docker-container-list" v-if="dockerContainers.length">
+                        <div class="docker-table-header">
+                            <span class="dc dc-state">状态</span>
+                            <span class="dc dc-name">容器名称</span>
+                            <span class="dc dc-image">镜像</span>
+                            <span class="dc dc-cpu">CPU</span>
+                            <span class="dc dc-cpu-bar"></span>
+                            <span class="dc dc-mem">内存</span>
+                            <span class="dc dc-mem-bar"></span>
+                            <span class="dc dc-net">网络 I/O</span>
+                            <span class="dc dc-block">磁盘 I/O</span>
+                            <span class="dc dc-pids">PIDs</span>
+                        </div>
+                        <div class="docker-table-body">
+                            <div v-for="(c, i) in dockerContainers" :key="i"
+                                 class="docker-row" :class="{ 'docker-row-stopped': c.State !== 'running' }">
+                                <span class="dc dc-state">
+                                    <span class="state-indicator" :class="'state-' + (c.State || 'exited')"></span>
+                                    <span class="state-text">{{ c.State || 'exited' }}</span>
+                                </span>
+                                <span class="dc dc-name" :title="c.Name">
+                                    <span class="container-name">{{ c.Name }}</span>
+                                    <span class="container-id">{{ c.ContainerId }}</span>
+                                </span>
+                                <span class="dc dc-image" :title="c.Image">{{ c.Image }}</span>
+                                <span class="dc dc-cpu" :class="getCpuClass(c.CPUPercNum)">{{ c.CPUPerc }}</span>
+                                <span class="dc dc-cpu-bar">
+                                    <div class="micro-bar">
+                                        <div class="micro-bar-fill micro-bar-cpu" :style="{ width: Math.min(c.CPUPercNum || 0, 100) + '%' }"></div>
+                                    </div>
+                                </span>
+                                <span class="dc dc-mem">
+                                    <span class="mem-usage-text">{{ c.MemUsage }}</span>
+                                    <span class="mem-perc" :class="getMemClass(c.MemPercNum)">{{ c.MemPerc }}</span>
+                                </span>
+                                <span class="dc dc-mem-bar">
+                                    <div class="micro-bar">
+                                        <div class="micro-bar-fill micro-bar-mem" :style="{ width: Math.min(c.MemPercNum || 0, 100) + '%' }"></div>
+                                    </div>
+                                </span>
+                                <span class="dc dc-net">
+                                    <span class="net-detail">{{ c.NetIO }}</span>
+                                </span>
+                                <span class="dc dc-block">
+                                    <span class="block-detail">{{ c.BlockIO }}</span>
+                                </span>
+                                <span class="dc dc-pids">{{ c.PIDs }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="docker-empty">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="rgba(0,212,255,0.2)" stroke-width="1.5">
+                            <path d="M13 3h-2v2h2V3zm4 0h-2v2h2V3zm0 4h-2v2h2V7zm-4 0h-2v2h2V7zm-4 0H7v2h2V7zm-4 0H3v2h2V7zm0-4H3v2h2V3zm4 0H7v2h2V3zm12 8.5c-.69-.73-2.18-1-3.32-.8-.48-1.68-1.82-2.5-3.18-2.7v-1h-2v1H9V9H7v1H3v1c0 3.87 3.13 7 7 7h4c2.5 0 4.7-1.3 5.93-3.27.81.15 2.07.07 2.57-1.23z"/>
+                        </svg>
+                        <span>暂无运行中的容器</span>
+                    </div>
+                </div>
+            </el-col>
+        </el-row>
+
+        <!-- 第五行：接口引擎排行(50%) + 表数据量排行(50%) -->
         <el-row :gutter="10" class="section-row">
             <el-col :span="12" :sm="12">
                 <div class="neon-card">
@@ -159,7 +245,7 @@
             </el-col>
         </el-row>
 
-        <!-- 第五行：最近登录(50%) + 磁盘分区(25%) + 磁盘IO(25%) -->
+        <!-- 第六行：最近登录(50%) + 磁盘分区(25%) + 磁盘IO(25%) -->
         <el-row :gutter="10" class="section-row">
             <el-col :span="12" :sm="12">
                 <div class="neon-card">
@@ -283,6 +369,15 @@ export default {
             memHistory: [],
             rxHistory: [],
             txHistory: [],
+            // Docker
+            dockerAvailable: false,
+            dockerLoading: false,
+            dockerVersion: "",
+            dockerContainersRunning: 0,
+            dockerContainersStopped: 0,
+            dockerContainersTotal: 0,
+            dockerImages: 0,
+            dockerContainers: [],
             // Charts (private cache)
             _cpuChart: null, _memChart: null, _diskChart: null,
             _trendChart: null, _networkChart: null,
@@ -304,6 +399,7 @@ export default {
     mounted() {
         this.loadAll();
         this.loadPlatformStats();
+        this.loadDockerStats();
         this.toggleAutoRefresh(true);
         this.startTick();
         window.addEventListener("resize", this.resizeCharts);
@@ -337,7 +433,7 @@ export default {
         },
         toggleAutoRefresh(val) {
             if (this.autoRefreshTimer) { clearInterval(this.autoRefreshTimer); this.autoRefreshTimer = null; }
-            if (val) { this.autoRefreshTimer = setInterval(() => this.loadAll(), 5000); }
+            if (val) { this.autoRefreshTimer = setInterval(() => { this.loadAll(); this.loadDockerStats(); }, 5000); }
         },
         resizeCharts() {
             [this._cpuChart, this._memChart, this._diskChart, this._trendChart, this._networkChart, this._apiRankChart, this._tableRankChart].forEach(c => c && c.resize());
@@ -370,6 +466,30 @@ export default {
                     });
                 }
             });
+        },
+        loadDockerStats() {
+            this.dockerLoading = true;
+            this.DiyCommon.Post("/api/systemmonitor/GetDockerStats", {}, (result) => {
+                this.dockerLoading = false;
+                if (result && result.Code === 1 && result.Data) {
+                    var d = result.Data;
+                    this.dockerAvailable = d.Available || false;
+                    this.dockerVersion = d.DockerVersion || "";
+                    this.dockerContainersRunning = d.ContainersRunning || 0;
+                    this.dockerContainersStopped = d.ContainersStopped || 0;
+                    this.dockerContainersTotal = d.ContainersTotal || 0;
+                    this.dockerImages = d.Images || 0;
+                    this.dockerContainers = (d.Containers || []).map(function(item) { return JSON.parse(JSON.stringify(item)); });
+                }
+            });
+        },
+        getCpuClass(val) {
+            if (!val) return '';
+            return val >= 80 ? 'perc-danger' : val >= 50 ? 'perc-warn' : 'perc-ok';
+        },
+        getMemClass(val) {
+            if (!val) return '';
+            return val >= 90 ? 'perc-danger' : val >= 70 ? 'perc-warn' : 'perc-ok';
         },
         parseData(d) {
             var os = d.OS || {};
@@ -737,6 +857,128 @@ export default {
 .io-val small { font-size: 10px; font-weight: 400; color: #999; }
 .io-r { color: #36d399; }
 .io-w { color: #f7768e; }
+
+/* ===== Docker 容器监控 ===== */
+.docker-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(0,150,255,0.12);
+    background: linear-gradient(180deg, rgba(13,17,23,0.95) 0%, rgba(10,14,26,0.98) 100%);
+}
+.docker-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,150,255,0.4), rgba(0,212,255,0.6), rgba(0,150,255,0.4), transparent);
+}
+.docker-title {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(0,212,255,0.06);
+}
+.docker-title svg { color: #0096ff; }
+.docker-title-text {
+    font-size: 12px; font-weight: 700; color: #e6edf3; letter-spacing: 1px;
+    background: linear-gradient(90deg, #00d4ff, #0096ff);
+    background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.docker-badges { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
+.docker-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10px;
+    font-family: "SF Mono", monospace; letter-spacing: 0.2px;
+}
+.docker-ver { background: rgba(0,150,255,0.1); color: #5bc0ff; border: 1px solid rgba(0,150,255,0.2); }
+.docker-running { background: rgba(0,255,136,0.08); color: #36d399; border: 1px solid rgba(0,255,136,0.15); }
+.docker-stopped { background: rgba(255,170,0,0.08); color: #ffaa00; border: 1px solid rgba(255,170,0,0.15); }
+.docker-images { background: rgba(160,120,255,0.08); color: #a078ff; border: 1px solid rgba(160,120,255,0.15); }
+.docker-images svg { color: #a078ff; }
+.docker-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.docker-dot-run { background: #36d399; box-shadow: 0 0 6px rgba(54,211,153,0.6); animation: dotPulse 2s ease infinite; }
+.docker-dot-stop { background: #ffaa00; }
+@keyframes dotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.docker-refresh-btn {
+    margin-left: auto;
+    background: rgba(0,150,255,0.06) !important;
+    border-color: rgba(0,150,255,0.15) !important;
+    color: #0096ff !important;
+    width: 26px; height: 26px;
+}
+
+/* Docker Table */
+.docker-table-header {
+    display: flex; align-items: center; padding: 6px 8px;
+    background: rgba(0,150,255,0.04);
+    border-radius: 6px; margin-bottom: 4px;
+    font-size: 10px; font-weight: 600; color: #8b949e;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.docker-table-body { max-height: 320px; overflow-y: auto; }
+.docker-table-body::-webkit-scrollbar { width: 4px; }
+.docker-table-body::-webkit-scrollbar-track { background: transparent; }
+.docker-table-body::-webkit-scrollbar-thumb { background: rgba(0,150,255,0.15); border-radius: 2px; }
+.docker-row {
+    display: flex; align-items: center; padding: 7px 8px;
+    border-bottom: 1px solid rgba(0,212,255,0.03);
+    transition: background 0.15s;
+}
+.docker-row:hover { background: rgba(0,150,255,0.04); }
+.docker-row-stopped { opacity: 0.5; }
+.dc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.dc-state { flex: 0 0 72px; display: flex; align-items: center; gap: 5px; }
+.dc-name { flex: 0 0 150px; display: flex; flex-direction: column; gap: 0; }
+.dc-image { flex: 0 0 160px; color: #8b949e; font-size: 10px; }
+.dc-cpu { flex: 0 0 62px; font-family: "SF Mono", monospace; font-weight: 600; text-align: right; }
+.dc-cpu-bar { flex: 0 0 70px; padding: 0 6px; }
+.dc-mem { flex: 0 0 140px; display: flex; flex-direction: column; gap: 0; font-family: "SF Mono", monospace; }
+.dc-mem-bar { flex: 0 0 70px; padding: 0 6px; }
+.dc-net { flex: 0 0 130px; font-family: "SF Mono", monospace; font-size: 10px; color: #8b949e; }
+.dc-block { flex: 0 0 130px; font-family: "SF Mono", monospace; font-size: 10px; color: #8b949e; }
+.dc-pids { flex: 0 0 44px; text-align: center; font-family: "SF Mono", monospace; color: #d5d5d5; }
+
+.state-indicator { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.state-running { background: #36d399; box-shadow: 0 0 6px rgba(54,211,153,0.5); }
+.state-exited { background: #f56c6c; }
+.state-created { background: #ffaa00; }
+.state-paused { background: #e6a23c; }
+.state-restarting { background: #4facfe; animation: dotPulse 1s ease infinite; }
+.state-text { font-size: 10px; color: #8b949e; }
+
+.container-name { font-size: 12px; font-weight: 600; color: #e6edf3; line-height: 1.3; }
+.container-id { font-size: 9px; color: #484f58; font-family: "SF Mono", monospace; }
+
+.mem-usage-text { font-size: 10px; color: #c9d1d9; line-height: 1.3; }
+.mem-perc { font-size: 11px; font-weight: 600; }
+
+.perc-ok { color: #36d399; }
+.perc-warn { color: #ffaa00; }
+.perc-danger { color: #f56c6c; }
+
+/* Mini Progress Bars */
+.micro-bar {
+    width: 100%; height: 5px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px; overflow: hidden;
+}
+.micro-bar-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    min-width: 0;
+}
+.micro-bar-cpu {
+    background: linear-gradient(90deg, #00d4ff, #0070f3);
+    box-shadow: 0 0 6px rgba(0,150,255,0.3);
+}
+.micro-bar-mem {
+    background: linear-gradient(90deg, #36d399, #00ff88);
+    box-shadow: 0 0 6px rgba(54,211,153,0.3);
+}
+
+.net-detail, .block-detail { color: #8b949e; }
+
+.docker-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 28px 0; color: #30363d; font-size: 12px;
+}
 
 /* ===== 通用 ===== */
 .empty-tip { color: #30363d; text-align: center; padding: 20px 0; font-size: 12px; }

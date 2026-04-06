@@ -1,12 +1,79 @@
-#!/bin/bash
+:<<'WIN'
+@echo off
+chcp 65001 2>nul
+setlocal EnableDelayedExpansion
+rem ════════════════════════════════════════════════════════════════
+rem  Microi 一键编译发布助手 - Windows 自动启动器
+rem  自动查找 Git Bash 或 WSL 并执行此脚本
+rem ════════════════════════════════════════════════════════════════
+set "BASH_EXE="
+if exist "%ProgramFiles%\Git\bin\bash.exe"           set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
+if exist "%ProgramFiles(x86)%\Git\bin\bash.exe"      if not defined BASH_EXE set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
+if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe"  if not defined BASH_EXE set "BASH_EXE=%LOCALAPPDATA%\Programs\Git\bin\bash.exe"
+if exist "C:\Git\bin\bash.exe"                       if not defined BASH_EXE set "BASH_EXE=C:\Git\bin\bash.exe"
+if exist "C:\msys64\usr\bin\bash.exe"                if not defined BASH_EXE set "BASH_EXE=C:\msys64\usr\bin\bash.exe"
+if not defined BASH_EXE (
+    for /f "delims=" %%i in ('where bash 2^>nul') do (
+        echo %%i | findstr /i "System32" >nul || if not defined BASH_EXE set "BASH_EXE=%%i"
+    )
+)
+if defined BASH_EXE goto :bash_run
+where wsl >nul 2>nul
+if %ERRORLEVEL% equ 0 goto :wsl_run
+echo.
+echo   ════════════════════════════════════════════════════════
+echo   ERROR: 未找到 Git Bash 或 WSL！请安装以下任意一种:
+echo     1. Git for Windows: https://git-scm.com/download/win
+echo     2. WSL2: 在管理员 PowerShell 中运行 wsl --install
+echo   ════════════════════════════════════════════════════════
+echo.
+pause
+exit /b 1
+:bash_run
+echo.
+echo   ^> Bash: !BASH_EXE!
+echo.
+"!BASH_EXE!" "%~f0"
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+:wsl_run
+echo.
+echo   ^> WSL: 执行中...
+echo.
+for /f "delims=" %%p in ('wsl wslpath -u "%~f0"') do set "WSLP=%%p"
+wsl bash "!WSLP!"
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+WIN
+#!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
 #  Microi 一键编译发布助手
 #  适用于 Microi 低代码平台的后端 (.NET) 和前端 (Vue3) 一键编译发布
-#  初次使用：chmod +x Microi一键编译发布.sh
+#  macOS / Linux:  bash Microi一键编译发布.sh
+#  Windows:        在 Git Bash 终端中运行同样的命令即可
+#                  bash Microi一键编译发布.sh
 #  开源地址: https://gitee.com/ITdos/microi.net
 # ════════════════════════════════════════════════════════════════
 set -e
 set -o pipefail
+
+# Windows (Git Bash) 下：无论正常结束还是异常退出，都暂停等待用户确认，避免窗口自动关闭
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    trap 'echo ""; read -r -p "  按回车键关闭窗口..." _w' EXIT
+    # 将 Windows 常见 Node.js 安装路径加入 PATH，确保 npm/pnpm 可用
+    for _np in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$APPDATA/npm" \
+        "$LOCALAPPDATA/pnpm" \
+        "$LOCALAPPDATA/Yarn/bin"; do
+        [ -d "$_np" ] && export PATH="$_np:$PATH"
+    done
+fi
 
 # ════════════════════════════════════════════════════════════════
 # ⚙️  用户配置区域（请根据您的环境修改以下配置）
@@ -738,8 +805,24 @@ fi
 if [ "$PUBLISH_DOC" = true ]; then
     print_phase "发布官方网站文档"
 
+    # 自动检测可用的包管理器（优先 pnpm，其次 npm，最后 yarn）
+    DOC_PKG_MGR=""
+    if command -v pnpm &>/dev/null; then
+        DOC_PKG_MGR="pnpm"
+    elif command -v npm &>/dev/null; then
+        DOC_PKG_MGR="npm run"
+    elif command -v yarn &>/dev/null; then
+        DOC_PKG_MGR="yarn"
+    else
+        print_fail "未找到 pnpm / npm / yarn，请先安装 Node.js: https://nodejs.org"
+    fi
+    print_info "使用包管理器: ${DOC_PKG_MGR%% *}"
+
+    print_step "安装依赖（如需）..."
+    (cd microi.doc && ${DOC_PKG_MGR%% *} install --frozen-lockfile 2>/dev/null || ${DOC_PKG_MGR%% *} install) || true
+
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && pnpm docs:build)
+    (cd microi.doc && $DOC_PKG_MGR docs:build)
     print_success "VitePress 构建完成"
 
     print_step "构建 Docker 镜像: microi.doc"
