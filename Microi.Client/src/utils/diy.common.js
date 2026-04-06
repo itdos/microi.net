@@ -1995,6 +1995,9 @@ var DiyCommon = {
             field.Config = defaultConfig;
         } else if (typeof field.Config === "string") {
             var tempConfigObj = {};
+            // console.log("1、field.Config（" + field.Name + "）: ", field.Config);
+            // 先清理 JSON 字符串值内的字面量控制字符（如 SQL 中未转义的真实换行符），避免 JSON.parse 报错
+            field.Config = field.Config.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
             try {
                 tempConfigObj = JSON.parse(field.Config);
             } catch (error) {
@@ -2002,14 +2005,64 @@ var DiyCommon = {
                     field.Config = field.Config.replace(/\\\\/g, "\\");
                     tempConfigObj = JSON.parse(field.Config);
                 } catch (error) {
-                    console.log("field.Config（" + field.Name + "）: ", field.Config);
-                    DiyCommon.Tips(
-                        "注意：字段【" + field.Name + "】出现了Config字段序列化报错，一般是由V8Code格式错误导致，请至数据库将V8Code置空，备份到别的地方，然后清除缓存，重新配置该字段的V8代码。",
-                        false
-                    );
-                    // field.Config = field.Config.replace(/↵/g, '');
-                    // field.Config = field.Config.replace(/\n/g, '');
-                    tempConfigObj = JSON.parse(field.Config);
+                    // 第三次尝试：基于错误位置的精确修复，不依赖任何已知字段名或字段顺序。
+                    // 算法：
+                    //   1. 从 JSON.parse 错误消息中提取出错位置 P（意外字符的位置）
+                    //   2. 向前回溯找到紧跟 "key": 之后的那个开头引号（即损坏字段值的起点）
+                    //   3. 从 P 往后逐个扫描候选闭合引号（后跟 , 或 }），逐一尝试替换为 ""
+                    //   4. 直到 JSON.parse 成功；如仍有损坏字段最多重复 5 次
+                    try {
+                        var repaired = field.Config;
+                        var repairedObj = null;
+                        for (var fixLoop = 0; fixLoop <= 5; fixLoop++) {
+                            try {
+                                repairedObj = JSON.parse(repaired);
+                                break; // 解析成功，退出循环
+                            } catch (loopErr) {
+                                if (fixLoop >= 5) break;
+                                // 从错误消息中提取出错位置
+                                var posMatch = loopErr.message.match(/position (\d+)/i);
+                                if (!posMatch) break;
+                                var errorPos = parseInt(posMatch[1]);
+
+                                // 向前回溯：找到损坏字符串值的起始引号（直接跟在 "key": 后面的 "）
+                                var valueOpenQuote = -1;
+                                for (var bi = errorPos - 2; bi >= 0; bi--) {
+                                    if (repaired[bi] !== '"') continue;
+                                    var bj = bi - 1;
+                                    while (bj >= 0 && (repaired[bj] === ' ' || repaired[bj] === '\t')) bj--;
+                                    if (bj >= 0 && repaired[bj] === ':') { valueOpenQuote = bi; break; }
+                                }
+                                if (valueOpenQuote < 0) break;
+
+                                // 向后扫描：找第一个"后跟 , 或 }"的候选闭合引号，用 "" 替换整个损坏值
+                                var fixedStr = null;
+                                for (var ei = errorPos; ei < repaired.length; ei++) {
+                                    if (repaired[ei] !== '"') continue;
+                                    var ni = ei + 1;
+                                    while (ni < repaired.length && (repaired[ni] === ' ' || repaired[ni] === '\t')) ni++;
+                                    if (ni < repaired.length && (repaired[ni] === ',' || repaired[ni] === '}')) {
+                                        var candidate = repaired.slice(0, valueOpenQuote) + '""' + repaired.slice(ei + 1);
+                                        try { JSON.parse(candidate); fixedStr = candidate; break; } catch (e3) { /* 继续下一个候选 */ }
+                                    }
+                                }
+                                if (!fixedStr) break;
+                                repaired = fixedStr;
+                            }
+                        }
+                        if (!repairedObj) throw new Error('自动修复失败');
+                        tempConfigObj = repairedObj;
+                        console.warn('field.Config（' + field.Name + '）：检测到含未转义引号的字段已自动清空，请重新配置。');
+                    } catch (error2) {
+                        console.log('field.Config（' + field.Name + '）: ', field.Config);
+                        console.error(error2);
+                        DiyCommon.Tips(
+                            '注意：字段【' + field.Name + '】出现了Config字段序列化报错，一般是由V8Code格式错误导致，请至数据库将V8Code置空，备份到别的地方，然后清除缓存，重新配置该字段的V8代码。',
+                            false
+                        );
+                        // 所有修复均失败，降级为默认配置，避免抛出未捕获异常
+                        tempConfigObj = defaultConfig;
+                    }
                 }
             }
             for (const config in defaultConfig) {
