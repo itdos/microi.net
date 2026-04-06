@@ -191,6 +191,23 @@ LIMIT 10;";
         }
 
         /// <summary>
+        /// 获取Docker容器运行统计信息（CPU/内存/网络IO/磁盘IO/进程数）
+        /// </summary>
+        [HttpGet, HttpPost]
+        public JsonResult GetDockerStats()
+        {
+            try
+            {
+                var data = SystemMonitorLogic.GetDockerStats();
+                return Json(new { Code = 1, Data = data });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { Code = 0, Msg = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// 获取应用运行日志（Console.WriteLine输出的内容，支持Docker和非Docker环境）
         /// </summary>
         [HttpGet, HttpPost]
