@@ -76,6 +76,17 @@ namespace Dos.ORM
 
         }
 
+        /// <summary>
+        /// 保护构造函数，用于子类（如 SafeTransactionProxy）
+        /// </summary>
+        protected DbTrans(DbTrans source)
+        {
+            Check.Require(source, "source", Check.NotNull);
+            this.trans = source.trans;
+            this.conn = source.conn;
+            this.dbSession = source.dbSession;
+        }
+
 
 
         /// <summary>
@@ -100,7 +111,7 @@ namespace Dos.ORM
         /// <summary>
         /// 提交。由于catch里面的代码仍然可能异常，因此强烈建议在finally中再次执行Close();
         /// </summary>
-        public void Commit()
+        public virtual void Commit()
         {
             trans.Commit();
 
@@ -113,7 +124,7 @@ namespace Dos.ORM
         /// <summary>
         /// 回滚。由于catch里面的代码仍然可能异常，因此强烈建议在finally中再次执行Close();
         /// </summary>
-        public void Rollback()
+        public virtual void Rollback()
         {
             trans.Rollback();
 
@@ -135,28 +146,34 @@ namespace Dos.ORM
 
 
         /// <summary>
-        /// 关闭
+        /// 关闭。确保即使Rollback失败（如连接已断开），连接和事务资源也能被正确释放。
         /// </summary>
-        public void Close()
+        public virtual void Close()
         {
             if (isClose)
                 return;
 
-            if (!IsCommitOrRollback)
+            try
             {
-                IsCommitOrRollback = true;
-
-                trans.Rollback();
+                if (!IsCommitOrRollback)
+                {
+                    IsCommitOrRollback = true;
+                    try { trans.Rollback(); } catch { }
+                }
             }
-
-            if (conn.State != ConnectionState.Closed)
+            finally
             {
-                conn.Close();
+                isClose = true;
+
+                try
+                {
+                    if (conn.State != ConnectionState.Closed)
+                        conn.Close();
+                }
+                catch { }
+
+                try { trans.Dispose(); } catch { }
             }
-
-            trans.Dispose();
-
-            isClose = true;
         }
 
 
@@ -164,7 +181,7 @@ namespace Dos.ORM
         /// <summary>
         /// 关闭连接并释放资源
         /// </summary>
-        public void Dispose()
+        public virtual void Dispose()
         {
             Close();
         }
@@ -177,7 +194,7 @@ namespace Dos.ORM
         /// </summary>
         /// <param name="sql"></param>
         /// <returns></returns>
-        public SqlSection FromSql(string sql)
+        public virtual SqlSection FromSql(string sql)
         {
             //2026-03-16：执行SQL前检查连接状态，提前发现MySQL连接断开问题，避免Fatal error
             if (conn != null && conn.State != ConnectionState.Open)

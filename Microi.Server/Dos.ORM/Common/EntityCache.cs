@@ -14,6 +14,7 @@
 * 备注描述：
 *******************************************************/
 #endregion
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 namespace Dos.ORM
 {
@@ -23,14 +24,9 @@ namespace Dos.ORM
     public class EntityCache
     {
         /// <summary>
-        /// 保存实体列表
+        /// 保存实体列表（线程安全）
         /// </summary>
-        private static Dictionary<string, object> _entityList = new Dictionary<string, object>();
-
-        /// <summary>
-        /// lock object
-        /// </summary>
-        private static readonly object LockObj = new object();
+        private static readonly ConcurrentDictionary<string, object> _entityList = new ConcurrentDictionary<string, object>();
 
 
         /// <summary>
@@ -48,8 +44,7 @@ namespace Dos.ORM
             where TEntity : Entity
         {
             var typestring = typeof(TEntity).ToString();
-            if (_entityList.ContainsKey(typestring))
-                _entityList.Remove(typestring);
+            _entityList.TryRemove(typestring, out _);
         }
 
         /// <summary>
@@ -78,19 +73,7 @@ namespace Dos.ORM
             where TEntity : Entity
         {
             var typestring = typeof(TEntity).ToString();
-
-            if (_entityList.ContainsKey(typestring))
-                return (TEntity)_entityList[typestring];
-
-            lock (LockObj)
-            {
-                if (_entityList.ContainsKey(typestring))
-                    return (TEntity)_entityList[typestring];
-
-                var t = DataUtils.Create<TEntity>();
-                _entityList.Add(typestring, t);
-                return t;
-            }
+            return (TEntity)_entityList.GetOrAdd(typestring, _ => DataUtils.Create<TEntity>());
         }
 
 
@@ -118,20 +101,7 @@ namespace Dos.ORM
 
         private static Entity getTEntity(string tableName)
         {
-            var typestring = tableName;
-
-            if (_entityList.ContainsKey(typestring))
-                return (Entity)_entityList[typestring];
-
-            lock (LockObj)
-            {
-                if (_entityList.ContainsKey(typestring))
-                    return (Entity)_entityList[typestring];
-
-                var t = DataUtils.Create<Entity>();
-                _entityList.Add(typestring, t);
-                return t;
-            }
+            return (Entity)_entityList.GetOrAdd(tableName, _ => DataUtils.Create<Entity>());
         }
         /// <summary>
         /// 返回所有字段

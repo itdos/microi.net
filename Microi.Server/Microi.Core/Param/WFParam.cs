@@ -4,13 +4,15 @@ using System.ComponentModel.DataAnnotations;
 
 using Newtonsoft.Json.Linq;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
 
     public class GetV8LineValueParam : WFParam
     {
-        public IMicroiDbSession Db { get; set; }
-        public IMicroiDbSession DbRead { get; set; }
+        public DbSession Db { get; set; }
+        public DbSession DbRead { get; set; }
         //public SysUser CurrentSysUser { get; set; }
         public WFNode CurrentNodeModel { get; set; }
     }

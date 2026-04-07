@@ -1,4 +1,4 @@
-﻿using Dos.Common;
+using Dos.Common;
 using Dos.ORM;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
@@ -873,7 +873,7 @@ namespace Microi.net.Api
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
             }
             param.IsDeleted = 0;
-            IMicroiDbSession dbSessionStart = OsClient.GetClient(param.OsClient).Db;
+            DbSession dbSessionStart = OsClient.GetClient(param.OsClient).Db;
             var diyTableModelStart = dbSessionStart.From<DiyTable>()
                                         .Select(new DiyTable().GetFields())
                                         .Where(d => d.Id == param.TableId)
@@ -904,7 +904,7 @@ namespace Microi.net.Api
             if (param.TableName.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "TableName不能为空"));
             var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(osClient.Db.DbType);
+            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
             var result = dbService.GetTableIndexes(new DbServiceParam
             {
                 TableName = param.TableName,
@@ -928,7 +928,7 @@ namespace Microi.net.Api
             if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace() || param.IndexColumns.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "参数不完整"));
             var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(osClient.Db.DbType);
+            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
             var result = dbService.AddIndex(new DbServiceParam
             {
                 TableName = param.TableName,
@@ -955,7 +955,7 @@ namespace Microi.net.Api
             if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "参数不完整"));
             var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(osClient.Db.DbType);
+            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
             var result = dbService.DropIndex(new DbServiceParam
             {
                 TableName = param.TableName,
@@ -980,8 +980,8 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "_SysMenuId不能为空"));
 
             var osClient = OsClient.GetClient(param.OsClient);
-            var db = ORMAdapterHelper.GetDosSession(osClient.Db);
-            var dbService = MicroiEngine.ORM(osClient.Db.DbType);
+            var db = osClient.Db;
+            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
 
             // 1. 查询sys_menu模块配置
             var sysMenu = db.From<SysMenu>()

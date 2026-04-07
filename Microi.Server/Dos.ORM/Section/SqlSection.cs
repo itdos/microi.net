@@ -69,6 +69,14 @@ namespace Dos.ORM
 
 
         /// <summary>
+        /// 添加参数（自动推断DbType）
+        /// </summary>
+        public SqlSection AddInParameter(string parameterName, object value)
+        {
+            return AddInParameter(parameterName, DbType.String, 0, value);
+        }
+
+        /// <summary>
         /// 添加参数
         /// </summary>
         public SqlSection AddInParameter(string parameterName, DbType dbType, object value)
