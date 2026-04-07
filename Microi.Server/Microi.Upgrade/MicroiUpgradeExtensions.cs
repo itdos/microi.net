@@ -36,6 +36,13 @@ namespace Microi.net
                     {
                         foreach (var clientModelItem in OsClient.ClientList)
                         {
+                            // 跳过没有数据库连接的租户
+                            var dbConn = clientModelItem.Value.OsClientModel?["DbConn"]?.ToString();
+                            if (string.IsNullOrWhiteSpace(dbConn))
+                            {
+                                Console.WriteLine($"Microi：【⚠️警告】平台自动升级跳过租户【{clientModelItem.Value.OsClient}】：数据库连接（DbConn）未配置。");
+                                continue;
+                            }
                             try
                             {
                                 //获取当前数据库版本号

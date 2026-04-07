@@ -408,3 +408,107 @@ export function getLastContacts(websocket, userId, osClient) {
         OsClient: osClient
     });
 }
+
+/**
+ * 加载AI模型列表
+ * @param {Object} DiyCommon - DiyCommon实例
+ * @param {Function} callback - 回调函数(models)，models为数组
+ */
+export function loadAiModelList(DiyCommon, callback) {
+    DiyCommon.FormEngine.GetTableData('mic_ai', {
+        _Where: [['IsEnable', '=', '1']],
+        _OrderBy: 'CreateTime',
+        _OrderByType: 'DESC',
+        _PageSize: 100
+    }, function(result) {
+        if (result && result.Code === 1 && result.Data && result.Data.length > 0) {
+            callback(result.Data);
+        } else {
+            callback([]);
+        }
+    });
+}
+
+/**
+ * 构建AI消息的OtherInfo字段
+ * @param {string} toUserId - 目标用户ID
+ * @param {Object|null} selectedAiModel - 选中的AI模型对象
+ * @returns {string} OtherInfo JSON字符串，非AI聊天返回空字符串
+ */
+export function buildAiOtherInfo(toUserId, selectedAiModel) {
+    if (toUserId === 'AI' && selectedAiModel && selectedAiModel.AiModel) {
+        return JSON.stringify({ AiModel: selectedAiModel.AiModel });
+    }
+    return '';
+}
+
+/**
+ * 处理AI流式消息中的[THINKING]信号
+ * @param {Object} streamState - 流式消息状态对象 { currentStreamMessage, messages }
+ * @param {string} chunk - 收到的块
+ * @param {string} fromUserId - 发送者ID
+ * @param {string} toUserId - 接收者ID
+ * @param {boolean|string} isComplete - 是否完成
+ * @param {Object} options - 配置项 { chatName, scrollToBottom }
+ * @returns {boolean} 是否已处理（true=已处理，调用方无需额外操作）
+ */
+export function handleAIStreamChunk(streamState, chunk, fromUserId, toUserId, isComplete, options = {}) {
+    const { chatName = 'AI助手', scrollToBottom } = options;
+    const complete = isComplete === true || isComplete === 'true';
+
+    // [THINKING] 信号：创建"思考中"占位消息
+    if (chunk === '[THINKING]') {
+        if (!streamState.currentStreamMessage) {
+            streamState.currentStreamMessage = {
+                id: 'ai-stream-' + Date.now(),
+                Type: 'text',
+                Content: '',
+                SendTime: new Date().toISOString(),
+                FromUserId: fromUserId,
+                ToUserId: toUserId,
+                isSelf: false,
+                senderName: chatName,
+                avatar: '',
+                isStreaming: true,
+                isThinking: true
+            };
+            streamState.messages.push(streamState.currentStreamMessage);
+            if (scrollToBottom) scrollToBottom();
+        }
+        return true;
+    }
+
+    if (!streamState.currentStreamMessage) {
+        // 第一个数据块——创建消息
+        streamState.currentStreamMessage = {
+            id: 'ai-stream-' + Date.now(),
+            Type: 'text',
+            Content: chunk || '',
+            SendTime: new Date().toISOString(),
+            FromUserId: fromUserId,
+            ToUserId: toUserId,
+            isSelf: false,
+            senderName: chatName,
+            avatar: '',
+            isStreaming: true,
+            isThinking: false
+        };
+        streamState.messages.push(streamState.currentStreamMessage);
+    } else {
+        // 后续数据块——追加内容，取消思考中状态
+        if (streamState.currentStreamMessage.isThinking) {
+            streamState.currentStreamMessage.isThinking = false;
+        }
+        streamState.currentStreamMessage.Content += chunk || '';
+    }
+
+    if (complete) {
+        if (streamState.currentStreamMessage) {
+            streamState.currentStreamMessage.isStreaming = false;
+        }
+        streamState.currentStreamMessage = null;
+    }
+
+    if (scrollToBottom) scrollToBottom();
+    return true;
+}

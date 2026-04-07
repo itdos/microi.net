@@ -290,20 +290,27 @@ const products = [
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  background: rgba(20, 20, 35, 0.8);
-  border: 1px solid rgba(138, 43, 226, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   transform: translateY(0);
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 0.45s ease-out,
               border-color 0.45s ease-out,
-              box-shadow 0.45s ease-out;
+              box-shadow 0.45s ease-out,
+              background 0.45s ease-out,
+              backdrop-filter 0.45s ease-out;
   cursor: default;
 }
 
 .product-card:hover {
   transform: translateY(-8px);
-  border-color: rgba(138, 43, 226, 0.5);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(138, 43, 226, 0.45);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 4px 24px rgba(138, 43, 226, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* 每张卡片不同颜色光效 */
