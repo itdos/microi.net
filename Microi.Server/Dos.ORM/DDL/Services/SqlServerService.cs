@@ -1,11 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dos.Common;
-using Dos.ORM;
-using Microi.net;
 
-namespace Microi.net
+namespace Dos.ORM
 {
     public class SqlServerService : IMicroiORM
     {
@@ -36,7 +34,7 @@ namespace Microi.net
         /// <param name="_trans"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, IMicroiDbTransaction _trans = null)
+        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, DbTrans _trans = null)
         {
             throw new Exception("SqlServer暂未实现此功能！");
         }
@@ -47,10 +45,10 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
             // SQL注入防护
             if (!IsValidIdentifier(param.TableName))
@@ -73,7 +71,7 @@ namespace Microi.net
 
             try
             {
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -89,13 +87,13 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult AddColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.FieldName.DosIsNullOrWhiteSpace() ||
                 param.FieldType.DosIsNullOrWhiteSpace() ||
                 (param.DbSession == null && _trans == null))
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
             // SQL注入防护
             if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
@@ -113,7 +111,7 @@ namespace Microi.net
 
             try
             {
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -123,7 +121,7 @@ namespace Microi.net
             }
         }
 
-        public DosResult ChangeColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
                 || param.FieldName.DosIsNullOrWhiteSpace()
@@ -131,7 +129,7 @@ namespace Microi.net
                 || param.FieldType.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
@@ -158,10 +156,10 @@ namespace Microi.net
             {
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
                 //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                IMicroiDbSession dbSession = param.OsClientModel.Db;
+                DbSession dbSession = param.OsClientModel.Db;
                 //在客户数据库中创建表
                 var count = dbSession.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
@@ -172,7 +170,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<string>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResultList<string>(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             //取所有表
             var sql = @"select TABLE_NAME from information_schema.TABLES";
@@ -182,12 +180,12 @@ namespace Microi.net
             return new DosResultList<string>(1, result);
         }
 
-        public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.OldTableName.DosIsNullOrWhiteSpace() ||
                 (param.DbSession == null && _trans == null))
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
             // SQL注入防护
             if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
@@ -197,7 +195,7 @@ namespace Microi.net
 
             try
             {
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -210,7 +208,7 @@ namespace Microi.net
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() || param.DbSession == null)
-                return new DosResultList<information_schema_columns>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResultList<information_schema_columns>(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
             // SQL注入防护
             if (!IsValidIdentifier(param.TableName))
@@ -230,7 +228,7 @@ namespace Microi.net
 
             try
             {
-                var dosSession = ORMAdapterHelper.GetDosSession(param.DbSession);
+                var dosSession = param.DbSession;
                 var result = dosSession.FromSql(sql).ToList<information_schema_columns>();
                 return new DosResultList<information_schema_columns>(1, result);
             }
@@ -280,7 +278,7 @@ namespace Microi.net
                 if (!IsValidIdentifier(param.TableName))
                     return new DosResult(0, null, "表名不合法");
                 var sql = $"SELECT i.name AS Key_name, c.name AS Column_name, i.is_unique AS Non_unique, i.type_desc AS Index_type FROM sys.indexes i JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id WHERE i.object_id = OBJECT_ID('{param.TableName}')";
-                var list = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToArray();
+                var list = param.DbSession.FromSql(sql).ToArray();
                 return new DosResult(1, list);
             }
             catch (Exception ex)
@@ -303,7 +301,7 @@ namespace Microi.net
                 var columnsSql = string.Join(", ", columns.Select(c => $"[{c}]"));
                 var uniqueStr = param.IndexUnique ? "UNIQUE " : "";
                 var sql = $"CREATE {uniqueStr}NONCLUSTERED INDEX [{param.IndexName}] ON [{param.TableName}] ({columnsSql})";
-                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                param.DbSession.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1, null, "索引创建成功");
             }
             catch (Exception ex)
@@ -321,7 +319,7 @@ namespace Microi.net
                 if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.IndexName))
                     return new DosResult(0, null, "表名或索引名不合法");
                 var sql = $"DROP INDEX [{param.IndexName}] ON [{param.TableName}]";
-                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                param.DbSession.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1, null, "索引删除成功");
             }
             catch (Exception ex)

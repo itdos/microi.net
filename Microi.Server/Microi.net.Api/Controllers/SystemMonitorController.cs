@@ -75,7 +75,7 @@ namespace Microi.net.Api
             {
                 var sysUser = await DiyToken.GetCurrentToken();
                 var osClient = OsClient.GetClient(sysUser?.OsClient);
-                var db = ORMAdapterHelper.GetDosSession(osClient.Db);
+                var db = osClient.Db;
 
                 var stats = new JObject();
 

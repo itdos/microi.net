@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     /// <summary>
@@ -16,7 +18,7 @@ namespace Microi.net
         /// <summary>
         /// 重新加载指定 OsClient 的 SaaS 引擎配置
         /// </summary>
-        DosResult ReloadOsClient(string osClient, IMicroiDbTransaction _trans = null);
+        DosResult ReloadOsClient(string osClient, DbTrans _trans = null);
 
         /// <summary>
         /// 解析查询条件

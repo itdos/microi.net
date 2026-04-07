@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     /// <summary>
@@ -10,17 +12,17 @@ namespace Microi.net
     /// </summary>
     public interface IFormEngine
     {
-        DosResult UptTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        DosResult DelTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        DosResult AddTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        Task<DosResultList<dynamic>> GetTableTreeAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptTableData(dynamic dynamicParam, DbTrans _trans = null);
+        DosResult DelTableData(dynamic dynamicParam, DbTrans _trans = null);
+        DosResult AddTableData(dynamic dynamicParam, DbTrans _trans = null);
+        Task<DosResultList<dynamic>> GetTableTreeAsync(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResultList<GetFieldsDataResult>> GetFieldsData(DiyTableRowParam param);
         Task<DosResultList<dynamic>> GetDiyFieldSqlData(DiyTableRowParam param);
         Task<DosResultList<dynamic>> GetDiyTable(DiyTableParam param);
-        Task<DosResult<dynamic>> GetDiyTableModel(DiyTableParam param, IMicroiDbTransaction _trans = null);
+        Task<DosResult<dynamic>> GetDiyTableModel(DiyTableParam param, DbTrans _trans = null);
         Task<DosResult> UptDiyTable(DiyTableParam param);
         Task<DosResult> DelDiyTable(DiyTableParam param);
-        Task<DosResult> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddDiyTable(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResultList<string>> GetNotDiyTable(DiyTableParam param);
         Task<DosResultList<DiyDocument>> GetDiyDocumentTree(DiyDocumentParam param);
         #region 配置相关方法
@@ -49,34 +51,34 @@ namespace Microi.net
         /// <summary>
         /// 获取一条数据
         /// </summary>
-        Task<DosResult<dynamic>> GetFormDataAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult<dynamic>> GetFormDataAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取一条数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult<dynamic>> GetFormDataAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult<dynamic>> GetFormDataAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取一条数据（泛型版本）
         /// </summary>
-        Task<DosResult<T>> GetFormDataAsync<T>(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult<T>> GetFormDataAsync<T>(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取一条数据（指定表单引擎Key，泛型版本）
         /// </summary>
-        Task<DosResult<T>> GetFormDataAsync<T>(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult<T>> GetFormDataAsync<T>(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取一条数据（同步版本）
         /// </summary>
-        DosResult<dynamic> GetFormData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult<dynamic> GetFormData(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取一条数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult<dynamic> GetFormData(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        DosResult<T> GetFormData<T>(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        DosResult<T> GetFormData<T>(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult<dynamic> GetFormData(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
+        DosResult<T> GetFormData<T>(dynamic dynamicParam, DbTrans _trans = null);
+        DosResult<T> GetFormData<T>(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -85,52 +87,52 @@ namespace Microi.net
         /// <summary>
         /// 修改一条数据
         /// </summary>
-        Task<DosResult> UptFormDataAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFormDataAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 修改一条数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult> UptFormDataAsync(string formEngineKey, dynamic formData, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFormDataAsync(string formEngineKey, dynamic formData, DbTrans _trans = null);
 
         /// <summary>
         /// 修改一条数据（同步版本）
         /// </summary>
-        DosResult UptFormData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptFormData(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 修改一条数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult UptFormData(string formEngineKey, dynamic formData, IMicroiDbTransaction _trans = null);
+        DosResult UptFormData(string formEngineKey, dynamic formData, DbTrans _trans = null);
 
         /// <summary>
         /// 批量修改数据
         /// </summary>
-        Task<DosResult> UptFormDataBatchAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFormDataBatchAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 批量修改数据（同步版本）
         /// </summary>
-        DosResult UptFormDataBatch(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptFormDataBatch(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件修改数据
         /// </summary>
-        Task<DosResult> UptFormDataByWhereAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFormDataByWhereAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件修改数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult> UptFormDataByWhereAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFormDataByWhereAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件修改数据（同步版本）
         /// </summary>
-        DosResult UptFormDataByWhere(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptFormDataByWhere(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件修改数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult UptFormDataByWhere(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptFormDataByWhere(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -139,32 +141,32 @@ namespace Microi.net
         /// <summary>
         /// 新增一条数据
         /// </summary>
-        Task<DosResult> AddFormDataAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddFormDataAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 新增一条数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult> AddFormDataAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddFormDataAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 新增一条数据（同步版本）
         /// </summary>
-        DosResult AddFormData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddFormData(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 新增一条数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult AddFormData(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddFormData(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 批量新增数据
         /// </summary>
-        Task<DosResult> AddFormDataBatchAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddFormDataBatchAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 批量新增数据（同步版本）
         /// </summary>
-        DosResult AddFormDataBatch(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddFormDataBatch(dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -173,31 +175,31 @@ namespace Microi.net
         /// <summary>
         /// 新增一个字段
         /// </summary>
-        Task<DosResult> AddFieldAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddFieldAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 新增一个字段（同步版本）
         /// </summary>
-        DosResult AddField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddField(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 修改一个字段
         /// </summary>
-        Task<DosResult> UptFieldAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptFieldAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 修改一个字段（同步版本）
         /// </summary>
-        DosResult UptField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult UptField(dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
         #region 表管理
-        Task<DosResult> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddDiyField(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResultList<dynamic>> GetExceptionFieldList(DiyFieldParam param);
         Task<DosResult> AddDbField(DiyFieldParam param);
         Task<DosResult> DelDiyField(DiyFieldParam param);
-        Task<DosResult> UptDiyField(DiyFieldParam param, IMicroiDbTransaction _trans = null);
+        Task<DosResult> UptDiyField(DiyFieldParam param, DbTrans _trans = null);
         Task<DosResult> UptDiyFieldList(DiyFieldParam param);
         Task<DosResult<JObject>> GetDiyFieldModel(DiyFieldParam param);
         Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param);
@@ -208,12 +210,12 @@ namespace Microi.net
         /// <summary>
         /// 新增表
         /// </summary>
-        Task<DosResult> AddTableAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddTableAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 新增表（同步版本）
         /// </summary>
-        DosResult AddTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddTable(dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -222,52 +224,52 @@ namespace Microi.net
         /// <summary>
         /// 删除一条数据
         /// </summary>
-        Task<DosResult> DelFormDataAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> DelFormDataAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 删除一条数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult> DelFormDataAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> DelFormDataAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 删除一条数据（同步版本）
         /// </summary>
-        DosResult DelFormData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult DelFormData(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 删除一条数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult DelFormData(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult DelFormData(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 批量删除数据
         /// </summary>
-        Task<DosResult> DelFormDataBatchAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> DelFormDataBatchAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 批量删除数据（同步版本）
         /// </summary>
-        DosResult DelFormDataBatch(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult DelFormDataBatch(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件删除数据
         /// </summary>
-        Task<DosResult> DelFormDataByWhereAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> DelFormDataByWhereAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件删除数据（指定表单引擎Key）
         /// </summary>
-        Task<DosResult> DelFormDataByWhereAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> DelFormDataByWhereAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件删除数据（同步版本）
         /// </summary>
-        DosResult DelFormDataByWhere(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult DelFormDataByWhere(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 根据条件删除数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResult DelFormDataByWhere(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult DelFormDataByWhere(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -276,52 +278,52 @@ namespace Microi.net
         /// <summary>
         /// 获取数据列表
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据列表（指定表单引擎Key）
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据列表（泛型版本）
         /// </summary>
-        Task<DosResultList<T>> GetTableDataAsync<T>(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<T>> GetTableDataAsync<T>(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据列表（指定表单引擎Key，泛型版本）
         /// </summary>
-        Task<DosResultList<T>> GetTableDataAsync<T>(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<T>> GetTableDataAsync<T>(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据列表（同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableData(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据列表（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableData(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableData(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据条数
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataCountAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataCountAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据条数（指定表单引擎Key）
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataCountAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataCountAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据条数（同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableDataCount(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableDataCount(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取数据条数（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableDataCount(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableDataCount(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
@@ -330,22 +332,22 @@ namespace Microi.net
         /// <summary>
         /// 获取树形数据（异步版本）
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataTreeAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataTreeAsync(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取树形数据（指定表单引擎Key，异步版本）
         /// </summary>
-        Task<DosResultList<dynamic>> GetTableDataTreeAsync(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetTableDataTreeAsync(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取树形数据（同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableDataTree(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableDataTree(dynamic dynamicParam, DbTrans _trans = null);
 
         /// <summary>
         /// 获取树形数据（指定表单引擎Key，同步版本）
         /// </summary>
-        DosResultList<dynamic> GetTableDataTree(string formEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResultList<dynamic> GetTableDataTree(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
         #endregion
 
