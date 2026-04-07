@@ -5,14 +5,16 @@ using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     public interface IApiEngine
     {
-        dynamic Run(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        dynamic Run(string apiEngineKey, dynamic dynamicParam = null, IMicroiDbTransaction _trans = null);
-        Task<dynamic> RunAsync(string apiEngineKey, dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        Task<dynamic> RunAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        dynamic Run(dynamic dynamicParam, DbTrans _trans = null);
+        dynamic Run(string apiEngineKey, dynamic dynamicParam = null, DbTrans _trans = null);
+        Task<dynamic> RunAsync(string apiEngineKey, dynamic dynamicParam, DbTrans _trans = null);
+        Task<dynamic> RunAsync(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResult<dynamic>> GetApiEngineModel(ApiEngineParam param);
     }
 }

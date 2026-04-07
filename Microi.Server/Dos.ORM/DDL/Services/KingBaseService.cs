@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dos.Common;
-using Dos.ORM;
-using Microi.net;
 
-namespace Microi.net
+namespace Dos.ORM
 {
     /// <summary>
     /// 人大金仓数据库实现（兼容PostgreSQL语法）
@@ -42,21 +40,21 @@ namespace Microi.net
         /// <summary>
         /// 修改表名
         /// </summary>
-        public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             try
             {
                 if (param.TableName.DosIsNullOrWhiteSpace() ||
                     param.OldTableName.DosIsNullOrWhiteSpace() ||
                     (param.DbSession == null && _trans == null))
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
                 if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
                     return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
                 var sql = $"ALTER TABLE \"{param.OldTableName}\" RENAME TO \"{param.TableName}\"";
 
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -69,12 +67,12 @@ namespace Microi.net
         /// <summary>
         /// 创建表
         /// </summary>
-        public DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             try
             {
                 if (param.TableName.DosIsNullOrWhiteSpace())
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
                 if (!IsValidIdentifier(param.TableName))
                     return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
@@ -89,7 +87,7 @@ namespace Microi.net
                           PRIMARY KEY(""Id"")
                         )";
 
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -102,7 +100,7 @@ namespace Microi.net
         /// <summary>
         /// 创建列
         /// </summary>
-        public DosResult AddColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
             try
             {
@@ -110,7 +108,7 @@ namespace Microi.net
                     || param.FieldName.DosIsNullOrWhiteSpace()
                     || param.FieldType.DosIsNullOrWhiteSpace()
                     || (param.DbSession == null && _trans == null))
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
                 if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
                     return new DosResult(0, null, "表名或字段名不合法");
@@ -118,7 +116,7 @@ namespace Microi.net
                 var fieldType = ConvertFieldType(param.FieldType);
                 var sql = $"ALTER TABLE \"{param.TableName}\" ADD COLUMN \"{param.FieldName}\" {fieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
 
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
 
                 if (!param.FieldLabel.DosIsNullOrWhiteSpace())
@@ -139,7 +137,7 @@ namespace Microi.net
         /// <summary>
         /// 修改列
         /// </summary>
-        public DosResult ChangeColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
+        public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
             try
             {
@@ -148,14 +146,14 @@ namespace Microi.net
                     param.NewFieldName.DosIsNullOrWhiteSpace() ||
                     param.FieldType.DosIsNullOrWhiteSpace() ||
                     (param.DbSession == null && _trans == null))
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
                 if (!IsValidIdentifier(param.TableName) ||
                     !IsValidIdentifier(param.FieldName) ||
                     !IsValidIdentifier(param.NewFieldName))
                     return new DosResult(0, null, "表名或字段名不合法");
 
-                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+                dynamic session = (object)_trans ?? param.DbSession;
                 var fieldType = ConvertFieldType(param.FieldType);
 
                 if (!param.FieldName.Equals(param.NewFieldName, StringComparison.OrdinalIgnoreCase))
@@ -186,12 +184,12 @@ namespace Microi.net
         /// <summary>
         /// 加载非DIY表
         /// </summary>
-        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, IMicroiDbTransaction _trans = null)
+        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
-            var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
+            dynamic session = (object)_trans ?? param.DbSession;
 
             if (!realFieldList.Any(d => d.column_name.ToLower() == "id"))
                 session.FromSql($"ALTER TABLE \"{param.TableName}\" ADD COLUMN \"Id\" varchar(36) NOT NULL; ALTER TABLE \"{param.TableName}\" ADD PRIMARY KEY (\"Id\");").ExecuteNonQuery();
@@ -218,7 +216,7 @@ namespace Microi.net
                         FROM pg_catalog.pg_tables
                         WHERE schemaname NOT IN ('pg_catalog', 'information_schema', 'sys_catalog')
                         ORDER BY tablename";
-            var result = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToList<string>();
+            var result = param.DbSession.FromSql(sql).ToList<string>();
             return new DosResultList<string>(1, result);
         }
 
@@ -242,7 +240,7 @@ namespace Microi.net
                             ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
                         WHERE c.table_name = '{param.TableName}'
                         ORDER BY c.ordinal_position";
-            var realFieldList = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToList<information_schema_columns>();
+            var realFieldList = param.DbSession.FromSql(sql).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 
@@ -265,7 +263,7 @@ namespace Microi.net
                 var sql = $@"SELECT indexname AS ""Key_name"", indexdef AS ""Index_type""
                             FROM pg_indexes
                             WHERE tablename = '{param.TableName}'";
-                var list = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToArray();
+                var list = param.DbSession.FromSql(sql).ToArray();
                 return new DosResult(1, list);
             }
             catch (Exception ex)
@@ -293,7 +291,7 @@ namespace Microi.net
                 var uniqueStr = param.IndexUnique ? "UNIQUE " : "";
                 var sql = $"CREATE {uniqueStr}INDEX \"{param.IndexName}\" ON \"{param.TableName}\" ({columnsSql})";
 
-                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                param.DbSession.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1, null, "索引创建成功");
             }
             catch (Exception ex)
@@ -312,7 +310,7 @@ namespace Microi.net
                     return new DosResult(0, null, "索引名不合法");
 
                 var sql = $"DROP INDEX \"{param.IndexName}\"";
-                ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ExecuteNonQuery();
+                param.DbSession.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1, null, "索引删除成功");
             }
             catch (Exception ex)

@@ -1,4 +1,4 @@
-using Dos.ORM;
+﻿using Dos.ORM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,7 +50,7 @@ namespace Microi.net
             {
                 return new DosResult<SysBaseData>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             SysBaseData model = null;// (!param.Id.DosIsNullOrWhiteSpace() ? (await SysBaseDataCache.GetSysBaseDataModel(param.Id, param.OsClient)) : (await SysBaseDataCache.GetSysBaseDataModel(param.Key, param.OsClient)));
             if (model == null)
             {
@@ -75,7 +75,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<SysBaseData>> GetSysBaseDataStep(SysBaseDataParam param)
         {
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             Where<SysBaseData> where = new Where<SysBaseData>();
             if (!param.Customer.DosIsNullOrWhiteSpace())
             {
@@ -129,7 +129,7 @@ namespace Microi.net
             {
                 return new DosResultList<SysBaseData>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             Where<SysBaseData> where = new Where<SysBaseData>();
             new List<SysBaseData>();
             List<SysBaseData> list = null;
@@ -185,8 +185,8 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             SysBaseData model = (await GetSysBaseDataModel(param)).Data;
             if (model.Key != param.Key && !param.Key.Contains("未命名") && !param.Key.Contains("Unnamed") && (from d in dbRead.From<SysBaseData>()
                                                                                                            where d.Key == param.Key
@@ -251,8 +251,8 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             if (!param.Key.Contains("未命名") && !param.Key.Contains("Unnamed") && (from d in dbRead.From<SysBaseData>()
                                                                                  where d.Key == param.Key
                                                                                  select d).Count() > 0)
@@ -304,8 +304,8 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "CantDelete", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             if (!string.IsNullOrWhiteSpace(param.IDs))
             {
                 List<string> ids = param.IDs.DosSplit(',').ToList();
@@ -368,7 +368,7 @@ namespace Microi.net
                 Lang = DiyMessage.Lang;
             }
             SysBaseData model = null;// await SysBaseDataCache.GetSysBaseDataModelByValue(value, osClient);
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(osClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(osClient).DbRead;
             if (model == null)
             {
                 model = (from d in dbSession.From<SysBaseData>()

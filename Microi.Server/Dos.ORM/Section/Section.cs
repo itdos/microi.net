@@ -24,6 +24,7 @@ using System.Data.Common;
 using Dos.ORM;
 using Dos.ORM.Common;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -42,6 +43,36 @@ namespace Dos.ORM
         protected DbCommand cmd;
         protected DbTransaction tran = null;
 
+        /// <summary>
+        /// 慢SQL阈值（毫秒），0 = 不启用
+        /// </summary>
+        public static long SlowSqlThresholdMs { get; set; } = 5000;
+
+        /// <summary>
+        /// 慢SQL回调：(DbCommand, 耗时ms, 方法名)
+        /// </summary>
+        public static Action<DbCommand, long, string> OnSlowSql;
+
+        [ThreadStatic] private static bool _isTiming;
+        private T ExecuteWithTiming<T>(Func<T> action, string method)
+        {
+            if (_isTiming || OnSlowSql == null || SlowSqlThresholdMs <= 0)
+                return action();
+            _isTiming = true;
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var result = action();
+                sw.Stop();
+                if (sw.ElapsedMilliseconds >= SlowSqlThresholdMs)
+                {
+                    try { OnSlowSql(cmd, sw.ElapsedMilliseconds, method); } catch { }
+                }
+                return result;
+            }
+            finally { _isTiming = false; }
+        }
+
         public Section(DbSession dbSession)
         {
             Check.Require(dbSession, "dbSession", Check.NotNullOrEmpty);
@@ -56,7 +87,9 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual object ToScalar()
         {
-            return tran == null ? this.dbSession.ExecuteScalar(cmd) : this.dbSession.ExecuteScalar(cmd, tran);
+            return ExecuteWithTiming(() =>
+                tran == null ? this.dbSession.ExecuteScalar(cmd) : this.dbSession.ExecuteScalar(cmd, tran),
+                "ToScalar");
         }
 
 
@@ -84,28 +117,19 @@ namespace Dos.ORM
         /// <returns></returns>
         public TEntity ToFirst<TEntity>()
         {
-            TEntity t = default(TEntity);
-            using (IDataReader reader = ToDataReader())
+            return ExecuteWithTiming(() =>
             {
-                //var tempt = EntityUtils.Mapper.Map<TEntity>(reader);
-                //if (tempt.Any())
-                //{
-                //    t = tempt.First();
-                //}
-                var result = EntityUtils.ReaderToEnumerable<TEntity>(reader).ToArray();
-                if (result.Any())
+                TEntity t = default(TEntity);
+                using (IDataReader reader = ToDataReaderInternal())
                 {
-                    t = result.First();
+                    var result = EntityUtils.ReaderToEnumerable<TEntity>(reader).ToArray();
+                    if (result.Any())
+                    {
+                        t = result.First();
+                    }
                 }
-                #region 2015-08-10注释
-                //if (reader.Read())
-                //{
-                //    t = DataUtils.Create<TEntity>();
-                //    t.SetPropertyValues(reader);
-                //}
-                #endregion
-            }
-            return t;
+                return t;
+            }, "ToFirst");
         }
 
         /// <summary>
@@ -126,7 +150,7 @@ namespace Dos.ORM
 
         public dynamic[] ToArray()
         {
-            return ToList<dynamic>().ToArray();
+            return ExecuteWithTiming(() => ToListInternal<dynamic>().ToArray(), "ToArray");
         }
 
 
@@ -137,14 +161,15 @@ namespace Dos.ORM
         /// <returns></returns>
         public List<TEntity> ToList<TEntity>()
         {
-            //List<TEntity> listT = new List<TEntity>();
-            using (IDataReader reader = ToDataReader())
+            return ExecuteWithTiming(() => ToListInternal<TEntity>(), "ToList");
+        }
+
+        private List<TEntity> ToListInternal<TEntity>()
+        {
+            using (IDataReader reader = ToDataReaderInternal())
             {
-                //listT = EntityUtils.Mapper.Map<TEntity>(reader);
-                //reader.Close();
                 return EntityUtils.ReaderToEnumerable<TEntity>(reader).ToList();
             }
-            //return listT;
         }
         /// <summary>
         /// 返回懒加载数据
@@ -154,7 +179,7 @@ namespace Dos.ORM
         public IEnumerable<TEntity> ToEnumerable<TEntity>()
         {
             //IEnumerable<TEntity> result;
-            using (IDataReader reader = ToDataReader())
+            using (IDataReader reader = ToDataReaderInternal())
             {
                 var info = new EntityUtils.CacheInfo()
                 {
@@ -174,6 +199,11 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual IDataReader ToDataReader()
         {
+            return ToDataReaderInternal();
+        }
+
+        protected IDataReader ToDataReaderInternal()
+        {
             return (tran == null ? this.dbSession.ExecuteReader(cmd) : this.dbSession.ExecuteReader(cmd, tran));
         }
 
@@ -183,7 +213,9 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual DataSet ToDataSet()
         {
-            return (tran == null ? this.dbSession.ExecuteDataSet(cmd) : this.dbSession.ExecuteDataSet(cmd, tran));
+            return ExecuteWithTiming(() =>
+                tran == null ? this.dbSession.ExecuteDataSet(cmd) : this.dbSession.ExecuteDataSet(cmd, tran),
+                "ToDataSet");
         }
 
 
@@ -193,7 +225,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public DataTable ToDataTable()
         {
-            return this.ToDataSet().Tables[0];
+            return ExecuteWithTiming(() => this.ToDataSet().Tables[0], "ToDataTable");
         }
 
         /// <summary>
@@ -202,7 +234,9 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual int ExecuteNonQuery()
         {
-            return (tran == null ? this.dbSession.ExecuteNonQuery(cmd) : this.dbSession.ExecuteNonQuery(cmd, tran));
+            return ExecuteWithTiming(() =>
+                tran == null ? this.dbSession.ExecuteNonQuery(cmd) : this.dbSession.ExecuteNonQuery(cmd, tran),
+                "ExecuteNonQuery");
         }
 
 
