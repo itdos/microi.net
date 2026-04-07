@@ -75,7 +75,7 @@ namespace Microi.net
         public string ApiEngineKey { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Name { get; set; }
-        public int? _Top { get; set; }
+        // public int? _Top { get; set; }
     }
     /// <summary>
     /// 

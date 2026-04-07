@@ -75,7 +75,6 @@ useInitVChartsTheme(chartEditStore)
   position: relative;
   height: 100vh;
   width: 100vw;
-  max-width: 100%;
   @include background-image('background-image');
   &.fit,
   &.full {
@@ -86,6 +85,7 @@ useInitVChartsTheme(chartEditStore)
     .go-preview-scale {
       transform-origin: center center;
       max-width: 100%;
+      // transform: none !important;
     }
   }
   &.scrollY {

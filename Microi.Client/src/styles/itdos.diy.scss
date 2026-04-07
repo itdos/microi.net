@@ -81,6 +81,15 @@
         .tags-view-container-microi {
             padding: 0 !important;
         }
+        .fixed-header-microi{
+            padding: 0 !important;
+        }
+        .fixed-header-microi .el-tabs.el-tabs--top.parent-tabs{
+            margin-bottom: 0 !important;
+        }
+        .go-view-preview-wrapper{
+            height: 100vh !important;
+        }
     }
     .more-search-item {
         .el-date-editor--datetimerange.el-input,
