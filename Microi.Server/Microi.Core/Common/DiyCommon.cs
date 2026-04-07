@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -9,6 +9,8 @@ using Dos.Common;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+
+using Dos.ORM;
 
 namespace Microi.net
 {

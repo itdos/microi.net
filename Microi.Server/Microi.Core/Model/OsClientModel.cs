@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     public class OsClientDataBase
@@ -19,11 +21,11 @@ namespace Microi.net
         /// <summary>
         /// 数据库【增、删、改】对象
         /// </summary>
-        public IMicroiDbSession Db { get; set; }
+        public DbSession Db { get; set; }
         /// <summary>
         /// 数据库【读】对象
         /// </summary>
-        public IMicroiDbSession DbRead { get; set; }
+        public DbSession DbRead { get; set; }
     }
     public class DiyLang
     {
@@ -49,22 +51,11 @@ namespace Microi.net
         /// <summary>
         /// 数据库【增、删、改】对象
         /// </summary>
-        public IMicroiDbSession Db { get; set; }
+        public DbSession Db { get; set; }
         /// <summary>
         /// 数据库【读】对象
         /// </summary>
-        public IMicroiDbSession DbRead { get; set; }
-
-        /// <summary>
-        /// 强制使用 Dos.ORM 的数据库【增、删、改】对象
-        /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
-        /// </summary>
-        public Dos.ORM.DbSession DosOrmDb { get; set; }
-        /// <summary>
-        /// 强制使用 Dos.ORM 的数据库【读】对象
-        /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
-        /// </summary>
-        public Dos.ORM.DbSession DosOrmDbRead { get; set; }
+        public DbSession DbRead { get; set; }
 
         public List<OsClientDataBase> DataBases { get; set; } //ConcurrentDictionary
     }

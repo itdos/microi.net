@@ -73,10 +73,9 @@ catch (Exception ex)
     microiNetDllVersion = ex.Message;
 }
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】您的平台服务器端版本号：v{microiNetDllVersion}");
-// 读取 ORM 配置（Dos.ORM 或 SqlSugar）
-var ormType = Environment.GetEnvironmentVariable("OsClientORM", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientORM") ?? "Dos.ORM";
+// ORM 引擎：Dos.ORM
 services.AddMicroi();//【必须】Microi初始化
-services.AddMicroiORM(ormType);//【必须】注入【数据库ORM】插件
+services.AddMicroiORM();//【必须】注入【数据库ORM】插件
 services.AddMicroiCache();//【必须】注入【分布式缓存】插件
 services.AddMicroiHttp();//【必须】注入【Http】插件
 services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件

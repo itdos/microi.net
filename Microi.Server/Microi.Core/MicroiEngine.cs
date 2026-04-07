@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using Dos.ORM;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Microi.net
@@ -52,7 +52,7 @@ namespace Microi.net
     }
     public interface IDbFactory
     {
-        IMicroiORM Create(DatabaseType dbType);
+        IMicroiORM Create(Dos.ORM.DatabaseType dbType);
     }
     public interface IHDFSFactory
     {

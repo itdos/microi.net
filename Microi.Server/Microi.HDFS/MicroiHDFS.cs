@@ -1,4 +1,4 @@
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：
 * Copyright(c) Microi.net
@@ -554,8 +554,8 @@ namespace Microi.net
             }
 
             #endregion
-            IMicroiDbSession dbSession = clientModel.Db;
-            IMicroiDbSession dbRead = clientModel.DbRead;
+            DbSession dbSession = clientModel.Db;
+            DbSession dbRead = clientModel.DbRead;
             //var resultSysConfig = await _formEngine.GetFormDataAsync(new
             //{
             //    FormEngineKey = "sys_config",

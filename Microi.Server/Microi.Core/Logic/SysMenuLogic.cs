@@ -1,4 +1,4 @@
-using Dos.ORM;
+﻿using Dos.ORM;
 #region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：
@@ -51,7 +51,7 @@ namespace Microi.net
             {
                 return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //SysMenu model = dbSession.From<SysMenu>()
             //                .Where(d => d.IsDeleted != 1 && d.Display == true)
             //                .OrderBy(d=>d.Sort)
@@ -96,7 +96,7 @@ namespace Microi.net
             }
             if (model == null)
             {
-                IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+                DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
                 if (!param.Id.DosIsNullOrWhiteSpace())
                 {
                     model = dbSession.From<SysMenu>().Where(d => d.Id == param.Id).First();
@@ -134,7 +134,7 @@ namespace Microi.net
             {
                 return new DosResultList<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             List<SysMenu> list = null;// await SysMenuCache.GetSysMenuList(param.ParentId, param.OsClient);
             if (list == null)
             {
@@ -181,7 +181,7 @@ namespace Microi.net
             {
                 where.Add(new List<object>(){ "AppDisplay", "=", param.AppDisplay });
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
             //注意：如果有模块配置的菜单权限，那里返回的菜单就应该是所有
             if (param._CurrentUser != null)
@@ -357,7 +357,7 @@ namespace Microi.net
             var modelResult = await GetSysMenuModel(param);
             var model = modelResult.Data;
 
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
 
             #region  通用修改
@@ -396,7 +396,7 @@ namespace Microi.net
             }
             try
             {
-                IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+                DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
                 if (dbSession != null)
                 {
@@ -458,7 +458,7 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "CantDelete", param._Lang));
             }
             #endregion
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             if (param.Ids != null)
             {
                 var list = dbSession.From<SysMenu>().Where(d => d.Id.In(param.Ids)).ToList();

@@ -1,4 +1,4 @@
-using Dos.ORM;
+﻿using Dos.ORM;
 #region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
@@ -49,7 +49,7 @@ namespace Microi.net
         //    {
         //        return new DosResultList<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
         //    }
-        //    IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+        //    DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
         //    var msg = "";
         //    var where = new Where<SysUser>();
         //    if (!string.IsNullOrWhiteSpace(param._Keyword))
@@ -114,7 +114,7 @@ namespace Microi.net
             {
                 return new DosResultList<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var where = new Where<SysUser>();
 
             //默认情况下不指定Level
@@ -391,7 +391,7 @@ namespace Microi.net
         //     {
         //         return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
         //     }
-        //     IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+        //     DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
         //     SysUser model = null;
         //     if (!param.Id.DosIsNullOrWhiteSpace())
         //     {
@@ -443,7 +443,7 @@ namespace Microi.net
             {
                 return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             dynamic model = null;
             var _where = new List<DiyWhere>();
             if (!param.Id.DosIsNullOrWhiteSpace())
@@ -610,7 +610,7 @@ namespace Microi.net
             //{
             //    return new DosResult(0, null, "组织机构必选！");
             //}
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var isPass = false;
             var errorMsg = "";
             param.Account = param.Account.DosTrim();
@@ -811,7 +811,7 @@ namespace Microi.net
             //{
             //    return new DosResult(0, null, "组织机构必选！");
             //}
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var isPass = false;
             var errorMsg = "";
             param.Account = param.Account.DosTrim();
@@ -1008,8 +1008,8 @@ namespace Microi.net
         {
             var desEncodePwd = EncryptHelper.DESEncode(needEncodePwd);
             string v8EncodePwd = null; // 改为 null，便于区分"未执行V8"和"V8返回空字符串"
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(osClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(osClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(osClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(osClient).DbRead;
             
             var sysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
             
@@ -1224,8 +1224,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             // }
 
             var clientModel = OsClientExtend.GetClient(param.OsClient);
-            IMicroiDbSession dbSession = clientModel.Db;
-            IMicroiDbSession dbRead = clientModel.DbRead;
+            DbSession dbSession = clientModel.Db;
+            DbSession dbRead = clientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
 
             param.Account = param.Account.DosTrim();
@@ -1350,8 +1350,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             }
             //LogHelper.Debug("开始2", "调试Login_");
 
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
 
             param.Account = param.Account.DosTrim();
             ////如果是爱居，判断 mac地址是否注册
@@ -1769,8 +1769,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             param.Account = param.Account.DosTrim();
             var model = dbRead.From<SysUser>()
                                 .Select(new SysUser().GetFields())
@@ -1835,7 +1835,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             
             #endregion
             //var model = SysUserRepository.First(d => d.Id == param.Id);
@@ -2216,7 +2216,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 //return new DosResult(0, null, "系统内置默认帐号禁止删除！");
             }
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             //var model = SysUserRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysUser>()
                                 .Select(new SysUser().GetFields())
