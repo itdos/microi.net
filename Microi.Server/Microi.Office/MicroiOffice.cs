@@ -680,7 +680,7 @@ namespace Microi.net
             #endregion
 
             var osClientModel = OsClient.GetClient(param.OsClient);
-            IMicroiDbSession dbSession = osClientModel.Db;
+            DbSession dbSession = osClientModel.Db;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.OsClientModel["DbType"].Val<string>());
             //查询出DiyTableModel
             //var diyTableModel = DiyTableRepository.First(d => d.Id == param.TableId);

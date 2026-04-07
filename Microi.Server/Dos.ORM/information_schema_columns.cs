@@ -1,5 +1,5 @@
 ﻿using System;
-namespace Microi.net
+namespace Dos.ORM
 {
     public class information_schema_columns
     {

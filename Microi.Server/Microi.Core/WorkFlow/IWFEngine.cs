@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     /// <summary>
@@ -20,12 +22,12 @@ namespace Microi.net
         /// <summary>
         /// 启动工作流
         /// </summary>
-        Task<DosResult> StartWork(WFParam param, IMicroiDbTransaction _trans = null);
+        Task<DosResult> StartWork(WFParam param, DbTrans _trans = null);
 
         /// <summary>
         /// 发送工作（审批流程）
         /// </summary>
-        Task<DosResult> SendWork(WFParam param, IMicroiDbTransaction _trans = null);
+        Task<DosResult> SendWork(WFParam param, DbTrans _trans = null);
 
         /// <summary>
         /// 移交工作

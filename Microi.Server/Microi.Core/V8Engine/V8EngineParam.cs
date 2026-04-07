@@ -28,6 +28,8 @@ using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using Dos.ORM;
+
 namespace Microi.net
 {
     /// <summary>
@@ -71,10 +73,10 @@ namespace Microi.net
         public dynamic OldForm { get; set; }
         public string LineValue { get; set; }
         public string V8Code { get; set; }
-        public IMicroiDbSession Db { get; set; }
-        public Dictionary<string, IMicroiDbSession> Dbs { get; set; } = new Dictionary<string, IMicroiDbSession>();
-        public IMicroiDbSession DbRead { get; set; }
-        public IMicroiDbTransaction DbTrans { get; set; }
+        public DbSession Db { get; set; }
+        public Dictionary<string, DbSession> Dbs { get; set; } = new Dictionary<string, DbSession>();
+        public DbSession DbRead { get; set; }
+        public DbTrans DbTrans { get; set; }
         public string[] NotSaveField { get; set; }
         public IFormEngine FormEngine { get; set; }
         public IApiEngine ApiEngine { get; set; }
