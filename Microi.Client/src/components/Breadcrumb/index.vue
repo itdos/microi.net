@@ -14,7 +14,7 @@
 
 <script>
 import { generateTitle } from "@/utils/i18n";
-import pathToRegexp from "path-to-regexp";
+import { compile } from "path-to-regexp";
 
 export default {
     data() {
@@ -65,7 +65,7 @@ export default {
         },
         pathCompile(path) {
             const { params } = this.$route;
-            var toPath = pathToRegexp.compile(path);
+            var toPath = compile(path);
             return toPath(params);
         },
         handleLink(item) {

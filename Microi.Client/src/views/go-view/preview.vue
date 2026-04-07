@@ -1,5 +1,5 @@
 <template>
-  <div class="go-view-preview-wrapper" v-loading="loading">
+  <div class="go-view-preview-wrapper" :style="wrapperStyle" v-loading="loading">
     <n-config-provider :theme="darkTheme" :theme-overrides="overridesTheme">
       <n-message-provider>
         <n-dialog-provider>
@@ -18,11 +18,12 @@
 </template>
 
 <script>
-import { defineComponent, defineAsyncComponent, getCurrentInstance } from 'vue'
+import { defineComponent, defineAsyncComponent, getCurrentInstance, computed } from 'vue'
 import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { DiyCommon } from '@/utils/diy.common'
 import { setupGoView } from './setup.js'
 import GoViewMessageInject from './GoViewMessageInject.vue'
+import { useDiyStore } from '@/pinia'
 
 export default defineComponent({
   name: 'GoViewPreview',
@@ -33,6 +34,16 @@ export default defineComponent({
     NNotificationProvider,
     GoViewMessageInject,
     PreviewPage: defineAsyncComponent(() => import('./src/views/preview/suspenseIndex.vue'))
+  },
+  setup() {
+    const diyStore = useDiyStore()
+    const wrapperStyle = computed(() => {
+      const navbarHeight = diyStore.ShowClassicTop !== 0 ? 50 : 0
+      const tabsHeight = 33
+      const offset = navbarHeight + tabsHeight
+      return { height: `calc(100vh - ${offset}px)` }
+    })
+    return { wrapperStyle }
   },
   data() {
     return {
@@ -117,10 +128,8 @@ export default defineComponent({
 <style lang="scss" scoped>
 .go-view-preview-wrapper {
   width: 100%;
-  height: calc(100vh - 84px);
   overflow: hidden;
   position: relative;
-  margin-top: 10px;
 }
 
 .go-view-preview-content {

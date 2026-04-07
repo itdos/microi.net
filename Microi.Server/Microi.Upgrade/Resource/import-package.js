@@ -1,6 +1,6 @@
 /**
  * 导入应用数据包接口引擎（B系统）
- * v2026-03-28 14:20
+ * v2026-04-05 16:00
  * 功能：导入应用数据包，根据Id判断新增或修改
  * 
  * 业务逻辑：
@@ -360,11 +360,9 @@ try {
         }
 
         var exists = existsById || existsByName;
-        var modelCopy = {
-            _FormData: {}
-        };
+        var modelCopy = {};
         for (var key in table) {
-            modelCopy._FormData[key] = table[key];
+            modelCopy[key] = table[key];
         }
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = table.Id;
@@ -403,10 +401,19 @@ try {
     debugLog.step2 = '开始处理diy_field数据';
 
     var diyFields = Package.DiyFields || [];
+    debugLog.step2_totalFields = diyFields.length;
     var fieldChanges = []; // 记录字段的变化（Name、Type、Label）
 
     for (var i = 0; i < diyFields.length; i++) {
         var field = diyFields[i];
+
+        // SelectApi 专项追踪
+        var isSelectApi = (field.Name === 'SelectApi');
+        if (isSelectApi) {
+            debugLog['★SelectApi_found_at_index'] = i;
+            debugLog['★SelectApi_Id'] = field.Id;
+            debugLog['★SelectApi_TableId'] = field.TableId;
+        }
 
         if (!field.Id) {
             debugLog['field_no_id_' + i] = '跳过无Id的字段数据';
@@ -414,6 +421,9 @@ try {
         }
 
         var exists = checkExists('diy_field', field.Id);
+        if (isSelectApi) {
+            debugLog['★SelectApi_existsById'] = exists;
+        }
 
         if (!exists) {
             //判断根据Name和TableId是否存在，如果存在，则需要将Id改到以应用商城的为准
@@ -424,11 +434,17 @@ try {
                     ['Name', '=', field.Name]
                 ]
             });
+            if (isSelectApi) {
+                debugLog['★SelectApi_checkByName_Code'] = checkByNameResult.Code;
+                debugLog['★SelectApi_checkByName_HasData'] = !!(checkByNameResult.Data);
+            }
             if (checkByNameResult.Code == 1) {
                 try {
                     V8.Db.FromSql("UPDATE diy_field SET Id = '" + field.Id + "' WHERE TableId = '" + field.TableId + "' AND Name = '" + field.Name + "' and IsDeleted<>1").ExecuteNonQuery();
                 } catch (error) {
-
+                    if (isSelectApi) {
+                        debugLog['★SelectApi_updateId_error'] = error.message;
+                    }
                 }
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${field.TableId.toLowerCase()}`);
                 exists = true;
@@ -474,35 +490,125 @@ try {
             }
 
             // 创建副本，避免污染原始数据（步骤2.5需要用到TableId）
-            var fieldCopy = {
-                _FormData: {}
-            };
+            var fieldCopy = {};
             for (var key in field) {
-                fieldCopy._FormData[key] = field[key];
+                fieldCopy[key] = field[key];
             }
-            fieldCopy._Where = [
-                ['TableId', '=', field.TableId],
-                ['Name', '=', field.Name],
-            ];
             fieldCopy.OsClient = V8.OsClient;
+            fieldCopy.Id = field.Id;
+            fieldCopy.NameConfirm = 1;
 
-            var uptResult = V8.FormEngine.UptFormDataByWhere('diy_field', fieldCopy);
-            if (uptResult.Code == 1) {
-                stats.FieldUpdated++;
+            // 检测僵尸记录：由旧版 _FormData wrapper bug 创建，Name/TableId/OsClient 均为 null
+            // FormEngine.UptFormData 内部走 UptDiyField → ChangeColumn(from=null, to=Name)，
+            // 这条路径对 null→非null 的字段名变更有副作用，改为直接 SQL 全量覆盖
+            var isZombieRecord = (oldFieldResult.Code == 1 && oldFieldResult.Data &&
+                (!oldFieldResult.Data.OsClient || !oldFieldResult.Data.Name || !oldFieldResult.Data.TableId));
+
+            if (isSelectApi) {
+                debugLog['★SelectApi_isZombieRecord'] = isZombieRecord;
+                debugLog['★SelectApi_fieldCopy_Name'] = fieldCopy.Name;
+                debugLog['★SelectApi_fieldCopy_OsClient'] = fieldCopy.OsClient;
+                debugLog['★SelectApi_oldData_Name'] = oldFieldResult.Data ? oldFieldResult.Data.Name : null;
+                debugLog['★SelectApi_oldData_TableId'] = oldFieldResult.Data ? oldFieldResult.Data.TableId : null;
+            }
+
+            if (isZombieRecord) {
+                // 僵尸记录：用直接 SQL 全量覆盖所有字段
+                // 使用 sqle()/sqln() 转义，0个SQL参数，彻底绕过 Jint 的 params object[] 限制
+                var sqle = function(s) { return s == null ? 'NULL' : "'" + String(s).replace(/'/g, "''") + "'"; };
+                var sqln = function(n) { return n == null ? 'NULL' : Number(n); };
+                try {
+                    var rawSql = "UPDATE diy_field SET " +
+                        "TableId=" + sqle(fieldCopy.TableId) + "," +
+                        "TableName=" + sqle(fieldCopy.TableName) + "," +
+                        "Name=" + sqle(fieldCopy.Name) + "," +
+                        "Label=" + sqle(fieldCopy.Label) + "," +
+                        "Type=" + sqle(fieldCopy.Type) + "," +
+                        "Component=" + sqle(fieldCopy.Component) + "," +
+                        "Sort=" + sqln(fieldCopy.Sort) + "," +
+                        "Visible=" + sqln(fieldCopy.Visible) + "," +
+                        "Readonly=" + sqln(fieldCopy.Readonly) + "," +
+                        "NotEmpty=" + sqln(fieldCopy.NotEmpty) + "," +
+                        "Tab=" + sqle(fieldCopy.Tab) + "," +
+                        "FormWidth=" + sqln(fieldCopy.FormWidth) + "," +
+                        "TableWidth=" + sqln(fieldCopy.TableWidth) + "," +
+                        "Config=" + sqle(fieldCopy.Config) + "," +
+                        "Data=" + sqle(fieldCopy.Data) + "," +
+                        "`Unique`=" + sqln(fieldCopy.Unique) + "," +
+                        "Placeholder=" + sqle(fieldCopy.Placeholder) + "," +
+                        "BindRole=" + sqle(fieldCopy.BindRole) + "," +
+                        "InTableEdit=" + sqln(fieldCopy.InTableEdit) + "," +
+                        "IsLockField=" + sqln(fieldCopy.IsLockField) + "," +
+                        "Encrypt=" + sqln(fieldCopy.Encrypt) + "," +
+                        "AppVisible=" + sqln(fieldCopy.AppVisible) + "," +
+                        "NameConfirm=1," +
+                        "OsClient=" + sqle(V8.OsClient) + "," +
+                        "IsDeleted=0," +
+                        "UpdateTime=NOW() " +
+                        "WHERE Id='" + field.Id + "'";
+                    var zombieRawCount = V8.Db.FromSql(rawSql).ExecuteNonQuery();
+                    if (isSelectApi) {
+                        debugLog['★SelectApi_zombieRawCount'] = zombieRawCount;
+                    }
+                    if (zombieRawCount > 0) {
+                        stats.FieldUpdated++;
+                    } else {
+                        // 影响0行，说明记录根本不存在，改为新增
+                        var addFallback2 = V8.FormEngine.AddFormData('diy_field', fieldCopy);
+                        if (addFallback2.Code == 1) {
+                            stats.FieldInserted++;
+                        } else {
+                            debugLog['field_zombie_add_error_' + field.Id] = addFallback2.Msg;
+                        }
+                    }
+                } catch(zombieRawErr) {
+                    debugLog['field_zombie_raw_error_' + field.Id] = zombieRawErr.message;
+                }
             } else {
-                debugLog['field_upt_error_' + field.Id] = uptResult.Msg;
+                // 正常记录：使用 FormEngine 更新（默认不触发V8事件）
+                var uptResult = V8.FormEngine.UptFormData('diy_field', fieldCopy);
+                if (isSelectApi) {
+                    debugLog['★SelectApi_uptResult_Code'] = uptResult.Code;
+                    debugLog['★SelectApi_uptResult_Msg'] = uptResult.Msg || '';
+                }
+                if (uptResult.Code == 1) {
+                    stats.FieldUpdated++;
+                } else {
+                    // 更新失败：可能被软删(IsDeleted=1)，先修复再重试
+                    try {
+                        V8.Db.FromSql("UPDATE diy_field SET IsDeleted=0, OsClient='" + V8.OsClient + "' WHERE Id='" + field.Id + "'").ExecuteNonQuery();
+                    } catch(fixErr) {
+                        debugLog['field_fix_isdeleted_error_' + field.Id] = fixErr.message;
+                    }
+                    var uptRetryResult = V8.FormEngine.UptFormData('diy_field', fieldCopy);
+                    if (uptRetryResult.Code == 1) {
+                        stats.FieldUpdated++;
+                    } else {
+                        var addFallback = V8.FormEngine.AddFormData('diy_field', fieldCopy);
+                        if (addFallback.Code == 1) {
+                            stats.FieldInserted++;
+                        } else {
+                            debugLog['field_upt_error_' + field.Id] = uptRetryResult.Msg + ' | addFallback:' + addFallback.Msg;
+                        }
+                    }
+                }
             }
         } else {
-            var fieldCopy = {
-                _FormData: {}
-            };
+            var fieldCopy = {};
             for (var key in field) {
-                fieldCopy._FormData[key] = field[key];
+                fieldCopy[key] = field[key];
             }
             fieldCopy.OsClient = V8.OsClient;
             fieldCopy.Id = field.Id;
             // 不存在则新增
             var addResult = V8.FormEngine.AddFormData('diy_field', fieldCopy);
+            if (isSelectApi) {
+                debugLog['★SelectApi_action'] = 'AddFormData';
+                debugLog['★SelectApi_addResult_Code'] = addResult.Code;
+                debugLog['★SelectApi_addResult_Msg'] = addResult.Msg || '';
+                debugLog['★SelectApi_fieldCopy_keys'] = Object.keys(fieldCopy).join(',');
+                debugLog['★SelectApi_fieldCopy_Name'] = fieldCopy.Name;
+            }
             if (addResult.Code == 1) {
                 stats.FieldInserted++;
             } else {
@@ -525,6 +631,36 @@ try {
     }
 
     debugLog.step2Result = '字段数据处理完成：新增' + stats.FieldInserted + '，修改' + stats.FieldUpdated + '，检测到' + fieldChanges.length + '个字段变化';
+
+    // SelectApi 执行后验证
+    try {
+        var verifySelectApi = V8.FormEngine.GetFormData('diy_field', {
+            OsClient: V8.OsClient,
+            _Where: [
+                ['TableId', '=', '1d28e502-70ea-4a2b-9793-699b3f42234e'],
+                ['Name', '=', 'SelectApi']
+            ]
+        });
+        debugLog['★SelectApi_verify_Code'] = verifySelectApi.Code;
+        if (verifySelectApi.Code == 1 && verifySelectApi.Data) {
+            debugLog['★SelectApi_verify'] = '✅ 存在于diy_field，Id=' + verifySelectApi.Data.Id + ', Name=' + verifySelectApi.Data.Name;
+        } else {
+            // 再按Id查一次
+            var verifyById = V8.FormEngine.GetFormData('diy_field', {
+                OsClient: V8.OsClient,
+                Id: '01KGE0ZVAK801D2F3K1MWRMNTV'
+            });
+            if (verifyById.Code == 1 && verifyById.Data) {
+                debugLog['★SelectApi_verify'] = '⚠️ Id存在但Name不匹配，当前Name=' + verifyById.Data.Name + ', Type=' + verifyById.Data.Type + ', TableId=' + verifyById.Data.TableId;
+            } else {
+                debugLog['★SelectApi_verify'] = '❌ diy_field中不存在（按Name和Id均未找到）';
+                debugLog['★SelectApi_verifyById_Code'] = verifyById.Code;
+                debugLog['★SelectApi_verifyById_Msg'] = verifyById.Msg || '';
+            }
+        }
+    } catch (verifyError) {
+        debugLog['★SelectApi_verify_error'] = verifyError.message;
+    }
 
     // ==================== 步骤2.5：同步物理表字段（补充所有表的缺失字段） ====================
 
@@ -851,11 +987,9 @@ try {
                 menu.ParentId = '00000000000000000000000000';
             }
         }
-        var modelCopy = {
-            _FormData: {}
-        };
+        var modelCopy = {};
         for (var key in menu) {
-            modelCopy._FormData[key] = menu[key];
+            modelCopy[key] = menu[key];
         }
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = menu.Id;
@@ -872,12 +1006,12 @@ try {
             var addResult = V8.FormEngine.AddFormData('sys_menu', modelCopy);
             if (addResult.Code == 1) {
                 stats.MenuInserted++;
-            } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy._FormData.Url) {
+            } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy.Url) {
                 // Url重复，自动追加后缀重试
-                var originalUrl = modelCopy._FormData.Url;
+                var originalUrl = modelCopy.Url;
                 var urlCount = V8.Db.FromSql("SELECT COUNT(Id) FROM sys_menu WHERE Url='" + originalUrl.replace(/'/g, "''") + "'").ToScalar();
                 var newUrl = originalUrl + '-' + (Number(urlCount) + 1);
-                modelCopy._FormData.Url = newUrl;
+                modelCopy.Url = newUrl;
                 debugLog['menu_url_retry_' + menu.Id] = originalUrl + ' → ' + newUrl;
                 var retryResult = V8.FormEngine.AddFormData('sys_menu', modelCopy);
                 if (retryResult.Code == 1) {
@@ -915,11 +1049,9 @@ try {
             }
 
             var exists = checkExists('wf_flowdesign', flow.Id);
-            var modelCopy = {
-                _FormData: {}
-            };
+            var modelCopy = {};
             for (var key in flow) {
-                modelCopy._FormData[key] = flow[key];
+                modelCopy[key] = flow[key];
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = flow.Id;
@@ -960,11 +1092,9 @@ try {
             }
 
             var exists = checkExists('wf_node', node.Id);
-            var modelCopy = {
-                _FormData: {}
-            };
+            var modelCopy = {};
             for (var key in node) {
-                modelCopy._FormData[key] = node[key];
+                modelCopy[key] = node[key];
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = node.Id;
@@ -1005,11 +1135,9 @@ try {
             }
 
             var exists = checkExists('wf_line', line.Id);
-            var modelCopy = {
-                _FormData: {}
-            };
+            var modelCopy = {};
             for (var key in line) {
-                modelCopy._FormData[key] = line[key];
+                modelCopy[key] = line[key];
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = line.Id;
@@ -1086,11 +1214,9 @@ try {
             }
 
             var exists = existsById || existsByKey;
-            var modelCopy = {
-                _FormData: {}
-            };
+            var modelCopy = {};
             for (var key in apiEngine) {
-                modelCopy._FormData[key] = apiEngine[key];
+                modelCopy[key] = apiEngine[key];
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = apiEngine.Id;

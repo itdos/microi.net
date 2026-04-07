@@ -59,8 +59,11 @@
                             
                             <!-- 文本消息 -->
                             <div v-else class="bubble-text" :class="{ 'streaming-message': msg.isStreaming }">
+                                <span v-if="msg.isThinking" class="thinking-indicator">
+                                    <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> 正在思考
+                                </span>
                                 <span v-html="formatMessageContent(msg.Content || msg.content)"></span>
-                                <span v-if="msg.isStreaming" class="typing-cursor">▌</span>
+                                <span v-if="msg.isStreaming && !msg.isThinking" class="typing-cursor">▌</span>
                             </div>
                             
                             <span class="bubble-time">{{ formatBubbleTime(msg.SendTime || msg.time) }}</span>
@@ -81,6 +84,25 @@
 
         <!-- 底部输入区域 -->
         <div class="chat-input-area">
+            <!-- AI模型选择器 -->
+            <div v-if="isAIChat" class="ai-model-bar">
+                <span class="ai-model-label">AI模型：</span>
+                <el-select
+                    v-model="selectedAiModel"
+                    value-key="Id"
+                    size="small"
+                    placeholder="选择AI模型"
+                    :loading="aiModelLoading"
+                    style="flex: 1;"
+                >
+                    <el-option
+                        v-for="model in aiModelList"
+                        :key="model.Id"
+                        :label="`${model.Name}（${model.AiModel}）`"
+                        :value="model"
+                    />
+                </el-select>
+            </div>
             <div class="input-toolbar">
                 <el-icon class="toolbar-btn" @click="showEmoji = !showEmoji"><Microphone /></el-icon>
             </div>
@@ -174,7 +196,7 @@ import {
     Picture, Camera, Folder, Location, Document, Loading, ArrowRight 
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser, isDuplicateMessage, clearMessageDuplicateCache } from '@/utils/chat.common';
+import { formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser, isDuplicateMessage, clearMessageDuplicateCache, loadAiModelList, buildAiOtherInfo, handleAIStreamChunk } from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
 
 const router = useRouter();
@@ -206,6 +228,14 @@ const messages = ref([]);
 
 // 当前流式消息
 const currentStreamMessage = ref(null);
+
+// AI模型选择
+const aiModelList = ref([]);
+const selectedAiModel = ref(null);
+const aiModelLoading = ref(false);
+
+// 是否AI聊天
+const isAIChat = computed(() => chatId.value === 'AI');
 
 // 事件回调引用（方便移除）
 let _onReceiveSendToUser = null;
@@ -332,7 +362,8 @@ const sendMessage = async () => {
             ToUserAvatar: '',
             FromUserId: currentUser.value.Id,
             FromUserName: currentUser.value.NickName || currentUser.value.Name,
-            FromUserAvatar: currentUser.value.Avatar || ''
+            FromUserAvatar: currentUser.value.Avatar || '',
+            OtherInfo: buildAiOtherInfo(chatId.value, selectedAiModel.value)
         });
         console.log('[移动端聊天] 消息已发送:', content.substring(0, 30));
     } catch (error) {
@@ -453,12 +484,32 @@ const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
         return;
     }
     
-    // isComplete类型容错
     const complete = isComplete === true || isComplete === 'true';
     
+    // [THINKING] 信号：创建"思考中"占位消息
+    if (chunk === '[THINKING]') {
+        if (!currentStreamMessage.value) {
+            currentStreamMessage.value = {
+                id: 'ai-stream-' + Date.now(),
+                Type: 'text',
+                Content: '',
+                SendTime: new Date().toISOString(),
+                FromUserId: fromUserId,
+                ToUserId: toUserId,
+                isSelf: false,
+                senderName: chatName.value,
+                avatar: '',
+                isStreaming: true,
+                isThinking: true
+            };
+            messages.value.push(currentStreamMessage.value);
+            nextTick(() => scrollToBottom());
+        }
+        return;
+    }
+    
     if (!currentStreamMessage.value) {
-        // 创建新的流式消息
-        console.log('[移动端聊天] AI流式消息开始');
+        // 第一个数据块——创建消息
         currentStreamMessage.value = {
             id: 'ai-stream-' + Date.now(),
             Type: 'text',
@@ -469,26 +520,26 @@ const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
             isSelf: false,
             senderName: chatName.value,
             avatar: '',
-            isStreaming: true
+            isStreaming: true,
+            isThinking: false
         };
         messages.value.push(currentStreamMessage.value);
     } else {
-        // 追加内容到现有消息
+        // 后续数据块——追加内容，取消思考状态
+        if (currentStreamMessage.value.isThinking) {
+            currentStreamMessage.value.isThinking = false;
+        }
         currentStreamMessage.value.Content += chunk || '';
     }
     
-    // 检查是否完成
     if (complete) {
-        console.log('[移动端聊天] AI流式消息完成');
         if (currentStreamMessage.value) {
             currentStreamMessage.value.isStreaming = false;
         }
         currentStreamMessage.value = null;
     }
     
-    nextTick(() => {
-        scrollToBottom();
-    });
+    nextTick(() => scrollToBottom());
 };
 
 const handleReceiveSendChatRecordToUser = (records) => {
@@ -624,6 +675,17 @@ onMounted(() => {
     registerWebSocketEvents();
     setupReconnectHandler();
     loadChatRecord();
+    // AI聊天时加载模型列表
+    if (isAIChat.value) {
+        aiModelLoading.value = true;
+        loadAiModelList(DiyCommon, (models) => {
+            aiModelLoading.value = false;
+            aiModelList.value = models;
+            if (models.length > 0 && !selectedAiModel.value) {
+                selectedAiModel.value = models[0];
+            }
+        });
+    }
 });
 
 onBeforeUnmount(() => {
@@ -989,6 +1051,41 @@ onBeforeUnmount(() => {
             color: #f56c6c;
         }
     }
+}
+
+/* AI模型选择栏 */
+.ai-model-bar {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #e8e8e8;
+}
+.ai-model-label {
+    font-size: 12px;
+    color: #999;
+    margin-right: 6px;
+    white-space: nowrap;
+}
+
+/* 思考中动画 */
+.thinking-indicator {
+    color: #999;
+    font-size: 13px;
+}
+.thinking-dots {
+    display: inline-block;
+}
+.thinking-dots span {
+    animation: thinkingBounce 1.4s infinite ease-in-out both;
+    font-weight: bold;
+}
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes thinkingBounce {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
 }
 
 </style>

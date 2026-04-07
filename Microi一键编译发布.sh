@@ -1,12 +1,79 @@
-#!/bin/bash
+:<<'WIN'
+@echo off
+chcp 65001 2>nul
+setlocal EnableDelayedExpansion
+rem ════════════════════════════════════════════════════════════════
+rem  Microi 一键编译发布助手 - Windows 自动启动器
+rem  自动查找 Git Bash 或 WSL 并执行此脚本
+rem ════════════════════════════════════════════════════════════════
+set "BASH_EXE="
+if exist "%ProgramFiles%\Git\bin\bash.exe"           set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
+if exist "%ProgramFiles(x86)%\Git\bin\bash.exe"      if not defined BASH_EXE set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
+if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe"  if not defined BASH_EXE set "BASH_EXE=%LOCALAPPDATA%\Programs\Git\bin\bash.exe"
+if exist "C:\Git\bin\bash.exe"                       if not defined BASH_EXE set "BASH_EXE=C:\Git\bin\bash.exe"
+if exist "C:\msys64\usr\bin\bash.exe"                if not defined BASH_EXE set "BASH_EXE=C:\msys64\usr\bin\bash.exe"
+if not defined BASH_EXE (
+    for /f "delims=" %%i in ('where bash 2^>nul') do (
+        echo %%i | findstr /i "System32" >nul || if not defined BASH_EXE set "BASH_EXE=%%i"
+    )
+)
+if defined BASH_EXE goto :bash_run
+where wsl >nul 2>nul
+if %ERRORLEVEL% equ 0 goto :wsl_run
+echo.
+echo   ════════════════════════════════════════════════════════
+echo   ERROR: 未找到 Git Bash 或 WSL！请安装以下任意一种:
+echo     1. Git for Windows: https://git-scm.com/download/win
+echo     2. WSL2: 在管理员 PowerShell 中运行 wsl --install
+echo   ════════════════════════════════════════════════════════
+echo.
+pause
+exit /b 1
+:bash_run
+echo.
+echo   ^> Bash: !BASH_EXE!
+echo.
+"!BASH_EXE!" "%~f0"
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+:wsl_run
+echo.
+echo   ^> WSL: 执行中...
+echo.
+for /f "delims=" %%p in ('wsl wslpath -u "%~f0"') do set "WSLP=%%p"
+wsl bash "!WSLP!"
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+WIN
+#!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
 #  Microi 一键编译发布助手
 #  适用于 Microi 低代码平台的后端 (.NET) 和前端 (Vue3) 一键编译发布
-#  初次使用：chmod +x Microi一键编译发布.sh
+#  macOS / Linux:  bash Microi一键编译发布.sh
+#  Windows:        在 Git Bash 终端中运行同样的命令即可
+#                  bash Microi一键编译发布.sh
 #  开源地址: https://gitee.com/ITdos/microi.net
 # ════════════════════════════════════════════════════════════════
 set -e
 set -o pipefail
+
+# Windows (Git Bash) 下：无论正常结束还是异常退出，都暂停等待用户确认，避免窗口自动关闭
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    trap 'echo ""; read -r -p "  按回车键关闭窗口..." _w' EXIT
+    # 将 Windows 常见 Node.js 安装路径加入 PATH，确保 npm/pnpm 可用
+    for _np in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$APPDATA/npm" \
+        "$LOCALAPPDATA/pnpm" \
+        "$LOCALAPPDATA/Yarn/bin"; do
+        [ -d "$_np" ] && export PATH="$_np:$PATH"
+    done
+fi
 
 # ════════════════════════════════════════════════════════════════
 # ⚙️  用户配置区域（请根据您的环境修改以下配置）
@@ -257,7 +324,7 @@ echo ""
 
 # --- 发布模式（4选1）---
 echo -e "  ${BOLD}【发布模式】${NC}"
-echo "    1) 只编译前端和后端（不推送Docker、不推送NuGet、版本号不变）"
+echo "    1) 只编译前端和后端（含DLL加密+NuGet替换，不推送、版本号不变）"
 echo "    2) 只发布后端（推送Docker、推送NuGet、版本号+1）"
 if [ "$HAS_CLIENT" = true ]; then
     echo "    3) 只发布前端（推送Docker、不推送NuGet、版本号不变）"
@@ -267,11 +334,12 @@ else
     echo "    4) 只发布后端（推送Docker、推送NuGet、版本号+1）"
 fi
     echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
+    echo "    6) 只编译和推送【官方网站文档】"
     echo ""
-    read -p "  请输入选项 [1/2/3/4/5]: " DEPLOY_MODE
+    read -p "  请输入选项 [1/2/3/4/5/6]: " DEPLOY_MODE
     case "$DEPLOY_MODE" in
-        1|2|3|4|5) ;;
-        *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5）" ;;
+        1|2|3|4|5|6) ;;
+        *) print_fail "无效选项: $DEPLOY_MODE（仅支持 1/2/3/4/5/6）" ;;
     esac
 
     # 模式3需要前端源码
@@ -288,8 +356,8 @@ PUSH_NUGET=false        # 是否推送 NuGet
 PUSH_DOCKER=false       # 是否推送 Docker
 
 case "$DEPLOY_MODE" in
-    1)  # 只编译前端和后端
-        BUILD_BACKEND=true
+    1)  # 只编译前端和后端（含DLL加密+NuGet替换，不推送）
+        BUILD_BACKEND=true; PUBLISH_BACKEND=true
         if [ "$HAS_CLIENT" = true ]; then BUILD_CLIENT=true; fi
         ;;
     2)  # 只发布后端
@@ -306,6 +374,8 @@ case "$DEPLOY_MODE" in
         ;;
     5)  # 仅推送Docker镜像（跳过编译，使用已有产物）
         PUSH_DOCKER=true
+        ;;
+    6)  # 只编译和推送官方网站文档（由后续专属块处理）
         ;;
 esac
 
@@ -383,13 +453,15 @@ fi
 
 # --- 官方网站文档发布选项 ---
 PUBLISH_DOC=false
-if [ -d "microi.doc" ]; then
+if [ "$DEPLOY_MODE" = "6" ]; then
+    PUBLISH_DOC=true
+elif [ -d "microi.doc" ]; then
     echo ""
     echo -e "  ${BOLD}【官方网站文档】${NC}"
     echo "    是否同时发布官方网站文档（构建 VitePress 并推送 Docker 镜像）？"
-    read -p "  请输入 [y/N]: " _doc_choice
+    read -p "  请输入选项 [0=否/1=是]: " _doc_choice
     case "$_doc_choice" in
-        y|Y|yes|YES) PUBLISH_DOC=true ;;
+        1) PUBLISH_DOC=true ;;
         *) PUBLISH_DOC=false ;;
     esac
 fi
@@ -397,7 +469,7 @@ fi
 # ──────────────────────────────────────────────────────────────
 # 打印执行摘要
 # ──────────────────────────────────────────────────────────────
-_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
+_mode_names=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
 echo ""
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
 echo -e "  ${BOLD}✅ 选择完毕，即将开始全自动执行${NC}"
@@ -559,59 +631,99 @@ fi
 
 fi  # END: if PUBLISH_BACKEND
 
-# ─── 阶段（条件）: NuGet 推送 ─────────────────────────────
+# ─── 阶段（条件）: NuGet 包 DLL 替换（加密版本）──────────
+# 只要 DLL 已加密就执行替换，无论是否推送（模式1也会执行）
 NUPKG_REPLACED=false
-if [ "$PUSH_NUGET" = true ]; then
+if [ "$DLL_ENCRYPTED" = true ]; then
+    print_phase "替换 NuGet 包中的 DLL 为加密版本"
 
-    # 加密DLL替换nupkg（仅在加密可用时）
-    if [ "$DLL_ENCRYPTED" = true ]; then
-        print_phase "替换 NuGet 包中的 DLL 为加密版本"
+    replace_dll_in_nupkg() {
+        local project_name=$1
+        local package_dir="Microi.Server/${project_name}/bin/Release"
+        local encrypted_dll="$PUBLISH_DIR/${project_name}.dll"
 
-        replace_dll_in_nupkg() {
-            local project_name=$1
-            local package_dir="Microi.Server/${project_name}/bin/Release"
-            local encrypted_dll="$PUBLISH_DIR/${project_name}.dll"
+        if [ ! -d "$package_dir" ]; then print_warning "目录不存在: $package_dir"; return 1; fi
+        local latest_package=$(find "$package_dir" -name "*.nupkg" -not -name "*.symbols.nupkg" 2>/dev/null | sort -V -r | head -1)
+        if [ -z "$latest_package" ]; then print_warning "未找到包文件: $project_name"; return 1; fi
+        if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
 
-            if [ ! -d "$package_dir" ]; then print_warning "目录不存在: $package_dir"; return 1; fi
-            local latest_package=$(find "$package_dir" -name "*.nupkg" -not -name "*.symbols.nupkg" 2>/dev/null | sort -V -r | head -1)
-            if [ -z "$latest_package" ]; then print_warning "未找到包文件: $project_name"; return 1; fi
-            if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
+        local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
+        local nupkg_before_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
+        local enc_bytes=$(stat -f%z "$encrypted_dll" 2>/dev/null || stat -c%s "$encrypted_dll" 2>/dev/null)
 
-            local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
-            local nupkg_before_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
-            local enc_bytes=$(stat -f%z "$encrypted_dll" 2>/dev/null || stat -c%s "$encrypted_dll" 2>/dev/null)
-
-            print_step "替换 $(basename "$latest_package") 中的 ${project_name}.dll（加密DLL: $((enc_bytes/1024))KB，nupkg替换前: $((nupkg_before_bytes/1024))KB）"
-
-            local temp_dir=$(mktemp -d)
-            local dll_path="lib/netstandard2.1/${project_name}.dll"
-            mkdir -p "$temp_dir/lib/netstandard2.1"
-            cp "$encrypted_dll" "$temp_dir/$dll_path"
-            local abs_pkg="$(cd "$(dirname "$latest_package")" && pwd)/$(basename "$latest_package")"
-            if ! (cd "$temp_dir" && zip -u "$abs_pkg" "$dll_path" > /dev/null 2>&1); then
-                rm -rf "$temp_dir"
-                print_warning "替换失败: $project_name"
-                return 1
-            fi
-            rm -rf "$temp_dir"
-
-            local nupkg_after_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
-            local nupkg_after_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
-            if [ "$nupkg_before_md5" = "$nupkg_after_md5" ]; then
-                print_fail "$(basename "$latest_package") 替换后MD5未变化，替换未生效！"
-            fi
-            print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，MD5已变更）"
-        }
-
-        _replace_error=0
-        for project in "${ENCRYPTED_PROJECTS[@]}"; do
-            replace_dll_in_nupkg "$project" || _replace_error=1
-        done
-        if [ $_replace_error -ne 0 ]; then
-            print_fail "NuGet 包 DLL 替换失败"
+        # 自动检测 DLL 在 nupkg 中的实际路径（支持不同 TFM: netstandard2.1/net6.0/net8.0 等）
+        local dll_entry=""
+        if command -v unzip &>/dev/null; then
+            dll_entry=$(unzip -l "$latest_package" 2>/dev/null | grep -o "lib/[^/]*/$(basename "$encrypted_dll")" | head -1)
         fi
-        NUPKG_REPLACED=true
+        if [ -z "$dll_entry" ] && [[ -n "$WINDIR" || "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+            local _win_pkg
+            _win_pkg=$(cygpath -w "$latest_package" 2>/dev/null || echo "$latest_package" | sed 's|^/\([a-zA-Z]\)/|\1:/|' | sed 's|/|\\|g')
+            dll_entry=$(powershell.exe -NoProfile -NonInteractive -Command "
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                \$z = [System.IO.Compression.ZipFile]::OpenRead('${_win_pkg}')
+                \$e = \$z.Entries | Where-Object { \$_.FullName -like 'lib/*/${project_name}.dll' } | Select-Object -First 1 -ExpandProperty FullName
+                \$z.Dispose(); \$e -replace '\\\\','/'
+            " 2>/dev/null | tr -d '\r\n')
+        fi
+        [ -z "$dll_entry" ] && dll_entry="lib/netstandard2.1/${project_name}.dll"
+
+        print_step "替换 $(basename "$latest_package") 中的 ${project_name}.dll（路径: $dll_entry，加密DLL: $((enc_bytes/1024))KB，nupkg替换前: $((nupkg_before_bytes/1024))KB）"
+
+        local abs_pkg
+        abs_pkg="$(cd "$(dirname "$latest_package")" && pwd)/$(basename "$latest_package")"
+
+        # 优先用 zip 命令（macOS/Linux/MSYS2-with-zip），否则降级为 PowerShell（Windows）
+        local _update_ok=false
+        if command -v zip &>/dev/null; then
+            local _tmp_dir
+            _tmp_dir=$(mktemp -d)
+            mkdir -p "$_tmp_dir/$(dirname "$dll_entry")"
+            cp "$encrypted_dll" "$_tmp_dir/$dll_entry"
+            if (cd "$_tmp_dir" && zip -u "$abs_pkg" "$dll_entry" > /dev/null 2>&1); then
+                _update_ok=true
+            fi
+            rm -rf "$_tmp_dir"
+        fi
+
+        if [ "$_update_ok" != true ] && [[ -n "$WINDIR" || "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+            local _win_pkg _win_dll
+            _win_pkg=$(cygpath -w "$abs_pkg" 2>/dev/null || echo "$abs_pkg" | sed 's|^/\([a-zA-Z]\)/|\1:/|' | sed 's|/|\\|g')
+            _win_dll=$(cygpath -w "$encrypted_dll" 2>/dev/null || echo "$encrypted_dll" | sed 's|^/\([a-zA-Z]\)/|\1:/|' | sed 's|/|\\|g')
+            powershell.exe -NoProfile -NonInteractive -Command "
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                \$z = [System.IO.Compression.ZipFile]::Open('${_win_pkg}', 'Update')
+                \$z.Entries | Where-Object { (\$_.FullName -replace '\\\\','/') -eq '${dll_entry}' } | ForEach-Object { \$_.Delete() }
+                [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(\$z, '${_win_dll}', '${dll_entry}')
+                \$z.Dispose()
+            " > /dev/null 2>&1 && _update_ok=true
+        fi
+
+        if [ "$_update_ok" != true ]; then
+            print_warning "替换失败: $project_name"
+            return 1
+        fi
+
+        local nupkg_after_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
+        local nupkg_after_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
+        if [ "$nupkg_before_md5" = "$nupkg_after_md5" ]; then
+            print_fail "$(basename "$latest_package") 替换后MD5未变化，替换未生效！"
+        fi
+        print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，MD5已变更）"
+    }
+
+    _replace_error=0
+    for project in "${ENCRYPTED_PROJECTS[@]}"; do
+        replace_dll_in_nupkg "$project" || _replace_error=1
+    done
+    if [ $_replace_error -ne 0 ]; then
+        print_fail "NuGet 包 DLL 替换失败"
     fi
+    NUPKG_REPLACED=true
+fi
+
+# ─── 阶段（条件）: NuGet 推送 ─────────────────────────────
+if [ "$PUSH_NUGET" = true ]; then
 
     # 安全检查：有加密源码但未加密时禁止推送
     if [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
@@ -733,8 +845,24 @@ fi
 if [ "$PUBLISH_DOC" = true ]; then
     print_phase "发布官方网站文档"
 
+    # 自动检测可用的包管理器（优先 pnpm，其次 npm，最后 yarn）
+    DOC_PKG_MGR=""
+    if command -v pnpm &>/dev/null; then
+        DOC_PKG_MGR="pnpm"
+    elif command -v npm &>/dev/null; then
+        DOC_PKG_MGR="npm run"
+    elif command -v yarn &>/dev/null; then
+        DOC_PKG_MGR="yarn"
+    else
+        print_fail "未找到 pnpm / npm / yarn，请先安装 Node.js: https://nodejs.org"
+    fi
+    print_info "使用包管理器: ${DOC_PKG_MGR%% *}"
+
+    print_step "安装依赖（如需）..."
+    (cd microi.doc && ${DOC_PKG_MGR%% *} install --frozen-lockfile 2>/dev/null || ${DOC_PKG_MGR%% *} install) || true
+
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && pnpm docs:build)
+    (cd microi.doc && $DOC_PKG_MGR docs:build)
     print_success "VitePress 构建完成"
 
     print_step "构建 Docker 镜像: microi.doc"
@@ -780,7 +908,7 @@ ELAPSED=$((END_TIME - START_TIME))
 MINUTES=$((ELAPSED / 60))
 SECONDS_REMAIN=$((ELAPSED % 60))
 
-_mode_names_final=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像")
+_mode_names_final=(" " "只编译前端和后端" "只发布后端" "只发布前端" "发布前端和后端" "仅推送Docker镜像" "只编译和推送官方网站文档")
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 printf "${BOLD}${GREEN}║${NC}  ${BOLD}${GREEN}🎉 全部完成！%-46s${NC}${BOLD}${GREEN}║${NC}\n" ""

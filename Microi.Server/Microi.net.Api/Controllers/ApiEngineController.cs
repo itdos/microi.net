@@ -1,4 +1,4 @@
-﻿using Microi.net;
+using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
@@ -291,6 +291,10 @@ namespace Microi.net.Api
                     && redirectUrl.ToLower() != "undefined"
                     )
                 {
+                    if (!CommonHelper.IsUrlSafe(redirectUrl))
+                    {
+                        return BadRequest(new { Code = 0, Msg = "URL验证失败：不允许的URL格式" });
+                    }
                     return Redirect(redirectUrl);
                 }
             }
@@ -357,6 +361,10 @@ namespace Microi.net.Api
                     && redirectUrl.ToLower() != "undefined"
                     )
                 {
+                    if (!CommonHelper.IsUrlSafe(redirectUrl))
+                    {
+                        return BadRequest(new { Code = 0, Msg = "URL验证失败：不允许的URL格式" });
+                    }
                     return Redirect(redirectUrl);
                 }
             }
@@ -418,6 +426,10 @@ namespace Microi.net.Api
                     && redirectUrl.ToLower() != "undefined"
                     )
                 {
+                    if (!CommonHelper.IsUrlSafe(redirectUrl))
+                    {
+                        return BadRequest(new { Code = 0, Msg = "URL验证失败：不允许的URL格式" });
+                    }
                     return Redirect(redirectUrl);
                 }
             }

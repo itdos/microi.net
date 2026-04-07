@@ -624,6 +624,154 @@ namespace Microi.net
             return info;
         }
 
+        /// <summary>
+        /// 获取Docker容器统计信息（兼容Linux/Windows/macOS）
+        /// </summary>
+        public static JObject GetDockerStats()
+        {
+            var info = new JObject();
+            try
+            {
+                // 先检测docker是否可用
+                var versionOutput = ExecuteCommandTimeout("docker", "version --format \"{{.Server.Version}}\"", 5000);
+                if (string.IsNullOrWhiteSpace(versionOutput) || versionOutput.Contains("error") || versionOutput.Contains("Cannot connect"))
+                {
+                    info["Available"] = false;
+                    info["Msg"] = "Docker未安装或未运行";
+                    return info;
+                }
+
+                info["Available"] = true;
+                info["DockerVersion"] = versionOutput.Trim();
+
+                // 获取docker info概要
+                try
+                {
+                    var containersRunning = ExecuteCommandTimeout("docker", "info --format \"{{.ContainersRunning}}\"", 5000);
+                    var containersStopped = ExecuteCommandTimeout("docker", "info --format \"{{.ContainersStopped}}\"", 5000);
+                    var containersTotal = ExecuteCommandTimeout("docker", "info --format \"{{.Containers}}\"", 5000);
+                    var images = ExecuteCommandTimeout("docker", "info --format \"{{.Images}}\"", 5000);
+
+                    int.TryParse(containersRunning?.Trim(), out var running);
+                    int.TryParse(containersStopped?.Trim(), out var stopped);
+                    int.TryParse(containersTotal?.Trim(), out var total);
+                    int.TryParse(images?.Trim(), out var imgCount);
+
+                    info["ContainersRunning"] = running;
+                    info["ContainersStopped"] = stopped;
+                    info["ContainersTotal"] = total;
+                    info["Images"] = imgCount;
+                }
+                catch
+                {
+                    info["ContainersRunning"] = 0;
+                    info["ContainersStopped"] = 0;
+                    info["ContainersTotal"] = 0;
+                    info["Images"] = 0;
+                }
+
+                // 获取所有容器状态（包括停止的）
+                var containers = new JArray();
+                try
+                {
+                    var psOutput = ExecuteCommandTimeout("docker", "ps -a --format \"{{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.State}}\\t{{.Ports}}\"", 8000);
+                    if (!string.IsNullOrWhiteSpace(psOutput))
+                    {
+                        var psMap = new Dictionary<string, JObject>();
+                        foreach (var line in psOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var parts = line.Split('\t');
+                            if (parts.Length >= 5)
+                            {
+                                var ct = new JObject
+                                {
+                                    ["ContainerId"] = parts[0].Trim(),
+                                    ["Name"] = parts[1].Trim(),
+                                    ["Image"] = parts[2].Trim(),
+                                    ["Status"] = parts[3].Trim(),
+                                    ["State"] = parts[4].Trim(),
+                                    ["Ports"] = parts.Length > 5 ? parts[5].Trim() : ""
+                                };
+                                psMap[parts[1].Trim()] = ct;
+                            }
+                        }
+
+                        // 获取运行中容器的stats
+                        var statsOutput = ExecuteCommandTimeout("docker", "stats --no-stream --format \"{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.MemPerc}}\\t{{.NetIO}}\\t{{.BlockIO}}\\t{{.PIDs}}\"", 15000);
+                        var statsMap = new Dictionary<string, JObject>();
+                        if (!string.IsNullOrWhiteSpace(statsOutput))
+                        {
+                            foreach (var line in statsOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                var parts = line.Split('\t');
+                                if (parts.Length >= 7)
+                                {
+                                    var name = parts[0].Trim();
+                                    var stat = new JObject
+                                    {
+                                        ["CPUPerc"] = parts[1].Trim(),
+                                        ["MemUsage"] = parts[2].Trim(),
+                                        ["MemPerc"] = parts[3].Trim(),
+                                        ["NetIO"] = parts[4].Trim(),
+                                        ["BlockIO"] = parts[5].Trim(),
+                                        ["PIDs"] = parts[6].Trim()
+                                    };
+
+                                    // 解析CPU百分比为数字
+                                    var cpuStr = parts[1].Trim().Replace("%", "");
+                                    if (double.TryParse(cpuStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cpuVal))
+                                        stat["CPUPercNum"] = Math.Round(cpuVal, 2);
+                                    else
+                                        stat["CPUPercNum"] = 0;
+
+                                    // 解析内存百分比为数字
+                                    var memStr = parts[3].Trim().Replace("%", "");
+                                    if (double.TryParse(memStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var memVal))
+                                        stat["MemPercNum"] = Math.Round(memVal, 2);
+                                    else
+                                        stat["MemPercNum"] = 0;
+
+                                    statsMap[name] = stat;
+                                }
+                            }
+                        }
+
+                        // 合并ps和stats数据
+                        foreach (var kv in psMap)
+                        {
+                            var ct = kv.Value;
+                            if (statsMap.TryGetValue(kv.Key, out var stat))
+                            {
+                                ct.Merge(stat);
+                            }
+                            else
+                            {
+                                // 未运行的容器填充默认值
+                                ct["CPUPerc"] = "0.00%";
+                                ct["MemUsage"] = "0B / 0B";
+                                ct["MemPerc"] = "0.00%";
+                                ct["NetIO"] = "0B / 0B";
+                                ct["BlockIO"] = "0B / 0B";
+                                ct["PIDs"] = "0";
+                                ct["CPUPercNum"] = 0;
+                                ct["MemPercNum"] = 0;
+                            }
+                            containers.Add(ct);
+                        }
+                    }
+                }
+                catch { }
+
+                info["Containers"] = containers;
+            }
+            catch (Exception ex)
+            {
+                info["Available"] = false;
+                info["Msg"] = ex.Message;
+            }
+            return info;
+        }
+
         #region 辅助方法
 
         /// <summary>

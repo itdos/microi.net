@@ -207,10 +207,12 @@ export const asyncRoutes = [
     {
         path: "/mic/data-dashboard/design/:Id",
         component: Layout,
+        hidden: true,
         children: [
             {
                 path: "/mic/data-dashboard/design/:Id",
                 name: "mic_data_dashboard_design",
+                meta: { keepAlive: false },
                 component: () => import("@/views/go-view/editor.vue")
             }
         ]
@@ -219,10 +221,12 @@ export const asyncRoutes = [
     {
         path: "/mic/data-dashboard/preview/:Id",
         component: Layout,
+        hidden: true,
         children: [
             {
                 path: "/mic/data-dashboard/preview/:Id",
                 name: "mic_data_dashboard_preview",
+                meta: { keepAlive: false },
                 component: () => import("@/views/go-view/preview.vue")
             }
         ]
@@ -246,6 +250,33 @@ export const asyncRoutes = [
         path: "/mic/cad-preview",
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")
+    },
+    // 3D 引擎
+    {
+        path: "/3d-engine/designer",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/3d-engine/designer",
+                name: "3d_engine_designer",
+                component: () => import("@/views/3d-engine/designer.vue"),
+                meta: { title: "3D 设计器" }
+            }
+        ]
+    },
+    {
+        path: "/3d-engine/renderer",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/3d-engine/renderer",
+                name: "3d_engine_renderer",
+                component: () => import("@/views/3d-engine/renderer.vue"),
+                meta: { title: "3D 渲染器" }
+            }
+        ]
     },
     // License 授权管理
     {
