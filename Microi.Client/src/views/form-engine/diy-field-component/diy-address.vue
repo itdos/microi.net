@@ -11,23 +11,40 @@
         :props="props"
     >
     </el-cascader>
+    <!-- <el-tree-select
+        v-if="field.Component == 'Address' && diyStore.IsPhoneView"
+        v-model="ModelValue2"
+        :data="regionData"
+        placeholder="请选择"
+        clearable
+        :disabled="GetFieldReadOnly(field)"
+        @change="treeSelectChange"
+    /> -->
 </template>
 
 <script>
 import { regionDataPlus } from "element-china-area-data";
 import _ from "underscore";
+import { useDiyStore } from "@/pinia";
 export default {
     name: "diy-autocomplete",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    setup(props) {
+        const diyStore = useDiyStore();
+        return {
+            diyStore,
+        };
+    },
     data() {
         return {
             ModelValue: [],
+            ModelValue2: [],
             LastModelValue: [],
             regionData: regionDataPlus,
             props: {
                 value: "label"
-            }
+            },
         };
     },
     model: {
@@ -126,10 +143,25 @@ export default {
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
         },
+        treeSelectChange(item){
+          console.log(item,55555)
+        },
+        getFullPath (node){
+          const path = []
+          let currentNode = node
+
+          // 向上遍历父节点
+          while (currentNode) {
+            path.unshift(currentNode.label)
+            currentNode = currentNode.parent
+          }
+
+          return path
+        },
         CommonV8CodeChange(item) {
             //, field
             var self = this;
-
+            console.log(item,6666)
             //2022-09-28发现bug：此控件外部赋值后，并不会触发watch --> ModelProps，所以在这里额外处理下
             self.ModelValue = item;
 
