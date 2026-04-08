@@ -350,7 +350,8 @@
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 10px;
     margin-bottom: 0px;//这里要设置0，不然卡片模式会多出空隙
-    align-items: start;
+    // align-items: start;
+    align-items: center;
     flex-wrap: wrap;
 }
 :deep(.el-select__selected-item){
