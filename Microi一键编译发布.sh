@@ -548,13 +548,20 @@ if [ "$BUMP_VERSION" = true ]; then
     print_success "共更新 $update_count 个 .csproj + ${#PACKAGE_JSON_FILES[@]} 个 package.json"
 fi
 
+# Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
+_BUILD_EXTRA_ARGS=""
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    _BUILD_EXTRA_ARGS="-m:1"
+    print_info "Windows 环境：使用单线程编译（-m:1）避免文件锁冲突"
+fi
+
 # ─── 阶段（条件）: 编译后端解决方案 ──────────────────────
 if [ "$BUILD_BACKEND" = true ]; then
     print_phase "编译后端解决方案"
 
-    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental"
+    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS"
     echo ""
-    if ! dotnet build "$SLN_FILE" -c Release --no-incremental; then
+    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS; then
         print_fail "后端编译失败，请检查编译错误"
     fi
     echo ""
@@ -573,9 +580,9 @@ cd Microi.Server/Microi.net.Api
 dotnet clean -c Release > /dev/null 2>&1 || true
 rm -rf ./bin/Release/publish
 
-print_step "dotnet publish -c Release..."
+print_step "dotnet publish -c Release $_BUILD_EXTRA_ARGS..."
 echo ""
-if ! dotnet publish -c Release -o ./bin/Release/publish; then
+if ! dotnet publish -c Release $_BUILD_EXTRA_ARGS -o ./bin/Release/publish; then
     cd ../..
     print_fail "Microi.net.Api 发布失败"
 fi

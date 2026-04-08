@@ -28,6 +28,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading.Tasks;
 using System.Threading;
 
 namespace Dos.ORM
@@ -100,6 +101,55 @@ namespace Dos.ORM
         public TResult ToScalar<TResult>()
         {
             return DataUtils.ConvertValue<TResult>(ToScalar());
+        }
+
+        /// <summary>
+        /// 返回int值
+        /// </summary>
+        public int ToInt()
+        {
+            var val = ToScalar();
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToInt32(val);
+        }
+
+        /// <summary>
+        /// 返回long值
+        /// </summary>
+        public long ToLong()
+        {
+            var val = ToScalar();
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToInt64(val);
+        }
+
+        /// <summary>
+        /// 返回decimal值
+        /// </summary>
+        public decimal ToDecimal()
+        {
+            var val = ToScalar();
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToDecimal(val);
+        }
+
+        /// <summary>
+        /// 返回string值
+        /// </summary>
+        public string ToStringValue()
+        {
+            var val = ToScalar();
+            if (val == null || val == DBNull.Value) return null;
+            return Convert.ToString(val);
+        }
+
+        /// <summary>
+        /// 判断是否存在数据
+        /// </summary>
+        public bool Exists()
+        {
+            var val = ToScalar();
+            return val != null && val != DBNull.Value;
         }
 
         /// <summary>
@@ -239,6 +289,168 @@ namespace Dos.ORM
                 "ExecuteNonQuery");
         }
 
+
+        #endregion
+
+        #region 异步执行
+
+        private async Task<T> ExecuteWithTimingAsync<T>(Func<Task<T>> action, string method)
+        {
+            if (_isTiming || OnSlowSql == null || SlowSqlThresholdMs <= 0)
+                return await action().ConfigureAwait(false);
+            _isTiming = true;
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var result = await action().ConfigureAwait(false);
+                sw.Stop();
+                if (sw.ElapsedMilliseconds >= SlowSqlThresholdMs)
+                {
+                    try { OnSlowSql(cmd, sw.ElapsedMilliseconds, method); } catch { }
+                }
+                return result;
+            }
+            finally { _isTiming = false; }
+        }
+
+        protected async Task<DbDataReader> ToDataReaderInternalAsync()
+        {
+            return tran == null
+                ? await this.dbSession.ExecuteReaderAsync(cmd).ConfigureAwait(false)
+                : await this.dbSession.ExecuteReaderAsync(cmd, tran).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步返回单个值
+        /// </summary>
+        public virtual Task<object> ToScalarAsync()
+        {
+            return ExecuteWithTimingAsync(async () =>
+                tran == null
+                    ? await this.dbSession.ExecuteScalarAsync(cmd).ConfigureAwait(false)
+                    : await this.dbSession.ExecuteScalarAsync(cmd, tran).ConfigureAwait(false),
+                "ToScalar");
+        }
+
+        /// <summary>
+        /// 异步返回单个值（泛型）
+        /// </summary>
+        public async Task<TResult> ToScalarAsync<TResult>()
+        {
+            return DataUtils.ConvertValue<TResult>(await ToScalarAsync().ConfigureAwait(false));
+        }
+
+        /// <summary>
+        /// 异步返回int值
+        /// </summary>
+        public async Task<int> ToIntAsync()
+        {
+            var val = await ToScalarAsync().ConfigureAwait(false);
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToInt32(val);
+        }
+
+        /// <summary>
+        /// 异步返回long值
+        /// </summary>
+        public async Task<long> ToLongAsync()
+        {
+            var val = await ToScalarAsync().ConfigureAwait(false);
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToInt64(val);
+        }
+
+        /// <summary>
+        /// 异步返回decimal值
+        /// </summary>
+        public async Task<decimal> ToDecimalAsync()
+        {
+            var val = await ToScalarAsync().ConfigureAwait(false);
+            if (val == null || val == DBNull.Value) return 0;
+            return Convert.ToDecimal(val);
+        }
+
+        /// <summary>
+        /// 异步返回string值
+        /// </summary>
+        public async Task<string> ToStringValueAsync()
+        {
+            var val = await ToScalarAsync().ConfigureAwait(false);
+            if (val == null || val == DBNull.Value) return null;
+            return Convert.ToString(val);
+        }
+
+        /// <summary>
+        /// 异步判断是否存在数据
+        /// </summary>
+        public async Task<bool> ExistsAsync()
+        {
+            var val = await ToScalarAsync().ConfigureAwait(false);
+            return val != null && val != DBNull.Value;
+        }
+
+        /// <summary>
+        /// 异步返回第一个实体，同ToFirstAsync()。无数据返回Null。
+        /// </summary>
+        public Task<TEntity> FirstAsync<TEntity>()
+        {
+            return ToFirstAsync<TEntity>();
+        }
+
+        /// <summary>
+        /// 异步返回单个实体
+        /// </summary>
+        public Task<TEntity> ToFirstAsync<TEntity>()
+        {
+            return ExecuteWithTimingAsync(async () =>
+            {
+                using (var reader = await ToDataReaderInternalAsync().ConfigureAwait(false))
+                {
+                    var list = await EntityUtils.ReaderToListAsync<TEntity>(reader).ConfigureAwait(false);
+                    return list.Count > 0 ? list[0] : default;
+                }
+            }, "ToFirst");
+        }
+
+        /// <summary>
+        /// 异步返回dynamic数组
+        /// </summary>
+        public Task<dynamic[]> ToArrayAsync()
+        {
+            return ExecuteWithTimingAsync(async () =>
+            {
+                var list = await ToListInternalAsync<dynamic>().ConfigureAwait(false);
+                return list.ToArray();
+            }, "ToArray");
+        }
+
+        /// <summary>
+        /// 异步返回实体列表
+        /// </summary>
+        public Task<List<TEntity>> ToListAsync<TEntity>()
+        {
+            return ExecuteWithTimingAsync(() => ToListInternalAsync<TEntity>(), "ToList");
+        }
+
+        private async Task<List<TEntity>> ToListInternalAsync<TEntity>()
+        {
+            using (var reader = await ToDataReaderInternalAsync().ConfigureAwait(false))
+            {
+                return await EntityUtils.ReaderToListAsync<TEntity>(reader).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteNonQuery
+        /// </summary>
+        public virtual Task<int> ExecuteNonQueryAsync()
+        {
+            return ExecuteWithTimingAsync(async () =>
+                tran == null
+                    ? await this.dbSession.ExecuteNonQueryAsync(cmd).ConfigureAwait(false)
+                    : await this.dbSession.ExecuteNonQueryAsync(cmd, tran).ConfigureAwait(false),
+                "ExecuteNonQuery");
+        }
 
         #endregion
 

@@ -20,6 +20,7 @@ using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.Text;
+using System.Threading.Tasks;
 using Dos;
 using Dos.Common;
 using Dos.ORM;
@@ -203,6 +204,30 @@ namespace Dos.ORM
             return command.ExecuteReader(cmdBehavior);
 
         }
+
+        private async Task<object> DoExecuteScalarAsync(DbCommand command)
+        {
+            WriteLog(command);
+            return await command.ExecuteScalarAsync().ConfigureAwait(false);
+        }
+
+        private async Task<int> DoExecuteNonQueryAsync(DbCommand command)
+        {
+            if (IsBatchConnection)
+            {
+                batchCommander.Process(command);
+                return 0;
+            }
+            WriteLog(command);
+            return await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+
+        private async Task<DbDataReader> DoExecuteReaderAsync(DbCommand command, CommandBehavior cmdBehavior)
+        {
+            WriteLog(command);
+            return await command.ExecuteReaderAsync(cmdBehavior).ConfigureAwait(false);
+        }
+
         private DbTransaction BeginTransaction(DbConnection connection)
         {
             return connection.BeginTransaction();
@@ -421,6 +446,25 @@ namespace Dos.ORM
             catch
             {
                 // 打开失败时释放连接资源
+                connection?.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 异步创建并打开连接
+        /// </summary>
+        public async Task<DbConnection> CreateConnectionAsync()
+        {
+            DbConnection connection = null;
+            try
+            {
+                connection = CreateConnection();
+                await connection.OpenAsync().ConfigureAwait(false);
+                return connection;
+            }
+            catch
+            {
                 connection?.Dispose();
                 throw;
             }
@@ -932,6 +976,86 @@ namespace Dos.ORM
         {
             PrepareCommand(command, transaction);
             return DoExecuteReader(command, CommandBehavior.Default);
+        }
+
+        #endregion
+
+        #region Async Execute Methods
+
+        /// <summary>
+        /// 异步执行 ExecuteScalar
+        /// </summary>
+        public async Task<object> ExecuteScalarAsync(DbCommand command)
+        {
+            using (var connection = await CreateConnectionAsync().ConfigureAwait(false))
+            {
+                PrepareCommand(command, connection);
+                return await DoExecuteScalarAsync(command).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteScalar（事务）
+        /// </summary>
+        public async Task<object> ExecuteScalarAsync(DbCommand command, DbTransaction transaction)
+        {
+            PrepareCommand(command, transaction);
+            return await DoExecuteScalarAsync(command).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteNonQuery
+        /// </summary>
+        public async Task<int> ExecuteNonQueryAsync(DbCommand command)
+        {
+            if (IsBatchConnection)
+            {
+                PrepareCommand(command, GetConnection(true));
+                return await DoExecuteNonQueryAsync(command).ConfigureAwait(false);
+            }
+
+            using (var connection = await CreateConnectionAsync().ConfigureAwait(false))
+            {
+                PrepareCommand(command, connection);
+                return await DoExecuteNonQueryAsync(command).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteNonQuery（事务）
+        /// </summary>
+        public async Task<int> ExecuteNonQueryAsync(DbCommand command, DbTransaction transaction)
+        {
+            PrepareCommand(command, transaction);
+            return await DoExecuteNonQueryAsync(command).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteReader
+        /// </summary>
+        public async Task<DbDataReader> ExecuteReaderAsync(DbCommand command)
+        {
+            var connection = await CreateConnectionAsync().ConfigureAwait(false);
+            PrepareCommand(command, connection);
+
+            try
+            {
+                return await DoExecuteReaderAsync(command, CommandBehavior.CloseConnection).ConfigureAwait(false);
+            }
+            catch
+            {
+                try { connection.Close(); } catch { }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteReader（事务）
+        /// </summary>
+        public async Task<DbDataReader> ExecuteReaderAsync(DbCommand command, DbTransaction transaction)
+        {
+            PrepareCommand(command, transaction);
+            return await DoExecuteReaderAsync(command, CommandBehavior.Default).ConfigureAwait(false);
         }
 
         #endregion
