@@ -17,6 +17,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
@@ -25,7 +26,9 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Web;
 using System.Data;
+using System.Data.Common;
 using System.Threading;
+using System.Threading.Tasks;
 #if NETFRAMEWORK
 using System.Web.UI;
 #endif
@@ -695,10 +698,23 @@ namespace Dos.ORM
 
             if (!(typeMap.ContainsKey(type) || type.FullName == LinqBinary))
             {
-                return GetTypeDeserializer(type, reader, startBound, length, returnNullIfFirstMissing);
+                // 构建缓存key：类型 + 列名列表
+                int actualLength = length == -1 ? reader.FieldCount - startBound : length;
+                var sb = new StringBuilder(type.FullName);
+                for (int i = startBound; i < startBound + actualLength; i++)
+                {
+                    sb.Append('|').Append(reader.GetName(i));
+                }
+                var cacheKey = sb.ToString();
+
+                return _deserializerCache.GetOrAdd(cacheKey,
+                    _ => GetTypeDeserializer(type, reader, startBound, length, returnNullIfFirstMissing));
             }
             return GetStructDeserializer(type, startBound);
-        }/// <summary>
+        }
+
+        private static readonly ConcurrentDictionary<string, Func<IDataReader, object>> _deserializerCache
+            = new ConcurrentDictionary<string, Func<IDataReader, object>>();/// <summary>
          /// 
          /// </summary>
          /// <param name="type"></param>
@@ -750,27 +766,29 @@ namespace Dos.ORM
          /// </summary>
          /// <param name="t"></param>
          /// <returns></returns>
+        static readonly ConcurrentDictionary<Type, List<PropInfo>> _propCache = new ConcurrentDictionary<Type, List<PropInfo>>();
         static List<PropInfo> GetSettableProps(Type t)
         {
-            return t
+            return _propCache.GetOrAdd(t, type => type
                   .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                   .Select(p => new PropInfo
                   {
                       //2016-09-28
                       Name = (p.GetCustomAttribute<FieldAttribute>(false) != null ? p.GetCustomAttribute<FieldAttribute>(false).Field : p.Name),
-                      Setter = p.DeclaringType == t ? p.GetSetMethod(true) : p.DeclaringType.GetProperty(p.Name).GetSetMethod(true),
+                      Setter = p.DeclaringType == type ? p.GetSetMethod(true) : p.DeclaringType.GetProperty(p.Name).GetSetMethod(true),
                       Type = p.PropertyType
                   })
                   .Where(info => info.Setter != null)
-                  .ToList();
+                  .ToList());
         }/// <summary>
          /// 
          /// </summary>
          /// <param name="t"></param>
          /// <returns></returns>
+        static readonly ConcurrentDictionary<Type, List<FieldInfo>> _fieldCache = new ConcurrentDictionary<Type, List<FieldInfo>>();
         static List<FieldInfo> GetSettableFields(Type t)
         {
-            return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).ToList();
+            return _fieldCache.GetOrAdd(t, type => type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).ToList());
         }/// <summary>
          /// 
          /// </summary>
@@ -847,14 +865,38 @@ namespace Dos.ORM
             }
             //names = properties.Select(d => d.Name).ToList();
             #endregion
-            var setters = (
-                            from n in names
-                            let prop = properties.FirstOrDefault(p => string.Equals(p.Name, n, StringComparison.Ordinal))
-                                  ?? properties.FirstOrDefault(p => string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase))
-                            let field = prop != null ? null : (fields.FirstOrDefault(p => string.Equals(p.Name, n, StringComparison.Ordinal))
-                                ?? fields.FirstOrDefault(p => string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase)))
-                            select new { Name = n, Property = prop, Field = field }
-                          ).ToList();
+
+            // 构建属性和字段的字典，O(1)查找替代O(n)的FirstOrDefault
+            var propByExact = new Dictionary<string, PropInfo>(StringComparer.Ordinal);
+            var propByIgnoreCase = new Dictionary<string, PropInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in properties)
+            {
+                if (!propByExact.ContainsKey(p.Name)) propByExact[p.Name] = p;
+                if (!propByIgnoreCase.ContainsKey(p.Name)) propByIgnoreCase[p.Name] = p;
+            }
+
+            var fieldByExact = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
+            var fieldByIgnoreCase = new Dictionary<string, FieldInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in fields)
+            {
+                if (!fieldByExact.ContainsKey(f.Name)) fieldByExact[f.Name] = f;
+                if (!fieldByIgnoreCase.ContainsKey(f.Name)) fieldByIgnoreCase[f.Name] = f;
+            }
+
+            var setters = names.Select(n =>
+            {
+                PropInfo prop = null;
+                if (!propByExact.TryGetValue(n, out prop))
+                    propByIgnoreCase.TryGetValue(n, out prop);
+
+                FieldInfo field = null;
+                if (prop == null)
+                {
+                    if (!fieldByExact.TryGetValue(n, out field))
+                        fieldByIgnoreCase.TryGetValue(n, out field);
+                }
+                return new { Name = n, Property = prop, Field = field };
+            }).ToList();
 
             int index = startBound;
 
@@ -1298,6 +1340,21 @@ namespace Dos.ORM
                 dynamic next = info.Deserializer(reader);
                 yield return (T)next;
             }
+        }
+
+        /// <summary>
+        /// 异步读取DataReader到List
+        /// </summary>
+        public static async Task<List<T>> ReaderToListAsync<T>(DbDataReader reader)
+        {
+            var deserializer = GetDeserializer(typeof(T), reader, 0, -1, false);
+            var list = new List<T>();
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                dynamic next = deserializer(reader);
+                list.Add((T)next);
+            }
+            return list;
         }
     }
 }

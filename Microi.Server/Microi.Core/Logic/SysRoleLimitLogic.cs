@@ -38,35 +38,55 @@ namespace Microi.net
         {
             var where = new Where<SysRoleLimit>();
             var whereSql = " where 1=1 ";
+            var sqlParams = new List<System.Data.Common.DbParameter>();
+            var clientModel = OsClientExtend.GetClient(param.OsClient);
+            DbSession dbSession = clientModel.DbRead;
+            var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
+            var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
+
             if (param.RoleId != null)
             {
                 where.And(d => d.RoleId == param.RoleId);
-                whereSql += $" and A.RoleId = '{param.RoleId}' ";
+                whereSql += $" and A.RoleId = {dbInfo.P}pRoleId ";
+                var p = tDbSession.Db.DbProviderFactory.CreateParameter();
+                p.ParameterName = "pRoleId";
+                p.DbType = System.Data.DbType.String;
+                p.Value = param.RoleId;
+                sqlParams.Add(p);
             }
             if (param.RoleIds != null)
             {
-                var inSql = "";
+                where.And(d => d.RoleId.In(param.RoleIds));
                 if (param.RoleIds.Any())
                 {
-                    foreach (var item in param.RoleIds)
+                    var inParamNames = new List<string>();
+                    for (int i = 0; i < param.RoleIds.Count; i++)
                     {
-                        inSql += $"'{item}',";
+                        var pName = $"pRoleId{i}";
+                        inParamNames.Add($"{dbInfo.P}{pName}");
+                        var p = tDbSession.Db.DbProviderFactory.CreateParameter();
+                        p.ParameterName = pName;
+                        p.DbType = System.Data.DbType.String;
+                        p.Value = param.RoleIds[i];
+                        sqlParams.Add(p);
                     }
-                    inSql = inSql.DosTrimEnd(',');
+                    whereSql += " and A.RoleId in (" + string.Join(",", inParamNames) + ") ";
                 }
-                where.And(d => d.RoleId.In(param.RoleIds));
-                whereSql += " and A.RoleId in (" + (inSql.DosIsNullOrWhiteSpace() ? "''" : inSql) + ") ";
+                else
+                {
+                    whereSql += " and 1=0 ";
+                }
             }
             if (!param.Type.DosIsNullOrWhiteSpace())
             {
                 where.And(d => d.Type == param.Type);
-                whereSql += $" and A.Type = '{param.Type}' ";
+                whereSql += $" and A.Type = {dbInfo.P}pType ";
+                var p = tDbSession.Db.DbProviderFactory.CreateParameter();
+                p.ParameterName = "pType";
+                p.DbType = System.Data.DbType.String;
+                p.Value = param.Type;
+                sqlParams.Add(p);
             }
-            var clientModel = OsClientExtend.GetClient(param.OsClient);
-            DbSession dbSession = clientModel.DbRead;
-            var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
-
-            var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
 
             var fs = tDbSession.From<SysRoleLimit>()
                         //.Select<SysGroup, SysRole, SysDept, SysPost>((a, b, c, d, e) => new
@@ -109,6 +129,7 @@ namespace Microi.net
                                             + $" from {sysRoleLimitTableName} A left join {sysMenuTableName} B on A.FkId = B.Id "
                                             + whereSql;
             var list = tDbSession.FromSql(sql)
+                                .AddParameter(sqlParams.ToArray())
                                 .ToList<SysRoleLimit>();
             return list;
         }
@@ -286,17 +307,21 @@ namespace Microi.net
         public async Task<List<MenuRolelimitDto>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
         {
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
-            var sql = $"SELECT rl.Id, rl.RoleId,r.Name as RoleName,rl.Permission FROM sys_role  as r left join  sys_rolelimit  rl on r.Id= rl.RoleId  where 1=1 and rl.FkId = '{param.FkId}' and r.IsDeleted = false and rl.IsDeleted = false";
+            var sql = "SELECT rl.Id, rl.RoleId,r.Name as RoleName,rl.Permission FROM sys_role as r left join sys_rolelimit rl on r.Id= rl.RoleId where 1=1 and rl.FkId = @pFkId and r.IsDeleted = false and rl.IsDeleted = false";
             var list = dbSession.FromSql(sql)
+                                .AddInParameter("pFkId", System.Data.DbType.String, param.FkId)
                                 .ToList<MenuRolelimitDto>();
             return list;
         }
 
         public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string permission)
         {
-            DbSession dbSession = OsClientExtend.GetClient(osClient).DbRead;
-            var sql = $" UPDATE sys_rolelimit SET Permission = '{permission}' WHERE Id = '{id}'";
-            dbSession.FromSql(sql).ExecuteNonQuery();
+            DbSession dbSession = OsClientExtend.GetClient(osClient).Db;
+            var sql = " UPDATE sys_rolelimit SET Permission = @pPermission WHERE Id = @pId";
+            dbSession.FromSql(sql)
+                     .AddInParameter("pPermission", System.Data.DbType.String, permission)
+                     .AddInParameter("pId", System.Data.DbType.String, id)
+                     .ExecuteNonQuery();
         }
 
         public class MenuRolelimitDto

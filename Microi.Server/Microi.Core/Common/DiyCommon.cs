@@ -203,6 +203,41 @@ namespace Microi.net
             "{", "}", "【", "】", "[", "]", "\\", "、", "|", ";", ":", "；", "‘", "'", "“", "《", "<", "，", ",", ">", "》", "。", ".", "?", "？", "/"
         };
         /// <summary>
+        /// 校验排序方向，防止SQL注入。仅允许 ASC / DESC，其它值返回 "ASC"
+        /// </summary>
+        public static string SanitizeOrderDirection(string direction)
+        {
+            if (direction == null) return "ASC";
+            var d = direction.Trim().ToUpperInvariant();
+            return d == "DESC" ? "DESC" : "ASC";
+        }
+
+        /// <summary>
+        /// 危险SQL关键字正则（用于校验SQL片段，防止注入）
+        /// </summary>
+        private static readonly System.Text.RegularExpressions.Regex _dangerousSqlRegex = new System.Text.RegularExpressions.Regex(
+            @"\b(INSERT|DELETE|UPDATE|DROP|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE|GRANT|REVOKE|UNION|INTO)\b|;|--|\bXP_|\bSP_|/\*|\*/",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// 校验SQL片段是否安全（用于 _AppendSelect / _AppendHaving 等前端可传入的SQL片段）。
+        /// 拒绝包含危险关键字（INSERT/DELETE/UPDATE/DROP/UNION等）和注释符号的片段。
+        /// </summary>
+        public static bool IsSafeSqlFragment(string fragment)
+        {
+            if (string.IsNullOrWhiteSpace(fragment)) return false;
+            return !_dangerousSqlRegex.IsMatch(fragment);
+        }
+
+        /// <summary>
+        /// 转义SQL字符串值中的单引号，防止SQL注入。用于模板替换场景（$Keyword$、$CurrentUser.xxx$、$V8.Form.xxx$）。
+        /// </summary>
+        public static string EscapeSqlValue(string value)
+        {
+            return value?.Replace("'", "''");
+        }
+
+        /// <summary>
         /// 字段或表名称不能存在的字符
         /// </summary>
         public static readonly List<string> TableFieldNameNotChar = new List<string>()
@@ -275,22 +310,11 @@ namespace Microi.net
             {
                 return false;
             }
-            var sql = " " + selectSql.ToLower().ToString();
-            if (sql.Contains(" delete ")
-                || sql.Contains(" insert ")
-                || sql.Contains(" update ")
-                || sql.Contains(" drop ")
-                || sql.Contains(" alter ")
-                || sql.Contains(" create ")
-                || sql.Contains(" truncate ")
-                || sql.Contains(" show ")
-                || sql.Contains(" use ")
-                || sql.Contains(" mysql ")
-                )
-            {
-                return false;
-            }
-            return true;
+            // 使用正则 \b 词边界匹配，防止 tab/换行/注释绕过
+            return !System.Text.RegularExpressions.Regex.IsMatch(
+                selectSql,
+                @"\b(DELETE|INSERT|UPDATE|DROP|ALTER|CREATE|TRUNCATE|SHOW|USE|MYSQL|EXEC|EXECUTE|GRANT|REVOKE)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
         /// <summary>
         /// 
