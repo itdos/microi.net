@@ -22,7 +22,7 @@ export default {
         const settingsStore = useSettingsStore();
         const instance = getCurrentInstance();
         const { Microi } = instance.appContext.config.globalProperties;
-        
+
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const CurrentTime = computed(() => diyStore.CurrentTime);
         const DesktopBg = computed(() => diyStore.DesktopBg);
@@ -185,11 +185,11 @@ export default {
             // 获取当前计算出的主题色
             const computedStyle = window.getComputedStyle(document.documentElement);
             const primaryColor = computedStyle.getPropertyValue('--color-primary').trim() || '#409eff';
-            
+
             // 计算亮度
             const brightness = this.getColorBrightness(primaryColor);
             const textColor = brightness > 180 ? '#303133' : '#ffffff';
-            
+
             // 设置--color-primary-text变量
             document.documentElement.style.setProperty('--color-primary-text', textColor);
         },
