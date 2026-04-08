@@ -1,7 +1,7 @@
 <template>
     <!--注意：如果表内编辑开启了此控件类型的字段，会导致列表DOM渲染非常卡！！！-->
-    <!-- <el-cascader
-        v-if="field.Component == 'Address' "
+    <el-cascader
+        v-if="field.Component == 'Address' && !diyStore.IsPhoneView"
         v-model="ModelValue"
         :clearable="true"
         :disabled="GetFieldReadOnly(field)"
@@ -10,9 +10,9 @@
         :collapse-tags="LoadType == 'Table' ? true : false"
         :props="props"
     >
-    </el-cascader> -->
+    </el-cascader>
     <el-tree-select
-        v-if="field.Component == 'Address'"
+        v-if="field.Component == 'Address' && diyStore.IsPhoneView"
         v-model="ModelValue2"
         :data="regionData2"
         :props="defineProps"
