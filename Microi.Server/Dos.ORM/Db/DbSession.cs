@@ -22,6 +22,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 using Dos.Common;
 
 namespace Dos.ORM
@@ -2307,6 +2308,82 @@ namespace Dos.ORM
             using (cmd)
             {
                 return db.ExecuteDataSet(cmd, tran);
+            }
+        }
+
+        #endregion
+
+        #region 异步执行command
+
+        /// <summary>
+        /// 异步执行 ExecuteNonQuery
+        /// </summary>
+        public async Task<int> ExecuteNonQueryAsync(DbCommand cmd)
+        {
+            if (null == cmd) return 0;
+            using (cmd)
+            {
+                return await db.ExecuteNonQueryAsync(cmd).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteNonQuery（事务）
+        /// </summary>
+        public async Task<int> ExecuteNonQueryAsync(DbCommand cmd, DbTransaction tran)
+        {
+            if (null == cmd) return 0;
+            using (cmd)
+            {
+                return await db.ExecuteNonQueryAsync(cmd, tran).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteScalar
+        /// </summary>
+        public async Task<object> ExecuteScalarAsync(DbCommand cmd)
+        {
+            if (null == cmd) return null;
+            using (cmd)
+            {
+                return await db.ExecuteScalarAsync(cmd).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteScalar（事务）
+        /// </summary>
+        public async Task<object> ExecuteScalarAsync(DbCommand cmd, DbTransaction tran)
+        {
+            if (null == cmd) return null;
+            using (cmd)
+            {
+                return await db.ExecuteScalarAsync(cmd, tran).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteReader
+        /// </summary>
+        public async Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd)
+        {
+            if (null == cmd) return null;
+            using (cmd)
+            {
+                return await db.ExecuteReaderAsync(cmd).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// 异步执行 ExecuteReader（事务）
+        /// </summary>
+        public async Task<DbDataReader> ExecuteReaderAsync(DbCommand cmd, DbTransaction tran)
+        {
+            if (null == cmd) return null;
+            using (cmd)
+            {
+                return await db.ExecuteReaderAsync(cmd, tran).ConfigureAwait(false);
             }
         }
 
