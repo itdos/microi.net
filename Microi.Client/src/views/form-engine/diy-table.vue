@@ -248,8 +248,8 @@
                     </div>
                 </div>
 
-                <!--DIY移动端新增按钮-->
-                <div class="addBtn" v-if="diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
+                <!--DIY移动端新增按钮 加上人员权限_LimitAdd，表或字段是否可读TableChildField.Readonly，表是否为关联表PropsIsJoinTable-->
+                <div class="addBtn" v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
                   <el-icon class="addIcon"><Plus /></el-icon>
                 </div>
 
@@ -273,7 +273,7 @@
                       /> -->
                   <!-- 筛选下拉列表和清除搜索 -->
                   <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
-                   <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
+                   <DiyModleSearch :ref="'refDiySearch4'" :key="'refDiySearch4'" :CurrentDiyTableModel="CurrentDiyTableModel"
                     :SearchFieldIds="SearchFieldIds" :DiyFieldList="DiyFieldList" :SearchType="'Out'"
                     @clearSearch="childClearSearch" @CallbackGetDiyTableRow="(params) => {
                         GetDiyTableRow(params,1);
