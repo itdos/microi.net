@@ -4,7 +4,7 @@
             <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
                 <template #label>
-                    <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" />
+                    <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" @dblclick="toggleFullScreenCurrentTab()" />
                 </template>
             </el-tab-pane>
         </el-tabs>
@@ -26,6 +26,13 @@
                 />
             </keep-alive>
         </router-view>
+
+        <!-- 全屏提示 -->
+        <transition name="fade">
+            <div v-if="fullscreenTipVisible" class="fullscreen-tip">
+                按 <kbd>ESC</kbd> 退出全屏 · 按 <kbd>Alt</kbd> + <kbd>Enter</kbd> 进入全屏
+            </div>
+        </transition>
 
         <ul v-show="visible" :style="{ left: left + 'px', top: top + 'px' }" class="contextmenu">
             <li @click="refreshSelectedTag(selectedTag)">
@@ -132,6 +139,34 @@
         }
     }
 
+    // 全屏提示样式
+    .fullscreen-tip {
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 9999;
+        pointer-events: none;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+        kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 0 2px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+    }
+
     // 右键菜单样式优化
     .contextmenu {
         position: fixed;
@@ -209,7 +244,9 @@ export default {
             selectedTag: {},
             affixTags: [],
             tabs: [], //页签集合
-            activeTab: "" //当前页签
+            activeTab: "", //当前页签
+            fullscreenTipVisible: false,
+            fullscreenTipTimer: null
         };
     },
     watch: {
@@ -247,17 +284,26 @@ export default {
             this.exitFullScreen();
         }
 
-        // ESC 退出全屏
-        this._escHandler = (e) => {
+        // ESC 退出全屏 + Alt+Enter 进入全屏
+        this._keyHandler = (e) => {
             if (e.key === 'Escape' && this.diyStore.IsTabFullScreen) {
                 this.exitFullScreen();
             }
+            if (e.altKey && e.key === 'Enter') {
+                e.preventDefault();
+                if (!this.diyStore.IsTabFullScreen) {
+                    this.toggleFullScreenCurrentTab();
+                }
+            }
         };
-        document.addEventListener('keydown', this._escHandler);
+        document.addEventListener('keydown', this._keyHandler);
     },
     beforeUnmount() {
-        if (this._escHandler) {
-            document.removeEventListener('keydown', this._escHandler);
+        if (this._keyHandler) {
+            document.removeEventListener('keydown', this._keyHandler);
+        }
+        if (this.fullscreenTipTimer) {
+            clearTimeout(this.fullscreenTipTimer);
         }
     },
     methods: {
@@ -481,6 +527,16 @@ export default {
             if (this.$route.fullPath !== view.fullPath) {
                 this.$router.push(view.fullPath);
             }
+            this.enterFullScreen();
+        },
+        toggleFullScreenCurrentTab() {
+            if (this.diyStore.IsTabFullScreen) {
+                this.exitFullScreen();
+            } else {
+                this.enterFullScreen();
+            }
+        },
+        enterFullScreen() {
             // 保存当前状态到 sessionStorage（仅当前标签页有效，新开tab不会全屏）
             var before = {
                 ShowClassicTop: this.diyStore.ShowClassicTop,
@@ -492,6 +548,8 @@ export default {
             this.diyStore.setState("ShowClassicTop", 0);
             this.diyStore.setState("ShowClassicLeft", 0);
             this.diyStore.setState("IsTabFullScreen", true);
+            // 显示全屏提示
+            this.showFullscreenTip();
         },
         exitFullScreen() {
             const before = this.diyStore._beforeFullScreen;
@@ -499,6 +557,15 @@ export default {
             this.diyStore.setState("ShowClassicLeft", before.ShowClassicLeft);
             this.diyStore.setState("IsTabFullScreen", false);
             sessionStorage.removeItem('microi_tab_fullscreen');
+        },
+        showFullscreenTip() {
+            this.fullscreenTipVisible = true;
+            if (this.fullscreenTipTimer) {
+                clearTimeout(this.fullscreenTipTimer);
+            }
+            this.fullscreenTipTimer = setTimeout(() => {
+                this.fullscreenTipVisible = false;
+            }, 5000);
         },
         handleScroll() {
             this.closeMenu();
