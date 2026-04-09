@@ -183,10 +183,10 @@ export default {
             self.$emit("update:modelValue", self.ModelValue);
         },
         // zhy传送给接口的数据是数组所以选中值后将字符串转换，并直接调用之前的选择方法，不额外修改该组件原有数据
-        treeNodeClick(){
+        treeNodeClick() {
          var self = this;
          var treeVule = self.ModelValue2.split('/');
-         self.CommonV8CodeChange(treeVule)
+         self.CommonV8CodeChange(treeVule);
         },
         CommonV8CodeChange(item) {
             //, field
