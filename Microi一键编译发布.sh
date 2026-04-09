@@ -551,19 +551,33 @@ fi
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
 _BUILD_EXTRA_ARGS=""
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
-    _BUILD_EXTRA_ARGS="-m:1"
-    print_info "Windows 环境：使用单线程编译（-m:1）避免文件锁冲突"
+    _BUILD_EXTRA_ARGS="-m:1 -nodeReuse:false"
+    # 终止 Roslyn 编译服务器（VBCSCompiler）——它会在编译完 DLL 后仍持有文件句柄，
+    # 导致后续项目引用该 DLL 时报 "file is being used by another process"。
+    # VBCSCompiler 是纯后台缓存进程，终止后下次编译会自动重启，无副作用。
+    print_step "清理 Roslyn 编译服务进程（VBCSCompiler）..."
+    powershell.exe -NoProfile -NonInteractive -Command \
+        "Get-Process 'VBCSCompiler' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue" \
+        > /dev/null 2>&1 || true
+    print_info "Windows 环境：-m:1 -nodeReuse:false，已清理 VBCSCompiler"
 fi
 
 # ─── 阶段（条件）: 编译后端解决方案 ──────────────────────
 if [ "$BUILD_BACKEND" = true ]; then
     print_phase "编译后端解决方案"
 
-    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS"
+    print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false"
     echo ""
-    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS; then
-        print_fail "后端编译失败，请检查编译错误"
+    _BUILD_LOG="$(mktemp /tmp/microi-build.XXXXXX.log)"
+    if ! dotnet build "$SLN_FILE" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false 2>&1 | tee "$_BUILD_LOG"; then
+        echo ""
+        echo -e "  ${RED}───── 编译错误摘要（最后30行）─────${NC}"
+        grep -E "error |Error |FAILED" "$_BUILD_LOG" 2>/dev/null | tail -20 || tail -30 "$_BUILD_LOG"
+        echo -e "  ${RED}───────────────────────────────────${NC}"
+        rm -f "$_BUILD_LOG"
+        print_fail "后端编译失败，请检查上方编译错误"
     fi
+    rm -f "$_BUILD_LOG"
     echo ""
     print_success "后端编译成功"
 fi
@@ -589,6 +603,26 @@ fi
 cd ../..
 echo ""
 print_success "Microi.net.Api 发布成功"
+
+# --- 生成 NuGet 包（独立打包，避免编译期文件锁）---
+# 只在需要 nupkg（推送NuGet 或 加密DLL替换）时执行
+if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
+    print_divider
+    print_step "dotnet pack 生成 NuGet 包（--no-build，基于已编译产物）..."
+    echo ""
+    _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
+    if ! dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee "$_PACK_LOG"; then
+        echo ""
+        echo -e "  ${RED}───── Pack 错误摘要─────${NC}"
+        grep -E "error |Error |FAILED" "$_PACK_LOG" 2>/dev/null | tail -20 || tail -30 "$_PACK_LOG"
+        echo -e "  ${RED}────────────────────────${NC}"
+        rm -f "$_PACK_LOG"
+        print_fail "NuGet 包生成失败"
+    fi
+    rm -f "$_PACK_LOG"
+    echo ""
+    print_success "NuGet 包生成成功"
+fi
 
 # --- 冒烟测试 ---
 print_divider
@@ -778,6 +812,58 @@ if [ "$BUILD_CLIENT" = true ]; then
 fi
 
 # ─── 阶段（条件）: 推送 Docker 镜像 ──────────────────────
+
+# 确保 Docker 已启动（Windows 启动 Docker Desktop，macOS 启动 Docker.app）
+ensure_docker_running() {
+    if docker info > /dev/null 2>&1; then
+        return 0
+    fi
+    print_step "Docker 未运行，尝试自动启动..."
+
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+        # Windows: 查找并启动 Docker Desktop
+        local _docker_desktop=""
+        for _p in \
+            "/c/Program Files/Docker/Docker/Docker Desktop.exe" \
+            "/c/Users/$USERNAME/AppData/Local/Docker/Docker Desktop.exe"; do
+            [ -f "$_p" ] && _docker_desktop="$_p" && break
+        done
+        if [ -z "$_docker_desktop" ]; then
+            # 用 PowerShell 找安装路径
+            _docker_desktop=$(powershell.exe -NoProfile -NonInteractive -Command \
+                "Get-ItemProperty 'HKLM:\SOFTWARE\Docker Inc.\Docker Desktop' -Name InstallLocation -ErrorAction SilentlyContinue | Select-Object -ExpandProperty InstallLocation" 2>/dev/null | tr -d '\r\n')
+            [ -n "$_docker_desktop" ] && _docker_desktop="${_docker_desktop}\\Docker Desktop.exe"
+        fi
+        if [ -n "$_docker_desktop" ]; then
+            print_info "启动 Docker Desktop: $_docker_desktop"
+            "$_docker_desktop" &
+        else
+            print_warning "未找到 Docker Desktop，请手动启动后重试"
+            return 1
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        print_info "启动 Docker.app..."
+        open -a Docker
+    else
+        print_warning "无法自动启动 Docker，请手动启动后重试"
+        return 1
+    fi
+
+    # 等待 Docker daemon 就绪（最长 60 秒）
+    print_step "等待 Docker 启动..."
+    local _waited=0
+    while ! docker info > /dev/null 2>&1; do
+        if [ $_waited -ge 60 ]; then
+            print_fail "Docker 启动超时（60秒），请手动启动"
+        fi
+        sleep 2
+        _waited=$((_waited + 2))
+        printf "."
+    done
+    echo ""
+    print_success "Docker 已就绪（等待 ${_waited}s）"
+}
+
 # Docker 推送函数（内联执行，不依赖外部脚本）
 docker_push_plan() {
     local plan="$1"
@@ -829,6 +915,34 @@ docker_push_plan() {
 if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
     print_phase "推送 Docker 镜像"
 
+    # 确保 Docker 已启动
+    ensure_docker_running
+
+    # 模式5（跳过编译直接推送）：通过加密指纹文件 + MD5 验证确认 DLL 已加密
+    if [ "$DEPLOY_MODE" = "5" ] && [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
+        _sig_file="$PUBLISH_DIR/.microi-encrypted"
+        if [ -f "$_sig_file" ]; then
+            _match=true
+            for _proj in "${ENCRYPTED_PROJECTS[@]}"; do
+                _dll="$PUBLISH_DIR/${_proj}.dll"
+                if [ ! -f "$_dll" ]; then _match=false; break; fi
+                _recorded_md5=$(grep "^${_proj}.dll=" "$_sig_file" 2>/dev/null | cut -d'=' -f2)
+                _current_md5=$(md5 -q "$_dll" 2>/dev/null || md5sum "$_dll" 2>/dev/null | awk '{print $1}')
+                if [ -z "$_recorded_md5" ] || [ "$_recorded_md5" != "$_current_md5" ]; then
+                    _match=false; break
+                fi
+            done
+            if [ "$_match" = true ]; then
+                DLL_ENCRYPTED=true
+                print_info "模式5：已验证加密指纹文件 + DLL MD5，确认为加密版本"
+            else
+                print_warning "模式5：加密指纹与当前DLL不符（DLL可能已被覆盖），需重新执行加密"
+            fi
+        else
+            print_warning "模式5：未找到加密指纹文件 (.microi-encrypted)，需先运行模式1或2完成加密"
+        fi
+    fi
+
     # 安全检查：有加密源码但未加密时禁止推送后端 Docker
     if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
         print_fail "检测到 Microi.net/Microi.AI 源码但 DLL 未加密，禁止推送未加密的 Docker 镜像！"
@@ -871,6 +985,9 @@ if [ "$PUBLISH_DOC" = true ]; then
     print_step "构建 VitePress 文档..."
     (cd microi.doc && $DOC_PKG_MGR docs:build)
     print_success "VitePress 构建完成"
+
+    # 确保 Docker 已启动
+    ensure_docker_running
 
     print_step "构建 Docker 镜像: microi.doc"
     (cd microi.doc/docs/.vitepress && docker build -t microi.doc .)
