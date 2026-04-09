@@ -42,6 +42,12 @@ namespace Microi.net
         /// 这里之所以不使用【InvokeType】是因为【表单引擎】需要区分【表单字段】和【系统字段】
         /// </summary>
         public string _InvokeType { get; set; }
+        /// <summary>
+        /// 是否执行V8引擎事件。0或空表示不执行，1表示执行。默认1
+        /// 主要用于表单引擎提交时，区分是否执行SubmitBeforeServerV8和SubmitAfterServerV8事件
+        /// </summary>
+        public string _RunV8Event { get; set; }
+
         public string _ClientType { get; set; }
         /// <summary>
         /// .net9需要这样使用
