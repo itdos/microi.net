@@ -2068,16 +2068,41 @@ export default {
         // PC端使用 TagsView，需要检查路由变化以支持多标签切换
         // 注意：滚动位置由路由的 scrollBehavior 自动处理（使用 savedPosition）
         if (self.diyStore.IsPhoneView) {
-            console.log('%c[DiyTableRowlist] 移动端模式，保持页面状态不刷新', 'color: blue; font-size: 14px');
-            // 移动端：重新添加滚动监听
+            // zhy当移动端时，默认刷新列表以确保从新增/编辑页面返回时能看到新数据（片区管理板块），主要改动就是新增了！mobileKeep的情况。
+            // 如果你希望保留原先不刷新的行为，可在菜单配置中设置：SysMenuModel.DiyConfig.MobileKeepState = true
+            var mobileKeep = !!(self.SysMenuModel && self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.MobileKeepState === true);
+            if (mobileKeep) {
+                console.log('%c[DiyTableRowlist] 移动端模式，配置要求保持页面状态不刷新', 'color: blue; font-size: 14px');
+                // 仍需重新添加滚动监听
+                self.initMobileScroll();
+                // 恢复滚动位置（如果有）
+                if (self._savedScrollTop !== undefined) {
+                    self.$nextTick(() => {
+                        setTimeout(() => {
+                            window.scrollTo(0, self._savedScrollTop);
+                            console.log('[DiyTableRowlist] 恢复滚动位置:', self._savedScrollTop);
+                        }, 100);
+                    });
+                }
+                return;
+            }
+
+            // 重新添加滚动监听
             self.initMobileScroll();
-            // 移动端：恢复滚动位置
+            // 执行刷新（重建搜索并初始化）
+            try {
+                self.InitSearch();
+                self.Init();
+            } catch (err) {
+                console.warn('[DiyTableRowlist] 移动端刷新失败：', err);
+            }
+            // 恢复滚动位置（若存在），在下一次 DOM 更新后执行
             if (self._savedScrollTop !== undefined) {
                 self.$nextTick(() => {
                     setTimeout(() => {
                         window.scrollTo(0, self._savedScrollTop);
                         console.log('[DiyTableRowlist] 恢复滚动位置:', self._savedScrollTop);
-                    }, 100); // 延迟确保DOM已渲染
+                    }, 150);
                 });
             }
             return;
