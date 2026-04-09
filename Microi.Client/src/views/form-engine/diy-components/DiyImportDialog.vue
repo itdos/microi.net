@@ -111,7 +111,7 @@ export default {
     },
     computed: {
         importApi() {
-            if (this.sysMenuModel && 
+            if (this.sysMenuModel &&
                 (this.sysMenuModel.ImportApi || (this.sysMenuModel.DiyConfig && this.sysMenuModel.DiyConfig.ImportApi))
             ) {
                 return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi || this.sysMenuModel.DiyConfig.ImportApi);
