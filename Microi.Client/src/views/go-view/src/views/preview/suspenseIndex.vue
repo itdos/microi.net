@@ -84,7 +84,7 @@ useInitVChartsTheme(chartEditStore)
     overflow: hidden;
     .go-preview-scale {
       transform-origin: center center;
-      max-width: 100%;
+      // max-width: 100%;
       // transform: none !important;
     }
   }

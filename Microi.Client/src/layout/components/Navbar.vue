@@ -25,6 +25,11 @@
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
+            <!-- 浏览器全屏 -->
+            <div class="right-menu-item hover-effect" @click="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
+                <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
+            </div>
+
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
@@ -190,6 +195,7 @@ export default {
             ShowChat: false,
             ChatType: "",
             ShowUnreadCount: true,
+            isBrowserFullScreen: !!document.fullscreenElement,
             dialogUptPwd: false,
             FormUptPwd: {
                 Pwd: "",
@@ -254,8 +260,26 @@ export default {
 
         // 动态修改 CSS 变量
         document.documentElement.style.setProperty("--color-primary", self.themeColor || "#409eff");
+
+        // 监听浏览器全屏状态变化
+        this._fullscreenChangeHandler = () => {
+            this.isBrowserFullScreen = !!document.fullscreenElement;
+        };
+        document.addEventListener('fullscreenchange', this._fullscreenChangeHandler);
+    },
+    beforeUnmount() {
+        if (this._fullscreenChangeHandler) {
+            document.removeEventListener('fullscreenchange', this._fullscreenChangeHandler);
+        }
     },
     methods: {
+        toggleBrowserFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        },
         loadLang() {
             //兼容旧版本语言配置
 
