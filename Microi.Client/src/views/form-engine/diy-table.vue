@@ -72,7 +72,7 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，移动端也需要各种V8按钮功能！！！-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 && diyStore.IsPhoneView) || !diyStore.IsPhoneView">
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 || !ShowAddByRoute) || !diyStore.IsPhoneView">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -1434,7 +1434,7 @@ export default {
         self._colMenuVisible = false;
         self._colMenuField = null;
 
-        console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
+        // console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
       // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
@@ -2072,7 +2072,7 @@ export default {
             // 如果你希望保留原先不刷新的行为，可在菜单配置中设置：SysMenuModel.DiyConfig.MobileKeepState = true
             var mobileKeep = !!(self.SysMenuModel && self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.MobileKeepState === true);
             if (mobileKeep) {
-                console.log('%c[DiyTableRowlist] 移动端模式，配置要求保持页面状态不刷新', 'color: blue; font-size: 14px');
+                // console.log('%c[DiyTableRowlist] 移动端模式，配置要求保持页面状态不刷新', 'color: blue; font-size: 14px');
                 // 仍需重新添加滚动监听
                 self.initMobileScroll();
                 // 恢复滚动位置（如果有）
