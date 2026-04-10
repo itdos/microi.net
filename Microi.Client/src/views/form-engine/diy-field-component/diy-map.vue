@@ -89,7 +89,7 @@ const saveConfig = () => {
         props.field.Config = {};
     }
     props.field.Config.MapCompany = configForm.value.MapCompany;
-    
+
     configDialogVisible.value = false;
     DiyCommon.Tips('配置已保存', true);
 };
@@ -111,7 +111,7 @@ const initAMap = () => {
     // 这里可以添加高德地图的初始化逻辑
     // 目前先保留占位容器
     // 完整的地图初始化代码可以根据需要后续添加
-    
+
     // 示例：如果window.AMap可用
     if (window.AMap && mapContainer.value) {
         // mapInstance = new window.AMap.Map(mapContainer.value, {
@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
             // ignore
         }
     }
-    
+
     // 清理字段配置
     if (props.field.AmapConfig) {
         props.field.AmapConfig = null;

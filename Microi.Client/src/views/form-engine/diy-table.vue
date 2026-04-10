@@ -72,7 +72,7 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，移动端也需要各种V8按钮功能！！！-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 && diyStore.IsPhoneView) || !diyStore.IsPhoneView">
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 || !ShowAddByRoute) || !diyStore.IsPhoneView">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -248,8 +248,8 @@
                     </div>
                 </div>
 
-                <!--DIY移动端新增按钮-->
-                <div class="addBtn" v-if="diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
+                <!--DIY移动端新增按钮 加上人员权限_LimitAdd，表或字段是否可读TableChildField.Readonly，表是否为关联表PropsIsJoinTable-->
+                <div class="addBtn" v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
                   <el-icon class="addIcon"><Plus /></el-icon>
                 </div>
 
@@ -273,7 +273,7 @@
                       /> -->
                   <!-- 筛选下拉列表和清除搜索 -->
                   <div class="search-action-group" style="display: flex;" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 ">
-                   <DiyModleSearch :ref="'refDiySearch4'" :key="refDiySearch4" :CurrentDiyTableModel="CurrentDiyTableModel"
+                   <DiyModleSearch :ref="'refDiySearch4'" :key="'refDiySearch4'" :CurrentDiyTableModel="CurrentDiyTableModel"
                     :SearchFieldIds="SearchFieldIds" :DiyFieldList="DiyFieldList" :SearchType="'Out'"
                     @clearSearch="childClearSearch" @CallbackGetDiyTableRow="(params) => {
                         GetDiyTableRow(params,1);
@@ -1434,7 +1434,7 @@ export default {
         self._colMenuVisible = false;
         self._colMenuField = null;
 
-        console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
+        // console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
       // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
@@ -2068,16 +2068,41 @@ export default {
         // PC端使用 TagsView，需要检查路由变化以支持多标签切换
         // 注意：滚动位置由路由的 scrollBehavior 自动处理（使用 savedPosition）
         if (self.diyStore.IsPhoneView) {
-            console.log('%c[DiyTableRowlist] 移动端模式，保持页面状态不刷新', 'color: blue; font-size: 14px');
-            // 移动端：重新添加滚动监听
+            // zhy当移动端时，默认刷新列表以确保从新增/编辑页面返回时能看到新数据（片区管理板块），主要改动就是新增了！mobileKeep的情况。
+            // 如果你希望保留原先不刷新的行为，可在菜单配置中设置：SysMenuModel.DiyConfig.MobileKeepState = true
+            var mobileKeep = !!(self.SysMenuModel && self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.MobileKeepState === true);
+            if (mobileKeep) {
+                // console.log('%c[DiyTableRowlist] 移动端模式，配置要求保持页面状态不刷新', 'color: blue; font-size: 14px');
+                // 仍需重新添加滚动监听
+                self.initMobileScroll();
+                // 恢复滚动位置（如果有）
+                if (self._savedScrollTop !== undefined) {
+                    self.$nextTick(() => {
+                        setTimeout(() => {
+                            window.scrollTo(0, self._savedScrollTop);
+                            console.log('[DiyTableRowlist] 恢复滚动位置:', self._savedScrollTop);
+                        }, 100);
+                    });
+                }
+                return;
+            }
+
+            // 重新添加滚动监听
             self.initMobileScroll();
-            // 移动端：恢复滚动位置
+            // 执行刷新（重建搜索并初始化）
+            try {
+                self.InitSearch();
+                self.Init();
+            } catch (err) {
+                console.warn('[DiyTableRowlist] 移动端刷新失败：', err);
+            }
+            // 恢复滚动位置（若存在），在下一次 DOM 更新后执行
             if (self._savedScrollTop !== undefined) {
                 self.$nextTick(() => {
                     setTimeout(() => {
                         window.scrollTo(0, self._savedScrollTop);
                         console.log('[DiyTableRowlist] 恢复滚动位置:', self._savedScrollTop);
-                    }, 100); // 延迟确保DOM已渲染
+                    }, 150);
                 });
             }
             return;
