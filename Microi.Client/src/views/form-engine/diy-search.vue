@@ -22,13 +22,13 @@
         <div v-if="GetSearchFieldList('Text', SearchType).length > 0" class="search-fields-wrapper">
             <div v-for="(field, index) in GetSearchFieldList('Text', SearchType)" :key="'search_line_2' + field.Id + '_' + index" class="search-field-item">
                 <!-- 日期时间选择器 -->
-                <div v-if="field.Component == 'DateTime'" class="search-input-block">
+                <div v-if="field.Component == 'DateTime'" class="search-dateTime-block">
                     <div class="search-input-label">
                         <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
-                    <el-date-picker
+                    <!-- <el-date-picker
                         v-model="SearchDateTime[field.AsName || field.Name]"
                         :type="GetDatePickerType(field)"
                         :value-format="GetDateTimeFormat(field)"
@@ -38,7 +38,31 @@
                         end-placeholder="结束日期"
                         :picker-options="pickerOptions"
                         @change="GetDiyTableRow({ _PageIndex: 1 })"
-                    />
+                    /> -->
+                    <div class="date-timer">
+                      <el-date-picker
+                          id="input-picker"
+                          v-model="SearchStartDateTime[field.AsName || field.Name]"
+                          type="datetime"
+                          :value-format="GetDateTimeFormat(field)"
+                          :editable="false"
+                          placeholder="开始日期"
+                          :picker-options="pickerOptions"
+                          @change="(val) => DateTimeChange(val, field,1)"
+                          @clear="() => DateTimeChange('', field,2)"
+                      />
+                      <span>至</span>
+                      <el-date-picker
+                          v-model="SearchEndDateTime[field.AsName || field.Name]"
+                          type="datetime"
+                          :value-format="GetDateTimeFormat(field)"
+                          :editable="false"
+                          placeholder="结束日期"
+                          :picker-options="pickerOptions"
+                          @change="(val) => DateTimeChange(val, field,1)"
+                          @clear="() => DateTimeChange('', field,2)"
+                      />
+                    </div>
                 </div>
 
                 <!-- 部门选择器 -->
@@ -205,7 +229,23 @@
 .diy-search-container {
     padding: 0;
 }
-
+.search-dateTime-block{
+  display: flex;
+  align-items: center;
+  // flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0; // 防止溢出
+}
+.date-timer{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+:deep(.el-input__wrapper){
+    width: 80px !important;
+  }
 // 复选框搜索区域
 .search-checkbox-wrapper {
     margin-bottom: 0;
@@ -310,7 +350,8 @@
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 10px;
     margin-bottom: 0px;//这里要设置0，不然卡片模式会多出空隙
-    align-items: start;
+    // align-items: start;
+    align-items: center;
     flex-wrap: wrap;
 }
 :deep(.el-select__selected-item){
@@ -500,7 +541,6 @@ export default {
                 }
 
                 const result = [];
-
                 self.SearchFieldIds.forEach((id) => {
                     // 处理自定义字段列表
                     self.DiyFieldList.forEach((field) => {
@@ -592,6 +632,8 @@ export default {
             SearchSelect: {},
             SearchModel: {},
             SearchNumber: {},
+            SearchStartDateTime: {},
+            SearchEndDateTime: {},
             SearchDateTime: {},
             forceRerender: false,
 
@@ -670,7 +712,8 @@ export default {
             this.SearchDateTime = {};
             this.SearchNumber = {};
             this.SearchSelect = {};
-
+            this.SearchStartDateTime = {};
+            this.SearchEndDateTime = {};
             // 清空URL参数
             if (this.$route.query._SearchDateTime) {
                 this.$route.query._SearchDateTime = "";
@@ -859,7 +902,7 @@ export default {
 
             // 设置最终的 Where 条件
             param._Where = self.SearchWhere.length > 0 ? self.SearchWhere : [];
-
+            console.log(self.SearchDateTime,self.SearchStartDateTime,self.SearchEndDateTime,'日历SearchDateTime')
             // 处理时间搜索条件
             if (self.SearchDateTime) {
                 for (const key in self.SearchDateTime) {
@@ -873,6 +916,7 @@ export default {
                     }
                 }
             }
+
 
             // 处理复选框搜索条件
             if (param.SearchCheckbox) {
@@ -1060,6 +1104,30 @@ export default {
             const fieldName = field.AsName || field.Name;
             this.SearchModel[fieldName] = item ? item[item.length - 1] : "";
             this.GetDiyTableRow({ _PageIndex: 1 });
+        },
+
+        /**
+         * 合并开始/结束日期到 SearchDateTime 并触发查询
+         */
+        DateTimeChange(value, field,type) {
+            const fieldName = field.AsName || field.Name;
+            const start = this.SearchStartDateTime[fieldName];
+            const end = this.SearchEndDateTime[fieldName];
+
+            if ((start !== undefined && start !== null && start !== "") || (end !== undefined && end !== null && end !== "")) {
+                this.SearchDateTime[fieldName] = [start || "", end || ""];
+            } else {
+                if (this.SearchDateTime[fieldName]) {
+                    delete this.SearchDateTime[fieldName];
+                }
+            }
+            if(type == 1 && start !== undefined && start !== null && start !== "" && end !== undefined && end !== null && end !== ""){
+              this.GetDiyTableRow({ _PageIndex: 1 });
+            }else if(type == 2){
+              // 无论是设置还是清除，均触发一次查询以同步 SearchDateTime
+              this.GetDiyTableRow({ _PageIndex: 1 });
+            }
+
         },
 
         /**
