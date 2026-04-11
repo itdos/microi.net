@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Aliyun.OSS;
 using Aliyun.OSS.Common;
@@ -288,6 +289,328 @@ namespace Microi.net
                 //    OsClient = param.OsClient
                 //});
                 return new DosResult(0, null, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// 列出指定前缀下的文件和文件夹
+        /// </summary>
+        public async Task<DosResult> ListObjects(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+
+                var endpoint = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+                var accessKeyId = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+                var accessKeySecret = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+
+                var config = new ClientConfiguration
+                {
+                    ConnectionTimeout = 30000,
+                    MaxErrorRetry = 2
+                };
+                var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+
+                var prefix = (param.Prefix ?? "").TrimStart('/');
+                var delimiter = param.Delimiter ?? "/";
+
+                var listRequest = new ListObjectsRequest(bucketName)
+                {
+                    Prefix = prefix,
+                    Delimiter = delimiter,
+                    MaxKeys = param.MaxKeys > 0 ? param.MaxKeys : 1000
+                };
+                if (!param.Marker.DosIsNullOrWhiteSpace())
+                {
+                    listRequest.Marker = param.Marker;
+                }
+
+                var listing = ossClient.ListObjects(listRequest);
+
+                var folders = new List<object>();
+                var files = new List<object>();
+
+                // 公共前缀 = 子文件夹
+                if (listing.CommonPrefixes != null)
+                {
+                    foreach (var commonPrefix in listing.CommonPrefixes)
+                    {
+                        var folderName = commonPrefix.TrimEnd('/');
+                        if (folderName.Contains("/"))
+                        {
+                            folderName = folderName.Substring(folderName.LastIndexOf('/') + 1);
+                        }
+                        folders.Add(new
+                        {
+                            Name = folderName,
+                            FullPath = commonPrefix,
+                            IsFolder = true
+                        });
+                    }
+                }
+
+                // 对象 = 文件
+                if (listing.ObjectSummaries != null)
+                {
+                    foreach (var obj in listing.ObjectSummaries)
+                    {
+                        // 排除文件夹自身的空对象
+                        if (obj.Key == prefix || obj.Key.EndsWith("/"))
+                            continue;
+
+                        var fileName = obj.Key;
+                        if (fileName.Contains("/"))
+                        {
+                            fileName = fileName.Substring(fileName.LastIndexOf('/') + 1);
+                        }
+
+                        // 关键字过滤
+                        if (!param.Keyword.DosIsNullOrWhiteSpace())
+                        {
+                            if (!fileName.ToLower().Contains(param.Keyword.ToLower()))
+                                continue;
+                        }
+
+                        var ext = Path.GetExtension(fileName).TrimStart('.').ToLower();
+                        files.Add(new
+                        {
+                            Name = fileName,
+                            FullPath = obj.Key,
+                            Size = obj.Size,
+                            Type = ext,
+                            LastModified = obj.LastModified.ToString("yyyy-MM-dd HH:mm:ss"),
+                            IsFolder = false
+                        });
+                    }
+                }
+
+                return new DosResult(1, new
+                {
+                    Folders = folders,
+                    Files = files,
+                    IsTruncated = listing.IsTruncated,
+                    NextMarker = listing.NextMarker
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Aliyun OSS ListObjects Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 删除文件
+        /// </summary>
+        public async Task<DosResult> DeleteObject(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+
+                var endpoint = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+                var accessKeyId = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+                var accessKeySecret = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+
+                var config = new ClientConfiguration
+                {
+                    ConnectionTimeout = 30000,
+                    MaxErrorRetry = 2
+                };
+                var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+
+                var objectKey = param.FileFullPath.DosTrimStart('/');
+
+                // 如果是文件夹，递归删除所有子对象
+                if (objectKey.EndsWith("/"))
+                {
+                    var allKeys = new List<string>();
+                    string marker = null;
+                    bool isTruncated = true;
+                    while (isTruncated)
+                    {
+                        var listRequest = new ListObjectsRequest(bucketName)
+                        {
+                            Prefix = objectKey,
+                            MaxKeys = 1000
+                        };
+                        if (marker != null) listRequest.Marker = marker;
+
+                        var listing = ossClient.ListObjects(listRequest);
+                        if (listing.ObjectSummaries != null)
+                        {
+                            foreach (var obj in listing.ObjectSummaries)
+                            {
+                                allKeys.Add(obj.Key);
+                            }
+                        }
+                        isTruncated = listing.IsTruncated;
+                        marker = listing.NextMarker;
+                    }
+
+                    if (allKeys.Count > 0)
+                    {
+                        // 批量删除，每次最多1000个
+                        for (int i = 0; i < allKeys.Count; i += 1000)
+                        {
+                            var batch = allKeys.Skip(i).Take(1000).ToList();
+                            var deleteRequest = new DeleteObjectsRequest(bucketName, batch, false);
+                            ossClient.DeleteObjects(deleteRequest);
+                        }
+                    }
+                }
+                else
+                {
+                    ossClient.DeleteObject(bucketName, objectKey);
+                }
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Aliyun OSS DeleteObject Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 创建文件夹
+        /// </summary>
+        public async Task<DosResult> CreateFolder(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+
+                var endpoint = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+                var accessKeyId = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+                var accessKeySecret = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+
+                var config = new ClientConfiguration
+                {
+                    ConnectionTimeout = 30000,
+                    MaxErrorRetry = 2
+                };
+                var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+
+                var folderKey = param.FileFullPath.DosTrimStart('/');
+                if (!folderKey.EndsWith("/"))
+                {
+                    folderKey += "/";
+                }
+
+                // 上传空对象模拟文件夹
+                using (var emptyStream = new MemoryStream(new byte[0]))
+                {
+                    ossClient.PutObject(bucketName, folderKey, emptyStream);
+                }
+
+                return new DosResult(1, new { FullPath = folderKey });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Aliyun OSS CreateFolder Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 复制文件
+        /// </summary>
+        public async Task<DosResult> CopyObject(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+
+                var endpoint = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+                var accessKeyId = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+                var accessKeySecret = param.Limit == true
+                    ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                    : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+
+                var config = new ClientConfiguration
+                {
+                    ConnectionTimeout = 60000,
+                    MaxErrorRetry = 3
+                };
+                var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+
+                var sourceKey = param.FileFullPath.DosTrimStart('/');
+                var destKey = param.DestPath.DosTrimStart('/');
+
+                var copyRequest = new CopyObjectRequest(bucketName, sourceKey, bucketName, destKey);
+                ossClient.CopyObject(copyRequest);
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Aliyun OSS CopyObject Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 移动文件（复制+删除）
+        /// </summary>
+        public async Task<DosResult> MoveObject(HDFSParam param)
+        {
+            try
+            {
+                var copyResult = await CopyObject(param);
+                if (copyResult.Code != 1)
+                {
+                    return copyResult;
+                }
+
+                var deleteResult = await DeleteObject(new HDFSParam
+                {
+                    ClientModel = param.ClientModel,
+                    Limit = param.Limit,
+                    FileFullPath = param.FileFullPath
+                });
+                if (deleteResult.Code != 1)
+                {
+                    return new DosResult(0, null, "文件复制成功但删除源文件失败: " + deleteResult.Msg);
+                }
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Aliyun OSS MoveObject Error: " + ex.Message);
             }
         }
     }

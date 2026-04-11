@@ -788,6 +788,220 @@ namespace Microi.net
             }
 
         }
+
+        /// <summary>
+        /// 文件管理 - 列出指定路径下的文件和文件夹
+        /// </summary>
+        public async Task<DosResult> ListObjects(DiyUploadParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "OsClient不能为空！");
+            }
+
+            var clientModel = OsClient.GetClient(param.OsClient);
+            var hdfs = "Aliyun";
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+            }
+            var _iMicroiHDFS = default(IMicroiHDFS);
+            switch (hdfs)
+            {
+                case "MinIO":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+                    break;
+                case "S3":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+                    break;
+                default:
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+                    break;
+            }
+
+            return await _iMicroiHDFS.ListObjects(new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = param.Limit,
+                Prefix = param.Path,
+                Keyword = param._Keyword
+            });
+        }
+
+        /// <summary>
+        /// 文件管理 - 删除文件或文件夹
+        /// </summary>
+        public async Task<DosResult> DeleteObject(DiyUploadParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "OsClient不能为空！");
+            }
+
+            var clientModel = OsClient.GetClient(param.OsClient);
+            var hdfs = "Aliyun";
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+            }
+            var _iMicroiHDFS = default(IMicroiHDFS);
+            switch (hdfs)
+            {
+                case "MinIO":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+                    break;
+                case "S3":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+                    break;
+                default:
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+                    break;
+            }
+
+            return await _iMicroiHDFS.DeleteObject(new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName
+            });
+        }
+
+        /// <summary>
+        /// 文件管理 - 创建文件夹
+        /// </summary>
+        public async Task<DosResult> CreateFolder(DiyUploadParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "OsClient不能为空！");
+            }
+
+            var clientModel = OsClient.GetClient(param.OsClient);
+            var hdfs = "Aliyun";
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+            }
+            var _iMicroiHDFS = default(IMicroiHDFS);
+            switch (hdfs)
+            {
+                case "MinIO":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+                    break;
+                case "S3":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+                    break;
+                default:
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+                    break;
+            }
+
+            return await _iMicroiHDFS.CreateFolder(new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName
+            });
+        }
+
+        /// <summary>
+        /// 文件管理 - 重命名文件（移动到同目录下的新名称）
+        /// </summary>
+        public async Task<DosResult> RenameObject(DiyUploadParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "OsClient不能为空！");
+            }
+
+            var clientModel = OsClient.GetClient(param.OsClient);
+            var hdfs = "Aliyun";
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+            }
+            var _iMicroiHDFS = default(IMicroiHDFS);
+            switch (hdfs)
+            {
+                case "MinIO":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+                    break;
+                case "S3":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+                    break;
+                default:
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+                    break;
+            }
+
+            return await _iMicroiHDFS.MoveObject(new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName,
+                DestPath = param.Path
+            });
+        }
+
+        /// <summary>
+        /// 文件管理 - 移动文件
+        /// </summary>
+        public async Task<DosResult> MoveObject(DiyUploadParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "OsClient不能为空！");
+            }
+
+            var clientModel = OsClient.GetClient(param.OsClient);
+            var hdfs = "Aliyun";
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+            }
+            var _iMicroiHDFS = default(IMicroiHDFS);
+            switch (hdfs)
+            {
+                case "MinIO":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+                    break;
+                case "S3":
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+                    break;
+                default:
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+                    break;
+            }
+
+            return await _iMicroiHDFS.MoveObject(new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = param.Limit,
+                FileFullPath = param.FilePathName,
+                DestPath = param.Path
+            });
+        }
+
         private static string ReplaceDbCode(string fileName)
         {
             if (fileName.DosIsNullOrWhiteSpace())

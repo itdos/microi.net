@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -331,6 +332,289 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
+            }
+        }
+
+        private IMinioClient CreateMinioClient(OsClientSecret clientModel, bool isPrivate)
+        {
+            var endPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
+            var osClientNetwork = Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
+            if (osClientNetwork == "Internet")
+            {
+                endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
+            }
+
+            var minioClient = new MinioClient()
+                .WithEndpoint(endPoint)
+                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
+
+            if (osClientNetwork == "Internet")
+            {
+                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
+                {
+                    minioClient = minioClient.WithSSL();
+                }
+            }
+            else
+            {
+                if (clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1)
+                {
+                    minioClient = minioClient.WithSSL();
+                }
+            }
+
+            return minioClient.Build();
+        }
+
+        private string GetBucketName(OsClientSecret clientModel, bool isPrivate)
+        {
+            return isPrivate
+                ? clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>()
+                : clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
+        }
+
+        /// <summary>
+        /// 列出指定前缀下的文件和文件夹
+        /// </summary>
+        public async Task<DosResult> ListObjects(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var isPrivate = param.Limit == true;
+                var minioClient = CreateMinioClient(clientModel, isPrivate);
+                var bucketName = GetBucketName(clientModel, isPrivate);
+
+                var prefix = (param.Prefix ?? "").TrimStart('/');
+
+                var listArgs = new ListObjectsArgs()
+                    .WithBucket(bucketName)
+                    .WithPrefix(prefix)
+                    .WithRecursive(false);
+
+                var folders = new List<object>();
+                var files = new List<object>();
+                var seenPrefixes = new HashSet<string>();
+
+                await foreach (var item in minioClient.ListObjectsEnumAsync(listArgs))
+                {
+                    var key = item.Key;
+                    if (item.IsDir)
+                    {
+                        if (!seenPrefixes.Contains(key))
+                        {
+                            seenPrefixes.Add(key);
+                            var folderName = key.TrimEnd('/');
+                            if (folderName.Contains("/"))
+                            {
+                                folderName = folderName.Substring(folderName.LastIndexOf('/') + 1);
+                            }
+                            folders.Add(new
+                            {
+                                Name = folderName,
+                                FullPath = key,
+                                IsFolder = true
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // 排除文件夹自身的空对象
+                        if (key == prefix || key.EndsWith("/"))
+                            continue;
+
+                        var fileName = key;
+                        if (fileName.Contains("/"))
+                        {
+                            fileName = fileName.Substring(fileName.LastIndexOf('/') + 1);
+                        }
+
+                        // 关键字过滤
+                        if (!param.Keyword.DosIsNullOrWhiteSpace())
+                        {
+                            if (!fileName.ToLower().Contains(param.Keyword.ToLower()))
+                                continue;
+                        }
+
+                        var ext = Path.GetExtension(fileName).TrimStart('.').ToLower();
+                        files.Add(new
+                        {
+                            Name = fileName,
+                            FullPath = key,
+                            Size = (long)item.Size,
+                            Type = ext,
+                            LastModified = item.LastModifiedDateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+                            IsFolder = false
+                        });
+                    }
+                }
+
+                return new DosResult(1, new
+                {
+                    Folders = folders,
+                    Files = files,
+                    IsTruncated = false,
+                    NextMarker = ""
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO ListObjects Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 删除文件
+        /// </summary>
+        public async Task<DosResult> DeleteObject(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var isPrivate = param.Limit == true;
+                var minioClient = CreateMinioClient(clientModel, isPrivate);
+                var bucketName = GetBucketName(clientModel, isPrivate);
+
+                var objectKey = param.FileFullPath.DosTrimStart('/');
+
+                // 如果是文件夹，递归删除所有子对象
+                if (objectKey.EndsWith("/"))
+                {
+                    var keysToDelete = new List<string>();
+                    var listArgs = new ListObjectsArgs()
+                        .WithBucket(bucketName)
+                        .WithPrefix(objectKey)
+                        .WithRecursive(true);
+
+                    await foreach (var item in minioClient.ListObjectsEnumAsync(listArgs))
+                    {
+                        keysToDelete.Add(item.Key);
+                    }
+
+                    foreach (var key in keysToDelete)
+                    {
+                        var removeArgs = new RemoveObjectArgs()
+                            .WithBucket(bucketName)
+                            .WithObject(key);
+                        await minioClient.RemoveObjectAsync(removeArgs);
+                    }
+                }
+                else
+                {
+                    var removeArgs = new RemoveObjectArgs()
+                        .WithBucket(bucketName)
+                        .WithObject(objectKey);
+                    await minioClient.RemoveObjectAsync(removeArgs);
+                }
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO DeleteObject Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 创建文件夹
+        /// </summary>
+        public async Task<DosResult> CreateFolder(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var isPrivate = param.Limit == true;
+                var minioClient = CreateMinioClient(clientModel, isPrivate);
+                var bucketName = GetBucketName(clientModel, isPrivate);
+
+                var folderKey = param.FileFullPath.DosTrimStart('/');
+                if (!folderKey.EndsWith("/"))
+                {
+                    folderKey += "/";
+                }
+
+                using (var emptyStream = new MemoryStream(new byte[0]))
+                {
+                    var putArgs = new PutObjectArgs()
+                        .WithBucket(bucketName)
+                        .WithObject(folderKey)
+                        .WithStreamData(emptyStream)
+                        .WithObjectSize(0)
+                        .WithContentType("application/octet-stream");
+                    await minioClient.PutObjectAsync(putArgs);
+                }
+
+                return new DosResult(1, new { FullPath = folderKey });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO CreateFolder Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 复制文件
+        /// </summary>
+        public async Task<DosResult> CopyObject(HDFSParam param)
+        {
+            try
+            {
+                var clientModel = param.ClientModel;
+                var isPrivate = param.Limit == true;
+                var minioClient = CreateMinioClient(clientModel, isPrivate);
+                var bucketName = GetBucketName(clientModel, isPrivate);
+
+                var sourceKey = param.FileFullPath.DosTrimStart('/');
+                var destKey = param.DestPath.DosTrimStart('/');
+
+                var cpSrcArgs = new CopySourceObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(sourceKey);
+
+                var copyArgs = new CopyObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(destKey)
+                    .WithCopyObjectSource(cpSrcArgs);
+
+                await minioClient.CopyObjectAsync(copyArgs);
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO CopyObject Error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 移动文件（复制+删除）
+        /// </summary>
+        public async Task<DosResult> MoveObject(HDFSParam param)
+        {
+            try
+            {
+                var copyResult = await CopyObject(param);
+                if (copyResult.Code != 1)
+                {
+                    return copyResult;
+                }
+
+                var deleteResult = await DeleteObject(new HDFSParam
+                {
+                    ClientModel = param.ClientModel,
+                    Limit = param.Limit,
+                    FileFullPath = param.FileFullPath
+                });
+                if (deleteResult.Code != 1)
+                {
+                    return new DosResult(0, null, "文件复制成功但删除源文件失败: " + deleteResult.Msg);
+                }
+
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO MoveObject Error: " + ex.Message);
             }
         }
     }
