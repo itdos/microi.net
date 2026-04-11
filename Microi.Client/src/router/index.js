@@ -231,21 +231,22 @@ export const asyncRoutes = [
             }
         ]
     },
-    // {
-    //     path: "/file-manage",
-    //     component: Layout,
-    //     children: [
-    //         {
-    //             path: "/file-manage",
-    //             name: "file-manage",
-    //             component: () => import("@/views/file-manage/index.vue"),
-    //             meta: {
-    //                 title: "文件柜",
-    //                 icon: "el-icon-s-operation"
-    //             }
-    //         }
-    //     ]
-    // },
+    {
+        path: "/file-manage",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/file-manage",
+                name: "file-manage",
+                component: () => import("@/views/file-manage/index.vue"),
+                meta: {
+                    title: "文件柜",
+                    icon: "el-icon-s-operation"
+                }
+            }
+        ]
+    },
     {
         path: "/mic/cad-preview",
         name: "mic_cad_preview",
@@ -261,7 +262,7 @@ export const asyncRoutes = [
                 path: "/3d-engine/designer",
                 name: "3d_engine_designer",
                 component: () => import("@/views/3d-engine/designer.vue"),
-                meta: { title: "3D 设计器" }
+                meta: { title: "3D引擎 设计器" }
             }
         ]
     },
@@ -274,7 +275,7 @@ export const asyncRoutes = [
                 path: "/3d-engine/renderer",
                 name: "3d_engine_renderer",
                 component: () => import("@/views/3d-engine/renderer.vue"),
-                meta: { title: "3D 渲染器" }
+                meta: { title: "3D引擎 渲染器" }
             }
         ]
     },

@@ -48,6 +48,31 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <returns></returns>
         Task<DosResult> GetPrivateFileByte(DiyUploadParam param);
+
+        /// <summary>
+        /// 列出指定前缀下的文件和文件夹。传入ClientModel、Limit、FileFullPath（作为前缀）
+        /// </summary>
+        Task<DosResult> ListObjects(HDFSParam param);
+
+        /// <summary>
+        /// 删除文件。传入ClientModel、Limit、FileFullPath
+        /// </summary>
+        Task<DosResult> DeleteObject(HDFSParam param);
+
+        /// <summary>
+        /// 创建文件夹（上传空对象）。传入ClientModel、Limit、FileFullPath
+        /// </summary>
+        Task<DosResult> CreateFolder(HDFSParam param);
+
+        /// <summary>
+        /// 复制文件。传入ClientModel、Limit、FileFullPath（源）、FileFullPathOrigin（目标）
+        /// </summary>
+        Task<DosResult> CopyObject(HDFSParam param);
+
+        /// <summary>
+        /// 移动文件（复制+删除）。传入ClientModel、Limit、FileFullPath（源）、FileFullPathOrigin（目标）
+        /// </summary>
+        Task<DosResult> MoveObject(HDFSParam param);
     }
 }
 
