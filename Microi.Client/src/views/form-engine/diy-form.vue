@@ -950,7 +950,9 @@ export default {
         // Vue 3 不再需要 $set，此调试代码已跳过
         // 在 Vue 3 中，响应式系统可以自动追踪属性的添加和删除
         // 2026-02-05 Anderson：没必要让外部每次去调用 Init()，组件实现自动初始化
-        if(!self.TableName || !self.TableId){
+        // 2026-04-13 Fix：条件改为"有标识时才自动Init"，避免工作流等场景下 TableId 还是空值时
+        // 就提前 Init() 导致 GetDiyFieldList 报"参数错误"（工作流中 TableId 由 InitSendWork 延迟设置）
+        if(self.TableName || self.TableId){
             self.Init();
         }
     },
