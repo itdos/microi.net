@@ -51,8 +51,8 @@
                         </div>
                     </div>
 
-                    <!-- 工具栏 -->
-                    <div class="work-toolbar">
+                    <!-- 工具栏 —— PC端 -->
+                    <div class="work-toolbar" v-if="!diyStore.IsPhoneView">
                         <el-button v-if="WorkType == 'Todo'" :type="SelectList.length > 0 ? 'primary' : ''" @click="BatchApproval()">
                             <el-icon class="more-btn mr-1"><CircleCheck /></el-icon> 批量审批
                         </el-button>
@@ -65,9 +65,9 @@
                         </el-button>
                     </div>
 
-                    <!-- 我的待办表格（wf_work） -->
+                    <!-- 我的待办表格（wf_work）—— PC端 -->
                     <el-table
-                        v-show="WorkType == 'Todo'"
+                        v-show="WorkType == 'Todo' && !diyStore.IsPhoneView"
                         v-loading="TableLoading"
                         :data="MyWorkList"
                         @selection-change="TableRowSelectionChange"
@@ -124,9 +124,9 @@
                         </template>
                     </el-table>
 
-                    <!-- 我发起的/我处理的/抄送我的/我相关的表格（wf_flow） -->
+                    <!-- 我发起的/我处理的/抄送我的/我相关的表格（wf_flow）—— PC端 -->
                     <el-table
-                        v-show="WorkType != 'Todo'"
+                        v-show="WorkType != 'Todo' && !diyStore.IsPhoneView"
                         v-loading="TableLoading"
                         :data="MyWorkList"
                         style="width: 100%"
@@ -187,8 +187,9 @@
                         </template>
                     </el-table>
 
-                    <!-- 分页 -->
+                    <!-- 分页 —— PC端 -->
                     <el-pagination
+                        v-if="!diyStore.IsPhoneView"
                         class="work-pagination"
                         background
                         layout="total, sizes, prev, pager, next, jumper"
@@ -199,6 +200,78 @@
                         @size-change="DiyTableRowSizeChange"
                         @current-change="DiyTableRowCurrentChange"
                     />
+
+                    <!-- ====== 移动端卡片列表 ====== -->
+                    <div v-if="diyStore.IsPhoneView" class="wf-mobile-cards" v-loading="TableLoading && MyWorkList.length === 0">
+                        <!-- 移动端搜索 -->
+                        <div class="wf-mobile-search">
+                            <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })" clearable>
+                                <template #prefix><el-icon><Search /></el-icon></template>
+                            </el-input>
+                        </div>
+
+                        <!-- 空状态 -->
+                        <el-empty v-if="!TableLoading && MyWorkList.length === 0" :description="'暂无数据'" />
+
+                        <!-- 卡片列表 -->
+                        <div v-for="(item, index) in MyWorkList" :key="item.Id" class="wf-card" @click="OpenWork(item, WorkType == 'Todo' ? 'Edit' : 'View')">
+                            <div class="wf-card-header">
+                                <span class="wf-card-index">{{ index + 1 }}</span>
+                                <span class="wf-card-title">{{ item.FlowTitle }}</span>
+                                <el-tag v-if="WorkType != 'Todo' && item.FlowState" :type="item.FlowState == 'Running' ? 'success' : item.FlowState == 'End' ? 'info' : item.FlowState == 'Cancel' ? 'danger' : ''" size="small" effect="light">
+                                    {{ item.FlowState == 'Running' ? '运行中' : item.FlowState == 'End' ? '已结束' : item.FlowState == 'Cancel' ? '已作废' : item.FlowState }}
+                                </el-tag>
+                            </div>
+                            <div class="wf-card-body" v-html="GetNotice(item)"></div>
+                            <div class="wf-card-meta">
+                                <span v-if="WorkType == 'Todo' && item.Sender" class="wf-card-meta-item">
+                                    <fa-icon :icon="'fas fa-user'" class="wf-card-meta-icon" /> {{ item.Sender }}
+                                </span>
+                                <span v-if="item.FirstSender || item.Sender" class="wf-card-meta-item">
+                                    <fa-icon :icon="'fas fa-user-edit'" class="wf-card-meta-icon" /> {{ item.FirstSender || item.Sender }}
+                                </span>
+                                <span v-if="WorkType == 'Todo' && item.NodeName" class="wf-card-meta-item">
+                                    <fa-icon :icon="'fas fa-sitemap'" class="wf-card-meta-icon" /> {{ item.NodeName }}
+                                </span>
+                            </div>
+                            <div class="wf-card-footer">
+                                <span class="wf-card-time">{{ formatCardTime(item.CreateTime) }}</span>
+                                <div class="wf-card-actions" @click.stop>
+                                    <el-button v-if="WorkType == 'Todo'" type="primary" size="small" round @click.stop="OpenWork(item, 'Edit')">
+                                        去处理
+                                    </el-button>
+                                    <el-button v-if="WorkType == 'Todo'" size="small" round @click.stop="OpenWork(item, 'View', 'Cancel')">
+                                        作废
+                                    </el-button>
+                                    <el-button v-if="WorkType != 'Todo'" type="primary" size="small" round @click.stop="OpenWork(item, 'View')">
+                                        查看
+                                    </el-button>
+                                    <el-button
+                                        v-if="(WorkType == 'Done' || WorkType == 'Sender') && item.FlowState != 'End' && item.FlowState != 'Cancel'"
+                                        size="small"
+                                        round
+                                        @click.stop="OpenWork(item, 'View', 'Recall')"
+                                    >
+                                        撤回
+                                    </el-button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 移动端加载更多 -->
+                        <div v-if="MyWorkList.length < DataCount" class="wf-mobile-load-more">
+                            <div v-if="mobileLoadingMore" class="wf-loading-text">
+                                <el-icon class="is-loading"><Loading /></el-icon>
+                                <span>正在加载更多... ({{ MyWorkList.length }}/{{ DataCount }})</span>
+                            </div>
+                            <div v-else class="wf-load-more-text">
+                                <span>上拉加载更多 ({{ MyWorkList.length }}/{{ DataCount }})</span>
+                            </div>
+                        </div>
+                        <div v-if="MyWorkList.length >= DataCount && DataCount > 0" class="wf-mobile-no-more">
+                            <span>已加载全部 {{ DataCount }} 条数据</span>
+                        </div>
+                    </div>
                 </div>
             </el-tab-pane>
 
@@ -255,7 +328,7 @@
         <el-drawer
             class="diy-form-container"
             :modal="true"
-            :size="'90%'"
+            :size="diyStore.IsPhoneView ? '100%' : '90%'"
             :modal-append-to-body="false"
             v-model="ShowFieldFormDrawer"
             :close-on-press-escape="false"
@@ -333,7 +406,10 @@ export default {
             noticeList: [],
             noticeCount: 0,
             noticePageIndex: 1,
-            noticePageSize: 10
+            noticePageSize: 10,
+            // 移动端加载更多
+            mobileLoadingMore: false,
+            _mobileScrollHandler: null
         };
     },
     mounted() {
@@ -341,6 +417,20 @@ export default {
         self.GetList();
         self.loadWFStats();
         self.loadUnreadCount();
+        // 移动端无限滚动
+        if (self.diyStore.IsPhoneView) {
+            self._mobileScrollHandler = function () {
+                self.onMobileScroll();
+            };
+            window.addEventListener('scroll', self._mobileScrollHandler);
+        }
+    },
+    unmounted() {
+        var self = this;
+        if (self._mobileScrollHandler) {
+            window.removeEventListener('scroll', self._mobileScrollHandler);
+            self._mobileScrollHandler = null;
+        }
     },
     methods: {
         // ====== 主Tab切换 ======
@@ -596,18 +686,20 @@ export default {
             self.ShowFieldFormDrawer = true;
             //DIY-FROM-WF
             self.$nextTick(function () {
-                self.$refs.refDiyFormWF.InitSendWork({
-                    CurrentNodeId: currentNodeId,
-                    CurrentFlowId: currentFlowId,
-                    CurrentWorkModel: self.CurrentWorkModel,
-                    OpenFormMode: self.OpenFormMode,
-                    CurrentTableId: self.CurrentTableId,
-                    CurrentTableRowId: self.CurrentTableRowId,
-                    OpenWorkType: OpenWorkType,
-                    CurrentFlowDesign: {
-                        Id: model.FlowDesignId
-                    }
-                });
+                setTimeout(function () {
+                    self.$refs.refDiyFormWF.InitSendWork({
+                        CurrentNodeId: currentNodeId,
+                        CurrentFlowId: currentFlowId,
+                        CurrentWorkModel: self.CurrentWorkModel,
+                        OpenFormMode: self.OpenFormMode,
+                        CurrentTableId: self.CurrentTableId,
+                        CurrentTableRowId: self.CurrentTableRowId,
+                        OpenWorkType: OpenWorkType,
+                        CurrentFlowDesign: {
+                            Id: model.FlowDesignId
+                        }
+                    });
+                }, 500);
             });
         },
         OpenWorkFLowList() {
@@ -706,8 +798,56 @@ export default {
                 self.GetWFWork();
                 self.loadWFStats();
             });
-        }
+        },
         //批量审批代码结束
+
+        // ====== 移动端方法 ======
+        formatCardTime(time) {
+            if (!time) return '';
+            var now = new Date();
+            var t = new Date(time.replace(/-/g, '/'));
+            var diff = now - t;
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+            if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+            return (time || '').substring(0, 16);
+        },
+        onMobileScroll() {
+            var self = this;
+            if (self.mobileLoadingMore || self.TableLoading) return;
+            if (self.MyWorkList.length >= self.DataCount) return;
+            var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+            var clientHeight = document.documentElement.clientHeight;
+            var scrollHeight = document.documentElement.scrollHeight;
+            if (scrollTop + clientHeight >= scrollHeight - 100) {
+                self.loadMoreMobile();
+            }
+        },
+        loadMoreMobile() {
+            var self = this;
+            if (self.mobileLoadingMore) return;
+            if (self.MyWorkList.length >= self.DataCount) return;
+            self.mobileLoadingMore = true;
+            self.PageIndex++;
+            var api = self.WorkType == 'Todo' ? '/api/WorkFlow/getWFWork' : '/api/WorkFlow/getWFFlow';
+            self.DiyCommon.Post(
+                api,
+                {
+                    WorkType: self.WorkType,
+                    _PageIndex: self.PageIndex,
+                    _PageSize: self.PageSize,
+                    _Keyword: self.Keyword
+                },
+                function (result) {
+                    if (self.DiyCommon.Result(result) && result.Data) {
+                        self.MyWorkList = self.MyWorkList.concat(result.Data);
+                        self.DataCount = result.DataCount;
+                    }
+                    self.mobileLoadingMore = false;
+                }
+            );
+        }
     }
 };
 </script>
@@ -984,12 +1124,7 @@ export default {
     }
 
     .work-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-
-        .search-input {
-            width: 100% !important;
-        }
+        display: none;
     }
 
     .notice-header {
@@ -997,6 +1132,157 @@ export default {
         align-items: flex-start;
         gap: 6px;
     }
+}
+
+// ====== 移动端工作流卡片 ======
+.wf-mobile-cards {
+    min-height: 200px;
+}
+
+.wf-mobile-search {
+    margin-bottom: 12px;
+
+    :deep(.el-input__wrapper) {
+        border-radius: 20px;
+        background: #f5f7fa;
+        box-shadow: none;
+        &:hover, &.is-focus {
+            box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+        }
+    }
+}
+
+.wf-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border: 1px solid #f0f2f5;
+    transition: all 0.2s;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+
+    &:active {
+        transform: scale(0.99);
+        background: #fafbfc;
+    }
+}
+
+.wf-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.wf-card-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--el-color-primary) 0%, var(--el-color-primary-light-3) 100%);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.wf-card-title {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1d2129;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wf-card-body {
+    font-size: 13px;
+    color: #606266;
+    line-height: 1.6;
+    margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+
+    :deep(.badge) {
+        display: inline-block;
+        padding: 1px 6px;
+        margin: 1px 2px;
+        font-size: 12px;
+        border-radius: 4px;
+        background: #f0f5ff;
+        color: #409eff;
+    }
+}
+
+.wf-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #86909c;
+}
+
+.wf-card-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.wf-card-meta-icon {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.wf-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #f5f7fa;
+    padding-top: 10px;
+}
+
+.wf-card-time {
+    font-size: 12px;
+    color: #c0c4cc;
+}
+
+.wf-card-actions {
+    display: flex;
+    gap: 6px;
+
+    .el-button {
+        padding: 5px 12px;
+        font-size: 12px;
+    }
+}
+
+// 移动端加载更多
+.wf-mobile-load-more,
+.wf-mobile-no-more {
+    text-align: center;
+    padding: 16px 0;
+    font-size: 13px;
+    color: #909399;
+}
+
+.wf-loading-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.wf-load-more-text {
+    color: #c0c4cc;
 }
 </style>
 
