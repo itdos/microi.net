@@ -192,6 +192,10 @@ namespace Microi.net
         public Dictionary<string, Stream> Files { get; set; } = new Dictionary<string, Stream>();
         public Dictionary<string, byte[]> FilesByte { get; set; } = new Dictionary<string, byte[]>();
         public Dictionary<string, string> FilesByteBase64 { get; set; } = new Dictionary<string, string>();
+        /// <summary>
+        /// 文件管理 - 新名称（重命名用）
+        /// </summary>
+        public string _NewName { get; set; }
     }
     public partial class KeyValue
     {

@@ -117,7 +117,7 @@ export default {
             WorkFlowInfo: "History", //FlowDesign
             CurrentApprovalType: "",
             CurrentApprovalIdea: "",
-            CurrentBackNodeId: [],
+            CurrentBackNodeId: '',
             CurrentBackNodes: [],
             CurrentNodeModel: {},
             CurrentWorkModel: {},
