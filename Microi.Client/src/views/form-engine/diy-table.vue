@@ -4680,6 +4680,10 @@ export default {
             if(self.$route.path.startsWith('/diy/form-page/')){
                 isOpenPage = false;
             }
+            // 工作流模式不支持Page路由跳转（路由无法传递工作流参数），强制使用抽屉模式
+            if (isOpenWorkFlowForm) {
+                isOpenPage = false;
+            }
             if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {
