@@ -4,8 +4,9 @@
     FormDiyTableModel[field.Name]
     @change="(item) => {return CommonV8CodeChange(item, field)}"
 -->
+    <!-- PC端: el-cascader -->
     <el-cascader
-        v-if="field.Component == 'Cascader'"
+        v-if="field.Component == 'Cascader' && !isMobile"
         v-model="ModelValue"
         :clearable="TableInEdit ? false : true"
         :disabled="GetFieldReadOnly(field)"
@@ -16,6 +17,22 @@
         :collapse-tags="LoadType == 'Table' ? true : false"
     >
     </el-cascader>
+    <!-- 移动端: el-tree-select 替代 el-cascader，避免级联面板向右展开超出屏幕 -->
+    <el-tree-select
+        v-if="field.Component == 'Cascader' && isMobile"
+        clearable
+        :filterable="field.Config.Cascader.Filterable == true"
+        :disabled="GetFieldReadOnly(field)"
+        v-model="TreeInnerValue"
+        :data="field.Data"
+        :props="GetMobileTreeProps(field)"
+        :node-key="GetMobileTreeValueKey(field)"
+        :multiple="field.Config.Cascader.Multiple === true"
+        :show-checkbox="field.Config.Cascader.Multiple === true"
+        :check-strictly="true"
+        :filter-node-method="filterMobileTreeNode"
+        @update:modelValue="handleMobileTreeChange"
+    />
 
     <!-- 配置弹窗 - 设计模式下可用 -->
     <el-dialog
@@ -142,6 +159,8 @@ export default {
             // 修复：根据是否多选决定默认值类型
             ModelValue: (this.field?.Config?.Cascader?.Multiple) ? [] : '',
             LastModelValue: (this.field?.Config?.Cascader?.Multiple) ? [] : '',
+            // 移动端 el-tree-select 的内部值（只存key，不存路径）
+            TreeInnerValue: (this.field?.Config?.Cascader?.Multiple) ? [] : null,
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -230,19 +249,29 @@ export default {
             var self = this;
             if (newVal != oldVal) {
                 self.ModelValue = newVal;
+                if (self.isMobile) {
+                    self.TreeInnerValue = self.cascaderValueToTreeValue(newVal);
+                }
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
                 self.ModelValue = self.ModelProps;
+                if (self.isMobile) {
+                    self.TreeInnerValue = self.cascaderValueToTreeValue(self.ModelProps);
+                }
             }
         }
     },
 
     components: {},
 
-    computed: {},
+    computed: {
+        isMobile() {
+            return !!(this.DosCommon && this.DosCommon.isMobile);
+        }
+    },
 
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
@@ -258,8 +287,107 @@ export default {
                 modelValue = JSON.parse(modelValue);
             }
             self.ModelValue = modelValue;
-
+            // 移动端同步 TreeInnerValue
+            if (self.isMobile) {
+                self.TreeInnerValue = self.cascaderValueToTreeValue(modelValue);
+            }
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+        },
+        // ==================== 移动端 tree-select 相关方法 ====================
+        GetMobileTreeValueKey(field) {
+            return this.DiyCommon.IsNull(field.Config.SelectSaveField) ? 'Id' : field.Config.SelectSaveField;
+        },
+        GetMobileTreeProps(field) {
+            var self = this;
+            var valueKey = self.GetMobileTreeValueKey(field);
+            var labelKey = !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : valueKey;
+            var childrenKey = self.DiyCommon.IsNull(field.Config.Cascader.Children) ? '_Child' : field.Config.Cascader.Children;
+            var result = { value: valueKey, label: labelKey, children: childrenKey };
+            if (!self.DiyCommon.IsNull(field.Config.Cascader.Disabled)) {
+                result.disabled = field.Config.Cascader.Disabled;
+            }
+            if (!self.DiyCommon.IsNull(field.Config.Cascader.Leaf)) {
+                result.isLeaf = field.Config.Cascader.Leaf;
+            }
+            return result;
+        },
+        filterMobileTreeNode(value, data) {
+            if (!value) return true;
+            var self = this;
+            var labelField = !self.DiyCommon.IsNull(self.field.Config.SelectLabel) ? self.field.Config.SelectLabel : self.field.Config.SelectSaveField;
+            return String(data[labelField] || '').toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
+        },
+        // 将 cascader 的值格式转换为 tree-select 的值格式
+        cascaderValueToTreeValue(modelValue) {
+            var self = this;
+            var isMultiple = self.field.Config.Cascader.Multiple === true;
+            var isEmitPath = self.field.Config.Cascader.EmitPath !== false;
+            if (self.DiyCommon.IsNull(modelValue)) {
+                return isMultiple ? [] : null;
+            }
+            if (isEmitPath) {
+                if (isMultiple) {
+                    // cascader: [["p1","c1","d1"],["p2","c2","d2"]] → tree: ["d1","d2"]
+                    if (!Array.isArray(modelValue)) return [];
+                    return modelValue.map(function (path) {
+                        return Array.isArray(path) ? path[path.length - 1] : path;
+                    });
+                } else {
+                    // cascader: ["p1","c1","d1"] → tree: "d1"
+                    if (Array.isArray(modelValue) && modelValue.length > 0) {
+                        return modelValue[modelValue.length - 1];
+                    }
+                    return modelValue;
+                }
+            } else {
+                // emitPath=false，值格式一致
+                return modelValue;
+            }
+        },
+        // 在树形数据中查找从根到目标节点的路径
+        buildPathToNode(key, data, valueField, childrenField) {
+            var findPath = function (nodes, target, currentPath) {
+                if (!Array.isArray(nodes)) return null;
+                for (var i = 0; i < nodes.length; i++) {
+                    var node = nodes[i];
+                    var newPath = currentPath.concat([node[valueField]]);
+                    if (node[valueField] == target) return newPath;
+                    if (node[childrenField] && node[childrenField].length) {
+                        var result = findPath(node[childrenField], target, newPath);
+                        if (result) return result;
+                    }
+                }
+                return null;
+            };
+            return findPath(data || [], key, []);
+        },
+        // 移动端 tree-select 值变化处理
+        handleMobileTreeChange(value) {
+            var self = this;
+            var isMultiple = self.field.Config.Cascader.Multiple === true;
+            var isEmitPath = self.field.Config.Cascader.EmitPath !== false;
+            var valueField = self.GetMobileTreeValueKey(self.field);
+            var childrenField = self.DiyCommon.IsNull(self.field.Config.Cascader.Children) ? '_Child' : self.field.Config.Cascader.Children;
+
+            var cascaderValue;
+            if (isEmitPath) {
+                if (isMultiple) {
+                    var keys = Array.isArray(value) ? value : [];
+                    cascaderValue = keys.map(function (k) {
+                        return self.buildPathToNode(k, self.field.Data, valueField, childrenField) || [k];
+                    });
+                } else {
+                    if (self.DiyCommon.IsNull(value)) {
+                        cascaderValue = null;
+                    } else {
+                        cascaderValue = self.buildPathToNode(value, self.field.Data, valueField, childrenField) || [value];
+                    }
+                }
+            } else {
+                // emitPath=false，值格式一致
+                cascaderValue = value;
+            }
+            self.CommonV8CodeChange(cascaderValue);
         },
         GetCascaderProps(field) {
             var self = this;

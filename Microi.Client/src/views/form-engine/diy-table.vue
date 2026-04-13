@@ -61,11 +61,11 @@
                     <div class="mobile-header-center">
                         <span class="mobile-title">{{ SysMenuModel.Name || $t('Msg.TableList') }}</span>
                     </div>
-                    <div class="mobile-header-right">
+                    <!-- <div class="mobile-header-right">
                         <el-icon class="search-icon" @click="showMobileSearch = true">
                             <Search />
                         </el-icon>
-                    </div>
+                    </div> -->
                 </div>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
@@ -713,10 +713,10 @@
                                 :class="{ 'card-selected': TableEnableBatch && isCardSelected(item) }"
                                 @click="CardItemClick(item)"
                             >
-                                <!-- 卡片图片区域 -->
                                 <div
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
                                 >
+                                    <!-- 卡片图片区域 -->
                                     <img
                                         v-if="SysMenuModel.TableCardImgField"
                                         :src="
@@ -905,6 +905,7 @@
                                     >
                                         <el-button class="card-action-btn card-action-btn-more" size="small" round plain @click.stop>
                                             <el-icon><MoreFilled /></el-icon>
+                                            更多
                                         </el-button>
                                         <template #dropdown>
                                             <el-dropdown-menu>

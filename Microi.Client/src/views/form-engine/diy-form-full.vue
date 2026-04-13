@@ -14,7 +14,7 @@
                 <div class="mobile-header-center">
                     <span class="mobile-title">{{ GetOpenTitlePage() }}</span>
                 </div>
-                <div class="mobile-header-right">
+                <!-- <div class="mobile-header-right">
                     <el-dropdown trigger="click" v-if="HasMobileActions">
                         <el-icon class="more-icon">
                             <MoreFilled />
@@ -42,7 +42,7 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
-                </div>
+                </div> -->
             </div>
 
             <div>
@@ -191,9 +191,10 @@
                     >
                     <el-button
                         v-if="
-                            FormMode == 'Edit' &&
-                            TableChildFormMode !== 'View' &&
-                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            FormMode == 'Edit' 
+                            && TableChildFormMode !== 'View' 
+                            && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            && !diyStore.IsPhoneView
                         "
                         type="info"
                         icon="ArrowLeft"
@@ -430,9 +431,10 @@
                     >
                     <el-button
                         v-if="
-                            FormMode == 'Edit' &&
-                            TableChildFormMode !== 'View' &&
-                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            FormMode == 'Edit' 
+                            && TableChildFormMode !== 'View' 
+                            && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            && !diyStore.IsPhoneView
                         "
                         type="info"
                         icon="ArrowLeft"
@@ -1057,6 +1059,17 @@ export default {
                     wfParam: wfParam
                 };
                 self.ShowFieldFormDrawer = true;
+
+                // 移动端：推入历史记录，拦截返回键关闭抽屉而非路由回退
+                if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
+                    window.history.pushState({ drawerOpen: true }, '');
+                    self._drawerPopstateHandler = function () {
+                        if (self.ShowFieldFormDrawer) {
+                            self.CloseFieldForm('ShowFieldFormDrawer', 'Close', self.TableRowId, true);
+                        }
+                    };
+                    window.addEventListener('popstate', self._drawerPopstateHandler);
+                }
             }
         },
 
@@ -1114,6 +1127,8 @@ export default {
             self.OpenDiyFormWorkFlow = false;
             self.OpenDiyFormWorkFlowType = {};
             self.StartWorkSubmited = false;
+            // 清理移动端返回键拦截
+            self._cleanupDrawerPopstate();
         },
 
         // ========== 弹窗关闭动画完成后的清理 ==========
@@ -1126,11 +1141,20 @@ export default {
             self.StartWorkSubmited = false;
         },
 
+        // ========== 清理移动端Drawer返回键拦截 ==========
+        _cleanupDrawerPopstate() {
+            var self = this;
+            if (self._drawerPopstateHandler) {
+                window.removeEventListener('popstate', self._drawerPopstateHandler);
+                self._drawerPopstateHandler = null;
+            }
+        },
+
         // ========== 获取表单宽度 ==========
         GetOpenFormWidth() {
             var self = this;
             if (self.diyStore.IsPhoneView) {//self.DiyCommon.GetPageBodyClientWH().Width < 768
-                return "95%";
+                return "100%";
             }
             if (self.Width) {
                 return self.Width;
@@ -1373,6 +1397,13 @@ export default {
         },
         async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
             var self = this;
+            // 移动端关闭Drawer时：如果是通过代码关闭（非popstate触发），需要回退pushState推入的历史记录
+            if (dialogId === 'ShowFieldFormDrawer' && self._drawerPopstateHandler) {
+                // 先移除监听，避免history.back()触发的popstate再次执行关闭
+                window.removeEventListener('popstate', self._drawerPopstateHandler);
+                self._drawerPopstateHandler = null;
+                window.history.back();
+            }
             if (self.$refs.fieldForm) {
                 await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
             }
@@ -2095,7 +2126,7 @@ export default {
     }
 
     :deep(.el-form) {
-        padding: 10px;
+        padding: 0px;
 
         .el-form-item {
             margin-bottom: 16px;
@@ -2152,7 +2183,7 @@ export default {
 
     .mobile-header-left,
     .mobile-header-right {
-        flex: 0 0 40px;
+        // flex: 0 0 40px;
         display: flex;
         align-items: center;
 

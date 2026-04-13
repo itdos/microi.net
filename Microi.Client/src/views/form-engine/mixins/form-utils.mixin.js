@@ -36,11 +36,11 @@ export default {
             // 不显示 label 的组件类型
             var noLabelComponents = ['Divider', 'DevComponent'];
             // 如果是子表，并且 Label 为空，也不显示
-            if (field.Component === 'TableChild' && self.DiyCommon.IsNull(field.Label)) {
+            if (field.Component === 'TableChild' && !field.Label) {
                 return false;
             }
-            return !noLabelComponents.includes(field.Component) && 
-                   self.DiyCommon.IsNull(field.Config?.DevComponentName);
+            return !noLabelComponents.includes(field.Component)
+                    && !field.Config?.DevComponentName;
         },
         
         /**

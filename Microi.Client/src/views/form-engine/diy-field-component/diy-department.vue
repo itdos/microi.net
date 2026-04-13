@@ -1,6 +1,7 @@
 <template>
+    <!-- PC端: el-cascader -->
     <el-cascader
-        v-if="field.Component == 'Department'"
+        v-if="field.Component == 'Department' && !isMobile"
         clearable
         :value="ModelValue"
         :options="field.Data"
@@ -15,6 +16,22 @@
         :collapse-tags="LoadType == 'Table' ? true : false"
     >
     </el-cascader>
+    <!-- 移动端: el-tree-select 替代 el-cascader，避免级联面板向右展开超出屏幕 -->
+    <el-tree-select
+        v-if="field.Component == 'Department' && isMobile"
+        clearable
+        :filterable="field.Config.Department.Filterable === true"
+        :disabled="GetFieldReadOnly(field)"
+        v-model="TreeInnerValue"
+        :data="field.Data"
+        :props="{ value: 'Id', label: 'Name', children: '_Child' }"
+        node-key="Id"
+        :multiple="field.Config.Department.Multiple === true"
+        :show-checkbox="field.Config.Department.Multiple === true"
+        :check-strictly="true"
+        :filter-node-method="filterMobileTreeNode"
+        @update:modelValue="handleMobileTreeChange"
+    />
 
     <!-- 配置弹窗 - 设计模式下可用 -->
     <el-dialog
@@ -59,6 +76,8 @@ export default {
         return {
             ModelValue: "",
             LastModelValue: "",
+            // 移动端 el-tree-select 的内部值
+            TreeInnerValue: null,
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -131,7 +150,11 @@ export default {
             var self = this;
             if (typeof newVal == "string" && newVal != oldVal) {
                 self.$nextTick(function () {
-                    self.ModelValue = JSON.parse(newVal);
+                    var parsed = JSON.parse(newVal);
+                    self.ModelValue = parsed;
+                    if (self.isMobile) {
+                        self.TreeInnerValue = self.cascaderValueToTreeValue(parsed);
+                    }
                 });
             }
         },
@@ -139,7 +162,11 @@ export default {
             var self = this;
             if (typeof newVal == "string" && newVal != oldVal) {
                 self.$nextTick(function () {
-                    self.ModelValue = JSON.parse(newVal);
+                    var parsed = JSON.parse(newVal);
+                    self.ModelValue = parsed;
+                    if (self.isMobile) {
+                        self.TreeInnerValue = self.cascaderValueToTreeValue(parsed);
+                    }
                 });
             }
         }
@@ -147,7 +174,11 @@ export default {
 
     components: {},
 
-    computed: {},
+    computed: {
+        isMobile() {
+            return !!(this.DosCommon && this.DosCommon.isMobile);
+        }
+    },
 
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
@@ -167,8 +198,10 @@ export default {
                     modelValue = ""; // 或者其他默认值
                 }
             }
-            self.ModelValue = modelValue;
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            self.ModelValue = modelValue;            // 移动端同步 TreeInnerValue
+            if (self.isMobile) {
+                self.TreeInnerValue = self.cascaderValueToTreeValue(modelValue);
+            }            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         },
         DeptChange(value, field) {
             var self = this;
@@ -192,6 +225,80 @@ export default {
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: value });
             }
             self.$emit("CallbackFormValueChange", self.field, value);
+        },
+        // ==================== 移动端 tree-select 相关方法 ====================
+        filterMobileTreeNode(value, data) {
+            if (!value) return true;
+            return String(data['Name'] || '').toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
+        },
+        // 将 cascader 的值格式转换为 tree-select 的值格式
+        cascaderValueToTreeValue(modelValue) {
+            var self = this;
+            var isMultiple = self.field.Config.Department.Multiple === true;
+            var isEmitPath = self.field.Config.Department.EmitPath !== false;
+            if (self.DiyCommon.IsNull(modelValue)) {
+                return isMultiple ? [] : null;
+            }
+            if (isEmitPath) {
+                if (isMultiple) {
+                    // cascader: [["p1","c1","d1"],["p2","c2","d2"]] → tree: ["d1","d2"]
+                    if (!Array.isArray(modelValue)) return [];
+                    return modelValue.map(function (path) {
+                        return Array.isArray(path) ? path[path.length - 1] : path;
+                    });
+                } else {
+                    // cascader: ["p1","c1","d1"] → tree: "d1"
+                    if (Array.isArray(modelValue) && modelValue.length > 0) {
+                        return modelValue[modelValue.length - 1];
+                    }
+                    return modelValue;
+                }
+            } else {
+                return modelValue;
+            }
+        },
+        // 在树形数据中查找从根到目标节点的路径
+        buildPathToNode(key) {
+            var self = this;
+            var findPath = function (nodes, target, currentPath) {
+                if (!Array.isArray(nodes)) return null;
+                for (var i = 0; i < nodes.length; i++) {
+                    var node = nodes[i];
+                    var newPath = currentPath.concat([node['Id']]);
+                    if (node['Id'] == target) return newPath;
+                    if (node['_Child'] && node['_Child'].length) {
+                        var result = findPath(node['_Child'], target, newPath);
+                        if (result) return result;
+                    }
+                }
+                return null;
+            };
+            return findPath(self.field.Data || [], key, []);
+        },
+        // 移动端 tree-select 值变化处理
+        handleMobileTreeChange(value) {
+            var self = this;
+            var isMultiple = self.field.Config.Department.Multiple === true;
+            var isEmitPath = self.field.Config.Department.EmitPath !== false;
+
+            var cascaderValue;
+            if (isEmitPath) {
+                if (isMultiple) {
+                    var keys = Array.isArray(value) ? value : [];
+                    cascaderValue = keys.map(function (k) {
+                        return self.buildPathToNode(k) || [k];
+                    });
+                } else {
+                    if (self.DiyCommon.IsNull(value)) {
+                        cascaderValue = null;
+                    } else {
+                        cascaderValue = self.buildPathToNode(value) || [value];
+                    }
+                }
+            } else {
+                cascaderValue = value;
+            }
+            self.DeptChange(cascaderValue, self.field);
         },
         GetDepartmentProps(field) {
             var self = this;
