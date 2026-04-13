@@ -1,34 +1,36 @@
 <template>
     <div class="diy-form-wf">
-        <div class="pull-left" style="width: calc(100% - 380px)">
-            <DiyForm
-                v-if="CurrentTableId"
-                ref="diyFormWfWork"
-                :LoadMode="''"
-                :FormMode="OpenFormMode"
-                :TableId="CurrentTableId"
-                :TableRowId="CurrentTableRowId"
-                :DefaultValues="CurrentDefaultValues"
-                :HideFields="CurrentHideFields"
-                :ShowFields="CurrentShowFields"
-                :FormWF="FormWF"
-                :ReadonlyFields="CurrentReadonlyFields"
-                @CallbackGetDiyField="CallbackGetDiyField"
-                @CallbackFormClose="CallbackFormClose"
-            />
-        </div>
-        <div class="pull-right" style="width: 360px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
-            <WFWorkHandler
-                ref="refWfWorkHandler"
-                @CallbackStartWork="CallbackStartWork"
-                @CallbackSendWork="CallbackSendWork"
-                @CallbackRecallOrCancelWork="CallbackRecallOrCancelWork"
-                @CallbackHandOverWork="CallbackHandOverWork"
-                @CallbackFieldSet="CallbackFieldSet"
-                @CallbackGetFormData="CallbackGetFormData"
-                :form-data="FormData"
-            ></WFWorkHandler>
-        </div>
+        <el-row :gutter="20">
+            <el-col :span="diyStore.IsPhoneView ? 24 : 18" :xs="24">
+                <DiyForm
+                    v-if="CurrentTableId"
+                    ref="diyFormWfWork"
+                    :LoadMode="''"
+                    :FormMode="OpenFormMode"
+                    :TableId="CurrentTableId"
+                    :TableRowId="CurrentTableRowId"
+                    :DefaultValues="CurrentDefaultValues"
+                    :HideFields="CurrentHideFields"
+                    :ShowFields="CurrentShowFields"
+                    :FormWF="FormWF"
+                    :ReadonlyFields="CurrentReadonlyFields"
+                    @CallbackGetDiyField="CallbackGetDiyField"
+                    @CallbackFormClose="CallbackFormClose"
+                />
+            </el-col>
+            <el-col :span="diyStore.IsPhoneView ? 24 : 6" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+                <WFWorkHandler
+                    ref="refWfWorkHandler"
+                    @CallbackStartWork="CallbackStartWork"
+                    @CallbackSendWork="CallbackSendWork"
+                    @CallbackRecallOrCancelWork="CallbackRecallOrCancelWork"
+                    @CallbackHandOverWork="CallbackHandOverWork"
+                    @CallbackFieldSet="CallbackFieldSet"
+                    @CallbackGetFormData="CallbackGetFormData"
+                    :form-data="FormData"
+                ></WFWorkHandler>
+            </el-col>
+        </el-row>
     </div>
 </template>
 

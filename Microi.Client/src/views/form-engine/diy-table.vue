@@ -38,7 +38,6 @@
             </template>
             <!--DIY子表-->
             <el-card :class="'box-card box-card-table-row-list' + ((diyStore.IsPhoneView || TableDisplayMode == 'Card') ? ' mobile-box-card' : '')">
-
                 <!-- 统计面板（数据来自 sys_menu.TableReport） -->
                 <div v-if="tableReportItems && tableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
                     <div v-for="item in tableReportItems" :key="item.Id || item.Label" class="table-report-card" :style="{ '--report-color': item.Color || '#409eff' }">
@@ -71,8 +70,8 @@
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
-                <!--Fix by Anderson for 小赵：下面这一句不能增加【v-if="!(diyStore.IsPhoneView && ShowAddByRoute)"】判断，移动端也需要各种V8按钮功能！！！-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="(!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0 || !ShowAddByRoute) || !diyStore.IsPhoneView">
+                <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="!diyStore.IsPhoneView">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -86,11 +85,13 @@
                             :icon="BtnLoading ? '' : CirclePlusFilled"
                             @click="OpenDetail(null, 'Add')"
                         >
-                            {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
+                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText 
+                                ? SysMenuModel.DiyConfig.AddBtnText 
+                                : $t("Msg.Add") }}
                         </el-button>
-                        <!-- 全部分享按钮 -->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0 && !diyStore.IsPhoneView">
-                            <!-- HandlerBtns(SysMenuModel.PageBtns) -->
+                        <!-- 更多页面按钮 PageBtns -->
+                        <template v-if="SysMenuModel.PageBtns
+                                        && SysMenuModel.PageBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
                                     :key="TypeFieldName + 'more_btn_pagebtns_' + btnIndex"
@@ -106,7 +107,9 @@
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                        <template v-if="SysMenuModel.DiyConfig 
+                                        && SysMenuModel.BatchSelectMoreBtns 
+                                        && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
                                 v-if="TableDisplayMode == 'Card' && TableEnableBatch"
                                 v-model="cardSelectAll"
@@ -248,9 +251,44 @@
                     </div>
                 </div>
 
-                <!--DIY移动端新增按钮 加上人员权限_LimitAdd，表或字段是否可读TableChildField.Readonly，表是否为关联表PropsIsJoinTable-->
-                <div class="addBtn" v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && diyStore.IsPhoneView && ShowAddByRoute && IsVisibleAdd == true" @click="OpenDetail(null, 'Add')">
-                  <el-icon class="addIcon"><Plus /></el-icon>
+                <!--DIY移动端浮动操作按钮（FAB）-->
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute">
+                    <!--遮罩层-->
+                    <transition name="fab-overlay">
+                        <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
+                    </transition>
+                    <!--弹出菜单-->
+                    <transition name="fab-menu">
+                        <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <!--新增按钮-->
+                            <div class="mobile-fab-menu-item" v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; OpenDetail(null, 'Add')">
+                                <div class="mobile-fab-menu-icon add"><el-icon><Plus /></el-icon></div>
+                                <span class="mobile-fab-menu-label">{{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText ? SysMenuModel.DiyConfig.AddBtnText : $t('Msg.Add') }}</span>
+                            </div>
+                            <!--V8页面按钮 PageBtns-->
+                            <template v-if="SysMenuModel.PageBtns && SysMenuModel.PageBtns.length > 0">
+                                <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns" :key="'fab_pagebtn_' + btnIndex">
+                                    <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
+                                        <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
+                                        <span class="mobile-fab-menu-label">{{ btn.Name }}</span>
+                                    </div>
+                                </template>
+                            </template>
+                            <!--批量操作按钮-->
+                            <template v-if="SysMenuModel.DiyConfig && SysMenuModel.BatchSelectMoreBtns && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                                <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns" :key="'fab_batchbtn_' + btnIndex">
+                                    <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
+                                        <div class="mobile-fab-menu-icon batch"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
+                                        <span class="mobile-fab-menu-label">{{ btn.Name }}</span>
+                                    </div>
+                                </template>
+                            </template>
+                        </div>
+                    </transition>
+                    <!--FAB主按钮-->
+                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                        <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
+                    </div>
                 </div>
 
                 <!--DIY移动端顶部搜索-->
@@ -1927,6 +1965,8 @@ export default {
             _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
             // 移动端搜索弹窗状态
             showMobileSearch: false,
+            // 移动端FAB菜单状态
+            showMobileFabMenu: false,
             // 索引管理弹窗
             ShowIndexManager: false,
             // BtnLoading:false,
@@ -4640,6 +4680,10 @@ export default {
             if(self.$route.path.startsWith('/diy/form-page/')){
                 isOpenPage = false;
             }
+            // 工作流模式不支持Page路由跳转（路由无法传递工作流参数），强制使用抽屉模式
+            if (isOpenWorkFlowForm) {
+                isOpenPage = false;
+            }
             if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {
@@ -4683,7 +4727,9 @@ export default {
                             EventReplace: self.EventReplace,
                             DataAppend: self.DataAppend,
                             Width: self.CurrentDiyTableModel.FormOpenWidth || undefined,
-                            IsDefaultOpen: isDefaultOpen
+                            IsDefaultOpen: isDefaultOpen,
+                            IsOpenWorkFlowForm: isOpenWorkFlowForm,
+                            WFParam: wfParam
                         });
                         self.BtnLoading = false;
                     };
@@ -5930,22 +5976,168 @@ export default {
        opacity: 0.5;
      }
   }
-  .addBtn{
-    width:46px;
-    height:46px;
-    border-radius: 100%;
+  .mobile-fab-container {
     position: fixed;
-    bottom:200px;
-    right:30px;
-    border-color: var(--color-primary, #409eff);
-    background:var(--color-primary, #409eff);
+    bottom: 100px;
+    right: 20px;
+    z-index: 2000;
+  }
+
+  .mobile-fab-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+  }
+
+  .mobile-fab-btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary, #409eff), #267be0);
     display: flex;
     justify-content: center;
     align-items: center;
-    color:#fff;
-    font-size: 30px;
-    z-index: 999;
-    box-shadow: 0 0 10px #ccc;
+    color: #fff;
+    font-size: 26px;
+    z-index: 2002;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(64, 158, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+      transform: scale(0.92);
+      box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+    }
+
+    &.is-open {
+      background: linear-gradient(135deg, #f56c6c, #e04040);
+      box-shadow: 0 4px 16px rgba(245, 108, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .mobile-fab-icon {
+      font-size: 26px;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  }
+
+  .mobile-fab-menu {
+    position: absolute;
+    bottom: 66px;
+    right: 0;
+    z-index: 2001;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    padding-bottom: 4px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .mobile-fab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    animation: fabItemSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+
+    &:active {
+      opacity: 0.7;
+      transform: scale(0.96);
+    }
+  }
+
+  @for $i from 1 through 10 {
+    .mobile-fab-menu-item:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.04}s;
+    }
+  }
+
+  .mobile-fab-menu-label {
+    background: #fff;
+    color: #333;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+
+  .mobile-fab-menu-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+
+    &.add {
+      background: linear-gradient(135deg, #67c23a, #4fa52e);
+    }
+    &.v8 {
+      background: linear-gradient(135deg, #409eff, #267be0);
+    }
+    &.batch {
+      background: linear-gradient(135deg, #e6a23c, #cf8a20);
+    }
+  }
+
+  @keyframes fabItemSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px) scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .fab-overlay-enter-active {
+    transition: opacity 0.25s ease;
+  }
+  .fab-overlay-leave-active {
+    transition: opacity 0.2s ease;
+  }
+  .fab-overlay-enter-from,
+  .fab-overlay-leave-to {
+    opacity: 0;
+  }
+
+  .fab-menu-enter-active {
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .fab-menu-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .fab-menu-enter-from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  .fab-menu-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
   }
   .reset-search{
     margin-left:10px;
