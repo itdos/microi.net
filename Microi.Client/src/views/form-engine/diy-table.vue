@@ -71,7 +71,7 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="!diyStore.IsPhoneView">
+                <div class="keyword-search" style="margin-bottom:10px;" v-if="!diyStore.IsPhoneView || IsTableChild">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd

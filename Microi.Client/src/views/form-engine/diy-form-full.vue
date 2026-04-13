@@ -46,24 +46,19 @@
             </div>
 
             <div>
-                <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }"
-                    style="margin-bottom: 10px;">
-                    <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;" v-show="!diyStore.IsPhoneView || diyStore.IsMiniProgram">
+                <!--PC端表单头部操作栏（移动端改用FAB浮动按钮）-->
+                <div v-if="!diyStore.IsPhoneView" class="form-header" style="margin-bottom: 10px;">
+                    <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
                     </div>
-                    <div class="form-actions " :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
-                        <!-- zhy将移动端保存返回按钮改为保存 -->
-                        <!-- <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
-                            {{ $t("Msg.SaveBack") }}
-                        </el-button> -->
+                    <div class="form-actions">
                         <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
-                        <!-- zhy增加取消编辑按钮，不然无法取消只能退出页面取消 -->
                         <el-button
                             v-if="FormMode == 'Edit'"
                             type="info"
@@ -85,8 +80,7 @@
                                 </el-button>
                             </template>
                         </template>
-                        <!-- zhy移动端隐藏掉返回按钮，移动端自带的有返回上一页 -->
-                        <el-button v-if="!diyStore.IsPhoneView" type="default" :icon="Back" @click="Go_1()">
+                        <el-button type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
                         </el-button>
                     </div>
@@ -126,6 +120,44 @@
                     @CallbackParentFormSubmit="CallbackParentFormSubmit"
                     @CallbackFormClose="CallbackFormClose"
                 />
+
+                <!--移动端FAB浮动操作按钮（Page模式）-->
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram">
+                    <transition name="fab-overlay">
+                        <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
+                    </transition>
+                    <transition name="fab-menu">
+                        <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <!--保存-->
+                            <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveDiyTableCommonPage(true)">
+                                <div class="mobile-fab-menu-icon save"><el-icon><SuccessFilled /></el-icon></div>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.Save') }}</span>
+                            </div>
+                            <!--编辑-->
+                            <div class="mobile-fab-menu-item" v-if="FormMode == 'View' && ShowUpdateBtn" @click="showMobileFabMenu = false; GotoEdit()">
+                                <div class="mobile-fab-menu-icon edit"><el-icon><Edit /></el-icon></div>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.Edit') }}</span>
+                            </div>
+                            <!--取消编辑-->
+                            <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit'" @click="showMobileFabMenu = false; FormMode = 'View'">
+                                <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
+                            </div>
+                            <!--表单更多按钮 FormBtns-->
+                            <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                                <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'fab_formbtn_' + btnIndex">
+                                    <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
+                                        <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
+                                        <span class="mobile-fab-menu-label">{{ btn.Name }}</span>
+                                    </div>
+                                </template>
+                            </template>
+                        </div>
+                    </transition>
+                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                        <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -805,7 +837,10 @@ export default {
             _isDeactivated: false, // keep-alive 停用标记，防止缓存实例响应路由变化导致重复请求
 
             // ========== 抽屉打开上下文 ==========
-            _pendingDrawerContext: null
+            _pendingDrawerContext: null,
+
+            // ========== 移动端FAB ==========
+            showMobileFabMenu: false
         };
     },
     activated() {
@@ -938,6 +973,55 @@ export default {
                 self.$nextTick(function () {
                     self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                 });
+
+                // 加载数据日志（角色权限检查）
+                self.isCheckDataLog = false;
+                if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
+                    var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
+                    DataLogRole.forEach((item) => {
+                        if (self.GetCurrentUser.RoleIds && self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
+                            self.isCheckDataLog = true;
+                        }
+                    });
+                } else {
+                    self.isCheckDataLog = true;
+                }
+
+                if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
+                    self.DataLogListLoading = true;
+                    self.DataLogList = [];
+                    self.DiyCommon.FormEngine.GetTableData(
+                        {
+                            FormEngineKey: "microi_datalog",
+                            _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
+                        },
+                        function (result) {
+                            if (result.Code == 1) {
+                                result.Data.forEach((item) => {
+                                    if (item.Content) {
+                                        item.Content = JSON.parse(item.Content);
+                                    } else {
+                                        item.Content = [];
+                                    }
+                                    if (item.Avatar) {
+                                        item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
+                                    } else {
+                                        item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+                                    }
+                                });
+                                self.DataLogList = result.Data;
+                            } else {
+                                self.DataLogList = [];
+                            }
+                            self.DataLogListLoading = false;
+                        }
+                    );
+                }
+
+                // 加载数据评论
+                if (self.CurrentDiyTableModel.EnableDataComment) {
+                    self.GetCommentList();
+                }
             }
         },
 
@@ -1160,7 +1244,7 @@ export default {
                 return self.Width;
             }
 
-            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
+            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "50%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
 
@@ -2218,5 +2302,173 @@ export default {
     .mobile-header-right {
         justify-content: flex-end;
     }
+}
+
+// 移动端FAB浮动操作按钮样式（Page模式）
+.mobile-fab-container {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    z-index: 2000;
+}
+
+.mobile-fab-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+}
+
+.mobile-fab-btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary, #409eff), #267be0);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 26px;
+    z-index: 2002;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(64, 158, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+        transform: scale(0.92);
+        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+    }
+
+    &.is-open {
+        background: linear-gradient(135deg, #f56c6c, #e04040);
+        box-shadow: 0 4px 16px rgba(245, 108, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .mobile-fab-icon {
+        font-size: 26px;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+}
+
+.mobile-fab-menu {
+    position: absolute;
+    bottom: 66px;
+    right: 0;
+    z-index: 2001;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    padding-bottom: 4px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.mobile-fab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    animation: fabItemSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+
+    &:active {
+        opacity: 0.7;
+        transform: scale(0.96);
+    }
+}
+
+@for $i from 1 through 10 {
+    .mobile-fab-menu-item:nth-child(#{$i}) {
+        animation-delay: #{$i * 0.04}s;
+    }
+}
+
+.mobile-fab-menu-label {
+    background: #fff;
+    color: #333;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.mobile-fab-menu-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+
+    &.save {
+        background: linear-gradient(135deg, #f56c6c, #e04040);
+    }
+    &.edit {
+        background: linear-gradient(135deg, #409eff, #267be0);
+    }
+    &.cancel {
+        background: linear-gradient(135deg, #909399, #73767a);
+    }
+    &.v8 {
+        background: linear-gradient(135deg, #409eff, #267be0);
+    }
+}
+
+@keyframes fabItemSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.fab-overlay-enter-active {
+    transition: opacity 0.25s ease;
+}
+.fab-overlay-leave-active {
+    transition: opacity 0.2s ease;
+}
+.fab-overlay-enter-from,
+.fab-overlay-leave-to {
+    opacity: 0;
+}
+
+.fab-menu-enter-active {
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fab-menu-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.fab-menu-enter-from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+}
+.fab-menu-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
 }
 </style>
