@@ -128,7 +128,8 @@ watch(
 
 <style lang="scss" scoped>
 .folder-tree {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);

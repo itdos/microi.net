@@ -2,6 +2,7 @@
     <div class="diy-form-wf">
         <div class="pull-left" style="width: calc(100% - 380px)">
             <DiyForm
+                v-if="CurrentTableId"
                 ref="diyFormWfWork"
                 :LoadMode="''"
                 :FormMode="OpenFormMode"

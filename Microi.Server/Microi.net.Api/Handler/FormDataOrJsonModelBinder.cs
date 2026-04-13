@@ -141,7 +141,9 @@ namespace Microi.net.Api
         {
             FloatParseHandling = FloatParseHandling.Decimal,
             DateParseHandling = DateParseHandling.None,
-            Converters = { new LenientNumberConverter() }
+            Converters = { new LenientNumberConverter() },
+            // 容忍单个属性类型不匹配（如前端传 BackNodeId:[] 但后端为 string），跳过出错属性继续反序列化其余字段
+            Error = (sender, args) => { args.ErrorContext.Handled = true; }
         };
 
         /// <summary>简单类型集合（用于快速判断）</summary>
@@ -205,7 +207,20 @@ namespace Microi.net.Api
             if (TryBindFromForm(bindingContext, request, modelType, modelName))
                 return;
 
-            // 所有方式都失败，让框架默认处理
+            // 所有方式都失败
+            // 对于复杂类型，创建默认实例（与ASP.NET Core默认ComplexObjectModelBinder行为一致，避免参数为null）
+            if (!IsSimpleType(modelType))
+            {
+                try
+                {
+                    var defaultInstance = Activator.CreateInstance(modelType);
+                    bindingContext.Result = ModelBindingResult.Success(defaultInstance);
+                    return;
+                }
+                catch { }
+            }
+
+            // 简单类型或创建实例失败，让框架默认处理
             bindingContext.Result = ModelBindingResult.Failed();
         }
 
@@ -375,8 +390,9 @@ namespace Microi.net.Api
                 }
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Microi：【⚠️Warn】FormDataOrJsonModelBinder JSON反序列化失败 [{modelType.Name}]: {ex.Message}");
                 return false;
             }
         }
