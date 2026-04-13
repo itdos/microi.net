@@ -902,14 +902,16 @@ export default {
 
             var formMode = param.FormMode;
             var isDefaultOpen = param.IsDefaultOpen;
+            var isOpenWorkFlowForm = param.IsOpenWorkFlowForm;
+            var wfParam = param.WFParam;
 
             self.$nextTick(function () {
-                self.OpenDetail(tableRowModel, formMode, isDefaultOpen);
+                self.OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
         },
 
         // ========== 打开详情（核心方法，以diy-table.vue为准） ==========
-        OpenDetail(tableRowModel, formMode, isDefaultOpen) {
+        OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
 
             self.BtnLoading = true;
@@ -924,7 +926,7 @@ export default {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {
-                            self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen);
+                            self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                         });
                     } else {
                         self.BtnLoading = false;
@@ -932,12 +934,12 @@ export default {
                 });
             } else {
                 self.$nextTick(function () {
-                    self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen);
+                    self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                 });
             }
         },
 
-        async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen) {
+        async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
             if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
                 var V8 = {
@@ -1025,6 +1027,12 @@ export default {
                                     }
                                     self.BtnLoading = false;
                                 });
+                                // 工作流面板初始化
+                                if (isOpenWorkFlowForm == true) {
+                                    if (self.DiyCommon.IsNull(wfParam)) { wfParam = { WorkType: "ViewWork" }; }
+                                    wfParam.FormMode = formMode;
+                                    self.InitWorkFlow(wfParam);
+                                }
                             } else if (retryCount < maxRetries) {
                                 retryCount++;
                                 setTimeout(tryInit, 50);
@@ -1039,7 +1047,9 @@ export default {
             } else {
                 // Drawer模式
                 self._pendingDrawerContext = {
-                    formMode: formMode
+                    formMode: formMode,
+                    isOpenWorkFlowForm: isOpenWorkFlowForm,
+                    wfParam: wfParam
                 };
                 self.ShowFieldFormDrawer = true;
             }
@@ -1049,6 +1059,8 @@ export default {
         onDrawerOpened() {
             var self = this;
             var formMode = self._pendingDrawerContext?.formMode;
+            var isOpenWorkFlowForm = self._pendingDrawerContext?.isOpenWorkFlowForm;
+            var wfParam = self._pendingDrawerContext?.wfParam;
 
             self.CloseFormNeedConfirm = false;
 
@@ -1066,6 +1078,12 @@ export default {
                         }
                         self.BtnLoading = false;
                     });
+                    // 工作流面板初始化
+                    if (isOpenWorkFlowForm == true) {
+                        if (self.DiyCommon.IsNull(wfParam)) { wfParam = { WorkType: "ViewWork" }; }
+                        wfParam.FormMode = formMode;
+                        self.InitWorkFlow(wfParam);
+                    }
                 } else {
                     retryCount++;
                     if (retryCount < maxRetries) {
@@ -1088,6 +1106,9 @@ export default {
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
             self._pendingDrawerContext = null;
+            self.OpenDiyFormWorkFlow = false;
+            self.OpenDiyFormWorkFlowType = {};
+            self.StartWorkSubmited = false;
         },
 
         // ========== 弹窗关闭动画完成后的清理 ==========
@@ -1095,6 +1116,9 @@ export default {
             var self = this;
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
+            self.OpenDiyFormWorkFlow = false;
+            self.OpenDiyFormWorkFlowType = {};
+            self.StartWorkSubmited = false;
         },
 
         // ========== 获取表单宽度 ==========
@@ -1653,10 +1677,142 @@ export default {
             );
         },
 
-        // ========== 工作流回调（占位，外部可能通过ref调用） ==========
-        CallbackStartWork() {
+        // ========== 工作流回调（发起流程按钮点击时触发） ==========
+        async CallbackStartWork(param, callback) {
             var self = this;
-            // 工作流回调
+
+            try {
+                // 第1步：执行节点开始V8（可终止提交、修改表单值、获取审批信息）
+                var formData = self.$refs.fieldForm.GetFormData();
+                var v8Result = await self.$refs.refWfWorkHandler_2.RunNodeStartV8({
+                    Form: formData
+                });
+                if (v8Result.Result === false) {
+                    if (callback) { callback(); }
+                    return;
+                }
+                if (v8Result.Form) {
+                    self.$refs.fieldForm.SetFormData(v8Result.Form);
+                } else {
+                    v8Result.Form = formData;
+                }
+
+                // 第2步：提交表单（首次Add，之后Edit防止重复数据）
+                var formParam = {
+                    FormMode: self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit",
+                    SavedType: "Edit"
+                };
+
+                self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData) {
+                    if (success == true) {
+                        self.StartWorkSubmited = true;
+                        self.FormMode = "Edit";
+                        self.OpenDiyFormWorkFlowType.FormMode = "Edit";
+
+                        // 第3步：发起工作流
+                        self.$refs.refWfWorkHandler_2.StartWork(
+                            {
+                                FormData: v8Result.Form
+                            },
+                            function (result) {
+                                if (result.Code == 1) {
+                                    self.ShowFieldForm = false;
+                                    self.ShowFieldFormDrawer = false;
+                                    self.GetDiyTableRow();
+                                }
+                                if (callback) { callback(); }
+                            }
+                        );
+                    } else {
+                        if (callback) { callback(); }
+                    }
+                });
+            } catch (error) {
+                if (callback) { callback(); }
+                throw error;
+            }
+        },
+
+        // ========== 工作流面板初始化（从diy-table-rowlist.vue移植） ==========
+        InitWorkFlow(wfParam) {
+            var self = this;
+            self.OpenDiyFormWorkFlowType = wfParam;
+            self.FormWF = self.GetFormWF();
+            if (wfParam.WorkType == "ViewWork") {
+                // 获取此数据对应的最后一个流程
+                if (self.FormMode != "Add" && self.FormMode != "Insert" && !self.DiyCommon.IsNull(self.TableRowId)) {
+                    self.DiyCommon.GetDiyTableRowModel(
+                        {
+                            FormEngineKey: "WF_Work",
+                            _SearchEqual: {
+                                TableRowId: self.TableRowId
+                            }
+                        },
+                        function (result) {
+                            if (result.Code == 1 && !self.DiyCommon.IsNull(result.Data)) {
+                                self.OpenDiyFormWorkFlow = true;
+                                self.FormRightType = "WorkFlow";
+                                self.FormWF = self.GetFormWF();
+                                var historyParam = {
+                                    CurrentFlowId: result.Data.FlowId,
+                                    CurrentFlowDesignId: result.Data.FlowDesignId,
+                                    CurrentNodeId: result.Data.NodeId
+                                };
+                                var retryCount = 0;
+                                var maxRetries = 40;
+                                var tryInitHistory = function () {
+                                    if (self.$refs.refWFHistory) {
+                                        self.$refs.refWFHistory.Init(historyParam);
+                                    } else if (retryCount < maxRetries) {
+                                        retryCount++;
+                                        setTimeout(tryInitHistory, 50);
+                                    }
+                                };
+                                self.$nextTick(tryInitHistory);
+                            }
+                        }
+                    );
+                }
+            } else {
+                if (self.DiyCommon.IsNull(wfParam.FlowDesignId)) {
+                    self.DiyCommon.Tips("未传入FlowDesignId", false);
+                    return;
+                }
+                self.OpenDiyFormWorkFlow = true;
+                self.FormRightType = "WorkFlow";
+                self.FormWF = self.GetFormWF();
+                var param = {
+                    CurrentFlowDesignId: wfParam.FlowDesignId,
+                    OpenFormMode: wfParam.FormMode,
+                    CurrentTableId: self.TableId
+                };
+                // 使用重试机制等待WFWorkHandler组件挂载完成
+                // 因为OpenDiyFormWorkFlow刚设为true，多层v-if嵌套的组件可能需要多个tick才能完成挂载
+                var retryCount = 0;
+                var maxRetries = 40;
+                var tryInitStartWork = function () {
+                    if (self.$refs.refWfWorkHandler_2) {
+                        self.$refs.refWfWorkHandler_2.InitStartWork(param, function (callbackObj) {
+                        });
+                    } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(tryInitStartWork, 50);
+                    } else {
+                        console.error('[DiyFormFull] refWfWorkHandler_2 始终未挂载，已重试' + maxRetries + '次');
+                    }
+                };
+                self.$nextTick(tryInitStartWork);
+            }
+        },
+
+        // ========== 获取表单工作流状态 ==========
+        GetFormWF() {
+            var self = this;
+            return {
+                IsWF: self.OpenDiyFormWorkFlow == true,
+                WorkType: self.OpenDiyFormWorkFlowType.WorkType,
+                FlowDesignId: self.OpenDiyFormWorkFlowType.FlowDesignId
+            };
         },
 
         // ========== FormSubmitAction 和 FormOutAction 占位（由DiyForm内部处理） ==========
