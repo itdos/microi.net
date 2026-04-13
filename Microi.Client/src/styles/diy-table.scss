@@ -260,8 +260,8 @@
 
     // 响应式适配
     @media (max-width: 768px) {
-        margin-left: 10px;
-        margin-right: 10px;
+        margin-left: 0px;
+        margin-right: 0px;
         flex-direction: column;
         align-items: stretch;
 
@@ -527,7 +527,8 @@
         }
 
         :deep(.el-card__body) {
-            padding: 0 !important;
+            padding: 10px !important;
+            padding-bottom: 0px !important;
             overflow: visible;
         }
         .right-view-icon {
@@ -813,10 +814,11 @@
     left: 0;
     right: 0;
     z-index: 1000;
+    border-radius : 0px;
 
     .mobile-header-left,
     .mobile-header-right {
-        flex: 0 0 40px;
+        // flex: 0 0 40px;
         display: flex;
         align-items: center;
 
@@ -960,7 +962,7 @@
     // 移动端卡片优化
     @media screen and (max-width: 768px) {
         padding: 0px;
-        gap: 16px;
+        gap: 10px;
 
         .card-wrapper-mobile {
             margin: 0;
@@ -977,8 +979,8 @@
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             background: #fff;
-            margin-left: 10px;
-            margin-right: 10px;
+            margin-left: 0px;
+            margin-right: 0px;
 
             &:active {
                 transform: scale(0.98);
@@ -1018,7 +1020,7 @@
 .mobile-load-more,
 .mobile-no-more {
     text-align: center;
-    padding: 20px;
+    padding: 10px;
     color: #909399;
     font-size: 14px;
 
@@ -1249,9 +1251,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 0 4px 0;
-    margin-top: 4px;
-    border-top: 1px solid #f0f2f5;
+    padding: 0;
+    margin-top: 0px;
+    border-top: none;
     min-height: 28px;
 }
 
@@ -1298,7 +1300,7 @@
     gap: 6px;
     padding: 8px 16px 12px 16px;
     border-top: 1px solid #f0f2f5;
-    background: linear-gradient(to bottom, #fafbfc 0%, #f5f6f8 100%);
+    // background: linear-gradient(to bottom, #fafbfc 0%, #f5f6f8 100%);
 }
 
 .card-action-btn {
@@ -1433,7 +1435,7 @@
 /* 移动端卡片适配 */
 @media screen and (max-width: 768px) {
     .card-body {
-        padding: 12px 14px 6px 14px;
+        padding: 5px;
     }
 
     .card-title-row {
@@ -1449,8 +1451,8 @@
     }
 
     .card-actions {
-        padding: 8px 14px 10px 14px;
-        gap: 6px;
+        padding: 5px;
+        gap: 5px;
     }
 
     .card-action-btn {
