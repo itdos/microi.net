@@ -16,6 +16,31 @@ namespace Microi.net
         public string ReturnFileType { get; set; }
         public bool? NetworkIsInternet { get; set; }
         public string _Lang = DiyMessage.Lang;
+
+        /// <summary>
+        /// 列表查询前缀
+        /// </summary>
+        public string Prefix { get; set; }
+        /// <summary>
+        /// 分隔符，用于模拟文件夹（通常为"/"）
+        /// </summary>
+        public string Delimiter { get; set; }
+        /// <summary>
+        /// 分页标记
+        /// </summary>
+        public string Marker { get; set; }
+        /// <summary>
+        /// 每页最大数量
+        /// </summary>
+        public int MaxKeys { get; set; } = 1000;
+        /// <summary>
+        /// 搜索关键字
+        /// </summary>
+        public string Keyword { get; set; }
+        /// <summary>
+        /// 目标路径，用于复制/移动操作
+        /// </summary>
+        public string DestPath { get; set; }
     }
 }
 
