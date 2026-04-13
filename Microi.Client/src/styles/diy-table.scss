@@ -178,7 +178,7 @@
             width: 100%;
 
             :deep(.el-input__wrapper) {
-                border-radius: 8px 0 0 8px;
+                border-radius: 0px;
                 box-shadow: 0 0 0 1px #dcdfe6 inset;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -194,6 +194,23 @@
 
             :deep(.el-input-group__append) {
                 border-radius: 0 8px 8px 0;
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
+                border: none;
+                box-shadow: 0 2px 8px var(--color-primary-30);
+
+                .el-button {
+                    background: transparent;
+                    border: none;
+                    color: #fff;
+                    box-shadow: none;
+
+                    &:hover {
+                        transform: scale(1.05);
+                    }
+                }
+            }
+            :deep(.el-input-group__prepend) {
+                border-radius: 8px 0 0 8px;
                 background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
                 border: none;
                 box-shadow: 0 2px 8px var(--color-primary-30);
@@ -866,7 +883,7 @@
 }
 .table-rowlist-tabs{
     @media screen and (max-width: 768px) {
-        padding-top: calc(56px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
+        padding-top: calc(46px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
     }
 }
 .table-rowlist-tabs.mini-program{

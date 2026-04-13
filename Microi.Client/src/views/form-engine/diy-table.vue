@@ -71,7 +71,7 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
-                <div class="keyword-search" style="margin-bottom:10px;" v-if="!diyStore.IsPhoneView || IsTableChild">
+                <div class="keyword-search" style="margin-bottom:10px;">
                     <div class="search-action-group">
                         <el-button
                             v-if="_LimitAdd
@@ -90,7 +90,8 @@
                                 : $t("Msg.Add") }}
                         </el-button>
                         <!-- 更多页面按钮 PageBtns -->
-                        <template v-if="SysMenuModel.PageBtns
+                        <template v-if="!diyStore.IsPhoneView
+                                        && SysMenuModel.PageBtns
                                         && SysMenuModel.PageBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
                                 <el-button
@@ -107,7 +108,8 @@
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
-                        <template v-if="SysMenuModel.DiyConfig 
+                        <template v-if="!diyStore.IsPhoneView 
+                                        && SysMenuModel.DiyConfig 
                                         && SysMenuModel.BatchSelectMoreBtns 
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
@@ -167,10 +169,18 @@
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
                     <!-- 通用搜索 -->
-                    <div class="search-input-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
+                    <div class="search-input-group" 
+                        v-if="IsPermission('NoSearch') 
+                            && SysMenuModel.DiyConfig 
+                            && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
+                        style="display: flex;align-items: center;gap: 10px;justify-content: center;">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
+                            <template #prepend><el-button :icon="RefreshLeft" @click="InitSearch();GetDiyTableRow({ _PageIndex: 1 });"></el-button></template>
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
+                        <div v-if="ShowAddByRoute" class="more-search" @click="showMobileSearch=true">
+                            <el-icon :size="20"><Operation /></el-icon>
+                        </div>
                     </div>
                     <!-- <template v-if="IsPermission('NoSearch')">
                         <DiySearch
@@ -187,7 +197,7 @@
                         ></DiySearch>
                     </template> -->
                     <!--清除搜索-->
-                    <div class="search-clear-group" v-if="!diyStore.IsPhoneView && IsPermission('NoSearch')">
+                    <!-- <div class="search-clear-group" v-if="IsPermission('NoSearch')">
                         <el-button
                             :icon="RefreshLeft"
                             @click="
@@ -197,7 +207,7 @@
                         >
                             {{ $t("Msg.ClearSearch") }}
                         </el-button>
-                    </div>
+                    </div> -->
 
                     <div class="search-more-group" v-if="!diyStore.IsPhoneView && _HasSearchFields && IsPermission('NoSearch')">
                         <!-- 更多搜索 弹出层  【内部】搜索-->
@@ -292,7 +302,8 @@
                 </div>
 
                 <!--DIY移动端顶部搜索-->
-                <div class="keyword-search" v-if="diyStore.IsPhoneView">
+                <!-- v-if="diyStore.IsPhoneView" -->
+                <div class="keyword-search" v-if="false">
                   <div class="search-box">
                     <div class="search-input-group" style="max-width:240px;"
                       v-if=" IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" >
