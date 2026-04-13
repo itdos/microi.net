@@ -249,8 +249,8 @@
                     <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
                 </div>
             </template>
-            <div class="clear">
-                <div :class="ShowFormRight() ? 'el-col el-col-20' : 'el-col el-col-24'">
+            <el-row class="clear" :gutter="20">
+                <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
                     <DiyForm
                         ref="fieldForm"
                         :FormWF="FormWF"
@@ -283,8 +283,8 @@
                         @CallbackFormValueChange="CallbackFormValueChange"
                         @CallbackFormClose="CallbackFormClose"
                     />
-                </div>
-                <div v-if="ShowFormRight()" class="el-col el-col-4" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+                </el-col>
+                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
                     <el-tabs v-model="FormRightType">
                         <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
                             <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -353,8 +353,8 @@
                             </div>
                         </el-tab-pane>
                     </el-tabs>
-                </div>
-            </div>
+                </el-col>
+            </el-row>
         </el-dialog>
 
         <!--以抽屉形式打开Form-->
@@ -974,6 +974,11 @@ export default {
             } else if (self.CurrentDiyTableModel.FormOpenType == "Page") {
                 dialogType = "Page";
             } else {
+                dialogType = "Drawer";
+            }
+
+            // 工作流模式不支持Page路由跳转（路由无法传递工作流参数），强制使用Drawer
+            if (dialogType == "Page" && isOpenWorkFlowForm) {
                 dialogType = "Drawer";
             }
 
