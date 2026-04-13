@@ -53,9 +53,9 @@ export default {
             let color = "#000"; // 默认颜色
             let display = "visible";
             
-            if (self.diyStore && self.diyStore.IsPhoneView && field.Component === "TableChild") {
-                display = "none";
-            }
+            // if (self.diyStore && self.diyStore.IsPhoneView && field.Component === "TableChild") {
+            //     display = "none";
+            // }
             
             // 根据 field.Visible 设置颜色
             if (!field.Visible) {
