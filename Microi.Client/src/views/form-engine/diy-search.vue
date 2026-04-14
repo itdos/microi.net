@@ -231,7 +231,7 @@
 }
 .search-dateTime-block{
   display: flex;
-  align-items: center;
+  align-items: top;
   // flex-direction: column;
   gap: 8px;
   width: 100%;
@@ -239,9 +239,14 @@
 }
 .date-timer{
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+@media screen and (max-width: 768px) {
+    .date-timer,
+    .number-range-wrapper{
+        flex-wrap: wrap;
+    }
 }
 :deep(.el-input__wrapper){
     width: 80px !important;
