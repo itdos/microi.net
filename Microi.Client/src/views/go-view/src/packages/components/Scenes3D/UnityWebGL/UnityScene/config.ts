@@ -16,7 +16,11 @@ export const option = {
   companyName: 'DefaultCompany',
   streamingAssetsUrl: 'StreamingAssets',
   // 画布背景色
-  backgroundColor: '#000000'
+  backgroundColor: '#000000',
+  // 控制面板
+  showControls: true,
+  gameManagerName: 'Main Camera',
+  waypointCount: 5
 }
 
 export default class Config extends PublicConfigClass implements CreateComponentType {
