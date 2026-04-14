@@ -1589,6 +1589,9 @@ a.disabled {
 
 .el-drawer__header {
     border-top: 5px solid var(--color-primary) !important;
+    @media screen and (max-width: 768px) {
+        border-top: 0 !important;
+    }
 }
 
 .badge-primary {

@@ -78,7 +78,7 @@
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
                                     && IsVisibleAdd == true
-                                    && !(diyStore.IsPhoneView && ShowAddByRoute)
+                                    && (!diyStore.IsPhoneView || _IsTableChild)
                                 "
                             :loading="BtnLoading"
                             type="primary"
@@ -90,7 +90,7 @@
                                 : $t("Msg.Add") }}
                         </el-button>
                         <!-- 更多页面按钮 PageBtns -->
-                        <template v-if="!diyStore.IsPhoneView
+                        <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
                                         && SysMenuModel.PageBtns
                                         && SysMenuModel.PageBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
@@ -108,7 +108,7 @@
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
-                        <template v-if="!diyStore.IsPhoneView 
+                        <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
                                         && SysMenuModel.DiyConfig 
                                         && SysMenuModel.BatchSelectMoreBtns 
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
@@ -1488,7 +1488,7 @@ export default {
         // console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
-      // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
+        // 判断是否在diy-table列表---仅在 diy-table 列表路由显示新增按钮
         ShowAddByRoute() {
           const route = this.$route || {};
           const path = route.path || '';
@@ -4683,13 +4683,11 @@ export default {
                 self.FieldFormFixedTabs = [];
             }
 
-            // 移动端模式下，使用路由跳转而非抽屉/弹窗打开表单
-            // 因为用户在移动端会使用手机的后退功能返回上一页
+            // 移动端模式下，也使用抽屉模式打开表单（而非路由跳转）
+            // diy-form-full.vue 中已通过 pushState + popstate 拦截手势返回关闭抽屉
+            // 这样可以保留列表滚动位置
             // 2026-02-08 Anderson：如果是在弹窗中打开了表格，此时不应该跳走！
             var isOpenPage = false;
-            if(self.diyStore.IsPhoneView){
-                isOpenPage = true;
-            }
             if(self.$route.path.startsWith('/diy/form-page/')){
                 isOpenPage = false;
             }
