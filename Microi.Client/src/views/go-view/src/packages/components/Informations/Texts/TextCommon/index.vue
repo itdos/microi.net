@@ -24,6 +24,7 @@ const props = defineProps({
 const {
   linkHead,
   link,
+  linkTarget,
   fontColor,
   fontSize,
   letterSpacing,
@@ -61,7 +62,13 @@ useChartDataFetch(props.chartConfig, useChartEditStore, (newData: string) => {
 
 //打开链接
 const click = () => {
-  window.open(linkHead.value + link.value)
+  const url = linkHead.value + link.value
+  const target = linkTarget?.value || '_blank'
+  if (target === '_self') {
+    window.location.href = url
+  } else {
+    window.open(url)
+  }
 }
 </script>
 
