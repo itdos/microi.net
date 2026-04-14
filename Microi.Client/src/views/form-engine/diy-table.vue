@@ -170,7 +170,8 @@
                     </div>
                     <!-- 通用搜索 -->
                     <div class="search-input-group" 
-                        v-if="IsPermission('NoSearch') 
+                        v-if="diyStore.IsPhoneView 
+                            && IsPermission('NoSearch') 
                             && SysMenuModel.DiyConfig 
                             && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
                         style="display: flex;align-items: center;gap: 10px;justify-content: center;">

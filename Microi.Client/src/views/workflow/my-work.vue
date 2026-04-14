@@ -1,5 +1,15 @@
 <template>
     <div class="my-work-page">
+        <!-- 移动端渐变头部 -->
+        <div v-if="diyStore.IsPhoneView" class="wf-header">
+            <div class="wf-header-bg">
+                <div class="wf-bg-circle c1"></div>
+                <div class="wf-bg-circle c2"></div>
+            </div>
+            <div class="wf-header-content">
+                <span class="wf-header-title">我的工作</span>
+            </div>
+        </div>
         <!-- 三个主Tab：我的工作 / 日历 / 公告 -->
         <el-tabs v-model="MainTab" class="main-tabs" @tab-click="MainTabChange">
             <!-- ====== Tab 1: 我的工作 ====== -->
@@ -326,7 +336,7 @@
 
         <!-- 工作流表单 Drawer -->
         <el-drawer
-            class="diy-form-container"
+            class="diy-form-container wf-drawer"
             :modal="true"
             :size="diyStore.IsPhoneView ? '100%' : '90%'"
             :modal-append-to-body="false"
@@ -337,17 +347,12 @@
             :show-close="false"
             append-to-body
         >
-            <template #header
-                ><div>
-                    <div class="pull-left" style="color: #000; font-size: 15px">
-                        <i :class="''" />
-                        {{ FlowTitle }}
-                    </div>
-                    <div class="pull-right">
-                        <el-button :icon="Close" @click="ShowFieldFormDrawer = false">{{ $t("Msg.Close") }}</el-button>
-                    </div>
-                </div></template
-            >
+            <template #header>
+                <div class="wf-drawer-header">
+                    <div class="wf-drawer-title">{{ FlowTitle }}</div>
+                    <el-button :icon="Close" @click="ShowFieldFormDrawer = false">{{ $t("Msg.Close") }}</el-button>
+                </div>
+            </template>
 
             <div class="clear">
                 <DiyFormWF v-if="OpenFormType != 'Custom'" ref="refDiyFormWF" @CallbackWFSubmit="CallbackWFSubmit"></DiyFormWF>
@@ -1079,14 +1084,89 @@ export default {
     justify-content: center;
 }
 
+// ====== Drawer header ======
+.wf-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.wf-drawer-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1d2129;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 // ====== 响应式 ======
 @media (max-width: 768px) {
+    .my-work-page {
+        background: #f5f7fa;
+        min-height: 100vh;
+    }
+
+    // 移动端渐变头部
+    .wf-header {
+        position: relative;
+        background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
+        padding: 14px 16px 18px;
+        padding-top: calc(14px + var(--status-bar-height, 0px));
+        flex-shrink: 0;
+        z-index: 10;
+    }
+
+    .wf-header-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .wf-bg-circle {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.06);
+
+        &.c1 {
+            width: 200px;
+            height: 200px;
+            top: -50px;
+            right: -40px;
+        }
+        &.c2 {
+            width: 125px;
+            height: 125px;
+            bottom: -30px;
+            left: -30px;
+        }
+    }
+
+    .wf-header-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .wf-header-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+    }
+
     .main-tabs {
-        border-radius: 8px;
+        border-radius: 0;
 
         :deep(.el-tabs__header) {
             padding: 0 10px;
-            border-radius: 8px 8px 0 0;
+            border-radius: 0;
         }
 
         :deep(.el-tabs__item) {
@@ -1287,6 +1367,36 @@ export default {
 </style>
 
 <style lang="scss">
+// 移动端 Drawer 样式（不能 scoped，因为 drawer 是 append-to-body）
+@media (max-width: 768px) {
+    .wf-drawer {
+        .el-drawer__header {
+            padding: 12px 16px;
+            padding-top: calc(12px + var(--status-bar-height, 0px));
+            margin-bottom: 0;
+            border-bottom: 1px solid #f0f0f0;
+            background: #fff;
+        }
+
+        .el-drawer__body {
+            padding: 12px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .diy-form-wf {
+            .el-row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+
+            .el-col {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+        }
+    }
+}
+
 .workflow-history {
     .el-timeline-item__tail {
         left: 14px;

@@ -2472,3 +2472,18 @@ export default {
     transform: translateY(10px) scale(0.9);
 }
 </style>
+
+<style lang="scss">
+// 移动端 drawer 安全区域（不能 scoped，因为 drawer 是 append-to-body）
+@media (max-width: 768px) {
+    .diy-form-container.el-drawer {
+        .el-drawer__header {
+            padding-top: calc(10px + var(--status-bar-height, 0px));
+        }
+
+        .el-drawer__body {
+            padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+        }
+    }
+}
+</style>
