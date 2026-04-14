@@ -122,7 +122,7 @@
                 />
 
                 <!--移动端FAB浮动操作按钮（Page模式）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                     </transition>
@@ -394,7 +394,7 @@
             </el-row>
 
             <!--移动端FAB浮动操作按钮（Dialog模式）-->
-            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram">
+            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
                 <transition name="fab-overlay">
                     <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                 </transition>
@@ -685,7 +685,7 @@
             </el-row>
 
             <!--移动端FAB浮动操作按钮（Drawer模式）-->
-            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram">
+            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
                 <transition name="fab-overlay">
                     <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                 </transition>
