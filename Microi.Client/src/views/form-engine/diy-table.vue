@@ -170,10 +170,8 @@
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
                     <!-- 通用搜索 -->
-
                     <div class="search-input-group"
-                        v-if="diyStore.IsPhoneView
-                            && IsPermission('NoSearch')
+                        v-if="IsPermission('NoSearch')
                             && SysMenuModel.DiyConfig
                             && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
                         style="display: flex;align-items: center;gap: 10px;justify-content: center;">
@@ -181,7 +179,7 @@
                             <template #prepend><el-button :icon="RefreshLeft" @click="InitSearch();GetDiyTableRow({ _PageIndex: 1 });"></el-button></template>
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
-                        <div v-if="ShowAddByRoute" class="more-search" @click="showMobileSearch=true">
+                        <div v-if="ShowAddByRoute && diyStore.IsPhoneView" class="more-search" @click="showMobileSearch=true">
                             <el-icon :size="20"><Operation /></el-icon>
                         </div>
                     </div>
@@ -3207,7 +3205,7 @@ export default {
             self.DiyCommon.PostAll(params, async function (results) {
                 if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
                     // && self.DiyCommon.Result(results[2])
-                    console.log(6666666,results[0])
+                    // console.log(6666666,results[0])
                     await self.GetSysMenuModelAfter(results[0]);
                     self.GetDiyTableModelAfter(results[1]);
                     //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
@@ -4824,7 +4822,7 @@ export default {
             result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
             self.HandlerBtns(result.Data.PageTabs);
             self.HandlerBtns(result.Data.BatchSelectMoreBtns);
-            console.log(898998,result.Data.BatchSelectMoreBtns)
+            // console.log(898998,result.Data.BatchSelectMoreBtns)
             if (result.Data.BatchSelectMoreBtns.length > 0) {
                 self.TableEnableBatch = true;
             }
@@ -4855,7 +4853,7 @@ export default {
 
                 //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
                 if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
-                  //zhy加个条件好初始选中”全部“
+                  //zhy加个条件好初始选中”全部“,self.$route.fullPath和设备中的tabs好区分开
                     if (self.diyStore.IsPhoneView && (self.$route.fullPath == '/shouhoudingdan' || self.TableChildTableId == '455f886c-9467-463e-8987-f6c3227bb37e')) {
                       self.TableRowListActiveTab = "01KP4RHPVACR1WNNMJ9KQSNACX";
                     }else {
@@ -6188,7 +6186,7 @@ export default {
   //     display: none !important;
   //   }
   // }
-  /* 针对移动端，启用原生滚动 */
+  /* zhy对售后任务tabs针对移动端，启用原生滚动 */
   @media (max-width: 768px) {
     :deep(.el-tabs__nav-scroll) {
       overflow-x: auto;
@@ -6203,6 +6201,7 @@ export default {
     :deep(.el-tabs__nav) {
       flex-wrap: nowrap;
     }
+    /* 方便左右按钮跳动 */
     :deep(.el-tabs__nav-wrap){
       padding:0 22px !important;
     }
