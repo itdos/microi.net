@@ -170,8 +170,7 @@
                     </div>
                     <!-- 通用搜索 -->
                     <div class="search-input-group" 
-                        v-if="diyStore.IsPhoneView 
-                            && IsPermission('NoSearch') 
+                        v-if="IsPermission('NoSearch') 
                             && SysMenuModel.DiyConfig 
                             && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
                         style="display: flex;align-items: center;gap: 10px;justify-content: center;">
@@ -179,7 +178,7 @@
                             <template #prepend><el-button :icon="RefreshLeft" @click="InitSearch();GetDiyTableRow({ _PageIndex: 1 });"></el-button></template>
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
-                        <div v-if="ShowAddByRoute" class="more-search" @click="showMobileSearch=true">
+                        <div v-if="ShowAddByRoute && diyStore.IsPhoneView" class="more-search" @click="showMobileSearch=true">
                             <el-icon :size="20"><Operation /></el-icon>
                         </div>
                     </div>
