@@ -249,13 +249,24 @@
                 <el-button type="primary" @click="saveCodeEditor">确定</el-button>
             </template>
         </el-dialog>
+
+        <!-- 图片预览 -->
+        <teleport to="body">
+            <el-image-viewer
+                v-if="imagePreviewVisible"
+                :url-list="imagePreviewList"
+                :initial-index="0"
+                :hide-on-click-modal="true"
+                @close="imagePreviewVisible = false"
+            />
+        </teleport>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets, Edit, View } from '@element-plus/icons-vue';
-import { ElMessageBox } from 'element-plus';
+import { ElMessageBox, ElImageViewer } from 'element-plus';
 import Sortable from 'sortablejs';
 
 // 禁用属性继承
@@ -310,6 +321,18 @@ let sortableInstance = null;
 
 // 单文件文件名编辑
 const singleFileName = ref('');
+
+// 图片预览相关
+const imagePreviewVisible = ref(false);
+const imagePreviewList = ref([]);
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'tif'];
+const isImageFile = (fileNameOrUrl) => {
+    if (!fileNameOrUrl) return false;
+    // 先去掉查询参数和hash
+    let clean = fileNameOrUrl.split('?')[0].split('#')[0];
+    const ext = clean.toLowerCase().split('.').pop();
+    return IMAGE_EXTENSIONS.includes(ext);
+};
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -958,6 +981,13 @@ const GoUrl = (url) => {
         DiyCommon.Tips('文件路径未就绪，请稍后再试', false);
         return;
     }
+
+    // 图片文件使用内置图片预览器，避免在APP端 window.open 体验差
+    if (isImageFile(url)) {
+        imagePreviewList.value = [url];
+        imagePreviewVisible.value = true;
+        return;
+    }
     
     if (
         props.SysConfig &&
@@ -1336,5 +1366,18 @@ onBeforeUnmount(() => {
     color: #909399;
     line-height: 1.5;
     margin-top: 4px;
+}
+</style>
+
+<style lang="scss">
+/* 文件上传组件的图片预览器样式 */
+.el-image-viewer__wrapper {
+    z-index: 9999 !important;
+}
+/* 移动端隐藏图片预览器的缩放旋转按钮，保留关闭按钮 */
+@media (max-width: 768px) {
+    .el-image-viewer__actions {
+        display: none !important;
+    }
 }
 </style>

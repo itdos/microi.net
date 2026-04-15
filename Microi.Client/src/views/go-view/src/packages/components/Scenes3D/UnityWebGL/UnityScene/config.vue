@@ -69,6 +69,20 @@
       </setting-item>
     </setting-item-box>
   </collapse-item>
+
+  <collapse-item name="控制面板">
+    <setting-item-box name="播放控制">
+      <setting-item name="显示控制按钮">
+        <n-switch v-model:value="optionData.showControls" size="small" />
+      </setting-item>
+      <setting-item name="GameManager 名称">
+        <n-input v-model:value="optionData.gameManagerName" size="small" placeholder="Main Camera" />
+      </setting-item>
+      <setting-item name="路径点数量">
+        <n-input-number v-model:value="optionData.waypointCount" size="small" :min="0" :max="20" />
+      </setting-item>
+    </setting-item-box>
+  </collapse-item>
 </template>
 
 <script setup lang="ts">
