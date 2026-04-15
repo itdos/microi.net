@@ -18,6 +18,13 @@
           <n-button :disabled="!optionData.link" secondary size="small" @click="handleLinkClick">跳转</n-button>
         </n-input-group>
       </setting-item>
+      <setting-item name="打开方式">
+        <n-select
+          v-model:value="optionData.linkTarget"
+          size="small"
+          :options="linkTargetOptions"
+        />
+      </setting-item>
     </setting-item-box>
   </collapse-item>
 
@@ -119,10 +126,20 @@ const fontWeightOptions = [
   }
 ]
 const handleLinkClick = () => {
-  window.open(props.optionData.linkHead + props.optionData.link)
+  const url = props.optionData.linkHead + props.optionData.link
+  const target = props.optionData.linkTarget || '_blank'
+  if (target === '_self') {
+    window.location.href = url
+  } else {
+    window.open(url)
+  }
 }
 const linkHeadOptions = [
   { label: 'http://', value: 'http://' },
   { label: 'https://', value: 'https://' }
+]
+const linkTargetOptions = [
+  { label: '新窗口打开', value: '_blank' },
+  { label: '当前页面跳转', value: '_self' }
 ]
 </script>

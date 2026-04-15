@@ -2,12 +2,11 @@
     <div class="mobile-message">
         <!-- 顶部导航栏（渐变背景） -->
         <div class="msg-header">
-            <div class="header-inner">
-                <span class="header-title">消息</span>
+            <!-- <div class="header-inner">
                 <div class="header-action" @click="showNewChat = true">
                     <span class="action-icon">✚</span>
                 </div>
-            </div>
+            </div> -->
             <!-- Tab 切换 -->
             <div class="msg-tabs">
                 <div class="msg-tab" :class="{ active: activeTab === 'messages' }" @click="activeTab = 'messages'">
@@ -559,9 +558,10 @@ onBeforeUnmount(() => {
 .header-inner {
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 44px;
+    justify-content: flex-end;
+    height: 32px;
     position: relative;
+    padding: 0 16px;
 }
 
 .header-title {
@@ -601,7 +601,7 @@ onBeforeUnmount(() => {
     cursor: pointer;
 
     span {
-        font-size: 14px;
+        font-size: 17px;
         color: rgba(255, 255, 255, 0.65);
     }
 

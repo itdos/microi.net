@@ -37,6 +37,91 @@
       :style="{ display: loaderUrl && !errorMsg ? 'block' : 'none', width: '100%', height: '100%' }"
       tabindex="-1"
     ></canvas>
+
+    <!-- 控制面板 -->
+    <div
+      v-if="(showControls !== false) && unityReady && !loading && !errorMsg"
+      class="unity-controls"
+      :class="{ 'unity-controls-collapsed': controlsCollapsed }"
+      @mousedown.stop
+      @pointerdown.stop
+    >
+      <!-- 折叠/展开按钮 -->
+      <button class="ctrl-toggle" @click.stop="controlsCollapsed = !controlsCollapsed" title="展开/收起控制面板">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path v-if="controlsCollapsed" d="M8 5v14l11-7z"/>
+          <path v-else d="M7 7h10v10H7z" opacity="0.6"/>
+        </svg>
+      </button>
+
+      <template v-if="!controlsCollapsed">
+        <!-- 播放控制 -->
+        <div class="ctrl-group">
+          <button class="ctrl-btn" @click.stop="sendMessage('StartPlayback')" title="播放/恢复 (Space)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="ctrl-btn" @click.stop="sendMessage('PausePlayback')" title="暂停 (Space)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <button class="ctrl-btn" @click.stop="sendMessage('StopPlayback')" title="停止 (Esc)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+          </button>
+          <button class="ctrl-btn" @click.stop="sendMessage('RestartPlayback')" title="重新播放">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+          </button>
+        </div>
+
+        <div class="ctrl-divider"></div>
+
+        <!-- 路径点快速跳转 -->
+        <div v-if="(waypointCount || 0) > 0" class="ctrl-group ctrl-waypoints">
+          <button
+            v-for="i in (waypointCount || 0)"
+            :key="i"
+            class="ctrl-btn ctrl-btn-sm"
+            @click.stop="sendMessage('JumpToPosition', 'position_' + i)"
+            :title="'跳转到路径点 ' + i + ' (按键' + i + ')'"
+          >{{ i }}</button>
+        </div>
+
+        <div v-if="(waypointCount || 0) > 0" class="ctrl-divider"></div>
+
+        <!-- 快捷键提示 -->
+        <button class="ctrl-btn" @click.stop="showHelp = !showHelp" title="操作帮助">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
+        </button>
+      </template>
+    </div>
+
+    <!-- 快捷键帮助浮层 -->
+    <div v-if="showHelp" class="unity-help-overlay" @click="showHelp = false">
+      <div class="unity-help-card" @click.stop>
+        <div class="unity-help-title">操作说明</div>
+        <div class="unity-help-section">
+          <div class="unity-help-subtitle">鼠标操作</div>
+          <div class="unity-help-row"><kbd>左键拖动</kbd><span>轨道旋转（围绕模型）</span></div>
+          <div class="unity-help-row"><kbd>右键拖动</kbd><span>平移视角</span></div>
+          <div class="unity-help-row"><kbd>中键拖动</kbd><span>平移视角</span></div>
+          <div class="unity-help-row"><kbd>滚轮</kbd><span>缩放（拉近/拉远）</span></div>
+        </div>
+        <div class="unity-help-section">
+          <div class="unity-help-subtitle">键盘操作</div>
+          <div class="unity-help-row"><kbd>W A S D</kbd><span>前后左右移动</span></div>
+          <div class="unity-help-row"><kbd>Q / E</kbd><span>上下移动</span></div>
+          <div class="unity-help-row"><kbd>Shift</kbd><span>加速移动</span></div>
+          <div class="unity-help-row"><kbd>Space</kbd><span>开始/暂停播放</span></div>
+          <div class="unity-help-row"><kbd>R</kbd><span>重置到起点</span></div>
+          <div class="unity-help-row"><kbd>1-9</kbd><span>跳转到路径点</span></div>
+          <div class="unity-help-row"><kbd>Esc</kbd><span>停止播放</span></div>
+        </div>
+        <div class="unity-help-section">
+          <div class="unity-help-subtitle">触摸操作</div>
+          <div class="unity-help-row"><kbd>单指拖动</kbd><span>旋转视角</span></div>
+          <div class="unity-help-row"><kbd>双指缩放</kbd><span>拉近/拉远</span></div>
+        </div>
+        <button class="unity-help-close" @click="showHelp = false">关闭</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -61,7 +146,10 @@ const {
   productVersion,
   companyName,
   streamingAssetsUrl,
-  backgroundColor
+  backgroundColor,
+  showControls,
+  gameManagerName,
+  waypointCount
 } = toRefs(props.chartConfig.option)
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -73,6 +161,9 @@ const canvasAlive = ref(false)
 const loading = ref(false)
 const progress = ref(0)
 const errorMsg = ref('')
+const unityReady = ref(false)
+const controlsCollapsed = ref(false)
+const showHelp = ref(false)
 
 let unityInstance: any = null
 let loaderScript: HTMLScriptElement | null = null
@@ -149,6 +240,7 @@ const destroyUnity = (): Promise<void> => {
   loaderScript = null
   loadedLoaderUrl = ''
   canvasAlive.value = false   // 立即移除 canvas，不等 Quit 完成
+  unityReady.value = false
   cleanupBlobUrls()
 
   // === 异步阶段：执行耗时的 Quit 和 GPU 释放 ===
@@ -244,10 +336,30 @@ const initUnity = async () => {
     })
 
     loading.value = false
+    unityReady.value = true
   } catch (e: any) {
     loading.value = false
     errorMsg.value = 'Unity 加载失败: ' + (e?.message || e)
     console.error('[Unity3D]', e)
+  }
+}
+
+// 向 Unity 发送消息
+const sendMessage = (method: string, param?: string) => {
+  if (!unityInstance) {
+    console.warn('[Unity3D] SendMessage skipped: unityInstance is null, method:', method)
+    return
+  }
+  const target = gameManagerName?.value || 'Main Camera';//GameManager
+  console.log('[Unity3D] SendMessage →', target, method, param ?? '')
+  try {
+    if (param !== undefined) {
+      unityInstance.SendMessage(target, method, param)
+    } else {
+      unityInstance.SendMessage(target, method)
+    }
+  } catch (e) {
+    console.error('[Unity3D] SendMessage failed:', target, method, e)
   }
 }
 
@@ -358,5 +470,182 @@ onActivated(async () => {
   padding: 20px;
   text-align: center;
   z-index: 10;
+}
+
+/* ===== 控制面板 ===== */
+.unity-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 20;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.unity-controls-collapsed {
+  padding: 6px;
+  gap: 0;
+}
+
+.ctrl-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.ctrl-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: all 0.2s;
+  pointer-events: auto;
+}
+.ctrl-btn:hover {
+  background: rgba(81, 214, 169, 0.25);
+  color: #51d6a9;
+}
+.ctrl-btn:active {
+  transform: scale(0.92);
+}
+
+.ctrl-btn-sm {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.ctrl-waypoints {
+  gap: 1px;
+}
+
+.ctrl-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ===== 帮助浮层 ===== */
+.unity-help-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 30;
+}
+
+.unity-help-card {
+  background: rgba(30, 34, 44, 0.95);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 24px;
+  min-width: 320px;
+  max-width: 400px;
+  color: #ddd;
+}
+
+.unity-help-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #51d6a9;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.unity-help-section {
+  margin-bottom: 12px;
+}
+
+.unity-help-subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.unity-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.unity-help-row kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  color: #fff;
+  min-width: 60px;
+  text-align: center;
+}
+
+.unity-help-row span {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.unity-help-close {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  margin-top: 10px;
+  border: none;
+  border-radius: 7px;
+  background: rgba(81, 214, 169, 0.15);
+  color: #51d6a9;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.unity-help-close:hover {
+  background: rgba(81, 214, 169, 0.28);
 }
 </style>
