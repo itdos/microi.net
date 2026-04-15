@@ -26,6 +26,7 @@ export const FontWeightObject = {
 export const option = {
   link: '',
   linkHead: 'http://',
+  linkTarget: '_blank' as '_blank' | '_self',
   dataset: '我是文本',
   fontSize: 20,
   fontColor: '#ffffff',
