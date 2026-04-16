@@ -50,7 +50,7 @@
                 <div v-if="!diyStore.IsPhoneView" class="form-header" style="margin-bottom: 10px;">
                     <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;">
                         <i :class="GetOpenTitleIcon()" />
-                        {{ GetOpenTitlePage() }}1111
+                        {{ GetOpenTitlePage() }}
                     </div>
                     <div class="form-actions">
                         <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
@@ -182,7 +182,7 @@
             <template #header>
                 <div>
                     <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}222
+                    {{ GetOpenTitle() }}
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <el-dropdown
@@ -458,7 +458,7 @@
             <template #header>
                 <div style="color: #000; font-size: 15px;min-width: 200px;">
                     <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}333
+                    {{ GetOpenTitle() }}
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <el-dropdown
