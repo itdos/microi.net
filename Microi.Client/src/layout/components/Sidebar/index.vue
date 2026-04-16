@@ -110,8 +110,8 @@ export default {
 <style scoped lang="scss">
 // 默认侧边栏背景 - 使用主题色渐变
 .has-logo {
-    background: linear-gradient(180deg, 
-        var(--color-primary, #409eff) 0%, 
+    background: linear-gradient(180deg,
+        var(--color-primary, #409eff) 0%,
         var(--color-primary-dark, #2c7acc) 100%
     );
 }
@@ -204,7 +204,7 @@ export default {
 
         .el-menu-item {
             // padding-left: 50px !important;
-            
+
             &::before {
                 left: 25px;
             }

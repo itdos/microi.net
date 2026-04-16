@@ -19,7 +19,7 @@
             <template v-for="(tab, tabIndex) in SysMenuModel.PageTabs" :key="TypeFieldName + 'page_tabs_' + tab.Id + tabIndex">
                 <el-tab-pane v-if="tab.IsVisible" :name="tab.Id" :lazy="true">
                     <template #label>
-                        <span
+                       <span
                             :style="{
                                 color: TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
                             }"
@@ -85,8 +85,8 @@
                             :icon="BtnLoading ? '' : CirclePlusFilled"
                             @click="OpenDetail(null, 'Add')"
                         >
-                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText 
-                                ? SysMenuModel.DiyConfig.AddBtnText 
+                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText
+                                ? SysMenuModel.DiyConfig.AddBtnText
                                 : $t("Msg.Add") }}
                         </el-button>
                         <!-- 更多页面按钮 PageBtns -->
@@ -108,9 +108,10 @@
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
+
                         <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
-                                        && SysMenuModel.DiyConfig 
-                                        && SysMenuModel.BatchSelectMoreBtns 
+                                        && SysMenuModel.DiyConfig
+                                        && SysMenuModel.BatchSelectMoreBtns
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
                                 v-if="TableDisplayMode == 'Card' && TableEnableBatch"
@@ -169,9 +170,9 @@
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
                     </div>
                     <!-- 通用搜索 -->
-                    <div class="search-input-group" 
-                        v-if="IsPermission('NoSearch') 
-                            && SysMenuModel.DiyConfig 
+                    <div class="search-input-group"
+                        v-if="IsPermission('NoSearch')
+                            && SysMenuModel.DiyConfig
                             && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
                         style="display: flex;align-items: center;gap: 10px;justify-content: center;">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
@@ -3204,6 +3205,7 @@ export default {
             self.DiyCommon.PostAll(params, async function (results) {
                 if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
                     // && self.DiyCommon.Result(results[2])
+                    // console.log(6666666,results[0])
                     await self.GetSysMenuModelAfter(results[0]);
                     self.GetDiyTableModelAfter(results[1]);
                     //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
@@ -4820,6 +4822,7 @@ export default {
             result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
             self.HandlerBtns(result.Data.PageTabs);
             self.HandlerBtns(result.Data.BatchSelectMoreBtns);
+            // console.log(898998,result.Data.BatchSelectMoreBtns)
             if (result.Data.BatchSelectMoreBtns.length > 0) {
                 self.TableEnableBatch = true;
             }
@@ -4850,7 +4853,12 @@ export default {
 
                 //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
                 if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
-                    self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
+                  //zhy加个条件好初始选中”全部“,self.$route.fullPath和设备中的tabs好区分开
+                    if (self.diyStore.IsPhoneView && (self.$route.fullPath == '/shouhoudingdan' || self.TableChildTableId == '455f886c-9467-463e-8987-f6c3227bb37e')) {
+                      self.TableRowListActiveTab = "01KP4RHPVACR1WNNMJ9KQSNACX";
+                    }else {
+                      self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
+                    }
                     var tabModel = result.Data.PageTabs[0];
                     self.CurrentTableRowListActiveTab = tabModel;
                     //执行V8
@@ -4890,7 +4898,7 @@ export default {
             self.MobileListFields = self.SysMenuModel.MobileListFields || [];
             self.FixedFields = self.SysMenuModel.FixedFields || [];
             //------------------------
-
+            console.log('TableRowListActiveTab，self.SysMenuModel.PageTabs',self.SysMenuModel.PageTabs)
             //2022-05-14 这里不再查询数据，全部After处理好了再查询数据
             if (self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) || self.SysMenuModel.PageTabs.length == 0) {
                 // self.GetDiyTableRow({_PageIndex : 1});
@@ -6178,4 +6186,24 @@ export default {
   //     display: none !important;
   //   }
   // }
+  /* zhy对售后任务tabs针对移动端，启用原生滚动 */
+  @media (max-width: 768px) {
+    :deep(.el-tabs__nav-scroll) {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+      scrollbar-width: none; /* Firefox 隐藏滚动条 */
+    }
+
+    :deep(.el-tabs__nav-scroll::-webkit-scrollbar) {
+      display: none; /* Chrome/Safari 隐藏滚动条 */
+    }
+
+    :deep(.el-tabs__nav) {
+      flex-wrap: nowrap;
+    }
+    /* 方便左右按钮跳动 */
+    :deep(.el-tabs__nav-wrap){
+      padding:0 22px !important;
+    }
+  }
 </style>
