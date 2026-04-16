@@ -2629,6 +2629,11 @@ var DiyCommon = {
             ) {
                 //!DiyCommon.IsNull(field.Config.Sql)
                 if (isPostSql !== false) {
+                    // 防止 SetFieldData(单字段) 与 SetFieldsData(批量) 并发重复请求
+                    if (field._DataLoading === true) {
+                        return;
+                    }
+                    field._DataLoading = true;
                     var apiGetDiyFieldSqlData = DiyApi.GetDiyFieldSqlData;
                     if (!DiyCommon.IsNull(apiReplace) && !DiyCommon.IsNull(apiReplace.GetDiyFieldSqlData)) {
                         apiGetDiyFieldSqlData = apiReplace.GetDiyFieldSqlData;
@@ -2647,6 +2652,7 @@ var DiyCommon = {
                     }
                     // 查询数据库
                     DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
+                        field._DataLoading = false;
                         if (DiyCommon.Result(result)) {
                             try {
                                 if (DiyCommon.IsNull(result.Data)) {
@@ -2851,8 +2857,11 @@ var DiyCommon = {
 
         //提前定义查询数据库的方法
         function GetFieldsData() {
+            // 标记所有待加载字段为加载中，防止子组件并发请求
+            fieldList.forEach((f) => { f._DataLoading = true; });
             // 查询数据库
             DiyCommon.Post(apiGetFieldsData, param, function (results) {
+                fieldList.forEach((f) => { f._DataLoading = false; });
                 if (results.Code == 1) {
                     fieldList.forEach((field) => {
                         var resultModel = _.find(results.Data, function (item) {
@@ -2926,6 +2935,8 @@ var DiyCommon = {
                     (field.Config.DataSource == "ApiEngine" && !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey))
                 ) {
                     if (field.Config.DataSource == "Api" || field.Config.DataSource == "DataSource" || field.Config.DataSource == "ApiEngine") {
+                        // 标记为加载中，防止子组件 SetFieldData 再次发起重复请求
+                        field._DataLoading = true;
                         var param = {
                             _FormData: formData
                         };
@@ -2941,6 +2952,7 @@ var DiyCommon = {
                         // GetFieldsData();
 
                         DiyCommon.Post(apiGetFieldsData, param, function (result) {
+                            field._DataLoading = false;
                             if (DiyCommon.Result(result)) {
                                 try {
                                     if (DiyCommon.IsNull(result.Data)) {

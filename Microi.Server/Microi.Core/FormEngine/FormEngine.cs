@@ -450,11 +450,11 @@ namespace Microi.net
 
                         if (model.IsTree == 1)
                         {
-                            if (model.TreeParentField.DosIsNullOrWhiteSpace() || model.TreeParentFields.DosIsNullOrWhiteSpace())
-                            {
-                                trans.Rollback();
-                                return new DosResult(0, null, "当表单为树型结构时，【树形结构父级字段、树形结构完整父级字段】必填！");
-                            }
+                            // if (model.TreeParentField.DosIsNullOrWhiteSpace() || model.TreeParentFields.DosIsNullOrWhiteSpace())
+                            // {
+                            //     trans.Rollback();
+                            //     return new DosResult(0, null, "当表单为树型结构时，【树形结构父级字段、树形结构完整父级字段】必填！");
+                            // }
                             var fieldListResult = await GetDiyField(new DiyFieldParam()
                             {
                                 TableId = model.Id,
@@ -465,15 +465,15 @@ namespace Microi.net
                             {
                                 return new DosResult(0, null, fieldListResult.Msg);
                             }
-                            if (fieldListResult.Data == null 
-                                || !fieldListResult.Data.Any(d => d["Name"].Val<string>()?.ToLower() 
-                                    == model.TreeParentField.ToLower()) 
-                                || !fieldListResult.Data.Any(d => d["Name"].Val<string>() ?.ToLower() 
-                                    == model.TreeParentFields.ToLower()))
-                            {
-                                trans.Rollback();
-                                return new DosResult(0, null, "当表单为树型结构时，必须存在【树形结构父级字段、树形结构完整父级字段】！");
-                            }
+                            // if (fieldListResult.Data == null 
+                            //     || !fieldListResult.Data.Any(d => d["Name"].Val<string>()?.ToLower() 
+                            //         == model.TreeParentField.ToLower()) 
+                            //     || !fieldListResult.Data.Any(d => d["Name"].Val<string>() ?.ToLower() 
+                            //         == model.TreeParentFields.ToLower()))
+                            // {
+                            //     trans.Rollback();
+                            //     return new DosResult(0, null, "当表单为树型结构时，必须存在【树形结构父级字段、树形结构完整父级字段】！");
+                            // }
                         }
                         var count = trans.Update(model);
                         //DiyTableCache.DelDiyTableModel(model, param.OsClient);
