@@ -734,6 +734,7 @@
 import { defineAsyncComponent, computed } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
+import { set } from "lodash";
 
 export default {
     name: "diy-form-full",
@@ -932,6 +933,19 @@ export default {
 
             // ========== 抽屉打开上下文 ==========
             _pendingDrawerContext: null,
+
+            // ========== 移动端历史管理（按实例） ==========
+            // 抽屉组件相关数据
+            _drawerStack: [], // 存储抽屉组件实例的栈结构
+            _drawerHandlers: {}, // 存储抽屉组件的处理函数映射
+
+            // 对话框组件相关数据
+            _dialogStack: [], // 存储对话框组件实例的栈结构
+            _dialogHandlers: {}, // 存储对话框组件的处理函数映射
+
+            // 全局处理函数
+            _drawerGlobalHandler: null, // 抽屉组件的全局处理函数
+            _dialogGlobalHandler: null, // 对话框组件的全局处理函数
 
             // ========== 移动端FAB ==========
             showMobileFabMenu: false
@@ -1191,17 +1205,55 @@ export default {
 
             if (dialogType == "Dialog") {
                 self.ShowFieldForm = true;
-                // 移动端：推入历史记录，拦截返回键关闭弹窗而非路由回退
-                if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
-                    window.history.pushState({ dialogOpen: true }, '');
-                    self._dialogPopstateHandler = function () {
-                        if (self.ShowFieldForm) {
-                            window.removeEventListener('popstate', self._dialogPopstateHandler);
-                            self._dialogPopstateHandler = null;
-                            self.CloseFieldForm('ShowFieldForm', 'Close', self.TableRowId, true);
-                        }
+                 // 移动端：推入历史记录，拦截返回键关闭弹窗而非路由回退
+                                // if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
+                                //     window.history.pushState({ dialogOpen: true }, '');
+                                //     self._dialogPopstateHandler = function () {
+                                //         if (self.ShowFieldForm) {
+                                //             window.removeEventListener('popstate', self._dialogPopstateHandler);
+                                //             self._dialogPopstateHandler = null;
+                                //             self.CloseFieldForm('ShowFieldForm', 'Close', self.TableRowId, true);
+                                //         }
+                                //     };
+                                //     window.addEventListener('popstate', self._dialogPopstateHandler);
+                                // }
+
+                // zhy移动端：若为栈底（栈空），推入历史记录并注册单一全局 popstate 处理器；嵌套打开仅入栈
+                if (self.diyStore.IsPhoneView) {
+                    // 使用全局单例堆栈来管理 dialog 模式下的 popstate
+                    var dialogId = self._generateInstanceId('dialog');
+                    if (!self._currentDialogInstanceIds) { self._currentDialogInstanceIds = []; }
+                    self._currentDialogInstanceIds.push(dialogId);
+
+                    window.__microi_dialog_stack = window.__microi_dialog_stack || [];
+                    var closeDialogFn = function (isPop) {
+                        try { self.CloseFieldForm('ShowFieldForm', 'Close', self.TableRowId, true, !!isPop); } catch (e) {}
                     };
-                    window.addEventListener('popstate', self._dialogPopstateHandler);
+                    window.__microi_dialog_stack.push({ id: dialogId, owner: self, closeFn: closeDialogFn });
+
+                    if (window.__microi_dialog_stack.length === 1 && window.history && window.history.pushState) {
+                        try { window.history.pushState({ dialogStack: true }, ''); } catch (e) {}
+                        if (!window.__microi_dialog_popstate_handler) {
+                            window.__microi_dialog_popstate_handler = function () {
+                                try {
+                                    if (window.__microi_ignore_pop) { window.__microi_ignore_pop = false; return; }
+                                    // 立即恢复一个保护性历史条目，防止浏览器在本次 pop 后继续导航离开页面
+                                    try { if (window.history && window.history.pushState) { window.history.pushState({ dialogStack: true }, ''); } } catch (e) {}
+                                    // 仅 peek 顶层项，由 CloseFieldFormHandler 负责真正移除堆栈项
+                                    var item = (window.__microi_dialog_stack && window.__microi_dialog_stack.length) ? window.__microi_dialog_stack[window.__microi_dialog_stack.length - 1] : null;
+                                    if (item && item.closeFn) {
+                                        try { item.closeFn(true); } catch (e) {}
+                                    }
+                                } finally {
+                                    if (!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0) {
+                                        try { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
+                                        window.__microi_dialog_popstate_handler = null;
+                                    }
+                                }
+                            };
+                            try { window.addEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
+                        }
+                    }
                 }
                 self.$nextTick(function () {
                     self.$nextTick(function () {
@@ -1244,19 +1296,61 @@ export default {
                     wfParam: wfParam
                 };
                 self.ShowFieldFormDrawer = true;
-
                 // 移动端：推入历史记录，拦截返回键关闭抽屉而非路由回退
-                if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
-                    window.history.pushState({ drawerOpen: true }, '');
-                    self._drawerPopstateHandler = function () {
-                        if (self.ShowFieldFormDrawer) {
-                            // 先清除引用，popstate已消费历史条目，CloseFieldFormHandler不需要再调history.back()
-                            window.removeEventListener('popstate', self._drawerPopstateHandler);
-                            self._drawerPopstateHandler = null;
-                            self.CloseFieldForm('ShowFieldFormDrawer', 'Close', self.TableRowId, true);
-                        }
+                                // if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
+                                //     window.history.pushState({ drawerOpen: true }, '');
+                                //     self._drawerPopstateHandler = function () {
+                                //         if (self.ShowFieldFormDrawer) {
+                                //             // 先清除引用，popstate已消费历史条目，CloseFieldFormHandler不需要再调history.back()
+                                //             window.removeEventListener('popstate', self._drawerPopstateHandler);
+                                //             self._drawerPopstateHandler = null;
+                                //             self.CloseFieldForm('ShowFieldFormDrawer', 'Close', self.TableRowId, true);
+                                //         }
+                                //     };
+                                //     window.addEventListener('popstate', self._drawerPopstateHandler);
+                                // }
+
+                // zhy移动端：若为栈底（栈空），推入历史记录并注册单一全局 popstate 处理器；嵌套打开仅入栈
+                if (self.diyStore.IsPhoneView) {
+                    // 使用全局单例堆栈来管理多实例情况下的 popstate
+                    var drawerId = self._generateInstanceId('drawer');
+                    // 保存当前实例 id，便于程序化关闭时清理对应堆栈项
+                    if (!self._currentDrawerInstanceIds) { self._currentDrawerInstanceIds = []; }
+                    self._currentDrawerInstanceIds.push(drawerId);
+
+                    // 全局堆栈初始化
+                    window.__microi_drawer_stack = window.__microi_drawer_stack || [];
+
+                    // push 一个可调用的关闭函数到全局堆栈（pop 时只关闭该实例顶部）
+                    var closeFn = function (isPop) {
+                        try { self.CloseFieldForm('ShowFieldFormDrawer', 'Close', self.TableRowId, true, !!isPop); } catch (e) {}
                     };
-                    window.addEventListener('popstate', self._drawerPopstateHandler);
+                    window.__microi_drawer_stack.push({ id: drawerId, owner: self, closeFn: closeFn });
+
+                    // 仅在全局堆栈从空到非空时推入浏览器历史并注册单例 popstate 处理器
+                    if (window.__microi_drawer_stack.length === 1 && window.history && window.history.pushState) {
+                        try { window.history.pushState({ drawerStack: true }, ''); } catch (e) {}
+                        if (!window.__microi_drawer_popstate_handler) {
+                            window.__microi_drawer_popstate_handler = function () {
+                                try {
+                                    if (window.__microi_ignore_pop) { window.__microi_ignore_pop = false; return; }
+                                    // 立即恢复一个保护性历史条目，防止浏览器在本次 pop 后继续导航离开页面
+                                    try { if (window.history && window.history.pushState) { window.history.pushState({ drawerStack: true }, ''); } } catch (e) {}
+                                    // 仅 peek 顶层项，由 CloseFieldFormHandler 负责真正移除堆栈项
+                                    var item = (window.__microi_drawer_stack && window.__microi_drawer_stack.length) ? window.__microi_drawer_stack[window.__microi_drawer_stack.length - 1] : null;
+                                    if (item && item.closeFn) {
+                                        try { item.closeFn(true); } catch (e) {}
+                                    }
+                                } finally {
+                                    if (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0) {
+                                        try { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
+                                        window.__microi_drawer_popstate_handler = null;
+                                    }
+                                }
+                            };
+                            try { window.addEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
+                        }
+                    }
                 }
             }
         },
@@ -1336,19 +1430,39 @@ export default {
         // ========== 清理移动端Drawer返回键拦截 ==========
         _cleanupDrawerPopstate() {
             var self = this;
-            if (self._drawerPopstateHandler) {
-                window.removeEventListener('popstate', self._drawerPopstateHandler);
-                self._drawerPopstateHandler = null;
-            }
+            // 移除所有已注册的 drawer popstate 处理器
+            try {
+                // 移除全局单例 popstate 处理器并清空全局堆栈
+                try {
+                    if (window.__microi_drawer_popstate_handler) {
+                        try { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
+                        window.__microi_drawer_popstate_handler = null;
+                    }
+                } catch (e) {}
+                try { window.__microi_drawer_stack = []; } catch (e) {}
+                // 清理本组件内的记录
+                if (self._drawerStack) { self._drawerStack = []; }
+                if (self._drawerHandlers) { self._drawerHandlers = {}; }
+                if (self._currentDrawerInstanceIds) { self._currentDrawerInstanceIds = []; }
+            } catch (e) {}
         },
 
         // ========== 清理移动端Dialog返回键拦截 ==========
         _cleanupDialogPopstate() {
             var self = this;
-            if (self._dialogPopstateHandler) {
-                window.removeEventListener('popstate', self._dialogPopstateHandler);
-                self._dialogPopstateHandler = null;
-            }
+            // 移除所有已注册的 dialog popstate 处理器
+            try {
+                try {
+                    if (window.__microi_dialog_popstate_handler) {
+                        try { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
+                        window.__microi_dialog_popstate_handler = null;
+                    }
+                } catch (e) {}
+                try { window.__microi_dialog_stack = []; } catch (e) {}
+                if (self._dialogStack) { self._dialogStack = []; }
+                if (self._dialogHandlers) { self._dialogHandlers = {}; }
+                if (self._currentDialogInstanceIds) { self._currentDialogInstanceIds = []; }
+            } catch (e) {}
         },
 
         // ========== 获取表单宽度 ==========
@@ -1363,6 +1477,14 @@ export default {
 
             var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "50%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
+        },
+
+        // ========== zhy生成实例ID ==========
+        _generateInstanceId(prefix) {
+            var self = this;
+            var t = Date.now().toString(36);
+            var r = Math.random().toString(36).slice(2, 8);
+            return (prefix ? prefix + '_' : '') + t + '_' + r;
         },
 
         GetOpenTitleIcon() {
@@ -1585,32 +1707,102 @@ export default {
             }
         },
 
-        // ========== 关闭表单 ==========
-        async CloseFieldForm(dialogId, actionType, tableRowId, isForceClose) {
+        // ========== 关闭表单 ,zhy加了isPopstate，根据 isPopstate 决定是否回退历史，移动端不回退==========
+        async CloseFieldForm(dialogId, actionType, tableRowId, isForceClose, isPopstate) {
             var self = this;
             if (self.FormMode == "View" || self.CloseFormNeedConfirm == false || isForceClose) {
-                await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+                await self.CloseFieldFormHandler(dialogId, actionType, tableRowId, isPopstate);
             } else {
                 self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
-                    await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+                    await self.CloseFieldFormHandler(dialogId, actionType, tableRowId, isPopstate);
                 });
             }
         },
-        async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
+        async CloseFieldFormHandler(dialogId, actionType, tableRowId, isPopstate) {
             var self = this;
             // 移动端关闭Drawer时：如果是通过代码关闭（非popstate触发），需要回退pushState推入的历史记录
-            if (dialogId === 'ShowFieldFormDrawer' && self._drawerPopstateHandler) {
-                // 先移除监听，避免history.back()触发的popstate再次执行关闭
-                window.removeEventListener('popstate', self._drawerPopstateHandler);
-                self._drawerPopstateHandler = null;
-                window.history.back();
-            }
-            // 移动端关闭Dialog时：同上
-            if (dialogId === 'ShowFieldForm' && self._dialogPopstateHandler) {
-                window.removeEventListener('popstate', self._dialogPopstateHandler);
-                self._dialogPopstateHandler = null;
-                window.history.back();
-            }
+                        // if (dialogId === 'ShowFieldFormDrawer' && self._drawerPopstateHandler) {
+                        //     // 先移除监听，避免history.back()触发的popstate再次执行关闭
+                        //     window.removeEventListener('popstate', self._drawerPopstateHandler);
+                        //     self._drawerPopstateHandler = null;
+                        //     window.history.back();
+                        // }
+                        // // 移动端关闭Dialog时：同上
+                        // if (dialogId === 'ShowFieldForm' && self._dialogPopstateHandler) {
+                        //     window.removeEventListener('popstate', self._dialogPopstateHandler);
+                        //     self._dialogPopstateHandler = null;
+                        //     window.history.back();
+                        // }
+
+            // zhy如果是通过代码关闭（非 popstate 触发），需要移除对应实例的监听并回退历史
+            try {
+                // Drawer 模式：从全局堆栈中移除对应的项；若移除后堆栈为空，则卸载全局处理器并消费历史（programmatic close 最后一个）
+                if (dialogId === 'ShowFieldFormDrawer' && self.diyStore.IsPhoneView) {
+                    var myId = null;
+                    try {
+                        if (self._currentDrawerInstanceIds && self._currentDrawerInstanceIds.length) {
+                            myId = self._currentDrawerInstanceIds.pop();
+                        }
+                    } catch (e) {}
+                    //移除顶部抽屉
+                    try {
+                        if (window.__microi_drawer_stack && window.__microi_drawer_stack.length) {
+                            for (var i = window.__microi_drawer_stack.length - 1; i >= 0; i--) {
+                                var it = window.__microi_drawer_stack[i];
+                                if (!it) { continue; }
+                                if (it.owner === self || (myId && it.id === myId)) {
+                                    window.__microi_drawer_stack.splice(i, 1);
+                                    break;
+                                }
+                            }
+                        }
+                        if (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0) {
+                            try { if (window.__microi_drawer_popstate_handler) { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); window.__microi_drawer_popstate_handler = null; } } catch (e) {}
+                            try { window.__microi_drawer_stack = []; } catch (e) {}
+                            // 仅在非 popstate（即程序化）场景下，回退历史以消费先前 pushState
+                            try {
+                                if (!isPopstate && window.history && window.history.length) {
+                                    // 防止由 history.back 触发的 popstate 再次关闭，先设忽略标志
+                                    try { window.__microi_ignore_pop = true; } catch (e) {}
+                                    try { window.history.back(); } catch (e) {}
+                                }
+                            } catch (e) {}
+                        }
+                    } catch (e) {}
+                }
+
+                // Dialog 模式：同理处理全局 dialog 堆栈
+                if (dialogId === 'ShowFieldForm' && self.diyStore.IsPhoneView) {
+                    var myDialogId = null;
+                    try {
+                        if (self._currentDialogInstanceIds && self._currentDialogInstanceIds.length) {
+                            myDialogId = self._currentDialogInstanceIds.pop();
+                        }
+                    } catch (e) {}
+                    try {
+                        if (window.__microi_dialog_stack && window.__microi_dialog_stack.length) {
+                            for (var j = window.__microi_dialog_stack.length - 1; j >= 0; j--) {
+                                var dit = window.__microi_dialog_stack[j];
+                                if (!dit) { continue; }
+                                if (dit.owner === self || (myDialogId && dit.id === myDialogId)) {
+                                    window.__microi_dialog_stack.splice(j, 1);
+                                    break;
+                                }
+                            }
+                        }
+                        if (!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0) {
+                            try { if (window.__microi_dialog_popstate_handler) { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); window.__microi_dialog_popstate_handler = null; } } catch (e) {}
+                            try { window.__microi_dialog_stack = []; } catch (e) {}
+                            try {
+                                if (!isPopstate && window.history && window.history.length) {
+                                    try { window.__microi_ignore_pop = true; } catch (e) {}
+                                    try { window.history.back(); } catch (e) {}
+                                }
+                            } catch (e) {}
+                        }
+                    } catch (e) {}
+                }
+            } catch (e) {}
             if (self.$refs.fieldForm) {
                 await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
             }
