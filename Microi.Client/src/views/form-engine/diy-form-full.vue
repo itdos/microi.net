@@ -223,8 +223,8 @@
                     >
                     <el-button
                         v-if="
-                            FormMode == 'Edit' 
-                            && TableChildFormMode !== 'View' 
+                            FormMode == 'Edit'
+                            && TableChildFormMode !== 'View'
                             && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
                             && !diyStore.IsPhoneView
                         "
@@ -510,8 +510,8 @@
                     >
                     <el-button
                         v-if="
-                            FormMode == 'Edit' 
-                            && TableChildFormMode !== 'View' 
+                            FormMode == 'Edit'
+                            && TableChildFormMode !== 'View'
                             && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
                             && !diyStore.IsPhoneView
                         "
