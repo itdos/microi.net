@@ -254,6 +254,14 @@ export default {
         }
     },
 
+    // 在模板渲染前确保 field.Config.SelectTree 存在，避免模板中访问 undefined 属性崩溃
+    created() {
+        if (this.field) {
+            if (!this.field.Config) this.field.Config = {};
+            if (!this.field.Config.SelectTree) this.field.Config.SelectTree = {};
+        }
+    },
+
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
         var self = this;
@@ -293,13 +301,111 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            // 如果数据还未加载，触发数据加载
+            // 如果数据还未加载，触发数据加载（避免与父表单批量 SetFieldsData 并发重复请求）
             if (!self.field.Data || self.field.Data.length === 0) {
+                if (self.field._DataLoading === true) {
+                    return; // 批量加载已在进行中，等待 watch 触发
+                }
                 self.DiyCommon.SetFieldData(self.field);
                 return; // 等待watch触发后再次初始化
             }
+            // 如果后端返回了平铺数据（没有 _Child 嵌套），则在前端构建树形结构
+            self.ensureTreeStructure();
             self.syncFromExternalValue(modelValue);
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+        },
+
+        /**
+         * 确保 field.Data 是树形嵌套结构。
+         * 如果后端返回平铺数据（有 ParentId 但没有 _Child），则在前端构建树形。
+         */
+        ensureTreeStructure() {
+            var self = this;
+            var data = self.field.Data;
+            if (!data || data.length === 0) return;
+            
+            var cfg = (self.field.Config && self.field.Config.SelectTree) || {};
+            var childrenKey = self.GetChildrenName(self.field);
+            var parentField = cfg.ParentField || 'ParentId';
+            var valueKey = self.field.Config.SelectSaveField || 'Id';
+            
+            // 检查是否已经是树形结构（任意节点有 children 数组就认为已是树形）
+            var alreadyTree = data.some(function (item) {
+                return item[childrenKey] && Array.isArray(item[childrenKey]) && item[childrenKey].length > 0;
+            });
+            if (alreadyTree) return;
+            
+            // 尝试查找 parentField：先精确匹配，再不区分大小写匹配
+            var actualParentField = parentField;
+            var hasParentField = data.some(function (item) {
+                return item[parentField] !== undefined;
+            });
+            if (!hasParentField) {
+                // 尝试不区分大小写匹配
+                var firstItem = data[0];
+                if (firstItem) {
+                    var keys = Object.keys(firstItem);
+                    var lowerTarget = parentField.toLowerCase();
+                    for (var i = 0; i < keys.length; i++) {
+                        if (keys[i].toLowerCase() === lowerTarget) {
+                            actualParentField = keys[i];
+                            hasParentField = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!hasParentField) return;
+            
+            // 构建 id -> item 映射
+            var map = {};
+            data.forEach(function (item) {
+                var id = item[valueKey];
+                if (id !== undefined && id !== null) {
+                    map[String(id)] = item;
+                }
+            });
+            
+            // 判断是否为根节点（与后端 IsRootParentValue 保持一致）
+            var isRootValue = function(pid) {
+                if (pid === undefined || pid === null) return true;
+                var s = String(pid);
+                return s === '' || s === '0' || s === '00000000-0000-0000-0000-000000000000' || s === '00000000000000000000000000';
+            };
+            
+            // 构建树形
+            var roots = [];
+            data.forEach(function (item) {
+                var pid = item[actualParentField];
+                
+                if (isRootValue(pid)) {
+                    roots.push(item);
+                } else if (map[String(pid)]) {
+                    // 有父节点，挂到父节点的 children 下
+                    var parent = map[String(pid)];
+                    if (!parent[childrenKey]) {
+                        parent[childrenKey] = [];
+                    }
+                    parent[childrenKey].push(item);
+                } else {
+                    // 孤儿节点（父不存在），作为根节点
+                    roots.push(item);
+                }
+            });
+            
+            // 修正 _Leaf 值：有子节点的设为 false，无子节点的设为 true
+            data.forEach(function (item) {
+                if (item[childrenKey] && item[childrenKey].length > 0) {
+                    item['_Leaf'] = false;
+                } else {
+                    item['_Leaf'] = true;
+                }
+            });
+            
+            // 替换 field.Data 为树形根节点列表
+            if (roots.length > 0 && roots.length < data.length) {
+                self.field.Data = roots;
+            }
         },
 
         // 四级菜单
@@ -479,7 +585,10 @@ export default {
         },
         GetLabel(field) {
             var self = this;
-            return !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
+            // SelectLabel → SelectSaveField → 'Name' 兜底默认（常见树形表都有 Name 字段）
+            if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) return field.Config.SelectLabel;
+            if (!self.DiyCommon.IsNull(field.Config.SelectSaveField)) return field.Config.SelectSaveField;
+            return 'Name';
         },
         GetChildrenName(field) {
             var self = this;
@@ -726,8 +835,8 @@ export default {
                 DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false,
                 SelectTree: {
                     Children: self.field.Config.SelectTree.Children || '',
-                    ParentField: self.field.Config.SelectTree.ParentField || '',
-                    ParentFields: self.field.Config.SelectTree.ParentFields || '',
+                    ParentField: self.field.Config.SelectTree.ParentField || 'ParentId',
+                    ParentFields: self.field.Config.SelectTree.ParentFields || 'ParentIds',
                     Lazy: self.field.Config.SelectTree.Lazy || false,
                     Filterable: self.field.Config.SelectTree.Filterable || false,
                     Multiple: self.field.Config.SelectTree.Multiple || false,

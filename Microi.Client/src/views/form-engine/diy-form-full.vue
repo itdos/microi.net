@@ -1067,16 +1067,23 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.TableRowId = result.Data;
-                        self.$nextTick(function () {
-                            self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
-                        });
-                    } else {
-                        self.BtnLoading = false;
-                    }
-                });
+                // 2026-04-17 Fix：如果父组件（diy-table）已经调用 NewGuid 并传入了 Id，则复用，避免重复请求
+                if (!self.DiyCommon.IsNull(self.TableRowId)) {
+                    self.$nextTick(function () {
+                        self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+                    });
+                } else {
+                    self.DiyCommon.Post("/api/FormEngine/NewGuid", {}, function (result) {
+                        if (self.DiyCommon.Result(result)) {
+                            self.TableRowId = result.Data;
+                            self.$nextTick(function () {
+                                self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+                            });
+                        } else {
+                            self.BtnLoading = false;
+                        }
+                    });
+                }
             } else {
                 self.$nextTick(function () {
                     self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);

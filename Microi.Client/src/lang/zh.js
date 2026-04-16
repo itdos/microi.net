@@ -224,7 +224,7 @@ export default {
         
         // DIY表单相关
         TableList: "列表",
-        SwitchTableDisplay: "切换表格/卡片显示",
+        SwitchTableDisplay: "切换显示",
         Selected: "已选择",
         Items: "项",
         SelectAll: "全选",
