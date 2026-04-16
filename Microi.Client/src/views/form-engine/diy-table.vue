@@ -179,8 +179,13 @@
                             <template #prepend><el-button :icon="RefreshLeft" @click="InitSearch();GetDiyTableRow({ _PageIndex: 1 });"></el-button></template>
                             <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                         </el-input>
-                        <div v-if="ShowAddByRoute && diyStore.IsPhoneView" class="more-search" @click="showMobileSearch=true">
-                            <el-icon :size="20"><Operation /></el-icon>
+                        <div v-if="diyStore.IsPhoneView" class="mobile-search-actions">
+                            <div v-if="ShowAddByRoute" class="mobile-icon-btn" @click="showMobileSearch=true">
+                                <el-icon :size="20"><Operation /></el-icon>
+                            </div>
+                            <div class="mobile-icon-btn" :class="{ 'is-active': cardCompactMode }" @click="cardCompactMode = !cardCompactMode">
+                                <el-icon :size="20"><Fold v-if="!cardCompactMode" /><Expand v-else /></el-icon>
+                            </div>
                         </div>
                     </div>
                     <!-- <template v-if="IsPermission('NoSearch')">
@@ -373,7 +378,7 @@
                     @row-click="DiyTableRowClick"
                     highlight-current-row
                     @current-change="DiyTableCurrentChange"
-                    :lazy="true"
+                    :lazy="CurrentDiyTableModel.TreeLazy === true || CurrentDiyTableModel.TreeLazy === 1"
                     :load="DiyTableLoad"
                     row-key="Id"
                     :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
@@ -797,6 +802,7 @@
                                         <!-- ====== 中间行：其余字段 ====== -->
                                         <div
                                             v-for="(field, fieldIndex) in CardShowDiyFieldList.slice(1)"
+                                            v-show="!cardCompactMode || fieldIndex === 0"
                                             :key="field.Id"
                                             class="card-field-row"
                                         >
@@ -1978,6 +1984,7 @@ export default {
             _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
             // 移动端搜索弹窗状态
             showMobileSearch: false,
+            cardCompactMode: false,
             // 移动端FAB菜单状态
             showMobileFabMenu: false,
             // 索引管理弹窗
@@ -2891,10 +2898,23 @@ export default {
         },
         DiyTableLoad(tree, treeNode, resolve) {
             var self = this;
+            // 若未配置树形父级字段，默认使用 ParentId；避免发送 _Where: [["","=",id]] 这种非法请求，
+            // 同时避免后端因识别不到 ParentId 过滤而错误地添加"根节点过滤"，返回的根节点数据被当作子节点
+            // 造成树形循环引用 & Vue 渲染栈溢出（RangeError: Maximum call stack size exceeded）。
+            if (!self.CurrentDiyTableModel || !self.CurrentDiyTableModel.IsTree) {
+                if (typeof resolve === "function") resolve([]);
+                return;
+            }
+            var treeParentField = self.CurrentDiyTableModel.TreeParentField;
+            if (self.DiyCommon.IsNull(treeParentField)) {
+                treeParentField = "ParentId";
+            }
             var param = {
                 ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-                // _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
-                _Where: [[self.CurrentDiyTableModel.TreeParentField, "=", tree.Id]]
+                // _Where: [{ Name: treeParentField, Value: tree.Id, Type: "=" }]
+                _Where: [[treeParentField, "=", tree.Id]],
+                // 懒加载展开子节点时显式声明：返回平铺子节点，不要走"根节点过滤+递归"逻辑
+                _TreeLazy: 1
             };
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
@@ -2911,6 +2931,21 @@ export default {
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开处理数据列表总耗时`);
+
+                        // 【防御性修复】过滤掉返回数据中 ParentId 不等于当前展开节点 Id 的记录，
+                        // 防止后端异常返回根节点/其它层级节点时被当作子节点追加，造成树形循环引用 & 渲染栈溢出。
+                        if (treeParentField && result.Data && result.Data.length > 0) {
+                            var expandId = tree && tree.Id;
+                            var originalLen = result.Data.length;
+                            result.Data = result.Data.filter(function (row) {
+                                return row && row.Id !== expandId && String(row[treeParentField] || "") === String(expandId || "");
+                            });
+                            if (result.Data.length !== originalLen) {
+                                console.warn("Microi：树形展开响应中包含非直属子节点，已自动过滤。", {
+                                    expandId: expandId, 过滤前: originalLen, 过滤后: result.Data.length
+                                });
+                            }
+                        }
 
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
                         var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
@@ -5439,9 +5474,6 @@ export default {
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
                         for (var i = 0; i < result.Data.length; i++) {
-                            if (!self.CurrentDiyTableModel.TreeLazy) {
-                                result.Data[i][self.CurrentDiyTableModel.TreeHasChildren] = false;
-                            }
                             // 默认都显示，后续异步更新
                             result.Data[i].IsVisibleDetail = true;
                             result.Data[i].IsVisibleEdit = true;
@@ -5518,6 +5550,11 @@ export default {
                             }
 
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
+
+                            // 非懒加载树形模式：递归处理 _Child 子节点的按钮可见性
+                            if (self.CurrentDiyTableModel.IsTree && !(self.CurrentDiyTableModel.TreeLazy === true || self.CurrentDiyTableModel.TreeLazy === 1)) {
+                                self.DiguiDiyTableRowDataList(result.Data, currentVersion);
+                            }
 
                             if (templateEngineFields.length > 0) {
                                 console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
@@ -5993,6 +6030,35 @@ export default {
      .more-search:active {
        opacity: 0.5;
      }
+  }
+  .mobile-search-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .mobile-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #f2f3f5;
+    color: #606266;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    &:active {
+      transform: scale(0.92);
+      opacity: 0.7;
+    }
+    &.is-active {
+      background: var(--el-color-primary, #409eff);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(64,158,255,0.3);
+    }
   }
   .mobile-fab-container {
     position: fixed;

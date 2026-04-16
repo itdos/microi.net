@@ -173,8 +173,8 @@ export default {
                 DataSourceSqlRemote: false,
                 Cascader: {
                     Children: '',
-                    ParentField: '',
-                    ParentFields: '',
+                    ParentField: 'ParentId',
+                    ParentFields: 'ParentIds',
                     Lazy: false,
                     Filterable: false,
                     Multiple: false,
@@ -270,6 +270,14 @@ export default {
     computed: {
         isMobile() {
             return !!(this.DosCommon && this.DosCommon.isMobile);
+        }
+    },
+
+    // 在模板渲染前确保 field.Config.Cascader 存在，避免模板中访问 undefined 属性崩溃
+    created() {
+        if (this.field) {
+            if (!this.field.Config) this.field.Config = {};
+            if (!this.field.Config.Cascader) this.field.Config.Cascader = {};
         }
     },
 
@@ -604,8 +612,8 @@ export default {
                 DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false,
                 Cascader: {
                     Children: self.field.Config.Cascader.Children || '',
-                    ParentField: self.field.Config.Cascader.ParentField || '',
-                    ParentFields: self.field.Config.Cascader.ParentFields || '',
+                    ParentField: self.field.Config.Cascader.ParentField || 'ParentId',
+                    ParentFields: self.field.Config.Cascader.ParentFields || 'ParentIds',
                     Lazy: self.field.Config.Cascader.Lazy || false,
                     Filterable: self.field.Config.Cascader.Filterable || false,
                     Multiple: self.field.Config.Cascader.Multiple || false,
