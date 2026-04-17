@@ -11,7 +11,7 @@
       </view>
     </view>
 
-    <scroll-view class="detail-scroll" scroll-y v-if="!loading && article">
+    <scroll-view class="detail-scroll" scroll-y v-if="!loading && article" :style="{ height: scrollHeight + 'px' }">
       <!-- 文章标题 -->
       <view class="article-header">
         <text class="article-title">{{ article.Biaoti }}</text>
@@ -70,7 +70,10 @@ export default {
       articleId: '',
       article: null,
       coverImage: '',
-      loading: true
+      loading: true,
+      // iOS WeChat 下 flex:1 + height:0 会让 scroll-view 计算不到高度导致空白，
+      // 直接用 window.windowHeight - navHeight 得到像素高度。
+      scrollHeight: 600
     }
   },
 
@@ -93,14 +96,20 @@ export default {
   },
 
   onLoad(options) {
+    let windowHeight = 667
     try {
       const info = uni.getWindowInfo()
       this.statusBarHeight = info.statusBarHeight || 44
+      windowHeight = info.windowHeight || info.screenHeight || 667
     } catch (e) {
       try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+        const sys = uni.getSystemInfoSync()
+        this.statusBarHeight = sys.statusBarHeight || 44
+        windowHeight = sys.windowHeight || 667
       } catch (e2) {}
     }
+    // 自定义导航栏高度 = statusBar + 44（navContent 高度 88rpx ≈ 44px）
+    this.scrollHeight = Math.max(300, windowHeight - this.statusBarHeight - 44)
 
     this.articleId = options.id
     if (this.articleId) {
@@ -149,10 +158,13 @@ export default {
 
 <style lang="scss" scoped>
 .detail-container {
-  min-height: 100vh;
+  /* iOS WeChat 下 min-height:100vh + flex:1 会导致子 scroll-view 高度为 0 出现空白，
+     改为 height:100vh 确保 flex 子项有明确父高度可以计算。 */
+  height: 100vh;
   background: #fff;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* 导航栏 */
@@ -201,8 +213,8 @@ export default {
 }
 
 .detail-scroll {
-  flex: 1;
-  height: 0;
+  /* 高度由 :style 动态计算，确保 iOS WeChat 下可正确滚动。 */
+  width: 100%;
 }
 
 /* 文章标题 */

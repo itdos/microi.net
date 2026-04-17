@@ -41,7 +41,7 @@ V8.FormSet('UserName', { Id : 1, Name : '张三' });
 ## V8.Field
 >* 访问当前表单字段属性
 ```js
-var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
+var isReadonly = V8.Field.UserName.Readonly;//UserName字段当前是否是只读
 //包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
 ```
 
@@ -50,6 +50,7 @@ var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
 ```js
 //设置UserName字段为只读
 V8.FieldSet('UserName', 'Readonly', true);
+//其它可设置属性：Readonly、Visible、Placeholder等等
 //给某个下拉框动态设置数据源：
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
