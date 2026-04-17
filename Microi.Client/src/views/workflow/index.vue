@@ -133,7 +133,7 @@
             </el-row>
         </template>
         <el-dialog draggable width="768px" :modal-append-to-body="false" v-model="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
-            <DiyForm ref="form_diy_flow" :FormMode="DiyFormMode" :TableId="DiyTableId" :TableRowId="CurrentDiyTableModel.Id" />
+            <DiyForm ref="form_diy_flow" :AutoInit="false" :FormMode="DiyFormMode" :TableId="DiyTableId" :TableRowId="CurrentDiyTableModel.Id" />
             <template #footer>
                 <el-button :loading="SaveDiyTableLoding" type="primary" :icon="QuestionFilled" @click="DiySave">{{ $t("Msg.Save") }}</el-button>
                 <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
