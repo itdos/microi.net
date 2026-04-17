@@ -118,8 +118,9 @@
                                     <el-button
                                         type="text"
                                         :icon="Delete"
-                                        v-if="(data._Child ? data._Child.length === 0 : data._HasChild) && LeftTreeData.ShushanC === 1 && ShowButton(data, 'Delete')"
+                                        v-if="!data._HasChild && LeftTreeData.ShushanC && ShowButton(data, 'Delete')"
                                         title="删除分类"
+                                        @click.stop="DeleteNode(data)"
                                     ></el-button>
                                 </span>
                             </span>
@@ -231,7 +232,7 @@ export default {
                         },
                         function (res) {
                             for (var item of res.Data) {
-                                item._HasChild = item._HasChild !== 1;
+                                item._HasChild = item._HasChild ? true : false;
                             }
                             resolve(res);
                         }
@@ -367,13 +368,34 @@ export default {
             this.treeData();
         },
 
+        // 删除节点
+        DeleteNode(data) {
+            var self = this;
+            var labelField = self.TreeData.defaultProps.label || 'Name';
+            var title = data[labelField] || data.Name || '';
+            self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDelTo") + "【" + title + "】？", function () {
+                self.DiyCommon.Post(
+                    self.DiyApi.DelDiyTableRow,
+                    {
+                        FormEngineKey: self.LeftTreeData.GuanlianBD,
+                        Id: data.Id
+                    },
+                    function (result) {
+                        if (self.DiyCommon.Result(result)) {
+                            self.DiyCommon.Tips(self.$t("Msg.Success"));
+                            self.refreshTree();
+                        }
+                    }
+                );
+            });
+        },
         // 打开表单
         OpenAnyForm(ParentData, FormMode, origin) {
             var self = this;
             var param = {
                 TableName: this.LeftTreeData.GuanlianBD,
                 FormMode: FormMode,
-                Id: ParentData.Id,
+                Id: FormMode === "Add" ? "" : ParentData.Id,
                 DialogType: this.LeftTreeData.TanchuangLX || "Dialog",
                 Width: this.LeftTreeData.TanchuangDX || "765px"
             };

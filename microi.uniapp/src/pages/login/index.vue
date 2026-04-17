@@ -462,15 +462,23 @@ export default {
 
       this.phoneAuthLoading = true
       try {
-        // 如果 cachedLoginCode 过期，重新获取
-        let loginCode = this.cachedLoginCode
-        if (!loginCode) {
+        // cachedLoginCode 已在第一步 jscode2session 中被消费（code 只能用一次，微信返回 40163），
+        // 必须重新调用 uni.login 获取全新的 LoginCode 供后端换 openid 使用。
+        let loginCode = ''
+        try {
           const provider = getLoginProvider()
           const loginRes = await uni.login({ provider })
           if (loginRes && loginRes.code) {
             loginCode = loginRes.code
             this.cachedLoginCode = loginCode
           }
+        } catch (err) {
+          console.warn('[Login] 重新获取 LoginCode 失败:', err)
+        }
+        if (!loginCode) {
+          uni.showToast({ title: '获取登录凭证失败，请重试', icon: 'none' })
+          this.phoneAuthLoading = false
+          return
         }
 
         const authApi = getAuthLoginApi(appConfig)
