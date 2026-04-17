@@ -415,8 +415,36 @@ export default {
             }
             if (field.Config.Cascader.Lazy === true) {
                 result.lazy = true;
+                var self = this;
                 result.lazyLoad = function (node, resolve) {
-                    const { level } = node;
+                    if (node.level === 0) {
+                        // 根级别由 el-cascader 的 :options 提供，直接 resolve
+                        resolve([]);
+                        return;
+                    }
+                    var parentValue = node.data ? node.data[field.Config.SelectSaveField || 'Id'] : '';
+                    if (self.DiyCommon.IsNull(parentValue)) {
+                        resolve([]);
+                        return;
+                    }
+                    self.DiyCommon.Post(
+                        self.DiyApi.GetDiyFieldSqlData,
+                        {
+                            _FieldId: field.Id,
+                            _FormData: {},
+                            _ParentValue: parentValue
+                        },
+                        function (result) {
+                            if (self.DiyCommon.Result(result) && result.Data) {
+                                resolve(result.Data);
+                            } else {
+                                resolve([]);
+                            }
+                        },
+                        function (error) {
+                            resolve([]);
+                        }
+                    );
                 };
             }
             if (!self.DiyCommon.IsNull(field.Config.Cascader.Disabled)) {

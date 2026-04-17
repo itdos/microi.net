@@ -512,10 +512,10 @@ export default {
             type: Boolean,
             default: false
         },
-        // AutoInit: {
-        //     type: Boolean,
-        //     default: true
-        // },
+        AutoInit: {
+            type: Boolean,
+            default: true
+        },
         ShowHideField: {
             type: Boolean,
             default: false
@@ -952,10 +952,10 @@ export default {
         // 2026-02-05 Anderson：没必要让外部每次去调用 Init()，组件实现自动初始化
         // 2026-04-13 Fix：条件改为"有标识时才自动Init"，避免工作流等场景下 TableId 还是空值时
         // 就提前 Init() 导致 GetDiyFieldList 报"参数错误"（工作流中 TableId 由 InitSendWork 延迟设置）
-        // 2026-04-17 Fix：Dialog/Drawer 模式下（LoadMode 为空），父组件 diy-form-full 会手动调用 Init()（含回调），
-        // 此处不应自动 Init，否则会导致 GetDiyTableModel/GetDiyFieldList/GetFieldsData 全部请求两遍。
-        // 仅在 Page/Design 等独立模式下才自动 Init。
-        if((self.TableName || self.TableId) && self.LoadMode){
+        // 2026-04-17 Fix：通过 AutoInit prop 控制是否自动初始化。
+        // 父组件手动调用 Init() 的场景（如 diy-form-full Dialog/Drawer、RightForm、workflow 等）传入 :AutoInit="false"，
+        // 其余场景（diy-design 字段/表属性编辑、Page 模式等）默认 AutoInit=true，挂载后自动初始化。
+        if((self.TableName || self.TableId) && self.AutoInit){
             self.Init();
         }
     },

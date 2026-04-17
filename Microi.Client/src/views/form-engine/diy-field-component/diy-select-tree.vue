@@ -1,7 +1,7 @@
 <template>
     <el-tree-select
         clearable
-        :filterable="(field.Config.SelectTree && field.Config.SelectTree.Filterable) || field.Config.Filterable"
+        :filterable="(field.Config.SelectTree && field.Config.SelectTree.Filterable) || field.Config.Filterable || field.Config.DataSourceSqlRemote === true"
         :disabled="GetFieldReadOnly(field)"
         :placeholder="GetFieldPlaceholder(field)"
         class="main-select-tree"
@@ -301,6 +301,22 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            var isLazy = self.field.Config && self.field.Config.SelectTree && self.field.Config.SelectTree.Lazy === true;
+            // Lazy 模式：数据通过 loadTreeNode 回调按需加载，不需要预加载全量数据
+            if (isLazy) {
+                // 如果数据还未加载，需要先加载根节点数据
+                if (!self.field.Data || self.field.Data.length === 0) {
+                    if (self.field._DataLoading === true) {
+                        return;
+                    }
+                    self.DiyCommon.SetFieldData(self.field);
+                    return;
+                }
+                // Lazy 模式不需要 ensureTreeStructure，根节点数据由 loadTreeNode(level=0) 读取
+                self.syncFromExternalValue(modelValue);
+                self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+                return;
+            }
             // 如果数据还未加载，触发数据加载（避免与父表单批量 SetFieldsData 并发重复请求）
             if (!self.field.Data || self.field.Data.length === 0) {
                 if (self.field._DataLoading === true) {
@@ -461,10 +477,40 @@ export default {
 
         loadTreeNode(node, resolve) {
             var self = this;
+            // 优先使用自定义 LazyLoad 回调
             if (self.field && self.field.Config && self.field.Config.SelectTree && typeof self.field.Config.SelectTree.LazyLoad === "function") {
                 return self.field.Config.SelectTree.LazyLoad(node, resolve, self.field, self.FormDiyTableModel);
             }
-            resolve([]);
+            // 根节点（level=0）：从 field.Data 中获取已加载的根节点数据
+            if (node.level === 0) {
+                resolve(self.field.Data || []);
+                return;
+            }
+            // 子节点：调用后端接口获取子级数据
+            var parentValue = node.data ? node.data[self.GetTreeValueKey(self.field)] : '';
+            if (self.DiyCommon.IsNull(parentValue)) {
+                resolve([]);
+                return;
+            }
+            self.DiyCommon.Post(
+                self.DiyApi.GetDiyFieldSqlData,
+                {
+                    _FieldId: self.field.Id,
+                    _FormData: {},
+                    _ParentValue: parentValue
+                },
+                function (result) {
+                    if (self.DiyCommon.Result(result) && result.Data) {
+                        // 后端 Lazy=true 时返回平铺数据，这里是直接子级
+                        resolve(result.Data);
+                    } else {
+                        resolve([]);
+                    }
+                },
+                function (error) {
+                    resolve([]);
+                }
+            );
         },
 
         syncFromExternalValue(rawValue) {
@@ -563,6 +609,24 @@ export default {
 
         filterNode(value, data) {
             var self = this;
+            // 远程搜索模式：将过滤委托给后端
+            if (self.field.Config && self.field.Config.DataSourceSqlRemote === true) {
+                // 防抖：每个不同的搜索词只触发一次 API 调用
+                if (self._lastRemoteQuery !== value) {
+                    self._lastRemoteQuery = value;
+                    clearTimeout(self._remoteSearchTimer);
+                    self._remoteSearchTimer = setTimeout(function () {
+                        if (value) {
+                            self.remoteSearchTree(value);
+                        } else {
+                            // 清空搜索：重新加载完整数据
+                            self.DiyCommon.SetFieldData(self.field);
+                        }
+                    }, 300);
+                }
+                return true; // 显示所有节点，后端负责过滤
+            }
+            // 本地过滤
             if (!value) return true;
             var labelField = self.GetLabel(self.field);
             var saveField = self.field.Config.SelectSaveField;
@@ -571,6 +635,23 @@ export default {
                 labelValue = data[saveField];
             }
             return String(labelValue || "").toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
+        },
+        // 远程搜索树数据
+        remoteSearchTree(keyword) {
+            var self = this;
+            self.DiyCommon.Post(
+                self.DiyApi.GetDiyFieldSqlData,
+                {
+                    _FieldId: self.field.Id,
+                    _FormData: {},
+                    _Keyword: keyword
+                },
+                function (result) {
+                    if (self.DiyCommon.Result(result) && result.Data) {
+                        self.field.Data = result.Data;
+                    }
+                }
+            );
         },
 
         GetSelectValueKey(field) {
