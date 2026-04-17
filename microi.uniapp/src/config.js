@@ -20,7 +20,7 @@ export default {
   // ============ WebView 地址 ============
   // webviewUrl: 'http://localhost:1988/?OsClient=qiqiang',
   webviewUrl: 'https://saas.jifulii.com',
-
+  // webviewUrl: 'http://192.168.31.63:1988/',
   // ============ 静态资源服务器 ============
   fileServer: 'https://static.jifulii.com',
 
