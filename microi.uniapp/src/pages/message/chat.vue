@@ -22,7 +22,7 @@
       :scroll-with-animation="true"
     >
       <!-- 连接状态提示 -->
-      <view class="connection-hint" v-if="!wsConnected">
+      <view class="connection-hint" v-if="wsEverAttempted && !wsConnected">
         <text class="hint-text">⏳ {{ t('message.reconnecting') }}</text>
       </view>
 
@@ -205,6 +205,8 @@ export default {
       scrollToId: '',
       currentStreamMessage: null,
       wsConnected: false,
+      // 首次 loadChatRecord 前是否至少尝试过连接；用于抑制初始状态假提示
+      wsEverAttempted: false,
       _pollTimer: null,
       // AI模型选择
       aiModelList: [],
@@ -259,6 +261,14 @@ export default {
       return
     }
 
+    // 同步当前真实连接状态，避免从 message 页进入 chat 时出现短暂的"正在重连"假提示
+    try {
+      const existing = getSignalR()
+      if (existing && existing.isConnected) {
+        this.wsConnected = true
+      }
+    } catch (e) {}
+
     this.loadChatRecord()
 
     // AI聊天时加载模型列表
@@ -266,22 +276,29 @@ export default {
       this.loadAiModelList()
     }
 
-    // 监听 SignalR 重连事件，自动重新订阅
+    // 监听 SignalR 连接/断开事件，实时同步 wsConnected
     this._onReconnected = () => {
-      console.log('[Chat] SignalR 重连成功，重新加载聊天记录')
+      console.log('[Chat] SignalR 连接成功，重新加载聊天记录')
       this.wsConnected = true
       this.loadChatRecord()
     }
+    this._onDisconnected = () => {
+      console.log('[Chat] SignalR 连接断开')
+      this.wsConnected = false
+    }
     try {
       const client = getSignalR()
-      if (client) client.on('_connected', this._onReconnected)
+      if (client) {
+        client.on('_connected', this._onReconnected)
+        client.on('_disconnected', this._onDisconnected)
+      }
     } catch (e) {}
 
-    // 定期检查连接状态
+    // 定期检查连接状态（事件丢失兜底）
     this._wsCheckTimer = setInterval(() => {
       try {
         const client = getSignalR()
-        const connected = client && client.isConnected
+        const connected = !!(client && client.isConnected)
         if (connected !== this.wsConnected) {
           this.wsConnected = connected
           if (connected) {
@@ -303,6 +320,13 @@ export default {
         if (client) client.off('_connected', this._onReconnected)
       } catch (e) {}
       this._onReconnected = null
+    }
+    if (this._onDisconnected) {
+      try {
+        const client = getSignalR()
+        if (client) client.off('_disconnected', this._onDisconnected)
+      } catch (e) {}
+      this._onDisconnected = null
     }
     // 清理连接检查定时器
     if (this._wsCheckTimer) {
@@ -344,6 +368,8 @@ export default {
     // 加载聊天记录（通过 SignalR）
     async loadChatRecord() {
       if (!this._loadRetryCount) this._loadRetryCount = 0
+      // 标记已至少尝试过一次连接，这时才允许显示"正在重连"提示
+      this.wsEverAttempted = true
       try {
         // 带超时的连接，防止无限等待
         let client
@@ -362,10 +388,9 @@ export default {
           return
         }
 
-        // Bug#12: 检查连接是否成功
+        // 检查连接是否真正成功（不 show toast，避免反复弹窗；由模板统一展示提示）
         if (!client || !client.isConnected) {
           this.wsConnected = false
-          uni.showToast({ title: this.t('message.reconnecting'), icon: 'none' })
           if (this._loadRetryCount < 3) {
             this._loadRetryCount++
             setTimeout(() => this.loadChatRecord(), 3000)

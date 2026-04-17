@@ -290,6 +290,7 @@
                 <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
                     <DiyForm
                         ref="fieldForm"
+                        :AutoInit="false"
                         :FormWF="FormWF"
                         :LoadMode="''"
                         :FormMode="FormMode"
@@ -578,6 +579,7 @@
                 <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
                     <DiyForm
                         ref="fieldForm"
+                        :AutoInit="false"
                         :FormWF="FormWF"
                         :LoadMode="''"
                         :FormMode="FormMode"
