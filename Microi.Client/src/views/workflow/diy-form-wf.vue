@@ -5,6 +5,7 @@
                 <DiyForm
                     v-if="CurrentTableId"
                     ref="diyFormWfWork"
+                    :AutoInit="false"
                     :LoadMode="''"
                     :FormMode="OpenFormMode"
                     :TableId="CurrentTableId"

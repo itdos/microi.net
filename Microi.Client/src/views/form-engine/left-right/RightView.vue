@@ -22,6 +22,7 @@
         <div class="clear">
             <DiyForm
                 ref="fieldForm"
+                :AutoInit="false"
                 :LoadMode="''"
                 :FormMode="FormMode"
                 :TableChildFormMode="TableChildFormMode"

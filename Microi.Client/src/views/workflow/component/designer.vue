@@ -64,6 +64,7 @@
                             <div v-if="divForm_diy_node_designer">
                                 <DiyForm
                                     ref="form_diy_node_designer"
+                                    :AutoInit="false"
                                     :FormMode="DiyFormMode"
                                     :TableId="DiyTableId_Node"
                                     :TableRowId="DiyTableRowId_Node"
@@ -83,6 +84,7 @@
                             <div style="padding-left: 15px; padding-right: 15px">
                                 <DiyForm
                                     ref="form_diy_line_designer"
+                                    :AutoInit="false"
                                     :FormMode="DiyFormMode"
                                     :TableId="DiyTableId_Line"
                                     :TableRowId="DiyTableRowId_Line"
@@ -103,6 +105,7 @@
                                 <!-- :LoadMode="'Dialog'"  -->
                                 <DiyForm
                                     ref="form_diy_flow_designer"
+                                    :AutoInit="false"
                                     :FormMode="DiyFormMode"
                                     :TableId="DiyTableId_Flow"
                                     :TableRowId="DiyTableRowId_Flow"
