@@ -122,7 +122,15 @@ class SignalRClient {
    * 连接到 SignalR Hub
    */
   async connect() {
-    if (this.connected || this.connecting) return true
+    if (this.connected) return true
+    // 已有一次 connect 正在进行中，则等待它完成，而不是直接返回 true
+    // 否则调用方以为连接成功但 isConnected 还是 false，会进入死循环重试
+    if (this.connecting && this._connectingPromise) {
+      try {
+        await this._connectingPromise
+      } catch (e) {}
+      return this.connected
+    }
     this._destroyed = false
 
     const token = getToken()
@@ -132,7 +140,16 @@ class SignalRClient {
     }
 
     this.connecting = true
+    this._connectingPromise = this._doConnect(token)
+    try {
+      await this._connectingPromise
+    } finally {
+      this._connectingPromise = null
+    }
+    return this.connected
+  }
 
+  async _doConnect(token) {
     try {
       // Step 1: Negotiate
       const negotiateUrl = `${appConfig.apiBase}/diy-websocket/negotiate?negotiateVersion=1`
