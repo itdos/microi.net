@@ -434,6 +434,22 @@ body:has(.VPHome) {
       animation: none;
     }
   }
+  // —— 第5个按钮：火热黄 ——
+  .action:nth-child(5) .VPButton {
+    background: linear-gradient(135deg, #ffcc00 0%, #ff9900 100%) !important;
+    border: 1px solid rgba(255, 204, 0, 0.6) !important;
+    color: #000 !important;
+    -webkit-text-fill-color: #000 !important;
+    animation: btn-pulse-yellow 3s ease-in-out infinite 1.5s;
+
+    &:hover {
+      transform: translateY(-5px) scale(1.06) !important;
+      box-shadow: 0 12px 40px rgba(255, 204, 0, 0.55),
+                  0 0 60px rgba(255, 153, 0, 0.25) !important;
+      filter: brightness(1.15);
+      animation: none;
+    }
+  }
 }
 
 // 鼠标悬停图片时放大背景光晕
