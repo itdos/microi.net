@@ -21,6 +21,9 @@ hero:
     - theme: brand
       text: OpenClaw 吾码小龙虾
       link: https://gitee.com/microi-net/microi.openclaw
+    - theme: brand
+      text: 吾码视频下载器
+      link: https://gitee.com/microi-net/microi.spider
   image:
     src: /home2.jpg
 features:
