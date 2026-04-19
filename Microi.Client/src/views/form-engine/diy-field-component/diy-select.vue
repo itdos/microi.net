@@ -55,8 +55,8 @@
                 'slt_opt_key' +
                 field.Name +
                 '_' +
-                (field.Config.DataSource === 'KeyValue' 
-                    ? fieldData.Key 
+                (field.Config.DataSource === 'KeyValue'
+                    ? fieldData.Key
                     : (DiyCommon.IsNull(field.Config.SelectSaveField)
                         ? DiyCommon.IsNull(field.Config.SelectLabel)
                             ? fieldData
@@ -173,7 +173,7 @@ export default {
             if (newVal != oldVal) {
                 // 先标准化值
                 const normalizedVal = self.normalizeSelectValue(newVal);
-                
+
                 // 普通数据源 Data，值就是字符串
                 if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
                     if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
@@ -207,7 +207,7 @@ export default {
             if (newVal != oldVal) {
                 // 先标准化值
                 const normalizedVal = self.normalizeSelectValue(newVal);
-                
+
                 // 普通数据源 Data，值就是字符串
                 if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
                     if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
@@ -290,7 +290,6 @@ export default {
 
     mounted() {
         var self = this;
-        
         // 标准化KeyValue数据源的数据格式（将旧的小写key/value转换为大驼峰Key/Value）
         if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue" && self.field.Data && Array.isArray(self.field.Data)) {
             self.field.Data = self.field.Data.map(item => {
@@ -303,7 +302,7 @@ export default {
                 return item;
             });
         }
-        
+
         var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         // 普通数据源 Data 时，值就是字符串，不需要转换
         if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
@@ -395,7 +394,7 @@ export default {
                     self.SelectRemoteMethod("", self.field);
                 }
             }
-            
+
             self.Initing = false;
         });
     },
@@ -457,17 +456,17 @@ export default {
         // 修复：标准化选择框的值，根据单选/多选返回正确类型
         normalizeSelectValue(value) {
             const isMultiple = this.field?.Component === 'MultipleSelect';
-            
+
             // null 或 undefined
             if (value === null || value === undefined) {
                 return isMultiple ? [] : '';
             }
-            
+
             // 空字符串
             if (value === '') {
                 return isMultiple ? [] : '';
             }
-            
+
             // 多选模式
             if (isMultiple) {
                 // 已经是数组
@@ -491,13 +490,12 @@ export default {
                 // 单个值包装成数组
                 return [value];
             }
-            
+
             // 单选模式
             // 数组取第一个元素
             if (Array.isArray(value)) {
                 return value.length > 0 ? value[0] : '';
             }
-            
             // 直接返回
             return value;
         },
@@ -694,7 +692,7 @@ export default {
         },
         SelectRemoteMethod(query, field) {
             var self = this;
-            if (field.Config.DataSourceSqlRemote == true) 
+            if (field.Config.DataSourceSqlRemote == true)
             {
                 field.Config.DataSourceSqlRemoteLoading = true;
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
@@ -792,7 +790,7 @@ export default {
             self.field.Config.DataSourceId = self.configForm.DataSourceId;
             self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
             self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
-            
+
             // 保存数据列表
             if (self.configForm.DataSource === 'Data') {
                 self.field.Data = [...self.configDataList];
@@ -805,7 +803,7 @@ export default {
                     Value: item.Value
                 }));
             }
-            
+
             self.configDialogVisible = false;
             self.DiyCommon.Tips('配置已保存', true);
         }
@@ -827,7 +825,7 @@ export default {
 
 .keyvalue-list {
     width: 100%;
-    
+
     .keyvalue-item {
         display: flex;
         align-items: center;

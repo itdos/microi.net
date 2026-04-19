@@ -4885,13 +4885,12 @@ export default {
                         }
                     });
                 }
-
                 //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
                 if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
                   //zhy加个条件好初始选中”全部“,self.$route.fullPath和设备中的tabs好区分开
-                    if (self.diyStore.IsPhoneView && (self.$route.fullPath == '/shouhoudingdan' || self.TableChildTableId == '455f886c-9467-463e-8987-f6c3227bb37e')) {
+                    if (self.diyStore.IsPhoneView && (self.$route.fullPath == '/shouhoudingdan' || self.TableChildTableId == '455f886c-9467-463e-8987-f6c3227bb37e' || result.Data.Name == '售后任务')) {
                       self.TableRowListActiveTab = "01KP4RHPVACR1WNNMJ9KQSNACX";
-                    }else {
+                    } else {
                       self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
                     }
                     var tabModel = result.Data.PageTabs[0];
