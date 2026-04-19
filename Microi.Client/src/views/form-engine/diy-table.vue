@@ -21,13 +21,13 @@
                     <template #label>
                        <span
                             :style="{
-                                color: TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
+                                color: TableRowListActiveTab !== tab.Id ? ' var(--el-text-color-regular, #606266) !important' : ''
                             }"
                         >
                             <i
                                 :class="DiyCommon.IsNull(tab.Icon) ? 'fas fa-list-ol marginRight5' : tab.Icon + ' marginRight5'"
                                 :style="{
-                                    color: TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
+                                    color: TableRowListActiveTab !== tab.Id ? ' var(--el-text-color-regular, #606266) !important' : ''
                                 }"
                             />
                             {{ tab.Name }}

@@ -1,90 +1,94 @@
 <template>
-    <div class="mobile-workspace">
-        <!-- 顶部区域（渐变背景 + 装饰圆） -->
-        <div class="ws-header">
-            <div class="header-bg">
-                <div class="bg-circle c1"></div>
-                <div class="bg-circle c2"></div>
+    <div class="mci-mobile-page page-workspace">
+        <!-- 顶部 Hero 区域：渐变背景 + 装饰光斑 -->
+        <header class="ws-hero">
+            <div class="ws-hero__decor">
+                <span class="decor-orb decor-orb--1"></span>
+                <span class="decor-orb decor-orb--2"></span>
             </div>
-            <div class="header-content">
-                <div class="header-top">
-                    <div class="header-left">
-                        <img class="ws-logo" :src="logoUrl" alt="logo" />
-                        <div class="header-text">
-                            <span class="ws-title">工作台</span>
-                            <span class="ws-subtitle">{{ appName }}</span>
-                        </div>
+            <div class="ws-hero__safe-top"></div>
+            <div class="ws-hero__row">
+                <div class="ws-hero__brand">
+                    <img v-if="logoUrl" class="ws-hero__logo" :src="logoUrl" alt="logo" />
+                    <div class="ws-hero__text">
+                        <span class="ws-hero__title">{{ appName }}</span>
+                        <span class="ws-hero__subtitle">{{ appName }}</span>
                     </div>
                 </div>
+                <!-- <span class="mci-navbar__action ws-hero__theme"></span> -->
             </div>
-        </div>
+        </header>
 
         <!-- 骨架屏 -->
-        <div v-if="loading" class="menu-card-list">
-            <div v-for="n in 3" :key="'skeleton-' + n" class="menu-card">
-                <div class="card-header skeleton-card-header">
-                    <div class="sk-icon-circle"></div>
-                    <div class="sk-text-line" style="width: 80px;"></div>
+        <div v-if="loading" class="menu-list">
+            <div v-for="n in 3" :key="'sk-' + n" class="menu-card mci-card">
+                <div class="menu-card__head">
+                    <div class="sk-circle"></div>
+                    <div class="sk-line" style="width: 80px;"></div>
                 </div>
-                <div class="card-content">
-                    <div v-for="m in 4" :key="'skeleton-item-' + m" class="menu-item skeleton-item">
-                        <div class="sk-icon-circle small"></div>
-                        <div class="sk-text-line" style="width: 60%;"></div>
+                <div class="menu-card__grid">
+                    <div v-for="m in 4" :key="'sk-i-' + m" class="menu-item">
+                        <div class="sk-circle sk-circle--lg"></div>
+                        <div class="sk-line" style="width: 60%;"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 菜单卡片列表 -->
-        <div v-else class="menu-card-list">
+        <!-- 菜单列表 -->
+        <div v-else class="menu-list">
             <!-- 空状态 -->
-            <div class="empty-ws" v-if="menuList.length === 0 && !loading">
-                <span class="empty-icon">📋</span>
-                <span class="empty-text">暂无菜单</span>
-                <span class="empty-sub">请联系管理员配置菜单</span>
+            <div v-if="menuList.length === 0" class="empty-state mci-card">
+                <span class="empty-state__icon">📁</span>
+                <span class="empty-state__title">暂无菜单</span>
+                <span class="empty-state__sub">请联系管理员开通权限</span>
             </div>
 
-            <div
-                v-for="menu in menuList"
+            <article
+                v-for="(menu, idx) in menuList"
                 :key="menu.Id"
-                class="menu-card"
+                class="menu-card mci-card mci-stagger-item"
+                :style="{ '--mci-index': idx }"
             >
-                <div class="card-header">
-                    <div class="card-header-icon">
+                <header class="menu-card__head">
+                    <div class="menu-card__head-icon">
                         <fa-icon v-if="menu.meta?.icon" :icon="menu.meta.icon" />
                         <el-icon v-else><Folder /></el-icon>
                     </div>
-                    <span class="card-title">{{ menu.meta?.title || menu.name }}</span>
-                </div>
-                <div class="card-content">
+                    <span class="menu-card__title">{{ menu.meta?.title || menu.name }}</span>
+                </header>
+                <div class="menu-card__grid">
                     <div
                         v-for="child in getVisibleChildren(menu.children)"
                         :key="child.Id"
                         class="menu-item"
                         @click="handleMenuClick(child)"
                     >
-                        <div class="item-icon-wrapper">
-                            <fa-icon v-if="child.meta?.icon" :icon="child.meta.icon" class="item-icon" />
-                            <el-icon v-else class="item-icon"><Document /></el-icon>
+                        <div class="menu-item__icon">
+                            <fa-icon v-if="child.meta?.icon" :icon="child.meta.icon" />
+                            <el-icon v-else><Document /></el-icon>
                         </div>
-                        <span class="item-name">{{ child.meta?.title || child.name }}</span>
-                        <el-icon v-if="child.children && child.children.length > 0&&!isPhoneView" class="item-arrow"><ArrowRight /></el-icon>
+                        <span class="menu-item__name">{{ child.meta?.title || child.name }}</span>
+                        <el-icon
+                            v-if="child.children && child.children.length > 0 && !isPhoneView"
+                            class="menu-item__arrow"
+                        ><ArrowRight /></el-icon>
                     </div>
                 </div>
-            </div>
+            </article>
 
-            <!-- 底部 powered by -->
-            <div class="ws-footer">
+            <!-- Footer -->
+            <footer class="ws-footer">
                 <span>Powered by {{ companyName || 'Microi.net' }}</span>
-            </div>
+            </footer>
         </div>
 
         <!-- 子菜单弹窗 -->
         <el-dialog
             v-model="showSubMenu"
             :title="currentSubMenu?.meta?.title || '子菜单'"
-            width="90%"
-            class="submenu-dialog"
+            width="92%"
+            class="mci-submenu-dialog"
             :close-on-click-modal="true"
             draggable
             align-center
@@ -93,15 +97,18 @@
                 <div
                     v-for="item in getVisibleChildren(currentSubMenuItems)"
                     :key="item.Id"
-                    class="submenu-item"
+                    class="mci-cell"
                     @click="handleSubMenuClick(item)"
                 >
-                    <div class="submenu-icon-wrapper">
-                        <fa-icon v-if="item.meta?.icon" :icon="item.meta.icon" class="submenu-icon" />
-                        <el-icon v-else class="submenu-icon"><Document /></el-icon>
+                    <div class="mci-cell__icon">
+                        <fa-icon v-if="item.meta?.icon" :icon="item.meta.icon" />
+                        <el-icon v-else><Document /></el-icon>
                     </div>
-                    <span class="submenu-name">{{ item.meta?.title || item.name }}</span>
-                    <el-icon v-if="item.children && item.children.length > 0" class="submenu-arrow"><ArrowRight /></el-icon>
+                    <span class="mci-cell__title">{{ item.meta?.title || item.name }}</span>
+                    <el-icon
+                        v-if="item.children && item.children.length > 0"
+                        class="mci-cell__arrow"
+                    ><ArrowRight /></el-icon>
                 </div>
             </div>
         </el-dialog>
@@ -114,7 +121,7 @@ import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight } from '@element-plus/icons-vue';
 import { DiyCommon } from '@/utils/diy.common';
-// 定义组件名称，用于 keep-alive 缓存
+
 defineOptions({
     name: 'mobile_workspace'
 });
@@ -123,12 +130,10 @@ const router = useRouter();
 const permissionStore = usePermissionStore();
 const diyStore = useDiyStore();
 
-// 加载状态
 const loading = ref(true);
 
-// 系统配置信息
 const isPhoneView = computed(() => diyStore.IsPhoneView);
-const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
+const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 工作台');
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const logoUrl = computed(() => {
     const logo = diyStore.SysConfig?.SysLogo;
@@ -136,34 +141,24 @@ const logoUrl = computed(() => {
     return './static/img/logo/microi-logo.svg';
 });
 
-// 过滤出有效的菜单（排除系统路由）
 const menuList = computed(() => {
     const routes = permissionStore.routes || [];
     return routes.filter(route => {
-        // 排除隐藏菜单和系统路由
         if (route.hidden) return false;
         if (!route.meta?.title) return false;
-        // 排除一些系统路由
         const excludePaths = ['/redirect', '/login', '/404', '/401', '/:pathMatch'];
         if (excludePaths.some(p => route.path?.includes(p))) return false;
-        // 判断AppDisplay，如果存在且为0表示不在移动端显示
         if (!route.AppDisplay) return false;
         return true;
     });
 });
 
-// 订阅清理函数
 let _permissionUnsubscribe = null;
 
-// 初始化时检查加载状态
 onMounted(() => {
-    // 模拟数据加载完成，如果路由已存在则直接显示
     if (permissionStore.routes && permissionStore.routes.length > 0) {
-        setTimeout(() => {
-            loading.value = false;
-        }, 300);
+        setTimeout(() => { loading.value = false; }, 300);
     } else {
-        // 监听路由变化，保存取消订阅函数
         _permissionUnsubscribe = permissionStore.$subscribe(() => {
             if (permissionStore.routes && permissionStore.routes.length > 0) {
                 loading.value = false;
@@ -172,25 +167,22 @@ onMounted(() => {
     }
 });
 
-// 组件卸载时清理订阅
 onBeforeUnmount(() => {
     if (_permissionUnsubscribe) {
         _permissionUnsubscribe();
         _permissionUnsubscribe = null;
     }
-    // 强制恢复 body 滚动（防止 el-dialog 未清理 overflow:hidden）
     _restoreBodyScroll();
 });
 
-// 子菜单相关
 const showSubMenu = ref(false);
 const currentSubMenu = ref(null);
 const currentSubMenuItems = ref([]);
-const subMenuStack = ref([]); // 用于支持多级菜单返回
+const subMenuStack = ref([]);
 
 /**
  * 强制恢复 body 滚动状态
- * 修复 el-dialog 在移动端 WebView 关闭后残留 overflow:hidden 导致页面无法滚动/点击的 bug
+ * 修复 el-dialog 在移动端 WebView 环境下overflow:hidden 可能残留导致页面不能滚动的问题
  */
 function _restoreBodyScroll() {
     try {
@@ -198,49 +190,39 @@ function _restoreBodyScroll() {
         document.body.style.paddingRight = '';
         document.body.classList.remove('el-popup-parent--hidden');
         document.documentElement.classList.remove('el-popup-parent--hidden');
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
 }
 
-// 监听 dialog 关闭，强制恢复 body 滚动
 watch(showSubMenu, (val) => {
     if (!val) {
-        // 延迟一帧，等 Element Plus 自己的关闭动画执行完再兜底检查
         setTimeout(_restoreBodyScroll, 300);
     }
 });
 
-// 处理菜单点击
 const handleMenuClick = (menu) => {
     if (menu.children && menu.children.length > 0) {
-        // 有子菜单，打开弹窗
         currentSubMenu.value = menu;
         currentSubMenuItems.value = menu.children;
         subMenuStack.value = [menu];
         showSubMenu.value = true;
     } else {
-        // 没有子菜单，直接跳转
         navigateToMenu(menu);
     }
 };
 
-// 处理子菜单点击
 const handleSubMenuClick = (item) => {
     if (item.children && item.children.length > 0) {
-        // 还有下级菜单，继续显示
         subMenuStack.value.push(item);
         currentSubMenu.value = item;
         currentSubMenuItems.value = item.children;
     } else {
-        // 最终菜单，跳转
         showSubMenu.value = false;
         navigateToMenu(item);
     }
 };
 
-// 导航到菜单
 const navigateToMenu = (menu) => {
     if (menu.path) {
-        // 处理外部链接
         if (menu.Link && (menu.Link.startsWith('http://') || menu.Link.startsWith('https://'))) {
             window.open(menu.Link, '_blank');
             return;
@@ -249,308 +231,317 @@ const navigateToMenu = (menu) => {
     }
 };
 
-// 获取可见的子菜单（根据AppDisplay判断）
 const getVisibleChildren = (children) => {
     if (!children || !Array.isArray(children)) return [];
-    return children.filter(child => {
-        // 如果AppDisplay === 0 表示不在移动端显示
-        return child.AppDisplay ? true : false;
-    });
+    return children.filter(child => !!child.AppDisplay);
 };
+
+
 </script>
 
 <style lang="scss" scoped>
-.mobile-workspace {
-    min-height: 100vh;
-    background: #f5f7fa;
-    padding-bottom: 56px;
+.page-workspace {
+    padding-bottom: calc(var(--mci-tabbar-height) + var(--mci-safe-bottom) + var(--mci-space-6));
 }
 
-/* 顶部区域 */
-.ws-header {
+/* === Hero 区域 === */
+.ws-hero {
     position: relative;
-    background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-    padding: 14px 16px 18px;
-    padding-top: calc(14px + var(--status-bar-height, 0px));
-    flex-shrink: 0;
-    z-index: 10;
-}
-
-.header-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     overflow: hidden;
-    pointer-events: none;
+    background: var(--mci-gradient-primary);
+    padding: var(--mci-space-4);
+    padding-bottom: var(--mci-space-6);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25),
+                0 0 40px var(--mci-color-primary-glow);
+
+    &__safe-top { height: var(--mci-safe-top); }
+
+    &__decor {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    &__row {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    &__brand {
+        display: flex;
+        align-items: center;
+        gap: var(--mci-space-3);
+    }
+
+    &__logo {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--mci-radius-md);
+        background: rgba(255, 255, 255, 0.2);
+        object-fit: cover;
+        backdrop-filter: blur(4px);
+    }
+
+    &__text {
+        display: flex;
+        flex-direction: column;
+    }
+
+    &__title {
+        font-size: var(--mci-text-lg);
+        font-weight: var(--mci-font-bold);
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    &__subtitle {
+        font-size: var(--mci-text-xs);
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 2px;
+    }
+
+    &__theme {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: var(--mci-radius-full);
+    }
 }
 
-.bg-circle {
+.decor-orb {
     position: absolute;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.1);
+    animation: orbDrift 8s ease-in-out infinite alternate;
 
-    &.c1 {
+    &--1 {
         width: 200px;
         height: 200px;
-        top: -50px;
-        right: -40px;
+        top: -60px;
+        right: -50px;
     }
-    &.c2 {
-        width: 125px;
-        height: 125px;
-        bottom: -30px;
+    &--2 {
+        width: 130px;
+        height: 130px;
+        bottom: -40px;
         left: -30px;
+        animation-delay: -4s;
     }
 }
 
-.header-content {
-    position: relative;
-    z-index: 1;
+@keyframes orbDrift {
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(15px, -10px) scale(1.06); }
 }
 
-.header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-}
-
-.ws-logo {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    margin-right: 10px;
-    object-fit: cover;
-}
-
-.header-text {
+/* === 菜单列表 === */
+.menu-list {
+    padding: var(--mci-space-4);
     display: flex;
     flex-direction: column;
-}
-
-.ws-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: #fff;
-}
-
-.ws-subtitle {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: 1px;
-}
-
-.menu-card-list {
-    padding: 12px;
-}
-
-/* 骨架屏 */
-.skeleton-card-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sk-icon-circle {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.3) 75%);
-    background-size: 400% 100%;
-    animation: shimmer 1.5s infinite;
-    flex-shrink: 0;
-
-    &.small {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-        background-size: 400% 100%;
-    }
-}
-
-.sk-text-line {
-    height: 14px;
-    border-radius: 7px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.3) 75%);
-    background-size: 400% 100%;
-    animation: shimmer 1.5s infinite;
-}
-
-.skeleton-item {
-    padding: 10px 0;
-
-    .sk-text-line {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-        background-size: 400% 100%;
-        height: 12px;
-    }
+    gap: var(--mci-space-4);
 }
 
 .menu-card {
-    background: #fff;
-    border-radius: 12px;
-    margin-bottom: 12px;
+    padding: 0;
     overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-    transition: transform 0.2s ease;
 
-    &:active {
-        transform: scale(0.98);
-    }
-
-    .card-header {
+    &__head {
         display: flex;
         align-items: center;
-        padding: 12px 16px;
-        background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-
-        .card-header-icon {
-            width: 24px;
-            height: 24px;
-            background: rgba(255, 255, 255, 0.25);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            flex-shrink: 0;
-            font-size: 14px;
-            color: #fff !important;
-
-            :deep(.el-icon),
-            :deep(svg) {
-                color: #fff !important;
-                font-size: 14px;
-            }
-        }
-
-        .card-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #fff !important;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-        }
+        gap: var(--mci-space-3);
+        padding: var(--mci-space-3) var(--mci-space-4);
+        background: linear-gradient(135deg,
+            rgba(114, 43, 255, 0.18),
+            rgba(41, 184, 255, 0.12));
+        border-bottom: 1px solid var(--mci-border-color);
     }
 
-    .card-content {
+    &__head-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--mci-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--mci-gradient-primary);
+        color: var(--mci-text-on-primary);
+        font-size: 14px;
+        box-shadow: 0 2px 8px var(--mci-color-primary-glow);
+        flex-shrink: 0;
+
+        :deep(svg),
+        :deep(.el-icon) { color: #fff; font-size: 14px; }
+    }
+
+    &__title {
+        font-size: var(--mci-text-base);
+        font-weight: var(--mci-font-semibold);
+        color: var(--mci-text-primary);
+    }
+
+    &__grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
-        padding: 14px 10px;
-    }
-
-    .menu-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 8px 4px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        position: relative;
-
-        &:active {
-            background: #f5f7fa;
-            transform: scale(0.95);
-        }
-
-        .item-icon-wrapper {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(var(--color-primary-rgb, 64,158,255), 0.08), rgba(var(--color-primary-rgb, 64,158,255), 0.15));
-            border-radius: 10px;
-            margin-bottom: 6px;
-        }
-
-        .item-icon {
-            font-size: 20px;
-            color: var(--color-primary, #409eff);
-        }
-
-        .item-name {
-            font-size: 12px;
-            color: #606266;
-            text-align: center;
-            line-height: 1.3;
-            max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-        }
-
-        .item-arrow {
-            position: absolute;
-            top: 6px;
-            right: 2px;
-            font-size: 10px;
-            color: #c0c4cc;
-        }
+        gap: var(--mci-space-2);
+        padding: var(--mci-space-4) var(--mci-space-3);
     }
 }
 
-/* 空状态 */
-.empty-ws {
+.menu-item {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 80px 0;
+    gap: var(--mci-space-2);
+    padding: var(--mci-space-2) var(--mci-space-1);
+    border-radius: var(--mci-radius-md);
+    cursor: pointer;
+    transition: transform var(--mci-duration-fast) var(--mci-ease-out),
+                background var(--mci-duration-fast) var(--mci-ease-out);
 
-    .empty-icon {
-        font-size: 48px;
-        margin-bottom: 12px;
+    &:active {
+        transform: scale(0.94);
+        background: var(--mci-bg-card-hover);
     }
 
-    .empty-text {
-        font-size: 15px;
-        color: #666;
-        font-weight: 500;
+    &__icon {
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg,
+            rgba(114, 43, 255, 0.12),
+            rgba(41, 184, 255, 0.12));
+        border: 1px solid var(--mci-border-color);
+        border-radius: var(--mci-radius-md);
+        font-size: 20px;
+        color: var(--mci-color-primary-light);
+        transition: box-shadow var(--mci-duration-base) var(--mci-ease-out);
     }
 
-    .empty-sub {
-        font-size: 12px;
-        color: #999;
-        margin-top: 4px;
+    &:active &__icon {
+        box-shadow: 0 0 12px var(--mci-color-primary-glow);
+    }
+
+    &__name {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-secondary);
+        text-align: center;
+        line-height: 1.3;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    &__arrow {
+        position: absolute;
+        top: 4px;
+        right: 2px;
+        font-size: 10px;
+        color: var(--mci-text-tertiary);
     }
 }
 
-/* Footer */
+/* === 空状态 === */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--mci-space-12) var(--mci-space-6);
+
+    &__icon {
+        font-size: 48px;
+        margin-bottom: var(--mci-space-3);
+        filter: drop-shadow(0 4px 12px var(--mci-color-primary-glow));
+    }
+
+    &__title {
+        font-size: var(--mci-text-base);
+        color: var(--mci-text-primary);
+        font-weight: var(--mci-font-medium);
+        margin-bottom: var(--mci-space-1);
+    }
+
+    &__sub {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
+    }
+}
+
+/* === Footer === */
 .ws-footer {
     text-align: center;
-    padding: 24px 0 40px;
+    padding: var(--mci-space-6) 0 var(--mci-space-4);
 
     span {
-        font-size: 11px;
-        color: #ccc;
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
     }
 }
 
-// 子菜单弹窗样式
-:deep(.submenu-dialog) {
-    .el-dialog__header {
-        padding: 16px;
-        border-bottom: 1px solid #ebeef5;
-        margin-right: 0;
+/* === 骨架屏 === */
+.sk-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--mci-radius-sm);
+    background: linear-gradient(90deg,
+        var(--mci-bg-card) 25%,
+        var(--mci-bg-card-hover) 50%,
+        var(--mci-bg-card) 75%);
+    background-size: 400% 100%;
+    animation: mciShimmer 1.5s infinite;
+    flex-shrink: 0;
 
-        .el-dialog__title {
-            font-size: 16px;
-            font-weight: 600;
-        }
+    &--lg {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--mci-radius-md);
     }
+}
 
+.sk-line {
+    height: 12px;
+    border-radius: var(--mci-radius-full);
+    background: linear-gradient(90deg,
+        var(--mci-bg-card) 25%,
+        var(--mci-bg-card-hover) 50%,
+        var(--mci-bg-card) 75%);
+    background-size: 400% 100%;
+    animation: mciShimmer 1.5s infinite;
+}
+
+@keyframes mciShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* === 子菜单弹窗 === */
+:deep(.mci-submenu-dialog) {
+    background: var(--mci-bg-elevated);
+    border-radius: var(--mci-radius-2xl);
+    border: 1px solid var(--mci-border-color);
+    box-shadow: var(--mci-shadow-dialog);
+    overflow: hidden;
+
+    .el-dialog__header {
+        padding: var(--mci-space-4);
+        border-bottom: 1px solid var(--mci-border-color);
+        margin-right: 0;
+    }
+    .el-dialog__title {
+        font-size: var(--mci-text-base);
+        font-weight: var(--mci-font-semibold);
+        color: var(--mci-text-primary);
+    }
     .el-dialog__body {
         padding: 0;
         max-height: 60vh;
@@ -559,53 +550,6 @@ const getVisibleChildren = (children) => {
 }
 
 .submenu-list {
-    .submenu-item {
-        display: flex;
-        align-items: center;
-        padding: 14px 16px;
-        border-bottom: 1px solid #f5f7fa;
-        cursor: pointer;
-        transition: background 0.2s;
-
-        &:active {
-            background: #f5f7fa;
-        }
-
-        &:last-child {
-            border-bottom: none;
-        }
-
-        .submenu-icon-wrapper {
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(var(--color-primary-rgb, 64,158,255), 0.08), rgba(var(--color-primary-rgb, 64,158,255), 0.15));
-            border-radius: 8px;
-            margin-right: 12px;
-        }
-
-        .submenu-icon {
-            font-size: 18px;
-            color: var(--color-primary, #409eff);
-        }
-
-        .submenu-name {
-            flex: 1;
-            font-size: 15px;
-            color: #303133;
-        }
-
-        .submenu-arrow {
-            font-size: 14px;
-            color: #c0c4cc;
-        }
-    }
-}
-
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    .mci-cell:last-child { border-bottom: none; }
 }
 </style>

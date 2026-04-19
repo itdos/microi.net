@@ -1,5 +1,5 @@
 <template>
-    <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: calc(100vh - 120px); background-color: #fff">
+    <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: calc(100vh - 120px); background-color: var(--el-bg-color, #fff)">
         <el-form inline @submit.prevent class="keyword-search">
             <el-form-item>
                 <!-- <span style="margin-right:20px;font-weight: bold;color: #666;}">设计 - {{ FlowDesignModel.FlowName }}</span> -->

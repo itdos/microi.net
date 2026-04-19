@@ -29,15 +29,18 @@ export default {
 }
 </script>
 
-<style>
-/* 全局样式 */
+<style lang="scss">
+/* MCI 设计系统全局接入：注入所有 CSS 变量与 .mci-* 工具类 */
+@import './styles/mci-design.scss';
+
+/* 全局 page 基础样式 */
 page {
-  background-color: #f5f7fa;
+  background-color: var(--mci-bg-base);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
     sans-serif;
-  font-size: 28rpx;
-  color: #333333;
+  font-size: var(--mci-text-base);
+  color: var(--mci-text-primary);
   -webkit-font-smoothing: antialiased;
 }
 </style>

@@ -1,156 +1,114 @@
-<template>
-    <div class="mobile-profile">
-        <!-- 骨架屏 -->
-        <template v-if="loading">
-            <!-- 用户信息卡片骨架 -->
-            <div class="user-card">
-                <div class="user-card-bg"></div>
-                <div class="user-info">
-                    <el-skeleton animated>
-                        <template #template>
-                            <div style="display: flex; align-items: center; gap: 16px;">
-                                <el-skeleton-item variant="circle" style="width: 72px; height: 72px; flex-shrink: 0;" />
-                                <div style="display: flex; flex-direction: column; gap: 8px;">
-                                    <el-skeleton-item variant="text" style="width: 100px; height: 22px;" />
-                                    <el-skeleton-item variant="text" style="width: 140px; height: 14px;" />
-                                </div>
-                            </div>
-                        </template>
-                    </el-skeleton>
-                </div>
+?<template>
+    <div class="mci-mobile-page page-profile">
+        <!-- 顶部用户卡片（霓虹光晕） -->
+        <header class="profile-hero">
+            <div class="profile-hero__decor">
+                <span class="decor-orb decor-orb--1"></span>
+                <span class="decor-orb decor-orb--2"></span>
+                <span class="decor-orb decor-orb--3"></span>
             </div>
-            <!-- 功能列表骨架 -->
-            <div class="function-list">
-                <div v-for="n in 3" :key="'skeleton-group-' + n" class="function-group">
-                    <div v-for="m in (n === 3 ? 1 : 2)" :key="'skeleton-item-' + n + '-' + m" class="function-item">
-                        <el-skeleton animated>
-                            <template #template>
-                                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                    <div style="display: flex; align-items: center; gap: 12px;">
-                                        <el-skeleton-item variant="rect" style="width: 20px; height: 20px; border-radius: 4px;" />
-                                        <el-skeleton-item variant="text" style="width: 80px; height: 16px;" />
-                                    </div>
-                                    <el-skeleton-item variant="text" style="width: 14px; height: 14px; border-radius: 2px;" />
-                                </div>
-                            </template>
-                        </el-skeleton>
-                    </div>
-                </div>
-            </div>
-        </template>
+            <div class="profile-hero__safe-top"></div>
 
-        <!-- 真实内容 -->
-        <template v-else>
-            <!-- 用户信息卡片 -->
-        <div class="user-card">
-            <div class="user-card-bg"></div>
-            <div class="user-info">
-                <el-avatar :size="64" :src="userAvatar" class="user-avatar">
-                    {{ currentUser.Name?.charAt(0) || 'U' }}
-                </el-avatar>
-                <div class="user-detail">
-                    <div class="user-name-row">
-                        <h2 class="user-name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
-                        <span class="tenant-tag" v-if="currentUser.TenantName">{{ currentUser.TenantName }}</span>
+            <!-- <div class="profile-hero__topbar">
+                <span class="profile-hero__title"></span>
+                <span class="profile-hero__theme" @click="toggleDark">
+                    <el-icon><component :is="darkModeIcon" /></el-icon>
+                </span>
+            </div> -->
+
+            <template v-if="loading">
+                <div class="profile-skeleton">
+                    <div class="sk-avatar-lg"></div>
+                    <div class="sk-stack">
+                        <div class="sk-line" style="width: 120px;"></div>
+                        <div class="sk-line" style="width: 180px; height: 10px;"></div>
                     </div>
-                    <p class="user-account">{{ currentUser.Account || '' }}</p>
-                    <p class="user-org" v-if="orgInfo">{{ orgInfo }}</p>
                 </div>
-            </div>
-        </div>
+            </template>
+            <template v-else>
+                <div class="profile-hero__user">
+                    <div class="profile-hero__avatar-wrap">
+                        <el-avatar :size="72" :src="userAvatar" class="profile-hero__avatar">
+                            {{ currentUser.Name?.charAt(0) || 'U' }}
+                        </el-avatar>
+                        <span class="profile-hero__avatar-glow"></span>
+                    </div>
+                    <div class="profile-hero__detail">
+                        <div class="profile-hero__name-row">
+                            <h2 class="profile-hero__name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
+                            <span v-if="currentUser.TenantName" class="mci-tag mci-tag--cyan">{{ currentUser.TenantName }}</span>
+                        </div>
+                        <p class="profile-hero__account">{{ currentUser.Account || '' }}</p>
+                        <p v-if="orgInfo" class="profile-hero__org">{{ orgInfo }}</p>
+                    </div>
+                </div>
+            </template>
+        </header>
 
         <!-- 功能列表 -->
-        <div class="function-list">
-            <!-- 主题设置 -->
-            <div class="function-group">
-                <div class="function-item" @click="showThemePanel = true">
-                    <div class="item-left">
-                        <el-icon class="item-icon"><Brush /></el-icon>
-                        <span class="item-title">主题切换</span>
-                    </div>
-                    <div class="item-right">
-                        <span class="item-value">
-                            <span class="theme-preview" :style="{ background: currentTheme }"></span>
-                        </span>
-                        <el-icon><ArrowRight /></el-icon>
-                    </div>
+        <div class="function-list" v-if="!loading">
+            <!-- 图标网格快捷操作 -->
+            <div class="quick-grid mci-stagger-item" :style="{ '--mci-index': 0 }">
+                <div class="quick-grid__item" @click="showThemePanel = true">
+                    <div class="quick-grid__icon quick-grid__icon--primary"><el-icon><Brush /></el-icon></div>
+                    <span class="quick-grid__label">主题</span>
                 </div>
-                
-                <div class="function-item" @click="showLangSelect = true">
-                    <div class="item-left">
-                        <el-icon class="item-icon"><fa-icon icon="fas fa-globe" /></el-icon>
-                        <span class="item-title">语言切换</span>
-                    </div>
-                    <div class="item-right">
-                        <span class="item-value">{{ currentLang }}</span>
-                        <el-icon><ArrowRight /></el-icon>
-                    </div>
+                <div class="quick-grid__item" @click="showLangSelect = true">
+                    <div class="quick-grid__icon quick-grid__icon--cyan"><fa-icon icon="fas fa-globe" /></div>
+                    <span class="quick-grid__label">语言</span>
+                </div>
+                <div class="quick-grid__item" @click="showPasswordDialog = true">
+                    <div class="quick-grid__icon quick-grid__icon--gold"><el-icon><Lock /></el-icon></div>
+                    <span class="quick-grid__label">修改密码</span>
+                </div>
+                <div class="quick-grid__item" @click="showAbout = true">
+                    <div class="quick-grid__icon quick-grid__icon--pink"><el-icon><InfoFilled /></el-icon></div>
+                    <span class="quick-grid__label">关于</span>
                 </div>
             </div>
 
-            <!-- 账号安全 -->
-            <div class="function-group">
-                <div class="function-item" @click="showPasswordDialog = true">
-                    <div class="item-left">
-                        <el-icon class="item-icon"><Lock /></el-icon>
-                        <span class="item-title">修改密码</span>
+            <!-- 横向列表 -->
+            <div class="mci-cell-group mci-stagger-item" :style="{ '--mci-index': 1 }">
+                <div v-if="isApk" class="mci-cell" @click="openServerUrlDialog">
+                    <div class="mci-cell__icon mci-cell__icon--cyan"><el-icon><Connection /></el-icon></div>
+                    <div class="mci-cell__main">
+                        <span class="mci-cell__title">服务器地址</span>
+                        <span class="mci-cell__desc">{{ currentServerUrl }}</span>
                     </div>
-                    <div class="item-right">
-                        <el-icon><ArrowRight /></el-icon>
-                    </div>
-                </div>
-                
-                <div class="function-item" @click="showAbout = true">
-                    <div class="item-left">
-                        <el-icon class="item-icon"><InfoFilled /></el-icon>
-                        <span class="item-title">关于系统</span>
-                    </div>
-                    <div class="item-right">
-                        <span class="item-value">{{ version }}</span>
-                        <el-icon><ArrowRight /></el-icon>
-                    </div>
+                    <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
                 </div>
             </div>
 
-            <!-- APK 服务器地址配置 -->
-            <div v-if="isApk" class="function-group apk-server-group">
-                <div class="function-item" @click="openServerUrlDialog">
-                    <div class="item-left">
-                        <el-icon class="item-icon apk-icon"><Connection /></el-icon>
-                        <div class="item-title-wrap">
-                            <span class="item-title">修改服务器地址</span>
-                            <span class="item-desc">{{ currentServerUrl }}</span>
-                        </div>
-                    </div>
-                    <div class="item-right">
-                        <el-icon><ArrowRight /></el-icon>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 退出登录 -->
-            <div class="function-group">
-                <div class="function-item logout-item" @click="handleLogout">
-                    <div class="item-left">
-                        <el-icon class="item-icon"><SwitchButton /></el-icon>
-                        <span class="item-title">退出登录</span>
-                    </div>
-                </div>
-            </div>
+            <!-- 退出登录按钮 -->
+            <button class="mci-btn mci-btn--danger logout-btn" @click="handleLogout">
+                <el-icon><SwitchButton /></el-icon>
+                <span>退出登录</span>
+            </button>
         </div>
-        </template>
 
-        <!-- 主题选择面板 -->
-        <el-drawer
-            v-model="showThemePanel"
-            direction="btt"
-            size="auto"
-            title="选择主题"
-            class="theme-drawer"
-        >
+        <!-- 主题色面板 -->
+        <el-drawer v-model="showThemePanel" direction="btt" size="auto" title="主题设置" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
+            <!-- 显示模式切换 -->
+            <div class="mode-section">
+                <div class="mode-section__label">显示模式</div>
+                <div class="mode-switch">
+                    <div class="mode-switch__item" :class="{ active: darkMode === 'light' }" @click="changeMode('light')">
+                        <el-icon :size="20"><Sunny /></el-icon>
+                        <span>浅色</span>
+                    </div>
+                    <div class="mode-switch__item" :class="{ active: darkMode === 'dark' }" @click="changeMode('dark')">
+                        <el-icon :size="20"><Moon /></el-icon>
+                        <span>深色</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 主题色 -->
+            <div class="mode-section">
+                <div class="mode-section__label">主题色</div>
+            </div>
             <div class="theme-grid">
-                <div 
-                    v-for="theme in themeColors" 
+                <div
+                    v-for="theme in themeColors"
                     :key="theme.value"
                     class="theme-item"
                     :class="{ active: currentTheme === theme.value }"
@@ -164,64 +122,31 @@
             </div>
         </el-drawer>
 
-        <!-- 修改密码弹窗 -->
+        <!-- 修改密码 -->
         <el-dialog
-            v-model="showPasswordDialog"
-            draggable
-            align-center
-            title="修改密码"
-            width="90%"
-            class="password-dialog"
+            v-model="showPasswordDialog" draggable align-center
+            title="修改密码" width="92%" class="mci-submenu-dialog"
             :close-on-click-modal="false"
         >
-            <el-form 
-                ref="passwordFormRef"
-                :model="passwordForm" 
-                :rules="passwordRules"
-                label-position="top"
-            >
+            <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-position="top">
                 <el-form-item label="原密码" prop="oldPassword">
-                    <el-input 
-                        v-model="passwordForm.oldPassword" 
-                        type="password"
-                        placeholder="请输入原密码"
-                        show-password
-                    />
+                    <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入原密码" show-password />
                 </el-form-item>
                 <el-form-item label="新密码" prop="newPassword">
-                    <el-input 
-                        v-model="passwordForm.newPassword" 
-                        type="password"
-                        placeholder="请输入新密码"
-                        show-password
-                    />
+                    <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" show-password />
                 </el-form-item>
                 <el-form-item label="确认密码" prop="confirmPassword">
-                    <el-input 
-                        v-model="passwordForm.confirmPassword" 
-                        type="password"
-                        placeholder="请再次输入新密码"
-                        show-password
-                    />
+                    <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password />
                 </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="showPasswordDialog = false">取消</el-button>
-                <el-button type="primary" :loading="passwordLoading" @click="submitPassword">
-                    确定
-                </el-button>
+                <el-button type="primary" :loading="passwordLoading" @click="submitPassword">确定</el-button>
             </template>
         </el-dialog>
 
-        <!-- 关于系统弹窗 -->
-        <el-dialog
-            v-model="showAbout"
-            title="关于系统"
-            width="90%"
-            class="about-dialog"
-            draggable
-            align-center
-        >
+        <!-- 关于 -->
+        <el-dialog v-model="showAbout" title="关于系统" width="92%" class="mci-submenu-dialog" draggable align-center>
             <div class="about-content">
                 <img :src="systemLogo" class="about-logo" alt="logo" />
                 <h3 class="about-title">{{ systemName }}</h3>
@@ -230,25 +155,19 @@
                 <div v-if="loginBottomContent" class="about-footer" v-html="loginBottomContent"></div>
             </div>
         </el-dialog>
-        
-        <!-- APK 修改服务器地址弹窗 -->
+
+        <!-- APK 服务器地址 -->
         <el-dialog
             v-if="isApk"
-            v-model="showServerUrlDialog"
-            title="修改服务器地址"
-            width="90%"
-            class="server-url-dialog"
-            draggable
-            align-center
+            v-model="showServerUrlDialog" title="修改服务器地址"
+            width="92%" class="mci-submenu-dialog" draggable align-center
             :close-on-click-modal="false"
         >
             <div class="server-url-form">
-                <!-- 当前地址 -->
                 <div class="current-url-card">
                     <div class="current-url-label">当前服务器</div>
                     <div class="current-url-value">{{ currentServerUrl }}</div>
                 </div>
-                <!-- 新地址输入 -->
                 <div class="new-url-section">
                     <div class="section-title">新地址配置</div>
                     <div class="url-row">
@@ -257,55 +176,36 @@
                             <el-option label="http://" value="http://" />
                         </el-select>
                         <el-input
-                            v-model="serverUrlForm.domain"
-                            placeholder="域名或 IP，如 example.com"
-                            class="domain-input"
-                            size="large"
-                            clearable
+                            v-model="serverUrlForm.domain" placeholder="域名或 IP"
+                            class="domain-input" size="large" clearable
                             @keyup.enter="confirmServerUrl"
                         />
                     </div>
                     <div class="url-preview" v-if="serverUrlForm.domain">
-                        <span class="preview-tag">预览</span>
+                        <span class="mci-tag mci-tag--cyan">预览</span>
                         <span class="preview-text">{{ serverUrlForm.protocol }}{{ serverUrlForm.domain }}</span>
                     </div>
                 </div>
                 <div class="tip-text">
                     <el-icon><InfoFilled /></el-icon>
-                    修改后应用将自动重启并加载新地址
+                    修改后应用将自动重启
                 </div>
             </div>
             <template #footer>
                 <el-button @click="showServerUrlDialog = false">取消</el-button>
-                <el-button type="primary" :loading="serverUrlLoading" @click="confirmServerUrl">
-                    保存并重启
-                </el-button>
+                <el-button type="primary" :loading="serverUrlLoading" @click="confirmServerUrl">保存并重启</el-button>
             </template>
         </el-dialog>
 
-        <!-- 语言选择弹窗 -->
-        <el-drawer
-            v-model="showLangSelect"
-            direction="btt"
-            size="auto"
-            title="选择语言"
-            class="lang-drawer"
-        >
+        <!-- 语言选择 -->
+        <el-drawer v-model="showLangSelect" direction="btt" size="auto" title="选择语言" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
             <div class="lang-list">
-                <div 
-                    class="lang-item"
-                    :class="{ active: language === 'zh-CN' }"
-                    @click="handleSetLanguage('zh-CN')"
-                >
-                    <span class="lang-name">中文</span>
+                <div class="mci-cell" :class="{ active: language === 'zh-CN' }" @click="handleSetLanguage('zh-CN')">
+                    <span class="mci-cell__title">中文</span>
                     <el-icon v-if="language === 'zh-CN'" class="check-icon"><Check /></el-icon>
                 </div>
-                <div 
-                    class="lang-item"
-                    :class="{ active: language === 'en' }"
-                    @click="handleSetLanguage('en')"
-                >
-                    <span class="lang-name">English</span>
+                <div class="mci-cell" :class="{ active: language === 'en' }" @click="handleSetLanguage('en')">
+                    <span class="mci-cell__title">English</span>
                     <el-icon v-if="language === 'en'" class="check-icon"><Check /></el-icon>
                 </div>
             </div>
@@ -318,18 +218,16 @@ import { DiyCommon } from "@/utils/diy.common.js";
 import { ref, computed, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
-import { 
-    Brush, Lock, InfoFilled, SwitchButton, ArrowRight, Check, Connection
+import {
+    Brush, Lock, InfoFilled, SwitchButton, ArrowRight, Check, Connection, Sunny, Moon
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
 import { useI18n } from 'vue-i18n';
+import { setThemeColor as applyThemeColor, setThemeMode, getThemeMode } from '@/utils/theme-color.js';
 
-// 定义组件名称，用于 keep-alive 缓存
-defineOptions({
-    name: 'mobile_profile'
-});
+defineOptions({ name: 'mobile_profile' });
 import { version as appVersion } from '../../../package.json';
 
 const router = useRouter();
@@ -339,28 +237,19 @@ const tagsViewStore = useTagsViewStore();
 const appStore = useAppStore();
 const { locale } = useI18n();
 
-// 加载状态
 const loading = ref(true);
 
-// 初始化
 onMounted(() => {
-    // 用户数据通常已经在登录时加载，短暂延迟后显示内容
-    setTimeout(() => {
-        loading.value = false;
-    }, 300);
+    setTimeout(() => { loading.value = false; }, 300);
 });
 
-// 当前用户
 const currentUser = computed(() => diyStore.GetCurrentUser);
 const userAvatar = computed(() => {
     const avatar = currentUser.value?.Avatar;
-    if (avatar) {
-        return avatar.startsWith('http') ? avatar : DiyCommon.GetServerPath(avatar);
-    }
+    if (avatar) return avatar.startsWith('http') ? avatar : DiyCommon.GetServerPath(avatar);
     return './static/img/nohead-girl.png';
 });
 
-// 组织信息：部门 + 角色
 const orgInfo = computed(() => {
     const user = currentUser.value;
     if (!user) return '';
@@ -374,12 +263,7 @@ const orgInfo = computed(() => {
     return parts.join(' · ');
 });
 
-// 版本号 - 从 package.json 获取
-const version = computed(() => {
-    return `v${appVersion}`;
-});
-
-// 系统信息
+const version = computed(() => `v${appVersion}`);
 const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const systemLogo = computed(() => {
@@ -390,7 +274,6 @@ const systemLogo = computed(() => {
 const loginBottomContent = computed(() => {
     const content = diyStore.SysConfig?.LoginBottomContent;
     if (!content) return '';
-    
     return content
         .replace('$CurrentLang$', currentLang.value)
         .replace('$OsVersion$', version.value)
@@ -399,56 +282,56 @@ const loginBottomContent = computed(() => {
         .replace('$CompanyName$', companyName.value);
 });
 
-// 当前主题
 const currentTheme = computed(() => diyStore.themeColor || '#409eff');
 
-// 当前语言
 const language = computed(() => appStore.language || 'zh-CN');
 const currentLang = computed(() => {
-    const langMap = {
-        'zh-CN': '中文',
-        'en': 'English'
-    };
+    const langMap = { 'zh-CN': '中文', 'en': 'English' };
     return langMap[language.value] || '中文';
 });
 
-// 主题颜色列表
 const themeColors = [
-    { name: '蓝色', value: '#409eff' },
-    { name: '橙色', value: '#E67E22' },
-    { name: '红色', value: '#E74C3C' },
+    { name: '紫色', value: '#6C2BD9' },
+    { name: '蓝色', value: '#2196F3' },
+    { name: '青色', value: '#06B6D4' },
+    { name: '粉色', value: '#EC4899' },
+    { name: '橙色', value: '#F59E0B' },
+    { name: '红色', value: '#E8294A' },
     { name: '绿色', value: '#27AE60' },
-    { name: '紫色', value: '#9B59B6' },
-    { name: '粉色', value: '#E91E63' },
-    { name: '青色', value: '#00BCD4' },
     { name: '靛蓝', value: '#3F51B5' },
     { name: '深橙', value: '#FF5722' },
-    { name: '棕色', value: '#795548' },
     { name: '灰蓝', value: '#607D8B' },
-    { name: '黑色', value: '#424242' },
+    { name: '天蓝', value: '#409EFF' },
+    { name: '深紫', value: '#673AB7' },
 ];
 
-// 弹窗状态
 const showThemePanel = ref(false);
 const showPasswordDialog = ref(false);
 const showAbout = ref(false);
 const showLangSelect = ref(false);
 
-// ===== APK 服务器地址配置 =====
-/** 检测当前是否运行在 5+App (APK) 环境 */
+// === 深色模式切换（与 PC 端 ThemeSelect.vue 同步逻辑）===
+const darkMode = ref(getThemeMode());
+const darkModeIcon = computed(() => darkMode.value === 'dark' ? Sunny : Moon);
+function toggleDark() {
+    const next = darkMode.value === 'dark' ? 'light' : 'dark';
+    changeMode(next);
+}
+function changeMode(mode) {
+    darkMode.value = mode;
+    setThemeMode(mode);
+    // 切换模式后重新写入主题色，使 MCI 渐变/阴影按当前模式重算
+    const color = diyStore.themeColor;
+    if (color) applyThemeColor(color);
+}
+
+// === APK 服务器配置 ===
 const isApk = ref(typeof window !== 'undefined' && !!window.plus);
-/** 当前访问的服务器地址 */
-const currentServerUrl = ref(
-    typeof window !== 'undefined' ? window.location.origin : ''
-);
+const currentServerUrl = ref(typeof window !== 'undefined' ? window.location.origin : '');
 const showServerUrlDialog = ref(false);
 const serverUrlLoading = ref(false);
-const serverUrlForm = reactive({
-    protocol: 'https://',
-    domain: ''
-});
+const serverUrlForm = reactive({ protocol: 'https://', domain: '' });
 
-/** 打开修改服务器地址对话框，自动解析当前 URL */
 const openServerUrlDialog = () => {
     const url = currentServerUrl.value || window.location.origin;
     if (url.startsWith('https://')) {
@@ -465,65 +348,39 @@ const openServerUrlDialog = () => {
     showServerUrlDialog.value = true;
 };
 
-/** 确认修改服务器地址，保存并重启 APK */
 const confirmServerUrl = () => {
     const domain = serverUrlForm.domain.trim().replace(/\/$/, '');
-    if (!domain) {
-        ElMessage.warning('请输入域名或 IP 地址');
-        return;
-    }
+    if (!domain) { ElMessage.warning('请输入域名或 IP 地址'); return; }
     const fullUrl = serverUrlForm.protocol + domain;
     ElMessageBox.confirm(
         `将切换服务器地址为\n\n${fullUrl}\n\n确认后应用将自动重启`,
         '确认切换',
-        {
-            confirmButtonText: '确定并重启',
-            cancelButtonText: '取消',
-            type: 'warning',
-            customClass: 'server-url-confirm-box'
-        }
+        { confirmButtonText: '确定并重启', cancelButtonText: '取消', type: 'warning' }
     ).then(() => {
         serverUrlLoading.value = true;
-        try {
-            localStorage.setItem('microi_apk_server_url', fullUrl);
-        } catch(e) {}
+        try { localStorage.setItem('microi_apk_server_url', fullUrl); } catch (e) {}
         showServerUrlDialog.value = false;
         try {
-            if (window.plus) {
-                plus.runtime.restart();
-            } else {
-                window.location.href = fullUrl;
-            }
-        } catch(e) {
+            if (window.plus) plus.runtime.restart();
+            else window.location.href = fullUrl;
+        } catch (e) {
             window.location.href = fullUrl;
         }
-    }).catch(() => {
-        serverUrlLoading.value = false;
-    });
+    }).catch(() => { serverUrlLoading.value = false; });
 };
 
-// 密码表单
+// === 密码 ===
 const passwordFormRef = ref(null);
 const passwordLoading = ref(false);
-const passwordForm = reactive({
-    oldPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-});
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
 
-// 密码验证规则
 const validateConfirmPassword = (rule, value, callback) => {
-    if (value !== passwordForm.newPassword) {
-        callback(new Error('两次输入的密码不一致'));
-    } else {
-        callback();
-    }
+    if (value !== passwordForm.newPassword) callback(new Error('两次输入的密码不一致'));
+    else callback();
 };
 
 const passwordRules = {
-    oldPassword: [
-        { required: true, message: '请输入原密码', trigger: 'blur' }
-    ],
+    oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
     newPassword: [
         { required: true, message: '请输入新密码', trigger: 'blur' },
         { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
@@ -534,557 +391,541 @@ const passwordRules = {
     ]
 };
 
-// 切换主题
 const changeTheme = (color) => {
-    // 设置 CSS 变量
-    document.documentElement.style.setProperty('--color-primary', color);
-    
-    // 计算文字颜色
-    const brightness = getColorBrightness(color);
-    const textColor = brightness > 180 ? '#303133' : '#ffffff';
-    document.documentElement.style.setProperty('--color-primary-text', textColor);
-    
-    // 保存到 store 和 localStorage
-    diyStore.themeColor = color;
-    localStorage.setItem('Microi.themeColor', color);
-    
+    // 使用中心化 setter，同时写入 Legacy + Element Plus + MCI 令牌
+    applyThemeColor(color);
+    diyStore.setThemeColor(color);
     showThemePanel.value = false;
     ElMessage.success('主题已切换');
 };
 
-// 计算颜色亮度
-const getColorBrightness = (color) => {
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    return (r * 299 + g * 587 + b * 114) / 1000;
-};
-
-// 提交密码修改
 const submitPassword = async () => {
     if (!passwordFormRef.value) return;
-    
     await passwordFormRef.value.validate((valid) => {
         if (valid) {
             passwordLoading.value = true;
-            
-            // 模拟API调用
             setTimeout(() => {
                 passwordLoading.value = false;
                 showPasswordDialog.value = false;
-                
-                // 重置表单
                 passwordForm.oldPassword = '';
                 passwordForm.newPassword = '';
                 passwordForm.confirmPassword = '';
-                
                 ElMessage.success('密码修改成功，请重新登录');
-                
-                // 退出登录
-                setTimeout(() => {
-                    handleLogout(false);
-                }, 1500);
+                setTimeout(() => { handleLogout(false); }, 1500);
             }, 1000);
         }
     });
 };
 
-// 切换语言
 const handleSetLanguage = (lang) => {
     locale.value = lang;
     localStorage.setItem('language', lang);
-    if (DiyCommon?.ChangeLang) {
-        DiyCommon.ChangeLang(lang);
-    }
+    if (DiyCommon?.ChangeLang) DiyCommon.ChangeLang(lang);
     showLangSelect.value = false;
     ElMessage.success('语言已切换');
 };
 
-// 退出登录
 const handleLogout = (showConfirm = true) => {
     const doLogout = async () => {
         try {
-            // 调用 userStore 的 logout 方法（与 PC 端保持一致）
             await userStore.logout();
-            // 清除本地存储
             removeToken();
             LocalStorageManager.remove('CurrentUser');
-            // 清除标签页视图
             tagsViewStore.delAllViews();
-            
-            // 检测是否在小程序 WebView 环境中
-            if (isMiniProgram()) {
-                // 在小程序中：通知小程序跳转回登录页
-                try {
-                    window.wx.miniProgram.reLaunch({ url: '/pages/login/index?logout=1' });
-                    return; // 小程序会接管页面跳转
-                } catch (wxErr) {
-                    console.warn('wx.miniProgram.reLaunch 失败:', wxErr);
-                    // 降级到 H5 内部跳转
-                }
-            }
-            
-            // 非小程序环境：正常 H5 路由跳转
-            router.push('/login');
-            ElMessage.success('已退出登录');
-        } catch (error) {
-            console.error('退出登录失败:', error);
-            // 即使出错也要确保清除本地数据并跳转
-            removeToken();
-            LocalStorageManager.remove('CurrentUser');
-            
             if (isMiniProgram()) {
                 try {
                     window.wx.miniProgram.reLaunch({ url: '/pages/login/index?logout=1' });
                     return;
-                } catch (e) { /* 降级 */ }
+                } catch (wxErr) { /* 降级 */ }
+            }
+            router.push('/login');
+            ElMessage.success('已退出登录');
+        } catch (error) {
+            removeToken();
+            LocalStorageManager.remove('CurrentUser');
+            if (isMiniProgram()) {
+                try {
+                    window.wx.miniProgram.reLaunch({ url: '/pages/login/index?logout=1' });
+                    return;
+                } catch (e) {}
             }
             router.push('/login');
         }
     };
-    
+
     if (showConfirm) {
         ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+            confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
         }).then(doLogout).catch(() => {});
     } else {
         doLogout();
     }
 };
 
-/**
- * 检测当前是否在小程序 WebView 环境中
- */
 function isMiniProgram() {
-    // 方式1：微信注入的环境变量
     if (window.__wxjs_environment === 'miniprogram') return true;
-    // 方式2：URL 参数标识（小程序 webview 传入 source=miniprogram）
     if (/source=miniprogram/.test(location.search)) return true;
-    // 方式3：检查 wx.miniProgram API 是否存在
     if (window.wx && window.wx.miniProgram) return true;
     return false;
 }
 </script>
 
 <style lang="scss" scoped>
-.mobile-profile {
-    min-height: 100vh;
-    background: #f5f7fa;
-    // padding-bottom: 70px;
+.page-profile {
+    padding-bottom: calc(var(--mci-tabbar-height) + var(--mci-safe-bottom) + var(--mci-space-6));
 }
 
-.user-card {
+/* === Hero === */
+.profile-hero {
     position: relative;
-    padding-top: var(--status-bar-height, 0px);
-    margin-bottom: 12px;
-    background: var(--color-primary);
-    
-    .user-card-bg {
+    overflow: hidden;
+    background: var(--mci-gradient-primary);
+    padding-bottom: var(--mci-space-4);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25),
+                0 0 60px var(--mci-color-primary-glow);
+
+    &__safe-top { height: var(--mci-safe-top); }
+
+    &__decor {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 100%;
-        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-dark, #2c7acc) 100%);
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
     }
-    
-    .user-info {
+
+    &__topbar {
+        position: relative; z-index: 1;
+        display: flex; align-items: center; justify-content: flex-end;
+        padding: var(--mci-space-2) var(--mci-space-4) 0;
+    }
+
+    &__title {
+        font-size: var(--mci-text-lg);
+        font-weight: var(--mci-font-bold);
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    &__theme {
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        border-radius: var(--mci-radius-full);
+        cursor: pointer;
+        transition: transform var(--mci-duration-fast);
+
+        &:active { transform: scale(0.92); }
+    }
+
+    &__user {
+        position: relative; z-index: 1;
+        display: flex; align-items: center;
+        gap: var(--mci-space-4);
+        padding: var(--mci-space-2) var(--mci-space-5) var(--mci-space-3);
+    }
+
+    &__avatar-wrap {
         position: relative;
+    }
+
+    &__avatar-glow {
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        filter: blur(10px);
+        z-index: 0;
+        animation: mciAvatarGlow 3s ease-in-out infinite alternate;
+    }
+
+    &__avatar {
+        position: relative;
+        z-index: 1;
+        border: 3px solid rgba(255, 255, 255, 0.7);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        background: var(--mci-gradient-primary);
+        color: #fff;
+        font-weight: var(--mci-font-bold);
+        font-size: 28px;
+    }
+
+    &__detail {
+        flex: 1;
+        min-width: 0;
+        color: #fff;
+    }
+
+    &__name-row {
+        display: flex; align-items: center; flex-wrap: wrap;
+        gap: var(--mci-space-2);
+        margin-bottom: 4px;
+    }
+
+    &__name {
+        font-size: var(--mci-text-xl);
+        font-weight: var(--mci-font-bold);
+        color: #fff;
+        margin: 0;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    &__account {
+        font-size: var(--mci-text-sm);
+        color: rgba(255, 255, 255, 0.85);
+        margin: 2px 0;
+    }
+
+    &__org {
+        font-size: var(--mci-text-xs);
+        color: rgba(255, 255, 255, 0.7);
+        margin: 2px 0;
+    }
+}
+
+@keyframes mciAvatarGlow {
+    from { opacity: 0.4; transform: scale(1); }
+    to   { opacity: 0.7; transform: scale(1.06); }
+}
+
+.decor-orb {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+
+    &--1 { width: 200px; height: 200px; top: -60px; right: -60px; }
+    &--2 { width: 130px; height: 130px; bottom: -40px; left: -30px; }
+    &--3 { width: 80px; height: 80px; top: 30%; right: 30%; opacity: 0.6; }
+}
+
+/* === 骨架 === */
+.profile-skeleton {
+    display: flex; align-items: center;
+    gap: var(--mci-space-4);
+    padding: var(--mci-space-2) var(--mci-space-5) var(--mci-space-4);
+    position: relative; z-index: 1;
+}
+
+.sk-avatar-lg {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    animation: mciShimmer 1.5s infinite;
+    background-size: 400% 100%;
+    background-image: linear-gradient(90deg,
+        rgba(255,255,255,0.15) 25%,
+        rgba(255,255,255,0.3) 50%,
+        rgba(255,255,255,0.15) 75%);
+}
+
+.sk-stack {
+    flex: 1;
+    display: flex; flex-direction: column;
+    gap: 8px;
+}
+
+.sk-line {
+    height: 14px;
+    border-radius: var(--mci-radius-full);
+    background-size: 400% 100%;
+    background-image: linear-gradient(90deg,
+        rgba(255,255,255,0.15) 25%,
+        rgba(255,255,255,0.3) 50%,
+        rgba(255,255,255,0.15) 75%);
+    animation: mciShimmer 1.5s infinite;
+}
+
+@keyframes mciShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* === 功能列表 === */
+.function-list {
+    margin-top: calc(-1 * var(--mci-space-4));
+    padding: 0 var(--mci-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--mci-space-4);
+    position: relative;
+    z-index: 2;
+}
+
+/* === 快捷图标网格 === */
+.quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--mci-space-2);
+    background: var(--mci-bg-elevated, #fff);
+    border-radius: var(--mci-radius-lg);
+    padding: var(--mci-space-4) var(--mci-space-2);
+    box-shadow: var(--mci-shadow-card);
+
+    &__item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        padding: var(--mci-space-2) 0;
+        border-radius: var(--mci-radius-md);
+        transition: transform var(--mci-duration-fast);
+
+        &:active { transform: scale(0.92); }
+    }
+
+    &__icon {
+        width: 44px; height: 44px;
+        border-radius: var(--mci-radius-md);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px;
+        color: #fff;
+
+        &--primary { background: var(--mci-gradient-primary); }
+        &--cyan { background: linear-gradient(135deg, #06B6D4, #22D3EE); }
+        &--gold { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
+        &--pink { background: linear-gradient(135deg, #EC4899, #F472B6); }
+    }
+
+    &__label {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-secondary);
+    }
+}
+
+.theme-preview {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--mci-bg-elevated);
+    box-shadow: 0 0 0 1px var(--mci-border-color), 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* 退出登录按钮 */
+.logout-btn {
+    margin-top: var(--mci-space-2);
+    width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    gap: var(--mci-space-2);
+}
+
+/* === 主题色面板样式移至非 scoped 块 === */
+
+
+/* === 显示模式切换 === */
+.mode-section {
+    margin-bottom: var(--mci-space-3);
+
+    &__label {
+        font-size: var(--mci-text-sm);
+        color: var(--mci-text-secondary);
+        font-weight: var(--mci-font-medium);
+        margin-bottom: var(--mci-space-2);
+    }
+}
+
+.mode-switch {
+    display: flex;
+    gap: var(--mci-space-2);
+
+    &__item {
+        flex: 1;
         display: flex;
         align-items: center;
-        padding: 24px 20px;
-        
-        .user-avatar {
-            border: 2px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            width: 64px;
-            height: 64px;
-            flex-shrink: 0;
+        justify-content: center;
+        gap: var(--mci-space-2);
+        padding: var(--mci-space-3);
+        border-radius: var(--mci-radius-md);
+        border: 2px solid var(--mci-border-color);
+        background: var(--mci-bg-card, var(--el-bg-color));
+        color: var(--mci-text-secondary);
+        cursor: pointer;
+        transition: all var(--mci-duration-base);
+        font-size: var(--mci-text-sm);
+
+        &:active { transform: scale(0.96); }
+
+        &.active {
+            border-color: var(--mci-color-primary);
+            color: var(--mci-color-primary);
+            background: var(--mci-color-primary-bg, rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.08));
         }
-        
-        .user-detail {
-            margin-left: 14px;
-            min-width: 0;
-            flex: 1;
-            
-            .user-name-row {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                flex-wrap: wrap;
-            }
-
-            .user-name {
-                font-size: 20px;
-                font-weight: 700;
-                color: #fff !important;
-                margin: 0;
-                line-height: 1.3;
-            }
-
-            .tenant-tag {
-                display: inline-block;
-                font-size: 11px;
-                line-height: 1;
-                padding: 3px 8px;
-                background: rgba(255, 255, 255, 0.2);
-                color: rgba(255, 255, 255, 0.95);
-                border-radius: 20px;
-                white-space: nowrap;
-                backdrop-filter: blur(4px);
-            }
-            
-            .user-account {
-                font-size: 13px;
-                color: rgba(255, 255, 255, 0.85) !important;
-                margin: 4px 0 0 0;
-            }
-
-            .user-org {
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.65) !important;
-                margin: 3px 0 0 0;
-            }
-        }
-    }
-}
-
-.function-list {
-    padding: 0 12px;
-    
-    .function-group {
-        background: #fff;
-        border-radius: 12px;
-        margin-bottom: 12px;
-        overflow: hidden;
-        
-        .function-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-            
-            &:not(:last-child) {
-                border-bottom: 1px solid #f5f7fa;
-            }
-            
-            &:active {
-                background: #f5f7fa;
-            }
-            
-            .item-left {
-                display: flex;
-                align-items: center;
-                
-                .item-icon {
-                    font-size: 20px;
-                    color: var(--color-primary, #409eff);
-                    margin-right: 12px;
-                }
-                
-                .item-title {
-                    font-size: 15px;
-                    color: #303133;
-                }
-            }
-            
-            .item-right {
-                display: flex;
-                align-items: center;
-                
-                .item-value {
-                    font-size: 14px;
-                    color: #909399;
-                    margin-right: 8px;
-                }
-                
-                .theme-preview {
-                    display: inline-block;
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    border: 2px solid #fff;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                }
-                
-                .el-icon {
-                    font-size: 14px;
-                    color: #c0c4cc;
-                }
-            }
-            
-            &.logout-item {
-                .item-icon {
-                    color: #f56c6c;
-                }
-                .item-title {
-                    color: #f56c6c;
-                }
-            }
-        }
-    }
-}
-
-// 主题选择抽屉
-:deep(.theme-drawer) {
-    .el-drawer__header {
-        margin-bottom: 0;
-        padding: 16px;
-        border-bottom: 1px solid #ebeef5;
-    }
-    
-    .el-drawer__body {
-        padding: 20px;
-        padding-bottom: calc(90px + env(safe-area-inset-bottom));
     }
 }
 
 .theme-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    
-    .theme-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-        
-        &:active {
-            opacity: 0.8;
-        }
-        
-        .theme-color {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 8px;
-            transition: transform 0.2s;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            
-            .check-icon {
-                font-size: 24px;
-                color: #fff;
-            }
-        }
-        
-        &.active .theme-color {
-            transform: scale(1.1);
-        }
-        
-        .theme-name {
-            font-size: 12px;
-            color: #606266;
-        }
+    gap: var(--mci-space-3);
+}
+
+.theme-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: var(--mci-space-2);
+    cursor: pointer;
+    padding: var(--mci-space-2) 0;
+    border-radius: var(--mci-radius-md);
+    transition: transform var(--mci-duration-fast);
+
+    &:active { transform: scale(0.94); }
+
+    &.active .theme-color {
+        box-shadow: 0 0 0 3px var(--mci-color-primary), 0 4px 16px var(--mci-color-primary-glow);
     }
 }
 
-// 关于系统弹窗
+.theme-color {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: box-shadow var(--mci-duration-base);
+}
+
+.check-icon { color: #fff; font-size: 18px; }
+
+.theme-name {
+    font-size: var(--mci-text-xs);
+    color: var(--mci-text-secondary);
+}
+
+/* === 关于内容 === */
 .about-content {
+    display: flex; flex-direction: column;
+    align-items: center;
     text-align: center;
-    padding: 20px 0;
-    
+    padding: var(--mci-space-4) 0;
+
     .about-logo {
-        width: 80px;
-        height: 80px;
-        margin-bottom: 16px;
-        object-fit: contain;
+        width: 64px; height: 64px;
+        border-radius: var(--mci-radius-md);
+        margin-bottom: var(--mci-space-3);
+        filter: drop-shadow(0 4px 12px var(--mci-color-primary-glow));
     }
-    
     .about-title {
-        font-size: 20px;
-        font-weight: 600;
-        color: #303133;
-        margin: 0 0 8px 0;
+        font-size: var(--mci-text-lg);
+        font-weight: var(--mci-font-bold);
+        color: var(--mci-text-primary);
+        margin: 0 0 var(--mci-space-1);
     }
-    
     .about-version {
-        font-size: 14px;
-        color: #909399;
-        margin: 0 0 8px 0;
+        font-size: var(--mci-text-sm);
+        color: var(--mci-text-tertiary);
+        margin: 0 0 var(--mci-space-2);
     }
-    
     .about-company {
-        font-size: 14px;
-        color: #606266;
-        margin: 0 0 16px 0;
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
+        margin: 0;
     }
-    
     .about-footer {
-        font-size: 13px;
-        color: #909399;
-        line-height: 1.6;
-        padding: 0 10px;
-        
-        :deep(p) {
-            margin: 8px 0;
-        }
-    }
-}
-// APK 服务器配置入口
-.apk-server-group {
-    margin-top: 0;
-    .apk-icon {
-        color: #7c5cfc !important;
-    }
-    .item-title-wrap {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-    }
-    .item-desc {
-        font-size: 11px;
-        color: #c0c4cc;
-        font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        margin-top: var(--mci-space-3);
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
     }
 }
 
-// APK 服务器地址弹窗
-:deep(.server-url-dialog) {
-    .el-dialog__header {
-        padding: 18px 20px 14px;
-        border-bottom: 1px solid #ebeef5;
-        .el-dialog__title {
-            font-size: 16px;
-            font-weight: 600;
-        }
-    }
-    .el-dialog__body { padding: 20px; }
-    .el-dialog__footer { padding: 12px 20px 20px; }
-}
-
+/* === 服务器地址表单 === */
 .server-url-form {
-    .current-url-card {
-        background: linear-gradient(135deg, #f0f4ff 0%, #f5f0ff 100%);
-        border: 1px solid #dce4ff;
-        border-radius: 10px;
-        padding: 14px 16px;
-        margin-bottom: 20px;
-        .current-url-label {
-            font-size: 11px;
-            color: #909399;
-            margin-bottom: 6px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .current-url-value {
-            font-size: 13px;
-            color: #303133;
-            font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-            word-break: break-all;
-        }
-    }
-    .new-url-section {
-        .section-title {
-            font-size: 13px;
-            color: #606266;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-        .url-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            .protocol-select {
-                width: 110px;
-                flex-shrink: 0;
-            }
-            .domain-input {
-                flex: 1;
-            }
-        }
-        .url-preview {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-            padding: 8px 12px;
-            background: #f5f7fa;
-            border-radius: 6px;
-            .preview-tag {
-                font-size: 11px;
-                color: #fff;
-                background: var(--color-primary, #409eff);
-                border-radius: 4px;
-                padding: 1px 6px;
-                flex-shrink: 0;
-            }
-            .preview-text {
-                font-size: 12px;
-                color: #303133;
-                font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-                word-break: break-all;
-            }
-        }
-    }
-    .tip-text {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 16px;
-        font-size: 12px;
-        color: #909399;
-        .el-icon { font-size: 14px; color: #e6a23c; }
-    }
+    display: flex; flex-direction: column;
+    gap: var(--mci-space-4);
 }
-// 语言选择抽屉
-:deep(.lang-drawer) {
-    .el-drawer__header {
-        margin-bottom: 0;
-        padding: 16px;
-        border-bottom: 1px solid #ebeef5;
+
+.current-url-card {
+    background: var(--mci-bg-card);
+    border: 1px solid var(--mci-border-color);
+    border-radius: var(--mci-radius-md);
+    padding: var(--mci-space-3);
+
+    .current-url-label {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
+        margin-bottom: 6px;
     }
-    
-    .el-drawer__body {
-        padding: 0;
-        padding-bottom: calc(90px + env(safe-area-inset-bottom));
+    .current-url-value {
+        font-size: var(--mci-text-sm);
+        color: var(--mci-text-primary);
+        word-break: break-all;
+        font-family: var(--mci-font-mono, monospace);
     }
 }
 
+.section-title {
+    font-size: var(--mci-text-sm);
+    color: var(--mci-text-secondary);
+    margin-bottom: var(--mci-space-2);
+    font-weight: var(--mci-font-medium);
+}
+
+.url-row {
+    display: flex; gap: var(--mci-space-2);
+
+    .protocol-select { flex: 0 0 110px; }
+    .domain-input { flex: 1; }
+}
+
+.url-preview {
+    display: flex; align-items: center;
+    gap: var(--mci-space-2);
+    margin-top: var(--mci-space-2);
+    padding: var(--mci-space-2) var(--mci-space-3);
+    background: var(--mci-bg-card);
+    border-radius: var(--mci-radius-md);
+
+    .preview-text {
+        font-size: var(--mci-text-sm);
+        color: var(--mci-color-primary);
+        word-break: break-all;
+        font-family: var(--mci-font-mono, monospace);
+    }
+}
+
+.tip-text {
+    display: flex; align-items: center;
+    gap: 6px;
+    color: var(--mci-text-tertiary);
+    font-size: var(--mci-text-xs);
+    padding: var(--mci-space-2) var(--mci-space-3);
+    background: var(--mci-bg-card);
+    border-radius: var(--mci-radius-md);
+    border-left: 3px solid var(--mci-color-warning);
+}
+
+/* === 语言列表 === */
 .lang-list {
-    .lang-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 20px;
-        cursor: pointer;
-        transition: background 0.2s;
-        border-bottom: 1px solid #f5f7fa;
-        
-        &:active {
-            background: #f5f7fa;
-        }
-        
-        &.active {
-            background: #f0f9ff;
-            
-            .lang-name {
-                color: var(--color-primary, #409eff);
-                font-weight: 600;
-            }
-        }
-        
-        .lang-name {
-            font-size: 15px;
-            color: #303133;
-        }
-        
-        .check-icon {
-            font-size: 20px;
-            color: var(--color-primary, #409eff);
-        }
+    .mci-cell.active .mci-cell__title { color: var(--mci-color-primary); }
+    .check-icon {
+        color: var(--mci-color-primary);
+        font-size: 18px;
+    }
+}
+</style>
+
+<!-- 非 scoped 样式：覆盖 teleport 到 body 的 el-drawer -->
+<style lang="scss">
+.mci-drawer {
+    background: var(--mci-bg-elevated) !important;
+    border-top-left-radius: var(--mci-radius-2xl) !important;
+    border-top-right-radius: var(--mci-radius-2xl) !important;
+
+    .el-drawer__header {
+        padding: var(--mci-space-4);
+        margin-bottom: 0;
+        border-bottom: 1px solid var(--mci-border-color);
+        color: var(--mci-text-primary);
+    }
+    .el-drawer__title {
+        font-size: var(--mci-text-base);
+        font-weight: var(--mci-font-semibold);
+        color: var(--mci-text-primary);
+    }
+    .el-drawer__body { padding: var(--mci-space-4); }
+}
+
+.mci-drawer--above-tabbar {
+    .el-drawer__body {
+        padding-bottom: calc(50px + env(safe-area-inset-bottom) + 16px) !important;
     }
 }
 </style>

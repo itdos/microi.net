@@ -1,5 +1,5 @@
 <template>
-  <view class="profile-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="profile-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部用户卡片 -->
     <view class="user-card" :style="{ paddingTop: statusBarHeight + 'px', background: themeColor }">
       <view class="card-bg">
@@ -127,7 +127,7 @@
             <view class="item-icon" style="background:#eef2ff;">
               <text>🔓</text>
             </view>
-            <text class="item-title" style="color:#4e6ef2;font-weight:600;">{{ t('common.loginNow') }}</text>
+            <text class="item-title" style="color:#6C2BD9;font-weight:600;">{{ t('common.loginNow') }}</text>
           </view>
           <view class="item-right">
             <text class="arrow">›</text>
@@ -225,7 +225,7 @@
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
 import appConfig from '@/config.js'
-import { themeMixin, setTheme } from '@/utils/theme.js'
+import { themeMixin, setTheme, applyMciTokensH5 } from '@/utils/theme.js'
 import { setLang } from '@/utils/i18n.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 
@@ -247,20 +247,20 @@ export default {
         newPassword: '',
         confirmPassword: ''
       },
-      // 主题色
+      // 主题色（MCI 设计系统色板：紫色为默认主色，搭配蓝/青/粉/橙/红/绿等多彩选项）
             themeColors: [
-        { name: this.t ? this.t('profile.blue') : '蓝色', value: '#4e6ef2' },
-        { name: '天蓝', value: '#409eff' },
-        { name: '橙色', value: '#E67E22' },
-        { name: '红色', value: '#E74C3C' },
+        { name: this.t ? this.t('profile.purple') || '紫色' : '紫色', value: '#6C2BD9' },
+        { name: this.t ? this.t('profile.blue') : '蓝色', value: '#2196F3' },
+        { name: '青色', value: '#06B6D4' },
+        { name: '粉色', value: '#EC4899' },
+        { name: '橙色', value: '#F59E0B' },
+        { name: '红色', value: '#E8294A' },
         { name: '绿色', value: '#27AE60' },
-        { name: '紫色', value: '#9B59B6' },
-        { name: '粉色', value: '#E91E63' },
-        { name: '青色', value: '#00BCD4' },
-        { name: '靛蓝', value: '#3F51B5' },
+        { name: '靖蓝', value: '#3F51B5' },
         { name: '深橙', value: '#FF5722' },
         { name: '灰蓝', value: '#607D8B' },
-        { name: '黑色', value: '#424242' }
+        { name: '天蓝', value: '#409EFF' },
+        { name: '黑色', value: '#1A1A2E' }
       ],
       // 语言
       currentLang: 'zh-CN',
@@ -357,6 +357,8 @@ export default {
     changeTheme(color) {
       this._themeColor = color
       setTheme(color)
+      // H5 端立即把 MCI 变量写到 documentElement
+      applyMciTokensH5(color)
       this.showThemePanel = false
       uni.showToast({ title: this.t('profile.themeSwitched'), icon: 'success' })
     },
@@ -455,7 +457,7 @@ export default {
 /* 用户卡片 */
 .user-card {
   position: relative;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   padding-bottom: 48rpx;
 }
 
@@ -780,7 +782,7 @@ export default {
     background: #f0f5ff;
 
     .lang-name {
-      color: var(--theme, #4e6ef2);
+      color: var(--theme, #6C2BD9);
       font-weight: 600;
     }
   }
@@ -793,7 +795,7 @@ export default {
 
 .lang-check {
   font-size: 32rpx;
-  color: var(--theme, #4e6ef2);
+  color: var(--theme, #6C2BD9);
   font-weight: 700;
 }
 
@@ -888,7 +890,7 @@ export default {
   flex: 2;
   height: 80rpx;
   border-radius: 40rpx;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   display: flex;
   align-items: center;
   justify-content: center;

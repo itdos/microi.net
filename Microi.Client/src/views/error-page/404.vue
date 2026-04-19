@@ -44,7 +44,7 @@ export default {
 }
 .error-page-main {
     position: relative;
-    background: #f9f9f9;
+    background: var(--el-bg-color-overlay, #f9f9f9);
     margin: 0 auto;
     width: 617px;
     -ms-box-sizing: border-box;
@@ -66,7 +66,8 @@ export default {
 .error-page-main h3 {
     font-size: 24px;
     font-weight: 400;
-    border-bottom: 1px solid #d0d0d0;
+    color: var(--el-text-color-primary);
+    border-bottom: 1px solid var(--el-border-color, #d0d0d0);
 }
 .error-page-main h3 strong {
     font-size: 54px;
@@ -76,7 +77,7 @@ export default {
 .error-page-main h4 {
     font-size: 20px;
     font-weight: 400;
-    color: #333;
+    color: var(--el-text-color-primary, #333);
 }
 .error-page-actions {
     font-size: 0;
@@ -91,7 +92,7 @@ export default {
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
-    color: #838383;
+    color: var(--el-text-color-regular, #838383);
 }
 .error-page-actions ol {
     list-style: decimal;
@@ -109,9 +110,9 @@ export default {
     left: 50px;
     width: 200px;
     height: 10px;
-    -moz-box-shadow: 4px 5px 31px 11px #999;
-    -webkit-box-shadow: 4px 5px 31px 11px #999;
-    box-shadow: 4px 5px 31px 11px #999;
+    -moz-box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
+    -webkit-box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
+    box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
     -moz-transform: rotate(-4deg);
     -webkit-transform: rotate(-4deg);
     -ms-transform: rotate(-4deg);
@@ -127,9 +128,9 @@ export default {
     right: 50px;
     width: 200px;
     height: 10px;
-    -moz-box-shadow: 4px 5px 31px 11px #999;
-    -webkit-box-shadow: 4px 5px 31px 11px #999;
-    box-shadow: 4px 5px 31px 11px #999;
+    -moz-box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
+    -webkit-box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
+    box-shadow: 4px 5px 31px 11px var(--el-border-color-lighter, #999);
     -moz-transform: rotate(4deg);
     -webkit-transform: rotate(4deg);
     -ms-transform: rotate(4deg);

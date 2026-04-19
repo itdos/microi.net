@@ -1,0 +1,240 @@
+/* ========================================================
+ * MCI 设计系统 — uni-app 全局样式（rpx 单位）
+ * 与 Microi.Client 移动端 mci-design.scss 同源
+ * 参考：microi.skills/ui-design/SKILL.md
+ * 命名前缀：--mci- / .mci-
+ * ======================================================== */
+
+/* === 主题变量（亮色多彩默认） === */
+page,
+page[data-theme="light"] {
+  /* 主色调 */
+  --mci-color-primary: #6C2BD9;
+  --mci-color-primary-light: #8B5CF6;
+  --mci-color-primary-glow: rgba(108, 43, 217, 0.20);
+
+  /* 强调色 */
+  --mci-color-accent-blue: #2196F3;
+  --mci-color-accent-cyan: #06B6D4;
+  --mci-color-accent-pink: #EC4899;
+  --mci-color-accent-yellow: #F59E0B;
+
+  /* 状态色 */
+  --mci-color-success: #07C160;
+  --mci-color-warning: #FF9900;
+  --mci-color-danger: #E8294A;
+  --mci-color-info: #2196F3;
+
+  /* 背景 */
+  --mci-bg-base: #F5F5FA;
+  --mci-bg-elevated: #FFFFFF;
+  --mci-bg-card: rgba(255, 255, 255, 0.92);
+  --mci-bg-card-hover: rgba(255, 255, 255, 0.98);
+
+  /* 文本 */
+  --mci-text-primary: #1A1A2E;
+  --mci-text-secondary: rgba(26, 26, 46, 0.65);
+  --mci-text-tertiary: rgba(26, 26, 46, 0.45);
+  --mci-text-muted: rgba(26, 26, 46, 0.22);
+  --mci-text-placeholder: rgba(26, 26, 46, 0.30);
+
+  /* 边框 */
+  --mci-border-color: rgba(15, 18, 30, 0.08);
+  --mci-border-color-hover: rgba(15, 18, 30, 0.16);
+
+  /* 渐变 */
+  --mci-gradient-primary: linear-gradient(135deg, #6C2BD9 0%, #2196F3 100%);
+  --mci-gradient-warm: linear-gradient(135deg, #EC4899 0%, #F59E0B 100%);
+  --mci-gradient-cool: linear-gradient(135deg, #06B6D4 0%, #2196F3 100%);
+
+  /* 阴影 / 光晕 */
+  --mci-shadow-sm: 0 2rpx 8rpx rgba(15, 18, 30, 0.06);
+  --mci-shadow-md: 0 8rpx 24rpx rgba(15, 18, 30, 0.10);
+  --mci-shadow-lg: 0 16rpx 48rpx rgba(15, 18, 30, 0.14);
+  --mci-shadow-button: 0 12rpx 40rpx var(--mci-color-primary-glow);
+  --mci-glow-primary: 0 0 48rpx var(--mci-color-primary-glow),
+                      0 0 120rpx rgba(33, 150, 243, 0.18);
+
+  /* 圆角（rpx） */
+  --mci-radius-xs: 8rpx;
+  --mci-radius-sm: 12rpx;
+  --mci-radius-md: 16rpx;
+  --mci-radius-lg: 20rpx;
+  --mci-radius-xl: 28rpx;
+  --mci-radius-2xl: 40rpx;
+  --mci-radius-full: 9999rpx;
+
+  /* 间距（rpx） */
+  --mci-space-1: 4rpx;
+  --mci-space-2: 8rpx;
+  --mci-space-3: 16rpx;
+  --mci-space-4: 24rpx;
+  --mci-space-5: 32rpx;
+  --mci-space-6: 40rpx;
+  --mci-space-8: 56rpx;
+  --mci-space-12: 80rpx;
+
+  /* 字号（rpx） */
+  --mci-text-xs: 22rpx;
+  --mci-text-sm: 26rpx;
+  --mci-text-base: 28rpx;
+  --mci-text-md: 32rpx;
+  --mci-text-lg: 36rpx;
+  --mci-text-xl: 44rpx;
+  --mci-text-2xl: 56rpx;
+  --mci-text-3xl: 68rpx;
+
+  /* 字重 */
+  --mci-font-regular: 400;
+  --mci-font-medium: 500;
+  --mci-font-semibold: 600;
+  --mci-font-bold: 700;
+
+  /* 动效 */
+  --mci-duration-fast: 150ms;
+  --mci-duration-base: 250ms;
+  --mci-duration-slow: 400ms;
+
+  /* TabBar */
+  --mci-tabbar-height: 110rpx;
+  --mci-safe-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* === 暗黑主题（可选切换） === */
+page[data-theme="dark"] {
+  --mci-color-primary: #722BFF;
+  --mci-color-primary-light: #9B5FFF;
+  --mci-color-primary-glow: rgba(114, 43, 255, 0.35);
+  --mci-color-accent-blue: #29B8FF;
+  --mci-color-accent-cyan: #00F5D4;
+  --mci-color-accent-pink: #FF6EC7;
+  --mci-color-danger: #FF2E63;
+
+  --mci-bg-base: #0A0A0F;
+  --mci-bg-elevated: #121218;
+  --mci-bg-card: rgba(255, 255, 255, 0.04);
+  --mci-bg-card-hover: rgba(255, 255, 255, 0.08);
+
+  --mci-text-primary: #FFFFFF;
+  --mci-text-secondary: rgba(255, 255, 255, 0.55);
+  --mci-text-tertiary: rgba(255, 255, 255, 0.35);
+  --mci-text-muted: rgba(255, 255, 255, 0.18);
+  --mci-text-placeholder: rgba(255, 255, 255, 0.30);
+
+  --mci-border-color: rgba(255, 255, 255, 0.08);
+  --mci-border-color-hover: rgba(255, 255, 255, 0.16);
+
+  --mci-gradient-primary: linear-gradient(135deg, #722BFF 0%, #29B8FF 100%);
+
+  --mci-shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.40);
+  --mci-shadow-button: 0 8rpx 32rpx var(--mci-color-primary-glow);
+  --mci-glow-primary: 0 0 48rpx rgba(114, 43, 255, 0.5),
+                      0 0 120rpx rgba(41, 184, 255, 0.18);
+}
+
+/* === 极光光斑 Aurora Orbs === */
+.mci-aurora {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.mci-aurora__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120rpx);
+  opacity: 0.55;
+  animation: mciAuroraDrift var(--dur, 26s) ease-in-out infinite alternate;
+}
+.mci-aurora__orb--1 {
+  width: 1040rpx; height: 1040rpx;
+  top: -240rpx; left: -200rpx;
+  background: radial-gradient(circle, var(--mci-color-primary) 0%, transparent 65%);
+  --dur: 22s;
+}
+.mci-aurora__orb--2 {
+  width: 920rpx; height: 920rpx;
+  top: 28%; right: -280rpx;
+  background: radial-gradient(circle, var(--mci-color-accent-blue) 0%, transparent 65%);
+  --dur: 28s;
+  animation-delay: -8s;
+}
+.mci-aurora__orb--3 {
+  width: 1160rpx; height: 1160rpx;
+  bottom: -360rpx; left: 18%;
+  background: radial-gradient(circle, var(--mci-color-accent-pink) 0%, transparent 65%);
+  opacity: 0.4;
+  --dur: 32s;
+  animation-delay: -14s;
+}
+.mci-aurora__orb--4 {
+  width: 760rpx; height: 760rpx;
+  top: 55%; left: -160rpx;
+  background: radial-gradient(circle, var(--mci-color-accent-cyan) 0%, transparent 65%);
+  opacity: 0.45;
+  --dur: 26s;
+  animation-delay: -4s;
+}
+@keyframes mciAuroraDrift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(80rpx, -60rpx, 0) scale(1.08); }
+  100% { transform: translate3d(-60rpx, 40rpx, 0) scale(0.95); }
+}
+page[data-theme="dark"] .mci-aurora__orb {
+  opacity: 0.35;
+  filter: blur(160rpx);
+}
+
+/* === 通用工具类 === */
+.mci-card {
+  background: var(--mci-bg-card);
+  backdrop-filter: blur(20rpx);
+  -webkit-backdrop-filter: blur(20rpx);
+  border: 1rpx solid var(--mci-border-color);
+  border-radius: var(--mci-radius-lg);
+  box-shadow: var(--mci-shadow-md);
+}
+
+.mci-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80rpx;
+  padding: 0 56rpx;
+  background: var(--mci-gradient-primary);
+  color: #fff;
+  font-size: var(--mci-text-base);
+  font-weight: var(--mci-font-semibold);
+  border: none;
+  border-radius: var(--mci-radius-full);
+  box-shadow: var(--mci-shadow-button);
+  transition: transform var(--mci-duration-fast) ease;
+}
+.mci-btn--ghost {
+  background: transparent;
+  color: var(--mci-color-primary);
+  border: 2rpx solid var(--mci-color-primary);
+  box-shadow: none;
+}
+.mci-btn:active { transform: scale(0.96); }
+
+.mci-text-gradient {
+  background: var(--mci-gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* === 入场动画 === */
+@keyframes mciFadeInUp {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mci-fade-in-up { animation: mciFadeInUp var(--mci-duration-slow) ease both; }
+
+@keyframes mciShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
