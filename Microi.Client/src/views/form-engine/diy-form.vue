@@ -1941,7 +1941,9 @@ export default {
                             field.Component !== "DevComponent" &&
                             field.Component !== "TableChild" &&
                             field.Component !== "Button" &&
-                            field.Component !== "Button"
+                            field.Component !== "Button" &&
+                            field.Component !== "AutoNumber" &&
+                            !self.GetFieldReadOnly(field)
                             // && !self.DiyCommon.IsNull(field.FieldType)
                         ) {
                             checkFailField = field;
@@ -2934,7 +2936,7 @@ export default {
             } catch (e) {}
 
             // 2. 设置表单验证规则
-            if (self.FormMode != "View" && field.NotEmpty && field.Visible) {
+            if (self.FormMode != "View" && field.NotEmpty && field.Visible && field.Component !== "AutoNumber" && !self.GetFieldReadOnly(field)) {
                 if (!self.FormRules[field.Name]) {
                     self.FormRules[field.Name] = [
                         {
@@ -3855,7 +3857,9 @@ export default {
                                         field.Component !== "DevComponent" &&
                                         field.Component !== "TableChild" &&
                                         field.Component !== "Button" &&
-                                        field.Component !== "Button"
+                                        field.Component !== "Button" &&
+                                        field.Component !== "AutoNumber" &&
+                                        !self.GetFieldReadOnly(field)
                                         // && !self.DiyCommon.IsNull(field.FieldType)
                                     ) {
                                         checkFailField = field;
