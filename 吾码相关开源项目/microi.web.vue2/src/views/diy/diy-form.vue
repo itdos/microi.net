@@ -2139,7 +2139,7 @@ export default {
         self.PageType = self.$route.query.PageType;
 
         VueAMap.initAMapApiLoader({
-            key: self.SysConfig.AMapKey || "99b272c930081b69507b218d660be3dc",
+            key: self.SysConfig.AMapKey,
             plugin: [
                 "Scale",
                 "OverView",
@@ -5005,7 +5005,7 @@ export default {
 
                 if (field.Config.MapCompany == "AMap") {
                     // self.VueAMap.initAMapApiLoader({
-                    //     key: field.Config.MapKey || self.SysConfig.AMapKey || '99b272c930081b69507b218d660be3dc',
+                    //     key: field.Config.MapKey || self.SysConfig.AMapKey,
                     //     plugin: [
                     //         'Scale', 'OverView', 'ToolBar', 'MapType', 'Geocoder', 'PlaceSearch', 'Autocomplete',
                     //         "AMap.Autocomplete", //输入提示插件

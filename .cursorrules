@@ -464,6 +464,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 数据库结构文件列表：
 - `microi-v8-engine/AI进销存 (api.itdos.com)\ips.Product.Internal\.microi-db-schema.md`
+- `microi-v8-engine/Microi吾码 (api.itdos.com)\iTdos.Product.Internal\.microi-db-schema.md`
 - `microi-v8-engine/集福鲤管理平台 (api.jifulii.com)\xjy.Product.Internal\.microi-db-schema.md`
 
 
