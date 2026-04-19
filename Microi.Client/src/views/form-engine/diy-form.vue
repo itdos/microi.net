@@ -3996,7 +3996,7 @@ export default {
     cursor: pointer;
 
     &:hover {
-        background-color: #f5f7fa;
+        background-color: var(--el-fill-color-light, #f5f7fa);
 
         .drag-handle {
             opacity: 1;
@@ -4021,9 +4021,9 @@ export default {
 
 /* 选中状态的字段 */
 .selected-field {
-    outline: 2px solid #409EFF !important;
+    outline: 2px solid var(--el-color-primary, #409EFF) !important;
     // outline-offset: 2px;
-    background-color: #ecf5ff !important;
+    background-color: var(--el-color-primary-light-9, #ecf5ff) !important;
     border-radius: 4px;
 }
 
@@ -4035,7 +4035,7 @@ export default {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: white;
+    background: var(--el-bg-color-overlay, white);
     padding: 8px 12px;
     border-radius: 6px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
@@ -4057,14 +4057,14 @@ export default {
         align-items: center;
         gap: 6px;
         padding: 4px 8px;
-        background-color: #f5f7fa;
+        background-color: var(--el-fill-color-light, #f5f7fa);
         border-radius: 4px;
 
         .width-display {
             font-weight: bold;
             min-width: 30px;
             text-align: center;
-            color: #409EFF;
+            color: var(--el-color-primary, #409EFF);
             font-size: 14px;
         }
 
@@ -4082,7 +4082,7 @@ export default {
     top: 50%;
     transform: translateY(-50%);
     cursor: move;
-    color: #409EFF;
+    color: var(--el-color-primary, #409EFF);
     font-size: 20px;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -4094,12 +4094,12 @@ export default {
         height: 24px;
         line-height: 24px;
         text-align: center;
-        background: white;
+        background: var(--el-bg-color-overlay, white);
         border-radius: 4px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
         &:hover {
-            color: #66b1ff;
+            color: var(--el-color-primary-light-3, #66b1ff);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
     }
@@ -4113,31 +4113,31 @@ export default {
     bottom: 0;
     width: 6px;
     cursor: ew-resize;
-    background: linear-gradient(to right, transparent, #409EFF);
+    background: linear-gradient(to right, transparent, var(--el-color-primary, #409EFF));
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 10;
 
     &:hover {
-        background: #409EFF;
+        background: var(--el-color-primary, #409EFF);
     }
 
     &.resizing {
         opacity: 1 !important;
-        background: #66b1ff;
+        background: var(--el-color-primary-light-3, #66b1ff);
     }
 }
 
 /* vuedraggable 拖拽状态样式 */
 :deep(.sortable-ghost) {
     opacity: 0.4;
-    background-color: #c8ebfb !important;
-    border: 2px dashed #409EFF;
+    background-color: var(--el-color-primary-light-7, #c8ebfb) !important;
+    border: 2px dashed var(--el-color-primary, #409EFF);
 }
 
 :deep(.sortable-drag) {
     opacity: 0.8;
-    background-color: white;
+    background-color: var(--el-bg-color-overlay, white);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     transform: rotate(2deg);
 }

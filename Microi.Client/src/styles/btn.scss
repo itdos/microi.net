@@ -53,7 +53,7 @@
     display: inline-block;
 
     &:hover {
-        background: #fff;
+        background: var(--el-bg-color, #fff);
 
         &:before,
         &:after {
@@ -86,7 +86,7 @@
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
-    background: #fff;
+    background: var(--el-bg-color, #fff);
     color: #fff;
     -webkit-appearance: none;
     text-align: center;

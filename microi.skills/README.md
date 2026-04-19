@@ -18,6 +18,7 @@
 | **v8-security** | 安全最佳实践（权限校验、输入验证、防注入） | `v8-security/SKILL.md` |
 | **page-engine** | 界面引擎页面 JSON 生成 | `page-engine/SKILL.md` |
 | **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
+| **ui-design** | 酷炫潮流 UI 设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |
 
 ---
 

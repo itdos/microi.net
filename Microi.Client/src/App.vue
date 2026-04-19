@@ -12,6 +12,7 @@
 <script>
 import { computed, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
+import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
@@ -85,8 +86,19 @@ export default {
         // 初始化主题色的文字颜色变量
         this.initThemeColorDefaults();
 
-        // 恢复 OpenClaw 风格主题（data-theme 和 body class）
-        this.restoreOcTheme();
+        // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
+        this.restoreMciMode();
+
+        // 清除遗留的 OpenClaw 风格主题状态（一次性迁移）
+        try {
+            localStorage.removeItem('microi_oc_theme');
+            var _appEl = document.getElementById('app-microi');
+            if (_appEl && (_appEl.getAttribute('data-theme') || '').indexOf('openclaw') === 0) {
+                _appEl.removeAttribute('data-theme');
+            }
+            document.body.classList.remove('oc-theme-dark', 'oc-theme-light');
+            document.documentElement.classList.remove('oc-theme-dark', 'oc-theme-light');
+        } catch (e) {}
 
         if (window.plus) {
             self.PageInit();
@@ -164,21 +176,16 @@ export default {
             var isPhoneView = window.innerWidth <= 768;
             this.diyStore.setIsPhoneView(isPhoneView);
         },
-        // 恢复 OpenClaw 风格主题
-        restoreOcTheme() {
-            var theme = localStorage.getItem('microi_oc_theme') || '';
-            if (!theme) return;
-            var appEl = document.getElementById('app-microi');
-            if (appEl) appEl.setAttribute('data-theme', theme);
-            document.body.classList.remove('oc-theme-dark', 'oc-theme-light');
-            document.documentElement.classList.remove('oc-theme-dark', 'oc-theme-light', 'dark');
-            if (theme === 'openclaw-dark') {
-                document.body.classList.add('oc-theme-dark');
-                document.documentElement.classList.add('oc-theme-dark', 'dark');
-            } else if (theme === 'openclaw-light') {
-                document.body.classList.add('oc-theme-light');
-                document.documentElement.classList.add('oc-theme-light');
-            }
+        // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
+        restoreMciMode() {
+            try {
+                var mode = localStorage.getItem('mci-theme');
+                if (mode !== 'light' && mode !== 'dark') {
+                    mode = 'light';
+                }
+                // 通过 setThemeMode 应用：暗色时会基于当前主题色生成主题色调暗色调色板
+                applyThemeMode(mode);
+            } catch (e) {}
         },
         // 初始化主题色的文字颜色变量
         initThemeColorDefaults() {

@@ -3,9 +3,6 @@
         v-show="ShowClassicTop != 0"
         class="sidebar-logo-microi-container-microi"
         :class="{ collapse: collapse }"
-        :style="{
-            background: SysConfig.MenuBg == 'Custom' && SysConfig.LogoBgColor ? SysConfig.LogoBgColor : '#fff'
-        }"
     >
         <transition name="sidebarLogoFade">
             <router-link v-if="collapse" key="collapse" class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
@@ -18,7 +15,7 @@
                     v-if="IsDisplayShortTitle()"
                     :title="SysConfig.SysShortTitle"
                     :style="{
-                        color: SysConfig.SysTitleColor ? SysConfig.SysTitleColor : '#000',
+                        color: 'var(--sidebar-text-color, #ffffff)',
                         fontSize: SysConfig.SysTitleFontSize ? SysConfig.SysTitleFontSize + 'px' : '20px'
                     }"
                 >

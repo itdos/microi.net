@@ -100,3 +100,8 @@ Microi一键编译发布配置.json
 
 /Microi.Spider/
 /Microi.Spider.Chrome/
+/dark-mode-screenshots/
+dark-mode-test-output.txt
+dark-test-log.txt
+login-debug.json
+test-dark-mode.mjs

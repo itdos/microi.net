@@ -867,26 +867,26 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
+    background: var(--el-bg-color, #ffffff);
     z-index: 1000;
     
     .el-icon {
       margin-bottom: 16px;
-      color: #3b82f6;
+      color: var(--el-color-primary, #3b82f6);
     }
     
     p {
       margin: 0;
       font-size: 14px;
-      color: #64748b;
+      color: var(--el-text-color-secondary, #64748b);
     }
   }
 
   .sidebar {
     flex-shrink: 0;
     height: 100%;
-    background: #fff;
-    border-right: 1px solid #e2e8f0;
+    background: var(--el-bg-color, #fff);
+    border-right: 1px solid var(--el-border-color-lighter, #e2e8f0);
     overflow: hidden;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
     display: flex;
@@ -895,10 +895,10 @@ onUnmounted(() => {
 
   .bucket-switcher {
     padding: 10px 12px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0);
     display: flex;
     justify-content: center;
-    background: #f8fafc;
+    background: var(--el-fill-color-light, #f8fafc);
     flex-shrink: 0;
     
     .el-radio-group {
@@ -936,7 +936,7 @@ onUnmounted(() => {
     flex: 1;
     overflow: hidden;
     min-width: 0;
-    background: #fff;
+    background: var(--el-bg-color, #fff);
     margin: 8px;
     margin-left: 0;
     border-radius: 12px;

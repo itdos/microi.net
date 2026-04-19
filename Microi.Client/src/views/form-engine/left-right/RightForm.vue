@@ -138,7 +138,7 @@
         <!--      style="background-color: rgba(0, 0, 0, 0.3);"-->
         <!--    >-->
         <div>
-            <div class="pull-left" style="color: #000; font-size: 15px">
+            <div class="pull-left" style="color: var(--el-text-color-primary); font-size: 15px">
                 <i :class="GetOpenTitleIcon()" />
                 {{ GetOpenTitle() }}
             </div>

@@ -107,11 +107,11 @@ const handleTabClick = (item) => {
     left: 0;
     right: 0;
     height: 50px;
-    background-color: #fff;
+    background-color: var(--el-bg-color, #fff);
     display: flex;
     justify-content: space-around;
     align-items: center;
-    border-top: 1px solid #e4e7ed;
+    border-top: 1px solid var(--el-border-color-lighter, #e4e7ed);
     z-index: 999;
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
     padding-bottom: env(safe-area-inset-bottom);
@@ -127,14 +127,14 @@ const handleTabClick = (item) => {
         padding: 4px 0;
         
         .tabbar-icon {
-            color: #909399;
+            color: var(--el-text-color-secondary, #909399);
             margin-bottom: 2px;
             transition: all 0.2s ease;
         }
 
         .tabbar-label {
             font-size: 11px;
-            color: #909399;
+            color: var(--el-text-color-secondary, #909399);
             transition: all 0.2s ease;
         }
 

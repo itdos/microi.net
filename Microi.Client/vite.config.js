@@ -48,6 +48,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@goview': path.resolve(__dirname, 'src/views/go-view/src'),
+            '@/webos': path.resolve(__dirname, 'src/views/webos'),
             '@': path.resolve(__dirname, 'src'),
             // 兼容 SCSS 中 ~@ 的导入
             '~@': path.resolve(__dirname, 'src'),

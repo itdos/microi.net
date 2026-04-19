@@ -819,7 +819,7 @@ export default {
 .submenu-back {
   text {
     font-size: 28rpx;
-    color: var(--theme, #4e6ef2);
+    color: var(--theme, #6C2BD9);
   }
 }
 

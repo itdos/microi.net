@@ -272,7 +272,7 @@ export default {
   width: 64rpx;
   height: 64rpx;
   border: 4rpx solid #eeeeee;
-  border-top-color: var(--theme, #4e6ef2);
+  border-top-color: var(--theme, #6C2BD9);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 24rpx;

@@ -121,7 +121,7 @@ export default {
         GetMenuBg() {
             var self = this;
             var result = {};
-            if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWidth)) {
+            if (self.SysConfig.MenuWidth) {
                 //这里要判断hideSidebar
                 if (self.classObj.openSidebar) {
                     result["width"] = self.SysConfig.MenuWidth; // + ' !important';
@@ -139,7 +139,7 @@ export default {
                 return result;
             }
             
-            if (self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWidth && self.isCollapse !== true) {
+            if (self.SysConfig.MenuWidth && self.isCollapse !== true) {
                 result["marginLeft"] = self.SysConfig.MenuWidth;
             }
             if (self.ShowClassicLeft == 0) {
@@ -159,7 +159,7 @@ export default {
             }
             return result;
 
-            if (self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWidth && self.isCollapse !== true) {
+            if (self.SysConfig.MenuWidth && self.isCollapse !== true) {
                 result["width"] = "calc(100% - " + self.SysConfig.MenuWidth + ")"; //'calc(100% - 240px)'
             } else if (self.isCollapse !== true) {
                 result["width"] = "calc(100% - 240px)";

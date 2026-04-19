@@ -322,7 +322,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <el-tabs v-model="FormRightType">
                         <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
                             <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -457,7 +457,7 @@
             @opened="onDrawerOpened"
         >
             <template #header>
-                <div style="color: #000; font-size: 15px;min-width: 200px;">
+                <div style="color: var(--el-text-color-primary); font-size: 15px;min-width: 200px;">
                     <fa-icon :class="GetOpenTitleIcon()" />
                     {{ GetOpenTitle() }}
                 </div>
@@ -610,7 +610,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <el-tabs v-model="FormRightType">
                         <el-tab-pane v-if="OpenDiyFormWorkFlow" :label="$t('Msg.WorkflowInfo')" name="WorkFlow">
                             <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -2525,7 +2525,7 @@ export default {
 // 移动端表单页面样式（页面模式）
 .mobile-form-page {
     padding: 0 10px !important;
-    background: #f5f7fa;
+    background: var(--el-fill-color-light, #f5f7fa);
     min-height: 100vh;
     padding-top: calc(45px + var(--status-bar-height, 0px)) !important;
 
@@ -2564,7 +2564,7 @@ export default {
 
         .el-form-item__label {
             font-size: 14px;
-            color: #606266;
+            color: var(--el-text-color-regular, #606266);
         }
 
         .el-input,
@@ -2583,10 +2583,10 @@ export default {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
-    background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
     border-radius: 8px;
     padding: 8px 12px;
-    border: 1px solid #e4e7ed;
+    border: 1px solid var(--el-border-color-lighter, #e4e7ed);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -2603,8 +2603,8 @@ export default {
     justify-content: space-between;
     padding: 12px 16px;
     padding-top: calc(12px + var(--status-bar-height, 0px));
-    background: #fff;
-    border-bottom: 1px solid #f0f0f0;
+    background: var(--el-bg-color, #fff);
+    border-bottom: 1px solid var(--el-border-color-lighter, #f0f0f0);
     position: fixed;
     top: 0;
     left: 0;
@@ -2621,7 +2621,7 @@ export default {
         .more-icon {
             font-size: 20px;
             cursor: pointer;
-            color: #333;
+            color: var(--el-text-color-primary, #333);
 
             &:active {
                 opacity: 0.6;
@@ -2637,7 +2637,7 @@ export default {
         .mobile-title {
             font-size: 16px;
             font-weight: 600;
-            color: #333;
+            color: var(--el-text-color-primary, #333);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2744,8 +2744,8 @@ export default {
 }
 
 .mobile-fab-menu-label {
-    background: #fff;
-    color: #333;
+    background: var(--el-bg-color, #fff);
+    color: var(--el-text-color-primary, #333);
     font-size: 13px;
     font-weight: 500;
     padding: 8px 14px;
@@ -2931,7 +2931,7 @@ export default {
     }
 
     .mobile-fab-menu-label {
-        background: #fff;
+        background: var(--el-bg-color, #fff);
         color: #333;
         font-size: 13px;
         font-weight: 500;

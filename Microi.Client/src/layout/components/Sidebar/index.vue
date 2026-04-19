@@ -97,11 +97,7 @@ export default {
             self.DiyCommon.Tips("用户点击了菜单！");
         },
         ShowStar() {
-            return false;
             var self = this;
-            if (self.DiyCommon.IsNull(self.SysConfig.MenuBg) || self.SysConfig.MenuBg == "Style1") {
-                return true;
-            }
             return false;
         }
     }

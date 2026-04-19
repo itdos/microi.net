@@ -60,6 +60,10 @@ export default {
             // 根据 field.Visible 设置颜色
             if (!field.Visible) {
                 color = "#ccc";
+                return {
+                    color,
+                    display
+                };
             }
             
             // 必填字段颜色
@@ -68,7 +72,7 @@ export default {
             }
             
             return {
-                color,
+                // color,//如果设置了这个颜色，会导致深色模式看不到
                 display
             };
         },

@@ -1,24 +1,382 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="renderer" content="webkit">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <style>
+        /* ========================================================
+         * MCI 设计系统 — PC/APK Splash Screen 内联版
+         * 与 microi.app/index.html 移动端 Loading 保持一致
+         * ======================================================== */
+
         :root {
             --status-bar-height: 0px;
             --status-bar-height: constant(safe-area-inset-top);
             --status-bar-height: env(safe-area-inset-top);
         }
-        html,body{ 
-            margin: 0px;
-            padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-            background-color: #EDF0F9 !important;
-            font-size: 14px !important;
-            background-size: 20%;
+
+        /* === 主题变量（亮色多彩默认） === */
+        :root[data-theme="light"], :root {
+            --mci-color-primary: #6C2BD9;
+            --mci-color-primary-light: #8B5CF6;
+            --mci-color-primary-glow: rgba(108, 43, 217, 0.2);
+            --mci-color-accent-blue: #2196F3;
+            --mci-color-accent-cyan: #06B6D4;
+            --mci-color-accent-pink: #EC4899;
+            --mci-color-danger: #E8294A;
+
+            --mci-bg-base: #F5F5FA;
+            --mci-bg-elevated: #FFFFFF;
+            --mci-bg-card: rgba(255, 255, 255, 0.92);
+
+            --mci-text-primary: #1A1A2E;
+            --mci-text-secondary: rgba(26, 26, 46, 0.65);
+            --mci-text-tertiary: rgba(26, 26, 46, 0.45);
+            --mci-text-muted: rgba(26, 26, 46, 0.22);
+
+            --mci-border-color: rgba(15, 18, 30, 0.08);
+
+            --mci-gradient-primary: linear-gradient(135deg, #6C2BD9 0%, #2196F3 100%);
+
+            --mci-shadow-button: 0 6px 20px var(--mci-color-primary-glow);
+            --mci-glow-primary: 0 0 24px var(--mci-color-primary-glow),
+                                0 0 60px rgba(33, 150, 243, 0.18);
+
+            --mci-radius-md: 12px;
+            --mci-radius-xl: 20px;
+            --mci-radius-2xl: 24px;
+            --mci-radius-full: 9999px;
+
+            --mci-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* === 暗黑主题（可选） === */
+        :root[data-theme="dark"] {
+            --mci-color-primary: #722BFF;
+            --mci-color-primary-light: #9B5FFF;
+            --mci-color-primary-glow: rgba(114, 43, 255, 0.35);
+            --mci-color-accent-blue: #29B8FF;
+            --mci-color-accent-cyan: #00F5D4;
+            --mci-color-accent-pink: #FF6EC7;
+            --mci-color-danger: #FF2E63;
+
+            --mci-bg-base: #0A0A0F;
+            --mci-bg-elevated: #121218;
+            --mci-bg-card: rgba(255, 255, 255, 0.04);
+
+            --mci-text-primary: #FFFFFF;
+            --mci-text-secondary: rgba(255, 255, 255, 0.55);
+            --mci-text-tertiary: rgba(255, 255, 255, 0.35);
+            --mci-text-muted: rgba(255, 255, 255, 0.18);
+
+            --mci-border-color: rgba(255, 255, 255, 0.08);
+
+            --mci-gradient-primary: linear-gradient(135deg, #722BFF 0%, #29B8FF 100%);
+
+            --mci-shadow-button: 0 4px 16px var(--mci-color-primary-glow);
+            --mci-glow-primary: 0 0 24px rgba(114, 43, 255, 0.5),
+                                0 0 60px rgba(41, 184, 255, 0.18);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--mci-bg-base);
+            font-family: var(--mci-font-family);
+            color: var(--mci-text-primary);
+            font-size: 14px;
+            -webkit-text-size-adjust: 100%;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 加载期锁定滚动，避免 Vue mount 后出现滚条造成页面跳动 */
+        html.is-loading,
+        html.is-loading body {
+            overflow: hidden !important;
+            height: 100%;
+            -webkit-overflow-scrolling: auto;
+        }
+
+        /* === Splash 容器（与 microi.loading.js 兼容：保留 #microi_loading 与 fade-out） === */
+        #microi_loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            background: var(--mci-bg-base);
+            overflow: hidden;
+            transition: opacity 0.5s ease;
+            /* iOS 安全区内边距、但不产生外部滚条 */
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            box-sizing: border-box;
+        }
+        #microi_loading.fade-out { opacity: 0; pointer-events: none; }
+
+        /* === 极光光斑 Aurora Orbs === */
+        .mci-aurora {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            contain: strict;
+        }
+        .mci-aurora__orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.55;
+            will-change: transform;
+            animation: mciAuroraDrift var(--dur, 26s) ease-in-out infinite alternate;
+        }
+        .mci-aurora__orb--1 {
+            width: 520px; height: 520px;
+            top: -120px; left: -100px;
+            background: radial-gradient(circle, var(--mci-color-primary) 0%, transparent 65%);
+            --dur: 22s;
+        }
+        .mci-aurora__orb--2 {
+            width: 460px; height: 460px;
+            top: 28%; right: -140px;
+            background: radial-gradient(circle, var(--mci-color-accent-blue) 0%, transparent 65%);
+            --dur: 28s;
+            animation-delay: -8s;
+        }
+        .mci-aurora__orb--3 {
+            width: 580px; height: 580px;
+            bottom: -180px; left: 18%;
+            background: radial-gradient(circle, var(--mci-color-accent-pink) 0%, transparent 65%);
+            opacity: 0.4;
+            --dur: 32s;
+            animation-delay: -14s;
+        }
+        .mci-aurora__orb--4 {
+            width: 380px; height: 380px;
+            top: 55%; left: -80px;
+            background: radial-gradient(circle, var(--mci-color-accent-cyan) 0%, transparent 65%);
+            opacity: 0.45;
+            --dur: 26s;
+            animation-delay: -4s;
+        }
+        @keyframes mciAuroraDrift {
+            0%   { transform: translate3d(0, 0, 0) scale(1); }
+            50%  { transform: translate3d(40px, -30px, 0) scale(1.08); }
+            100% { transform: translate3d(-30px, 20px, 0) scale(0.95); }
+        }
+        :root[data-theme="dark"] .mci-aurora__orb {
+            opacity: 0.35;
+            filter: blur(80px);
+        }
+
+        /* === Splash 主容器 === */
+        .mci-splash {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100%;
+            padding: 40px 30px;
+        }
+
+        /* === Logo 脉冲圆环（稳定居中：以 .mci-logo-ring 为定位上下文，子结构不再使用负偏移） === */
+        .mci-logo-ring {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .mci-logo-ring::before,
+        .mci-logo-ring::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: auto;
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .mci-logo-ring::before {
+            border: 2px solid var(--mci-color-primary-glow);
+            animation: mciRingPulse 2s ease-out infinite;
+        }
+        .mci-logo-ring::after {
+            border: 1.5px solid var(--mci-color-primary-glow);
+            animation: mciRingPulse 2s ease-out infinite 0.6s;
+            opacity: 0.5;
+        }
+        @keyframes mciRingPulse {
+            0%   { width: 96px;  height: 96px;  opacity: 1; }
+            100% { width: 170px; height: 170px; opacity: 0; }
+        }
+        .mci-logo-core {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            background: var(--mci-gradient-primary);
+            border-radius: var(--mci-radius-2xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--mci-glow-primary);
+            animation: mciFloat 3s ease-in-out infinite;
+            will-change: transform;
+        }
+        @keyframes mciFloat {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-6px); }
+        }
+        .mci-logo-core svg {
+            width: 40px;
+            height: 40px;
+            fill: #fff;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+        }
+
+        /* === 文字区 === */
+        .mci-app-title {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            background: var(--mci-gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 2px 30px var(--mci-color-primary-glow);
+        }
+        .mci-app-subtitle {
+            font-size: 13px;
+            color: var(--mci-text-tertiary);
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        /* === 加载百分比（不用 transform scale，用 opacity 脉动避免跳动） === */
+        .mci-load-percent {
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--mci-text-primary);
+            letter-spacing: 4px;
+            margin-bottom: 12px;
+            text-shadow: 0 2px 20px var(--mci-color-primary-glow);
+            animation: mciPercentPulse 1.5s ease-in-out infinite;
+            min-height: 52px;
+            line-height: 52px;
+            font-variant-numeric: tabular-nums;
+        }
+        @keyframes mciPercentPulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.78; }
+        }
+
+        /* === 进度条 === */
+        .mci-progress-wrap {
+            width: 220px;
+            height: 4px;
+            background: var(--mci-bg-card);
+            border-radius: var(--mci-radius-full);
+            overflow: hidden;
+            margin-bottom: 16px;
+            border: 1px solid var(--mci-border-color);
+        }
+        .mci-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--mci-gradient-primary);
+            border-radius: var(--mci-radius-full);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 8px var(--mci-color-primary-glow);
+        }
+
+        /* === 加载信息 === */
+        .mci-load-info {
+            font-size: 12px;
+            color: var(--mci-text-tertiary);
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+            min-height: 20px;
+            line-height: 20px;
+            text-align: center;
+        }
+        .mci-load-info--speed {
+            font-size: 13px;
+            color: var(--mci-text-secondary);
+        }
+
+        /* === 圆点加载动画 === */
+        .mci-load-dots {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 16px 0 12px;
+        }
+        .mci-load-dots .dot {
+            width: 10px;
+            height: 10px;
+            background: var(--mci-color-primary);
+            border-radius: 50%;
+            animation: mciDotBounce 1.4s ease-in-out infinite both;
+            box-shadow: 0 0 6px var(--mci-color-primary-glow);
+        }
+        .mci-load-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+        .mci-load-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+        .mci-load-dots .dot:nth-child(3) { animation-delay: 0s; }
+        .mci-load-dots .dot:nth-child(4) { animation-delay: 0.16s; }
+        .mci-load-dots .dot:nth-child(5) { animation-delay: 0.32s; }
+        @keyframes mciDotBounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* === serverUrl（仅 APK 模式显示） === */
+        .mci-server-url {
+            font-size: 10px;
+            color: var(--mci-text-muted);
+            word-break: break-all;
+            text-align: center;
+            max-width: 85vw;
+            font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+            margin-top: 4px;
+            display: none;
+        }
+        #microi_loading.is-apk .mci-server-url { display: block; }
+
+        /* === 底部水印 === */
+        .mci-watermark {
+            position: absolute;
+            bottom: calc(20px + env(safe-area-inset-bottom, 0));
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            color: var(--mci-text-muted);
+            z-index: 2;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
-    <link href="/static/css/microi.loading.css?d=20260302" rel="stylesheet" />
     <!-- 微信 JSSDK：支持小程序 WebView 内 H5 与小程序通信 -->
     <script>
       // 仅在小程序 WebView 环境下加载 JSSDK
@@ -110,26 +468,61 @@
 </head>
 <body class="microi Classic">
     <div id="microi_loading">
-        <div class="ml-stars" id="ml_stars"></div>
-        <div class="ml-splash">
-            <div class="ml-logo-ring"><div class="ml-logo-core">
-                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            </div></div>
-            <div class="ml-title" id="appTitle">Loading...</div>
-            <div class="ml-subtitle">正在加载资源</div>
-            <div class="ml-percent" id="loadPercent">0%</div>
-            <div class="ml-progress-wrap"><div class="ml-progress-bar" id="progressBar"></div></div>
-            <div class="ml-info speed" id="loadSpeed">正在加载资源...</div>
-            <div class="ml-info" id="loadSize"></div>
-            <div class="ml-dots" id="loadDots">
+        <!-- 极光光斑背景 -->
+        <div class="mci-aurora" aria-hidden="true">
+            <span class="mci-aurora__orb mci-aurora__orb--1"></span>
+            <span class="mci-aurora__orb mci-aurora__orb--2"></span>
+            <span class="mci-aurora__orb mci-aurora__orb--3"></span>
+            <span class="mci-aurora__orb mci-aurora__orb--4"></span>
+        </div>
+
+        <div class="mci-splash">
+            <!-- Logo 脉冲圆环 -->
+            <div class="mci-logo-ring">
+                <div class="mci-logo-core">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+            </div>
+
+            <!-- 标题 -->
+            <div class="mci-app-title" id="appTitle">Loading...</div>
+            <div class="mci-app-subtitle">正在加载资源</div>
+
+            <!-- 加载百分比 -->
+            <div class="mci-load-percent" id="loadPercent">0%</div>
+
+            <!-- 进度条 -->
+            <div class="mci-progress-wrap"><div class="mci-progress-bar" id="progressBar"></div></div>
+
+            <!-- 加载信息 -->
+            <div class="mci-load-info mci-load-info--speed" id="loadSpeed">正在加载资源...</div>
+            <div class="mci-load-info" id="loadSize"></div>
+
+            <!-- 圆点动画 -->
+            <div class="mci-load-dots" id="loadDots">
                 <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
             </div>
-            <div class="ml-url" id="serverUrl"></div>
-            <div class="ml-watermark" id="watermark">Powered by Loading...</div>
+
+            <!-- 服务器地址（APK 模式下显示） -->
+            <div class="mci-server-url" id="serverUrl"></div>
         </div>
+
+        <div class="mci-watermark" id="watermark">Powered by Loading...</div>
     </div>
     <script>
       (function() {
+        try {
+          // 加载期锁定滚动（避免 Vue mount 后滚条闪现造成页面跳动）
+          document.documentElement.classList.add('is-loading');
+        } catch(e) {}
+        try {
+          // 主题初始化（默认亮色多彩、跟随系统、支持 localStorage 持久化）
+          var saved = localStorage.getItem('mci-theme');
+          var prefersDark = window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme',
+              saved || (prefersDark ? 'dark' : 'light'));
+        } catch(e) {}
         try {
           // 读取 SysConfig 缓存，更新标题和公司名
           var data = JSON.parse(localStorage.getItem('microi.net') || '{}');
@@ -147,19 +540,6 @@
           }
         } catch(e) {}
         try {
-          // 生成星空粒子
-          var starsEl = document.getElementById('ml_stars');
-          if (starsEl) {
-            for (var i = 0; i < 60; i++) {
-              var s = document.createElement('div');
-              s.className = 'ml-star';
-              var sz = Math.random() * 2.5 + 0.5;
-              s.style.cssText = 'width:' + sz + 'px;height:' + sz + 'px;' +
-                'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;' +
-                '--dur:' + (Math.random() * 3 + 2) + 's;animation-delay:' + (Math.random() * 3) + 's;';
-              starsEl.appendChild(s);
-            }
-          }
           // 5+App (APK)：标记起始进度为20%（与 hbuilder-app 加载页衔接），并显示当前服务器地址
           if (window.plus || navigator.userAgent.indexOf('Html5Plus') > -1) {
             window.__microi_apk_start = 20;
@@ -167,10 +547,10 @@
             var pb = document.getElementById('progressBar');
             if (pe) pe.textContent = '20%';
             if (pb) pb.style.width = '20%';
-            // 标记 APK 模式，激活 ml-url 显示
+            // 标记 APK 模式，激活 mci-server-url 显示
             var loadEl = document.getElementById('microi_loading');
             if (loadEl) loadEl.classList.add('is-apk');
-            // 显示当前访问地址（即 hbuilder-app 跳转过来的服务器地址）
+            // 显示当前访问地址
             var urlEl = document.getElementById('serverUrl');
             if (urlEl) urlEl.textContent = window.location.href;
           }

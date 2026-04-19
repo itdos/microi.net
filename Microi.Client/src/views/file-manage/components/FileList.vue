@@ -735,15 +735,15 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--el-bg-color, #fff);
 
   .toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 20px;
-    border-bottom: 1px solid #e2e8f0;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0);
+    background: var(--el-bg-color, linear-gradient(180deg, #ffffff 0%, #f8fafc 100%));
     gap: 16px;
 
     .toolbar-left {
@@ -781,12 +781,12 @@ onUnmounted(() => {
           
           .el-input__wrapper {
             border-radius: 8px;
-            background: #f1f5f9;
+            background: var(--el-fill-color-light, #f1f5f9);
             box-shadow: none;
             
             &:hover, &:focus-within {
-              background: #fff;
-              box-shadow: 0 0 0 1px #3b82f6;
+              background: var(--el-bg-color, #fff);
+              box-shadow: 0 0 0 1px var(--el-color-primary, #3b82f6);
             }
           }
         }
@@ -800,7 +800,7 @@ onUnmounted(() => {
 
       .view-switch {
         display: flex;
-        background: #f1f5f9;
+        background: var(--el-fill-color-light, #f1f5f9);
         border-radius: 8px;
         padding: 2px;
 
@@ -812,16 +812,16 @@ onUnmounted(() => {
           height: 28px;
           border-radius: 6px;
           cursor: pointer;
-          color: #64748b;
+          color: var(--el-text-color-secondary, #64748b);
           transition: all 0.2s;
 
           &:hover {
-            color: #3b82f6;
+            color: var(--el-color-primary, #3b82f6);
           }
 
           &.active {
-            background: #fff;
-            color: #3b82f6;
+            background: var(--el-bg-color, #fff);
+            color: var(--el-color-primary, #3b82f6);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           }
         }

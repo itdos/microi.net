@@ -19,7 +19,7 @@
                     @CallbackFormClose="CallbackFormClose"
                 />
             </el-col>
-            <el-col :span="diyStore.IsPhoneView ? 24 : 6" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+            <el-col :span="diyStore.IsPhoneView ? 24 : 6" :xs="24" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                 <WFWorkHandler
                     ref="refWfWorkHandler"
                     @CallbackStartWork="CallbackStartWork"

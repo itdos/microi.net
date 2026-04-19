@@ -554,7 +554,7 @@ export default {
 
   &.active {
     background: #fff;
-    color: var(--theme, #4e6ef2);
+    color: var(--theme, #6C2BD9);
     font-weight: 600;
 
     &::before {
@@ -565,7 +565,7 @@ export default {
       bottom: 16rpx;
       width: 6rpx;
       border-radius: 0 4rpx 4rpx 0;
-      background: var(--theme, #4e6ef2);
+      background: var(--theme, #6C2BD9);
     }
   }
 }
@@ -596,7 +596,7 @@ export default {
   transition: all 0.15s;
 
   &.active {
-    color: var(--theme, #4e6ef2);
+    color: var(--theme, #6C2BD9);
     font-weight: 600;
     background: var(--theme-light, rgba(78,110,242,0.08));
   }
@@ -889,8 +889,8 @@ export default {
 
   &.active {
     background: var(--theme-light, rgba(78,110,242,0.08));
-    border-color: var(--theme, #4e6ef2);
-    color: var(--theme, #4e6ef2);
+    border-color: var(--theme, #6C2BD9);
+    color: var(--theme, #6C2BD9);
     font-weight: 500;
   }
 }

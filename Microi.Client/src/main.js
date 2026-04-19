@@ -11,6 +11,8 @@ import "normalize.css/normalize.css"; // a modern alternative to CSS resets
 // Element Plus
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
+// Element Plus 深色模式变量（配合 html.dark 类自动生效）
+import "element-plus/theme-chalk/dark/css-vars.css";
 import zhCn from "element-plus/dist/locale/zh-cn.mjs";
 // Element Plus 图标 - 直接加载所有图标，避免延迟加载导致部分图标不显示
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
@@ -30,7 +32,8 @@ import "./permission"; // permission control
 import "./utils/error-log"; // error log
 import "animate.css";
 import "./styles/itdos.diy.scss";
-import "./styles/theme-openclaw.scss";
+// MCI (Microi Cool Interface) 设计系统 — 移动端及全局变量
+import "./styles/mci-design.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
 // 主题色工具 - 360 极速浏览器兼容方案

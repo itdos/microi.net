@@ -164,11 +164,11 @@
         <view class="settings-list">
           <view class="settings-item">
             <text>{{ t('message.muteNotification') }}</text>
-            <switch :checked="chatMuted" @change="chatMuted = $event.detail.value" color="#4e6ef2" />
+            <switch :checked="chatMuted" @change="chatMuted = $event.detail.value" color="#6C2BD9" />
           </view>
           <view class="settings-item">
             <text>{{ t('message.pinChat') }}</text>
-            <switch :checked="chatPinned" @change="chatPinned = $event.detail.value" color="#4e6ef2" />
+            <switch :checked="chatPinned" @change="chatPinned = $event.detail.value" color="#6C2BD9" />
           </view>
           <view class="settings-item danger" @tap="clearHistory">
             <text>{{ t('message.clearHistory') }}</text>
@@ -895,7 +895,7 @@ export default {
       align-items: flex-end;
     }
     .bubble-self {
-      background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+      background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
       color: #fff;
       border-radius: 20rpx 4rpx 20rpx 20rpx;
     }
@@ -917,7 +917,7 @@ export default {
   width: 72rpx;
   height: 72rpx;
   border-radius: 50%;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1022,7 +1022,7 @@ export default {
 }
 
 .send-btn {
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   padding: 14rpx 28rpx;
   border-radius: 16rpx;
   height: 72rpx;

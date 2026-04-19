@@ -1,4 +1,8 @@
 .microi {
+    .ve__button{
+        background : linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
+        color: var(--color-primary-text, #ffffff) !important;
+    }
     // .el-modal-drawer{
     //     .diy-form-container{
     //         padding-top: var(--status-bar-height, 0px);
@@ -75,7 +79,7 @@
         }
     }
     .el-progress-bar__innerText {
-        color: #000 !important;
+        color: var(--el-text-color-primary) !important;
     }
     .ShowClassicTop0 {
         .el-tabs__header.is-top {
@@ -116,16 +120,16 @@
     //     margin-right: 0;
     // }
     .el-button.is-disabled {
-        color: #c0c4cc !important;
+        color: var(--el-text-color-placeholder) !important;
         cursor: not-allowed !important;
         background-image: none !important;
-        background-color: #ffffff !important;
-        border-color: #e6ebf5 !important;
+        background-color: var(--el-bg-color, #ffffff) !important;
+        border-color: var(--el-border-color, #e6ebf5) !important;
     }
     .el-button--primary.is-disabled {
-        color: #ffffff !important;
-        background-color: #8cc8ff !important;
-        border-color: #8cc8ff !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+        background-color: var(--el-color-primary-light-5) !important;
+        border-color: var(--el-color-primary-light-5) !important;
         cursor: not-allowed !important;
     }
     .diy-design-container {
@@ -138,7 +142,7 @@
                 }
             }
             .field-item:hover {
-                background-color: #ecf5ff;
+                background-color: var(--el-color-primary-light-9, #ecf5ff);
                 cursor: move !important;
             }
             .active-field {
@@ -182,7 +186,7 @@
         margin: 0.5em 0;
         padding: 0.4em 0.6em;
         border-radius: 8px;
-        background: #f8f8f8;
+        background: var(--el-fill-color-light, #f8f8f8);
     }
     .el-tooltip__popper {
         max-width: 50vw;
@@ -231,12 +235,12 @@
     }
     .el-input.is-disabled .el-input__inner,
     .el-textarea.is-disabled .el-textarea__inner {
-        background-color: #f5f7fa !important;
+        background-color: var(--el-fill-color-light, #f5f7fa) !important;
     }
     .el-input__inner,
     .el-textarea__inner {
         font-size: 14px;
-        color: #000;
+        color: var(--el-text-color-primary, #000);
     }
     .el-textarea__inner {
         padding-top: 4px !important;
@@ -392,10 +396,10 @@
     #table-rowlist-tabs {
         // 优化的 tabs 样式 - 简洁高效
         .el-tabs__header {
-            background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+            background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
             border-radius: 8px;
             padding: 8px 12px;
-            border: 1px solid #e4e7ed;
+            border: 1px solid var(--el-border-color, #e4e7ed);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             margin-bottom: 10px;
         }
@@ -427,7 +431,7 @@
             border-radius: 6px;
             font-weight: 400;
             font-size: 14px;
-            color: #606266;
+            color: var(--el-text-color-regular, #606266);
             transition: all 0.15s ease;
             background: transparent;
             margin: 0;
@@ -504,9 +508,9 @@
     .el-dialog__header {
         margin-bottom: 0px !important;
         padding: 10px 15px;
-        border-top: solid 5px #5473e8;
+        border-top: solid 5px var(--el-color-primary, #5473e8);
         // border-top: solid 5px #242B49;
-        box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
+        box-shadow: -5px 6px 9px 0px rgba(0, 0, 0, 0.06);
         // min-height: 52px;
         line-height: 30px;
         flex-wrap: wrap;
@@ -515,7 +519,7 @@
         justify-content: space-between;
     }
     .el-dialog__header {
-        border-top: solid 5px #5473e8;
+        border-top: solid 5px var(--el-color-primary, #5473e8);
     }
     .el-drawer {
         // overflow-y: scroll;
@@ -748,11 +752,11 @@ p {
 
     //以下为elemnt-ui样式覆盖
     .el-table th {
-        background-color: #f5f7fa; // #E5EAFF;
+        background-color: var(--el-fill-color-light, #f5f7fa); // #E5EAFF;
     }
     .el-table .cell {
         // color: #0F0F0F;
-        color: #606266;
+        color: var(--el-text-color-regular, #606266);
         white-space: nowrap;
     }
     //   .el-table .cell:last-child{
@@ -1183,7 +1187,7 @@ a.disabled {
     border-radius: 6px;
     // font-weight: 500;
     transition: all 0.2s ease;
-    border: 1px solid #dcdfe6;
+    border: 1px solid var(--el-border-color, #dcdfe6);
 
     &:hover:not(.is-disabled) {
         transform: translateY(-1px);
@@ -1369,7 +1373,7 @@ a.disabled {
 } */
 
 .el-pagination.is-background .el-pager li:not(.disabled):hover {
-    color: #000 !important;
+    color: var(--el-text-color-primary) !important;
 }
 
 .el-pagination.is-background .el-pager li:not(.disabled).active:hover {

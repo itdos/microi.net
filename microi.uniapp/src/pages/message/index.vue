@@ -643,7 +643,7 @@ export default {
 
 .action-icon {
   font-size: 36rpx;
-  color: var(--theme, #4e6ef2);
+  color: var(--theme, #6C2BD9);
 }
 
 /* Tab */
@@ -661,7 +661,7 @@ export default {
   color: #fff;
 
   &.active {
-    // color: var(--theme, #4e6ef2);
+    // color: var(--theme, #6C2BD9);
     font-weight: 600;
   }
 }
@@ -674,7 +674,7 @@ export default {
   width: 48rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: var(--theme, #4e6ef2);
+  background: var(--theme, #6C2BD9);
 }
 
 /* 搜索 */
@@ -792,7 +792,7 @@ export default {
   width: 96rpx;
   height: 96rpx;
   border-radius: 50%;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -875,7 +875,7 @@ export default {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -930,7 +930,7 @@ export default {
 }
 
 .empty-btn {
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   padding: 16rpx 48rpx;
   border-radius: 40rpx;
 
@@ -1012,7 +1012,7 @@ export default {
   width: 72rpx;
   height: 72rpx;
   border-radius: 50%;
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   display: flex;
   align-items: center;
   justify-content: center;
