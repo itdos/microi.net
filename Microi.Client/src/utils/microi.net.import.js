@@ -64,6 +64,7 @@ const DiyHtml = defineAsyncComponent(() => import("@/views/form-engine/diy-field
 const DiyRichText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-richtext.vue"));
 const DiyOpenTable = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-opentable.vue"));
 const DiyMap = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-map.vue"));
+const DiyMapArea = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-map.vue"));
 const DiyQrcode = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-qrcode.vue"));
 const DiyDevComponent = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-devcomponent.vue"));
 const DiyTableChild = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-tablechild.vue"));
@@ -164,6 +165,7 @@ function RegMicroiComponents(app) {
     app.component('DiyRichText', DiyRichText);
     app.component('DiyOpenTable', DiyOpenTable);
     app.component('DiyMap', DiyMap);
+    app.component('DiyMapArea', DiyMapArea);
     app.component('DiyQrcode', DiyQrcode);
     app.component('DiyDevComponent', DiyDevComponent);
     app.component('DiyTableChild', DiyTableChild);

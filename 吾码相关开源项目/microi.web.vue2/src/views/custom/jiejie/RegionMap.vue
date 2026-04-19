@@ -259,8 +259,8 @@ export default {
     created() {
         try {
             // 确保SysConfig存在
-            const mapKey = this.SysConfig?.AMapKey || "99b272c930081b69507b218d660be3dc";
-            const mapSecret = this.SysConfig?.AMapSecret || "0624622804551e8f0209117bb8de8f82";
+            const mapKey = this.SysConfig?.AMapKey;
+            const mapSecret = this.SysConfig?.AMapSecret;
 
             // 设置安全配置
             window._AMapSecurityConfig = {

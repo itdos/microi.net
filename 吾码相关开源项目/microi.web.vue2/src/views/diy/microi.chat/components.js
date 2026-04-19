@@ -55,7 +55,7 @@ const install = (Vue) => {
     Vue.use(infiniteLoading);
     // Vue.use(vueAMap)
     // vueAMap.initAMapApiLoader({
-    //     key: '99b272c930081b69507b218d660be3dc ',//"e1dedc6bdd765d46693986ff7ff969f4",
+    //     key: ' ',//"",
     //     plugin: [
     //         "AMap.Autocomplete", //输入提示插件
     //         "AMap.PlaceSearch", //POI搜索插件
