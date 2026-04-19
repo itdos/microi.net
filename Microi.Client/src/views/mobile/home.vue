@@ -1,94 +1,109 @@
-<template>
-    <div class="mobile-home">
-        <!-- 顶部标题栏 -->
-        <div class="home-header">
-            <span class="header-title">首页</span>
-        </div>
+?<template>
+    <div class="mci-mobile-page page-home">
+        <!-- 顶部导航栏 -->
+        <header class="mci-navbar">
+            <span class="mci-navbar__action"></span>
+            <h1 class="mci-navbar__title">首页</h1>
+            <span class="mci-navbar__action" @click="goTo('/mobile/message')">
+                <el-icon><Bell /></el-icon>
+            </span>
+        </header>
 
-        <!-- 欢迎区域 -->
-        <div class="welcome-section">
-            <div class="welcome-card">
+        <!-- 欢迎卡片：渐变背景 + 霓虹光晕 -->
+        <section class="welcome-section">
+            <div class="welcome-card mci-card mci-card--neon">
                 <div class="welcome-text">
-                    <h2>👋 {{ welcomePrefix }}，{{ currentUser.Name || currentUser.Account }}</h2>
-                    <p>{{ welcomeMessage }}</p>
+                    <h2 class="welcome-greet">
+                        <span>👋 {{ welcomePrefix }}</span>
+                        <span class="mci-text-gradient">{{ currentUser.Name || currentUser.Account }}</span>
+                    </h2>
+                    <p class="welcome-msg">{{ welcomeMessage }}</p>
                 </div>
                 <div class="welcome-date">
                     <span class="date">{{ currentDate }}</span>
                     <span class="week">{{ currentWeek }}</span>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- 快捷入口 -->
-        <div class="quick-entry">
-            <div class="section-title">快捷入口</div>
+        <section class="entry-section">
+            <div class="mci-section-title">
+                <span>快捷入口</span>
+            </div>
             <div class="entry-grid">
-                <div class="entry-item" @click="goTo('/mobile/workspace')">
-                    <div class="entry-icon" style="background: linear-gradient(135deg, #409eff, #66b1ff)">
-                        <el-icon><Grid /></el-icon>
+                <div
+                    v-for="(item, idx) in entries"
+                    :key="item.path || item.label"
+                    class="entry-item mci-stagger-item"
+                    :style="{ '--mci-index': idx }"
+                    @click="onEntryClick(item)"
+                >
+                    <div class="entry-icon" :class="`entry-icon--${item.tone}`">
+                        <el-icon><component :is="item.icon" /></el-icon>
                     </div>
-                    <span>工作台</span>
-                </div>
-                <div class="entry-item" @click="goTo('/mobile/message')">
-                    <div class="entry-icon" style="background: linear-gradient(135deg, #67c23a, #85ce61)">
-                        <el-icon><ChatDotRound /></el-icon>
-                    </div>
-                    <span>消息</span>
-                </div>
-                <div class="entry-item" @click="goTo('/mobile/profile')">
-                    <div class="entry-icon" style="background: linear-gradient(135deg, #e6a23c, #ebb563)">
-                        <el-icon><User /></el-icon>
-                    </div>
-                    <span>我的</span>
-                </div>
-                <div class="entry-item" @click="showMore = true">
-                    <div class="entry-icon" style="background: linear-gradient(135deg, #909399, #a6a9ad)">
-                        <el-icon><MoreFilled /></el-icon>
-                    </div>
-                    <span>更多</span>
+                    <span class="entry-label">{{ item.label }}</span>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- 待办事项 -->
-        <div class="todo-section">
-            <div class="section-header">
-                <span class="section-title">待办事项</span>
-                <span class="section-more" @click="goTo('/mobile/workspace')">查看全部 ></span>
+        <section class="list-section">
+            <div class="mci-section-title">
+                <span>待办事项</span>
+                <span class="mci-section-title__more" @click="goTo('/mobile/workspace')">
+                    查看全部
+                    <el-icon><ArrowRight /></el-icon>
+                </span>
             </div>
-            <div class="todo-list">
-                <div v-if="todoList.length > 0" class="todo-items">
-                    <div v-for="item in todoList" :key="item.id" class="todo-item">
-                        <div class="todo-icon">
+            <div class="mci-cell-group">
+                <template v-if="todoList.length > 0">
+                    <div
+                        v-for="(item, idx) in todoList"
+                        :key="item.id"
+                        class="mci-cell mci-stagger-item"
+                        :style="{ '--mci-index': idx }"
+                    >
+                        <div class="mci-cell__icon mci-cell__icon--danger">
                             <el-icon><Bell /></el-icon>
                         </div>
-                        <div class="todo-content">
-                            <span class="todo-title">{{ item.title }}</span>
-                            <span class="todo-time">{{ item.time }}</span>
+                        <div class="mci-cell__body">
+                            <span class="mci-cell__title">{{ item.title }}</span>
+                            <span class="mci-cell__sub">{{ item.time }}</span>
                         </div>
-                        <el-icon class="todo-arrow"><ArrowRight /></el-icon>
+                        <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
                     </div>
-                </div>
-                <div v-else class="todo-empty">
-                    <el-icon><CircleCheck /></el-icon>
+                </template>
+                <div v-else class="empty-state">
+                    <el-icon class="empty-icon"><CircleCheck /></el-icon>
                     <span>暂无待办事项</span>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- 系统公告 -->
-        <div class="notice-section">
-            <div class="section-header">
-                <span class="section-title">系统公告</span>
+        <section class="list-section">
+            <div class="mci-section-title">
+                <span>系统公告</span>
             </div>
-            <div class="notice-list">
-                <div v-for="notice in noticeList" :key="notice.id" class="notice-item">
-                    <el-icon class="notice-icon"><DocumentCopy /></el-icon>
-                    <span class="notice-title">{{ notice.title }}</span>
-                    <span class="notice-time">{{ notice.time }}</span>
+            <div class="mci-cell-group">
+                <div
+                    v-for="(notice, idx) in noticeList"
+                    :key="notice.id"
+                    class="mci-cell mci-stagger-item"
+                    :style="{ '--mci-index': idx }"
+                >
+                    <div class="mci-cell__icon mci-cell__icon--info">
+                        <el-icon><DocumentCopy /></el-icon>
+                    </div>
+                    <div class="mci-cell__body">
+                        <span class="mci-cell__title">{{ notice.title }}</span>
+                        <span class="mci-cell__sub">{{ notice.time }}</span>
+                    </div>
+                    <span class="mci-tag mci-tag--primary">公告</span>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </template>
 
@@ -96,12 +111,11 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore } from '@/pinia';
-import { 
-    Grid, ChatDotRound, User, MoreFilled, Bell, 
-    ArrowRight, CircleCheck, DocumentCopy 
+import {
+    Grid, ChatDotRound, User, MoreFilled, Bell,
+    ArrowRight, CircleCheck, DocumentCopy
 } from '@element-plus/icons-vue';
 
-// 定义组件名称，用于 keep-alive 缓存
 defineOptions({
     name: 'mobile_home'
 });
@@ -109,12 +123,9 @@ defineOptions({
 const router = useRouter();
 const diyStore = useDiyStore();
 
-// 当前用户
 const currentUser = computed(() => diyStore.GetCurrentUser);
 
-// 从 SysConfig 获取欢迎信息
 const welcomePrefix = computed(() => {
-    // 根据当前时间返回不同问候语
     const hour = new Date().getHours();
     if (hour < 6) return '夜深了';
     if (hour < 9) return '早上好';
@@ -136,7 +147,6 @@ const welcomeMessage = computed(() => {
     return '欢迎使用 Microi 吾码低代码平台';
 });
 
-// 当前日期
 const currentDate = computed(() => {
     const now = new Date();
     return `${now.getMonth() + 1}月${now.getDate()}日`;
@@ -147,287 +157,216 @@ const currentWeek = computed(() => {
     return weeks[new Date().getDay()];
 });
 
-// 显示更多
+const entries = ref([
+    { label: '工作台', icon: Grid, tone: 'primary', path: '/mobile/workspace' },
+    { label: '消息', icon: ChatDotRound, tone: 'cyan', path: '/mobile/message' },
+    { label: '我的', icon: User, tone: 'gold', path: '/mobile/profile' },
+    { label: '更多', icon: MoreFilled, tone: 'pink', action: 'more' }
+]);
+
 const showMore = ref(false);
 
-// 模拟待办数据
 const todoList = ref([
     { id: 1, title: '审批申请：请假申请 - 张三', time: '10分钟前' },
-    { id: 2, title: '审批申请：报销申请 - 李四', time: '30分钟前' },
+    { id: 2, title: '审批申请：报销申请 - 李四', time: '30分钟前' }
 ]);
 
-// 模拟公告数据
 const noticeList = ref([
     { id: 1, title: '关于系统升级的通知', time: '2026-01-28' },
-    { id: 2, title: '春节假期安排通知', time: '2026-01-25' },
+    { id: 2, title: '春节假期安排通知', time: '2026-01-25' }
 ]);
 
-// 跳转
-const goTo = (path) => {
+
+
+function goTo(path) {
     router.push(path);
-};
+}
+
+function onEntryClick(item) {
+    if (item.path) {
+        goTo(item.path);
+    } else if (item.action === 'more') {
+        showMore.value = true;
+    }
+}
 </script>
 
 <style lang="scss" scoped>
-.mobile-home {
-    min-height: 100vh;
-    background: #f5f7fa;
-    padding-top: calc(50px + var(--status-bar-height, 0px));
-    padding-bottom: 56px;
+.page-home {
+    padding-bottom: calc(var(--mci-tabbar-height) + var(--mci-safe-bottom) + var(--mci-space-6));
 }
 
-.home-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
+/* === 欢迎卡片 === */
+.welcome-section {
+    padding: var(--mci-space-4);
+}
+
+.welcome-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--mci-space-4);
+    padding: var(--mci-space-5);
+    overflow: hidden;
+    position: relative;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(114, 43, 255, 0.25) 0%, transparent 70%);
+        pointer-events: none;
+    }
+}
+
+.welcome-text {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.welcome-greet {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--mci-text-lg);
+    font-weight: var(--mci-font-bold);
+    color: var(--mci-text-primary);
+    margin: 0 0 var(--mci-space-2) 0;
+}
+
+.welcome-msg {
+    font-size: var(--mci-text-sm);
+    color: var(--mci-text-secondary);
+    margin: 0;
+}
+
+.welcome-date {
+    text-align: right;
+    flex-shrink: 0;
+
+    .date {
+        display: block;
+        font-size: var(--mci-text-xl);
+        font-weight: var(--mci-font-bold);
+        background: var(--mci-gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .week {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
+    }
+}
+
+/* === 快捷入口 === */
+.entry-section {
+    padding: 0 var(--mci-space-4) var(--mci-space-4);
+}
+
+.entry-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--mci-space-3);
+    background: var(--mci-bg-card);
+    border: 1px solid var(--mci-border-color);
+    border-radius: var(--mci-radius-xl);
+    padding: var(--mci-space-4);
+    box-shadow: var(--mci-shadow-card);
+}
+
+.entry-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--mci-space-2);
+    cursor: pointer;
+    padding: var(--mci-space-2) 0;
+    min-height: var(--mci-touch-target);
+    transition: transform var(--mci-duration-fast) var(--mci-ease-out);
+
+    &:active { transform: scale(0.92); }
+}
+
+.entry-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--mci-radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: calc(50px + var(--status-bar-height, 0px));
-    padding-top: var(--status-bar-height, 0px);
-    background: #fff;
-    border-bottom: 1px solid #ebeef5;
-    
-    .header-title {
-        font-size: 17px;
-        font-weight: 600;
-        color: #303133;
+    color: var(--mci-text-on-primary);
+
+    .el-icon { font-size: 22px; }
+
+    &--primary {
+        background: var(--mci-gradient-primary);
+        box-shadow: 0 4px 12px var(--mci-color-primary-glow);
+    }
+    &--cyan {
+        background: linear-gradient(135deg, #00F5D4 0%, #29B8FF 100%);
+        box-shadow: 0 4px 12px rgba(0, 245, 212, 0.3);
+    }
+    &--gold {
+        background: var(--mci-gradient-gold);
+        color: #1A1A2E;
+        box-shadow: 0 4px 12px rgba(255, 209, 0, 0.3);
+    }
+    &--pink {
+        background: linear-gradient(135deg, #FF6EC7 0%, #FF2E63 100%);
+        box-shadow: 0 4px 12px rgba(255, 110, 199, 0.3);
     }
 }
 
-.welcome-section {
-    padding: 16px 12px 8px;
-    background: var(--color-primary);
-    
-    .welcome-card {
-        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-dark, #2c7acc) 100%);
-        border-radius: 16px;
-        padding: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        
-        .welcome-text {
-            h2 {
-                font-size: 18px;
-                font-weight: 600;
-                color: #fff;
-                margin: 0 0 8px 0;
-            }
-            
-            p {
-                font-size: 13px;
-                color: rgba(255, 255, 255, 0.85);
-                margin: 0;
-            }
-        }
-        
-        .welcome-date {
-            text-align: right;
-            
-            .date {
-                display: block;
-                font-size: 20px;
-                font-weight: 600;
-                color: #fff;
-            }
-            
-            .week {
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.85);
-            }
-        }
-    }
+.entry-label {
+    font-size: var(--mci-text-xs);
+    color: var(--mci-text-secondary);
+    font-weight: var(--mci-font-medium);
 }
 
-.quick-entry {
-    padding: 16px 12px;
-    
-    .section-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #303133;
-        margin-bottom: 12px;
-    }
-    
-    .entry-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        background: #fff;
-        border-radius: 12px;
-        padding: 16px;
-        
-        .entry-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            
-            &:active {
-                opacity: 0.8;
-            }
-            
-            .entry-icon {
-                width: 48px;
-                height: 48px;
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 8px;
-                
-                .el-icon {
-                    font-size: 24px;
-                    color: #fff;
-                }
-            }
-            
-            span {
-                font-size: 12px;
-                color: #606266;
-            }
-        }
-    }
+/* === 列表区块 === */
+.list-section {
+    padding: 0 var(--mci-space-4) var(--mci-space-4);
 }
 
-.todo-section,
-.notice-section {
-    padding: 0 12px 16px;
-    
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        
-        .section-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #303133;
-        }
-        
-        .section-more {
-            font-size: 13px;
-            color: var(--color-primary, #409eff);
-            cursor: pointer;
-        }
-    }
-    
-    .todo-list {
-        background: #fff;
-        border-radius: 12px;
-        overflow: hidden;
-        
-        .todo-item {
-            display: flex;
-            align-items: center;
-            padding: 14px 16px;
-            cursor: pointer;
-            
-            &:not(:last-child) {
-                border-bottom: 1px solid #f5f7fa;
-            }
-            
-            &:active {
-                background: #f5f7fa;
-            }
-            
-            .todo-icon {
-                width: 36px;
-                height: 36px;
-                border-radius: 8px;
-                background: #fef0f0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-right: 12px;
-                
-                .el-icon {
-                    font-size: 18px;
-                    color: #f56c6c;
-                }
-            }
-            
-            .todo-content {
-                flex: 1;
-                
-                .todo-title {
-                    display: block;
-                    font-size: 14px;
-                    color: #303133;
-                    margin-bottom: 4px;
-                }
-                
-                .todo-time {
-                    font-size: 12px;
-                    color: #909399;
-                }
-            }
-            
-            .todo-arrow {
-                font-size: 14px;
-                color: #c0c4cc;
-            }
-        }
-        
-        .todo-empty {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 40px;
-            
-            .el-icon {
-                font-size: 40px;
-                color: #67c23a;
-                margin-bottom: 12px;
-            }
-            
-            span {
-                font-size: 14px;
-                color: #909399;
-            }
-        }
-    }
-    
-    .notice-list {
-        background: #fff;
-        border-radius: 12px;
-        overflow: hidden;
-        
-        .notice-item {
-            display: flex;
-            align-items: center;
-            padding: 14px 16px;
-            cursor: pointer;
-            
-            &:not(:last-child) {
-                border-bottom: 1px solid #f5f7fa;
-            }
-            
-            &:active {
-                background: #f5f7fa;
-            }
-            
-            .notice-icon {
-                font-size: 16px;
-                color: var(--color-primary, #409eff);
-                margin-right: 10px;
-            }
-            
-            .notice-title {
-                flex: 1;
-                font-size: 14px;
-                color: #303133;
-            }
-            
-            .notice-time {
-                font-size: 12px;
-                color: #909399;
-            }
-        }
+.mci-section-title__more {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    .el-icon { font-size: 12px; }
+}
+
+.mci-cell__icon--danger {
+    background: linear-gradient(135deg, rgba(255, 46, 99, 0.4), rgba(255, 110, 199, 0.4));
+    color: var(--mci-color-accent-red);
+}
+.mci-cell__icon--info {
+    background: linear-gradient(135deg, rgba(0, 245, 212, 0.4), rgba(41, 184, 255, 0.4));
+    color: var(--mci-color-accent-cyan);
+}
+
+/* === 空状态 === */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--mci-space-10);
+    color: var(--mci-text-tertiary);
+    font-size: var(--mci-text-sm);
+
+    .empty-icon {
+        font-size: 40px;
+        color: var(--mci-color-success);
+        margin-bottom: var(--mci-space-3);
+        filter: drop-shadow(0 0 8px currentColor);
     }
 }
 </style>

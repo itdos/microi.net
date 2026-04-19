@@ -1,13 +1,11 @@
 <template>
-    <div class="mobile-message">
-        <!-- 顶部导航栏（渐变背景） -->
-        <div class="msg-header">
-            <!-- <div class="header-inner">
-                <div class="header-action" @click="showNewChat = true">
-                    <span class="action-icon">✚</span>
-                </div>
-            </div> -->
-            <!-- Tab 切换 -->
+    <div class="mci-mobile-page page-message">
+        <header class="msg-hero">
+            <div class="msg-hero__decor">
+                <span class="decor-orb decor-orb--1"></span>
+                <span class="decor-orb decor-orb--2"></span>
+            </div>
+            <div class="msg-hero__safe-top"></div>
             <div class="msg-tabs">
                 <div class="msg-tab" :class="{ active: activeTab === 'messages' }" @click="activeTab = 'messages'">
                     <span>消息</span>
@@ -18,27 +16,27 @@
                     <div class="tab-line" v-if="activeTab === 'contacts'"></div>
                 </div>
             </div>
-        </div>
+        </header>
 
-        <!-- 搜索栏 -->
         <div class="search-section">
-            <div class="search-wrap">
-                <span class="search-icon">🔍</span>
-                <input 
+            <div class="search-wrap mci-input">
+                <el-icon class="search-icon"><Search /></el-icon>
+                <input
                     class="search-input"
-                    :placeholder="activeTab === 'messages' ? '搜索消息' : '搜索联系人'" 
+                    :placeholder="activeTab === 'messages' ? '搜索消息' : '搜索联系人'"
                     v-model="searchKeyword"
                     @input="activeTab === 'contacts' ? onContactSearchInput() : null"
                 />
-                <span v-if="searchKeyword" class="search-clear" @click="clearSearch">✕</span>
+                <span v-if="searchKeyword" class="search-clear" @click="clearSearch">?</span>
             </div>
+            <span class="search-add-btn" @click="showNewChat = true">
+                <el-icon><Plus /></el-icon>
+            </span>
         </div>
 
-        <!-- 消息列表 -->
         <div class="msg-scroll" v-if="activeTab === 'messages'">
-            <!-- 骨架屏 -->
             <div v-if="loading && filteredMessageList.length === 0" class="skeleton-list">
-                <div class="sk-item" v-for="i in 5" :key="i">
+                <div class="sk-item mci-card" v-for="i in 5" :key="i">
                     <div class="sk-avatar"></div>
                     <div class="sk-content">
                         <div class="sk-line sk-name"></div>
@@ -47,50 +45,51 @@
                 </div>
             </div>
 
-            <!-- 消息条目 -->
-            <div 
-                v-for="msg in filteredMessageList" 
-                :key="msg.ContactUserId"
-                class="msg-item"
-                @click="openChat(msg)"
-            >
-                <div class="msg-avatar-wrap">
-                    <div class="msg-avatar">
-                        <el-avatar :size="48" :src="DiyCommon.GetServerPath(msg.ContactUserAvatar)">
+            <div class="mci-cell-group">
+                <div
+                    v-for="(msg, idx) in filteredMessageList"
+                    :key="msg.ContactUserId"
+                    class="mci-cell msg-item mci-stagger-item"
+                    :style="{ '--mci-index': idx }"
+                    @click="openChat(msg)"
+                >
+                    <div class="msg-avatar-wrap">
+                        <el-avatar
+                            :size="46"
+                            :src="DiyCommon.GetServerPath(msg.ContactUserAvatar)"
+                            class="mci-avatar"
+                        >
                             {{ (msg.ContactUserName || '?').charAt(0) }}
                         </el-avatar>
-                    </div>
-                    <span v-if="msg.UnRead > 0" class="unread-badge">{{ msg.UnRead > 99 ? '99+' : msg.UnRead }}</span>
-                </div>
-                <div class="msg-body">
-                    <div class="msg-top">
-                        <span class="msg-name">{{ msg.ContactUserName }}</span>
-                        <span class="msg-time">{{ formatTime(msg.UpdateTime) }}</span>
-                    </div>
-                    <div class="msg-bottom">
-                        <span class="msg-preview" :class="{ 'has-unread': msg.UnRead > 0 }">
-                            {{ msg.LastMessage ? msg.LastMessage.replace(/<[^>]+>/g, '') : '' }}
+                        <span v-if="msg.UnRead > 0" class="mci-badge unread-badge">
+                            {{ msg.UnRead > 99 ? '99+' : msg.UnRead }}
                         </span>
+                    </div>
+                    <div class="msg-body">
+                        <div class="msg-top">
+                            <span class="msg-name">{{ msg.ContactUserName }}</span>
+                            <span class="msg-time">{{ formatTime(msg.UpdateTime) }}</span>
+                        </div>
+                        <div class="msg-bottom">
+                            <span class="msg-preview" :class="{ 'has-unread': msg.UnRead > 0 }">
+                                {{ msg.LastMessage ? msg.LastMessage.replace(/<[^>]+>/g, '') : '' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 空状态 -->
-            <div v-if="!loading && filteredMessageList.length === 0" class="empty-state">
-                <span class="empty-icon">💬</span>
-                <span class="empty-text">暂无消息</span>
-                <div class="empty-btn" @click="showNewChat = true">
-                    <span>发起聊天</span>
-                </div>
+            <div v-if="!loading && filteredMessageList.length === 0" class="empty-state mci-card">
+                <span class="empty-state__icon">📭</span>
+                <span class="empty-state__title">暂无消息</span>
+                <button class="mci-btn mci-btn--primary" @click="showNewChat = true">发起聊天</button>
             </div>
         </div>
 
-        <!-- 通讯录列表 -->
         <div class="msg-scroll" v-if="activeTab === 'contacts'" @scroll="onContactScroll">
-            <!-- 骨架屏 -->
             <div v-if="contactLoading && contactList.length === 0" class="skeleton-list">
-                <div class="sk-item" v-for="i in 8" :key="i">
-                    <div class="sk-avatar sk-avatar-sm"></div>
+                <div class="sk-item mci-card" v-for="i in 8" :key="i">
+                    <div class="sk-avatar sk-avatar--sm"></div>
                     <div class="sk-content">
                         <div class="sk-line sk-name"></div>
                         <div class="sk-line sk-dept"></div>
@@ -98,69 +97,45 @@
                 </div>
             </div>
 
-            <div 
-                v-for="contact in contactList" 
-                :key="contact.Id"
-                class="contact-item"
-                @click="startNewChat(contact)"
-            >
-                <div class="contact-avatar">
-                    <el-avatar :size="40" :src="contact.UserImg">
+            <div class="mci-cell-group">
+                <div
+                    v-for="(contact, idx) in contactList"
+                    :key="contact.Id"
+                    class="mci-cell contact-item mci-stagger-item"
+                    :style="{ '--mci-index': Math.min(idx, 12) }"
+                    @click="startNewChat(contact)"
+                >
+                    <el-avatar :size="40" :src="contact.UserImg" class="mci-avatar">
                         {{ (contact.Name || '?').charAt(0) }}
                     </el-avatar>
-                </div>
-                <div class="contact-info">
-                    <span class="contact-name">{{ contact.Name }}</span>
-                    <span class="contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
+                    <div class="contact-info">
+                        <span class="contact-name">{{ contact.Name }}</span>
+                        <span class="contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- 加载更多提示 -->
-            <div v-if="contactLoadingMore" class="loading-more-hint">
-                加载中...
-            </div>
-            <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">
-                已加载全部联系人
-            </div>
+            <div v-if="contactLoadingMore" class="loading-more-hint">加载中...</div>
+            <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">已加载全部联系人</div>
 
-            <!-- 空状态 -->
-            <div v-if="!contactLoading && contactList.length === 0" class="empty-state">
-                <span class="empty-icon">📇</span>
-                <span class="empty-text">暂无联系人</span>
+            <div v-if="!contactLoading && contactList.length === 0" class="empty-state mci-card">
+                <span class="empty-state__icon">👥</span>
+                <span class="empty-state__title">暂无联系人</span>
             </div>
         </div>
 
-        <!-- 新建聊天弹窗 -->
-        <el-dialog
-            v-model="showNewChat"
-            title="选择联系人"
-            width="90%"
-            class="contact-dialog"
-        >
+        <el-dialog v-model="showNewChat" title="选择联系人" width="92%" class="mci-submenu-dialog" align-center>
             <div class="contact-search">
-                <el-input 
-                    v-model="contactKeyword" 
-                    placeholder="搜索联系人" 
-                    :prefix-icon="Search"
-                    clearable
-                    @input="searchContacts"
-                />
+                <el-input v-model="contactKeyword" placeholder="搜索联系人" :prefix-icon="Search" clearable @input="searchContacts" />
             </div>
             <div class="dialog-contact-list">
-                <div 
-                    v-for="contact in dialogContactList" 
-                    :key="contact.Id"
-                    class="dialog-contact-item"
-                    @click="startDialogChat(contact)"
-                >
-                    <div class="dialog-contact-avatar">
-                        <el-avatar :size="36" :src="contact.UserImg">
-                            {{ (contact.Name || '?').charAt(0) }}
-                        </el-avatar>
-                    </div>
-                    <div class="dialog-contact-info">
-                        <span class="dialog-contact-name">{{ contact.Name }}</span>
-                        <span class="dialog-contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
+                <div v-for="contact in dialogContactList" :key="contact.Id" class="mci-cell" @click="startDialogChat(contact)">
+                    <el-avatar :size="36" :src="contact.UserImg" class="mci-avatar">
+                        {{ (contact.Name || '?').charAt(0) }}
+                    </el-avatar>
+                    <div class="contact-info">
+                        <span class="contact-name">{{ contact.Name }}</span>
+                        <span class="contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
                     </div>
                 </div>
             </div>
@@ -172,67 +147,41 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore } from '@/pinia';
-import { Search } from '@element-plus/icons-vue';
-import { 
-    getLastContacts, 
-    formatTime as chatFormatTime,
-    initWebSocketEvents,
-    cleanupWebSocketEvents
-} from '@/utils/chat.common';
+import { Search, Plus } from '@element-plus/icons-vue';
+import { getLastContacts, formatTime as chatFormatTime, initWebSocketEvents, cleanupWebSocketEvents } from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
 
-// 定义组件名称，用于 keep-alive 缓存
-defineOptions({
-    name: 'mobile_message'
-});
+defineOptions({ name: 'mobile_message' });
 
 const router = useRouter();
 const diyStore = useDiyStore();
-
-// 当前用户
 const currentUser = computed(() => diyStore.GetCurrentUser);
 
-// Tab切换
 const activeTab = ref('messages');
-
-// 搜索关键词
 const searchKeyword = ref('');
 const contactKeyword = ref('');
 const showNewChat = ref(false);
-
-// 加载状态
 const loading = ref(true);
 const contactLoading = ref(false);
-
-// 消息列表
 const messageList = ref([]);
-
-// 联系人列表
 const contactList = ref([]);
-
-// 通讯录分页
 const contactPageIndex = ref(1);
 const contactPageSize = ref(20);
 const contactHasMore = ref(true);
 const contactLoadingMore = ref(false);
-
-// 弹窗联系人列表
 const dialogContactList = ref([]);
 
-// 获取WebSocket实例
 let websocket = null;
 let wsEventsRegistered = false;
 
-// 过滤消息列表
 const filteredMessageList = computed(() => {
     if (!searchKeyword.value) return messageList.value;
-    return messageList.value.filter(msg => 
-        msg.ContactUserName?.includes(searchKeyword.value) || 
+    return messageList.value.filter(msg =>
+        msg.ContactUserName?.includes(searchKeyword.value) ||
         msg.LastMessage?.includes(searchKeyword.value)
     );
 });
 
-// 搜索关键词变化时远程搜索通讯录
 let contactSearchTimer = null;
 const onContactSearchInput = () => {
     clearTimeout(contactSearchTimer);
@@ -243,42 +192,17 @@ const onContactSearchInput = () => {
     }, 300);
 };
 
-// 搜索联系人
 const searchContacts = () => {
-    if (!contactKeyword.value) {
-        // 如果搜索为空，加载全部联系人
-        loadContacts();
-        return;
-    }
-    
-    DiyCommon.Post(
-        '/api/SysUser/GetSysUserPublicInfo',
-        {
-            State: 1,
-            _PageIndex: 1,
-            _PageSize: 15,
-            _Keyword: contactKeyword.value
-        },
-        function(result) {
-            if (DiyCommon.Result(result)) {
-                dialogContactList.value = result.Data || [];
-                console.log('[移动端消息] 搜索联系人成功:', dialogContactList.value.length);
-            } else {
-                console.error('[移动端消息] 搜索联系人失败:', result.Message);
-            }
-        },
-        function(error) {
-            console.error('[移动端消息] 搜索联系人请求失败:', error);
-        }
-    );
+    if (!contactKeyword.value) { loadContacts(); return; }
+    DiyCommon.Post('/api/SysUser/GetSysUserPublicInfo', {
+        State: 1, _PageIndex: 1, _PageSize: 15, _Keyword: contactKeyword.value
+    }, function(result) {
+        if (DiyCommon.Result(result)) dialogContactList.value = result.Data || [];
+    });
 };
 
-// 格式化时间（使用公共模块的formatTime函数）
-const formatTime = (time) => {
-    return chatFormatTime(time);
-};
+const formatTime = (time) => chatFormatTime(time);
 
-// 切换到通讯录 Tab
 const switchToContacts = () => {
     activeTab.value = 'contacts';
     if (contactList.value.length === 0) {
@@ -289,140 +213,71 @@ const switchToContacts = () => {
     }
 };
 
-// 打开聊天
-const openChat = (msg) => {
-    router.push({
-        path: '/mobile/chat',
-        query: {
-            id: msg.ContactUserId,
-            name: msg.ContactUserName
-        }
-    });
-};
-
-// 发起新聊天
-const startNewChat = (contact) => {
-    router.push({
-        path: '/mobile/chat',
-        query: {
-            id: contact.Id,
-            name: contact.Name
-        }
-    });
-};
-
-// 从弹窗发起聊天
+const openChat = (msg) => router.push({ path: '/mobile/chat', query: { id: msg.ContactUserId, name: msg.ContactUserName } });
+const startNewChat = (contact) => router.push({ path: '/mobile/chat', query: { id: contact.Id, name: contact.Name } });
 const startDialogChat = (contact) => {
     showNewChat.value = false;
-    router.push({
-        path: '/mobile/chat',
-        query: {
-            id: contact.Id,
-            name: contact.Name
-        }
-    });
+    router.push({ path: '/mobile/chat', query: { id: contact.Id, name: contact.Name } });
 };
 
-// 加载最近联系人
 const loadLastContacts = async () => {
     websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
     if (!websocket || websocket.state !== 'Connected') {
-        console.log('[移动端消息] WebSocket未连接，等待重试...');
-        // 轮询等待WebSocket连接（最多10秒）
         let retryCount = 0;
         const maxRetries = 20;
         const waitForConnection = () => {
             retryCount++;
             websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-            if (websocket && websocket.state === 'Connected') {
-                doLoadLastContacts();
-            } else if (retryCount >= maxRetries) {
-                console.warn('[移动端消息] WebSocket连接超时');
-                loading.value = false;
-            } else {
-                setTimeout(waitForConnection, 500);
-            }
+            if (websocket && websocket.state === 'Connected') doLoadLastContacts();
+            else if (retryCount >= maxRetries) loading.value = false;
+            else setTimeout(waitForConnection, 500);
         };
         setTimeout(waitForConnection, 500);
         return;
     }
-    
     doLoadLastContacts();
 };
 
 const doLoadLastContacts = async () => {
     try {
-        // 调用invoke触发服务端推送，实际数据通过 onReceiveLastContacts 回调接收
         await getLastContacts(websocket, currentUser.value.Id, DiyCommon.GetOsClient());
-        console.log('[移动端消息] SendLastContacts请求已发送');
-        // 设置超时保护：如果8秒内回调没触发，关闭loading
-        setTimeout(() => {
-            if (loading.value) {
-                console.warn('[移动端消息] 加载超时，关闭loading');
-                loading.value = false;
-            }
-        }, 8000);
+        setTimeout(() => { if (loading.value) loading.value = false; }, 8000);
     } catch (error) {
         console.error('[移动端消息] 加载联系人失败:', error);
         loading.value = false;
     }
 };
 
-// 加载通讯录（支持分页和远端搜索）
 const loadContacts = (isLoadMore = false) => {
-    if (isLoadMore) {
-        contactLoadingMore.value = true;
-    } else {
-        contactLoading.value = true;
-    }
-    
-    DiyCommon.Post(
-        '/api/SysUser/GetSysUserPublicInfo',
-        {
-            State: 1,
-            _PageIndex: contactPageIndex.value,
-            _PageSize: contactPageSize.value,
-            _Keyword: searchKeyword.value || ''
-        },
-        function(result) {
-            if (DiyCommon.Result(result)) {
-                const data = result.Data || [];
-                console.log('[移动端消息] 加载通讯录成功:', data.length, '总数:', result.Total);
-                
-                if (isLoadMore) {
-                    contactList.value = contactList.value.concat(data);
+    if (isLoadMore) contactLoadingMore.value = true;
+    else contactLoading.value = true;
+
+    DiyCommon.Post('/api/SysUser/GetSysUserPublicInfo', {
+        State: 1, _PageIndex: contactPageIndex.value, _PageSize: contactPageSize.value, _Keyword: searchKeyword.value || ''
+    }, function(result) {
+        if (DiyCommon.Result(result)) {
+            const data = result.Data || [];
+            if (isLoadMore) contactList.value = contactList.value.concat(data);
+            else {
+                if (!searchKeyword.value) {
+                    contactList.value = [{ Id: 'AI', Name: 'AI助手', UserImg: '', DepartmentName: '系统' }, ...data];
                 } else {
-                    // 首次加载或搜索：替换数据，无搜索关键字时加AI助手
-                    if (!searchKeyword.value) {
-                        contactList.value = [
-                            { Id: 'AI', Name: 'AI助手', UserImg: '', DepartmentName: '系统' },
-                            ...data
-                        ];
-                    } else {
-                        contactList.value = data;
-                    }
-                    dialogContactList.value = data;
+                    contactList.value = data;
                 }
-                
-                // 判断是否还有更多
-                const aiOffset = (!searchKeyword.value && contactPageIndex.value === 1) ? 1 : 0;
-                const loadedCount = contactList.value.length - aiOffset;
-                contactHasMore.value = loadedCount < (result.Total || 0);
-            } else {
-                console.error('[移动端消息] 加载通讯录失败:', result.Message);
+                dialogContactList.value = data;
             }
-            contactLoading.value = false;
-            contactLoadingMore.value = false;
-        },
-        function(error) {
-            console.error('[移动端消息] 加载通讯录请求失败:', error);
-            contactLoading.value = false;
-            contactLoadingMore.value = false;
+            const aiOffset = (!searchKeyword.value && contactPageIndex.value === 1) ? 1 : 0;
+            const loadedCount = contactList.value.length - aiOffset;
+            contactHasMore.value = loadedCount < (result.Total || 0);
         }
-    );
+        contactLoading.value = false;
+        contactLoadingMore.value = false;
+    }, function() {
+        contactLoading.value = false;
+        contactLoadingMore.value = false;
+    });
 };
 
-// 通讯录列表滚动加载更多
 const onContactScroll = (e) => {
     const target = e.target;
     if (!target) return;
@@ -433,7 +288,6 @@ const onContactScroll = (e) => {
     }
 };
 
-// 清除搜索
 const clearSearch = () => {
     searchKeyword.value = '';
     if (activeTab.value === 'contacts') {
@@ -443,26 +297,13 @@ const clearSearch = () => {
     }
 };
 
-// 注册WebSocket事件（使用公共模块）
 const registerWebSocketEvents = () => {
-    // 检查设备类型：只有移动端才注册
-    if (!diyStore.IsPhoneView) {
-        console.log('[移动端消息] 当前为PC端模式，不注册移动端聊天事件');
-        return;
-    }
-    
+    if (!diyStore.IsPhoneView) return;
     websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-    if (!websocket) {
-        console.log('[移动端消息] WebSocket未初始化');
-        return;
-    }
-    
-    // 使用公共模块初始化WebSocket事件
+    if (!websocket) return;
+
     const success = initWebSocketEvents(websocket, {
-        // 接收普通消息
         onReceiveMessage: (message) => {
-            console.log('[移动端消息] 收到新消息:', message);
-            // 更新消息列表
             const existingMsg = messageList.value.find(m => m.ContactUserId === message.FromUserId);
             if (existingMsg) {
                 existingMsg.LastMessage = message.Content;
@@ -475,30 +316,19 @@ const registerWebSocketEvents = () => {
                     ContactUserAvatar: message.FromUserAvatar || '',
                     LastMessage: message.Content,
                     UpdateTime: new Date().toISOString(),
-                    UnRead: 1,
-                    muted: false
+                    UnRead: 1, muted: false
                 });
             }
         },
-        
-        // 接收最近联系人列表
         onReceiveLastContacts: (contacts) => {
-            console.log('[移动端消息] 收到最近联系人:', contacts);
             if (contacts && contacts.length > 0) {
-                // 直接使用原始数据
                 messageList.value = contacts;
-                
-                // 确保AI助手在第一位
                 const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
                 if (aiIndex === -1) {
                     messageList.value.unshift({
-                        ContactUserId: 'AI',
-                        ContactUserName: 'AI助手',
-                        ContactUserAvatar: '',
-                        LastMessage: '我是您的AI助手，有什么可以帮您？',
-                        UpdateTime: new Date().toISOString(),
-                        UnRead: 0,
-                        muted: false
+                        ContactUserId: 'AI', ContactUserName: 'AI助手', ContactUserAvatar: '',
+                        LastMessage: '点击与AI对话，有什么可以帮您？',
+                        UpdateTime: new Date().toISOString(), UnRead: 0, muted: false
                     });
                 } else if (aiIndex > 0) {
                     const ai = messageList.value.splice(aiIndex, 1)[0];
@@ -507,18 +337,11 @@ const registerWebSocketEvents = () => {
             }
             loading.value = false;
         }
-    }, {
-        enableDuplicateCheck: true,
-        logPrefix: '[移动端消息]',
-        scope: 'mobile-message'
-    });
-    
-    if (success) {
-        wsEventsRegistered = true;
-    }
+    }, { enableDuplicateCheck: true, logPrefix: '[移动端消息]', scope: 'mobile-message' });
+
+    if (success) wsEventsRegistered = true;
 };
 
-// 注销WebSocket事件（使用公共模块）
 const unregisterWebSocketEvents = () => {
     if (wsEventsRegistered) {
         cleanupWebSocketEvents(websocket, '[移动端消息]', 'mobile-message');
@@ -526,446 +349,302 @@ const unregisterWebSocketEvents = () => {
     }
 };
 
-onMounted(() => {
-    console.log('[移动端消息] 组件已挂载');
-    registerWebSocketEvents();
-    loadLastContacts();
-});
-
-onBeforeUnmount(() => {
-    console.log('[移动端消息] 组件即将卸载');
-    unregisterWebSocketEvents();
-});
+onMounted(() => { registerWebSocketEvents(); loadLastContacts(); });
+onBeforeUnmount(() => { unregisterWebSocketEvents(); });
 </script>
 
 <style lang="scss" scoped>
-.mobile-message {
-    min-height: 100vh;
-    background: #f5f7fa;
+.page-message {
     display: flex;
     flex-direction: column;
+    padding-bottom: calc(var(--mci-tabbar-height) + var(--mci-safe-bottom));
     overflow: hidden;
-    padding-bottom: 56px;
+    height: 100vh;
 }
 
-/* 顶部导航（渐变背景） */
-.msg-header {
-    background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-    padding-top: var(--status-bar-height, 0px);
-    flex-shrink: 0;
-}
-
-.header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    height: 32px;
+.msg-hero {
     position: relative;
-    padding: 0 16px;
-}
+    overflow: hidden;
+    background: var(--mci-gradient-primary);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
 
-.header-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: #fff;
-}
+    &__safe-top { height: var(--mci-safe-top); }
+    &__decor { position: absolute; inset: 0; pointer-events: none; }
 
-.header-action {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
+    &__top {
+        position: relative; z-index: 1;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: var(--mci-space-3) var(--mci-space-4) 0;
+    }
 
-    &:active {
-        opacity: 0.7;
+    &__title {
+        font-size: var(--mci-text-lg);
+        font-weight: var(--mci-font-bold);
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    &__action {
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        border-radius: var(--mci-radius-full);
+        cursor: pointer;
+        transition: transform var(--mci-duration-fast);
+
+        &:active { transform: scale(0.92); }
     }
 }
 
-.action-icon {
-    font-size: 18px;
-    color: rgba(255, 255, 255, 0.9);
+.decor-orb {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+
+    &--1 { width: 160px; height: 160px; top: -50px; right: -40px; }
+    &--2 { width: 100px; height: 100px; bottom: -30px; left: 10px; }
 }
 
-/* Tab 切换 */
 .msg-tabs {
+    position: relative; z-index: 1;
     display: flex;
-    padding: 0 48px;
+    padding: 0 var(--mci-space-12);
 }
 
 .msg-tab {
-    flex: 1;
-    text-align: center;
-    padding: 8px 0 10px;
-    position: relative;
-    cursor: pointer;
+    flex: 1; text-align: center;
+    padding: var(--mci-space-2) 0 var(--mci-space-3);
+    position: relative; cursor: pointer;
 
     span {
-        font-size: 17px;
-        color: rgba(255, 255, 255, 0.65);
+        font-size: var(--mci-text-base);
+        color: rgba(255, 255, 255, 0.7);
+        transition: color var(--mci-duration-fast);
     }
-
     &.active span {
         color: #fff;
-        font-weight: 600;
+        font-weight: var(--mci-font-semibold);
     }
 }
 
 .tab-line {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
+    position: absolute; bottom: 0; left: 50%;
     transform: translateX(-50%);
-    width: 24px;
-    height: 3px;
-    border-radius: 1.5px;
+    width: 24px; height: 3px;
+    border-radius: 2px;
     background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* 搜索栏 */
 .search-section {
-    background: #f5f7fa;
-    padding: 8px 12px;
+    padding: var(--mci-space-3) var(--mci-space-4);
     flex-shrink: 0;
+    background: var(--mci-bg-base);
+    display: flex;
+    align-items: center;
+    gap: var(--mci-space-2);
+}
+
+.search-add-btn {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--mci-color-primary);
+    color: #fff;
+    border-radius: var(--mci-radius-md);
+    cursor: pointer;
+    font-size: 18px;
+    transition: transform var(--mci-duration-fast);
+
+    &:active { transform: scale(0.92); }
 }
 
 .search-wrap {
-    display: flex;
-    align-items: center;
-    background: #fff;
-    border-radius: 18px;
-    padding: 0 12px;
-    height: 34px;
+    display: flex; align-items: center;
+    height: 36px;
+    padding: 0 var(--mci-space-3);
 }
 
 .search-icon {
-    font-size: 12px;
-    margin-right: 6px;
+    color: var(--mci-text-tertiary);
+    font-size: 14px;
+    margin-right: var(--mci-space-2);
 }
 
 .search-input {
     flex: 1;
-    font-size: 13px;
-    color: #333;
-    height: 34px;
-    border: none;
-    outline: none;
-    background: transparent;
+    font-size: var(--mci-text-sm);
+    color: var(--mci-text-primary);
+    height: 100%;
+    border: none; outline: none; background: transparent;
 
-    &::placeholder {
-        color: #bbb;
-        font-size: 13px;
-    }
+    &::placeholder { color: var(--mci-text-placeholder); }
 }
 
 .search-clear {
-    font-size: 12px;
-    color: #999;
+    font-size: var(--mci-text-xs);
+    color: var(--mci-text-tertiary);
     padding: 4px;
     cursor: pointer;
 }
 
-/* 滚动区 */
 .msg-scroll {
     flex: 1;
     overflow-y: auto;
+    padding: 0 var(--mci-space-3) var(--mci-space-3);
 }
 
-/* 消息条目 */
-.msg-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: #fff;
-    border-bottom: 1px solid #f5f5f5;
-    cursor: pointer;
-    transition: background 0.2s;
+.msg-item { align-items: center; gap: var(--mci-space-3); }
 
-    &:active {
-        background: #f9f9f9;
-    }
-}
+.msg-avatar-wrap { position: relative; flex-shrink: 0; }
 
-.msg-avatar-wrap {
-    position: relative;
-    margin-right: 12px;
-    flex-shrink: 0;
-}
-
-.msg-avatar {
-    :deep(.el-avatar) {
-        background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-        font-size: 18px;
-        font-weight: 600;
-    }
+:deep(.mci-avatar.el-avatar) {
+    background: var(--mci-gradient-primary);
+    color: #fff;
+    font-weight: var(--mci-font-semibold);
+    box-shadow: 0 2px 8px var(--mci-color-primary-glow);
 }
 
 .unread-badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    min-width: 18px;
-    height: 18px;
+    position: absolute; top: -2px; right: -2px;
+    min-width: 18px; height: 18px;
     border-radius: 9px;
-    background: #ff4d4f;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: var(--mci-color-danger);
+    box-shadow: 0 2px 6px rgba(255, 64, 87, 0.5);
+    display: flex; align-items: center; justify-content: center;
     padding: 0 4px;
-    font-size: 10px;
-    color: #fff;
-    font-weight: 500;
+    font-size: 10px; color: #fff;
+    font-weight: var(--mci-font-medium);
 }
 
-.msg-body {
-    flex: 1;
-    min-width: 0;
-}
+.msg-body { flex: 1; min-width: 0; }
 
 .msg-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 4px;
 }
 
 .msg-name {
-    font-size: 15px;
-    font-weight: 500;
-    color: #333;
+    font-size: var(--mci-text-base);
+    font-weight: var(--mci-font-medium);
+    color: var(--mci-text-primary);
 }
 
 .msg-time {
-    font-size: 11px;
-    color: #bbb;
+    font-size: var(--mci-text-xs);
+    color: var(--mci-text-tertiary);
     flex-shrink: 0;
 }
 
-.msg-bottom {
-    display: flex;
-    align-items: center;
-}
+.msg-bottom { display: flex; align-items: center; }
 
 .msg-preview {
-    font-size: 13px;
-    color: #999;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: var(--mci-text-sm);
+    color: var(--mci-text-tertiary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     flex: 1;
 
     &.has-unread {
-        color: #606266;
-        font-weight: 500;
+        color: var(--mci-text-secondary);
+        font-weight: var(--mci-font-medium);
     }
 }
 
-/* 通讯录 */
-.contact-item {
-    display: flex;
-    align-items: center;
-    padding: 10px 16px;
-    background: #fff;
-    border-bottom: 1px solid #f5f5f5;
-    cursor: pointer;
-    transition: background 0.2s;
-
-    &:active {
-        background: #f9f9f9;
-    }
-}
-
-.contact-avatar {
-    margin-right: 10px;
-    flex-shrink: 0;
-
-    :deep(.el-avatar) {
-        background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-        font-size: 16px;
-        font-weight: 600;
-    }
-}
+.contact-item { align-items: center; gap: var(--mci-space-3); }
 
 .contact-info {
-    flex: 1;
-    min-width: 0;
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 2px;
 }
 
 .contact-name {
-    font-size: 14px;
-    font-weight: 500;
-    color: #333;
-    display: block;
+    font-size: var(--mci-text-sm);
+    font-weight: var(--mci-font-medium);
+    color: var(--mci-text-primary);
 }
 
 .contact-dept {
-    font-size: 11px;
-    color: #999;
-    margin-top: 2px;
-    display: block;
+    font-size: var(--mci-text-xs);
+    color: var(--mci-text-tertiary);
 }
 
-/* 空状态 */
 .empty-state {
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     align-items: center;
-    padding: 80px 0;
+    gap: var(--mci-space-3);
+    padding: var(--mci-space-12) var(--mci-space-6);
 
-    .empty-icon {
+    &__icon {
         font-size: 48px;
-        margin-bottom: 12px;
+        filter: drop-shadow(0 4px 12px var(--mci-color-primary-glow));
     }
-
-    .empty-text {
-        font-size: 14px;
-        color: #999;
-        margin-bottom: 16px;
+    &__title {
+        font-size: var(--mci-text-base);
+        color: var(--mci-text-secondary);
     }
 }
 
-/* 加载更多提示 */
 .loading-more-hint {
     text-align: center;
-    padding: 12px 0;
-    color: #999;
-    font-size: 13px;
+    padding: var(--mci-space-3) 0;
+    color: var(--mci-text-tertiary);
+    font-size: var(--mci-text-xs);
 }
 
-.empty-btn {
-    background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-    padding: 8px 24px;
-    border-radius: 20px;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(var(--color-primary-rgb, 64,158,255), 0.3);
-
-    &:active {
-        transform: scale(0.97);
-    }
-
-    span {
-        color: #fff;
-        font-size: 14px;
-    }
-}
-
-/* 骨架屏 */
 .skeleton-list {
-    padding: 0;
+    display: flex; flex-direction: column;
+    gap: var(--mci-space-2);
+    padding-top: var(--mci-space-2);
 }
 
 .sk-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: #fff;
-    border-bottom: 1px solid #f5f5f5;
+    display: flex; align-items: center;
+    gap: var(--mci-space-3);
+    padding: var(--mci-space-3);
 }
 
 .sk-avatar {
-    width: 48px;
-    height: 48px;
+    width: 46px; height: 46px;
     border-radius: 50%;
-    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg,
+        var(--mci-bg-card) 25%,
+        var(--mci-bg-card-hover) 50%,
+        var(--mci-bg-card) 75%);
     background-size: 400% 100%;
-    animation: shimmer 1.5s infinite;
-    margin-right: 12px;
+    animation: mciShimmer 1.5s infinite;
     flex-shrink: 0;
 
-    &.sk-avatar-sm {
-        width: 40px;
-        height: 40px;
-    }
+    &--sm { width: 40px; height: 40px; }
 }
 
-.sk-content {
-    flex: 1;
-}
+.sk-content { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 
 .sk-line {
     height: 12px;
-    border-radius: 6px;
-    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    border-radius: var(--mci-radius-full);
+    background: linear-gradient(90deg,
+        var(--mci-bg-card) 25%,
+        var(--mci-bg-card-hover) 50%,
+        var(--mci-bg-card) 75%);
     background-size: 400% 100%;
-    animation: shimmer 1.5s infinite;
-    margin-bottom: 8px;
+    animation: mciShimmer 1.5s infinite;
 }
 
-.sk-name { width: 40%; }
+.sk-name { width: 30%; }
 .sk-msg { width: 70%; }
-.sk-dept { width: 50%; height: 10px; }
+.sk-dept { width: 50%; }
 
-/* 新建聊天弹窗 */
-:deep(.contact-dialog) {
-    .el-dialog__header {
-        padding: 14px 16px;
-        border-bottom: 1px solid #f0f0f0;
-        margin-right: 0;
-
-        .el-dialog__title {
-            font-size: 16px;
-            font-weight: 600;
-        }
-    }
-
-    .el-dialog__body {
-        padding: 0;
-        max-height: 60vh;
-        overflow-y: auto;
-    }
+@keyframes mciShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
-.contact-search {
-    padding: 10px 14px;
-    border-bottom: 1px solid #f5f5f5;
-}
+.contact-search { padding: 0 0 var(--mci-space-3); }
 
 .dialog-contact-list {
     max-height: 50vh;
     overflow-y: auto;
-}
-
-.dialog-contact-item {
-    display: flex;
-    align-items: center;
-    padding: 10px 14px;
-    border-bottom: 1px solid #f8f8f8;
-    cursor: pointer;
-
-    &:active {
-        background: #f9f9f9;
-    }
-}
-
-.dialog-contact-avatar {
-    margin-right: 10px;
-
-    :deep(.el-avatar) {
-        background: linear-gradient(135deg, var(--color-primary, #409eff), var(--color-primary-light, #6ba3ff));
-        font-size: 14px;
-        font-weight: 600;
-    }
-}
-
-.dialog-contact-info {
-    flex: 1;
-}
-
-.dialog-contact-name {
-    font-size: 14px;
-    color: #333;
-    display: block;
-}
-
-.dialog-contact-dept {
-    font-size: 11px;
-    color: #999;
-    margin-top: 2px;
-    display: block;
-}
-
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
 }
 </style>

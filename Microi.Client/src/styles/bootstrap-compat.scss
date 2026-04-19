@@ -65,7 +65,7 @@
     font-weight: 400;
     line-height: 1.5;
     color: #495057;
-    background-color: #fff;
+    background-color: var(--el-bg-color, #fff);
     background-clip: padding-box;
     border: 1px solid #ced4da;
     border-radius: 0.25rem;
@@ -75,7 +75,7 @@
 
     &:focus {
         color: #495057;
-        background-color: #fff;
+        background-color: var(--el-bg-color, #fff);
         border-color: var(--el-color-primary, #409eff);
         outline: 0;
         box-shadow: 0 0 0 0.2rem rgba(64, 158, 255, 0.25);
@@ -175,7 +175,7 @@
     flex-direction: column;
     min-width: 0;
     word-wrap: break-word;
-    background-color: #fff;
+    background-color: var(--el-bg-color, #fff);
     background-clip: border-box;
     border: 1px solid rgba(0, 0, 0, 0.125);
     border-radius: 0.25rem;

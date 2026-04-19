@@ -266,7 +266,7 @@ export default {
 
 /* 顶部 */
 .news-header {
-  background: var(--theme-gradient, linear-gradient(135deg, #4e6ef2, #6b8aff));
+  background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   padding-bottom: 24rpx;
 }
 

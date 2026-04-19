@@ -11,7 +11,7 @@
         // border-bottom: 1px solid #dcdfe6;
         border-radius: 4px;
         padding: 0 8px;
-        background-color: #fff;
+        background-color: var(--el-bg-color, #fff);
         box-shadow: none;
     }
     .el-input-group--append.el-input--prefix .el-input__inner {
@@ -110,7 +110,7 @@
 .more-search {
     .el-input-group__prepend {
         padding: 0 10px;
-        color: #606266;
+        color: var(--el-text-color-regular, #606266);
         font-size: 13px;
     }
 }
@@ -121,7 +121,7 @@
     }
 }
 .keyword-search {
-    background-color: #fff;
+    background-color: var(--el-bg-color, #fff);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -179,11 +179,11 @@
 
             :deep(.el-input__wrapper) {
                 border-radius: 0px;
-                box-shadow: 0 0 0 1px #dcdfe6 inset;
+                box-shadow: 0 0 0 1px var(--el-border-color, #dcdfe6) inset;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
                 &:hover {
-                    box-shadow: 0 0 0 1px #c0c4cc inset;
+                    box-shadow: 0 0 0 1px var(--el-border-color-dark, #c0c4cc) inset;
                 }
 
                 &.is-focus {
@@ -265,12 +265,12 @@
     .el-tag {
         overflow: hidden;
         text-align: left;
-        color: #606266 !important;
+        color: var(--el-text-color-regular, #606266) !important;
         // font-size: 12px;
     }
 
     .el-checkbox__label {
-        color: #606266;
+        color: var(--el-text-color-regular, #606266);
         font-weight: normal;
         font-size: 14px;
     }
@@ -295,7 +295,7 @@
 }
 .search-outside {
     border-radius: 12px;
-    background-color: #fff;
+    background-color: var(--el-bg-color, #fff);
     display: flex;
     flex-wrap: wrap;
     padding-left: 10px;
@@ -332,12 +332,12 @@
         // min-width: 100px !important;
         overflow: hidden;
         text-align: left;
-        color: #606266 !important;
+        color: var(--el-text-color-regular, #606266) !important;
         // margin-right: 15px;
         // font-size: 12px;
     }
     .el-checkbox__label {
-        color: #606266;
+        color: var(--el-text-color-regular, #606266);
         font-weight: normal;
         font-size: 14px;
     }
@@ -361,7 +361,7 @@
 }
 .diy-table {
     :deep(.el-table-fixed-column--right){
-        background-color: #fff !important;
+        background-color: var(--el-bg-color, #fff) !important;
     }
     max-width: 100%;
     width: 100%;
@@ -389,8 +389,8 @@
         .el-table__header-wrapper {
             .el-table__header {
                 th {
-                    background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
-                    border-bottom: 1px solid #e4e7ed;
+                    background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
+                    border-bottom: 1px solid var(--el-border-color, #e4e7ed);
 
                     &:first-child {
                         border-top-left-radius: 0px;
@@ -404,7 +404,7 @@
                         font-size: 14px;
                         line-height: 40px;
                         // font-weight: 600;
-                        color: #000 !important;
+                        color: var(--el-text-color-primary, #000) !important;
                     }
                 }
             }
@@ -417,13 +417,13 @@
                     transition: all 0.3s ease;
 
                     &:hover {
-                        background: #f5f7fa !important;
+                        background: var(--el-fill-color-light, #f5f7fa) !important;
                         transform: scale(1.001);
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
                     }
 
                     td {
-                        border-bottom: 1px solid #f0f0f0;
+                        border-bottom: 1px solid var(--el-border-color-lighter, #f0f0f0);
 
                         .cell {
                             font-size: 14px;
@@ -433,7 +433,7 @@
 
                     // 斑马纹优化
                     &.el-table__row--striped {
-                        background: #fafafa;
+                        background: var(--el-fill-color-extra-light, #fafafa);
                     }
                 }
             }
@@ -502,7 +502,7 @@
     }
     .el-pagination{
         border-radius: 12px;
-        background-color: rgb(255, 255, 255);
+        background-color: var(--el-bg-color, rgb(255, 255, 255));
         margin: 0 !important;;
         padding:10px;
         width:100%;
@@ -521,11 +521,11 @@
 
         // 卡片头部样式
         :deep(.el-card__header) {
-            background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
-            border-bottom: 2px solid #e4e7ed;
+            background: var(--el-fill-color-light, linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%));
+            border-bottom: 2px solid var(--el-border-color, #e4e7ed);
             padding: 16px 20px;
             // font-weight: 600;
-            color: #303133;
+            color: var(--el-text-color-primary, #303133);
 
             .clearfix {
                 display: flex;
@@ -575,7 +575,7 @@
         position: absolute;
         width: 100%;
         bottom: 0px;
-        background-color: #fff;
+        background-color: var(--el-bg-color, #fff);
         left: 0;
         padding: 15px;
         height: 65px;
@@ -660,7 +660,7 @@
 }
 .row-bg {
     padding: 10px 0;
-    background-color: #f9fafc;
+    background-color: var(--el-fill-color-extra-light, #f9fafc);
 }
 
 /* 图片预览样式优化 */
@@ -672,8 +672,8 @@
 .global-more-menu {
     position: fixed;
     z-index: 2500;
-    background: #fff;
-    border: 1px solid #e4e7ed;
+    background: var(--el-bg-color, #fff);
+    border: 1px solid var(--el-border-color, #e4e7ed);
     border-radius: 4px;
     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
     min-width: 150px;
@@ -686,21 +686,22 @@
     padding: 8px 16px;
     cursor: pointer;
     font-size: 14px;
-    color: #606266;
+    color: var(--el-text-color-regular, #606266);
     transition: background-color 0.2s;
 }
 .global-more-menu-item:hover {
-    background-color: #f5f7fa;
+    background-color: var(--el-fill-color-light, #f5f7fa);
     color: var(--color-primary, #409eff);
 }
 .global-more-menu-item-danger {
-    color: #f56c6c;
-    border-top: 1px solid #ebeef5;
+    color: var(--el-color-danger, #f56c6c);
+    border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
     margin-top: 5px;
     padding-top: 13px;
 }
-.global-more-menu-item-danger:hover {    background-color: #fef0f0;
-    color: #f56c6c;
+.global-more-menu-item-danger:hover {
+    background-color: var(--el-color-danger-light-9, #fef0f0);
+    color: var(--el-color-danger, #f56c6c);
 }
 
 /* 列头菜单样式 */
@@ -720,7 +721,7 @@
     }
     .col-header-menu-icon {
         margin-left: auto;
-        color: #000000;
+        color: var(--el-text-color-primary, #000000);
         transition: opacity 0.2s, color 0.2s;
         margin:0px;
         padding:0px;
@@ -754,8 +755,8 @@
 .global-col-header-menu {
     position: fixed;
     z-index: 10;
-    background: #fff;
-    border: 1px solid #e4e7ed;
+    background: var(--el-bg-color, #fff);
+    border: 1px solid var(--el-border-color, #e4e7ed);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     min-width: 240px;
@@ -774,11 +775,11 @@
     padding: 9px 16px;
     cursor: pointer;
     font-size: 13px;
-    color: #303133;
+    color: var(--el-text-color-primary, #303133);
     transition: background-color 0.15s;
     position: relative;
     &:hover {
-        background-color: #f5f7fa;
+        background-color: var(--el-fill-color-light, #f5f7fa);
         color: var(--color-primary, #409eff);
     }
     &.is-active {
@@ -793,7 +794,7 @@
 }
 .global-col-menu-divider {
     height: 1px;
-    background: #ebeef5;
+    background: var(--el-border-color-lighter, #ebeef5);
     margin: 4px 12px;
 }
 .global-col-menu-section-title {
@@ -825,8 +826,8 @@
     justify-content: space-between;
     padding: 12px 16px;
     padding-top: calc(12px + var(--status-bar-height, 0px));
-    background: #fff;
-    border-bottom: 1px solid #f0f0f0;
+    background: var(--el-bg-color, #fff);
+    border-bottom: 1px solid var(--el-border-color, #f0f0f0);
     position: fixed;
     top: 0;
     left: 0;
@@ -844,7 +845,7 @@
         .search-icon {
             font-size: 20px;
             cursor: pointer;
-            color: #333;
+            color: var(--el-text-color-primary, #333);
 
             &:active {
                 opacity: 0.6;
@@ -859,7 +860,7 @@
         .mobile-title {
             font-size: 16px;
             font-weight: 600;
-            color: #333;
+            color: var(--el-text-color-primary, #333);
         }
     }
 
@@ -996,7 +997,7 @@
             overflow: hidden;
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: #fff;
+            background: var(--el-bg-color, #fff);
             margin-left: 0px;
             margin-right: 0px;
 
@@ -1250,7 +1251,7 @@
 }
 
 .card-field-value {
-    color: #333;
+    color: var(--el-text-color-primary, #333);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1290,9 +1291,9 @@
     height: 20px;
     line-height: 20px;
     padding: 0 6px;
-    background: #f5f7fa;
-    border-color: #e4e7ed;
-    color: #606266;
+    background: var(--el-fill-color-light, #f5f7fa);
+    border-color: var(--el-border-color, #e4e7ed);
+    color: var(--el-text-color-regular, #606266);
 }
 
 .card-create-time {

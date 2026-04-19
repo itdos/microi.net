@@ -441,9 +441,9 @@
 .text-input {
     :deep(.el-input-group__prepend) {
         box-shadow: none;
-        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
         border: 1px solid rgba(64, 158, 255, 0.2);
-        color: #666;//var(--color-primary, #409eff);
+        color: var(--color-primary-text, #ffffff);
         border-radius: 8px 0 0 8px;
         border: 1px solid #dcdfe6;
         border-right: none;
@@ -451,7 +451,7 @@
 
         .el-icon {
             margin-right: 4px;
-            color: #666;//var(--color-primary, #409eff);
+            color: var(--color-primary-text, #ffffff);
         }
     }
 

@@ -1,5 +1,5 @@
 <template>
-    <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: 100%; background-color: #fff">
+    <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: 100%; background-color: var(--el-bg-color, #fff)">
         <div style="display: flex; height: 80vh">
             <div id="itdos_flowchart" ref="itdos_flowchart" class="container">
                 <template v-for="nodeModel in WF_Node_List" :key="nodeModel.Id">
