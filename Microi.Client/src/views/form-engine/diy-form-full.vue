@@ -1241,18 +1241,26 @@ export default {
                     window.__microi_dialog_stack.push({ id: dialogId, owner: self, closeFn: closeDialogFn });
 
                     if (window.__microi_dialog_stack.length === 1 && window.history && window.history.pushState) {
-                        try { window.history.pushState({ dialogStack: true }, ''); } catch (e) {}
+                        try { window.history.pushState({ dialogStack: true }, ''); window.__microi_protected_count = (window.__microi_protected_count || 0) + 1; } catch (e) {}
                         if (!window.__microi_dialog_popstate_handler) {
                             window.__microi_dialog_popstate_handler = function () {
                                 try {
                                     if (window.__microi_ignore_pop) { window.__microi_ignore_pop = false; return; }
-                                    // 立即恢复一个保护性历史条目，防止浏览器在本次 pop 后继续导航离开页面
-                                    try { if (window.history && window.history.pushState) { window.history.pushState({ dialogStack: true }, ''); } } catch (e) {}
+                                    // 浏览器已消费一条历史，先递减计数
+                                    try { window.__microi_protected_count = Math.max(0, (window.__microi_protected_count || 0) - 1); } catch (e) {}
                                     // 仅 peek 顶层项，由 CloseFieldFormHandler 负责真正移除堆栈项
                                     var item = (window.__microi_dialog_stack && window.__microi_dialog_stack.length) ? window.__microi_dialog_stack[window.__microi_dialog_stack.length - 1] : null;
                                     if (item && item.closeFn) {
                                         try { item.closeFn(true); } catch (e) {}
                                     }
+                                    // 给予 CloseFieldFormHandler 一次事件循环机会去移除堆栈项，再决定是否需要重新 push 保护条目
+                                    setTimeout(function () {
+                                        try {
+                                            if (window.__microi_dialog_stack && window.__microi_dialog_stack.length > 0 && (!window.__microi_protected_count || window.__microi_protected_count === 0) && window.history && window.history.pushState) {
+                                                try { window.history.pushState({ dialogStack: true }, ''); window.__microi_protected_count = (window.__microi_protected_count || 0) + 1; } catch (e) {}
+                                            }
+                                        } catch (e) {}
+                                    }, 0);
                                 } finally {
                                     if (!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0) {
                                         try { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
@@ -1338,18 +1346,26 @@ export default {
 
                     // 仅在全局堆栈从空到非空时推入浏览器历史并注册单例 popstate 处理器
                     if (window.__microi_drawer_stack.length === 1 && window.history && window.history.pushState) {
-                        try { window.history.pushState({ drawerStack: true }, ''); } catch (e) {}
+                        try { window.history.pushState({ drawerStack: true }, ''); window.__microi_protected_count = (window.__microi_protected_count || 0) + 1; } catch (e) {}
                         if (!window.__microi_drawer_popstate_handler) {
                             window.__microi_drawer_popstate_handler = function () {
                                 try {
                                     if (window.__microi_ignore_pop) { window.__microi_ignore_pop = false; return; }
-                                    // 立即恢复一个保护性历史条目，防止浏览器在本次 pop 后继续导航离开页面
-                                    try { if (window.history && window.history.pushState) { window.history.pushState({ drawerStack: true }, ''); } } catch (e) {}
+                                    // 浏览器已消费一条历史，先递减计数
+                                    try { window.__microi_protected_count = Math.max(0, (window.__microi_protected_count || 0) - 1); } catch (e) {}
                                     // 仅 peek 顶层项，由 CloseFieldFormHandler 负责真正移除堆栈项
                                     var item = (window.__microi_drawer_stack && window.__microi_drawer_stack.length) ? window.__microi_drawer_stack[window.__microi_drawer_stack.length - 1] : null;
                                     if (item && item.closeFn) {
                                         try { item.closeFn(true); } catch (e) {}
                                     }
+                                    // 给予 CloseFieldFormHandler 一次事件循环机会去移除堆栈项，再决定是否需要重新 push 保护条目
+                                    setTimeout(function () {
+                                        try {
+                                            if (window.__microi_drawer_stack && window.__microi_drawer_stack.length > 0 && (!window.__microi_protected_count || window.__microi_protected_count === 0) && window.history && window.history.pushState) {
+                                                try { window.history.pushState({ drawerStack: true }, ''); window.__microi_protected_count = (window.__microi_protected_count || 0) + 1; } catch (e) {}
+                                            }
+                                        } catch (e) {}
+                                    }, 0);
                                 } finally {
                                     if (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0) {
                                         try { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
@@ -1449,6 +1465,8 @@ export default {
                     }
                 } catch (e) {}
                 try { window.__microi_drawer_stack = []; } catch (e) {}
+                try { window.__microi_protected_count = 0; } catch (e) {}
+                try { window.__microi_ignore_pop = false; } catch (e) {}
                 // 清理本组件内的记录
                 if (self._drawerStack) { self._drawerStack = []; }
                 if (self._drawerHandlers) { self._drawerHandlers = {}; }
@@ -1468,6 +1486,8 @@ export default {
                     }
                 } catch (e) {}
                 try { window.__microi_dialog_stack = []; } catch (e) {}
+                try { window.__microi_protected_count = 0; } catch (e) {}
+                try { window.__microi_ignore_pop = false; } catch (e) {}
                 if (self._dialogStack) { self._dialogStack = []; }
                 if (self._dialogHandlers) { self._dialogHandlers = {}; }
                 if (self._currentDialogInstanceIds) { self._currentDialogInstanceIds = []; }
@@ -1771,7 +1791,8 @@ export default {
                             // 仅在非 popstate（即程序化）场景下，回退历史以消费先前 pushState
                             try {
                                 if (!isPopstate && window.history && window.history.length) {
-                                    // 防止由 history.back 触发的 popstate 再次关闭，先设忽略标志
+                                    // 程序化回退：消费一个保护计数并设忽略标志，防止由 history.back 触发的 popstate 再次关闭
+                                    try { window.__microi_protected_count = Math.max(0, (window.__microi_protected_count || 0) - 1); } catch (e) {}
                                     try { window.__microi_ignore_pop = true; } catch (e) {}
                                     try { window.history.back(); } catch (e) {}
                                 }
@@ -1804,6 +1825,7 @@ export default {
                             try { window.__microi_dialog_stack = []; } catch (e) {}
                             try {
                                 if (!isPopstate && window.history && window.history.length) {
+                                    try { window.__microi_protected_count = Math.max(0, (window.__microi_protected_count || 0) - 1); } catch (e) {}
                                     try { window.__microi_ignore_pop = true; } catch (e) {}
                                     try { window.history.back(); } catch (e) {}
                                 }
