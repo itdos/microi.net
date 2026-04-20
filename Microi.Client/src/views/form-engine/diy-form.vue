@@ -188,6 +188,7 @@
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
+                                           <!-- {{GetFieldComponent(field)}}{{FormDiyTableModel[field.Name]}}{{field.Name}} -->
                                             <component
                                                 :is="GetFieldComponent(field)"
                                                 :ref="'ref_' + field.Name"
