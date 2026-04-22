@@ -2484,7 +2484,7 @@ export default {
              // 确保移除事件监听器（虽然使用了once选项，但手动移除更保险）
           // document.removeEventListener('click', self.hideMoreMenu);
 
-            // 使用之前保存的引用移除监听器（若存在）
+            // zhy使用之前保存的引用移除监听器（若存在）
             if (self._moreMenuDocClick) {
                 try { document.removeEventListener('click', self._moreMenuDocClick, true); } catch (e) {}
                 self._moreMenuDocClick = null;
