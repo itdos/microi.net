@@ -41,11 +41,11 @@ echo "Microi：镜像文件已找到 ✓"
 # 检查 SQL 文件
 HAS_DEMO_SQL=false
 HAS_EMPTY_SQL=false
-if [ -f "${SQL_DIR}/mysql5.6.50-demo.sql.zip" ]; then
+if [ -f "${SQL_DIR}/microi_demo_temp.sql.zip" ]; then
   HAS_DEMO_SQL=true
   echo "Microi：Demo 数据库文件已找到 ✓"
 fi
-if [ -f "${SQL_DIR}/mysql5.6.50-empty.sql.zip" ]; then
+if [ -f "${SQL_DIR}/microi_empty_temp.sql.zip" ]; then
   HAS_EMPTY_SQL=true
   echo "Microi：空数据库文件已找到 ✓"
 fi

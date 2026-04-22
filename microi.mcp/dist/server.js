@@ -22,7 +22,10 @@ function formatDbTables(tables) {
     }
     return lines.join('\n');
 }
-/** 常用编程类型→MySQL 列类型映射（防止 AI 传入无效的编程语言类型） */
+/** 常用编程类型→平台允许的列类型映射（防止 AI 传入无效类型）
+ *  ⚠️ 平台禁止使用 datetime/date/timestamp 物理列，统一存为 varchar(25)
+ *  平台允许的列类型：varchar(N) | mediumtext | longtext | int | bigint | decimal(18,N)
+ */
 const FIELD_TYPE_MAP = {
     string: 'varchar(500)',
     text: 'varchar(500)',
@@ -33,17 +36,30 @@ const FIELD_TYPE_MAP = {
     decimal: 'decimal(18,2)',
     boolean: 'int',
     bool: 'int',
-    date: 'datetime',
-    timestamp: 'datetime',
+    // ⚠️ 禁止 datetime / date / timestamp / time —— 一律映射为 varchar(25)
+    date: 'varchar(25)',
+    datetime: 'varchar(25)',
+    timestamp: 'varchar(25)',
+    time: 'varchar(25)',
     long: 'bigint',
     json: 'mediumtext',
 };
-/** 将 AI 可能传入的编程语言类型自动映射为 MySQL 列类型 */
+/** 将 AI 可能传入的编程语言类型自动映射为平台允许的列类型；并强制拦截 datetime/date/timestamp */
 function normalizeFieldType(type) {
     if (!type)
         return 'varchar(500)';
-    const lower = type.toLowerCase().trim();
-    return FIELD_TYPE_MAP[lower] || type;
+    const trimmed = type.trim();
+    const lower = trimmed.toLowerCase();
+    if (FIELD_TYPE_MAP[lower])
+        return FIELD_TYPE_MAP[lower];
+    // 兜底：以 datetime / timestamp 开头（含 datetime(6) 等变体）一律改为 varchar(25)
+    if (lower.startsWith('datetime') || lower.startsWith('timestamp') || lower === 'date' || lower === 'time') {
+        return 'varchar(25)';
+    }
+    if (lower.startsWith('float') || lower.startsWith('double') || lower.startsWith('real') || lower === 'money') {
+        return 'decimal(18,2)';
+    }
+    return trimmed;
 }
 /**
  * 构建 MCP Server instructions（让 AI 了解此 MCP 服务器的身份和系统知识）
@@ -60,8 +76,57 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
 2. **microi_create_table** — 创建自定义表（写入 diy_table，自动创建 MySQL 表并添加 Id/CreateTime/UpdateTime/CreateUser/OsClient 基础字段）
 3. **microi_add_field** — 逐个添加业务字段（写入 diy_field，执行 ALTER TABLE），需指定 component 组件类型
-4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD
-5. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
+4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
+5. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
+6. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
+
+## ✅ 工具支持并发调用（请尽量并发以提高效率）
+所有写入工具（microi_create_table / microi_add_field / microi_create_module / microi_create_engine）**已实现幂等 + 并发安全**：
+- 后端使用 Ulid 随机段（非时间戳）生成唯一 URL 后缀，碰撞自动重试最多 5 次
+- 重复 Name/字段会幂等返回 Skipped:true 而非报错
+- "已存在唯一值" 错误会自动重试并追加随机后缀
+**鼓励**：为同一张表批量添加 N 个字段时，可一次性发起 N 个并发 microi_add_field 调用以缩短总耗时；
+不同表的 microi_create_table 也可并发；菜单模块同理。
+
+## ⚖️ 何时创建接口引擎（microi_create_engine）
+**绑定了 diyTableId 的菜单模块已经自动具备完整的基础 CRUD**（新增/编辑/删除/列表/搜索/导入/导出），无需额外接口引擎。
+但**复杂业务系统几乎一定需要接口引擎**，遇到下列任一场景请**主动创建**：
+- ✅ 工作流/审批节点动作（指派、接单、验收、驳回、批量处理等）
+- ✅ 跨表事务操作（一次操作涉及多张表的写入/状态联动）
+- ✅ 数据统计/报表/聚合查询（GROUP BY、SUM、复杂 JOIN）
+- ✅ 第三方系统集成（调用外部 HTTP API、支付、短信、邮件、推送）
+- ✅ 定时任务 / 消息队列消费 / MQTT 处理
+- ✅ 业务校验/防重/库存扣减/账单生成
+- ✅ 菜单按钮 V8Code 中调用的业务接口（典型模式：按钮点击 → V8.ApiEngine.Run('your-key', {...})）
+**判断口诀**：能用一句 SQL/单表 CRUD 完成的不要建；逻辑超过 5 行 JS 或涉及多表/外部系统的，建一个接口引擎。
+
+## 🔘 菜单按钮（重要！业务系统必备）
+菜单模块（sys_menu）支持下列按钮 JSON 字段，每个按钮可写 V8 代码触发业务逻辑：
+| 字段 | 说明 | 触发位置 |
+|------|------|---------|
+| MoreBtns | 行操作按钮（每行尾） | 列表每一行 |
+| FormBtns | 表单底部按钮 | 编辑/查看表单 |
+| BatchSelectMoreBtns | 批量操作按钮 | 列表勾选多行后 |
+| PageTabs | 页面顶部 Tab 切换 | 列表顶部 |
+| ExportMoreBtns | 导出扩展按钮 | 列表导出菜单 |
+| PageBtns | 页面级按钮 | 页面顶部 |
+
+**按钮对象结构**：
+\`\`\`json
+{
+  "Id": "ulid-or-guid",     // 唯一Id
+  "Sort": 0,                 // 排序
+  "Name": "指派",            // 按钮名
+  "Icon": "fas fa-user",     // 图标(可选)
+  "BtnStyle": "primary",     // 样式: primary|success|warning|danger
+  "IsVisible": true,
+  "ShowRow": true,           // 行内显示(MoreBtns需要)
+  "V8CodeShow": "if(V8.Form.Status=='待处理'){V8.Result=true;}else{V8.Result=false;}",  // 显隐JS
+  "V8Code": "V8.ApiEngine.Run({ApiEngineKey:'order_assign', Id:V8.Form.Id}, function(r){V8.RefreshTable({_PageIndex:1});});"  // 点击执行JS
+}
+\`\`\`
+按钮的 V8Code **强烈建议** 调用接口引擎（V8.ApiEngine.Run）执行后端逻辑，前端只负责弹窗、刷新、提示。
+详细写法参考 skill 文档：\`microi.skills/v8-menu-buttons/SKILL.md\`
 
 ## 核心系统表名（请严格使用以下表名）
 | 表名 | 说明 |
@@ -73,16 +138,22 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 | sys_rolelimit | 角色-菜单权限关联表 |
 | sys_apiengine | 接口引擎 |
 | Sys_User | 用户表 |
+| mic_page | 界面引擎（页面配置） |
 
-## 字段类型（type 参数）→ 必须是 MySQL 列类型
-| 用途 | 正确的 type 值 | 错误示例 |
+## 字段类型（type 参数）→ 必须是平台允许的列类型
+⚠️ **平台禁止使用 datetime / date / timestamp / float / double / boolean 物理列类型！**
+所有日期时间字段一律使用 \`varchar(25)\` 存储 'yyyy-MM-dd HH:mm:ss' 格式字符串。
+
+| 用途 | 正确的 type 值 | 禁止使用 |
 |------|---------------|----------|
 | 短文本 | varchar(50), varchar(200), varchar(500) | ❌ string, text |
 | 长文本/富文本 | mediumtext, longtext | ❌ string |
 | 整数 | int, bigint | ❌ number, integer |
-| 小数/金额 | decimal(18,2), decimal(10,4) | ❌ float, double |
-| 日期时间 | datetime | ❌ date, timestamp |
+| 小数/金额 | decimal(18,2), decimal(10,4) | ❌ float, double, money |
+| **日期时间** | **varchar(25)**（存 'yyyy-MM-dd HH:mm:ss'） | ❌❌❌ datetime, date, timestamp, time |
 | 开关(0/1) | int | ❌ boolean, bool |
+
+平台允许的列类型只有：**varchar(N)** | **mediumtext** | **longtext** | **int** | **bigint** | **decimal(18,N)**
 
 ## 组件类型（component 参数）
 microi_add_field 的 component 决定该字段在表单中的 UI 控件：
@@ -100,7 +171,7 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | Switch | 开关 | int |
 | SelectTree | 树形选择器 | varchar(50) |
 | Cascader | 级联选择器 | varchar(500) |
-| DateTime | 日期时间选择器 | datetime |
+| DateTime | 日期时间选择器 | **varchar(25)**（不要用 datetime） |
 | Department | 部门选择器 | varchar(50) |
 | Address | 地址选择（省市区） | varchar(500) |
 | Map | 地图坐标选择 | varchar(200) |
@@ -110,6 +181,23 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | TableChild | 子表/明细表 | — (关联表) |
 | JoinForm | 关联表单（外键） | varchar(50) |
 | OpenTable | 弹窗选择关联数据 | varchar(50) |
+
+## 选项类组件（Select/MultipleSelect/Radio/Checkbox）数据源（重要！）
+为这四种组件添加字段时，**必须**通过 \`data\` 参数传入选项，否则表单下拉框为空。
+MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON。
+
+### data 参数格式
+- **KeyValue 格式**（推荐）：\`"key1|label1,key2|label2"\` —— 例如 \`"1|启用,0|禁用"\`、\`"male|男,female|女"\`
+  - 自动生成 Config: \`{DataSource:"KeyValue", SelectLabel:"Value", SelectSaveField:"Key"}\`
+  - 数据库存的是 key（如 "1"、"male"），界面显示 label
+- **简单数组格式**：\`"启用,禁用,已删除"\` —— 仅显示和存储相同值
+  - 自动生成 Config: \`{DataSource:"Data"}\`
+
+### 高级数据源（通过 config 参数显式传入 JSON）
+当需要 SQL/接口引擎/数据源引擎作为下拉数据时，传入 \`config\` JSON：
+- SQL 数据源：\`{"DataSource":"Sql","Sql":"select Id,Name from xxx where Name like '%$Keyword$%' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\`
+- 接口引擎：\`{"DataSource":"ApiEngine","DataSourceApiEngineKey":"my-engine","SelectLabel":"name","SelectSaveField":"id"}\`
+- 数据源引擎：\`{"DataSource":"DataSource","DataSourceId":"xxx","SelectLabel":"Name","SelectSaveField":"Id"}\`
 
 ## 字段命名规范
 - 使用 PascalCase（如 CustomerName, OrderAmount, CreateTime）
@@ -129,7 +217,43 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | SubmitBeforeServerV8 | 后端 | 数据写入DB前（事务中） |
 | SubmitAfterServerV8 | 后端 | 数据写入DB后（仍在事务中） |
 | OutFormV8 | 前端 | 表单关闭后 |
-| DataFilterV8 | 后端 | 获取数据后每行执行 |`;
+| DataFilterV8 | 后端 | 获取数据后每行执行 |
+
+## 界面引擎（Page Engine）
+界面引擎用于创建自定义页面（仪表盘、数据概览、报表等），数据存储在 mic_page 表。
+- **microi_list_pages** — 列出已有页面
+- **microi_get_page** — 获取页面JSON配置
+- **microi_save_page** — 创建或更新页面
+
+### 页面JSON结构
+\`\`\`json
+{
+  "formData": {
+    "Id": "", "Title": "页面标题",
+    "formConfig": { "gridNum": 12, "mask": false, "watermark": false },
+    "wrapperList": [
+      {
+        "type": "pannel", "title": "卡片标题",
+        "widgetList": [
+          { "type": "chart-bar", "title": "柱状图", "config": { "apiEngineKey": "xxx" } }
+        ]
+      }
+    ]
+  }
+}
+\`\`\`
+
+### 常用组件类型
+| type | 说明 |
+|------|------|
+| chart-bar | 柱状图 |
+| chart-pie | 饼图 |
+| chart-line | 折线图 |
+| chart-number | 统计数值 |
+| data-table | 数据表格 |
+| map-binddata | 地图 |
+| html | 自定义HTML |
+| iframe | 内嵌页面 |`;
 }
 /**
  * 创建 MCP Server 并注册所有工具
@@ -315,7 +439,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建接口引擎
     // ========================
-    server.tool('microi_create_engine', `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table.`, {
+    server.tool('microi_create_engine', `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations.`, {
         apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
         apiName: z.string().describe('Display name of the engine'),
         category: z.string().optional().describe('Category to organize engines'),
@@ -385,12 +509,20 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建自定义表（低代码系统设计）
     // ========================
-    server.tool('microi_create_table', `Create a new custom table for OsClient "${osClient}". Inserts a record into diy_table. This is step 1 of system design — create table, then add fields, then create menu module.`, {
+    server.tool('microi_create_table', `Create a new custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name returns Skipped:true with the existing TableId. This is step 2 of system design.`, {
         name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
         description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
-    }, async ({ name, description }) => {
+        tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Name":"基本信息"},{"Name":"详细信息"}]\'). Groups fields into tabs.'),
+        isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
+        column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 1'),
+        formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
+        formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
+    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth }) => {
         try {
-            const result = await client.createTable(name, description);
+            const result = await client.createTable(name, description, {
+                Tabs: tabs, IsTree: isTree, Column: column,
+                FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+            });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
@@ -404,19 +536,29 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 添加字段（低代码系统设计）
     // ========================
-    server.tool('microi_add_field', `Add a field to a custom table for OsClient "${osClient}". Inserts a record into diy_field and executes ALTER TABLE to add the MySQL column. The "type" parameter MUST be a valid MySQL column type (e.g. varchar(500), int, decimal(18,2), datetime, mediumtext). Do NOT use programming types like "string" or "number".`, {
+    server.tool('microi_add_field', `Add a field to a custom table for OsClient "${osClient}". Inserts a record into diy_field and executes ALTER TABLE to add the column. The "type" parameter MUST be a platform-allowed column type. ⚠️ FORBIDDEN: datetime, date, timestamp, time — all date/time fields MUST use varchar(25) and store 'yyyy-MM-dd HH:mm:ss' strings. Allowed types: varchar(N), mediumtext, longtext, int, bigint, decimal(18,N). This tool is IDEMPOTENT — calling it again with the same TableId+name returns Skipped:true instead of failing.`, {
         tableId: z.string().describe('The TableId returned from microi_create_table'),
         name: z.string().describe('Field name in English (e.g. "CustomerName", "Phone", "Amount")'),
         label: z.string().describe('Chinese display label (e.g. "客户名称", "手机号", "金额")'),
-        type: z.string().optional().describe('MySQL column type. Default: varchar(500). Valid examples: varchar(50), varchar(200), varchar(500), int, bigint, decimal(18,2), datetime, mediumtext, longtext. NEVER use: string, number, boolean, float, date — these are NOT valid MySQL types.'),
-        component: z.string().optional().describe('UI component type. Default: Text. Options: Text (单行文本), Textarea (多行文本), NumberText (数字), Select (下拉选择), Radio (单选), Switch (开关), DatePicker (日期), RichText (富文本), Upload (文件上传), Image (图片)'),
+        type: z.string().optional().describe('Platform column type. Default: varchar(500). Valid: varchar(25/50/200/500/2000), int, bigint, decimal(18,2), mediumtext, longtext. ⚠️ FORBIDDEN: datetime, date, timestamp, float, double, boolean — for dates use varchar(25); for floats use decimal(18,N); for booleans use int.'),
+        component: z.string().optional().describe('UI component type. Default: Text. Options: Text, Textarea, NumberText, Select, MultipleSelect, Radio, Checkbox, Switch, DateTime, RichText, ImgUpload, FileUpload, AutoNumber, JoinForm, OpenTable, SelectTree, Cascader, Department, Address, Map, Rate, TableChild'),
         visible: z.number().optional().describe('Is visible in form (1=yes, 0=no). Default: 1'),
         appVisible: z.number().optional().describe('Is visible in mobile app (1=yes, 0=no). Default: 1'),
         tab: z.string().optional().describe('Form tab group name (for organizing fields into tabs)'),
         tableWidth: z.number().optional().describe('Column width in list view (pixels). Default: 120'),
         sort: z.number().optional().describe('Field display order. Default: 100'),
         readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
-    }, async ({ tableId, name, label, type, component, visible, appVisible, tab, tableWidth, sort, readonly: readonlyVal }) => {
+        notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
+        unique: z.number().optional().describe('Unique constraint (1=unique, 0=allow duplicates). Default: 0'),
+        defaultValue: z.string().optional().describe('Default value for the field'),
+        placeholder: z.string().optional().describe('Placeholder text shown in form input'),
+        formWidth: z.string().optional().describe('Field width in form (e.g. "100%", "50%"). Default: "100%"'),
+        data: z.string().optional().describe('Options data source for Select/MultipleSelect/Radio/Checkbox components. REQUIRED for these four components. Format: "key1|label1,key2|label2" (KeyValue, recommended — e.g. "1|启用,0|禁用", "male|男,female|女") — backend stores key, displays label. Or simple "v1,v2,v3" (same value for both). Backend auto-builds the Config JSON. For SQL/ApiEngine/DataSource sources, use the config parameter instead.'),
+        config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm: \'{"JoinForm":{"TableId":"xxx","TableName":"xxx","JoinFieldName":"yyy"}}\''),
+        description: z.string().optional().describe('Field description / help text'),
+        encrypt: z.number().optional().describe('Enable encryption storage (1=encrypt, 0=plain). Default: 0. For sensitive data like phone/ID number.'),
+        inTableEdit: z.number().optional().describe('Enable inline editing in table list view (1=yes, 0=no). Default: 0'),
+    }, async ({ tableId, name, label, type, component, visible, appVisible, tab, tableWidth, sort, readonly: readonlyVal, notEmpty, unique, defaultValue, placeholder, formWidth, data, config, description, encrypt, inTableEdit }) => {
         try {
             // 自动映射编程语言类型为 MySQL 类型
             const normalizedType = normalizeFieldType(type);
@@ -429,6 +571,10 @@ export function createMcpServer(client, context) {
                 Visible: visible, AppVisible: appVisible,
                 Tab: tab, TableWidth: tableWidth, Sort: sort,
                 Readonly: readonlyVal,
+                NotEmpty: notEmpty, Unique: unique,
+                DefaultValue: defaultValue, Placeholder: placeholder,
+                FormWidth: formWidth, Data: data, Config: config,
+                Description: description, Encrypt: encrypt, InTableEdit: inTableEdit,
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -442,7 +588,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建功能模块/菜单（低代码系统设计）
     // ========================
-    server.tool('microi_create_module', `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). This links a diy_table to the navigation sidebar. Step 4 of system design.`, {
+    server.tool('microi_create_module', `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). Links a diy_table to the navigation sidebar. IDEMPOTENT — calling again with the same Name+ParentId returns Skipped:true with the existing ModuleId. URL collisions are auto-resolved with random suffixes (concurrency-safe). Step 4 of system design. ⚠️ For business systems, also pass moreBtns/formBtns/pageTabs/batchSelectMoreBtns JSON to wire up business buttons in one call — see skill doc microi.skills/v8-menu-buttons.`, {
         name: z.string().describe('Module display name (Chinese, e.g. "客户管理", "订单列表")'),
         diyTableId: z.string().optional().describe('The TableId to bind this module to (from microi_create_table)'),
         parentId: z.string().optional().describe('Parent menu Id for nesting (omit for top-level)'),
@@ -453,19 +599,52 @@ export function createMcpServer(client, context) {
         openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page"'),
         url: z.string().optional().describe('URL if openType is "Url"'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort }) => {
+        icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
+        searchFieldIds: z.string().optional().describe('Comma-separated field Ids to show in search bar (e.g. "fieldId1,fieldId2")'),
+        tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
+        defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
+        sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
+        diyConfig: z.string().optional().describe('Advanced module config JSON string'),
+        moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code}. V8Code typically calls V8.ApiEngine.Run(...). Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
+        formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required.'),
+        batchSelectMoreBtns: z.string().optional().describe('Batch action buttons (after selecting multiple rows) JSON ARRAY (string). Same item shape as moreBtns. Use V8.TableRowSelected to access selected rows.'),
+        pageTabs: z.string().optional().describe('Page top tabs JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,V8Code,V8CodeShow}. V8Code typically calls V8.SearchSet({field:value}) to filter. V8CodeShow controls visibility per V8.ClientType.'),
+        exportMoreBtns: z.string().optional().describe('Export menu extra buttons JSON ARRAY (string).'),
+        pageBtns: z.string().optional().describe('Page-level top buttons JSON ARRAY (string).'),
+        sortFieldIds: z.string().optional().describe('Comma-separated field Ids that user can sort by. JSON array string also accepted.'),
+        notShowFields: z.string().optional().describe('JSON array string of field Ids hidden in form view.'),
+        sqlJoin: z.string().optional().describe('Custom SQL JOIN clause for the list query (e.g. "LEFT JOIN Diy_Customer C ON A.CustomerId=C.Id"). Use aliases A=main table, B/C/D=joined tables.'),
+        joinTables: z.string().optional().describe('JSON array of joined tables for select fields cross-table: [{Id,AsName:"B",Name:"Diy_Xxx",Description:"xxx",IsVisible:true}]'),
+        selectFields: z.string().optional().describe('JSON array of selectable fields (cross-table) for the list view.'),
+        statisticsFields: z.string().optional().describe('JSON array of fields to show as table footer statistics (e.g. [{Id,Type:"Sum"}], Type=Sum|Avg|Max|Min|Count).'),
+        inTableEdit: z.number().optional().describe('Enable inline edit in list view (1=yes,0=no). Default: 0'),
+        inTableEditFields: z.string().optional().describe('JSON array string of field Ids that allow inline edit (when inTableEdit=1).'),
+        mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile list cards.'),
+        cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
+        cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, diyConfig, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields }) => {
         try {
             const result = await client.createModule({
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
                 ComponentName: componentName, ComponentPath: componentPath,
                 Display: display, AppDisplay: appDisplay,
                 OpenType: openType, Url: url, Sort: sort,
+                Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
+                DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere, DiyConfig: diyConfig,
+                MoreBtns: moreBtns, FormBtns: formBtns, BatchSelectMoreBtns: batchSelectMoreBtns,
+                PageTabs: pageTabs, ExportMoreBtns: exportMoreBtns, PageBtns: pageBtns,
+                SortFieldIds: sortFieldIds, NotShowFields: notShowFields,
+                SqlJoin: sqlJoin, JoinTables: joinTables, SelectFields: selectFields,
+                StatisticsFields: statisticsFields,
+                InTableEdit: inTableEdit, InTableEditFields: inTableEditFields,
+                MobileListFields: mobileListFields,
+                CardTitleTagFields: cardTitleTagFields, CardBottomTagFields: cardBottomTagFields,
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
             const data = result.Data;
-            return { content: [{ type: 'text', text: `✅ Module "${name}" created.\n- ModuleId: ${data?.ModuleId}\n- Use this ModuleId when setting permissions via microi_set_role_permission` }] };
+            return { content: [{ type: 'text', text: `✅ Module "${name}" created.\n- ModuleId: ${data?.ModuleId}\n- Url: ${data?.Url || '(auto-generated)'}\n- Use this ModuleId when setting permissions via microi_set_role_permission` }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -485,6 +664,88 @@ export function createMcpServer(client, context) {
             }
             const data = result.Data;
             return { content: [{ type: 'text', text: `✅ ${data?.Message || 'Permissions set successfully.'}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 列出界面引擎页面
+    // ========================
+    server.tool('microi_list_pages', `List page engine (界面引擎) pages for OsClient "${osClient}". Pages are stored in mic_page table and define custom UI layouts with charts, tables, maps, and other dashboard components.`, {
+        keyword: z.string().optional().describe('Search keyword to filter pages by title, number, or description'),
+    }, async ({ keyword }) => {
+        try {
+            const result = await client.getPageEngineList(keyword);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            const pages = Array.isArray(result.Data) ? result.Data : [];
+            if (!pages.length) {
+                return { content: [{ type: 'text', text: 'No pages found.' }] };
+            }
+            const lines = [
+                `# Page Engine Pages (${pages.length})\n`,
+                '| # | Title | Number | Description | Updated |',
+                '|---|-------|--------|-------------|---------|',
+            ];
+            pages.forEach((p, i) => {
+                lines.push(`| ${i + 1} | ${p.Title || ''} | ${p.Number || ''} | ${p.Desc || ''} | ${p.UpdateTime || ''} |`);
+            });
+            return { content: [{ type: 'text', text: lines.join('\n') }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 获取界面引擎页面详情
+    // ========================
+    server.tool('microi_get_page', `Get page engine detail including full JSON configuration for OsClient "${osClient}". The JsonObj field contains the complete page structure with formData, wrapperList, and widgetList.`, {
+        pageId: z.string().describe('The page Id to retrieve'),
+    }, async ({ pageId }) => {
+        try {
+            const result = await client.getPageEngineDetail(pageId);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            const page = result.Data;
+            const lines = [
+                `## Page: ${page?.Title || pageId}`,
+                page?.Number ? `- **Number**: ${page.Number}` : '',
+                page?.Desc ? `- **Description**: ${page.Desc}` : '',
+                '',
+                '### JSON Configuration',
+                '```json',
+                typeof page?.JsonObj === 'string' ? page.JsonObj : JSON.stringify(page?.JsonObj, null, 2),
+                '```',
+            ].filter(Boolean);
+            return { content: [{ type: 'text', text: lines.join('\n') }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 保存界面引擎页面
+    // ========================
+    server.tool('microi_save_page', `Create or update a page engine page for OsClient "${osClient}". The jsonStr must be a valid page engine JSON with formData/wrapperList/widgetList structure. Pass pageId to update an existing page, or omit to create a new one.`, {
+        pageId: z.string().optional().describe('Page Id to update. Omit to create a new page.'),
+        title: z.string().describe('Page title (e.g. "销售仪表盘", "数据概览")'),
+        number: z.string().optional().describe('Page number/code (auto-generated if omitted)'),
+        desc: z.string().optional().describe('Page description'),
+        jsonStr: z.string().describe('Complete page JSON configuration string. Must contain formData with wrapperList and widgetList structure. Refer to page engine documentation for the JSON schema.'),
+    }, async ({ pageId, title, number, desc, jsonStr }) => {
+        try {
+            const result = await client.savePageEngine({
+                PageId: pageId, Title: title, Number: number,
+                Desc: desc, JsonStr: jsonStr,
+            });
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            const data = result.Data;
+            return { content: [{ type: 'text', text: `✅ ${data?.Message || 'Page saved successfully.'}\n- PageId: ${data?.PageId}` }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

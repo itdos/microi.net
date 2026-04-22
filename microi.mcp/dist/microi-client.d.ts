@@ -88,7 +88,13 @@ export declare class MicroiClient {
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse>;
     getEventList(keyword?: string): Promise<ApiResponse<V8Event[]>>;
-    createTable(name: string, description?: string): Promise<ApiResponse>;
+    createTable(name: string, description?: string, options?: {
+        Tabs?: string;
+        IsTree?: number;
+        Column?: number;
+        FormOpenType?: string;
+        FormOpenWidth?: string;
+    }): Promise<ApiResponse>;
     addField(data: {
         TableId: string;
         Name: string;
@@ -102,6 +108,16 @@ export declare class MicroiClient {
         Sort?: number;
         NameConfirm?: number;
         Readonly?: number;
+        NotEmpty?: number;
+        Unique?: number;
+        DefaultValue?: string;
+        Placeholder?: string;
+        FormWidth?: string;
+        Data?: string;
+        Config?: string;
+        Description?: string;
+        Encrypt?: number;
+        InTableEdit?: number;
     }): Promise<ApiResponse>;
     createModule(data: {
         Name: string;
@@ -114,8 +130,40 @@ export declare class MicroiClient {
         OpenType?: string;
         Url?: string;
         Sort?: number;
+        Icon?: string;
+        SearchFieldIds?: string;
+        TableDiyFieldIds?: string;
+        DefaultOrderBy?: string;
+        SqlWhere?: string;
+        DiyConfig?: string;
+        MoreBtns?: string;
+        FormBtns?: string;
+        BatchSelectMoreBtns?: string;
+        PageTabs?: string;
+        ExportMoreBtns?: string;
+        PageBtns?: string;
+        SortFieldIds?: string;
+        NotShowFields?: string;
+        SqlJoin?: string;
+        JoinTables?: string;
+        SelectFields?: string;
+        StatisticsFields?: string;
+        InTableEdit?: number;
+        InTableEditFields?: string;
+        MobileListFields?: string;
+        CardTitleTagFields?: string;
+        CardBottomTagFields?: string;
     }): Promise<ApiResponse>;
     setRolePermission(roleId: string, menuIds: string[]): Promise<ApiResponse>;
+    getPageEngineList(keyword?: string): Promise<ApiResponse>;
+    getPageEngineDetail(pageId: string): Promise<ApiResponse>;
+    savePageEngine(data: {
+        PageId?: string;
+        Title: string;
+        Number?: string;
+        Desc?: string;
+        JsonStr: string;
+    }): Promise<ApiResponse>;
     destroy(): void;
 }
 //# sourceMappingURL=microi-client.d.ts.map
