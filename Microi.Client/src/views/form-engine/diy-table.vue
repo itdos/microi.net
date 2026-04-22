@@ -1338,6 +1338,11 @@ export default {
             window.removeEventListener('page-refresh', self._handlePageRefresh);
             self._handlePageRefresh = null;
         }
+        // 清理全局更多菜单的文档点击监听器（如果存在）
+        if (self._moreMenuDocClick) {
+            try { document.removeEventListener('click', self._moreMenuDocClick, true); } catch (e) {}
+            self._moreMenuDocClick = null;
+        }
 
         // ========== 1. 清理定时器 ==========
         if (self._importStepTimer) {
@@ -2419,7 +2424,7 @@ export default {
             self.Total = 0;
         },
 
-        // ========== 性能优化V3：全局共享菜单方法 ==========
+        // ========== 性能优化V3：全局共享菜单方法（基于 ref 的稳定处理） ==========
         showMoreMenu(event, row) {
             var self = this;
             event.stopPropagation();
@@ -2434,18 +2439,56 @@ export default {
             // 设置当前行数据并显示菜单
             self._moreMenuRow = row;
             self._moreMenuVisible = true;
+              // 添加全局点击事件监听，点击其他地方关闭菜单
+            // setTimeout(() => {
+            //     document.addEventListener('click', self.hideMoreMenu, { once: true });
+            // }, 0);
 
-            // 添加全局点击事件监听，点击其他地方关闭菜单
+
+            // zhy处理打开抽屉内表格更多按钮弹框无法关闭的问题
+            // zhy移除已有的老监听器（防止重复绑定）
+            if (self._moreMenuDocClick) {
+                try { document.removeEventListener('click', self._moreMenuDocClick, true); } catch (e) {}
+                self._moreMenuDocClick = null;
+            }
+
+            // zhy创建一个稳定的处理器引用，使用 capture 阶段以确保能收到事件（即使内部 stopPropagation）去掉之前的onec:true
+            self._moreMenuDocClick = function (e) {
+                try {
+                    var menuEl = self.$refs && self.$refs.globalMoreMenu ? self.$refs.globalMoreMenu : null;
+                    // 如果找不到菜单元素，直接关闭并清理
+                    if (!menuEl || (menuEl && !menuEl.contains)) {
+                        self.hideMoreMenu();
+                        return;
+                    }
+                    // 当点击的目标不在菜单内时才关闭菜单
+                    if (!menuEl.contains(e.target)) {
+                        self.hideMoreMenu();
+                    }
+                } catch (err) {
+                    // 出错情况下也尝试关闭并清理
+                    self.hideMoreMenu();
+                }
+            };
+
+            // 延迟绑定，确保 teleport 渲染完成后能拿到 ref
             setTimeout(() => {
-                document.addEventListener('click', self.hideMoreMenu, { once: true });
+                document.addEventListener('click', self._moreMenuDocClick, true);
             }, 0);
         },
+
         hideMoreMenu() {
             var self = this;
             self._moreMenuVisible = false;
             self._moreMenuRow = null;
-            // 确保移除事件监听器（虽然使用了once选项，但手动移除更保险）
-            document.removeEventListener('click', self.hideMoreMenu);
+             // 确保移除事件监听器（虽然使用了once选项，但手动移除更保险）
+          // document.removeEventListener('click', self.hideMoreMenu);
+
+            // zhy使用之前保存的引用移除监听器（若存在）
+            if (self._moreMenuDocClick) {
+                try { document.removeEventListener('click', self._moreMenuDocClick, true); } catch (e) {}
+                self._moreMenuDocClick = null;
+            }
         },
         handleMoreMenuAction(action, btn) {
             var self = this;
