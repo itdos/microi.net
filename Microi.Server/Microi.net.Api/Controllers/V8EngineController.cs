@@ -271,7 +271,16 @@ namespace Microi.net.Api
                 param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100,
                 param["Icon"].Val<string>(), param["SearchFieldIds"].Val<string>(),
                 param["TableDiyFieldIds"].Val<string>(), param["DefaultOrderBy"].Val<string>(),
-                param["SqlWhere"].Val<string>(), param["DiyConfig"].Val<string>());
+                param["SqlWhere"].Val<string>(), param["DiyConfig"].Val<string>(),
+                param["MoreBtns"].Val<string>(), param["FormBtns"].Val<string>(),
+                param["BatchSelectMoreBtns"].Val<string>(), param["PageTabs"].Val<string>(),
+                param["ExportMoreBtns"].Val<string>(), param["PageBtns"].Val<string>(),
+                param["SortFieldIds"].Val<string>(), param["NotShowFields"].Val<string>(),
+                param["SqlJoin"].Val<string>(), param["JoinTables"].Val<string>(),
+                param["SelectFields"].Val<string>(), param["StatisticsFields"].Val<string>(),
+                param["InTableEdit"]?.Val<int>() ?? 0, param["InTableEditFields"].Val<string>(),
+                param["MobileListFields"].Val<string>(),
+                param["CardTitleTagFields"].Val<string>(), param["CardBottomTagFields"].Val<string>());
             return Ok(result);
         }
 

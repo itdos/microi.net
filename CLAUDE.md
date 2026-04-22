@@ -463,11 +463,7 @@ console.log('调试信息')                                  // 控制台输出�
 编写 `V8.FormEngine` 或 `V8.Db` 代码时，请参考当前编辑文件所属 OsClient 目录下的 `.microi-db-schema.md` 获取表名和字段信息。
 
 数据库结构文件列表：
-- `microi-v8-engine/AI进销存 (api.itdos.com)\ips.Product.Internal\.microi-db-schema.md`
-- `microi-v8-engine/Microi吾码 (api.itdos.com)\iTdos.Product.Internal\.microi-db-schema.md`
-- `microi-v8-engine/微吾科技 (api.itdos.com)\pay.default.default\.microi-db-schema.md`
 - `microi-v8-engine/微吾科技 (api.itdos.com)\pay.Product.Internal\.microi-db-schema.md`
-- `microi-v8-engine/集福鲤管理平台 (api.jifulii.com)\xjy.Product.Internal\.microi-db-schema.md`
 
 
 ---

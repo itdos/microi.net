@@ -1136,7 +1136,7 @@ namespace Microi.net
         {
             try
             {
-                // 检查表名是否已存在
+                // 检查表名是否已存在（幂等：已存在则直接返回该表）
                 var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
                 {
                     OsClient = osClient,
@@ -1148,7 +1148,13 @@ namespace Microi.net
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
                 {
-                    return new DosResult<object>(0, null, $"表名 [{name}] 已存在");
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"表 [{name}] 已存在，跳过创建（幂等）",
+                        TableId = (string)existResult.Data.Id,
+                        Name = name,
+                        Skipped = true
+                    });
                 }
 
                 var id = Ulid.NewUlid().ToString();
@@ -1192,7 +1198,9 @@ namespace Microi.net
         #region AddField
 
         /// <summary>
-        /// 常用编程类型→MySQL列类型映射（兼容 AI 传入的非 MySQL 类型）
+        /// 常用编程类型→平台允许的列类型映射（兼容 AI 传入的非平台类型）
+        /// 平台仅允许：varchar(N)、mediumtext/longtext、int/bigint、decimal(18,N)
+        /// 禁止使用 datetime / date / timestamp / float / double / boolean —— 一律映射为 varchar(25) 或 int / decimal
         /// </summary>
         private static readonly Dictionary<string, string> FieldTypeMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1204,20 +1212,149 @@ namespace Microi.net
             ["double"] = "decimal(18,2)",
             ["boolean"] = "int",
             ["bool"] = "int",
-            ["date"] = "datetime",
-            ["timestamp"] = "datetime",
+            // 平台禁止使用 datetime/date/timestamp 物理列，统一存为 varchar(25)（'yyyy-MM-dd HH:mm:ss'）
+            ["date"] = "varchar(25)",
+            ["datetime"] = "varchar(25)",
+            ["timestamp"] = "varchar(25)",
+            ["time"] = "varchar(25)",
             ["long"] = "bigint",
             ["json"] = "mediumtext",
         };
 
         /// <summary>
-        /// 将编程语言类型自动映射为 MySQL 列类型
+        /// 将编程语言类型自动映射为平台允许的列类型；并强制拦截禁止使用的 datetime/date/timestamp
         /// </summary>
         private static string NormalizeFieldType(string type)
         {
             if (string.IsNullOrWhiteSpace(type)) return "varchar(500)";
             var trimmed = type.Trim();
-            return FieldTypeMap.TryGetValue(trimmed, out var mapped) ? mapped : trimmed;
+            // 优先字典映射
+            if (FieldTypeMap.TryGetValue(trimmed, out var mapped)) return mapped;
+            // 兜底：以 datetime / date / timestamp / time 开头（含 datetime(6) 等变体）一律改为 varchar(25)
+            var lower = trimmed.ToLowerInvariant();
+            if (lower.StartsWith("datetime") || lower.StartsWith("timestamp")
+                || lower == "date" || lower == "time")
+            {
+                return "varchar(25)";
+            }
+            // 兜底：float/double/real/money 一律映射为 decimal(18,2)
+            if (lower.StartsWith("float") || lower.StartsWith("double") || lower.StartsWith("real") || lower == "money")
+            {
+                return "decimal(18,2)";
+            }
+            return trimmed;
+        }
+
+        /// <summary>
+        /// 是否为下拉/单选/多选/复选框类组件（需要数据源 Data + Config 配置的组件）
+        /// </summary>
+        private static bool IsOptionComponent(string component)
+        {
+            if (string.IsNullOrWhiteSpace(component)) return false;
+            var c = component.Trim();
+            return c.Equals("Select", StringComparison.OrdinalIgnoreCase)
+                || c.Equals("MultipleSelect", StringComparison.OrdinalIgnoreCase)
+                || c.Equals("Radio", StringComparison.OrdinalIgnoreCase)
+                || c.Equals("Checkbox", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 将 AI 传入的简洁 data 字符串解析为前端约定的 Data + Config JSON
+        /// 支持格式：
+        ///   "1|启用,0|禁用"          → KeyValue 数据源
+        ///   "启用,禁用"               → Data 普通数据源
+        ///   "[\"启用\",\"禁用\"]"     → 已是 JSON 数组（Data 数据源），原样返回
+        ///   "[{\"Key\":\"1\",...}]" → 已是 KeyValue JSON 数组（KeyValue 数据源），原样返回
+        /// 仅在 component ∈ {Select,MultipleSelect,Radio,Checkbox} 且 config 为空时调用
+        /// </summary>
+        private static (string DataJson, string ConfigJson) BuildOptionDataAndConfig(string component, string data, string existingConfig)
+        {
+            // 已显式传入 Config 则不动；Config 必须是合法 JSON 对象
+            var hasExistingConfig = !string.IsNullOrWhiteSpace(existingConfig)
+                                    && existingConfig.TrimStart().StartsWith("{");
+            if (string.IsNullOrWhiteSpace(data))
+            {
+                // 没传 data，但仍需要给一个最小可用 Config，否则前端 field.Config.* 全部 undefined
+                if (hasExistingConfig) return (data ?? "", existingConfig);
+                var emptyCfg = new JObject
+                {
+                    ["DataSource"] = "Data",
+                    ["SelectSaveFormat"] = "Text",
+                    ["EnableSearch"] = false,
+                    ["DataSourceSqlRemote"] = false,
+                };
+                return ("[]", emptyCfg.ToString(Newtonsoft.Json.Formatting.None));
+            }
+
+            var trimmedData = data.Trim();
+
+            // 已是 JSON 数组：原样使用，仅补默认 Config
+            if (trimmedData.StartsWith("["))
+            {
+                if (hasExistingConfig) return (trimmedData, existingConfig);
+                // 探测是 KeyValue 还是 Data
+                var isKv = trimmedData.IndexOf("\"Key\"", StringComparison.OrdinalIgnoreCase) >= 0
+                           && trimmedData.IndexOf("\"Value\"", StringComparison.OrdinalIgnoreCase) >= 0;
+                var cfg = new JObject
+                {
+                    ["DataSource"] = isKv ? "KeyValue" : "Data",
+                    ["SelectSaveFormat"] = "Text",
+                    ["EnableSearch"] = false,
+                    ["DataSourceSqlRemote"] = false,
+                };
+                if (isKv)
+                {
+                    cfg["SelectLabel"] = "Value";
+                    cfg["SelectSaveField"] = "Key";
+                }
+                return (trimmedData, cfg.ToString(Newtonsoft.Json.Formatting.None));
+            }
+
+            // 解析 "k1|v1,k2|v2" 或 "v1,v2"
+            var items = trimmedData.Split(new[] { ',', '，', '\n', ';', '；' }, StringSplitOptions.RemoveEmptyEntries)
+                                   .Select(s => s.Trim())
+                                   .Where(s => s.Length > 0)
+                                   .ToList();
+            var hasPipe = items.Any(s => s.Contains('|'));
+
+            if (hasPipe)
+            {
+                // KeyValue 数据源：[{Key,Value},...]
+                var arr = new JArray();
+                foreach (var s in items)
+                {
+                    var parts = s.Split(new[] { '|' }, 2);
+                    var key = parts[0].Trim();
+                    var val = parts.Length > 1 ? parts[1].Trim() : key;
+                    arr.Add(new JObject { ["Key"] = key, ["Value"] = val });
+                }
+                if (hasExistingConfig) return (arr.ToString(Newtonsoft.Json.Formatting.None), existingConfig);
+                var cfg = new JObject
+                {
+                    ["DataSource"] = "KeyValue",
+                    ["SelectLabel"] = "Value",
+                    ["SelectSaveField"] = "Key",
+                    ["SelectSaveFormat"] = "Text",
+                    ["EnableSearch"] = false,
+                    ["DataSourceSqlRemote"] = false,
+                };
+                return (arr.ToString(Newtonsoft.Json.Formatting.None), cfg.ToString(Newtonsoft.Json.Formatting.None));
+            }
+            else
+            {
+                // Data 数据源：["v1","v2"]
+                var arr = new JArray();
+                foreach (var s in items) arr.Add(s);
+                if (hasExistingConfig) return (arr.ToString(Newtonsoft.Json.Formatting.None), existingConfig);
+                var cfg = new JObject
+                {
+                    ["DataSource"] = "Data",
+                    ["SelectSaveFormat"] = "Text",
+                    ["EnableSearch"] = false,
+                    ["DataSourceSqlRemote"] = false,
+                };
+                return (arr.ToString(Newtonsoft.Json.Formatting.None), cfg.ToString(Newtonsoft.Json.Formatting.None));
+            }
         }
 
         /// <summary>
@@ -1233,6 +1370,43 @@ namespace Microi.net
         {
             try
             {
+                var componentName = component ?? "Text";
+
+                // 幂等：先检查同 TableId + Name 的字段是否已存在，存在则视为成功（避免 AI 并发/重试报错）
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(tableId))
+                {
+                    var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>()
+                        {
+                            new List<object>() { "TableId", "=", tableId },
+                            new List<object>() { "AND", "Name", "=", name },
+                            new List<object>() { "AND", "IsDeleted", "<>", 1 },
+                        }
+                    });
+                    if (existResult.Code == 1 && existResult.Data != null)
+                    {
+                        return new DosResult<object>(1, new
+                        {
+                            Message = $"字段 [{label}({name})] 已存在，跳过创建（幂等）",
+                            FieldId = (string)existResult.Data.Id,
+                            TableId = tableId,
+                            Skipped = true
+                        });
+                    }
+                }
+
+                // 选项类组件（Select/MultipleSelect/Radio/Checkbox）：自动构建 Data + Config JSON
+                var effectiveData = data ?? "";
+                var effectiveConfig = config ?? "";
+                if (IsOptionComponent(componentName))
+                {
+                    var (dataJson, configJson) = BuildOptionDataAndConfig(componentName, data, config);
+                    effectiveData = dataJson;
+                    effectiveConfig = configJson;
+                }
+
                 var fieldParam = new DiyFieldParam
                 {
                     OsClient = osClient,
@@ -1241,7 +1415,7 @@ namespace Microi.net
                     Name = name,
                     Label = label,
                     Type = NormalizeFieldType(type),
-                    Component = component ?? "Text",
+                    Component = componentName,
                     Visible = visible,
                     AppVisible = appVisible,
                     Tab = tab ?? "",
@@ -1254,8 +1428,8 @@ namespace Microi.net
                     DefaultValue = defaultValue ?? "",
                     Placeholder = placeholder ?? "",
                     FormWidth = formWidth > 0 ? formWidth : 24,
-                    Data = data ?? "",
-                    Config = config ?? "",
+                    Data = effectiveData,
+                    Config = effectiveConfig,
                     Description = description ?? "",
                     Encrypt = encrypt,
                     InTableEdit = inTableEdit,
@@ -1272,6 +1446,17 @@ namespace Microi.net
                         Message = $"字段 [{label}({name})] 添加成功",
                         FieldId = fieldParam.Id,
                         TableId = tableId
+                    });
+                }
+
+                // 兜底：底层若仍报"已存在的字段"（极小概率并发竞态），转为幂等成功
+                if (result.Code != 1 && !string.IsNullOrEmpty(result.Msg) && result.Msg.Contains("已存在的字段"))
+                {
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"字段 [{label}({name})] 已存在，跳过创建（并发竞态保护）",
+                        TableId = tableId,
+                        Skipped = true
                     });
                 }
 
@@ -1297,23 +1482,43 @@ namespace Microi.net
             string parentId = null, int sort = 100,
             string icon = null, string searchFieldIds = null,
             string tableDiyFieldIds = null, string defaultOrderBy = null,
-            string sqlWhere = null, string diyConfig = null)
+            string sqlWhere = null, string diyConfig = null,
+            string moreBtns = null, string formBtns = null,
+            string batchSelectMoreBtns = null, string pageTabs = null,
+            string exportMoreBtns = null, string pageBtns = null,
+            string sortFieldIds = null, string notShowFields = null,
+            string sqlJoin = null, string joinTables = null,
+            string selectFields = null, string statisticsFields = null,
+            int inTableEdit = 0, string inTableEditFields = null,
+            string mobileListFields = null,
+            string cardTitleTagFields = null, string cardBottomTagFields = null)
         {
             try
             {
-                // 检查模块名是否已存在
+                // 检查模块名是否已存在（同 ParentId 下 Name 唯一即视为重复，幂等返回该模块）
+                var existWhere = new List<object>()
+                {
+                    new List<object>() { "Name", "=", name },
+                };
+                if (!string.IsNullOrWhiteSpace(parentId))
+                {
+                    existWhere.Add(new List<object>() { "AND", "ParentId", "=", parentId });
+                }
                 var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_menu", new
                 {
                     OsClient = osClient,
-                    _Where = new List<object>()
-                    {
-                        new List<object>() { "Name", "=", name },
-                        
-                    }
+                    _Where = existWhere
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
                 {
-                    return new DosResult<object>(0, null, $"模块名 [{name}] 已存在");
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"模块 [{name}] 已存在，跳过创建（幂等）",
+                        ModuleId = (string)existResult.Data.Id,
+                        DiyTableId = (string)existResult.Data.DiyTableId,
+                        Url = (string)existResult.Data.Url,
+                        Skipped = true
+                    });
                 }
 
                 // 根据 DiyTableId 查询 DiyTableName
@@ -1348,26 +1553,36 @@ namespace Microi.net
                     }
                     else
                     {
-                        // 没有绑定表时，从菜单名称的拼音或 Id 生成
-                        effectiveUrl = "/menu-" + id.Substring(0, 8).ToLower();
+                        // 没有绑定表时，使用 Ulid 的随机部分（chars 10..25 是随机段，前 10 字符是毫秒时间戳，
+                        // 并发调用时时间戳段会冲突，所以必须用随机段）
+                        effectiveUrl = "/menu-" + GetUlidRandomSuffix(id, 8);
                     }
                 }
 
-                // 检查 URL 是否已被其他菜单占用，如果是则追加随机后缀
+                // 检查 URL 是否已被其他菜单占用，如果是则追加随机后缀（最多重试 5 次以避免极端并发竞态）
                 if (!string.IsNullOrWhiteSpace(effectiveUrl))
                 {
-                    var urlExistResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_menu", new
+                    var baseUrl = effectiveUrl;
+                    var attempt = 0;
+                    while (attempt < 5)
                     {
-                        OsClient = osClient,
-                        _Where = new List<object>()
+                        var urlExistResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_menu", new
                         {
-                            new List<object>() { "Url", "=", effectiveUrl },
-                            
+                            OsClient = osClient,
+                            _Where = new List<object>()
+                            {
+                                new List<object>() { "Url", "=", effectiveUrl },
+                            }
+                        });
+                        if (!(urlExistResult.Code == 1 && urlExistResult.Data != null))
+                        {
+                            break; // URL 可用
                         }
-                    });
-                    if (urlExistResult.Code == 1 && urlExistResult.Data != null)
-                    {
-                        effectiveUrl = effectiveUrl + "-" + id.Substring(0, 6).ToLower();
+                        // 冲突：使用 Ulid 随机段 + 额外 Random 字节增加唯一性
+                        attempt++;
+                        var extra = GetUlidRandomSuffix(Ulid.NewUlid().ToString(), 6)
+                                  + ThreadRandom.Next(100, 999).ToString();
+                        effectiveUrl = baseUrl + "-" + extra;
                     }
                 }
 
@@ -1395,8 +1610,47 @@ namespace Microi.net
                 if (!string.IsNullOrWhiteSpace(defaultOrderBy)) menuData["DefaultOrderBy"] = defaultOrderBy;
                 if (!string.IsNullOrWhiteSpace(sqlWhere)) menuData["SqlWhere"] = sqlWhere;
                 if (!string.IsNullOrWhiteSpace(diyConfig)) menuData["DiyConfig"] = diyConfig;
+                // 业务按钮 / 高级配置（统一存为 sys_menu 的 JSON 字符串列）
+                if (!string.IsNullOrWhiteSpace(moreBtns)) menuData["MoreBtns"] = moreBtns;
+                if (!string.IsNullOrWhiteSpace(formBtns)) menuData["FormBtns"] = formBtns;
+                if (!string.IsNullOrWhiteSpace(batchSelectMoreBtns)) menuData["BatchSelectMoreBtns"] = batchSelectMoreBtns;
+                if (!string.IsNullOrWhiteSpace(pageTabs)) menuData["PageTabs"] = pageTabs;
+                if (!string.IsNullOrWhiteSpace(exportMoreBtns)) menuData["ExportMoreBtns"] = exportMoreBtns;
+                if (!string.IsNullOrWhiteSpace(pageBtns)) menuData["PageBtns"] = pageBtns;
+                if (!string.IsNullOrWhiteSpace(sortFieldIds)) menuData["SortFieldIds"] = sortFieldIds;
+                if (!string.IsNullOrWhiteSpace(notShowFields)) menuData["NotShowFields"] = notShowFields;
+                if (!string.IsNullOrWhiteSpace(sqlJoin)) menuData["SqlJoin"] = sqlJoin;
+                if (!string.IsNullOrWhiteSpace(joinTables)) menuData["JoinTables"] = joinTables;
+                if (!string.IsNullOrWhiteSpace(selectFields)) menuData["SelectFields"] = selectFields;
+                if (!string.IsNullOrWhiteSpace(statisticsFields)) menuData["StatisticsFields"] = statisticsFields;
+                if (inTableEdit == 1) menuData["InTableEdit"] = 1;
+                if (!string.IsNullOrWhiteSpace(inTableEditFields)) menuData["InTableEditFields"] = inTableEditFields;
+                if (!string.IsNullOrWhiteSpace(mobileListFields)) menuData["MobileListFields"] = mobileListFields;
+                if (!string.IsNullOrWhiteSpace(cardTitleTagFields)) menuData["CardTitleTagFields"] = cardTitleTagFields;
+                if (!string.IsNullOrWhiteSpace(cardBottomTagFields)) menuData["CardBottomTagFields"] = cardBottomTagFields;
 
-                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_menu", menuData);
+                // 并发安全：插入时若仍命中"已存在唯一值"（最常见为 Url 列），自动追加随机后缀重试最多 5 次
+                DosResult addResult = null;
+                var insertAttempt = 0;
+                while (insertAttempt < 5)
+                {
+                    addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_menu", menuData);
+                    if (addResult.Code == 1) break;
+                    var msg = addResult.Msg ?? "";
+                    if (msg.Contains("已存在唯一值") && msg.IndexOf("Url", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        insertAttempt++;
+                        var extra = GetUlidRandomSuffix(Ulid.NewUlid().ToString(), 6)
+                                  + ThreadRandom.Next(100, 999).ToString();
+                        effectiveUrl = (effectiveUrl ?? "/menu") + "-" + extra;
+                        menuData["Url"] = effectiveUrl;
+                        // 主键 Id 也换一下，避免再撞主键
+                        menuData["Id"] = Ulid.NewUlid().ToString();
+                        id = (string)menuData["Id"];
+                        continue;
+                    }
+                    break;
+                }
 
                 if (addResult.Code == 1)
                 {
@@ -1420,6 +1674,34 @@ namespace Microi.net
         #endregion
 
         #region ResolveOsClient
+
+        /// <summary>
+        /// 线程安全的 Random（用于生成 URL 唯一后缀）
+        /// </summary>
+        private static readonly Random _threadRandom = new Random(Guid.NewGuid().GetHashCode());
+        private static int ThreadRandomNext(int min, int max)
+        {
+            lock (_threadRandom) { return _threadRandom.Next(min, max); }
+        }
+        private static class ThreadRandom
+        {
+            public static int Next(int min, int max) => ThreadRandomNext(min, max);
+        }
+
+        /// <summary>
+        /// 取 Ulid 的随机段（chars 10..25 是随机段，前 10 字符是毫秒时间戳）。
+        /// 并发调用时时间戳段会冲突，所以生成 URL 等唯一标识时必须用随机段。
+        /// </summary>
+        private static string GetUlidRandomSuffix(string ulid, int length)
+        {
+            if (string.IsNullOrWhiteSpace(ulid)) return Guid.NewGuid().ToString("N").Substring(0, length).ToLower();
+            // Ulid 总长度 26：前 10 字符为时间戳，后 16 字符为随机段
+            if (ulid.Length >= 10 + length)
+            {
+                return ulid.Substring(10, length).ToLower();
+            }
+            return ulid.Substring(Math.Max(0, ulid.Length - length)).ToLower();
+        }
 
         /// <summary>
         /// 解析 OsClient（如果为空则从 token 或配置中获取）
