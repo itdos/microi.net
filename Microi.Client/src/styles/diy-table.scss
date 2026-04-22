@@ -1270,10 +1270,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0;
+    padding: 3px 0;
     margin-top: 0px;
     border-top: none;
-    min-height: 28px;
+    // min-height: 28px;
 }
 
 .card-bottom-tags {
@@ -1361,6 +1361,7 @@
 
 /* 卡片复选框容器 */
 .card-checkbox-wrapper {
+    height: 15px;
     flex-shrink: 0;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1455,6 +1456,7 @@
 @media screen and (max-width: 768px) {
     .card-body {
         padding: 5px;
+        padding-bottom: 0;
     }
 
     .card-title-row {
@@ -1466,18 +1468,18 @@
     }
 
     .card-field-row {
-        padding: 5px 0;
+        padding: 2px 0;
     }
 
     .card-actions {
-        padding: 5px;
+        padding: 3px;
         gap: 5px;
     }
 
     .card-action-btn {
-        height: 32px;
-        padding: 0 12px;
-        font-size: 12px;
+        height: 24px;
+        padding: 0 10px;
+        font-size: 10px;
     }
 
     .card-index-badge {
