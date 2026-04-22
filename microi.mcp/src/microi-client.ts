@@ -336,6 +336,15 @@ export class MicroiClient {
     OpenType?: string; Url?: string; Sort?: number;
     Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
     DefaultOrderBy?: string; SqlWhere?: string; DiyConfig?: string;
+    // 业务按钮 / 高级配置（JSON 字符串）
+    MoreBtns?: string; FormBtns?: string; BatchSelectMoreBtns?: string;
+    PageTabs?: string; ExportMoreBtns?: string; PageBtns?: string;
+    SortFieldIds?: string; NotShowFields?: string;
+    SqlJoin?: string; JoinTables?: string; SelectFields?: string;
+    StatisticsFields?: string;
+    InTableEdit?: number; InTableEditFields?: string;
+    MobileListFields?: string;
+    CardTitleTagFields?: string; CardBottomTagFields?: string;
   }): Promise<ApiResponse> {
     return this.post(API.CREATE_MODULE, {
       OsClient: this.config.osClient,

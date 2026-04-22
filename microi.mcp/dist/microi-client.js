@@ -219,11 +219,12 @@ export class MicroiClient {
         });
     }
     // ---------- 低代码系统设计 API 方法 ----------
-    async createTable(name, description) {
+    async createTable(name, description, options) {
         return this.post(API.CREATE_TABLE, {
             OsClient: this.config.osClient,
             Name: name,
             Description: description || '',
+            ...options,
         });
     }
     async addField(data) {
@@ -243,6 +244,25 @@ export class MicroiClient {
             OsClient: this.config.osClient,
             RoleId: roleId,
             MenuIds: menuIds,
+        });
+    }
+    // ---------- 界面引擎 API 方法 ----------
+    async getPageEngineList(keyword) {
+        return this.post(API.GET_PAGE_ENGINE_LIST, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async getPageEngineDetail(pageId) {
+        return this.post(API.GET_PAGE_ENGINE_DETAIL, {
+            OsClient: this.config.osClient,
+            PageId: pageId,
+        });
+    }
+    async savePageEngine(data) {
+        return this.post(API.SAVE_PAGE_ENGINE, {
+            OsClient: this.config.osClient,
+            ...data,
         });
     }
     destroy() {

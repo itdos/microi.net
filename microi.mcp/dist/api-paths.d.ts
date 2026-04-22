@@ -19,5 +19,8 @@ export declare const API: {
     readonly ADD_FIELD: "/api/V8Engine/AddField";
     readonly CREATE_MODULE: "/api/V8Engine/CreateModule";
     readonly SET_ROLE_PERMISSION: "/api/V8Engine/SetRolePermission";
+    readonly GET_PAGE_ENGINE_LIST: "/api/V8Engine/GetPageEngineList";
+    readonly GET_PAGE_ENGINE_DETAIL: "/api/V8Engine/GetPageEngineDetail";
+    readonly SAVE_PAGE_ENGINE: "/api/V8Engine/SavePageEngine";
 };
 //# sourceMappingURL=api-paths.d.ts.map

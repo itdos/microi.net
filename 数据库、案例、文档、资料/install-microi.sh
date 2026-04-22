@@ -112,11 +112,11 @@ echo 'Microi：请输入 1 或 2：'
 read -r db_type
 
 if [ "$db_type" == "1" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/mysql5.6.50-demo.sql.zip"
+  SQL_ZIP_URL="https://static.itdos.com/install/microi_demo_temp.sql.zip"
   SQL_FILE_NAME="microi_demo_temp.sql"
   echo 'Microi：将安装Demo示例数据库 ✓'
 elif [ "$db_type" == "2" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/mysql5.6.50-empty.sql.zip"
+  SQL_ZIP_URL="https://static.itdos.com/install/microi_empty_temp.sql.zip"
   SQL_FILE_NAME="microi_empty_temp.sql"
   echo 'Microi：将安装空数据库 ✓'
 else
