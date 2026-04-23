@@ -1,5 +1,5 @@
 <template>
-  <view class="mall-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="mall-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部搜索栏 -->
     <view class="search-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
       <view class="search-bar" :style="{ paddingRight: capsuleWidth + 'px' }">

@@ -228,12 +228,26 @@ app.MapControllerRoute(
 
 #region Microi.net 启用
 MicroiEngine.Init(app.Services);
-app.UseMicroi();//初始化平台
-app.UseMicroiJob();//启用任务计划
-app.UseMicroiMQ();//启用消息队列
-app.UseMicroiUpgrade();//启用平台自动升级
+app.UseMicroi();      // 初始化 SaaS 引擎（同步加载 sys_osclients → ClientList）
+app.UseMicroiJob();   // 启用任务计划
+app.UseMicroiMQ();    // 启用消息队列
+app.UseMicroiUpgrade();// 启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
-var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClient") ?? "";
+
+// 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
+var osClientName = OsClient.GetConfigOsClient();
+if (osClientName.DosIsNullOrWhiteSpace())
+{
+    osClientName = OsClientDefault.OsClient;
+}
+
+// 【关键修复】确保主租户的 OsClientModel 已从 sys_osclients 表中正确挂载，
+// 否则 InitializeDefaultClient 创建的占位模型不会包含 MqttEnable / EnableSwagger 等 DB 字段，
+// 导致 MQTT 等可选模块无法按配置启动。
+if (!OsClient.EnsureHydrated(osClientName))
+{
+    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】主租户[{osClientName}]的 OsClientModel 未能从 sys_osclients 完整挂载，部分 DB 配置项将以默认值生效。");
+}
 var clientModel = OsClient.GetClient(osClientName);
 #endregion
 
@@ -241,17 +255,29 @@ var clientModel = OsClient.GetClient(osClientName);
 redisConn = RedisConnBuilder.Build(clientModel);
 #endregion
 
-#region MQTT
+#region MQTT（在主机完全启动后再启动 Broker，确保依赖注入与 V8 引擎就绪）
 if (clientModel.OsClientModel["MqttEnable"].Val<int>() == 1)
 {
-    var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
-    _ = Task.Run(async () =>
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    lifetime.ApplicationStarted.Register(() =>
     {
-        await Task.Delay(5000); // 等待Host启动完成
-        await mqttService.StartServerAsync(clientModel);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // 再次取最新 clientModel（防止启动期间被 V8 ReloadOsClient 刷新过）
+                var latest = OsClient.GetClient(osClientName);
+                var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
+                await mqttService.StartServerAsync(latest);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT延迟启动失败：{ex.Message}");
+            }
+        });
     });
 }
-#endregion 
+#endregion
 
 #region 启用微信配置
 Senparc.CO2NET.Cache.Redis.Register.SetConfigurationOption(redisConn);
@@ -273,20 +299,10 @@ var registerService = app.UseSenparcWeixin(app.Environment,
 );
 #endregion
 
-#region 接口引擎初始化
-Task.Run(async () =>
-{
-    //初始化 DynamicApiEngine
-    foreach (var item in OsClient.ClientList)
-    {
-        await new DynamicRoute().Init(item.Value);
-    }
-});
-
+#region 接口引擎 / 数据源引擎动态路由
 try
 {
-    //-------接口引擎、数据源引擎动态接口
-    app.MapDynamicControllerRoute<DynamicRoute>("{controller}");//"{controller}/{action}"
+    app.MapDynamicControllerRoute<DynamicRoute>("{controller}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}");
@@ -302,10 +318,10 @@ catch (Exception ex)
 #endregion
 
 #region 其它
-// 注意：UseDeveloperExceptionPage 仅在开发环境使用，生产环境已在上方配置 UseExceptionHandler
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开发环境诊断模式已启用");
 }
 app.UseSession();
 app.UseCors("any");
@@ -321,42 +337,46 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 }
 #endregion
 
-#region 诊断端点（开发/测试环境）
-if (app.Environment.IsDevelopment())
+#region 应用完全启动后的延迟初始化（接口引擎缓存 / AI Schema 缓存）
 {
-    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开发环境诊断模式已启用");
-}
-#endregion
-
-//【AI引擎】初始化数据库Schema缓存（在服务完全启动后执行，避免依赖注入问题）
-Task.Run(async () =>
-{
-    try
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    lifetime.ApplicationStarted.Register(() =>
     {
-        await Task.Delay(2000); // 等待2秒确保服务完全启动
-        using (var scope = app.Services.CreateScope())
+        _ = Task.Run(async () =>
         {
-            var microiAI = scope.ServiceProvider.GetService<IMicroiAI>();
-            if (microiAI != null)
+            // 接口引擎初始化（并行，租户数量可能较大）
+            try
             {
-                // 初始化向量数据库（会自动检测是否已有数据，避免重复初始化）
-                var initResult = await microiAI.InitializeSchemaCache(osClientName);
-                if (initResult.Code == 1)
+                var initTasks = OsClient.ClientList.Values
+                    .Select(c => new DynamicRoute().Init(c))
+                    .ToList();
+                await Task.WhenAll(initTasks);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】接口引擎初始化失败：{ex.Message}");
+            }
+
+            // AI 引擎 Schema 缓存初始化
+            try
+            {
+                using var scope = app.Services.CreateScope();
+                var microiAI = scope.ServiceProvider.GetService<IMicroiAI>();
+                if (microiAI != null)
                 {
-                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
-                }
-                else
-                {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
+                    var initResult = await microiAI.InitializeSchemaCache(osClientName);
+                    var tag = initResult.Code == 1 ? "✅成功" : "⚠️警告";
+                    Console.WriteLine($"Microi：【{tag}】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
                 }
             }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】AI Schema缓存初始化失败: {ex.Message}");
-    }
-});
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】AI Schema缓存初始化失败: {ex.Message}");
+            }
+        });
+    });
+}
+#endregion
 
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
