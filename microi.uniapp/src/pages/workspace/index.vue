@@ -87,9 +87,10 @@
                 <text class="grid-icon">{{ getMenuEmoji(child) }}</text>
               </view>
               <text class="grid-name">{{ child.meta && child.meta.title || child.name || '' }}</text>
-              <view class="has-sub-badge" v-if="child.children && getVisibleChildren(child.children).length > 0">
+              <!-- zhy隐藏此处箭头 -->
+			  <!-- <view class="has-sub-badge" v-if="child.children && getVisibleChildren(child.children).length > 0">
                 <text>⟩</text>
-              </view>
+              </view> -->
             </view>
           </view>
         </view>
