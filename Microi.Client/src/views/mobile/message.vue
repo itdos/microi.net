@@ -469,7 +469,7 @@ onBeforeUnmount(() => { unregisterWebSocketEvents(); });
 
 .search-icon {
     color: var(--mci-text-tertiary);
-    font-size: 14px;
+    font-size: 13px;
     margin-right: var(--mci-space-2);
 }
 

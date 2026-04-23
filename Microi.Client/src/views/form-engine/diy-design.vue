@@ -1741,7 +1741,7 @@ export default {
         // border-bottom: solid 1px #ccc;
         padding-left: 20px;
         .el-form-item--mini.el-form-item {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             margin-top: 10px;
         }
     }
@@ -1845,7 +1845,7 @@ export default {
         overflow: hidden;
 
         .el-radio {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             margin-top: 10px;
         }
 
@@ -1863,7 +1863,7 @@ export default {
                 }
             }
             .el-form-item--mini.el-form-item {
-                margin-bottom: 10px;
+                margin-bottom: 5px;
             }
         }
 
@@ -1897,7 +1897,7 @@ export default {
         .icon {
             width: 20px;
             margin-right: 0px;
-            font-size: 14px;
+            font-size: 13px;
             // color: #ff6c04;
             // color: #171717;
         }

@@ -173,7 +173,7 @@
                                         <el-input v-model="applyForm.Remark" type="textarea" :rows="3" placeholder="附加说明" />
                                     </el-form-item>
                                     <el-form-item>
-                                        <el-button type="primary" size="large" :loading="applying" @click="submitApply">
+                                        <el-button type="primary" size="default" :loading="applying" @click="submitApply">
                                             <el-icon><Promotion /></el-icon> {{ existingApp ? '重新提交申请' : '提交授权申请' }}
                                         </el-button>
                                     </el-form-item>
@@ -187,7 +187,7 @@
                                 </template>
                                 <div class="deploy-section">
                                     <p class="deploy-hint">已提交授权申请？在此检查License签发状态。签发完成后可一键部署到当前服务器或下载License文件。</p>
-                                    <el-button type="primary" size="large" :loading="checking" @click="checkLicense">
+                                    <el-button type="primary" size="default" :loading="checking" @click="checkLicense">
                                         <el-icon><Search /></el-icon> 检查授权状态
                                     </el-button>
 
@@ -227,10 +227,10 @@
                                                 </span>
                                             </el-alert>
                                             <div class="deploy-actions">
-                                                <el-button type="success" size="large" :loading="deploying" @click="deployLicense">
+                                                <el-button type="success" size="default" :loading="deploying" @click="deployLicense">
                                                     <el-icon><Upload /></el-icon> 自动部署到服务器
                                                 </el-button>
-                                                <el-button size="large" @click="downloadLicense">
+                                                <el-button size="default" @click="downloadLicense">
                                                     <el-icon><Download /></el-icon> 下载 microi.net.lic 文件
                                                 </el-button>
                                             </div>
@@ -715,7 +715,7 @@ export default {
 .status-hint {
     margin: 0;
     color: #666;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.8;
 }
 
@@ -769,7 +769,7 @@ export default {
 }
 .deploy-hint {
     color: #666;
-    font-size: 14px;
+    font-size: 13px;
     margin: 0 0 20px;
     line-height: 1.8;
 }

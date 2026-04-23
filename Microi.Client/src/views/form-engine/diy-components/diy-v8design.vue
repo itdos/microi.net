@@ -2370,7 +2370,7 @@ export default {
     }
 
     .codetips {
-        font-size: 14px;
+        font-size: 13px;
         color: #a5a5a5;
         margin-bottom: 5px;
     }

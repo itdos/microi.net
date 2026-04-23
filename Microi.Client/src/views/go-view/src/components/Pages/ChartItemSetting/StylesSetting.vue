@@ -224,7 +224,7 @@ for (let i = 1; i <= 12; i++) {
   flex-wrap: wrap;
   justify-content: space-between;
   .preset-img {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     padding: 2px;
     border-radius: 6px;
     transition: 0.2s all;

@@ -47,7 +47,7 @@
 
             <div>
                 <!--PC端表单头部操作栏（移动端改用FAB浮动按钮）-->
-                <div v-if="!diyStore.IsPhoneView" class="form-header" style="margin-bottom: 10px;">
+                <div v-if="!diyStore.IsPhoneView" class="form-header" style="margin-bottom: 5px;">
                     <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;">
                         <i :class="GetOpenTitleIcon()" />
                         {{ GetOpenTitlePage() }}
@@ -2551,7 +2551,7 @@ export default {
         .el-button {
             margin: 0 !important;
             padding: 8px 16px;
-            font-size: 14px;
+            font-size: 13px;
         }
     }
 
@@ -2563,7 +2563,7 @@ export default {
         }
 
         .el-form-item__label {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--el-text-color-regular, #606266);
         }
 
@@ -2582,7 +2582,7 @@ export default {
 .form-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
     border-radius: 8px;
     padding: 8px 12px;

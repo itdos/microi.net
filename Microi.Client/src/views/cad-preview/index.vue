@@ -44,7 +44,7 @@ onMounted(() => {
     padding: 8px 16px;
     background: #1e293b;
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
     display: flex;
     align-items: center;
     .file-name {
@@ -66,7 +66,7 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     color: #909399;
-    p { margin-top: 12px; font-size: 14px; }
+    p { margin-top: 12px; font-size: 13px; }
   }
 }
 </style>

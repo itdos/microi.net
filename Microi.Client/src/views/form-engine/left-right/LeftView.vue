@@ -527,7 +527,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 14px;
+    font-size: 13px;
     padding-right: 8px;
     width: 100%;
     min-width: max-content; /* 防止内容换行 */
@@ -557,7 +557,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 14px;
+    font-size: 13px;
     padding-right: 8px;
     min-width: max-content; /* 防止内容换行 */
 }

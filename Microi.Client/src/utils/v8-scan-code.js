@@ -139,7 +139,7 @@ function createScanDialog() {
                 background: #f0f0f0;
                 border-radius: 8px;
                 cursor: pointer;
-                font-size: 14px;
+                font-size: 13px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -226,7 +226,7 @@ function createScanDialog() {
             .microi-scan-manual {
                 display: flex;
                 gap: 8px;
-                margin-bottom: 10px;
+                margin-bottom: 5px;
             }
             .microi-scan-input {
                 flex: 1;
@@ -234,7 +234,7 @@ function createScanDialog() {
                 padding: 0 12px;
                 border: 1px solid #dcdfe6;
                 border-radius: 6px;
-                font-size: 14px;
+                font-size: 13px;
                 outline: none;
                 transition: border 0.2s;
             }
@@ -249,7 +249,7 @@ function createScanDialog() {
                 color: #fff;
                 border-radius: 6px;
                 cursor: pointer;
-                font-size: 14px;
+                font-size: 13px;
                 white-space: nowrap;
                 transition: opacity 0.2s;
             }

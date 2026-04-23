@@ -238,16 +238,16 @@ onMounted(loadTemplates)
 .oc-btn-ghost { background: rgba(255,255,255,0.04) !important; color: #8b8fa3 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 10px !important; }
 .oc-card { background: linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
 .oc-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.oc-card-title { font-size: 14px; font-weight: 600; color: #d0d4e0; }
+.oc-card-title { font-size: 13px; font-weight: 600; color: #d0d4e0; }
 
 .oc-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .oc-template-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; transition: all 0.25s; }
 .oc-template-card:hover { border-color: rgba(249,115,22,0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.3); transform: translateY(-2px); }
-.oc-tpl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.oc-tpl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .oc-tpl-type { font-size: 10px; padding: 2px 8px; border-radius: 6px; color: #d0d4e0; font-weight: 600; }
 .oc-tpl-name { font-size: 15px; font-weight: 700; color: #f0f0f5; margin-bottom: 6px; }
 .oc-tpl-desc { font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.oc-tpl-schedule { font-size: 11px; color: #8b8fa3; display: flex; align-items: center; gap: 4px; margin-bottom: 10px; }
+.oc-tpl-schedule { font-size: 11px; color: #8b8fa3; display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
 .oc-tpl-actions { display: flex; gap: 4px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px; }
 .oc-text-btn { color: #8b8fa3 !important; font-size: 11.5px !important; }
 .oc-text-btn:hover { color: #f97316 !important; }

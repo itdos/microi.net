@@ -178,7 +178,7 @@ watch(
 
     .el-tree-node__expand-icon {
       color: #94a3b8;
-      font-size: 14px;
+      font-size: 13px;
       padding: 4px;
       
       &.is-leaf {
@@ -229,7 +229,7 @@ watch(
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 14px;
+      font-size: 13px;
       color: #475569;
       transition: color 0.2s ease;
     }

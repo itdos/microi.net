@@ -221,7 +221,7 @@ onMounted(loadConfigs)
 .oc-config-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .oc-config-item:last-child { border-bottom: none; }
 .oc-cfg-left { flex: 1; }
-.oc-cfg-key { font-size: 14px; font-weight: 600; color: #d0d4e0; margin-bottom: 2px; }
+.oc-cfg-key { font-size: 13px; font-weight: 600; color: #d0d4e0; margin-bottom: 2px; }
 .oc-cfg-desc { font-size: 12px; color: #6b7280; }
 .oc-cfg-right { flex-shrink: 0; margin-left: 20px; }
 

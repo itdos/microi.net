@@ -114,7 +114,7 @@ $primary-dark: #764ba2;
     background: linear-gradient(135deg, #1a1c2e 0%, #2d3250 100%);
   }
   .mpe-modal-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #fff;
     letter-spacing: 0.5px;

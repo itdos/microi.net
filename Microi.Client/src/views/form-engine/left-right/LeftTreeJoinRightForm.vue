@@ -240,7 +240,7 @@ export default {
 
 /* 搜索框 */
 .el-input {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 /* 树形组件 - 关键修改 */
@@ -257,7 +257,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 14px;
+    font-size: 13px;
     padding-right: 8px;
 }
 
@@ -337,6 +337,6 @@ export default {
 .table-operation-bar {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 </style>

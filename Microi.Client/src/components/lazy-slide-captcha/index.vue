@@ -356,7 +356,7 @@ export default {
     display: inline-block;
     text-align: center;
     max-width: 200px;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .captcha_message.loadding .captcha_message__text {

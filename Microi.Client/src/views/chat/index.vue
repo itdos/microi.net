@@ -68,7 +68,7 @@
                 </div>
                 <div class="flex1 flexbox">
                     <!-- <record-list></record-list> -->
-                    <div v-if="FirstConnectWebsocket" style="z-index: 2; height: 30px; position: absolute; width: 250px; color: var(--el-text-color-primary); font-size: 14px; top: calc(50% - 15px); left: calc(50% - 60px)">
+                    <div v-if="FirstConnectWebsocket" style="z-index: 2; height: 30px; position: absolute; width: 250px; color: var(--el-text-color-primary); font-size: 13px; top: calc(50% - 15px); left: calc(50% - 60px)">
                         <el-icon><Loading /></el-icon> 正在连接消息服务器...
                     </div>
                     <div v-if="FirstConnectWebsocket" style="z-index: 1; height: 100%; background-color: #ccc; position: absolute; width: calc(100% - 60px); opacity: 0.5"></div>
@@ -1738,7 +1738,7 @@ export default {
     
     .drag-title {
         color: var(--color-primary-text, #fff);
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
         letter-spacing: 1px;
     }

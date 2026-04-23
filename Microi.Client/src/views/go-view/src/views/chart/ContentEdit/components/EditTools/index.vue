@@ -241,7 +241,7 @@ $asideBottom: 70px;
     overflow: hidden;
     transition: height ease 0.4s;
     .btn-item {
-      margin-bottom: 10px;
+      margin-bottom: 5px;
       &:first-of-type {
         margin-bottom: 0;
       }

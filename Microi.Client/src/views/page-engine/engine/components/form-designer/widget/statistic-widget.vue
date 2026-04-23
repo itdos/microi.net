@@ -135,7 +135,7 @@ const handleMoreClick = (linkUrl) => {
   background-repeat: no-repeat; /* 默认值，确保不重复 */
 }
 .date-range {
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   text-align: right;
 }
 </style>

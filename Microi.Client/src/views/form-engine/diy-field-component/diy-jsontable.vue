@@ -151,7 +151,7 @@
             <el-tabs v-model="configTabActive" class="json-table-config-tabs">
                 <el-tab-pane label="当前配置" name="current">
                     <div class="json-table-config">
-                        <div style="margin-bottom: 10px; color: #909399; font-size: 12px;">
+                        <div style="margin-bottom: 5px; color: #909399; font-size: 12px;">
                             当前已配置 {{ configColumns.length }} 列，可继续添加
                         </div>
                         <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="500" row-key="Id">
@@ -1616,7 +1616,7 @@ export default {
     .json-table-toolbar {
         display: flex;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     :deep(.el-table--default .el-table__cell){
         padding: 2px 0;

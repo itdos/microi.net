@@ -84,7 +84,7 @@ export default {
     z-index: 100;
 }
 .error-page-actions div {
-    font-size: 14px;
+    font-size: 13px;
     display: inline-block;
     padding: 30px 0 0 10px;
     width: 50%;

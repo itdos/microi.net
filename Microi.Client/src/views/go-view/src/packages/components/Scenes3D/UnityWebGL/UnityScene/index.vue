@@ -440,7 +440,7 @@ onActivated(async () => {
 
 .unity-loading-text {
   color: #51d6a9;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .unity-loading-bar {
