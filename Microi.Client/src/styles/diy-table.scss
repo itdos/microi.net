@@ -553,6 +553,7 @@
             overflow: visible;
             @media screen and (max-width: 768px) {
                 padding: 10px !important;
+                padding-bottom: 0px !important;
             }
         }
         .right-view-icon {
@@ -1329,7 +1330,7 @@
 }
 
 .card-action-btn {
-    height: 30px;
+    height: 28px;
     padding: 0 14px;
     font-size: 12px;
     font-weight: 500;
@@ -1483,15 +1484,15 @@
     }
 
     .card-action-btn {
-        height: 24px;
+        height: 28px;
         padding: 0 10px;
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .card-index-badge {
         min-width: 22px;
         height: 22px;
-        font-size: 11px;
+        font-size: 12px;
     }
 }
 
