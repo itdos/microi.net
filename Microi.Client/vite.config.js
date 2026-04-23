@@ -28,19 +28,22 @@ export default defineConfig({
             filename: 'bin/Release/dist/stats.html' // 输出文件路径
         }),
         // 🔥 Brotli压缩 - 比gzip效果更好
+        // 注意：排除 index.html，因为它包含运行时环境变量占位符，需要在容器启动时由 sed 替换
         compression({
             algorithm: 'brotliCompress',
             ext: '.br',
             threshold: 10240, // 大于10KB才压缩
             deleteOriginFile: false,
-            compressionOptions: { level: 6 } // level 6 比 11 快 5-10 倍，体积仅大 1-2%
+            compressionOptions: { level: 6 }, // level 6 比 11 快 5-10 倍，体积仅大 1-2%
+            filter: (file) => !file.endsWith('index.html')
         }),
         // 🔥 Gzip压缩 - 兼容旧浏览器
         compression({
             algorithm: 'gzip',
             ext: '.gz',
             threshold: 10240,
-            deleteOriginFile: false
+            deleteOriginFile: false,
+            filter: (file) => !file.endsWith('index.html')
         }),
         // HTTPS 自签名证书（仅开发环境）
         // basicSsl()

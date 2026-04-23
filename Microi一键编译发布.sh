@@ -891,9 +891,9 @@ docker_push_plan() {
     print_step "登录 ${DOCKER_REGISTRY}..."
     docker login --username="${DOCKER_USERNAME}" --password="${DOCKER_PASSWORD}" "${DOCKER_REGISTRY}"
 
-    # 构建镜像
+    # 构建镜像（--no-cache 确保 Dockerfile 修改和最新产物都进入新镜像，避免旧缓存层污染）
     print_step "构建镜像: $local_image"
-    (cd "$build_dir" && docker build -t "$local_image" .)
+    (cd "$build_dir" && docker build --no-cache -t "$local_image" .)
 
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"

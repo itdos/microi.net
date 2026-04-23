@@ -10,4 +10,4 @@ COPY dist/  /usr/share/nginx/html/
 COPY default.conf /etc/nginx/conf.d/default.conf
 
 # 启动 Nginx 并替换环境变量
-CMD ["/bin/bash", "-c", "sed -i \"s@var OsClient = '';@var OsClient = '$OsClient';@;s@var ApiBase = '';@var ApiBase = '$ApiBase';@;s@var ApiCustom = '';@var ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
+CMD ["/bin/bash", "-c", "sed -i \"s@var OsClient = '';@var OsClient = '$OsClient';@;s@var ApiBase = '';@var ApiBase = '$ApiBase';@;s@var FileServer = '';@var FileServer = '$FileServer';@;s@var OsClientType = '';@var OsClientType = '$OsClientType';@;s@var ApiCustom = '';@var ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
