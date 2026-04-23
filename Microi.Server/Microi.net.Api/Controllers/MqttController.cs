@@ -26,7 +26,7 @@ namespace Microi.net.Api
             return Ok(new
             {
                 IsRunning = _mqttService.IsRunning,
-                // ConnectedClients = _mqttService.ConnectedClients
+                ConnectedClients = _mqttService.ConnectedClients
             });
         }
 
@@ -41,6 +41,7 @@ namespace Microi.net.Api
         [HttpPost("send-command")]
         public async Task<IActionResult> SendCommand([FromBody] string command)
         {
+            // 注意：此为旧版示例接口，未做租户隔离。生产请使用 PublishAsync(osClient, topic, payload)
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic("M100/command")
                 .WithPayload(command)
