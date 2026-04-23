@@ -1,10 +1,21 @@
 <template>
   <view class="profile-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
+    <view class="mci-aurora">
+      <view class="mci-aurora__orb mci-aurora__orb--1"></view>
+      <view class="mci-aurora__orb mci-aurora__orb--2"></view>
+      <view class="mci-aurora__orb mci-aurora__orb--3"></view>
+      <view class="mci-aurora__orb mci-aurora__orb--4"></view>
+    </view>
     <!-- 顶部用户卡片 -->
     <view class="user-card" :style="{ paddingTop: statusBarHeight + 'px', background: themeColor }">
       <view class="card-bg">
         <view class="bg-circle c1"></view>
         <view class="bg-circle c2"></view>
+      </view>
+      <view class="hero-actions">
+        <view class="mode-toggle" @tap="toggleThemeMode">
+          <text>{{ isDarkMode ? '☀️' : '🌙' }}</text>
+        </view>
       </view>
       <view class="card-content">
         <!-- 骨架屏 -->
@@ -42,7 +53,7 @@
       <view class="func-group">
         <view class="func-item" @tap="showThemePanel = true">
           <view class="item-left">
-            <view class="item-icon" style="background:#fff0e8;">
+            <view class="item-icon item-icon--primary">
               <text>🎨</text>
             </view>
             <text class="item-title">{{ t('profile.themeSwitch') }}</text>
@@ -54,7 +65,7 @@
         </view>
         <view class="func-item" @tap="showLangPanel = true">
           <view class="item-left">
-            <view class="item-icon" style="background:#eef2ff;">
+            <view class="item-icon item-icon--cyan">
               <text>🌐</text>
             </view>
             <text class="item-title">{{ t('profile.langSwitch') }}</text>
@@ -70,7 +81,7 @@
       <view class="func-group">
         <view class="func-item" @tap="goAbout">
           <view class="item-left">
-            <view class="item-icon" style="background:#eef2ff;">
+            <view class="item-icon item-icon--blue">
               <text>ℹ️</text>
             </view>
             <text class="item-title">{{ t('profile.aboutSystem') }}</text>
@@ -82,7 +93,7 @@
         </view>
         <view class="func-item" @tap="goPrivacy">
           <view class="item-left">
-            <view class="item-icon" style="background:#f5f0ff;">
+            <view class="item-icon item-icon--purple">
               <text>🔐</text>
             </view>
             <text class="item-title">{{ t('profile.privacyPolicy') }}</text>
@@ -97,7 +108,7 @@
       <view class="func-group" v-if="isLoggedIn">
         <view class="func-item" @tap="showPasswordDialog = true">
           <view class="item-left">
-            <view class="item-icon" style="background:#fff0e8;">
+            <view class="item-icon item-icon--gold">
               <text>🔑</text>
             </view>
             <text class="item-title">{{ t('profile.changePassword') }}</text>
@@ -112,10 +123,10 @@
       <view class="func-group" v-if="isLoggedIn">
         <view class="func-item logout-item" @tap="handleLogout">
           <view class="item-left">
-            <view class="item-icon" style="background:#ffecec;">
+            <view class="item-icon item-icon--danger">
               <text>🚪</text>
             </view>
-            <text class="item-title" style="color:#ff4d4f;">{{ t('profile.logout') }}</text>
+            <text class="item-title">{{ t('profile.logout') }}</text>
           </view>
         </view>
       </view>
@@ -124,10 +135,10 @@
       <view class="func-group" v-if="!isLoggedIn">
         <view class="func-item" @tap="goLogin">
           <view class="item-left">
-            <view class="item-icon" style="background:#eef2ff;">
+            <view class="item-icon item-icon--blue">
               <text>🔓</text>
             </view>
-            <text class="item-title" style="color:#6C2BD9;font-weight:600;">{{ t('common.loginNow') }}</text>
+            <text class="item-title item-title--primary">{{ t('common.loginNow') }}</text>
           </view>
           <view class="item-right">
             <text class="arrow">›</text>
@@ -147,6 +158,22 @@
         <view class="sheet-header">
           <text class="sheet-title">{{ t('profile.selectTheme') }}</text>
           <text class="sheet-close" @tap="showThemePanel = false">✕</text>
+        </view>
+        <view class="mode-section">
+          <text class="mode-section-title">显示模式</text>
+          <view class="mode-switch">
+            <view class="mode-item" :class="{ active: themeMode === 'light' }" @tap="switchThemeMode('light')">
+              <text class="mode-icon">☀️</text>
+              <text class="mode-label">浅色</text>
+            </view>
+            <view class="mode-item" :class="{ active: themeMode === 'dark' }" @tap="switchThemeMode('dark')">
+              <text class="mode-icon">🌙</text>
+              <text class="mode-label">深色</text>
+            </view>
+          </view>
+        </view>
+        <view class="mode-section mode-section--theme">
+          <text class="mode-section-title">主题色</text>
         </view>
         <view class="theme-grid">
           <view
@@ -225,7 +252,7 @@
 import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
 import appConfig from '@/config.js'
-import { themeMixin, setTheme, applyMciTokensH5 } from '@/utils/theme.js'
+import { themeMixin, setTheme } from '@/utils/theme.js'
 import { setLang } from '@/utils/i18n.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 
@@ -249,18 +276,18 @@ export default {
       },
       // 主题色（MCI 设计系统色板：紫色为默认主色，搭配蓝/青/粉/橙/红/绿等多彩选项）
             themeColors: [
-        { name: this.t ? this.t('profile.purple') || '紫色' : '紫色', value: '#6C2BD9' },
-        { name: this.t ? this.t('profile.blue') : '蓝色', value: '#2196F3' },
+              { name: this.t ? this.t('profile.purple') || '紫色' : '紫色', value: '#6C2BD9' },
+              { name: this.t ? this.t('profile.blue') : '蓝色', value: '#2196F3' },
         { name: '青色', value: '#06B6D4' },
         { name: '粉色', value: '#EC4899' },
         { name: '橙色', value: '#F59E0B' },
         { name: '红色', value: '#E8294A' },
         { name: '绿色', value: '#27AE60' },
-        { name: '靖蓝', value: '#3F51B5' },
+              { name: '靛蓝', value: '#3F51B5' },
         { name: '深橙', value: '#FF5722' },
         { name: '灰蓝', value: '#607D8B' },
         { name: '天蓝', value: '#409EFF' },
-        { name: '黑色', value: '#1A1A2E' }
+              { name: '深紫', value: '#673AB7' }
       ],
       // 语言
       currentLang: 'zh-CN',
@@ -303,7 +330,7 @@ export default {
     // 读取已保存的主题色和语言
     try {
       const savedTheme = uni.getStorageSync('microi_theme_color')
-      if (savedTheme) this.themeColor = savedTheme
+      if (savedTheme) this._themeColor = savedTheme
     } catch (e) {}
     try {
       const savedLang = uni.getStorageSync('microi_language')
@@ -357,8 +384,6 @@ export default {
     changeTheme(color) {
       this._themeColor = color
       setTheme(color)
-      // H5 端立即把 MCI 变量写到 documentElement
-      applyMciTokensH5(color)
       this.showThemePanel = false
       uni.showToast({ title: this.t('profile.themeSwitched'), icon: 'success' })
     },
@@ -449,9 +474,28 @@ export default {
 <style lang="scss" scoped>
 .profile-container {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--mci-bg-base);
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.hero-actions {
+  position: absolute;
+  top: calc(var(--mci-space-2) + 8rpx);
+  right: 24rpx;
+  z-index: 3;
+}
+
+.mode-toggle {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: var(--mci-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
 }
 
 /* 用户卡片 */
@@ -589,11 +633,12 @@ export default {
 }
 
 .func-group {
-  background: #fff;
-  border-radius: 20rpx;
+  background: var(--mci-bg-elevated);
+  border-radius: var(--mci-radius-lg);
   margin-bottom: 20rpx;
   overflow: hidden;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  box-shadow: var(--mci-shadow-card, var(--mci-shadow-md));
+  border: 1rpx solid var(--mci-border-color);
 }
 
 .func-item {
@@ -602,10 +647,11 @@ export default {
   justify-content: space-between;
   padding: 28rpx 28rpx;
   border-bottom: 1rpx solid #f8f8f8;
+  border-bottom-color: var(--mci-border-color);
   transition: background-color 0.15s ease;
 
   &:active {
-    background-color: #f5f5f5;
+    background-color: var(--mci-bg-card-hover);
   }
 
   &:last-child {
@@ -621,7 +667,7 @@ export default {
 .item-icon {
   width: 64rpx;
   height: 64rpx;
-  border-radius: 16rpx;
+  border-radius: var(--mci-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -630,11 +676,23 @@ export default {
   text {
     font-size: 30rpx;
   }
+
+  &--primary { background: var(--mci-gradient-primary); }
+  &--cyan { background: linear-gradient(135deg, #06B6D4, #22D3EE); }
+  &--blue { background: linear-gradient(135deg, #2196F3, #60A5FA); }
+  &--purple { background: linear-gradient(135deg, #8B5CF6, #A78BFA); }
+  &--gold { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
+  &--danger { background: linear-gradient(135deg, #E8294A, #FB7185); }
 }
 
 .item-title {
   font-size: 30rpx;
-  color: #333;
+  color: var(--mci-text-primary);
+}
+
+.item-title--primary {
+  color: var(--mci-color-primary);
+  font-weight: 600;
 }
 
 .item-right {
@@ -644,7 +702,7 @@ export default {
 
 .item-value {
   font-size: 26rpx;
-  color: #999;
+  color: var(--mci-text-secondary);
   margin-right: 8rpx;
 }
 
@@ -652,19 +710,19 @@ export default {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  border: 4rpx solid #fff;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.15);
+  border: 4rpx solid var(--mci-bg-elevated);
+  box-shadow: 0 0 0 1rpx var(--mci-border-color), 0 2rpx 8rpx rgba(0,0,0,0.15);
   margin-right: 12rpx;
 }
 
 .arrow {
   font-size: 36rpx;
-  color: #ccc;
+  color: var(--mci-text-tertiary);
 }
 
 .logout-item {
   .item-title {
-    color: #ff4d4f;
+    color: var(--mci-color-danger);
   }
 }
 
@@ -676,7 +734,7 @@ export default {
 
 .footer-text {
   font-size: 22rpx;
-  color: #ccc;
+  color: var(--mci-text-tertiary);
 }
 
 /* 底部弹出面板（主题、语言共用） */
@@ -696,10 +754,10 @@ export default {
 .sheet-panel {
   width: 100%;
   max-height: 70vh;
-  background: #fff;
+  background: var(--mci-bg-elevated);
   border-radius: 32rpx 32rpx 0 0;
   overflow: hidden;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
 }
 
 .sheet-header {
@@ -707,19 +765,61 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx 32rpx 24rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 1rpx solid var(--mci-border-color);
 }
 
 .sheet-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #333;
+  color: var(--mci-text-primary);
 }
 
 .sheet-close {
   font-size: 36rpx;
-  color: #999;
+  color: var(--mci-text-secondary);
   padding: 0 8rpx;
+}
+
+.mode-section {
+  padding: 24rpx 28rpx 0;
+
+  &--theme {
+    padding-top: 14rpx;
+  }
+}
+
+.mode-section-title {
+  color: var(--mci-text-secondary);
+  font-size: var(--mci-text-sm);
+}
+
+.mode-switch {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.mode-item {
+  flex: 1;
+  min-height: 86rpx;
+  border-radius: var(--mci-radius-md);
+  border: 1rpx solid var(--mci-border-color);
+  background: var(--mci-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+
+  &.active {
+    border-color: var(--mci-color-primary);
+    color: var(--mci-color-primary);
+    background: rgba(108, 43, 217, 0.08);
+  }
+}
+
+.mode-label {
+  color: inherit;
+  font-size: 26rpx;
 }
 
 /* 主题选择网格 */
@@ -739,7 +839,7 @@ export default {
 
   &.active .theme-color {
     transform: scale(1.15);
-    box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.25);
+    box-shadow: 0 0 0 4rpx var(--mci-color-primary), 0 4rpx 16rpx rgba(0,0,0,0.25);
   }
 }
 
@@ -763,7 +863,7 @@ export default {
 
 .theme-name {
   font-size: 24rpx;
-  color: #666;
+  color: var(--mci-text-secondary);
 }
 
 /* 语言选择列表 */
@@ -776,10 +876,10 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx 40rpx;
-  border-bottom: 1rpx solid #f5f5f5;
+  border-bottom: 1rpx solid var(--mci-border-color);
 
   &.active {
-    background: #f0f5ff;
+    background: rgba(108, 43, 217, 0.08);
 
     .lang-name {
       color: var(--theme, #6C2BD9);
@@ -790,7 +890,7 @@ export default {
 
 .lang-name {
   font-size: 30rpx;
-  color: #333;
+  color: var(--mci-text-primary);
 }
 
 .lang-check {
@@ -815,9 +915,10 @@ export default {
 
 .pwd-panel {
   width: 88%;
-  background: #fff;
+  background: var(--mci-bg-elevated);
   border-radius: 24rpx;
   overflow: hidden;
+  border: 1rpx solid var(--mci-border-color);
 }
 
 .pwd-header {
@@ -825,18 +926,18 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 1rpx solid var(--mci-border-color);
 }
 
 .pwd-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #333;
+  color: var(--mci-text-primary);
 }
 
 .pwd-close {
   font-size: 32rpx;
-  color: #999;
+  color: var(--mci-text-secondary);
 }
 
 .pwd-form {
@@ -849,7 +950,7 @@ export default {
 
 .pwd-label {
   font-size: 26rpx;
-  color: #666;
+  color: var(--mci-text-secondary);
   margin-bottom: 12rpx;
   display: block;
 }
@@ -857,11 +958,12 @@ export default {
 .pwd-input {
   width: 100%;
   height: 80rpx;
-  background: #f5f7fa;
-  border: 2rpx solid #f0f0f0;
+  background: var(--mci-bg-card);
+  border: 2rpx solid var(--mci-border-color);
   border-radius: 12rpx;
   padding: 0 24rpx;
   font-size: 28rpx;
+  color: var(--mci-text-primary);
   box-sizing: border-box;
 }
 
@@ -875,14 +977,14 @@ export default {
   flex: 1;
   height: 80rpx;
   border-radius: 40rpx;
-  border: 2rpx solid #ddd;
+  border: 2rpx solid var(--mci-border-color-hover);
   display: flex;
   align-items: center;
   justify-content: center;
 
   text {
     font-size: 28rpx;
-    color: #666;
+    color: var(--mci-text-secondary);
   }
 }
 

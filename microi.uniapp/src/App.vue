@@ -1,12 +1,15 @@
 <script>
 import { getToken, request } from './utils/request.js'
+import { initializeThemeSystem } from './utils/theme.js'
 
 export default {
   onLaunch() {
     console.log('App Launch')
+    initializeThemeSystem()
   },
   onShow() {
     console.log('App Show')
+    initializeThemeSystem()
     // 每次小程序/App切到前台时，自动刷新Token实现长期自动登录
     this.refreshToken()
   },

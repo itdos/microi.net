@@ -1,5 +1,5 @@
 <template>
-  <view class="privacy-page" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="privacy-page" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <view class="privacy-content">
       <view class="section">
         <text class="section-title">{{ t('privacy.intro') }}</text>
