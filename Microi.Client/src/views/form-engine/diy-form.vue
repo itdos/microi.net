@@ -4066,7 +4066,7 @@ export default {
             min-width: 30px;
             text-align: center;
             color: var(--el-color-primary, #409EFF);
-            font-size: 14px;
+            font-size: 13px;
         }
 
         :deep(.el-button) {

@@ -877,7 +877,7 @@ onUnmounted(() => {
     
     p {
       margin: 0;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--el-text-color-secondary, #64748b);
     }
   }
@@ -989,12 +989,12 @@ onUnmounted(() => {
       
       .label {
         color: #64748b;
-        font-size: 14px;
+        font-size: 13px;
       }
       
       .value {
         color: #1e293b;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
       }
     }
@@ -1050,7 +1050,7 @@ onUnmounted(() => {
     
     .preview-tip {
       color: #94a3b8;
-      font-size: 14px;
+      font-size: 13px;
       margin-bottom: 24px;
     }
   }
@@ -1074,7 +1074,7 @@ onUnmounted(() => {
     
     p {
       margin-top: 12px;
-      font-size: 14px;
+      font-size: 13px;
     }
   }
 

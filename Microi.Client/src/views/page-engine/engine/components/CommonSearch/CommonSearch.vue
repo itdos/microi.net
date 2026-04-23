@@ -169,7 +169,7 @@ await loadRemoteData()
 
 <style lang="scss" scoped>
 .date-range {
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   text-align: right;
 }
 </style>

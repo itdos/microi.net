@@ -1054,7 +1054,7 @@ export default {
 }
 
 .notice-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #303133;
     overflow: hidden;
@@ -1236,7 +1236,7 @@ export default {
     background: #fff;
     border-radius: 12px;
     padding: 14px 16px;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     border: 1px solid #f0f2f5;
     transition: all 0.2s;
     cursor: pointer;
@@ -1306,7 +1306,7 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     font-size: 12px;
     color: #86909c;
 }

@@ -563,7 +563,7 @@ export default {
             }
 
             &.tenant-name {
-                font-size: 14px;
+                font-size: 13px;
                 color: #606266;
                 // font-weight: 500;
             }

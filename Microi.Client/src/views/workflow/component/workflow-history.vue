@@ -52,7 +52,7 @@
                             <div>
                                 <!-- <span v-for="(copyUser, index2) in history.CopyUsers"
                             :key="'copyUser_' + copyUser.Id"
-                            style="text-align:center;margin-bottom:10px;margin-right:5px;float:left;">
+                            style="text-align:center;margin-bottom: 5px;margin-right:5px;float:left;">
                             <el-tooltip class="item" effect="dark" :content="copyUser.Name" placement="bottom" style="height:28px;">
                                 <el-avatar
                                     :size="'small'"

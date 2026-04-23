@@ -379,7 +379,7 @@ onUnmounted(() => {
 
     .row-item {
       display: flex;
-      font-size: 14px;
+      font-size: 13px;
       transition: all 0.3s;
       overflow: hidden;
     }

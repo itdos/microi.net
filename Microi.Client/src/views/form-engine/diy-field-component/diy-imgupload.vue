@@ -1063,13 +1063,13 @@ onBeforeUnmount(() => {
                     padding: 2px 8px;
                 }
                 :deep(.el-input__inner) {
-                    font-size: 14px;
+                    font-size: 13px;
                 }
             }
 
             .img-name {
                 flex: 1;
-                font-size: 14px;
+                font-size: 13px;
                 color: #606266;
                 overflow: hidden;
                 text-overflow: ellipsis;

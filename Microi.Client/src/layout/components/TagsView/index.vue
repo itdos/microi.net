@@ -121,7 +121,7 @@
 
             .el-icon {
                 margin-right: 4px;
-                font-size: 14px;
+                font-size: 13px;
                 transition: transform 0.3s ease;
             }
 
@@ -149,7 +149,7 @@
         color: #fff;
         padding: 10px 24px;
         border-radius: 8px;
-        font-size: 14px;
+        font-size: 13px;
         z-index: 9999;
         pointer-events: none;
         white-space: nowrap;
@@ -184,7 +184,7 @@
             padding: 8px 16px;
             cursor: pointer;
             color: #606266;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.2s ease;
 
             &:hover {

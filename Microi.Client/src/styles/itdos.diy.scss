@@ -1,4 +1,118 @@
+// ── 全局紧凑布局覆盖（配合 element-variables.scss 中的尺寸变量）──────────────────
+// 目标：在低分辨率屏幕上显示更多内容，不依赖组件 size 属性
+.microi, body {
+    // 表格行高 & 单元格
+    .el-table {
+        font-size: 12px;
+        .el-table__cell {
+            padding: 4px 0;
+        }
+        .cell {
+            padding: 0 6px;
+            line-height: 20px;
+        }
+        th.el-table__cell {
+            font-size: 12px;
+        }
+    }
+
+    // 卡片减少内边距
+    .el-card__body {
+        padding: 10px;
+    }
+    .el-card__header {
+        padding: 8px 12px;
+    }
+
+    // 表单项间距
+    .el-form-item {
+        margin-bottom: 5px;
+    }
+    .el-form-item__label {
+        font-size: 13px;
+        line-height: 22px;
+        padding-bottom: 2px;
+    }
+    .el-form-item__content {
+        line-height: 22px;
+        font-size: 13px;
+    }
+
+    // 分页
+    .el-pagination {
+        font-size: 12px;
+        .el-pagination__total,
+        .el-pagination__jump {
+            font-size: 12px;
+            line-height: 22px;
+        }
+    }
+
+    // Tag
+    .el-tag {
+        height: 20px;
+        line-height: 18px;
+        padding: 0 6px;
+        font-size: 11px;
+        &.el-tag--large {
+            height: 26px;
+            line-height: 24px;
+            font-size: 12px;
+        }
+    }
+
+    // Descriptions
+    .el-descriptions__label,
+    .el-descriptions__content {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    // Dialog header/footer 间距
+    .el-dialog__header {
+        padding: 10px 16px 8px;
+    }
+    .el-dialog__title {
+        font-size: 13px;
+    }
+    .el-dialog__footer {
+        padding: 8px 16px;
+    }
+
+    // Tabs
+    .el-tabs__item {
+        font-size: 13px;
+        height: 34px;
+        line-height: 34px;
+        padding: 0 14px;
+    }
+    .el-tabs__nav-wrap {
+        &::after {
+            height: 1px;
+        }
+    }
+
+    // 输入框/选择框高度跟随 small 尺寸
+    .el-input__inner {
+        font-size: 12px;
+    }
+    .el-select .el-input__inner {
+        font-size: 12px;
+    }
+
+    // 抽屉/弹窗内标题
+    .el-drawer__header {
+        font-size: 13px;
+        margin-bottom: 8px;
+        padding: 12px 16px 10px;
+    }
+}
+
 .microi {
+    .el-select--small .el-select__wrapper,
+    .el-checkbox.el-checkbox--small{
+        height: 28px;
+    }
     .ve__button{
         background : linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
         color: var(--color-primary-text, #ffffff) !important;
@@ -239,7 +353,7 @@
     }
     .el-input__inner,
     .el-textarea__inner {
-        font-size: 14px;
+        font-size: 13px;
         color: var(--el-text-color-primary, #000);
     }
     .el-textarea__inner {
@@ -338,12 +452,12 @@
             padding-top: 10px;
             padding-bottom: 10px;
             line-height: 28px;
-            font-size: 14px;
+            font-size: 13px;
         }
         .bottom-time,
         .bottom {
             color: #999;
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 5px;
         }
         .item {
@@ -377,7 +491,7 @@
             padding-bottom: 10px;
             line-height: 30px;
             .title {
-                font-size: 14px;
+                font-size: 13px;
             }
         }
         .item {
@@ -386,7 +500,7 @@
         }
         .bottom {
             color: #999;
-            font-size: 14px;
+            font-size: 13px;
             padding-left: 15px;
             padding-right: 15px;
             padding-bottom: 20px;
@@ -398,10 +512,10 @@
         .el-tabs__header {
             background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
             border-radius: 8px;
-            padding: 8px 12px;
+            padding: 4px 6px;
             border: 1px solid var(--el-border-color, #e4e7ed);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
         @media screen and (max-width: 768px) {
             .el-tabs__header {
@@ -430,7 +544,7 @@
             border: 1px solid transparent;
             border-radius: 6px;
             font-weight: 400;
-            font-size: 14px;
+            font-size: 13px;
             color: var(--el-text-color-regular, #606266);
             transition: all 0.15s ease;
             background: transparent;
@@ -467,7 +581,7 @@
 
             i {
                 margin-right: 6px;
-                font-size: 14px;
+                font-size: 13px;
             }
         }
 
@@ -661,7 +775,7 @@ p {
         top: 18px;
     }
     #app-microi .sidebar-container-microi {
-        font-size: 14px;
+        font-size: 13px;
     }
     #app-microi .sidebar-container-microi.has-logo .el-scrollbar {
         height: calc(100% - 80px);
@@ -693,7 +807,7 @@ p {
         line-height: 26px;
         margin-top: 8px;
         color: #171717;
-        font-size: 14px;
+        font-size: 13px;
     }
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi.active {
         // border-bottom: solid 3px #242B49;
@@ -717,18 +831,18 @@ p {
     }
     .el-submenu__title,
     .el-menu-item {
-        height: 50px;
-        line-height: 50px;
-        font-size: 14px;
+        height: 46px;
+        line-height: 46px;
+        font-size: 13px;
     }
     .el-submenu .el-menu-item {
-        height: 47px;
-        line-height: 47px;
-        font-size: 14px;
+        height: 46px;
+        line-height: 46px;
+        font-size: 13px;
     }
     .el-menu .el-submenu .el-submenu .el-submenu__title {
-        height: 47px;
-        line-height: 47px;
+        height: 46px;
+        line-height: 46px;
     }
 
     #app-microi .sidebar-container-microi .is-active > .el-submenu__title:hover {
@@ -810,7 +924,7 @@ p {
         padding-top: 0px;
         width: 100%;
         .el-tabs.el-tabs--top.parent-tabs{
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }   
     }
     .app-main-microi {
@@ -941,7 +1055,7 @@ p {
     margin-bottom: 5px;
 }
 .marginBottom10 {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 .marginBottom15 {
     margin-bottom: 15px;
@@ -1123,7 +1237,7 @@ a.disabled {
     min-height: 1px;
     padding-right: 15px;
     padding-left: 15px;
-    /* margin-bottom: 10px; */
+    /* margin-bottom: 5px; */
 }
 
 @media (min-width: 768px) {
@@ -1136,7 +1250,7 @@ a.disabled {
     .phone-table-more-btn{
         li.el-dropdown-menu__item{
             line-height: 36px;
-            font-size: 14px;
+            font-size: 13px;
         }
     }
 }
@@ -1759,7 +1873,7 @@ html {
     .filter-item {
         display: inline-block;
         vertical-align: middle;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
 }
 

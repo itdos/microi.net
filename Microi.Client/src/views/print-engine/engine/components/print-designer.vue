@@ -1279,7 +1279,7 @@ $text-secondary: #718096;
   }
 
   .mpe-brand-text {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #e2e8f0;
     letter-spacing: 1px;
@@ -1514,18 +1514,18 @@ $text-secondary: #718096;
     &__title {
       font-size: 12px;
       color: $text-secondary;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
       font-weight: 500;
     }
     &__row {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
     &__sep {
       color: $text-secondary;
-      font-size: 14px;
+      font-size: 13px;
     }
     &__actions {
       display: flex;

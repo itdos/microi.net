@@ -481,7 +481,7 @@ onUnmounted(() => {
       p {
         margin-top: 16px;
         color: #64748b;
-        font-size: 14px;
+        font-size: 13px;
       }
     }
 
@@ -506,7 +506,7 @@ onUnmounted(() => {
 
       p {
         color: #64748b;
-        font-size: 14px;
+        font-size: 13px;
         margin: 4px 0;
         max-width: 500px;
       }

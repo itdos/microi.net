@@ -794,7 +794,7 @@ export default {
     width: 100%;
     
     .tree-checkbox-toolbar {
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
 }
 

@@ -70,7 +70,7 @@ app.use(pinia);
 // 使用 Element Plus
 app.use(ElementPlus, {
     locale: zhCn,
-    size: Cookies.get("size") || "default"
+    size: Cookies.get("size") || "small"//default
 });
 // 注册所有 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
