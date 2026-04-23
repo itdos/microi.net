@@ -1658,7 +1658,7 @@ defineExpose({
             }
 
             .el-icon {
-                font-size: 14px;
+                font-size: 13px;
             }
 
             // AI 编程按钮特殊样式
@@ -1723,7 +1723,7 @@ defineExpose({
         
         .el-icon {
             color: #cccccc;
-            font-size: 14px;
+            font-size: 13px;
             transform: rotate(-45deg);
         }
         
@@ -1793,7 +1793,7 @@ defineExpose({
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
                 color: #e2e8f0;
 
@@ -1937,7 +1937,7 @@ defineExpose({
                 text-align: left;
 
                 .el-icon {
-                    font-size: 14px;
+                    font-size: 13px;
                     color: #a78bfa;
                     flex-shrink: 0;
                 }
@@ -1969,7 +1969,7 @@ defineExpose({
 
                 &.user-avatar {
                     background: linear-gradient(135deg, #3b82f6, #2563eb);
-                    .el-icon { color: #fff; font-size: 14px; }
+                    .el-icon { color: #fff; font-size: 13px; }
                 }
 
                 &.ai-avatar {
@@ -2176,7 +2176,7 @@ defineExpose({
     h4 {
         margin: 15px 0 10px;
         color: #409eff;
-        font-size: 14px;
+        font-size: 13px;
 
         &:first-child {
             margin-top: 0;
@@ -2213,7 +2213,7 @@ defineExpose({
             span {
                 margin-left: auto;
                 color: #666;
-                font-size: 14px;
+                font-size: 13px;
             }
         }
     }

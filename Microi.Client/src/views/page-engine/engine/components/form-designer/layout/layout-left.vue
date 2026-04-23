@@ -209,7 +209,7 @@ const handleDragWrapperStart = (e) => {
             border-radius: 5px;
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
             color: #667eea;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             img {
               transition: filter 0.25s;

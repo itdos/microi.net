@@ -131,7 +131,7 @@ $textSize: 10px;
       position: relative;
       height: $centerHeight;
       padding: 5px;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
       margin-right: 15px;
       border-radius: 5px;
       cursor: pointer;

@@ -443,10 +443,6 @@
             <div class="mci-progress-bar" id="progressBar"></div>
         </div>
 
-        <!-- 加载信息 -->
-        <div class="mci-load-info mci-load-info--speed" id="loadSpeed">正在初始化...</div>
-        <div class="mci-load-info" id="loadSize"></div>
-
         <!-- 圆点动画 -->
         <div class="mci-load-dots" id="loadDots">
             <div class="dot"></div>
@@ -537,11 +533,8 @@
         // 此处通过模拟进度给用户视觉反馈
         var _loadAnim = (function() {
             var percentEl = document.getElementById('loadPercent');
-            var speedEl = document.getElementById('loadSpeed');
-            var sizeEl = document.getElementById('loadSize');
             var barEl = document.getElementById('progressBar');
             var percent = 0;
-            var fakeTotal = 9.2; // MB（估算的前端资源大小）
             var timer = null;
             var running = false;
 
@@ -552,10 +545,6 @@
                 var p = Math.floor(percent);
                 if (percentEl) percentEl.textContent = p + '%';
                 if (barEl) barEl.style.width = p + '%';
-                var speed = (Math.random() * 700 + 350).toFixed(0);
-                if (speedEl) speedEl.textContent = '速度: ' + speed + ' KB/s';
-                var loaded = (fakeTotal * percent / 100).toFixed(2);
-                if (sizeEl) sizeEl.textContent = loaded + ' MB / ' + fakeTotal.toFixed(2) + ' MB';
             }
 
             return {
@@ -569,8 +558,6 @@
                     percent = 100;
                     if (percentEl) percentEl.textContent = '100%';
                     if (barEl) barEl.style.width = '100%';
-                    if (speedEl) speedEl.textContent = '正在进入应用...';
-                    if (sizeEl) sizeEl.textContent = fakeTotal.toFixed(2) + ' MB / ' + fakeTotal.toFixed(2) + ' MB';
                 },
                 stop: function() {
                     clearInterval(timer); running = false;
@@ -580,8 +567,6 @@
                     percent = 0;
                     if (percentEl) percentEl.textContent = '0%';
                     if (barEl) barEl.style.width = '0%';
-                    if (speedEl) speedEl.textContent = '正在初始化...';
-                    if (sizeEl) sizeEl.textContent = '';
                 }
             };
         })();
@@ -596,8 +581,6 @@
             try {
                 document.getElementById('progressWrap').style.display = 'none';
                 document.getElementById('loadPercent').style.display = 'none';
-                document.getElementById('loadSpeed').style.display = 'none';
-                document.getElementById('loadSize').style.display = 'none';
                 document.getElementById('loadDots').style.display = 'none';
                 document.getElementById('errorMsg').textContent = msg || '网络连接失败';
                 document.getElementById('errorPanel').style.display = 'flex';
@@ -609,8 +592,6 @@
             try {
                 document.getElementById('progressWrap').style.display = '';
                 document.getElementById('loadPercent').style.display = '';
-                document.getElementById('loadSpeed').style.display = '';
-                document.getElementById('loadSize').style.display = '';
                 document.getElementById('loadDots').style.display = '';
                 document.getElementById('errorPanel').style.display = 'none';
             } catch(e) {}

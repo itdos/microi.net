@@ -251,14 +251,14 @@ onMounted(() => {
 /* 卡片 */
 .oc-card { background: linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
 .oc-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.oc-card-title { font-size: 14px; font-weight: 600; color: #d0d4e0; }
+.oc-card-title { font-size: 13px; font-weight: 600; color: #d0d4e0; }
 .oc-card-extra { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
 
 /* 节点 */
 .oc-node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .oc-node-item { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; transition: all 0.2s; }
 .oc-node-item:hover { border-color: rgba(249,115,22,0.2); }
-.oc-node-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.oc-node-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .oc-node-name { font-size: 13px; font-weight: 600; color: #e0e0e5; }
 .oc-node-os { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); color: #8b8fa3; margin-left: auto; }
 .oc-node-metrics { display: flex; flex-direction: column; gap: 6px; }

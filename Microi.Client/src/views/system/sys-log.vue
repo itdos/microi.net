@@ -8,10 +8,10 @@
                     <el-form :model="SearchModel" inline @submit.prevent class="filter-form">
                         <el-form-item>
                             <el-button-group style="margin-right: 12px">
-                                <el-button :type="SearchModel.Type === '' ? 'primary' : 'default'" size="default" @click="QuickFilter('')">全部</el-button>
-                                <el-button :type="SearchModel.Type === '数据库慢SQL' ? 'warning' : 'default'" size="default" @click="QuickFilter('数据库慢SQL')">慢SQL</el-button>
-                                <el-button :type="SearchModel.Type === '表单V8慢日志' ? 'warning' : 'default'" size="default" @click="QuickFilter('表单V8慢日志')">慢执行</el-button>
-                                <el-button :type="SearchModel.Type === 'Exception' ? 'danger' : 'default'" size="default" @click="QuickFilter('Exception')">异常</el-button>
+                                <el-button :type="SearchModel.Type === '' ? 'primary' : 'default'" size="small" @click="QuickFilter('')">全部</el-button>
+                                <el-button :type="SearchModel.Type === '数据库慢SQL' ? 'warning' : 'default'" size="small" @click="QuickFilter('数据库慢SQL')">慢SQL</el-button>
+                                <el-button :type="SearchModel.Type === '表单V8慢日志' ? 'warning' : 'default'" size="small" @click="QuickFilter('表单V8慢日志')">慢执行</el-button>
+                                <el-button :type="SearchModel.Type === 'Exception' ? 'danger' : 'default'" size="small" @click="QuickFilter('Exception')">异常</el-button>
                             </el-button-group>
                             <el-tooltip content="自动刷新" placement="top">
                                 <el-switch v-model="AutoRefresh" @change="ToggleAutoRefresh" style="margin-right: 8px" />
@@ -240,7 +240,7 @@
         <!-- 详情弹窗 -->
         <el-dialog v-model="ShowDetail" title="日志详情" width="860px" draggable :close-on-click-modal="true" :destroy-on-close="true">
             <template v-if="DetailModel">
-                <el-descriptions :column="3" border size="default" class="detail-desc">
+                <el-descriptions :column="3" border size="small" class="detail-desc">
                     <el-descriptions-item label="日志级别" :span="1">
                         <el-tag :type="GetLevelTag(DetailModel.Level).type" size="small" effect="dark" round>
                             {{ GetLevelTag(DetailModel.Level).text }}
@@ -903,7 +903,7 @@ export default {
     justify-content: center;
     height: 200px;
     color: #565f89;
-    font-size: 14px;
+    font-size: 13px;
     gap: 8px;
 }
 .docker-lines {

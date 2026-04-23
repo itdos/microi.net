@@ -171,7 +171,7 @@ onMounted(loadArticles)
 
 .oc-article-preview { max-height: 600px; overflow-y: auto; }
 .oc-preview-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; font-size: 12px; color: #8b8fa3; }
-.oc-preview-content { font-size: 14px; line-height: 1.8; color: #d0d4e0; padding: 16px; background: rgba(0,0,0,0.3); border-radius: 10px; }
+.oc-preview-content { font-size: 13px; line-height: 1.8; color: #d0d4e0; padding: 16px; background: rgba(0,0,0,0.3); border-radius: 10px; }
 .oc-preview-tags { margin-top: 14px; display: flex; gap: 6px; flex-wrap: wrap; }
 
 :deep(.oc-select .el-input__wrapper) { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.08) !important; box-shadow: none !important; border-radius: 8px !important; }

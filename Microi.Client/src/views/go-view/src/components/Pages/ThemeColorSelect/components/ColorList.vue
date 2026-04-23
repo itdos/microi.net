@@ -77,7 +77,7 @@ const colorSelectHandle = (color: AppThemeColorType) => {
   .content-left-item {
     position: relative;
     display: flex;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     margin-right: 10px;
     padding: 10px 20px;
     min-width: 300px;

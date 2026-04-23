@@ -984,7 +984,7 @@ onUnmounted(() => {
 
         p {
           margin-top: 16px;
-          font-size: 14px;
+          font-size: 13px;
         }
       }
     }
@@ -1072,7 +1072,7 @@ onUnmounted(() => {
 
         p {
           margin-top: 16px;
-          font-size: 14px;
+          font-size: 13px;
         }
       }
     }

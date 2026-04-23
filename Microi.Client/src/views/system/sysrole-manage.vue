@@ -54,7 +54,7 @@
 
                     <el-pagination
                         :key="'pagination-' + SysRoleCount + '-' + PageSize"
-                        style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
+                        style="margin-top: 10px; float: left; margin-bottom: 5px; clear: both"
                         background
                         layout="total, sizes, prev, pager, next, jumper"
                         :total="SysRoleCount"
@@ -815,7 +815,7 @@ export default {
 }
 
 #divTzyCourseManage .rowAttachments .col-md-3 {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 .avatar-uploader .el-upload {

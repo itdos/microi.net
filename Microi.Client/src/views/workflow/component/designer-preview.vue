@@ -308,7 +308,7 @@ export default {
         border-bottom: solid 1px #ccc;
         padding-left: 20px;
         .el-form-item--mini.el-form-item {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             margin-top: 10px;
         }
     }

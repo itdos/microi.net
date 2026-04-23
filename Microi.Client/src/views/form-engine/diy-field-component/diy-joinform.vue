@@ -717,7 +717,7 @@ defineExpose({
 .joinform-tips p {
     margin: 10px 0;
     color: #606266;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .tips-detail {

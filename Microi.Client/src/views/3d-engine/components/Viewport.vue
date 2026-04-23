@@ -123,7 +123,7 @@ function onDrop(e) {
 }
 .drop-hint {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
-  font-size: 14px; color: #38bdf8;
+  font-size: 13px; color: #38bdf8;
   padding: 24px 40px; background: rgba(10,10,26,0.8); border-radius: 12px;
   backdrop-filter: blur(8px); border: 1px solid rgba(56,189,248,0.15);
 }

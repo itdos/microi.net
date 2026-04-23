@@ -1,7 +1,7 @@
 <template>
   <div class="microi-page-engine pageengine">
     <el-container>
-      <el-header ref="ref1" height="56px">
+      <el-header ref="ref1" height="50px">
         <layout-header></layout-header>
       </el-header>
       <el-container>

@@ -114,7 +114,7 @@ onMounted(loadRecords)
 .oc-link { color: #f97316; text-decoration: none; }
 .oc-link:hover { text-decoration: underline; }
 .oc-error-text { font-size: 11px; color: #ef4444; }
-.oc-status-dot { font-size: 14px; }
+.oc-status-dot { font-size: 13px; }
 .oc-text-btn { color: #8b8fa3 !important; font-size: 11.5px !important; }
 .oc-pagination { margin-top: 14px; display: flex; justify-content: flex-end; }
 .oc-empty-mini { text-align: center; padding: 30px 10px; font-size: 12.5px; color: #4b5563; }

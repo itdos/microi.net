@@ -142,7 +142,7 @@ const BT_DIALOG_CSS = `
     }
     .microi-bt-device:hover { border-color: #409eff; background: #ecf5ff; }
     .microi-bt-device.active { border-color: #67c23a; background: #f0f9eb; }
-    .microi-bt-device-name { font-size: 14px; font-weight: 500; color: #303133; }
+    .microi-bt-device-name { font-size: 13px; font-weight: 500; color: #303133; }
     .microi-bt-device-id { font-size: 11px; color: #909399; margin-top: 2px; }
     .microi-bt-device-badge {
         font-size: 11px; padding: 2px 8px; border-radius: 10px;

@@ -352,7 +352,7 @@ const mockClick = (index) => {
     align-items: center;
     gap: 6px;
     .brand-text {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: 0.5px;
       background-image: linear-gradient(135deg, var(--el-color-primary), var(--el-color-success));

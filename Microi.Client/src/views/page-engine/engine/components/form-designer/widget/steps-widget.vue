@@ -95,7 +95,7 @@ const handleClick = (id, linkUrl) => {
     background: var(--el-bg-color-overlay) !important;
   }
   .el-step__title {
-    font-size: 14px;
+    font-size: 13px;
     line-height: 30px;
   }
   .el-timeline {

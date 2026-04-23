@@ -270,7 +270,7 @@ export default {
     margin-right: 20px;
 }
 .subTitle {
-    font-size: 14px;
+    font-size: 13px;
     color: #91a1b7;
 }
 .head {

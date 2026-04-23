@@ -1059,7 +1059,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     .style-selector-label {
         font-size: 13px;
         color: rgba(255, 255, 255, 0.85);
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         text-align: left;
         font-weight: 500;
         letter-spacing: 0.5px;
@@ -1230,7 +1230,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     
     .register-link {
         a {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
         }
     }

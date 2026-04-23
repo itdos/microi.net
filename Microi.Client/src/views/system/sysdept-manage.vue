@@ -93,7 +93,7 @@
                     </el-table>
 
                     <el-pagination
-                        style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
+                        style="margin-top: 10px; float: left; margin-bottom: 5px; clear: both"
                         background
                         layout="total, sizes, prev, pager, next, jumper"
                         :total="MenuListTotal"

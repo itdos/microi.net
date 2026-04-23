@@ -3,71 +3,7 @@ var loadingRate = window.__microi_apk_start || 0;
 var firstLoginCover = true;
 var isNeedLogin = false;
 var rateEl = document.getElementById('loadPercent');
-var speedEl = document.getElementById('loadSpeed');
-var sizeEl = document.getElementById('loadSize');
 var barEl = document.getElementById('progressBar');
-
-// 资源加载监控
-var resourceMonitor = {
-    totalSize: 0,
-    loadedSize: 0,
-    maxLoadedSize: 0,
-    startTime: Date.now(),
-    speeds: [],
-
-    formatSize: function(bytes) {
-        if (bytes === 0) return '0 B';
-        var k = 1024;
-        var sizes = ['B', 'KB', 'MB', 'GB'];
-        var i = Math.floor(Math.log(bytes) / Math.log(k));
-        return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
-    },
-
-    formatSpeed: function(bytesPerSec) {
-        if (bytesPerSec === 0) return '0 B/s';
-        var k = 1024;
-        var speeds = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-        var i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
-        return (bytesPerSec / Math.pow(k, i)).toFixed(2) + ' ' + speeds[i];
-    },
-
-    update: function(loaded, total) {
-        this.maxLoadedSize = Math.max(this.maxLoadedSize, loaded);
-        this.loadedSize = this.maxLoadedSize;
-        this.totalSize = Math.max(total, this.maxLoadedSize);
-        var elapsed = (Date.now() - this.startTime) / 1000;
-        var currentSpeed = elapsed > 0 ? this.loadedSize / elapsed : 0;
-        this.speeds.push(currentSpeed);
-        if (this.speeds.length > 5) this.speeds.shift();
-        var avgSpeed = this.speeds.reduce(function(a, b) { return a + b; }, 0) / this.speeds.length;
-        if (speedEl) {
-            speedEl.textContent = '速度: ' + this.formatSpeed(avgSpeed);
-        }
-        if (sizeEl) {
-            sizeEl.textContent = this.formatSize(this.loadedSize) + ' / ' + this.formatSize(this.totalSize);
-        }
-    }
-};
-
-// PerformanceObserver 监听资源加载
-if (window.performance && window.PerformanceObserver) {
-    var observer = new PerformanceObserver(function(list) {
-        var allResources = window.performance.getEntriesByType('resource');
-        var totalLoaded = 0;
-        allResources.forEach(function(entry) {
-            if (entry.transferSize && entry.responseEnd > 0) {
-                totalLoaded += entry.transferSize;
-            }
-        });
-        var estimatedTotal = Math.max(totalLoaded, 9 * 1024 * 1024);
-        resourceMonitor.update(totalLoaded, estimatedTotal);
-    });
-    try {
-        observer.observe({ entryTypes: ['resource'] });
-    } catch (e) {
-        console.log('PerformanceObserver not supported');
-    }
-}
 
 function updateLoadUI(rate) {
     var r = Math.min(rate, 100);

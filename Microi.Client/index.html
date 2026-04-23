@@ -96,7 +96,7 @@
             background: var(--mci-bg-base);
             font-family: var(--mci-font-family);
             color: var(--mci-text-primary);
-            font-size: 14px;
+            font-size: 13px;
             -webkit-text-size-adjust: 100%;
             -webkit-tap-highlight-color: transparent;
             -webkit-font-smoothing: antialiased;
@@ -121,6 +121,10 @@
             /* iOS 安全区内边距、但不产生外部滚条 */
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             box-sizing: border-box;
+            /* 居中子内容 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #microi_loading.fade-out { opacity: 0; pointer-events: none; }
 
@@ -188,7 +192,6 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
             width: 100%;
             padding: 40px 30px;
         }
@@ -493,10 +496,6 @@
 
             <!-- 进度条 -->
             <div class="mci-progress-wrap"><div class="mci-progress-bar" id="progressBar"></div></div>
-
-            <!-- 加载信息 -->
-            <div class="mci-load-info mci-load-info--speed" id="loadSpeed">正在加载资源...</div>
-            <div class="mci-load-info" id="loadSize"></div>
 
             <!-- 圆点动画 -->
             <div class="mci-load-dots" id="loadDots">

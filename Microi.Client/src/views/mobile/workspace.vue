@@ -369,12 +369,12 @@ const getVisibleChildren = (children) => {
         justify-content: center;
         background: var(--mci-gradient-primary);
         color: var(--mci-text-on-primary);
-        font-size: 14px;
+        font-size: 13px;
         box-shadow: 0 2px 8px var(--mci-color-primary-glow);
         flex-shrink: 0;
 
         :deep(svg),
-        :deep(.el-icon) { color: #fff; font-size: 14px; }
+        :deep(.el-icon) { color: #fff; font-size: 13px; }
     }
 
     &__title {

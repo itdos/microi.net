@@ -164,9 +164,9 @@ export default {
     font-size: 13px;
     font-weight: 600;
     color: var(--mci-text-secondary, #64648c);
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 
-    .el-icon { font-size: 14px; color: var(--mci-color-primary, #6C2BD9); }
+    .el-icon { font-size: 13px; color: var(--mci-color-primary, #6C2BD9); }
 }
 
 /* 模式切换 */

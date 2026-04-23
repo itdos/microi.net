@@ -1241,14 +1241,14 @@ onBeforeUnmount(() => {
                         padding: 2px 8px;
                     }
                     :deep(.el-input__inner) {
-                        font-size: 14px;
+                        font-size: 13px;
                     }
                 }
 
                 .file-name {
                     color: #409eff;
                     cursor: pointer;
-                    font-size: 14px;
+                    font-size: 13px;
                     transition: color 0.2s;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -1333,7 +1333,7 @@ onBeforeUnmount(() => {
                     .file-name {
                         color: #409eff;
                         cursor: pointer;
-                        font-size: 14px;
+                        font-size: 13px;
                         flex: 1;
                         overflow: hidden;
                         text-overflow: ellipsis;

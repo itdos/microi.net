@@ -182,7 +182,7 @@
 
     /* TabBar / NavBar 高度（移动端常量） */
     --mci-navbar-height: 48px;
-    --mci-tabbar-height: 56px;
+    --mci-tabbar-height: 50px;
 }
 
 /* 暗黑主题下阴影加深 */
@@ -895,7 +895,7 @@ html.dark {
 .mci-cell {
     display: flex;
     align-items: center;
-    min-height: 56px;
+    min-height: 50px;
     padding: var(--mci-space-3) var(--mci-space-4);
     background: var(--mci-bg-card);
     border-bottom: 1px solid var(--mci-border-color);
@@ -940,7 +940,7 @@ html.dark {
 }
 .mci-cell__arrow {
     color: var(--mci-text-tertiary);
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .mci-cell-group {
@@ -1105,7 +1105,7 @@ html.dark {
     flex-shrink: 0;
 }
 .mci-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.mci-avatar--lg { width: 56px; height: 56px; font-size: var(--mci-text-xl); }
+.mci-avatar--lg { width: 50px; height: 50px; font-size: var(--mci-text-xl); }
 .mci-avatar--sm { width: 32px; height: 32px; font-size: var(--mci-text-sm); }
 
 .mci-dot {

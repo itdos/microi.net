@@ -301,7 +301,7 @@ $base-color-default: #1077fa;
                     border-right: none;
                 }
                 dt {
-                    margin-bottom: 10px;
+                    margin-bottom: 5px;
                     font-size: 12px;
                 }
                 dd {

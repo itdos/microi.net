@@ -178,9 +178,9 @@ export default {
     
     .loaded-tables-section {
         h4 {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             color: #606266;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
         }
     }

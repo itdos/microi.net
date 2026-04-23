@@ -387,7 +387,7 @@ function onPPChange() {
 }
 .prop-label { min-width: 44px; flex-shrink: 0; }
 .slider-wrap { flex: 1; margin-left: 8px; }
-.vec-group { margin-bottom: 10px; }
+.vec-group { margin-bottom: 5px; }
 .vec-label { font-size: 10px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
 .vec3-row { display: flex; gap: 4px; }
 .vi { flex: 1; display: flex; align-items: center; gap: 2px; }
@@ -452,7 +452,7 @@ function onPPChange() {
 .wp-goto:hover { background: rgba(52,211,153,0.1); color: #34d399; }
 .wp-del {
   width: 22px; height: 22px; border: none; border-radius: 4px; background: transparent;
-  color: #64748b; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #64748b; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.15s; flex-shrink: 0;
 }
 .wp-del:hover { background: rgba(239,68,68,0.12); color: #f87171; }

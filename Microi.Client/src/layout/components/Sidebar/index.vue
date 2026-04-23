@@ -122,11 +122,14 @@ export default {
 :deep(.el-menu) {
     border-right: none;
     background: transparent !important;
-
+    .el-sub-menu__title {
+        height: 46px;
+        line-height: 46px;
+    }
     .el-menu-item,
     .el-sub-menu__title {
         position: relative;
-        margin: 4px 8px;
+        margin: 0px 8px;
         border-radius: 8px;
         transition: all 0.2s ease;
         overflow: hidden;
@@ -217,7 +220,7 @@ export default {
         display: none;
     }
     .el-sub-menu__title{
-        margin: 4px 0px;
+        margin: 0px 0px;
         .menu-title{
             display: none;
         }

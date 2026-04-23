@@ -403,14 +403,14 @@ onUnmounted(() => {
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.95); z-index: 10;
-      p { margin-top: 16px; color: #64748b; font-size: 14px; }
+      p { margin-top: 16px; color: #64748b; font-size: 13px; }
     }
     .error-message {
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 40px; text-align: center;
       h3 { margin: 16px 0 8px; color: #1e293b; font-size: 18px; }
-      p { color: #64748b; font-size: 14px; margin: 4px 0; max-width: 500px; }
+      p { color: #64748b; font-size: 13px; margin: 4px 0; max-width: 500px; }
       .tip {
         margin-top: 16px; padding: 12px 16px;
         background: #fef3c7; border-radius: 6px; color: #92400e; font-size: 13px;

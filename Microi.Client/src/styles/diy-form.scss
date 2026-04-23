@@ -162,7 +162,7 @@
             padding-left: unset !important;
             background-color: var(--el-bg-color, #fff);
             box-shadow: none;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .el-input__inner:focus,
@@ -204,7 +204,7 @@
 
     .imgupload-imgs {
         .time {
-            font-size: 14px;
+            font-size: 13px;
             color: #999;
         }
 
@@ -303,7 +303,7 @@
     #field-form-tabs {
         // 优化的 tabs 样式 - 简洁高效
         :deep(.el-tabs__header) {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
             border-radius: 8px;
             padding: 8px 12px;
@@ -338,7 +338,7 @@
             border: 1px solid transparent;
             border-radius: 6px;
             font-weight: 400;
-            font-size: 14px;
+            font-size: 13px;
             color: var(--el-text-color-regular, #606266);
             transition: all 0.15s ease;
             background: transparent;
@@ -375,7 +375,7 @@
 
             .fa-icon, i {
                 margin-right: 6px;
-                font-size: 14px;
+                font-size: 13px;
             }
             span{
                 display: flex;
@@ -438,7 +438,7 @@
         // 表单项美化
         :deep(.el-form-item) {
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             transition: all 0.3s ease;
 
             &:hover {
@@ -467,7 +467,7 @@
             &.is-required::before {
                 color: #f56c6c;
                 margin-right: 4px;
-                font-size: 14px;
+                font-size: 13px;
             }
         }
 

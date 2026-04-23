@@ -266,11 +266,11 @@
 }
 
 .search-checkbox-item {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     display: flex;
     gap: 10px;
     &:last-child {
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
 }
 
@@ -344,7 +344,7 @@
 
         .el-checkbox__label {
             padding-left: 0;
-            font-size: 14px;
+            font-size: 13px;
         }
     }
 }

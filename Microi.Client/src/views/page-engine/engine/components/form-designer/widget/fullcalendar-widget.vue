@@ -451,7 +451,7 @@ b {
   display: flex;
   min-height: 100%;
   font-family: Arial, Helvetica Neue, Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .demo-app-sidebar {

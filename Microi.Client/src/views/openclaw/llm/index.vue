@@ -201,7 +201,7 @@ onMounted(loadList)
 .oc-text-btn.danger:hover { color: #ef4444 !important; }
 
 .oc-test-result { text-align: center; padding: 20px; }
-.oc-test-status { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+.oc-test-status { font-size: 18px; font-weight: 700; margin-bottom: 5px; }
 .oc-test-status.success { color: #22c55e; }
 .oc-test-status.fail { color: #ef4444; }
 .oc-test-detail { font-size: 13px; color: #8b8fa3; margin-bottom: 6px; }

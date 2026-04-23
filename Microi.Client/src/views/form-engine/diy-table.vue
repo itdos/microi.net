@@ -71,9 +71,10 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
-                <div class="keyword-search" style="margin-bottom:10px;">
+                <div class="keyword-search" style="margin-bottom: 5px;">
                     <div class="search-action-group">
                         <el-button
+                            size="mini"
                             v-if="_LimitAdd
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
@@ -940,7 +941,7 @@
                 </el-row>
                 <el-pagination
                     v-if="(!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)) && !diyStore.IsPhoneView"
-                    style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
+                    style="margin-top: 10px; float: left; margin-bottom: 5px; clear: both; margin-left: 10px"
                     background
                     layout="total, sizes, prev, pager, next, jumper"
                     :total="DiyTableRowCount"
@@ -1716,7 +1717,7 @@ export default {
             if (self.SysMenuModel.TableActionFixedWidth) {
                 return self.SysMenuModel.TableActionFixedWidth;
             }
-            var baseWidth = 30;
+            var baseWidth = 0;//30;
             // 详情按钮
             if (self.IsPermission('NoDetail')) {
                 baseWidth += 80;
@@ -2175,7 +2176,7 @@ export default {
 
         // PC端：检查路由是否发生变化（这种情况发生在标签数超过 max 时，组件被销毁后又被重用）
         if (self._lastLoadedRoute && self._lastLoadedRoute !== self.$route.fullPath) {
-            console.log('%c[DiyTableRowlist] 检测到路由变化，重新初始化', 'color: orange; font-size: 14px; font-weight: bold');
+            console.log('%c[DiyTableRowlist] 检测到路由变化，重新初始化', 'color: orange; font-size: 13px; font-weight: bold');
             // 更新记录的路由
             self._lastLoadedRoute = self.$route.fullPath;
             // 重新初始化
@@ -2186,7 +2187,7 @@ export default {
     // 🔥 deactivated 钩子：组件被 keep-alive 停用时触发
     deactivated() {
         var self = this;
-        console.log('%c[DiyTableRowlist] ========== deactivated 被触发 ==========', 'color: orange; font-size: 14px; font-weight: bold');
+        console.log('%c[DiyTableRowlist] ========== deactivated 被触发 ==========', 'color: orange; font-size: 13px; font-weight: bold');
 
         // 保存当前滚动位置（移动端）
         if (self.diyStore.IsPhoneView) {

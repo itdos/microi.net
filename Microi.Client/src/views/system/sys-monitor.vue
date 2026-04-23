@@ -766,7 +766,7 @@ export default {
 .neon-card-title {
     display: flex; align-items: center; gap: 5px;
     font-size: 11px; font-weight: 600; color: #d5d5d5;
-    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;
 }
 .neon-card-title svg { color: #00d4ff; opacity: 0.7; flex-shrink: 0; }
 
