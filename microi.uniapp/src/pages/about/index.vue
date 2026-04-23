@@ -1,5 +1,5 @@
 <template>
-  <view class="about-page" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="about-page" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <view class="about-header">
       <image class="about-logo" :src="logoUrl" mode="aspectFit" />
       <text class="about-name">{{ appName }}</text>
