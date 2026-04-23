@@ -4930,9 +4930,12 @@ export default {
                 }
                 //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
                 if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
-                  //zhy加个条件好初始选中”全部“,self.$route.fullPath和设备中的tabs好区分开
-                    if (self.diyStore.IsPhoneView && (self.$route.fullPath == '/shouhoudingdan' || self.TableChildTableId == '455f886c-9467-463e-8987-f6c3227bb37e' || result.Data.Name == '售后任务')) {
-                      self.TableRowListActiveTab = "01KP4RHPVACR1WNNMJ9KQSNACX";
+                  // zhy只针对移动端tabs进行重新筛选出IsVisibale为true的tab,防止设置高亮值TableRowListActiveTab错误
+                    if (self.diyStore.IsPhoneView) {
+                        var activetabs = result.Data.PageTabs.filter(item => {
+                            return item.IsVisible == true
+                        })
+                        self.TableRowListActiveTab = activetabs[0].Id;
                     } else {
                       self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
                     }
@@ -4958,7 +4961,6 @@ export default {
                 ];
             }
             //-----
-
             self.SysMenuModel = result.Data;
             if(self.diyStore.IsPhoneView || self.SysMenuModel.ComponentName == '搜索+卡片'){
                 self.TableDisplayMode = 'Card'
@@ -4975,7 +4977,6 @@ export default {
             self.MobileListFields = self.SysMenuModel.MobileListFields || [];
             self.FixedFields = self.SysMenuModel.FixedFields || [];
             //------------------------
-            console.log('TableRowListActiveTab，self.SysMenuModel.PageTabs',self.SysMenuModel.PageTabs)
             //2022-05-14 这里不再查询数据，全部After处理好了再查询数据
             if (self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) || self.SysMenuModel.PageTabs.length == 0) {
                 // self.GetDiyTableRow({_PageIndex : 1});
