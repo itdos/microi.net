@@ -238,3 +238,105 @@ page[data-theme="dark"] .mci-aurora__orb {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* === uniapp 页面统一风格覆盖（对齐 Microi.Client 移动端） === */
+.mall-container,
+.news-container,
+.workspace-container,
+.message-container,
+.profile-container,
+.chat-container,
+.news-detail-container,
+.privacy-container,
+.about-container,
+.webview-container {
+  background: var(--mci-bg-base) !important;
+  color: var(--mci-text-primary);
+}
+
+.prompt-card,
+.menu-card,
+.news-item,
+.product-card,
+.msg-item,
+.contact-item,
+.func-group,
+.current-url-card,
+.submenu-panel,
+.filter-panel,
+.new-chat-panel,
+.sheet-panel,
+.pwd-panel {
+  background: var(--mci-bg-elevated) !important;
+  color: var(--mci-text-primary);
+  border: 1rpx solid var(--mci-border-color);
+  box-shadow: var(--mci-shadow-md);
+}
+
+.search-wrap,
+.search-input-wrap,
+.panel-search-input,
+.pwd-input,
+.price-input {
+  background: var(--mci-bg-card) !important;
+  color: var(--mci-text-primary) !important;
+  border-color: var(--mci-border-color) !important;
+}
+
+.empty-text,
+.item-title,
+.card-title,
+.msg-name,
+.contact-name,
+.news-item-title,
+.featured-title,
+.submenu-item-name,
+.lang-name {
+  color: var(--mci-text-primary) !important;
+}
+
+.empty-sub,
+.item-value,
+.card-model,
+.card-supplier,
+.msg-preview,
+.msg-time,
+.contact-dept,
+.meta-time,
+.meta-views,
+.news-item-meta,
+.footer-text,
+.tip-text,
+.section-title,
+.theme-name,
+.sheet-close,
+.pwd-label {
+  color: var(--mci-text-secondary) !important;
+}
+
+.mci-btn,
+.prompt-btn,
+.empty-btn,
+.filter-confirm-btn,
+.pwd-confirm {
+  background: var(--mci-gradient-primary) !important;
+  color: #fff !important;
+  box-shadow: var(--mci-shadow-button);
+}
+
+.filter-reset-btn,
+.pwd-cancel {
+  background: transparent !important;
+  color: var(--mci-text-secondary) !important;
+  border: 1rpx solid var(--mci-border-color-hover) !important;
+}
+
+.func-item,
+.lang-item,
+.submenu-item,
+.panel-contact-item,
+.contact-item,
+.msg-item,
+.news-item {
+  border-bottom-color: var(--mci-border-color) !important;
+}

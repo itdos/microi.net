@@ -1,5 +1,5 @@
 <template>
-  <view class="news-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="news-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部区域 -->
     <view class="news-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
       <view class="header-content">

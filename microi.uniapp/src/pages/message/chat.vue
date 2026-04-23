@@ -1,5 +1,5 @@
 <template>
-  <view class="chat-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="chat-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部导航 -->
     <view class="chat-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
       <view class="header-inner">

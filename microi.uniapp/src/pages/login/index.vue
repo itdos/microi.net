@@ -1,5 +1,5 @@
 <template>
-  <view class="login-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient + ';background:' + themeGradient">
+  <view class="login-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient, background: themeGradient }]">
     <!-- 顶部导航：返回按钮 -->
     <view class="login-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="login-nav-back" @tap="goBack">
