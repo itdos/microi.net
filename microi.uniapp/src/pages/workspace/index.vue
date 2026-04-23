@@ -1,5 +1,5 @@
 <template>
-  <view class="workspace-container" :style="'--theme:' + themeColor + ';--theme-light:' + themeColorLight + ';--theme-gradient:' + themeGradient">
+  <view class="workspace-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部区域 -->
     <view class="ws-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
       <view class="header-bg">
