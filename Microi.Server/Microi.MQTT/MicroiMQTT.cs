@@ -35,6 +35,24 @@ namespace Microi.net
         private static readonly ConcurrentDictionary<string, string> _connectedClients
             = new ConcurrentDictionary<string, string>();
 
+        /// <summary>
+        /// 设备级 ApiEngineId 缓存：ClientId → 设备专属接口引擎Id（来自 mci_mqtt_client.ApiEngineId）。
+        /// 若该字段为空则不入缓存，运行时回退到租户默认 OsClientModel.MqttApiEngine。
+        /// 连接成功时刷新，断开时清理。
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, string> _clientApiEngineCache
+            = new ConcurrentDictionary<string, string>();
+
+        // mci_mqtt_log / mci_mqtt_client 表名与日志类型常量
+        private const string LogTable = "mci_mqtt_log";
+        private const string ClientTable = "mci_mqtt_client";
+        private const string LogTypeServerStart = "ServerStart";
+        private const string LogTypeServerStop = "ServerStop";
+        private const string LogTypeConnect = "Connect";
+        private const string LogTypeDisconnect = "Disconnect";
+        private const string LogTypeReceive = "Receive";
+        private const string LogTypeSubscribe = "Subscribe";
+
         public IReadOnlyDictionary<string, string> ConnectedClients => _connectedClients;
 
         public async Task StartServerAsync(OsClientSecret clientModel)
@@ -94,7 +112,8 @@ namespace Microi.net
 
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动成功！TCP端口:{port}");
 
-                // 触发所有配置了MqttApiEngine的租户的StartServer事件
+                // 内部写入 mci_mqtt_log（服务启动日志） + 触发所有配置了MqttApiEngine的租户的StartServer V8事件
+                await WriteServerLifecycleLogAsync(LogTypeServerStart, $"MQTT服务启动成功，端口:{port}");
                 await FireV8EventForAllTenantsAsync("StartServer", new MqttParam());
             }
             catch (System.Net.Sockets.SocketException sox) when (sox.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
@@ -211,7 +230,8 @@ namespace Microi.net
                     return null;
                 }
 
-                var mqttApiEngine = clientModel.OsClientModel?["MqttApiEngine"]?.Val<string>();
+                // 优先取设备级 ApiEngineId（mci_mqtt_client.ApiEngineId），缺失时回退到租户默认 OsClientModel.MqttApiEngine
+                var mqttApiEngine = ResolveClientApiEngineId(mqttParam?.ClientId, clientModel);
                 if (mqttApiEngine.DosIsNullOrWhiteSpace()) return null;
 
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
@@ -357,6 +377,134 @@ namespace Microi.net
 
         #endregion
 
+        #region 内部日志(mci_mqtt_log) 与 设备表(mci_mqtt_client) 操作
+
+        /// <summary>
+        /// 写入 mci_mqtt_log（系统日志：连接/断开/订阅/消息/服务启停）。
+        /// 失败仅打印告警，不会中断 MQTT 主流程。
+        /// </summary>
+        private static async Task WriteMqttLogAsync(string osClient, string type, string clientId, string topic, object data)
+        {
+            try
+            {
+                string dataStr = null;
+                if (data != null)
+                {
+                    dataStr = data is string s ? s : JsonConvert.SerializeObject(data);
+                }
+                await MicroiEngine.FormEngine.AddFormDataAsync(LogTable, new
+                {
+                    OsClient = osClient,
+                    ClientId = clientId,
+                    Type = type,
+                    Topic = topic,
+                    Data = dataStr
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT日志写入异常 OsClient={osClient}, Type={type}, ClientId={clientId}, Error={ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 设备上线/下线时维护 mci_mqtt_client 表（不存在则插入，存在则更新 LastConnectTime / IsOnline），
+        /// 并刷新设备级 ApiEngineId 缓存。
+        /// </summary>
+        private static async Task UpsertMqttClientAsync(string osClient, string clientId, bool isOnline)
+        {
+            if (string.IsNullOrEmpty(clientId)) return;
+            try
+            {
+                var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(ClientTable, new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "ClientId", "=", clientId }
+                    }
+                });
+
+                var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                // GetFormDataAsync: Code=1 找到, Code=2 不存在
+                if (existing != null && existing.Code == 1 && existing.Data != null)
+                {
+                    string id = existing.Data.Id?.ToString();
+                    await MicroiEngine.FormEngine.UptFormDataAsync(ClientTable, new
+                    {
+                        OsClient = osClient,
+                        Id = id,
+                        LastConnectTime = nowStr,
+                        IsOnline = isOnline ? 1 : 0
+                    });
+
+                    // 刷新设备级 ApiEngineId 缓存
+                    string apiEngineId = existing.Data.ApiEngineId?.ToString();
+                    if (isOnline && !string.IsNullOrWhiteSpace(apiEngineId))
+                    {
+                        _clientApiEngineCache[clientId] = apiEngineId;
+                    }
+                    else
+                    {
+                        _clientApiEngineCache.TryRemove(clientId, out _);
+                    }
+                }
+                else
+                {
+                    // 首次上线：新增记录（ApiEngineId 留空，由用户后续在表里维护）
+                    await MicroiEngine.FormEngine.AddFormDataAsync(ClientTable, new
+                    {
+                        OsClient = osClient,
+                        ClientId = clientId,
+                        LastConnectTime = nowStr,
+                        IsOnline = isOnline ? 1 : 0
+                    });
+                    _clientApiEngineCache.TryRemove(clientId, out _);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT设备表操作异常 OsClient={osClient}, ClientId={clientId}, Error={ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 解析指定 ClientId 应使用的 ApiEngineId：
+        /// 优先返回 mci_mqtt_client.ApiEngineId（设备级，从内存缓存读取，无 DB 开销），
+        /// 缺失时回退到租户默认 OsClientModel.MqttApiEngine。
+        /// 设备级允许不同设备执行不同业务逻辑（如温度传感器/继电器/网关分别接入各自的解析引擎）。
+        /// </summary>
+        private static string ResolveClientApiEngineId(string clientId, OsClientSecret clientModel)
+        {
+            if (!string.IsNullOrEmpty(clientId)
+                && _clientApiEngineCache.TryGetValue(clientId, out var deviceEngine)
+                && !string.IsNullOrWhiteSpace(deviceEngine))
+            {
+                return deviceEngine;
+            }
+            return clientModel?.OsClientModel?["MqttApiEngine"]?.Val<string>();
+        }
+
+        /// <summary>
+        /// 服务启停时为所有启用 MQTT 的租户各写一条 mci_mqtt_log 记录（ClientId/Topic 留空）。
+        /// </summary>
+        private static async Task WriteServerLifecycleLogAsync(string type, string message)
+        {
+            var snapshot = OsClient.ClientList.ToArray();
+            var tasks = new List<Task>(snapshot.Length);
+            foreach (var item in snapshot)
+            {
+                // 仅对配置了 MqttApiEngine 的租户写日志（即真正启用 MQTT 的租户）
+                var mqttApiEngine = item.Value.OsClientModel?["MqttApiEngine"]?.Val<string>();
+                if (mqttApiEngine.DosIsNullOrWhiteSpace()) continue;
+                tasks.Add(WriteMqttLogAsync(item.Key, type, null, null, message));
+            }
+            if (tasks.Count > 0) await Task.WhenAll(tasks);
+        }
+
+        #endregion
+
         #region MQTT事件处理
 
         // 连接验证：解析租户 → 验证凭据 → 注册ClientId映射
@@ -378,7 +526,7 @@ namespace Microi.net
                 // 1. MQTT v5 UserProperties
                 if (!osClient.DosIsNullOrWhiteSpace())
                 {
-                    clientModel = OsClient.GetClient(osClient);
+                    OsClient.ClientList.TryGetValue(osClient, out clientModel);
                 }
                 // 2. MQTT 3.1/3.1.1：Username 前缀格式 "{osClient}:{actualUsername}"（如 "congshi:admin"）
                 // effectiveUserName 存放剥离前缀后的实际用户名，用于凭据校验
@@ -389,8 +537,7 @@ namespace Microi.net
                     if (idx > 0)
                     {
                         var candidate = args.UserName.Substring(0, idx);
-                        var m = OsClient.GetClient(candidate);
-                        if (m != null)
+                        if (OsClient.ClientList.TryGetValue(candidate, out var m))
                         {
                             osClient = candidate;
                             clientModel = m;
@@ -399,21 +546,26 @@ namespace Microi.net
                     }
                 }
                 // 3. MQTT 3.1/3.1.1：ClientId 前缀格式 "{osClient}:{actualClientId}"（如 "congshi:device001"）
+                //    Bridge 等格式（如 "bridge:mqtt:huayou:egress:emqx@127..."）首段不是有效 OsClient 时
+                //    会自动 fallback 到下一步主租户回退，不会抛异常
                 if (clientModel == null && !string.IsNullOrEmpty(args.ClientId))
                 {
                     var idx = args.ClientId.IndexOf(':');
                     if (idx > 0)
                     {
                         var candidate = args.ClientId.Substring(0, idx);
-                        var m = OsClient.GetClient(candidate);
-                        if (m != null) { osClient = candidate; clientModel = m; }
+                        if (OsClient.ClientList.TryGetValue(candidate, out var m))
+                        {
+                            osClient = candidate;
+                            clientModel = m;
+                        }
                     }
                 }
                 // 4. 最终回退到主租户
                 if (clientModel == null)
                 {
                     osClient = OsClient.GetConfigOsClient();
-                    clientModel = OsClient.GetClient(osClient);
+                    OsClient.ClientList.TryGetValue(osClient, out clientModel);
                 }
                 if (clientModel == null)
                 {
@@ -477,6 +629,14 @@ namespace Microi.net
             // 防御性：确保映射已注册
             _connectedClients[args.ClientId] = osClient;
 
+            // 内部写入 mci_mqtt_log + 设备表 mci_mqtt_client（同时刷新设备级 ApiEngineId 缓存）
+            await UpsertMqttClientAsync(osClient, args.ClientId, true);
+            await WriteMqttLogAsync(osClient, LogTypeConnect, args.ClientId, null, new
+            {
+                ClientId = args.ClientId,
+                UserName = args.UserName
+            });
+
             // 触发该租户的Connected V8事件
             await RunMqttV8EngineAsync(osClient, "Connected", new MqttParam
             {
@@ -505,6 +665,10 @@ namespace Microi.net
 
             // 清理连接记录
             _connectedClients.TryRemove(args.ClientId, out _);
+
+            // 内部写入 mci_mqtt_log + 更新设备表 IsOnline=0 + 清理设备级 ApiEngineId 缓存
+            await UpsertMqttClientAsync(osClient, args.ClientId, false);
+            await WriteMqttLogAsync(osClient, LogTypeDisconnect, args.ClientId, null, null);
 
             // 触发该租户的Disconnected V8事件
             await RunMqttV8EngineAsync(osClient, "Disconnected", new MqttParam
@@ -549,6 +713,9 @@ namespace Microi.net
                     topic = corrected;
                 }
             }
+
+            // 内部写入 mci_mqtt_log（订阅日志）
+            await WriteMqttLogAsync(osClient, LogTypeSubscribe, args.ClientId, topic, null);
 
             await RunMqttV8EngineAsync(osClient, "Subscribing", new MqttParam
             {
@@ -609,6 +776,15 @@ namespace Microi.net
 
             var (raw, parsed) = ParsePayload(args.ApplicationMessage.PayloadSegment);
 
+            // 内部写入 mci_mqtt_log（消息接收日志）
+            await WriteMqttLogAsync(osClient, LogTypeReceive, args.ClientId, topic, new
+            {
+                ClientId = args.ClientId,
+                Topic = topic,
+                Payload = parsed,
+                PayloadRaw = raw
+            });
+
             var v8Result = await RunMqttV8EngineAsync(osClient, "MessageReceived", new MqttParam
             {
                 Topic = topic,
@@ -648,7 +824,10 @@ namespace Microi.net
                 await _mqttServer.StopAsync();
                 IsRunning = false;
                 _connectedClients.Clear();
+                _clientApiEngineCache.Clear();
 
+                // 内部写入 mci_mqtt_log（服务停止日志） + 触发 StopServer V8事件
+                await WriteServerLifecycleLogAsync(LogTypeServerStop, "MQTT服务已停止");
                 await FireV8EventForAllTenantsAsync("StopServer", new MqttParam());
             }
             catch (Exception ex)
