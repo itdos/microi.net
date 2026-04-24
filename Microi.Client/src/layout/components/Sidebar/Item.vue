@@ -106,7 +106,7 @@ export default {
 }
 
 .menu-title {
-    font-size: 13px;
+    font-size: 12px;
     // font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
