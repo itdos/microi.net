@@ -553,7 +553,6 @@
             overflow: visible;
             @media screen and (max-width: 768px) {
                 padding: 10px !important;
-                padding-bottom: 0px !important;
             }
         }
         .right-view-icon {
@@ -882,6 +881,13 @@
             display: none;
         }
     }
+    .box-card-table-row-list{
+        :deep(.el-card__body) {
+            @media screen and (max-width: 768px) {
+                padding: 0px !important;
+            }
+        }
+    }
 }
 
 // 移动端卡片列表容器 - 添加顶部间距避免被固定头部遮挡
@@ -1025,13 +1031,13 @@
 // 移动端搜索弹窗样式
 .mobile-search-drawer {
     .el-drawer__header {
-        padding: 16px;
+        padding: 10px;
         margin-bottom: 0;
         border-bottom: 1px solid #f0f0f0;
     }
 
     .el-drawer__body {
-        padding: 16px;
+        padding: 10px;
     }
 }
 .mobile-view{

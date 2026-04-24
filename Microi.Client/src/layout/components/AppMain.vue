@@ -88,6 +88,7 @@ export default {
         min-height: 100vh;
         padding-top: 0;
         padding-bottom: 60px; // 为底部导航栏留出空间
+        overflow: visible; // 允许内容撑开文档高度，使 window scroll 可用（移动端卡片列表滚动依赖此）
     }
 }
 </style>
