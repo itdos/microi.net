@@ -21,11 +21,12 @@ function LoadRate(step, t) {
                 clearInterval(tTimer);
                 if (loadingRate >= 100) {
                     setTimeout(function () {
+                        // 解锁页面滚动（与 index.html 中加载期 .is-loading 锁配合）
+                        try { document.documentElement.classList.remove('is-loading'); } catch(e) {}
                         var loadEl = document.getElementById('microi_loading');
                         if (loadEl != null) {
                             loadEl.classList.add('fade-out');
-                            // 解锁页面滚动（与 index.html 中加载期 .is-loading 锁配合）
-                            try { document.documentElement.classList.remove('is-loading'); } catch(e) {}
+                            
                             setTimeout(function () {
                                 loadEl.remove();
                                 if (isNeedLogin) {
