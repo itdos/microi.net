@@ -22,7 +22,28 @@ function LoadRate(step, t) {
                 if (loadingRate >= 100) {
                     setTimeout(function () {
                         // 解锁页面滚动（与 index.html 中加载期 .is-loading 锁配合）
+                        // 层1：标准 classList（大多数浏览器）
                         try { document.documentElement.classList.remove('is-loading'); } catch(e) {}
+                        // 层2：className 字符串替换（兼容部分旧版移动端 WebView classList 静默失效）
+                        try {
+                            if (document.documentElement.className.indexOf('is-loading') !== -1) {
+                                document.documentElement.className =
+                                    document.documentElement.className.replace(/\bis-loading\b/g, '').trim();
+                            }
+                        } catch(e) {}
+                        // 层3：requestAnimationFrame 下一帧再移除一次（防止渲染未刷新）
+                        try {
+                            requestAnimationFrame(function () {
+                                document.documentElement.classList.remove('is-loading');
+                                // 终极保险：直接强制解锁 overflow，防止类名移除仍未生效
+                                if (document.documentElement.className.indexOf('is-loading') !== -1) {
+                                    document.documentElement.style.setProperty('overflow', 'auto', 'important');
+                                    document.documentElement.style.setProperty('height', 'auto', 'important');
+                                    document.body.style.setProperty('overflow', 'auto', 'important');
+                                    document.body.style.setProperty('height', 'auto', 'important');
+                                }
+                            });
+                        } catch(e) {}
                         var loadEl = document.getElementById('microi_loading');
                         if (loadEl != null) {
                             loadEl.classList.add('fade-out');
