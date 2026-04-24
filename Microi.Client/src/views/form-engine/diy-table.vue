@@ -2022,7 +2022,8 @@ export default {
             TableName: "",
             TableRowId: "",
             CurrentRowModel: {},
-            DiyTableRowPageSize: this.DiyCommon.DefaultPageSize || 15,
+            DefaultPageSize : 15,
+            DiyTableRowPageSize: this.DiyCommon.DefaultPageSize || this.DefaultPageSize,
             DiyTableRowPageIndex: 1,
             ShowDiyFieldList: null,
             // 🔥 性能优化：分批渲染表格列
@@ -2868,7 +2869,7 @@ export default {
                 //2022-02-17 有可能二次开发传过来的FormDefaultValues
                 self.FieldFormDefaultValues = { ...self.FormDefaultValues };
             }
-            // 取缓存中的DiyTableRowPageSize
+            // 取缓存中的 DiyTableRowPageSize
             try {
                 var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
                 if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
@@ -4968,6 +4969,17 @@ export default {
             }else{
                 self.TableDisplayMode = 'Table'
             }
+            try {
+                var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
+                if (self.DiyCommon.IsNull(cacheDiyTableRowPageSize) 
+                    && self.SysMenuModel.DefaultPageSize 
+                    && self.SysMenuModel.DefaultPageSize > 0) {
+                    self.DiyTableRowPageSize = self.SysMenuModel.DefaultPageSize;
+                }
+            } catch (error) {
+               
+            }
+
             //--------处理模块配置
             // Bug优化：直接使用 SysMenuModel 的属性，避免不必要的数据复制和内存占用
             // 注意：保留这些赋值是为了向后兼容，但建议后续直接使用 self.SysMenuModel.xxx
