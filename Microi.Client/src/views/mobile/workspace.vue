@@ -339,10 +339,10 @@ const getVisibleChildren = (children) => {
 
 /* === 菜单列表 === */
 .menu-list {
-    padding: var(--mci-space-4);
+    padding: var(--mci-space-3);
     display: flex;
     flex-direction: column;
-    gap: var(--mci-space-4);
+    gap: var(--mci-space-2);
 }
 
 .menu-card {
@@ -353,7 +353,7 @@ const getVisibleChildren = (children) => {
         display: flex;
         align-items: center;
         gap: var(--mci-space-3);
-        padding: var(--mci-space-3) var(--mci-space-4);
+        padding: var(--mci-space-2) var(--mci-space-4);
         background: linear-gradient(135deg,
             rgba(114, 43, 255, 0.18),
             rgba(41, 184, 255, 0.12));
@@ -386,8 +386,8 @@ const getVisibleChildren = (children) => {
     &__grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: var(--mci-space-2);
-        padding: var(--mci-space-4) var(--mci-space-3);
+        gap: var(--mci-space-1);
+        padding: var(--mci-space-1);
     }
 }
 

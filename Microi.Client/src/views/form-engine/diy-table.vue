@@ -6312,7 +6312,7 @@ export default {
       flex-wrap: nowrap;
     }
     /* 方便左右按钮跳动 */
-    :deep(.el-tabs__nav-wrap){
+    :deep(.is-scrollable.el-tabs__nav-wrap){
       padding:0 22px !important;
     }
   }

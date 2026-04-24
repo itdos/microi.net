@@ -109,6 +109,16 @@
 }
 
 .microi {
+    .el-tabs__nav-wrap.is-scrollable{
+        padding: 0 25px;
+    }
+    .el-tabs__nav-next, .el-tabs__nav-prev{
+        line-height: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        display: flex;
+    }
     .el-select--small .el-select__wrapper,
     .el-checkbox.el-checkbox--small{
         height: 28px;
@@ -797,9 +807,7 @@ p {
     .tags-view-container-microi {
         border-bottom: none;
         box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
-        .el-tabs__nav-next, .el-tabs__nav-prev{
-            line-height: 34px;
-        }
+        
     }
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi {
         border: none;
