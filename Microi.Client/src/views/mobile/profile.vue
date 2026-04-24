@@ -376,9 +376,9 @@ function changeMode(mode) {
 
 // === iOS 检测 ===
 const isIos = ref(
-    typeof window !== 'undefined' &&
-    /iPhone|iPad|iPod/.test(navigator.userAgent) &&
-    !window.navigator.standalone   // 已是 PWA 主屏幕模式则不显示
+    typeof window !== 'undefined' 
+    && /iPhone|iPad|iPod/.test(navigator.userAgent) 
+    // && !window.navigator.standalone   // 已是 PWA 主屏幕模式则不显示
 );
 const showIosGuide = ref(false);
 
