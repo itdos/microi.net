@@ -1,3 +1,8 @@
+/*
+    * Microi Loading Animation Script
+    注意：修改此文件一定要去【Microi.Client\index.html】修改
+    【/static/js/microi.loading.js?d=20260424】时间戳，防止浏览器缓存不更新
+*/
 var isApkEnv = !!(window.plus || navigator.userAgent.indexOf('Html5Plus') > -1);
 var loadingRate = window.__microi_apk_start || 0;
 var firstLoginCover = true;
