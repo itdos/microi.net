@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 【配置项】请修改为你的实际服务器地址 -->
+    <meta name="apple-mobile-web-app-title" id="appleMobileTitle" content="Loading...">
+    <link rel="apple-touch-icon" id="appleTouchIcon" href="/favicon.png">    <!-- 【配置项】请修改为你的实际服务器地址 -->
     <script>
         var MICROI_SERVER_URL = 'http://192.168.31.177:1988/?OsClient=iTdos';
         // 优先读取用户在 APP 内自定义的服务器地址
@@ -187,8 +188,10 @@
             left: 50%;
             width: 96px;
             height: 96px;
+            margin-left: -48px;
+            margin-top: -48px;
             border-radius: 50%;
-            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
         .mci-logo-ring::before {
             border: 2px solid var(--mci-color-primary-glow);
@@ -200,8 +203,8 @@
             opacity: 0.5;
         }
         @keyframes mciRingPulse {
-            0% { width: 96px; height: 96px; opacity: 1; }
-            100% { width: 170px; height: 170px; opacity: 0; }
+            0%   { transform: scale(1);    opacity: 1; }
+            100% { transform: scale(1.77); opacity: 0; }
         }
         .mci-logo-core {
             position: absolute;
@@ -225,8 +228,24 @@
         .mci-logo-core svg {
             width: 40px;
             height: 40px;
-            fill: var(--mci-text-primary);
+            fill: #fff;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+        }
+        .mci-logo-core img {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        .mci-logo-core.has-custom-logo {
+            background: transparent;
+            box-shadow: none;
+        }
+        .mci-logo-core.has-custom-logo img {
+            width: 72px;
+            height: 72px;
+            border-radius: 16px;
+            filter: drop-shadow(0 6px 20px rgba(0,0,0,0.22)) drop-shadow(0 2px 6px rgba(0,0,0,0.14));
         }
 
         /* === 文字区 === */
@@ -260,10 +279,11 @@
             animation: mciPercentPulse 1.5s ease-in-out infinite;
             min-height: 52px;
             line-height: 52px;
+            font-variant-numeric: tabular-nums;
         }
         @keyframes mciPercentPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.03); opacity: 0.92; }
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.78; }
         }
 
         /* === 进度条 === */
@@ -311,7 +331,7 @@
         .mci-load-dots .dot {
             width: 10px;
             height: 10px;
-            background: var(--mci-text-primary);
+            background: var(--mci-color-primary);
             border-radius: 50%;
             animation: mciDotBounce 1.4s ease-in-out infinite both;
             box-shadow: 0 0 6px var(--mci-color-primary-glow);
@@ -426,7 +446,7 @@
     <div class="mci-splash" id="splash">
         <!-- Logo -->
         <div class="mci-logo-ring">
-            <div class="mci-logo-core">
+            <div class="mci-logo-core" id="logoCore">
                 <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
         </div>
@@ -494,7 +514,7 @@
 
         // ===== 极光光斑背景为纯静态 HTML，无需 JS 生成 =====
 
-        // ===== 读取 SysConfig 缓存，更新标题和公司名 =====
+        // ===== 读取 SysConfig 缓存，更新标题、公司名和 Logo =====
         (function() {
             try {
                 var data = JSON.parse(localStorage.getItem('microi.net') || '{}');
@@ -504,10 +524,44 @@
                         document.title = cfg.SysTitle;
                         var t = document.getElementById('appTitle');
                         if (t) t.textContent = cfg.SysTitle;
+                        var amwat = document.getElementById('appleMobileTitle');
+                        if (amwat) amwat.setAttribute('content', cfg.SysTitle);
                     }
                     if (cfg.CompanyName) {
                         var w = document.getElementById('watermark');
                         if (w) w.textContent = 'Powered by ' + cfg.CompanyName;
+                    }
+                    if (cfg.SysLogo) {
+                        var fileServer = (cfg.FileServer || '').replace(/\/+$/, '');
+                        var sysLogo = cfg.SysLogo;
+                        var logoUrl = '';
+                        try {
+                            // toUrl: 路径已是绝对 URL 则直接返回，否则拼接 fileServer
+                            var toUrl = function(p) { return (p && p.indexOf('http') === 0) ? p : (fileServer + (p || '')); };
+                            if (typeof sysLogo === 'object' && sysLogo !== null) {
+                                logoUrl = toUrl(sysLogo.Path || sysLogo.path || '');
+                            } else {
+                                var s = String(sysLogo);
+                                if (s.indexOf('http') === 0) {
+                                    logoUrl = s;
+                                } else if (s.charAt(0) === '{') {
+                                    var obj = JSON.parse(s); logoUrl = toUrl(obj.Path || obj.path || '');
+                                } else if (s.charAt(0) === '[') {
+                                    var arr = JSON.parse(s); logoUrl = arr.length > 0 ? toUrl(arr[0].Path || arr[0].path || '') : '';
+                                } else {
+                                    logoUrl = fileServer + s;
+                                }
+                            }
+                        } catch (e) { logoUrl = ''; }
+                        if (logoUrl) {
+                            var lc = document.getElementById('logoCore');
+                            if (lc) {
+                                lc.innerHTML = '<img src="' + logoUrl + '" alt="Logo">';
+                                lc.classList.add('has-custom-logo');
+                            }
+                            var ati = document.getElementById('appleTouchIcon');
+                            if (ati) ati.setAttribute('href', logoUrl);
+                        }
                     }
                 }
             } catch(e) {}

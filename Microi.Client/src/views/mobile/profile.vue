@@ -77,6 +77,14 @@
                     </div>
                     <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
                 </div>
+                <div v-if="isIos" class="mci-cell" @click="showIosGuide = true">
+                    <div class="mci-cell__icon mci-cell__icon--ios"><fa-icon icon="fab fa-apple" /></div>
+                    <div class="mci-cell__main">
+                        <span class="mci-cell__title">iOS APP</span>
+                        <span class="mci-cell__desc">添加到手机主屏幕</span>
+                    </div>
+                    <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
+                </div>
             </div>
 
             <!-- 退出登录按钮 -->
@@ -210,6 +218,47 @@
                 </div>
             </div>
         </el-drawer>
+
+        <!-- iOS 添加到主屏幕指引 -->
+        <el-drawer
+            v-if="isIos"
+            v-model="showIosGuide"
+            direction="btt"
+            size="auto"
+            title="添加到主屏幕"
+            class="mci-drawer mci-drawer--above-tabbar"
+            :z-index="2001"
+        >
+            <div class="ios-guide">
+                <p class="ios-guide__tip">请按以下步骤手动操作：</p>
+                <div class="ios-guide__steps">
+                    <div class="ios-guide__step">
+                        <div class="ios-guide__step-num">1</div>
+                        <div class="ios-guide__step-text">
+                            点击 Safari 底部中央的
+                            <span class="ios-guide__badge">分享</span>
+                            按钮（方框+箭头图标 <span class="ios-guide__icon-hint">⬆</span>）
+                        </div>
+                    </div>
+                    <div class="ios-guide__step">
+                        <div class="ios-guide__step-num">2</div>
+                        <div class="ios-guide__step-text">
+                            在弹出菜单中向下滑动，找到并点击
+                            <span class="ios-guide__badge">添加到主屏幕</span>
+                        </div>
+                    </div>
+                    <div class="ios-guide__step">
+                        <div class="ios-guide__step-num">3</div>
+                        <div class="ios-guide__step-text">
+                            确认应用名称后，点击右上角
+                            <span class="ios-guide__badge">添加</span>
+                            即可完成
+                        </div>
+                    </div>
+                </div>
+                <p class="ios-guide__hint">添加后从主屏幕打开，将以全屏 App 模式运行，无浏览器导航栏干扰。</p>
+            </div>
+        </el-drawer>
     </div>
 </template>
 
@@ -324,6 +373,14 @@ function changeMode(mode) {
     const color = diyStore.themeColor;
     if (color) applyThemeColor(color);
 }
+
+// === iOS 检测 ===
+const isIos = ref(
+    typeof window !== 'undefined' &&
+    /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+    !window.navigator.standalone   // 已是 PWA 主屏幕模式则不显示
+);
+const showIosGuide = ref(false);
 
 // === APK 服务器配置 ===
 const isApk = ref(typeof window !== 'undefined' && !!window.plus);
@@ -685,6 +742,7 @@ function isMiniProgram() {
         &--cyan { background: linear-gradient(135deg, #06B6D4, #22D3EE); }
         &--gold { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
         &--pink { background: linear-gradient(135deg, #EC4899, #F472B6); }
+        &--ios { background: linear-gradient(135deg, #555, #1c1c1e); }
     }
 
     &__label {
@@ -707,6 +765,80 @@ function isMiniProgram() {
     width: 100%;
     display: flex; align-items: center; justify-content: center;
     gap: var(--mci-space-2);
+}
+
+/* === iOS 添加主屏幕指引 === */
+.ios-guide {
+    padding: 0 var(--mci-space-2) var(--mci-space-2);
+
+    &__tip {
+        font-size: var(--mci-text-sm);
+        color: var(--mci-text-secondary);
+        margin: 0 0 var(--mci-space-4);
+        line-height: 1.6;
+    }
+
+    &__steps {
+        display: flex;
+        flex-direction: column;
+        gap: var(--mci-space-4);
+        margin-bottom: var(--mci-space-4);
+    }
+
+    &__step {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--mci-space-3);
+    }
+
+    &__step-num {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--mci-gradient-primary);
+        color: #fff;
+        font-size: var(--mci-text-sm);
+        font-weight: var(--mci-font-bold);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    &__step-text {
+        flex: 1;
+        font-size: var(--mci-text-sm);
+        color: var(--mci-text-primary);
+        line-height: 1.7;
+        padding-top: 4px;
+    }
+
+    &__badge {
+        display: inline-block;
+        padding: 1px 8px;
+        background: var(--mci-color-primary);
+        color: #fff;
+        border-radius: var(--mci-radius-full);
+        font-size: 12px;
+        font-weight: var(--mci-font-medium);
+        vertical-align: middle;
+    }
+
+    &__icon-hint {
+        font-size: 15px;
+        vertical-align: middle;
+    }
+
+    &__hint {
+        font-size: var(--mci-text-xs);
+        color: var(--mci-text-tertiary);
+        line-height: 1.6;
+        margin: 0;
+        padding: var(--mci-space-3);
+        background: var(--mci-bg-card);
+        border-radius: var(--mci-radius-md);
+        border: 1px solid var(--mci-border-color);
+    }
 }
 
 /* === 主题色面板样式移至非 scoped 块 === */
