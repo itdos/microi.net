@@ -2022,8 +2022,7 @@ export default {
             TableName: "",
             TableRowId: "",
             CurrentRowModel: {},
-            DefaultPageSize : 15,
-            DiyTableRowPageSize: this.DiyCommon.DefaultPageSize || this.DefaultPageSize,
+            DiyTableRowPageSize: 15,
             DiyTableRowPageIndex: 1,
             ShowDiyFieldList: null,
             // 🔥 性能优化：分批渲染表格列
@@ -2870,6 +2869,7 @@ export default {
                 self.FieldFormDefaultValues = { ...self.FormDefaultValues };
             }
             // 取缓存中的 DiyTableRowPageSize
+            // this.DiyCommon.DefaultPageSize || this.DefaultPageSize
             try {
                 var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
                 if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
