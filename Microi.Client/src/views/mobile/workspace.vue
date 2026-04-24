@@ -250,7 +250,7 @@ const getVisibleChildren = (children) => {
     overflow: hidden;
     background: var(--mci-gradient-primary);
     padding: var(--mci-space-4);
-    padding-bottom: var(--mci-space-6);
+    // padding-bottom: var(--mci-space-6);
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25),
                 0 0 40px var(--mci-color-primary-glow);
 
