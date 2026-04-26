@@ -1,13 +1,14 @@
 <template>
     <div class="diy-datasource-config">
         <el-divider content-position="left">显示与存储</el-divider>
-        
-        <el-form-item label="显示对应字段">
+
+        <!-- SelectLabel/SelectSaveField 仅对 Sql/DataSource/ApiEngine 数据源生效；Data/KeyValue 由组件内部自动处理 -->
+        <el-form-item v-if="config.DataSource !== 'Data' && config.DataSource !== 'KeyValue'" label="显示对应字段">
             <el-input :model-value="config.SelectLabel" @update:model-value="updateConfig('SelectLabel', $event)" placeholder="如：Name、label" />
             <div class="form-item-tip">数据源中用于显示的字段名</div>
         </el-form-item>
-        
-        <el-form-item v-if="showSaveFormat" label="存储形式">
+
+        <el-form-item v-if="showSaveFormat && config.DataSource !== 'Data' && config.DataSource !== 'KeyValue'" label="存储形式">
             <el-radio-group :model-value="config.SelectSaveFormat" @update:model-value="updateConfig('SelectSaveFormat', $event)">
                 <el-radio value="Text">字段</el-radio>
                 <el-radio value="Json">Json</el-radio>
@@ -17,8 +18,8 @@
                 <div>Json：会将每个选项的所有字段值存入数据库，且【存储对应字段】设置无效</div>
             </div>
         </el-form-item>
-        
-        <el-form-item label="存储对应字段">
+
+        <el-form-item v-if="config.DataSource !== 'Data' && config.DataSource !== 'KeyValue'" label="存储对应字段">
             <el-input :model-value="config.SelectSaveField" @update:model-value="updateConfig('SelectSaveField', $event)" placeholder="如：Id、value" />
             <div class="form-item-tip">数据源中用于存储到数据库的字段名</div>
         </el-form-item>
