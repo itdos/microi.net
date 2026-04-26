@@ -51,21 +51,9 @@
             已解决-->
         <el-option
             v-for="(fieldData, index2) in field.Data"
-            :key="
-                'slt_opt_key' +
-                field.Name +
-                '_' +
-                (field.Config.DataSource === 'KeyValue'
-                    ? fieldData.Key
-                    : (DiyCommon.IsNull(field.Config.SelectSaveField)
-                        ? DiyCommon.IsNull(field.Config.SelectLabel)
-                            ? fieldData
-                            : fieldData[field.Config.SelectLabel]
-                        : fieldData[field.Config.SelectSaveField])) +
-                index2
-            "
-            :label="field.Config.DataSource === 'KeyValue' ? (fieldData.Value || fieldData.value) : (DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel])"
-            :value="fieldData"
+            :key="'slt_opt_' + field.Name + '_' + index2"
+            :label="GetOptionLabel(fieldData)"
+            :value="GetOptionValue(fieldData)"
         />
     </el-select>
 
@@ -428,6 +416,64 @@ export default {
     },
 
     methods: {
+        // ============ 模板渲染辅助 ============
+        // el-option 的 :label —— 严格按数据源类型分流，不会因 SelectLabel 误配置导致 undefined
+        GetOptionLabel(fieldData) {
+            var self = this;
+            var cfg = (self.field && self.field.Config) || {};
+            // KeyValue：固定显示 Value
+            if (cfg.DataSource === "KeyValue") {
+                if (fieldData && typeof fieldData === "object") {
+                    return fieldData.Value !== undefined ? fieldData.Value : (fieldData.value !== undefined ? fieldData.value : "");
+                }
+                return fieldData == null ? "" : fieldData;
+            }
+            // 普通数据源 Data（含老字段空 DataSource + 字符串数组）：直接显示 fieldData 本身
+            if (self._isPlainDataSource()) {
+                return fieldData == null ? "" : (typeof fieldData === "object" ? "" : fieldData);
+            }
+            // 字符串/数字/布尔（理论上不该出现在对象数据源里，兜底）
+            if (typeof fieldData === "string" || typeof fieldData === "number" || typeof fieldData === "boolean") {
+                return fieldData;
+            }
+            // Sql / DataSource / ApiEngine：fieldData 是对象
+            if (fieldData && typeof fieldData === "object") {
+                if (!self.DiyCommon.IsNull(cfg.SelectLabel) && fieldData[cfg.SelectLabel] != null) {
+                    return fieldData[cfg.SelectLabel];
+                }
+                if (!self.DiyCommon.IsNull(cfg.SelectSaveField) && fieldData[cfg.SelectSaveField] != null) {
+                    return fieldData[cfg.SelectSaveField];
+                }
+                // 兜底：常见命名
+                var fb = ["Name", "name", "Label", "label", "Text", "text", "Value", "value"];
+                for (var i = 0; i < fb.length; i++) {
+                    if (fieldData[fb[i]] != null) return fieldData[fb[i]];
+                }
+            }
+            return "";
+        },
+        // el-option 的 :value —— 必须与 ModelValue 类型严格一致才能命中选中
+        GetOptionValue(fieldData) {
+            var self = this;
+            var cfg = (self.field && self.field.Config) || {};
+            // KeyValue：value 是整个对象（el-select 用 value-key="Key" 比较）
+            if (cfg.DataSource === "KeyValue") {
+                if (fieldData && typeof fieldData === "object") {
+                    return {
+                        Key: fieldData.Key !== undefined ? fieldData.Key : (fieldData.key !== undefined ? fieldData.key : ""),
+                        Value: fieldData.Value !== undefined ? fieldData.Value : (fieldData.value !== undefined ? fieldData.value : "")
+                    };
+                }
+                return fieldData;
+            }
+            // 普通数据源 Data：value 是字符串本身（绝不能是对象，否则与 ModelValue (字符串) 无法匹配）
+            if (self._isPlainDataSource()) {
+                if (fieldData == null) return "";
+                return typeof fieldData === "object" ? "" : (typeof fieldData === "string" ? fieldData : String(fieldData));
+            }
+            // Sql / DataSource / ApiEngine：value 是整个对象
+            return fieldData;
+        },
         // 判断是否为“普通数据源 Data”：宽容老字段（DataSource 可能为空/未设置，但 field.Data 是字符串数组）
         _isPlainDataSource() {
             var self = this;
@@ -460,8 +506,21 @@ export default {
         _resolveDataSourceValue(val) {
             var self = this;
             if (self.DiyCommon.IsNull(val)) return "";
-            // 字符串/数字：直接转字符串（数字情况兼容历史脏数据）
-            if (typeof val === "string") return val;
+            // 字符串：先尝试 JSON 解析（兼容历史脏数据 '"齐套"' / '["齐套"]' / '{"Name":"齐套"}'）
+            if (typeof val === "string") {
+                var trimmed = val.trim();
+                if ((trimmed.length > 1) && (
+                    (trimmed.charAt(0) === "[" && trimmed.charAt(trimmed.length - 1) === "]") ||
+                    (trimmed.charAt(0) === "{" && trimmed.charAt(trimmed.length - 1) === "}") ||
+                    (trimmed.charAt(0) === '"' && trimmed.charAt(trimmed.length - 1) === '"')
+                )) {
+                    try {
+                        var parsed = JSON.parse(trimmed);
+                        return self._resolveDataSourceValue(parsed);
+                    } catch (e) { /* 解析失败按原始字符串处理 */ }
+                }
+                return val;
+            }
             if (typeof val === "number" || typeof val === "boolean") return String(val);
             // 数组（历史误存）：取第一个元素
             if (Array.isArray(val)) {
@@ -470,7 +529,7 @@ export default {
             // 对象（历史误存或 SelectLabel/SelectSaveField 配置遗留）：尝试按配置字段提取
             if (typeof val === "object") {
                 var cfg = (self.field && self.field.Config) || {};
-                var keys = [cfg.SelectSaveField, cfg.SelectLabel, "Value", "value", "Name", "name", "Label", "label", "Text", "text"];
+                var keys = [cfg.SelectSaveField, cfg.SelectLabel, "Value", "value", "Name", "name", "Label", "label", "Text", "text", "Key", "key"];
                 for (var i = 0; i < keys.length; i++) {
                     var k = keys[i];
                     if (k && !self.DiyCommon.IsNull(val[k])) {
@@ -872,9 +931,7 @@ export default {
         saveConfig() {
             var self = this;
             // 保存配置到 field.Config
-            self.field.Config.SelectLabel = self.configForm.SelectLabel;
             self.field.Config.SelectSaveFormat = self.configForm.SelectSaveFormat;
-            self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
             self.field.Config.EnableSearch = self.configForm.EnableSearch;
             self.field.Config.DataSource = self.configForm.DataSource;
             self.field.Config.Sql = self.configForm.Sql;
@@ -882,17 +939,24 @@ export default {
             self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
             self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
 
-            // 保存数据列表
+            // 关键：按数据源严格设置 SelectLabel / SelectSaveField，避免残留导致选中显示异常
             if (self.configForm.DataSource === 'Data') {
+                // 普通数据源：值就是字符串本身，不需要 SelectLabel/SelectSaveField
+                self.field.Config.SelectLabel = '';
+                self.field.Config.SelectSaveField = '';
                 self.field.Data = [...self.configDataList];
             } else if (self.configForm.DataSource === 'KeyValue') {
-                // KeyValue 格式：设置显示字段为 Value，存储字段为 Key
+                // KeyValue 格式：固定显示 Value，存储 Key
                 self.field.Config.SelectLabel = 'Value';
                 self.field.Config.SelectSaveField = 'Key';
                 self.field.Data = self.configKeyValueList.map(item => ({
                     Key: item.Key,
                     Value: item.Value
                 }));
+            } else {
+                // Sql / DataSource / ApiEngine：使用用户配置的 SelectLabel / SelectSaveField
+                self.field.Config.SelectLabel = self.configForm.SelectLabel;
+                self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
             }
 
             self.configDialogVisible = false;
