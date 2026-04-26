@@ -152,11 +152,11 @@ export default {
             var result = {};
             //2022-07-22修改为固定
             result["width"] = "100%";
-            if (self.SysConfig.TopWidthFull) {
-                result["padding-left"] = "0px";
-                result["padding-right"] = "0px";
-                result["backgroundColor"] = "#fff";
-            }
+            // if (self.SysConfig.TopWidthFull) {
+            //     result["padding-left"] = "0px";
+            //     result["padding-right"] = "0px";
+            //     result["backgroundColor"] = "#fff";
+            // }
             return result;
 
             if (self.SysConfig.MenuWidth && self.isCollapse !== true) {

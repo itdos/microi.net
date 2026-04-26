@@ -109,6 +109,9 @@
 }
 
 .microi {
+    .tags-view-container-microi{
+        height: 28px;
+    }
     .el-tabs__nav-wrap.is-scrollable{
         padding: 0 25px;
     }
@@ -808,7 +811,7 @@ p {
     .tags-view-container-microi {
         border-bottom: none;
         box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
-        
+        border-radius: 0 0 12px 12px;
     }
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi {
         border: none;

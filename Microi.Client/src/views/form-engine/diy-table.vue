@@ -3373,7 +3373,7 @@ export default {
                 if (offset) {
                     var top = offset.top;
                     // var height = $('#diy-table-' + self.TableId).height();
-                    var result = `calc(100vh - ${top}px - 70px)`;
+                    var result = `calc(100vh - ${top}px - 55px)`;
                     // $('#diy-table-' + self.TableId).height(result);
                     return result;
                 }
@@ -5389,10 +5389,30 @@ export default {
                 self.hbParam4 = recParam._Where;
               }
             }
+            // 2026-04-26 Anderson 修复：typed 搜索（diy-search/diy-mobile-search）传入空 _Where 表示清空该来源的搜索条件
+            // 否则该来源的旧 hbParam 会一直残留，导致后续调用拿到过期搜索条件
+            if (recParam && recParam._Where && recParam._Where.length === 0 && (type == 1 || type == 2 || type == 3 || type == 4)) {
+                if (type == 1) self.hbParam1 = [];
+                else if (type == 2) self.hbParam2 = [];
+                else if (type == 3) self.hbParam3 = [];
+                else if (type == 4) self.hbParam4 = [];
+            }
             let hbYdParams = [];
             let hbPcParams = [];
             hbYdParams=[...self.hbParam1,...self.hbParam2];
             hbPcParams=[...self.hbParam3,...self.hbParam4];
+            // 2026-04-26 Anderson 修复：将 typed 搜索（diy-search 等）合并后的 _Where 持久化到 self.SearchWhere
+            // 这样后续的"无 type 调用"（如搜索框 append 按钮、ExportDiyTableRow、V8按钮里调用 V8.GetDiyTableRow 等）
+            // 才能通过下方 `else if (self.SearchWhere.length > 0)` 分支保留住搜索条件，避免搜索丢失
+            if (type == 1 || type == 2 || type == 3 || type == 4) {
+                let _typedCombinedWhere = [];
+                if (type == 1 || type == 2) {
+                    _typedCombinedWhere = hbYdParams;
+                } else {
+                    _typedCombinedWhere = hbPcParams;
+                }
+                self.SearchWhere = _typedCombinedWhere;
+            }
             // ========== 关键：立即递增版本号取消所有旧操作 ==========
             self._paginationVersion++;
             const currentVersion = self._paginationVersion;

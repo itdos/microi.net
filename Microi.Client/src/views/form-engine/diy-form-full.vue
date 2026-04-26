@@ -1374,11 +1374,24 @@ export default {
                 });
             } else {
                 // Drawer模式
+                // 2026-04-26 Anderson 修复 V8.ReloadForm bug：
+                // 如果抽屉已经打开（典型场景：用户在表单V8按钮里调用 V8.ReloadForm 重载当前表单），
+                // 设置 ShowFieldFormDrawer=true 不会再次触发 @opened 事件，onDrawerOpened 不会被调用，
+                // 导致 fieldForm.Init() 永远不会执行，表单不会用新参数刷新。
+                // 此时直接走 onDrawerOpened 的初始化逻辑即可（diy-form.vue 内部对 TableRowId/FormMode props 变化已有响应式处理）。
+                var _drawerAlreadyOpen = self.ShowFieldFormDrawer === true;
                 self._pendingDrawerContext = {
                     formMode: formMode,
                     isOpenWorkFlowForm: isOpenWorkFlowForm,
                     wfParam: wfParam
                 };
+                if (_drawerAlreadyOpen) {
+                    // 抽屉已打开 → 直接调用初始化逻辑（等价于 V8.ReloadForm）
+                    self.$nextTick(function () {
+                        self.onDrawerOpened();
+                    });
+                    return;
+                }
                 self.ShowFieldFormDrawer = true;
                 // 移动端：推入历史记录，拦截返回键关闭抽屉而非路由回退
                                 // if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {

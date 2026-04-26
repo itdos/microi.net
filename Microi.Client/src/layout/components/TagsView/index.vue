@@ -71,10 +71,10 @@
 
         .el-tabs__item {
             position: relative;
-            padding: 6px 5px;
+            padding: 4px 5px;
             // border: 1px solid #e4e7ed;
             border-bottom: none;
-            border-radius: 4px 4px 0 0;
+            border-radius: 20px;
             font-weight: 400;
             font-size: 13px;
             color: #606266;
@@ -347,10 +347,10 @@ export default {
         GetTagsViewContainerMicroiStyle() {
             var self = this;
             var result = {};
-            if (self.SysConfig.TopWidthFull) {
-                result["padding-left"] = "10px";
-                result["padding-right"] = "10px";
-            }
+            // if (self.SysConfig.TopWidthFull) {
+            //     result["padding-left"] = "10px";
+            //     result["padding-right"] = "10px";
+            // }
             return result;
         },
         isActive(route) {

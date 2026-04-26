@@ -2182,6 +2182,29 @@ var DiyCommon = {
                 var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
                     ? "" : formData[field.Name];
                 
+                // 普通数据源 Data：值就是字符串数组中的某一项（如 "齐套"），永远不要包装成对象
+                // 修复 bug：用户可能在 Data 源上误配置了 SelectLabel/SelectSaveField，
+                // 导致下面的"包装成对象"分支错误触发，使得 ModelValue 与 el-option 的 :value(string) 无法匹配
+                if (field.Config && field.Config.DataSource === "Data") {
+                    // 兼容历史脏数据：如果 rawValue 是对象（如 {Name:"齐套"}），按配置/常用键提取字符串
+                    if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+                        var pickKeys = [field.Config.SelectSaveField, field.Config.SelectLabel,
+                            "Value", "value", "Name", "name", "Label", "label", "Text", "text"];
+                        for (var pi = 0; pi < pickKeys.length; pi++) {
+                            var pk = pickKeys[pi];
+                            if (pk && !DiyCommon.IsNull(rawValue[pk])) {
+                                return typeof rawValue[pk] === "string" ? rawValue[pk] : String(rawValue[pk]);
+                            }
+                        }
+                        // 找不到就返回空串，避免污染下游
+                        return "";
+                    }
+                    if (Array.isArray(rawValue)) {
+                        return rawValue.length > 0 ? String(rawValue[0]) : "";
+                    }
+                    return DiyCommon.IsNull(rawValue) ? "" : (typeof rawValue === "string" ? rawValue : String(rawValue));
+                }
+
                 // KeyValue 数据源：存储的是 Key字段的值，但V8访问时需要完整的 {Key, Value} 对象
                 if (field.Config && field.Config.DataSource === "KeyValue") {
                     // 如果已经是对象，直接返回（标准化为Key/Value）

@@ -284,7 +284,7 @@
         border-radius: 6px;
         padding: 6px 12px;
         // font-weight: 500;
-        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        // background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
         border: 1px solid rgba(64, 158, 255, 0.2);
         color: #666;//var(--color-primary, #409eff);
 
@@ -344,7 +344,7 @@
 
         .el-checkbox__label {
             padding-left: 0;
-            font-size: 13px;
+            font-size: 12px;
         }
     }
 }
@@ -400,7 +400,7 @@
         border-radius: 6px;
         padding: 6px 12px;
         // font-weight: 500;
-        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        // background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
         border: 1px solid rgba(64, 158, 255, 0.2);
         color: #666;//var(--color-primary, #409eff);
 
