@@ -275,7 +275,7 @@
     .el-checkbox__label {
         color: var(--el-text-color-regular, #606266);
         font-weight: normal;
-        font-size: 13px;
+        font-size: 12px;
     }
 
     // 响应式适配
@@ -317,7 +317,7 @@
         height:28px;
         line-height: 28px;
         .el-tag__content{
-            font-size:13px;
+            font-size:12px;
             display : flex;
             align-items : center;
             .el-icon{

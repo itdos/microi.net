@@ -175,11 +175,16 @@ export default {
                 const normalizedVal = self.normalizeSelectValue(newVal);
 
                 // 普通数据源 Data，值就是字符串
-                if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
-                        return;
+                if (self._isPlainDataSource()) {
+                    var resolved = self._resolveDataSourceValue(normalizedVal);
+                    // 优先从 field.Data 中取同引用，避免同值不触发重选
+                    if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
+                        var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
+                        if (hit !== undefined) resolved = hit;
                     }
-                    self.ModelValue = normalizedVal;
+                    var changed = self.ModelValue !== resolved;
+                    self.ModelValue = resolved;
+                    if (!changed) self._forceReSelectModelValue();
                     return;
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
@@ -209,11 +214,15 @@ export default {
                 const normalizedVal = self.normalizeSelectValue(newVal);
 
                 // 普通数据源 Data，值就是字符串
-                if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
-                        return;
+                if (self._isPlainDataSource()) {
+                    var resolved = self._resolveDataSourceValue(normalizedVal);
+                    if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
+                        var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
+                        if (hit !== undefined) resolved = hit;
                     }
-                    self.ModelValue = normalizedVal;
+                    var changed = self.ModelValue !== resolved;
+                    self.ModelValue = resolved;
+                    if (!changed) self._forceReSelectModelValue();
                     return;
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
@@ -251,11 +260,21 @@ export default {
 
                 // 只有在需要重置数据源时才同步 ModelValue
                 // 如果是普通数据源Data或KeyValue，处理方式不同
-                if (self.field.Config.DataSource === "Data") {
+                if (self._isPlainDataSource()) {
+                    // 普通数据源：ModelValue 可能是字符串、数字、对象（历史遗留），统一规整
+                    var normalizedCurrent = self._resolveDataSourceValue(self.ModelValue);
                     var delData = self.field.Data.find((item) => {
-                        return item == self.ModelValue;
+                        // 用宽松比较以兼容数字/字符串（普通数据源选项均为字符串）
+                        return item == normalizedCurrent || String(item) === String(normalizedCurrent);
                     });
-                    if (delData) self.ModelValue = delData;
+                    if (delData !== undefined) {
+                        var sameRef = self.ModelValue === delData;
+                        self.ModelValue = delData;
+                        if (sameRef) self._forceReSelectModelValue();
+                    } else if (normalizedCurrent !== self.ModelValue) {
+                        // 没匹配到但当前值已规整过，更新本地 ModelValue
+                        self.ModelValue = normalizedCurrent;
+                    }
                 } else if (self.field.Config.DataSource === "KeyValue") {
                     var delData = self.field.Data.find((item) => {
                         return item.Key == self.ModelValue || (typeof self.ModelValue === 'object' && item.Key == self.ModelValue.Key);
@@ -305,9 +324,18 @@ export default {
 
         var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         // 普通数据源 Data 时，值就是字符串，不需要转换
-        if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-            // 普通数据源，值直接是字符串，不做任何转换
-            self.ModelValue = modelValue || "";
+        if (self._isPlainDataSource()) {
+            // 普通数据源：兼容历史遗留数据（对象/数组/数字），统一规整为字符串
+            // 并尽量从 field.Data 中找到完全相等的引用，确保 el-select 能匹配上
+            self.ModelValue = self._resolveDataSourceValue(modelValue);
+            if (!self.DiyCommon.IsNull(self.ModelValue) && self.field.Data && self.field.Data.length > 0) {
+                var matchedItem = self.field.Data.find(function (item) {
+                    return item == self.ModelValue || String(item) === String(self.ModelValue);
+                });
+                if (matchedItem !== undefined) {
+                    self.ModelValue = matchedItem;
+                }
+            }
         } else if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
             // KeyValue 数据源，存储的是对象或Key字符串
             if (typeof modelValue === 'object' && modelValue !== null) {
@@ -375,7 +403,7 @@ export default {
         self.LastModelValue = self.ModelValue;
         self.$nextTick(function () {
             //如果是普通数据源或KeyValue
-            if (self.field && (self.field.Config.DataSource == "Data" || self.field.Config.DataSource == "KeyValue")) {
+            if (self.field && (self._isPlainDataSource() || self.field.Config.DataSource == "KeyValue")) {
                 self.FieldAllData = [...self.field.Data];
             }
             // SQL/DataSource/ApiEngine数据源处理
@@ -400,6 +428,65 @@ export default {
     },
 
     methods: {
+        // 判断是否为“普通数据源 Data”：宽容老字段（DataSource 可能为空/未设置，但 field.Data 是字符串数组）
+        _isPlainDataSource() {
+            var self = this;
+            var ds = self.field && self.field.Config ? self.field.Config.DataSource : "";
+            if (ds === "Data") return true;
+            // 未设置数据源但 field.Data 是字符串数组 → 视为普通数据源
+            if (!ds || ds === "") {
+                if (Array.isArray(self.field.Data) && self.field.Data.length > 0 && typeof self.field.Data[0] === "string") {
+                    return true;
+                }
+            }
+            return false;
+        },
+        // 强制刷新 el-select 选中状态（处理同字符串赋值不触发反应性的场景）
+        _forceReSelectModelValue() {
+            var self = this;
+            var keep = self.ModelValue;
+            if (self.DiyCommon.IsNull(keep)) return;
+            self.$nextTick(function () {
+                // 先清空再赋值，才能让基本类型相同值也触发变更
+                var isMulti = self.field && self.field.Component === "MultipleSelect";
+                self.ModelValue = isMulti ? [] : "";
+                self.$nextTick(function () {
+                    self.ModelValue = keep;
+                });
+            });
+        },
+        // 修复：普通数据源(Data) 单选时，把任意形态的值（字符串/数字/对象/数组）规整为字符串。
+        // 解决 bug：旧记录可能将值保存成 {Name:"选项1"} / ["选项1"] / 数字 等，导致 el-select 无法匹配 el-option 的 :value（字符串）而显示为空。
+        _resolveDataSourceValue(val) {
+            var self = this;
+            if (self.DiyCommon.IsNull(val)) return "";
+            // 字符串/数字：直接转字符串（数字情况兼容历史脏数据）
+            if (typeof val === "string") return val;
+            if (typeof val === "number" || typeof val === "boolean") return String(val);
+            // 数组（历史误存）：取第一个元素
+            if (Array.isArray(val)) {
+                return val.length > 0 ? self._resolveDataSourceValue(val[0]) : "";
+            }
+            // 对象（历史误存或 SelectLabel/SelectSaveField 配置遗留）：尝试按配置字段提取
+            if (typeof val === "object") {
+                var cfg = (self.field && self.field.Config) || {};
+                var keys = [cfg.SelectSaveField, cfg.SelectLabel, "Value", "value", "Name", "name", "Label", "label", "Text", "text"];
+                for (var i = 0; i < keys.length; i++) {
+                    var k = keys[i];
+                    if (k && !self.DiyCommon.IsNull(val[k])) {
+                        return typeof val[k] === "string" ? val[k] : String(val[k]);
+                    }
+                }
+                // 兜底：取对象第一个非空字符串属性
+                for (var p in val) {
+                    if (Object.prototype.hasOwnProperty.call(val, p) && !self.DiyCommon.IsNull(val[p])) {
+                        return typeof val[p] === "string" ? val[p] : String(val[p]);
+                    }
+                }
+                return "";
+            }
+            return val;
+        },
         // 修复：SQL/DataSource/ApiEngine数据源 + 存储形式"字段"时，将字符串值转换为el-select需要的对象
         _resolveTextFormatValue(val) {
             var self = this;
@@ -656,7 +743,11 @@ export default {
         },
         GetSelectValueKey(field) {
             var self = this;
-            //如果是普通数据源Data，直接返回undefined，因为值本身就是字符串，不需要value-key
+            //如果是普通数据源Data（含老字段：DataSource为空但field.Data为字符串数组），直接返回undefined，
+            //因为值本身就是字符串，不需要 value-key（设了 value-key 会让 el-select 用对象比较，导致字符串无法选中）
+            if (self._isPlainDataSource && self._isPlainDataSource()) {
+                return undefined;
+            }
             if (field.Config.DataSource === "Data") {
                 return undefined;
             }
