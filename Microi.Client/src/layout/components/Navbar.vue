@@ -336,10 +336,10 @@ export default {
         GetNavbarMicroiStyle() {
             var self = this;
             var result = {};
-            if (self.SysConfig.TopWidthFull) {
-                result["padding-left"] = "10px";
-                result["padding-right"] = "10px";
-            }
+            // if (self.SysConfig.TopWidthFull) {
+            //     result["padding-left"] = "10px";
+            //     result["padding-right"] = "10px";
+            // }
             return result;
         },
         SwitchDiyChatShow() {
