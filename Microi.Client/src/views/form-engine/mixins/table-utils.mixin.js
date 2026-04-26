@@ -55,6 +55,15 @@ export default {
             // 切换显示模式时清空卡片选择
             self.cardSelection = [];
             self.TableMultipleSelection = [];
+
+            // 🔥 手机端 + 卡片模式强制每页 15 条（PC端不限制，按用户配置）
+            if (self.diyStore && self.diyStore.IsPhoneView
+                && self.TableDisplayMode === "Card" && self.DiyTableRowPageSize > 15) {
+                self.DiyTableRowPageSize = 15;
+                if (typeof self.GetDiyTableRow === "function") {
+                    self.GetDiyTableRow({ _PageIndex: 1 });
+                }
+            }
         },
         
         /**

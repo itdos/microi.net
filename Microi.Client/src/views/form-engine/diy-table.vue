@@ -74,7 +74,6 @@
                 <div class="keyword-search" style="margin-bottom: 5px;">
                     <div class="search-action-group">
                         <el-button
-                            size="mini"
                             v-if="_LimitAdd
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
@@ -365,7 +364,7 @@
                     :id="'diy-table-' + TableId"
                     :ref="'diy-table-' + TableId"
                     v-loading="tableLoading"
-                    :data="DiyTableRowList"
+                    :data="RenderedTableRowList"
                     style="width: 100%"
                     :show-summary="StatisticsFields != null"
                     :summary-method="StatisticsFieldsMethod"
@@ -1339,6 +1338,15 @@ export default {
             window.removeEventListener('page-refresh', self._handlePageRefresh);
             self._handlePageRefresh = null;
         }
+        // 🔥 解绑表格懒渲染滚动监听
+        try { self.UnbindLazyScroll && self.UnbindLazyScroll(); } catch (e) {}
+        // 🔥 解绑移动端无限滚动监听（避免 keep-alive 之外的卸载场景泄漏）
+        try {
+            if (self.mobileScrollHandler) {
+                window.removeEventListener('scroll', self.mobileScrollHandler);
+                self.mobileScrollHandler = null;
+            }
+        } catch (e) {}
         // 清理全局更多菜单的文档点击监听器（如果存在）
         if (self._moreMenuDocClick) {
             try { document.removeEventListener('click', self._moreMenuDocClick, true); } catch (e) {}
@@ -1542,6 +1550,29 @@ export default {
         // 性能优化：将频繁调用的方法转换为计算属性
         _IsTableChild() {
             return !this.DiyCommon.IsNull(this.TableChildTableId);
+        },
+        // 🔥 性能优化：表格懒渲染窗口
+        // 大分页(如每页200条)时首屏只渲染前 _lazyRenderInitial 行，
+        // 用户滚动到底部前 _lazyRenderBottomGap 像素时再追加 _lazyRenderStep 行。
+        // 不影响：服务端分页、服务端排序、服务端统计(StatisticsFields)、行Id唯一性。
+        // 跳过：移动端(已有自身的双向滚动)、卡片模式、树形模式、子表/嵌入表。
+        RenderedTableRowList() {
+            var self = this;
+            var list = self.DiyTableRowList;
+            if (!list || list.length === 0) return list || [];
+            // 跳过条件
+            if (self.diyStore && self.diyStore.IsPhoneView) return list;
+            if (self.TableDisplayMode !== 'Table') return list;
+            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.IsTree) return list;
+            // 子表/嵌入表通常不设height，不会出现长滚动，直接全量渲染
+            if (self._IsTableChild) return list;
+            if (self.PropsIsJoinTable === true) return list;
+            if (self.PropsTableType == 'OpenTable') return list;
+            // 数据量未达阈值，直接全量
+            if (list.length <= self._lazyRenderThreshold) return list;
+            // 已渲染足够 → 返回全量（避免后续不必要的slice）
+            if (self._lazyRenderedCount >= list.length) return list;
+            return list.slice(0, self._lazyRenderedCount);
         },
         // 卡片模式显示的字段列表：优先使用MobileListFields（移动端显示列），否则回退到ShowDiyFieldList前4个
         CardShowDiyFieldList() {
@@ -2028,6 +2059,15 @@ export default {
             // 🔥 性能优化：分批渲染表格列
             _renderedColumnCount: 10, // 首批渲染10列
             _allFieldList: null, // 存储完整字段列表
+            // 🔥 性能优化：分批渲染表格行（PC端虚拟滚动），解决大分页(如200条/页)首屏卡顿+内存暴涨
+            _lazyRenderInitial: 30,    // 首批渲染行数
+            _lazyRenderStep: 50,       // 每次滚动追加渲染行数（大批量更平滑）
+            _lazyRenderThreshold: 50,  // 启用懒渲染的阈值（当前页 > 此值时启用）
+            _lazyRenderBottomGap: 600, // 距底部多少像素时触发追加渲染（拉大预加载窗口）
+            _lazyRenderedCount: 30,    // 当前已渲染的行数
+            _lazyScrollHandler: null,  // 滚动事件处理器（缓存，便于解绑）
+            _lazyScrollWrapper: null,  // 当前绑定的滚动容器
+            _lazyScrollTicking: false, // requestAnimationFrame 节流标记
             _OrderBy: "",
             _OrderByType: "",
             SearchFieldIds: [], // SearchFieldIds
@@ -3163,18 +3203,37 @@ export default {
         },
         DiyTableCurrentChange(currentRow) {
             var self = this;
-            self.TableSelectedRowLast = { ...self.TableSelectedRow };
-            self.TableSelectedRow = currentRow;
+            // 🔥 性能优化：避免对整行做 spread (200条数据时 currentRow 可能含数十字段)
+            // 仅保存引用即可；行已 markRaw 不会触发深度代理
+            self.TableSelectedRowLast = self.TableSelectedRow || {};
+            self.TableSelectedRow = currentRow || {};
         },
 
         async DiyTableRowClick(row, column, event) {
             var self = this;
+            // 🔥 性能优化：先做 fast-path 判断，避免每次点击都同步初始化 V8 引擎（耗时 50-200ms）
+            var hasInFormV8 = self._IsTableChild
+                && self.TableSelectedRow.Id
+                && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id
+                && !self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8);
+            var hasRowClickV8 = !self.DiyCommon.IsNull(self.TableChildField)
+                && !self.DiyCommon.IsNull(self.TableChildField.Config)
+                && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8);
+
+            // 没有任何 V8 要执行时：仅更新选中状态，立即返回（消除点击行卡顿）
+            if (!hasInFormV8 && !hasRowClickV8) {
+                // 浅拷贝避免暴露原始行的响应代理（行已 markRaw，但 spread 仍便宜）
+                self.CurrentSelectedRowModel = { ...row };
+                self.DiyTableCurrentChange(row);
+                return;
+            }
+
             var form = { ...row };
             // self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
             self.CurrentSelectedRowModel = form;
             //执行表单进入V8事件
             //2021-01-19 新增：只有是子表的时候，才执行进入表单事件
-            if (self._IsTableChild && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
+            if (hasInFormV8) {
                 // 判断需要执行的V8
                 self.TableSelectedRowLast = { ...self.TableSelectedRow };
                 if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
@@ -3205,14 +3264,16 @@ export default {
 
             //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
             // var V8 = v8 ? v8 : {};
-            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
-            try {
-                if (!self.DiyCommon.IsNull(self.TableChildField) && !self.DiyCommon.IsNull(self.TableChildField.Config) && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8)) {
+            // 🔥 性能优化：只有真的有 TableChildRowClickV8 才初始化 V8
+            //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
+            // var V8 = v8 ? v8 : {};
+            // 🔥 性能优化：只有真的有 TableChildRowClickV8 才初始化 V8
+            if (hasRowClickV8) {
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                try {
                     V8.Row = row;
-                    var form = { ...row };
-                    // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-                    V8.Form = form; // 当前Form表单所有字段值
-                    // V8.Form = row;
+                    var form2 = { ...row };
+                    V8.Form = form2; // 当前Form表单所有字段值
                     if (!V8.FormSet) {
                         V8.FormSet = (fieldName, value) => {
                             return self.FormSet(fieldName, value, row);
@@ -3224,15 +3285,10 @@ export default {
                     V8.RefreshChildTable = (field, parentFormModel) => {
                         return self.RefreshChildTable(field, parentFormModel, V8);
                     };
-                    // eval(btn.V8Code)
                     await eval("(async () => {\n " + self.TableChildField.Config.TableChildRowClickV8 + " \n})()");
-                } else {
-                    //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+                } catch (error) {
+                    self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
                 }
-            } catch (error) {
-                self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
-            } finally {
-
             }
             // 为了卡片而实现，因为<el-table>有 @current-change="DiyTableCurrentChange"
             self.DiyTableCurrentChange(row);
@@ -3332,6 +3388,74 @@ export default {
                     $("#diy-table-" + self.TableId).height(height);
                 }
             }
+        },
+        // 🔥 性能优化：每次表格数据刷新后调用，重置懒渲染窗口并绑定滚动监听
+        ResetLazyRender() {
+            var self = this;
+            // 重置已渲染数量
+            self._lazyRenderedCount = self._lazyRenderInitial;
+            // 等 DOM 更新后再绑定监听 + 重置滚动
+            self.$nextTick(() => {
+                if (self._isDestroyed) return;
+                self.BindLazyScroll();
+                if (self._lazyScrollWrapper) {
+                    try { self._lazyScrollWrapper.scrollTop = 0; } catch (e) {}
+                }
+            });
+        },
+        // 🔥 绑定 el-table 滚动容器的 scroll 事件，触底追加渲染
+        BindLazyScroll() {
+            var self = this;
+            if (!self.TableId) return;
+            // 仅在懒渲染生效场景下绑定
+            if (self.diyStore && self.diyStore.IsPhoneView) return;
+            if (self.TableDisplayMode !== 'Table') return;
+            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.IsTree) return;
+            if (self._IsTableChild) return;
+            if (!self.DiyTableRowList || self.DiyTableRowList.length <= self._lazyRenderThreshold) return;
+
+            // Element Plus 2.x: 真实滚动容器是 .el-scrollbar__wrap，旧版本是 .el-table__body-wrapper
+            var root = document.getElementById('diy-table-' + self.TableId);
+            if (!root) return;
+            var wrapper = root.querySelector('.el-scrollbar__wrap')
+                       || root.querySelector('.el-table__body-wrapper');
+            if (!wrapper) return;
+
+            // 容器没变 → 已绑定过，直接返回
+            if (self._lazyScrollWrapper === wrapper && self._lazyScrollHandler) return;
+
+            // 解绑旧的（容器可能被 el-table 重建）
+            self.UnbindLazyScroll();
+
+            self._lazyScrollWrapper = wrapper;
+            self._lazyScrollHandler = function () {
+                // requestAnimationFrame 节流：滚动事件高频触发，每帧只处理一次
+                if (self._lazyScrollTicking) return;
+                self._lazyScrollTicking = true;
+                requestAnimationFrame(function () {
+                    self._lazyScrollTicking = false;
+                    var w = self._lazyScrollWrapper;
+                    if (!w || self._isDestroyed) return;
+                    var total = (self.DiyTableRowList || []).length;
+                    if (self._lazyRenderedCount >= total) return;
+                    if (w.scrollTop + w.clientHeight >= w.scrollHeight - self._lazyRenderBottomGap) {
+                        var next = Math.min(self._lazyRenderedCount + self._lazyRenderStep, total);
+                        if (next > self._lazyRenderedCount) {
+                            self._lazyRenderedCount = next;
+                        }
+                    }
+                });
+            };
+            wrapper.addEventListener('scroll', self._lazyScrollHandler, { passive: true });
+        },
+        // 🔥 解绑滚动监听
+        UnbindLazyScroll() {
+            var self = this;
+            if (self._lazyScrollWrapper && self._lazyScrollHandler) {
+                try { self._lazyScrollWrapper.removeEventListener('scroll', self._lazyScrollHandler); } catch (e) {}
+            }
+            self._lazyScrollWrapper = null;
+            self._lazyScrollHandler = null;
         },
         async RunV8Code({ field, thisValue, row, callback }) {
             var self = this;
@@ -4976,6 +5100,11 @@ export default {
                     && self.SysMenuModel.DefaultPageSize > 0) {
                     self.DiyTableRowPageSize = self.SysMenuModel.DefaultPageSize;
                 }
+                // 🔥 手机端 + 卡片模式强制每页 15 条（PC端不限制）
+                if (self.diyStore && self.diyStore.IsPhoneView
+                    && self.TableDisplayMode === 'Card' && self.DiyTableRowPageSize > 15) {
+                    self.DiyTableRowPageSize = 15;
+                }
             } catch (error) {
                
             }
@@ -5344,6 +5473,11 @@ export default {
             if (!self.TableChildConfig || (self.TableChildConfig && !self.TableChildConfig.DisablePagination)) {
                 param._PageIndex = self.DiyTableRowPageIndex;
                 param._PageSize = self.DiyTableRowPageSize;
+                // 🔥 手机端 + 卡片模式强制每页 15 条（PC端按用户配置）
+                if (self.diyStore && self.diyStore.IsPhoneView
+                    && self.TableDisplayMode === 'Card' && (!param._PageSize || param._PageSize > 15)) {
+                    param._PageSize = 15;
+                }
             }
 
             //zhy此处添加移动和PC合并搜索的参数传接
@@ -5633,6 +5767,21 @@ export default {
                                 console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
                             }
 
+                            // 🔥 性能优化（关键）：用 markRaw 标记每一行，跳过 Vue 深响应代理。
+                            // 大分页(200/500条)时这一步可以把渲染耗时和内存占用降低 50%+。
+                            // 注意：标记后，行内属性的后续变更不会触发响应式更新——
+                            // 但本组件刷新数据时是整个 DiyTableRowList = result.Data 一次性替换，
+                            // 不会有"刷新后又异步改某行某字段"的场景，因此安全。
+                            // 🔥 性能优化：用 markRaw 标记每一行跳过 Vue 深响应代理。
+                            // ⚠️ 不要 Object.freeze 按钮数组——beforeUnmount 中需要 .length=0 清理，
+                            //    否则会抛 "Cannot assign to read only property 'length'" 导致后续表单无法打开。
+                            for (var rk = 0; rk < result.Data.length; rk++) {
+                                var rawRow = result.Data[rk];
+                                if (rawRow && typeof rawRow === 'object') {
+                                    try { markRaw(rawRow); } catch (e) {}
+                                }
+                            }
+
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             // 移动端追加模式：将新数据追加到现有列表
                             if (isAppendMode && self.diyStore.IsPhoneView && recParam._bidirectional) {
@@ -5664,6 +5813,9 @@ export default {
                                     self._mobileWindowStart = 0;
                                     self._mobileTotalLoaded = result.Data.length;
                                     console.log('[双向滚动] 初始化，加载:', result.Data.length, '条');
+                                } else {
+                                    // 🔥 PC端：重置懒渲染窗口（首屏只渲染前 _lazyRenderInitial 行，后续滚动追加）
+                                    self.ResetLazyRender();
                                 }
                             }
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);

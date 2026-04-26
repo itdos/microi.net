@@ -167,8 +167,8 @@
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td><strong>开源版</strong></td><td>免费</td><td>PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
-<tr><td><strong>个人版</strong></td><td>￥999</td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署</strong></td></tr>
-<tr><td><strong>企业版</strong></td><td>￥10w（首付 ￥2.5w）</td><td>提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong></td></tr>
+<tr><td><strong>个人版</strong></td><td>￥999</td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、永久有效</strong></td></tr>
+<tr><td><strong>企业版</strong></td><td>￥2.5w</td><td>提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong></td></tr>
 </tbody>
 </table>
 

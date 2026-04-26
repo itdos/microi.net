@@ -124,8 +124,9 @@
         height: 28px;
     }
     .ve__button{
-        background : linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
-        color: var(--color-primary-text, #ffffff) !important;
+        // 如果增加以下样式，会导致default按钮背景色不是白色
+        // background : linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
+        // color: var(--color-primary-text, #ffffff) !important;
     }
     // .el-modal-drawer{
     //     .diy-form-container{
