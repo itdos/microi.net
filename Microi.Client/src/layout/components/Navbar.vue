@@ -25,11 +25,6 @@
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
-            <!-- 浏览器全屏 -->
-            <div class="right-menu-item hover-effect" @click="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
-                <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
-            </div>
-
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
@@ -61,6 +56,11 @@
                     </el-dropdown-menu>
                 </template>
             </el-dropdown>
+
+            <!-- 浏览器全屏 -->
+            <div class="right-menu-item hover-effect" @click="toggleBrowserFullScreen" :title="isBrowserFullScreen ? '退出全屏' : '全屏'">
+                <el-icon class="menu-icon"><FullScreen v-if="!isBrowserFullScreen" /><Close v-else /></el-icon>
+            </div>
 
             <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="hover">
                 <div class="avatar-wrapper">

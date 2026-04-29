@@ -1,7 +1,7 @@
 // Pinia Store - App
 import { defineStore } from "pinia";
 import Cookies from "js-cookie";
-import { getLanguage } from "@/lang/index";
+import { getLanguage, normalizeLocale, LANG_STORAGE_KEY } from "@/lang/index";
 
 export const useAppStore = defineStore("app", {
     state: () => ({
@@ -36,8 +36,10 @@ export const useAppStore = defineStore("app", {
         },
 
         setLanguage(language) {
-            this.language = language;
-            Cookies.set("language", language);
+            const n = normalizeLocale(language) || "zh-CN";
+            this.language = n;
+            try { Cookies.set("language", n); } catch {}
+            try { localStorage.setItem(LANG_STORAGE_KEY, n); } catch {}
         },
 
         setSize(size) {
@@ -47,8 +49,8 @@ export const useAppStore = defineStore("app", {
     },
 
     persist: {
-        key: "microi.net",
+        key: "microi.net.app",
         storage: localStorage,
-        paths: ["sidebar", "device", "size"]
+        paths: ["sidebar", "device", "size", "language"]
     }
 });

@@ -1,26 +1,26 @@
 <template>
-    <div id="app-microi" :class="GetAppClass()">
-        <router-view />
-        <!-- v-drag -->
-        <!-- <div class="diy-chat" v-show="DiyChatShow">
-      <DiyChat ref="refDiyChat"></DiyChat>
-    </div>
-    <DiyFormDialog ref="refDiyFormDialog"></DiyFormDialog> -->
-    </div>
+    <el-config-provider :locale="elementLocale">
+        <div id="app-microi" :class="GetAppClass()">
+            <router-view />
+        </div>
+    </el-config-provider>
 </template>
 
 <script>
 import { computed, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
-import { useDiyStore, useSettingsStore } from "@/pinia";
+import { ElConfigProvider } from "element-plus";
+import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
+import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",
-    components: {},
+    components: { ElConfigProvider },
     setup() {
         const diyStore = useDiyStore();
         const settingsStore = useSettingsStore();
+        const appStore = useAppStore();
         const instance = getCurrentInstance();
         const { Microi } = instance.appContext.config.globalProperties;
 
@@ -38,9 +38,15 @@ export default {
         const DiyChatShow = computed(() => diyStore.DiyChat.Show);
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const ShowClassicLeft = computed(() => diyStore.ShowClassicLeft);
+        // Element Plus 语言包跟随 appStore.language 实时切换
+        const elementLocale = computed(() =>
+            getElementLocale(normalizeLocale(appStore.language) || "zh-CN")
+        );
         return {
             diyStore,
             settingsStore,
+            appStore,
+            elementLocale,
             GetCurrentUser,
             CurrentTime,
             DesktopBg,

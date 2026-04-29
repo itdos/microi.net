@@ -1,70 +1,56 @@
 <template>
     <el-dropdown trigger="hover" class="international" @command="handleSetLanguage">
         <div>
-            <fa-icon :class="'fas fa-globe'" />
-            <!-- <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span> -->
+            <span style="font-size: 13px;">{{ currentLabel }}</span>
         </div>
         <template #dropdown>
             <el-dropdown-menu style="max-height: 500px; overflow: auto">
-                <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"> 中文 </el-dropdown-item>
-                 <el-dropdown-item :disabled="language === 'en'" command="en"> English </el-dropdown-item>
-                <!-- <el-dropdown-item :disabled="language==='es'" command="es">
-                    Español
+                <el-dropdown-item
+                    v-for="item in supportedLocales"
+                    :key="item.value"
+                    :disabled="currentLocale === item.value"
+                    :command="item.value"
+                >
+                    {{ item.label }}
                 </el-dropdown-item>
-                <el-dropdown-item :disabled="language==='ja'" command="ja">
-                    日本語
-                </el-dropdown-item> -->
-
-                <!-- <el-dropdown-item v-for="item in langOptions" :key="item.value" class="ignore" command="chinese_simplified">{{ item.label }}</el-dropdown-item> -->
             </el-dropdown-menu>
         </template>
     </el-dropdown>
 </template>
 
 <script>
-import { getLangs } from "@/utils/langs";
 import { computed } from "vue";
 import { useAppStore } from "@/pinia";
+import { SUPPORTED_LOCALES, setI18nLocale, normalizeLocale } from "@/lang";
 
 export default {
+    name: "LangSelect",
     setup() {
         const appStore = useAppStore();
-        const language = computed(() => appStore.language);
-        return { language };
-    },
-    computed: {},
-    data() {
+        const currentLocale = computed(
+            () => normalizeLocale(appStore.language) || "zh-CN"
+        );
+        const currentLabel = computed(() => {
+            const found = SUPPORTED_LOCALES.find((l) => l.value === currentLocale.value);
+            return found ? found.label : "简体中文";
+        });
         return {
-            currentLang: "",
-            langOptions: []
+            appStore,
+            supportedLocales: SUPPORTED_LOCALES,
+            currentLocale,
+            currentLabel
         };
-    },
-    mounted() {
-        let self = this;
-        if (typeof window.translate !== "undefined") {
-            self.langOptions = getLangs();
-            setTimeout(function () {
-                let lang = translate.language.getCurrent();
-                self.currentLang = self.langOptions.find((item) => item.value === lang).label;
-            }, 3000);
-        }
-        this.updateCurrentLang();
     },
     methods: {
         handleSetLanguage(lang) {
-            this.$i18n.locale = lang;
-            this.updateCurrentLang();
-            // 存储语言偏好
-            localStorage.setItem('language', lang);
-            this.DiyCommon?.ChangeLang?.(lang);
-        },
-        updateCurrentLang() {
-            const currentLang = this.$i18n.locale || 'zh-CN';
-            const langMap = {
-                'zh-CN': '中文',
-                'en': 'English'
-            };
-            this.currentLang = langMap[currentLang] || '中文';
+            const n = setI18nLocale(lang); // 切換 i18n、寫入 localStorage、廣播事件
+            this.appStore.setLanguage(n); // 同步 Pinia，使下拉禁用態實時更新
+            // 兼容舊代碼：若 DiyCommon.ChangeLang 存在則調用（用於可能殘留的全局副作用）
+            try {
+                if (this.DiyCommon && typeof this.DiyCommon.ChangeLang === "function") {
+                    this.DiyCommon.ChangeLang(n, true);
+                }
+            } catch {}
         }
     }
 };
