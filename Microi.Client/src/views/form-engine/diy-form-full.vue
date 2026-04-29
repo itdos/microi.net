@@ -1533,21 +1533,38 @@ export default {
         },
 
         // ========== 清理移动端Drawer返回键拦截 ==========
+        // Fix 2026-04-28：仅在全局堆栈为空时才卸载全局 popstate 处理器与重置保护计数，
+        // 否则会误伤其它仍处于打开状态的 drawer/diy-form-full 实例（嵌套或并存场景）。
         _cleanupDrawerPopstate() {
             var self = this;
-            // 移除所有已注册的 drawer popstate 处理器
             try {
-                // 移除全局单例 popstate 处理器并清空全局堆栈
+                // 先把本实例残留在全局堆栈中的项移除（防御性清理；正常 close 流程已处理）
                 try {
-                    if (window.__microi_drawer_popstate_handler) {
-                        try { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
-                        window.__microi_drawer_popstate_handler = null;
+                    if (window.__microi_drawer_stack && window.__microi_drawer_stack.length) {
+                        for (var i = window.__microi_drawer_stack.length - 1; i >= 0; i--) {
+                            var it = window.__microi_drawer_stack[i];
+                            if (it && it.owner === self) {
+                                window.__microi_drawer_stack.splice(i, 1);
+                            }
+                        }
                     }
                 } catch (e) {}
-                try { window.__microi_drawer_stack = []; } catch (e) {}
-                try { window.__microi_protected_count = 0; } catch (e) {}
-                try { window.__microi_ignore_pop = false; } catch (e) {}
-                // 清理本组件内的记录
+                // 仅当全局堆栈已清空时，才卸载全局处理器与重置全局保护标志
+                try {
+                    if (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0) {
+                        if (window.__microi_drawer_popstate_handler) {
+                            try { window.removeEventListener('popstate', window.__microi_drawer_popstate_handler); } catch (e) {}
+                            window.__microi_drawer_popstate_handler = null;
+                        }
+                        try { window.__microi_drawer_stack = []; } catch (e) {}
+                        // 仅在 dialog 堆栈也为空时才重置共享的保护/忽略标志，避免影响仍打开的 dialog
+                        if (!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0) {
+                            try { window.__microi_protected_count = 0; } catch (e) {}
+                            try { window.__microi_ignore_pop = false; } catch (e) {}
+                        }
+                    }
+                } catch (e) {}
+                // 清理本组件内的记录（仅本实例，安全）
                 if (self._drawerStack) { self._drawerStack = []; }
                 if (self._drawerHandlers) { self._drawerHandlers = {}; }
                 if (self._currentDrawerInstanceIds) { self._currentDrawerInstanceIds = []; }
@@ -1555,19 +1572,33 @@ export default {
         },
 
         // ========== 清理移动端Dialog返回键拦截 ==========
+        // Fix 2026-04-28：同上，避免误清空仍存活的兄弟/嵌套 dialog 实例的全局堆栈。
         _cleanupDialogPopstate() {
             var self = this;
-            // 移除所有已注册的 dialog popstate 处理器
             try {
                 try {
-                    if (window.__microi_dialog_popstate_handler) {
-                        try { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
-                        window.__microi_dialog_popstate_handler = null;
+                    if (window.__microi_dialog_stack && window.__microi_dialog_stack.length) {
+                        for (var j = window.__microi_dialog_stack.length - 1; j >= 0; j--) {
+                            var dit = window.__microi_dialog_stack[j];
+                            if (dit && dit.owner === self) {
+                                window.__microi_dialog_stack.splice(j, 1);
+                            }
+                        }
                     }
                 } catch (e) {}
-                try { window.__microi_dialog_stack = []; } catch (e) {}
-                try { window.__microi_protected_count = 0; } catch (e) {}
-                try { window.__microi_ignore_pop = false; } catch (e) {}
+                try {
+                    if (!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0) {
+                        if (window.__microi_dialog_popstate_handler) {
+                            try { window.removeEventListener('popstate', window.__microi_dialog_popstate_handler); } catch (e) {}
+                            window.__microi_dialog_popstate_handler = null;
+                        }
+                        try { window.__microi_dialog_stack = []; } catch (e) {}
+                        if (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0) {
+                            try { window.__microi_protected_count = 0; } catch (e) {}
+                            try { window.__microi_ignore_pop = false; } catch (e) {}
+                        }
+                    }
+                } catch (e) {}
                 if (self._dialogStack) { self._dialogStack = []; }
                 if (self._dialogHandlers) { self._dialogHandlers = {}; }
                 if (self._currentDialogInstanceIds) { self._currentDialogInstanceIds = []; }
