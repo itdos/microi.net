@@ -437,7 +437,7 @@ export default {
                 }
                 // 最终检查 Visible 属性
                 if (isShow && !isDesignMode) {
-                    isShow = self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
+                    isShow = self.FieldIsVisible(field);//self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
                 }
                 field._isShow = isShow;
 
@@ -961,6 +961,14 @@ export default {
         }
     },
     methods: {
+        FieldIsVisible(field) {
+            var self = this;
+            if (!field) return false;
+            if (self.diyStore.IsPhoneView){
+                return field.AppVisible ? true : false;
+            }
+            return field.Visible ? true : false;
+        },
         /**
          * 安全获取组件 ref 实例（兼容 Vue 2/3）
          * @param {string} fieldName - 字段名称
@@ -1933,7 +1941,7 @@ export default {
                         if (
                             !self.DiyCommon.IsNull(field.NotEmpty) &&
                             field.NotEmpty &&
-                            field.Visible &&
+                            self.FieldIsVisible(field) &&
                             (self.DiyCommon.IsNull(self.FormDiyTableModel[field.Name]) ||
                                 (typeof self.FormDiyTableModel[field.Name] == "object" &&
                                     (JSON.stringify(self.FormDiyTableModel[field.Name]) == "{}" || JSON.stringify(self.FormDiyTableModel[field.Name]) == "[]"))) &&
@@ -2781,6 +2789,17 @@ export default {
                         element["Config"] = oldConfig;
                     } else {
                         element[attrName] = value;
+                        if(attrName == 'Visible'
+                            || attrName == 'AppVisible'
+                            || attrName == 'Display'
+                            || attrName == 'AppDisplay'
+                        ){
+                            debugger;
+                            element['Visible'] = value;
+                            element['AppVisible'] = value;
+                            element['Display'] = value;
+                            element['AppDisplay'] = value;
+                        }
                     }
                 }
             });
@@ -2937,7 +2956,10 @@ export default {
             } catch (e) {}
 
             // 2. 设置表单验证规则
-            if (self.FormMode != "View" && field.NotEmpty && field.Visible && field.Component !== "AutoNumber" && !self.GetFieldReadOnly(field)) {
+            if (self.FormMode != "View" && field.NotEmpty 
+                && self.FieldIsVisible(field) 
+                && field.Component !== "AutoNumber" 
+                && !self.GetFieldReadOnly(field)) {
                 if (!self.FormRules[field.Name]) {
                     self.FormRules[field.Name] = [
                         {
@@ -3847,7 +3869,7 @@ export default {
                                     if (
                                         !self.DiyCommon.IsNull(field.NotEmpty) &&
                                         field.NotEmpty &&
-                                        field.Visible &&
+                                        self.FieldIsVisible(field) &&
                                         (self.DiyCommon.IsNull(rowModel[field.Name]) ||
                                             (typeof rowModel[field.Name] == "object" && (JSON.stringify(rowModel[field.Name]) == "{}" || JSON.stringify(rowModel[field.Name]) == "[]"))) &&
                                         // && (
