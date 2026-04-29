@@ -154,7 +154,7 @@ AI：（参考 v8-crud-api Skill）
 | 方案 | 提供的能力 | 适用场景 |
 |------|---------|---------|
 | **VS Code 插件** | V8 全部 API 知识 + 数据库表结构 + 代码拉取/推送 | 日常开发，自动化 |
-| **[MCP Server](/doc/ai-integrate/ai-mcp-integrate)** | 实时查询数据库结构、读取/保存引擎代码、远程执行 | AI 实时操作平台 |
+| **[MCP Server](https://microi.net/doc/ai-integrate/ai-mcp-integrate)** | 实时查询数据库结构、读取/保存引擎代码、远程执行 | AI 实时操作平台 |
 | **Skills**（本文档） | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
 
 ::: tip 推荐三者搭配使用

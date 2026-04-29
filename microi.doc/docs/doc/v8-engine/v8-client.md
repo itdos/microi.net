@@ -604,7 +604,7 @@ var sysTitle = V8.SysConfig.SysTitle;
 ```
 
 ## V8.FormEngine
->* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
+>* 见平台文档：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
 
 ## 移动端函数
 ### 蓝牙打印

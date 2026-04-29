@@ -7,14 +7,14 @@
 ## 📌 简介
 
 - 接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
-- 在线使用 JavaScript 编写 API 接口，支持 [AI 编程](/doc/v8-engine/ai-apiengine)
+- 在线使用 JavaScript 编写 API 接口，支持 [AI 编程](https://microi.net/doc/v8-engine/ai-apiengine)
 - 支持 `Get`/`Post` 请求，返回 JSON、字符串、文件、HTML 等
 - 支持自定义接口地址、分布式锁、权限、自定义扩展函数等
 - 极致的性能（V8 代码预编译、多级缓存）与开发效率，无需本地编译发布
 - 经过 8 年以上成功案例验证，部分项目高达 500+ 接口
 
 ::: tip 相关文档
-[[FormEngine 用法]](/doc/v8-engine/form-engine)    [[Where 条件用法]](/doc/v8-engine/where)
+[[FormEngine 用法]](https://microi.net/doc/v8-engine/form-engine)    [[Where 条件用法]](https://microi.net/doc/v8-engine/where)
 :::
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
@@ -45,7 +45,7 @@ return result;
 >7. `前端`表单提交后V8事件      `[支持调试]`
 
 ## 支持所有后端V8函数
->* 见平台文档：[V8函数-后端](/doc/v8-engine/v8-server.html)
+>* 见平台文档：[V8函数-后端](https://microi.net/doc/v8-engine/v8-server.html)
 
 ## 支持`Get`、`Post`请求
 >* 无论您是通过`get`还是`post`，均能成功请求接口引擎
@@ -61,7 +61,7 @@ var id = V8.Param.Id;
 ```
 
 ## 异步执行代码
->* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](/doc/v8-engine/v8-server.html#system)
+>* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](https://microi.net/doc/v8-engine/v8-server.html#system)
 ```js
 //方法1（推荐）
 var timer1 = setTimeout(function() {
@@ -300,7 +300,7 @@ try{
 :::
 
 ## 接口引擎实战
->* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](/doc/v8-engine/apiengine-index.html)
+>* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](https://microi.net/doc/v8-engine/apiengine-index.html)
 
 ## 注意事项
 >* 若前端传入的某个参数是数组，接口引擎的V8.Param收到参数时，也是数组，能使用数组的所有特性，但唯独无法使用`Array.isArray(V8.Param.ArrayParamName)`来判断为真

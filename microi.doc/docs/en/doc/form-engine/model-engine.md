@@ -52,7 +52,7 @@ else if(V8.Form.HebingID){
 ## Support 'bootstrap', 'element-ui style
 
 Commonly used`bootstrap`Style:
-![alt text](/doc/bootstrap.jpg)
+![alt text](https://microi.net/doc/bootstrap.jpg)
 
 ```html
 <span class="badge badge-primary">Primary</span>

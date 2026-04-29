@@ -52,7 +52,7 @@ else if(V8.Form.HebingID){
 ## 支持 `bootstrap`、`element-ui`样式
 
 常用 `bootstrap` 样式：
-![alt text](/doc/bootstrap.jpg)
+![alt text](https://microi.net/doc/bootstrap.jpg)
 
 ```html
 <span class="badge badge-primary">Primary</span>
