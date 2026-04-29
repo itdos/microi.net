@@ -950,14 +950,17 @@
                     @size-change="DiyTableRowSizeChange"
                     @current-change="DiyTableRowCurrentChange"
                 />
-                <!-- 移动端加载更多提示 -->
-                <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) < DiyTableRowCount" class="mobile-load-more">
+                <!-- 移动端加载更多提示（支持上拉触发或点击触发，子表场景需点击加载） -->
+                <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) < DiyTableRowCount"
+                    class="mobile-load-more"
+                    :class="{ 'is-clickable': !mobileLoadingMore }"
+                    @click="!mobileLoadingMore && loadMoreMobileData()">
                     <div v-if="mobileLoadingMore" class="loading-text">
                         <el-icon class="is-loading"><Loading /></el-icon>
                         <span>正在加载更多数据... ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                     <div v-else class="load-more-text">
-                        <span>上拉加载更多 (已加载 {{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
+                        <span>上拉或点击加载更多 (已加载 {{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                 </div>
                 <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) >= DiyTableRowCount && DiyTableRowCount > 0" class="mobile-no-more">
@@ -1651,7 +1654,7 @@ export default {
         _LimitAdd() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Add") > -1 || el.Permission.indexOf("Insert") > -1);
             }
             return false;
@@ -1659,7 +1662,7 @@ export default {
         _LimitImport() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Import") > -1);
             }
             return false;
@@ -1675,7 +1678,7 @@ export default {
         _LimitEdit() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Edit") > -1);
             }
             return false;
@@ -1683,7 +1686,7 @@ export default {
         _LimitDel() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Del") > -1);
             }
             return false;
@@ -3577,7 +3580,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Add") > -1 || element.Permission.indexOf("Insert") > -1) {
@@ -3595,7 +3598,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Import") > -1) {
@@ -3634,7 +3637,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Edit") > -1) {
@@ -3652,7 +3655,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Del") > -1) {
@@ -5666,6 +5669,13 @@ export default {
                         console.log('[数据加载调试] 返回数据条数:', result.Data?.length, '总数:', result.DataCount);
                         console.log('[数据加载调试] isAppendMode:', isAppendMode, 'IsPhoneView:', self.diyStore.IsPhoneView);
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
+
+                        //统计列的值，后来应该改成单独接口
+                        if (result.DataAppend && result.DataAppend.StatisticsFields) {
+                            self.StatisticsFields = result.DataAppend.StatisticsFields;
+                        } else {
+                            self.StatisticsFields = null;
+                        }
 
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();

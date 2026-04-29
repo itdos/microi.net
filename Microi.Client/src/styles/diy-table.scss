@@ -1075,6 +1075,18 @@
     }
 }
 
+// 加载更多容器：可点击态（子表场景常无下拉空间，需点击触发）
+.mobile-load-more.is-clickable {
+    cursor: pointer;
+    user-select: none;
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+
+    &:active {
+        background-color: rgba(64, 158, 255, 0.08);
+    }
+}
+
 .mobile-no-more {
     span {
         color: #C0C4CC;
