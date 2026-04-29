@@ -157,8 +157,15 @@ namespace Microi.net.Api
                 foreach (var item in jArray)
                 {
                     string id = (string)item["Id"];
+                    string roleId = (string)item["RoleId"];
+                    string fkId = (string)item["FkId"];
+                    // 兜底：如果前端没把 FkId 放在每条记录里，使用顶层 param.FkId（一次保存一个菜单的全部角色）
+                    if (string.IsNullOrEmpty(fkId))
+                    {
+                        fkId = param.FkId;
+                    }
                     string permissionStr = item["Permission"]?.ToString();
-                    await new SysRoleLimitLogic().UpdateSysRoleLimitByMenuId(param.OsClient, id, permissionStr);
+                    await new SysRoleLimitLogic().UpdateSysRoleLimitByMenuId(param.OsClient, id, roleId, fkId, permissionStr);
                 }
 
                 return Json(new { code = 1, msg = "成功" });

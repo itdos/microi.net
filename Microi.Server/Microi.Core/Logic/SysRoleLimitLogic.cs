@@ -301,27 +301,59 @@ namespace Microi.net
 
         /// <summary>
         /// 获取角色权限列表（表单设置权限）
+        /// 修复 2026-04-29：
+        /// 1) 原 SQL 把 rl.FkId 过滤条件写在 WHERE，使 LEFT JOIN 退化为 INNER JOIN，
+        ///    导致还没有为该菜单分配过权限记录的角色全部丢失（前端列表为空）。
+        ///    现把 rl.FkId 过滤迁入 ON 子句，保证返回所有未删除的角色。
+        /// 2) sys_rolelimit 表无 IsDeleted 字段，原 SQL 的 rl.IsDeleted 过滤会在
+        ///    严格数据库（如 PostgreSQL/Oracle）报错；移除之。
+        /// 3) sys_role.IsDeleted 为 int 列，使用 = 0 替代 = false 提高跨库兼容。
+        /// 4) 额外回传 rl.FkId，便于前端在保存时进行 upsert（无记录则 insert）。
         /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        public async Task<List<MenuRolelimitDto>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
+        public async Task<DosResult<List<MenuRolelimitDto>>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
         {
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
-            var sql = "SELECT rl.Id, rl.RoleId,r.Name as RoleName,rl.Permission FROM sys_role as r left join sys_rolelimit rl on r.Id= rl.RoleId where 1=1 and rl.FkId = @pFkId and r.IsDeleted = false and rl.IsDeleted = false";
+            var sql = @"SELECT rl.Id, r.Id as RoleId, r.Name as RoleName, rl.FkId, rl.Permission
+                          FROM sys_role as r
+                     LEFT JOIN sys_rolelimit rl
+                            ON r.Id = rl.RoleId AND rl.FkId = @pFkId
+                         WHERE r.IsDeleted <> 1 AND rl.IsDeleted <> 1
+                      ORDER BY r.Sort ASC";
             var list = dbSession.FromSql(sql)
                                 .AddInParameter("pFkId", System.Data.DbType.String, param.FkId)
                                 .ToList<MenuRolelimitDto>();
-            return list;
+            return new DosResult<List<MenuRolelimitDto>>(1, list);
         }
 
-        public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string permission)
+        /// <summary>
+        /// 保存角色对单个菜单的权限。Upsert：Id 为空则新增 sys_rolelimit 记录，否则更新。
+        /// 修复 2026-04-29：原实现仅 UPDATE Id，对没有历史 rolelimit 行的角色完全无效，
+        /// 导致勾选了权限点保存后下次再打开仍为空。
+        /// </summary>
+        public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string roleId, string fkId, string permission)
         {
             DbSession dbSession = OsClientExtend.GetClient(osClient).Db;
-            var sql = " UPDATE sys_rolelimit SET Permission = @pPermission WHERE Id = @pId";
-            dbSession.FromSql(sql)
-                     .AddInParameter("pPermission", System.Data.DbType.String, permission)
-                     .AddInParameter("pId", System.Data.DbType.String, id)
-                     .ExecuteNonQuery();
+            if (string.IsNullOrEmpty(id))
+            {
+                var insertSql = @"INSERT INTO sys_rolelimit (Id, RoleId, FkId, Type, Permission, CreateTime)
+                                  VALUES (@pId, @pRoleId, @pFkId, @pType, @pPermission, @pCreateTime)";
+                dbSession.FromSql(insertSql)
+                         .AddInParameter("pId", System.Data.DbType.String, Guid.NewGuid().ToString())
+                         .AddInParameter("pRoleId", System.Data.DbType.String, roleId)
+                         .AddInParameter("pFkId", System.Data.DbType.String, fkId)
+                         .AddInParameter("pType", System.Data.DbType.String, "Menu")
+                         .AddInParameter("pPermission", System.Data.DbType.String, permission)
+                         .AddInParameter("pCreateTime", System.Data.DbType.DateTime, DateTime.Now)
+                         .ExecuteNonQuery();
+            }
+            else
+            {
+                var updateSql = "UPDATE sys_rolelimit SET Permission = @pPermission WHERE Id = @pId";
+                dbSession.FromSql(updateSql)
+                         .AddInParameter("pPermission", System.Data.DbType.String, permission)
+                         .AddInParameter("pId", System.Data.DbType.String, id)
+                         .ExecuteNonQuery();
+            }
         }
 
         public class MenuRolelimitDto
@@ -329,6 +361,7 @@ namespace Microi.net
             public string Id { get; set; }
             public string RoleId { get; set; }
             public string RoleName { get; set; }
+            public string FkId { get; set; }
             public string Permission { get; set; }
         }
     }

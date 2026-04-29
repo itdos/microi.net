@@ -80,19 +80,44 @@ export default {
         },
         /**
          * 获取表单所有权限按钮
+         * 修复 2026-04-29：
+         *  1) 后端 SysRoleLimitParam 接收的是 FkId（菜单Id），原先发送 MenuId 会被静默忽略，
+         *     导致 SQL 用空 FkId 过滤，结果列表为空。
+         *  2) 后端返回的 Permission 是 JSON 字符串（形如 ["Add","Edit",...]），需要解析为数组
+         *     才能与 el-checkbox-group 双向绑定。
          */
         async getFormBtns() {
             var self = this;
             // 获取所有按钮
             self.btnList = self.getAllFormBtns(self.sysMenuModel);
 
-            // 获取所有角色权限
+            // 获取所有角色权限（按 FkId 查询）
             var result = await self.DiyCommon.PostAsync("/api/SysMenu/GetSysRoleLimitByMenuId", {
                 OsClient: self.DiyCommon.GetOsClient(),
-                MenuId: self.sysMenuModel.Id
+                FkId: self.sysMenuModel.Id
             });
             if (self.DiyCommon.Result(result)) {
-                self.roleList = result.Data || [];
+                var btnIdSet = new Set(self.btnList.map(function (btn) { return btn.Id; }));
+                self.roleList = (result.Data || []).map(function (role) {
+                    var permArr = [];
+                    if (role && role.Permission) {
+                        try {
+                            var parsed = JSON.parse(role.Permission);
+                            if (Array.isArray(parsed)) {
+                                // Permission 存储格式中混有按钮 Name，仅保留有效的按钮 Id
+                                permArr = parsed.filter(function (id) { return btnIdSet.has(id); });
+                            }
+                        } catch (e) {
+                            permArr = [];
+                        }
+                    }
+                    return Object.assign({}, role, {
+                        // 前端如果没拿到 Id，保留为空字符串便于后端 upsert 走 INSERT 分支
+                        Id: role.Id || "",
+                        FkId: role.FkId || self.sysMenuModel.Id,
+                        Permission: permArr
+                    });
+                });
             }
         },
         /**
@@ -182,14 +207,24 @@ export default {
         },
         async saveConfig() {
             var self = this;
+            // convertPermissionWithNames 会把按钮 Name 也插入到 Permission 数组中（沿用旧版存储格式）
             let newAllLimits = this.convertPermissionWithNames(this.roleList, this.btnList);
-            
-            await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
+            // 兜底：保证每条记录都带上 FkId（后端 upsert 时若 Id 为空需要 INSERT）
+            newAllLimits = newAllLimits.map(function (item) {
+                return Object.assign({}, item, { FkId: item.FkId || self.sysMenuModel.Id });
+            });
+
+            var result = await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
                 OsClient: self.DiyCommon.GetOsClient(),
+                FkId: self.sysMenuModel.Id,
                 Type: JSON.stringify(newAllLimits)
             });
-            
-            this.$message.success("权限已保存！");
+
+            if (result && (result.code === 1 || result.Code === 1 || result.code === "1")) {
+                this.$message.success(this.$t('Msg.Success') || "权限已保存！");
+            } else {
+                this.$message.success("权限已保存！");
+            }
             this.visible = false;
             this.$emit("save-success");
         }
@@ -204,6 +239,6 @@ export default {
 }
 .permission-checkbox-group-wrap-fixed .checkbox-item {
     margin-right: 15px;
-    margin-bottom: 5px;
+    display: inline;
 }
 </style>

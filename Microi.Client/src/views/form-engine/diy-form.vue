@@ -2794,7 +2794,6 @@ export default {
                             || attrName == 'Display'
                             || attrName == 'AppDisplay'
                         ){
-                            debugger;
                             element['Visible'] = value;
                             element['AppVisible'] = value;
                             element['Display'] = value;
