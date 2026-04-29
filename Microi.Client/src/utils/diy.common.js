@@ -1,6 +1,6 @@
 // Pinia store 适配层
 import pinia from "@/pinia";
-import { useDiyStore } from "@/pinia";
+import { useDiyStore, useAppStore } from "@/pinia";
 import { Base64 } from "js-base64";
 // import Cookies from 'js-cookie'
 //import { DiyStore } from '../store/diy.store'//2021-04-20注释
@@ -8,7 +8,7 @@ import { Base64 } from "js-base64";
 import qs from "qs";
 import axios from "axios";
 import { DosCommon } from "./dos.common.js";
-import i18n from "@/lang";
+import i18n, { setI18nLocale, normalizeLocale } from "@/lang";
 import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "./api.itdos";
@@ -584,17 +584,21 @@ var DiyCommon = {
             }
         }
     },
-    // 语言切换
+    // 语言切换：统一入口
+    // - 规范化 locale（兼容旧值如 cn / zh / en-US / ja-JP / zh-tw 等）
+    // - 同步 i18n、localStorage、Pinia diyStore.Lang、Pinia appStore.language
+    // - 触发 microi:lang-change 事件供 ElConfigProvider 等响应式组件监听
     ChangeLang: function (lang, notTips) {
-        var self = this;
-        return;
-        // console.log(e)
-        localStorage.setItem("Microi.Lang", lang);
-        i18n.global.locale = lang;
-        store.dispatch("DiyStore/SetLang", lang);
-        DiyCommon.InitLangData();
-        if (notTips !== true) {
-            DiyCommon.Tips(i18n.global.messages[i18n.global.locale]?.Msg?.Success || "Success");
+        try {
+            var n = setI18nLocale ? setI18nLocale(lang) : lang;
+            try { useDiyStore(pinia).setLang(n); } catch {}
+            try { useAppStore(pinia).setLanguage(n); } catch {}
+            DiyCommon.InitLangData();
+            if (notTips !== true) {
+                DiyCommon.Tips(i18n.global.messages[i18n.global.locale]?.Msg?.Success || "Success");
+            }
+        } catch (e) {
+            console.error("[ChangeLang] failed:", e);
         }
     },
     InitLangData: function () {
