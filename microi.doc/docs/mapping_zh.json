@@ -32,8 +32,8 @@
   "local-run-client.md" : "源码本地运行-前端",
 
   "v8-engine":"V8引擎",
+  "ai-apiengine.md" : "AI 编程",
   "api-engine.md" : "API 接口引擎",
-  "ai-apiengine.md" : "AI 编程全指南",
   "v8-server.md" : "V8函数-后端",
   "v8-client.md" : "V8函数-前端",
   "form-engine.md" : "FormEngine用法",
@@ -56,7 +56,6 @@
   "module-engine.md" : "模块引擎",
   "page-engine.md" : "界面引擎",
   "print-engine.md" : "打印引擎",
-  "ai-engine.md" : "AI引擎",
   "translate-engine.md" : "翻译引擎",
   "search-engine.md" : "搜索引擎",
   "job.md" : "任务调度",
@@ -66,11 +65,7 @@
   "databases.md" : "数据库扩展",
   "web-plug-engine.md" : "前端插件引擎",
 
-  "ai-integrate": "AI 编程",
-  "ai-skills-integrate.md": "AI Skills 集成指南",
-  "ai-mcp-integrate.md": "AI MCP 集成指南",
-
-  "advanced" : "进阶功能",
+  "advanced" : "其它文档",
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
