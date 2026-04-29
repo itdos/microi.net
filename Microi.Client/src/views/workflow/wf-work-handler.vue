@@ -20,15 +20,15 @@
         </template>
 
         <template v-if="OpenFormMode == 'Edit' || OpenFormMode == 'Add'">
-            <!--选择审批人：-->
-            <div style="margin-top: 10px" v-if="NextNodeConfirmUsersData.AllowSelectUsers === true && NextNodeConfirmUsersData.SelectUsers.length">
+            <!--选择审批人：之前是NextNodeConfirmUsersData.AllowSelectUsers && NextNodeConfirmUsersData.SelectUsers  && NextNodeConfirmUsersData.SelectUsers.length > 0-->
+            <div style="margin-top: 10px" v-if="CurrentNodeModel.AllowSelectUsers">
                 <div style="margin-bottom: 5px">选择审批人：</div>
-                <el-checkbox-group v-model="CurrentSelectUsers" :max="20">
+                <el-checkbox-group v-model="CurrentSelectUsers" :max="50">
                     <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :value="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
                 </el-checkbox-group>
             </div>
-            <!--添加审批人：-->
-            <div style="margin-top: 10px" v-if="NextNodeConfirmUsersData.AllowAddUsers === true && CurrentApprovalType != 'HandOver'">
+            <!--添加审批人：之前是NextNodeConfirmUsersData.AllowAddUsers-->
+            <div style="margin-top: 10px" v-if="CurrentNodeModel.AllowAddUsers && CurrentApprovalType != 'HandOver'">
                 <div style="margin-bottom: 5px">添加审批人：</div>
                 <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
                     <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
@@ -437,8 +437,10 @@ export default {
                             self.NextNodeConfirmUsersData = result.Data;
                             self.IsNextNodeConfirmUsers = true;
                             //2023-12-10 新增：V8指定可添加审批人
-                            if (self.NextNodeConfirmUsersData.AllowAddUserV8Code) {
-                                var userList = await self.RunAllowAddUserV8Code(self.NextNodeConfirmUsersData.AllowAddUserV8Code);
+                            //之前用的是： if (self.NextNodeConfirmUsersData.AllowAddUserV8Code) {
+                            if (self.CurrentNodeModel.AllowAddUserV8Code) {
+                                //之前用的是：  var userList = await self.RunAllowAddUserV8Code(self.NextNodeConfirmUsersData.AllowAddUserV8Code);
+                                var userList = await self.RunAllowAddUserV8Code(self.CurrentNodeModel.AllowAddUserV8Code);
                                 if (userList && userList.length > 0) {
                                     self.SysUserList = userList;
                                 }

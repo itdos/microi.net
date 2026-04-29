@@ -124,7 +124,8 @@
     }
     .el-select--small .el-select__wrapper,
     .el-checkbox.el-checkbox--small{
-        height: 28px;
+        min-height: 28px;
+        height: auto;
     }
     .ve__button{
         // 如果增加以下样式，会导致default按钮背景色不是白色

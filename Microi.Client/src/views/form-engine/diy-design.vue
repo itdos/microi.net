@@ -2,6 +2,25 @@
     <div class="diy-design-container">
         <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:10px;border-bottom: solid 1px #ccc;">
             <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="UploadFilled" @click="SaveAllDiyField">{{ $t("Msg.Save") }}</el-button>
+            <!-- 预览（3选1：抽屉 / 弹窗 / 新页面），方便设计时即时查看运行效果 -->
+            <el-dropdown trigger="click" @command="PreviewForm">
+                <el-button type="success">
+                    <el-icon style="margin-right: 4px"><View /></el-icon>预览<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item command="Drawer">
+                            <el-icon><Tickets /></el-icon>抽屉模式
+                        </el-dropdown-item>
+                        <el-dropdown-item command="Dialog">
+                            <el-icon><ChatLineSquare /></el-icon>弹窗模式
+                        </el-dropdown-item>
+                        <el-dropdown-item command="Page">
+                            <el-icon><FullScreen /></el-icon>新页面模式
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
             <el-select v-if="DiyFieldList && DiyFieldList.length > 0"
                 v-model="CurrentDiyFieldModel"
                 @change="SelectFieldChange"
@@ -38,6 +57,7 @@
             <el-button v-if="CurrentDeletedFieldModel && !DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
                 {{ "恢复" }}
             </el-button>
+            
         </div>
         <el-container class="field-container">
             <el-aside class="aside aside-left" width="250px">
@@ -201,6 +221,12 @@
             :fields="DiyFieldList"
             v-model:model="currentV8Model"
         ></DiyV8Design>
+
+        <!-- 预览用的表单弹窗/抽屉容器（按需挂载，避免初始加载开销） -->
+        <DiyFormDialog
+            v-if="ShowPreviewFormDialog"
+            ref="refDiyDesign_PreviewFormDialog"
+        ></DiyFormDialog>
     </div>
 </template>
 
@@ -212,6 +238,10 @@ import { useDiyStore } from "@/pinia";
 import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
 import lodash, { set } from "lodash";
+import { defineAsyncComponent } from "vue";
+
+// 异步加载完整表单组件用于预览（与 diy-table 保持一致的复用方式）
+const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
 
 export default {
     name: "DiyDesign",
@@ -219,7 +249,8 @@ export default {
     components: {
         draggable,
         DiyV8Design,
-        DiyChildTableCallback
+        DiyChildTableCallback,
+        DiyFormDialog
     },
     setup() {
         const diyStore = useDiyStore();
@@ -330,6 +361,9 @@ export default {
             ApiEngineList: [],
             ExceptionFieldList: [],
             DeletedDiyField: [],
+
+            // 预览表单弹窗按需挂载
+            ShowPreviewFormDialog: false,
 
             FieldTypeList: [
                 {
@@ -1211,6 +1245,67 @@ export default {
                 return 4;
             } else {
                 return 24;
+            }
+        },
+        /**
+         * 预览当前正在设计的表单（3 选 1：抽屉 / 弹窗 / 新页面）
+         * 复用 diy-table 的同款 DiyFormDialog（即 diy-form-full.vue），保证预览与运行时表现完全一致。
+         * - Drawer / Dialog：直接挂载组件并以 Add 模式打开；
+         * - Page：路由跳转到 /diy/form-page/:TableId 全新页面。
+         */
+        async PreviewForm(dialogType) {
+            var self = this;
+            if (!self.TableId) {
+                self.DiyCommon.Tips("请先保存表单后再预览！", false);
+                return;
+            }
+
+            // 新页面模式：直接路由跳转，由目标页处理表单初始化
+            if (dialogType === "Page") {
+                var url = "/diy/form-page/" + self.TableId + "?FormMode=Add";
+                self.$router.push(url);
+                return;
+            }
+
+            // Drawer / Dialog：按需挂载 DiyFormDialog，再调用其 Init
+            if (!self.ShowPreviewFormDialog) {
+                self.ShowPreviewFormDialog = true;
+            }
+
+            // 由后端生成新 Id，避免空 Id 导致的内部分支异常
+            var newIdResult = await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid");
+            var newId = newIdResult && newIdResult.Code == 1 ? newIdResult.Data : "";
+
+            var openPreview = function () {
+                if (!self.$refs.refDiyDesign_PreviewFormDialog) {
+                    return;
+                }
+                self.$refs.refDiyDesign_PreviewFormDialog.Init({
+                    TableId: self.TableId,
+                    TableRowId: newId,
+                    Id: newId,
+                    DialogType: dialogType, // "Drawer" | "Dialog"
+                    FormMode: "Add"
+                });
+            };
+
+            // 异步组件首次挂载需要等 ref 就绪
+            if (self.$refs.refDiyDesign_PreviewFormDialog) {
+                self.$nextTick(openPreview);
+            } else {
+                var retryCount = 0;
+                var maxRetries = 30;
+                var tryOpen = function () {
+                    if (self.$refs.refDiyDesign_PreviewFormDialog) {
+                        openPreview();
+                    } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(tryOpen, 50);
+                    } else {
+                        console.error("[diy-design] 预览组件挂载失败，已重试", maxRetries, "次");
+                    }
+                };
+                self.$nextTick(tryOpen);
             }
         },
         UptDiyTable() {
