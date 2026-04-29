@@ -55,7 +55,8 @@
 
         <template #reference>
             <div class="theme-select-trigger">
-                <el-icon class="theme-icon"><Brush /></el-icon>
+                <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
+                <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
             </div>
         </template>
     </el-popover>

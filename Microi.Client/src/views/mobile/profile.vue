@@ -208,13 +208,15 @@
         <!-- 语言选择 -->
         <el-drawer v-model="showLangSelect" direction="btt" size="auto" title="选择语言" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
             <div class="lang-list">
-                <div class="mci-cell" :class="{ active: language === 'zh-CN' }" @click="handleSetLanguage('zh-CN')">
-                    <span class="mci-cell__title">中文</span>
-                    <el-icon v-if="language === 'zh-CN'" class="check-icon"><Check /></el-icon>
-                </div>
-                <div class="mci-cell" :class="{ active: language === 'en' }" @click="handleSetLanguage('en')">
-                    <span class="mci-cell__title">English</span>
-                    <el-icon v-if="language === 'en'" class="check-icon"><Check /></el-icon>
+                <div
+                    v-for="item in SUPPORTED_LOCALES"
+                    :key="item.value"
+                    class="mci-cell"
+                    :class="{ active: language === item.value }"
+                    @click="handleSetLanguage(item.value)"
+                >
+                    <span class="mci-cell__title">{{ item.label }}</span>
+                    <el-icon v-if="language === item.value" class="check-icon"><Check /></el-icon>
                 </div>
             </div>
         </el-drawer>
@@ -274,6 +276,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
 import { useI18n } from 'vue-i18n';
+import { setI18nLocale, SUPPORTED_LOCALES, normalizeLocale } from '@/lang';
 import { setThemeColor as applyThemeColor, setThemeMode, getThemeMode } from '@/utils/theme-color.js';
 
 defineOptions({ name: 'mobile_profile' });
@@ -333,10 +336,10 @@ const loginBottomContent = computed(() => {
 
 const currentTheme = computed(() => diyStore.themeColor || '#409eff');
 
-const language = computed(() => appStore.language || 'zh-CN');
+const language = computed(() => normalizeLocale(appStore.language) || 'zh-CN');
 const currentLang = computed(() => {
-    const langMap = { 'zh-CN': '中文', 'en': 'English' };
-    return langMap[language.value] || '中文';
+    const found = SUPPORTED_LOCALES.find(l => l.value === language.value);
+    return found ? found.label : '简体中文';
 });
 
 const themeColors = [
@@ -475,9 +478,10 @@ const submitPassword = async () => {
 };
 
 const handleSetLanguage = (lang) => {
-    locale.value = lang;
-    localStorage.setItem('language', lang);
-    if (DiyCommon?.ChangeLang) DiyCommon.ChangeLang(lang);
+    const n = setI18nLocale(lang);
+    locale.value = n;
+    appStore.setLanguage(n);
+    if (DiyCommon?.ChangeLang) DiyCommon.ChangeLang(n, true);
     showLangSelect.value = false;
     ElMessage.success('语言已切换');
 };
