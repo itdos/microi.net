@@ -1,6 +1,6 @@
 # 🤖AI engine
 
-> This document has been merged with the "Full AI Programming Guide", please visit [→ Full AI Programming Guide](/doc/v8-engine/ai-apiengine) for complete content, including:
+> This document has been merged with the "Full AI Programming Guide", please visit [→ Full AI Programming Guide](https://microi.net/doc/v8-engine/ai-apiengine) for complete content, including:
 >-🌐Online AI programming (upload db.json/document to AI)
 >-💻Local AI programming (VS Code plug-in Copilot / Claude Code / Cursor)
 >-🔗Call AI large model in V8 code (content of this page)
@@ -30,4 +30,4 @@ var option = {
 V8.Post(option);
 ```
 
-For more use and best practices, please refer to [AI Programming Guide → Mode 3: Call AI Large Model in V8 Code](/doc/v8-engine/ai-apiengine# Mode 3-Call-AI-Large Model in-v8-Code).
+For more use and best practices, please refer to [AI Programming Guide → Mode 3: Call AI Large Model in V8 Code](https://microi.net/doc/v8-engine/ai-apiengine# Mode 3-Call-AI-Large Model in-v8-Code).

@@ -67,7 +67,7 @@ var dataList = result.Data;
 ```
 
 ## _Where条件
->* 见平台文档：[Where条件](/doc/v8-engine/where.html)
+>* 见平台文档：[Where条件](https://microi.net/doc/v8-engine/where.html)
 
 ## 获取一条数据 GetFormData
 ```javascript

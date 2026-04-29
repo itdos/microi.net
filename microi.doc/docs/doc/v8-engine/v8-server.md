@@ -13,7 +13,7 @@
 - 主要用于表单属性的服务器端 V8 事件、接口引擎、数据源引擎等
 
 ## 接口引擎 V8.ApiEngine
->* [接口引擎详细介绍](/doc/v8-engine/api-engine)
+>* [接口引擎详细介绍](https://microi.net/doc/v8-engine/api-engine)
 >* 服务器端V8事件可以直接调用接口引擎（非http），接口引擎也可以调用接口引擎
 >* V8事件或接口引擎在调用另外一个接口引擎时，可传入事件对象，即可保证在同一事务
 ```javascript
@@ -28,7 +28,7 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 ```
 
 ## 表单引擎 V8.FormEngine
->* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
+>* 见平台文档：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
 
 ## 缓存操作 V8.Cache
 >* 平台分布式缓存是L1、L2级联动的分布式缓存，L1为本地内存缓存，L2为redis缓存，V8.Cache操作的就是L2级redis缓存，平台会自动管理L1和L2的联动关系。当覆盖数据库、或直接修改数据库表结构数据后，可能需要手动重启api的docker容器以实现自动清除L1级缓存，然后可通过redis desktop manage软件清除L2级缓存。
