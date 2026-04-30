@@ -65,14 +65,14 @@
                 <el-divider content-position="left">
                     <i class="el-icon-setting"></i> 基本配置
                 </el-divider>
-                
+
                 <el-form-item label="关联模块">
                     <el-popover placement="bottom" trigger="click" :width="400">
-                        <el-tree 
-                            :data="SysMenuList" 
-                            node-key="Id" 
-                            :props="{ label: 'Name', children: '_Child' }" 
-                            @node-click="handleModuleSelect" 
+                        <el-tree
+                            :data="SysMenuList"
+                            node-key="Id"
+                            :props="{ label: 'Name', children: '_Child' }"
+                            @node-click="handleModuleSelect"
                         />
                         <template #reference>
                             <el-button style="width: 100%">
@@ -82,19 +82,19 @@
                     </el-popover>
                     <div class="form-item-tip">选择要弹出的表格所属模块</div>
                 </el-form-item>
-                
+
                 <el-form-item label="按钮名称">
                     <el-input v-model="configForm.BtnName" placeholder="弹出表格" />
                 </el-form-item>
-                
+
                 <el-form-item label="是否多选">
                     <el-switch v-model="configForm.MultipleSelect" active-color="#ff6c04" inactive-color="#ccc" />
                 </el-form-item>
-                
+
                 <el-divider content-position="left">
                     <i class="el-icon-s-operation"></i> V8引擎代码
                 </el-divider>
-                
+
                 <el-form-item class="form-item-top" label-position="top" style="display: block;">
                     <template #label>
                         <div style="display: flex; align-items: center;">
@@ -112,7 +112,7 @@
                         可用方法：V8.OpenTableSetWhere(字段, 条件) 设置查询条件；V8.AppendSearchChildTable(字段, 条件) 追加搜索条件
                     </div>
                 </el-form-item>
-                
+
                 <el-form-item class="form-item-top" label-position="top" style="display: block;">
                     <template #label>
                         <div style="display: flex; align-items: center;">
@@ -282,11 +282,11 @@ const appendSearchChildTable = (fieldModel, appendSearch) => {
 // 打开表格对话框
 const handleOpenTable = async () => {
     const field = props.field;
-    
+
     // 使用 ParentV8 作为基础 V8 对象，而不是自己创建
     const V8 = { ...props.ParentV8 };
     V8.EventName = "OpenTableBefore";
-    
+
     try {
         if (
             !DiyCommon.IsNull(field.Config) &&
@@ -296,14 +296,14 @@ const handleOpenTable = async () => {
             V8.AppendSearchChildTable = appendSearchChildTable;
             V8.OpenTableSetWhere = openTableSetWhere;
             // 不需要再调用 setV8DefaultValue，因为 ParentV8 已经包含了所有必要的属性
-            
+
             await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.BeforeOpenV8 + " \n})()");
         }
     } catch (error) {
         DiyCommon.Tips("执行弹出表格弹出前V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
     } finally {
     }
-    
+
     // 打开对话框
     proxy.$nextTick(() => {
         showDialog.value = true;
@@ -314,11 +314,11 @@ const handleOpenTable = async () => {
 const handleSubmit = async () => {
     const field = props.field;
     btnLoading.value = true;
-    
+
     // 使用 ParentV8 作为基础 V8 对象，而不是自己创建
     const V8 = { ...props.ParentV8 };
     V8.EventName = "OpenTableSubmit";
-    
+
     try {
         if (
             !DiyCommon.IsNull(field.Config) &&
@@ -335,11 +335,11 @@ const handleSubmit = async () => {
                     V8.TableRowSelected = tableChildRef.TableMultipleSelection;
                 }
             }
-            
+
             // 不需要再调用 setV8DefaultValue，因为 ParentV8 已经包含了所有必要的属性
-            
+
             await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()");
-            
+
             if (V8.Result !== false) {
                 showDialog.value = false;
             }
@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
     if (unwatchShowDialog) {
         unwatchShowDialog();
     }
-    
+
     // 清理对话框状态
     showDialog.value = false;
     if (props.field.Config && props.field.Config.OpenTable) {
@@ -415,6 +415,12 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+ // zhy只修改打开table按钮的颜色
+.opentable{
+  color: white;
+  background: #409eff;
+}
+
 .clear {
     clear: both;
 }
