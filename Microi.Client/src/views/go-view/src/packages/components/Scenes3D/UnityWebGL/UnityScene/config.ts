@@ -20,7 +20,9 @@ export const option = {
   // 控制面板
   showControls: true,
   gameManagerName: 'Main Camera',
-  waypointCount: 5
+  waypointCount: 5,
+  // 实例名（用于在其它插件事件中通过 window.$microiUnity.get(name) 访问）
+  instanceName: ''
 }
 
 export default class Config extends PublicConfigClass implements CreateComponentType {

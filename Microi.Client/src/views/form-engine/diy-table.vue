@@ -73,8 +73,28 @@
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
                 <div class="keyword-search" style="margin-bottom: 5px;">
                     <div class="search-action-group">
+                        <!-- 工作流菜单（OpenType=='WorkFlow' && FlowDesignId 存在）：发起申请按钮，替代普通新增 -->
                         <el-button
-                            v-if="_LimitAdd
+                            v-if="IsWorkFlowMenu()
+                                    && _LimitAdd
+                                    && !TableChildField.Readonly
+                                    && PropsIsJoinTable !== true
+                                    && IsVisibleAdd == true
+                                    && (!diyStore.IsPhoneView || _IsTableChild)
+                                "
+                            :loading="BtnLoading"
+                            type="primary"
+                            icon="Promotion"
+                            @click="StartWorkFlow()"
+                        >
+                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText
+                                ? SysMenuModel.DiyConfig.AddBtnText
+                                : '发起流程' }}
+                        </el-button>
+                        <!-- 普通新增按钮（OpenType!=WorkFlow 或未配置 FlowDesignId 时显示） -->
+                        <el-button
+                            v-if="!IsWorkFlowMenu()
+                                    && _LimitAdd
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
                                     && IsVisibleAdd == true
@@ -296,8 +316,13 @@
                     <!--弹出菜单-->
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <!--工作流-发起申请按钮-->
+                            <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
+                                <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>
+                                <span class="mobile-fab-menu-label">{{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText ? SysMenuModel.DiyConfig.AddBtnText : '发起流程' }}</span>
+                            </div>
                             <!--新增按钮-->
-                            <div class="mobile-fab-menu-item" v-if="_LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; OpenDetail(null, 'Add')">
+                            <div class="mobile-fab-menu-item" v-if="!IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; OpenDetail(null, 'Add')">
                                 <div class="mobile-fab-menu-icon add"><el-icon><Plus /></el-icon></div>
                                 <span class="mobile-fab-menu-label">{{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText ? SysMenuModel.DiyConfig.AddBtnText : $t('Msg.Add') }}</span>
                             </div>
@@ -637,6 +662,16 @@
                                         {{ btn.Name }}
                                     </el-button>
                                 </template>
+                                <!--工作流-去处理 按钮（OpenType=='WorkFlow' 时显示，放在【详情】之前）-->
+                                <el-button
+                                    v-if="IsWorkFlowMenu() && scope.row._IsInTableAdd !== true"
+                                    type="primary"
+                                    :icon="Tickets"
+                                    :loading="BtnLoading"
+                                    @click.stop="OpenWorkFlowProcess(scope.row)"
+                                >
+                                    去处理
+                                </el-button>
                                 <el-button
                                     v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true"
                                     :icon="Tickets"
@@ -646,9 +681,10 @@
                                 </el-button>
                                 <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                                 <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
+                                <!-- 流程引擎模式下：隐藏【编辑】项但保留【更多】按钮以提供删除/V8内部按钮 -->
                                 <el-button
                                     v-if="
-                                        (TableChildFormMode != 'View' &&
+                                        (!IsWorkFlowMenu() && TableChildFormMode != 'View' &&
                                             !TableChildField.Readonly &&
                                             _LimitEdit &&
                                             scope.row._IsInTableAdd !== true &&
@@ -913,7 +949,7 @@
                                         {{ btn.Name }}
                                     </el-button>
                                     <el-button
-                                        v-if="_LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleEdit"
+                                        v-if="!IsWorkFlowMenu() && _LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleEdit"
                                         class="card-action-btn"
                                         @click.stop="OpenDetail(item, 'Edit')"
                                         size="small"
@@ -923,6 +959,19 @@
                                     >
                                         <el-icon><Edit /></el-icon>
                                         {{ $t('Msg.Edit') }}
+                                    </el-button>
+                                    <!--工作流-去处理 按钮（OpenType=='WorkFlow' 时显示）-->
+                                    <el-button
+                                        v-if="IsWorkFlowMenu() && item._IsInTableAdd !== true"
+                                        class="card-action-btn"
+                                        :loading="BtnLoading"
+                                        @click.stop="OpenWorkFlowProcess(item)"
+                                        size="small"
+                                        round
+                                        type="primary"
+                                    >
+                                        <fa-icon icon="far fa-clipboard-check" />
+                                        去处理
                                     </el-button>
                                     <template v-if="item._RowMoreBtnsIn && item._RowMoreBtnsIn.length > 0">
                                         <el-button
@@ -1003,7 +1052,7 @@
                 @click.stop
             >
                 <div
-                    v-if="_LimitEdit && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true"
+                    v-if="!IsWorkFlowMenu() && _LimitEdit && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true"
                     class="global-more-menu-item"
                     @click="handleMoreMenuAction('edit')"
                 >
@@ -1776,12 +1825,18 @@ export default {
                 return self.SysMenuModel.TableActionFixedWidth;
             }
             var baseWidth = 0;//30;
+            var isWF = self.IsWorkFlowMenu();
+            // 工作流-去处理 按钮
+            if (isWF) {
+                baseWidth += 100;
+            }
             // 详情按钮
             if (self.IsPermission('NoDetail')) {
                 baseWidth += 80;
             }
             // 更多按钮（编辑/删除/内部自定义按钮）
-            var canEdit = self.TableChildFormMode != 'View' && self._LimitEdit;
+            // WF 模式下仅考虑删除与内部自定义按钮（编辑项被隐藏）；非WF模式下考虑编辑+删除+内部按钮
+            var canEdit = !isWF && self.TableChildFormMode != 'View' && self._LimitEdit;
             if (canEdit || self._LimitDel || self.HasVisibleMoreBtnsIn) {
                 baseWidth += 100;
             }
@@ -5116,6 +5171,62 @@ export default {
                 self.SysMenuModel.Name,
                 paramType
             );
+        },
+        // ========== 工作流相关：通过 SysMenuModel.OpenType=='WorkFlow' && FlowDesignId 实现一键发起申请 / 一键处理工作 ==========
+        IsWorkFlowMenu() {
+            var self = this;
+            return !!(self.SysMenuModel
+                && self.SysMenuModel.OpenType === "WorkFlow"
+                && !self.DiyCommon.IsNull(self.SysMenuModel.FlowDesignId));
+        },
+        // 一键发起流程：等价于 V8.OpenFormWF(V8.Form, 'Add', { WorkType:'StartWork', FlowDesignId:'xxx' })
+        StartWorkFlow() {
+            var self = this;
+            if (!self.IsWorkFlowMenu()) {
+                self.DiyCommon.Tips("当前菜单未配置流程引擎或缺少 FlowDesignId！", false);
+                return;
+            }
+            self.OpenDetail(null, "Add", true, true, {
+                WorkType: "StartWork",
+                FlowDesignId: self.SysMenuModel.FlowDesignId
+            });
+        },
+        // 一键处理工作：参考 my-work.vue 的【去处理】实现，查询当前用户在该行上的待办 WF_Work，
+        // 然后打开表单 + 工作流右抽屉，进入"发送下一节点 / 同意 / 不同意 / 退回"等处理流程。
+        async OpenWorkFlowProcess(row) {
+            var self = this;
+            if (self.DiyCommon.IsNull(row) || self.DiyCommon.IsNull(row.Id)) {
+                return;
+            }
+            self.BtnLoading = true;
+            try {
+                // 1) 查询当前用户在此业务数据上的待办（WF_Work，WorkState='Todo'）
+                var workRes = await self.DiyCommon.PostAsync("/api/FormEngine/GetFormData", {
+                    FormEngineKey: "WF_Work",
+                    _Where: [
+                        ["TableRowId", "=", row.Id],
+                        ["ReceiverId", "=", self.GetCurrentUser.Id],
+                        ["WorkState", "=", "Todo"]
+                    ]
+                });
+                if (!workRes || workRes.Code !== 1 || self.DiyCommon.IsNull(workRes.Data)) {
+                    self.DiyCommon.Tips("未找到您可处理的待办，可能已被处理或非接收人。", false);
+                    self.BtnLoading = false;
+                    return;
+                }
+                var workModel = workRes.Data;
+                // 2) 调用 OpenDetail，使用 wfParam.WorkType='DoWork' 进入处理流程
+                self.OpenDetail(row, "Edit", true, true, {
+                    WorkType: "DoWork",
+                    FlowDesignId: workModel.FlowDesignId || self.SysMenuModel.FlowDesignId,
+                    WorkModel: workModel,
+                    CurrentFlowId: workModel.FlowId,
+                    CurrentNodeId: workModel.NodeId
+                });
+            } catch (error) {
+                self.DiyCommon.Tips("打开处理工作页面失败：" + (error && error.message ? error.message : error), false);
+                self.BtnLoading = false;
+            }
         },
         //tableRowModel:行数据/表单数据
         //isDefaultOpen：是否默认打开，默认打开不会跳走到定制界面

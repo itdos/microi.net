@@ -83,6 +83,14 @@
       </setting-item>
     </setting-item-box>
   </collapse-item>
+
+  <collapse-item name="对外 API">
+    <setting-item-box name="实例名" :alone="true">
+      <setting-item name="instanceName（其它插件事件中调用 window.$microiUnity.get(实例名) 时使用）">
+        <n-input v-model:value="optionData.instanceName" size="small" placeholder="如：factory3D（留空则只能用 chartId 或 first()）" />
+      </setting-item>
+    </setting-item-box>
+  </collapse-item>
 </template>
 
 <script setup lang="ts">

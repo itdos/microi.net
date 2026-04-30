@@ -12,8 +12,9 @@
                 <div class="panel-card">
                     <WFHistory v-if="openDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
                     <WFWorkHandler
-                        v-if="openDiyFormWorkFlowType.WorkType == 'StartWork'"
+                        v-if="openDiyFormWorkFlowType.WorkType == 'StartWork' || openDiyFormWorkFlowType.WorkType == 'DoWork'"
                         ref="refWfWorkHandler"
+                        :HideInlineSubmit="hideInlineSubmit"
                         @CallbackStartWork="OnCallbackStartWork"
                     ></WFWorkHandler>
                 </div>
@@ -140,7 +141,9 @@ export default {
         dataCommentListLoading: { type: Boolean, default: false },
         commentContent: { type: String, default: "" },
         btnLoading: { type: Boolean, default: false },
-        isMobileDrawer: { type: Boolean, default: false }
+        isMobileDrawer: { type: Boolean, default: false },
+        // 隐藏 wf-work-handler 内联的发起流程/处理工作提交按钮——由表单顶部的 CTA 接管
+        hideInlineSubmit: { type: Boolean, default: false }
     },
     emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work"],
     data() {
