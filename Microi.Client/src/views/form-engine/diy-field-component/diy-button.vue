@@ -33,7 +33,7 @@
                     <el-radio value="danger">危险按钮</el-radio>
                 </el-radio-group>
             </el-form-item>
-            
+
             <el-form-item label="预览可点击">
                 <el-radio-group v-model="configForm.Button.PreviewCanClick">
                     <el-radio :value="true">是</el-radio>
@@ -41,7 +41,7 @@
                 </el-radio-group>
                 <div class="form-item-tip">开启后在预览/查看模式下按钮仍可点击</div>
             </el-form-item>
-            
+
             <el-form-item label="图标">
                 <div style="display: flex; align-items: center;">
                     <span class="hand" style="display: inline-block; padding: 5px 10px; cursor: pointer; border: 1px solid #dcdfe6; border-radius: 4px; margin-right: 10px;" @click="$refs.refButtonIcon && $refs.refButtonIcon.show()">
@@ -201,7 +201,65 @@ export default {
             self.$emit("CallbackRunV8Code", {
                 field: field,
                 thisValue: self.ModelValue,
-                callback: (res) => {}
+                callback: (res) => {
+                  // zhy处理审核按钮点击后页面不刷新的问题,采用全局监听再次手动触发监听
+                  try {
+                      // 如果回调显式返回 false，则认为不刷新
+                      if (typeof res !== 'undefined' && res === false) return;
+
+                      // 尝试从可用来源获取标识，以供 diy-table 精确匹配
+                      var sysMenuId = null;
+                      var tableId = null;
+
+                      // 优先从当前组件自身的已知字段取
+                      if (self.DiyConfig && self.DiyConfig.SysMenuId) sysMenuId = self.DiyConfig.SysMenuId;
+                      if (!sysMenuId && self.FormDiyTableModel && self.FormDiyTableModel.SysMenuId) sysMenuId = self.FormDiyTableModel.SysMenuId;
+                      if (!sysMenuId && self.DiyTableModel && self.DiyTableModel.SysMenuId) sysMenuId = self.DiyTableModel.SysMenuId;
+                      if (!tableId && self.TableId) tableId = self.TableId;
+                      if (!tableId && self.FormDiyTableModel && self.FormDiyTableModel.TableId) tableId = self.FormDiyTableModel.TableId;
+                      if (!tableId && self.DiyTableModel && self.DiyTableModel.Id) tableId = self.DiyTableModel.Id;
+
+                      // 向上遍历父组件，查找最近的子表/表单组件上的 SysMenuId 或 PropsSysMenuId
+                      try {
+                          var vm = self.$parent;
+                          var safety = 0;
+                          while (vm && safety++ < 20 && (!sysMenuId || !tableId)) {
+                              if (!sysMenuId) {
+                                  if (vm.SysMenuId) sysMenuId = vm.SysMenuId;
+                                  else if (vm.PropsSysMenuId) sysMenuId = vm.PropsSysMenuId;
+                                  else if (vm.SysMenuModel && vm.SysMenuModel.Id) sysMenuId = vm.SysMenuModel.Id;
+                              }
+                              if (!tableId) {
+                                  if (vm.TableId) tableId = vm.TableId;
+                                  else if (vm.PropsTableId) tableId = vm.PropsTableId;
+                                  else if (vm.DiyTableModel && vm.DiyTableModel.Id) tableId = vm.DiyTableModel.Id;
+                              }
+                              if (sysMenuId && tableId) break;
+                              vm = vm.$parent;
+                          }
+                      } catch (e) {
+                          // ignore
+                      }
+                      // 最后回退到路由上的 meta
+                      if (!sysMenuId && self.$route && self.$route.meta) sysMenuId = self.$route.meta.Id || self.$route.meta.SysMenuId || null;
+                      if (!tableId && self.$route && self.$route.meta) tableId = self.$route.meta.DiyTableId || self.$route.meta.TableId || null;
+                      var formModelId = (self.FormDiyTableModel && self.FormDiyTableModel.Id) || null;
+
+                      var detail = {
+                          sysMenuId: sysMenuId,
+                          tableId: tableId,
+                          formModelId: formModelId,
+                          timestamp: new Date().getTime()
+                      };
+                      // console.log(detail,888888888888);
+                      setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('page-refresh', { detail }));
+                      }, 100);
+                  } catch (e) {
+                      // 忽略派发失败，不影响主流程
+                  }
+
+                }
             });
         },
         GetFieldReadOnly(field) {
@@ -271,7 +329,7 @@ export default {
             self.field.Config.Button.Type = self.configForm.Button.Type;
             self.field.Config.Button.PreviewCanClick = self.configForm.Button.PreviewCanClick;
             self.field.Config.Button.Icon = self.configForm.Button.Icon;
-            
+
             self.configDialogVisible = false;
             self.DiyCommon.Tips('配置已保存', true);
         }

@@ -1414,6 +1414,12 @@ export default {
             window.removeEventListener('page-refresh', self._handlePageRefresh);
             self._handlePageRefresh = null;
         }
+        //zhy移除全局子表格刷新事件监听
+        if (self._handleTableRefresh) {
+            window.removeEventListener('table-refresh', self._handleTableRefresh);
+            self._handleTableRefresh = null;
+        }
+
         // 🔥 解绑表格懒渲染滚动监听
         try { self.UnbindLazyScroll && self.UnbindLazyScroll(); } catch (e) {}
         // 🔥 解绑移动端无限滚动监听（避免 keep-alive 之外的卸载场景泄漏）
@@ -1727,7 +1733,7 @@ export default {
         _LimitAdd() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Add") > -1 || el.Permission.indexOf("Insert") > -1);
             }
             return false;
@@ -1735,7 +1741,7 @@ export default {
         _LimitImport() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Import") > -1);
             }
             return false;
@@ -1751,7 +1757,7 @@ export default {
         _LimitEdit() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Edit") > -1);
             }
             return false;
@@ -1759,7 +1765,7 @@ export default {
         _LimitDel() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Del") > -1);
             }
             return false;
@@ -2246,6 +2252,24 @@ export default {
             }
         };
         window.addEventListener('page-refresh', self._handlePageRefresh);
+
+        // zhy监听子表格刷新事件，处理审核按钮点击后页面不刷新的问题
+        self._handleTableRefresh = (event) => {
+            // 使用 SysMenuId 精确匹配，避免同一个组件的不同实例都被刷新
+            if (event.detail && event.detail.sysMenuId && event.detail.sysMenuId === self.SysMenuId) {
+                // 子表收到刷新事件，SysMenuId 匹配，使用 RefreshDiyTableRowList 重新获取子表数据
+                try {
+                    // 使用统一的子表刷新方法，保留 param 以便上层传递分页或其它信息
+                    var param = event.detail && event.detail.param ? event.detail.param : { _PageIndex: 1 };
+                    self.RefreshDiyTableRowList(param);
+                } catch (err) {
+                    // console.error('调用 RefreshDiyTableRowList 失败，回退到 GetDiyTableRow:', err);
+                }
+            } else {
+                // console.log('子表收到刷新事件，但 SysMenuId 不匹配，忽略');
+            }
+        };
+        window.addEventListener('table-refresh', self._handleTableRefresh);
 
         // 移动端无限滚动监听
         if (self.diyStore.IsPhoneView) {
@@ -3951,7 +3975,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Add") > -1 || element.Permission.indexOf("Insert") > -1) {
@@ -3969,7 +3993,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Import") > -1) {
@@ -4008,7 +4032,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Edit") > -1) {
@@ -4026,7 +4050,7 @@ export default {
                 return true;
             }
             var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
-            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" && 
+            if (roleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf("Del") > -1) {
@@ -5525,8 +5549,8 @@ export default {
             }
             try {
                 var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
-                if (self.DiyCommon.IsNull(cacheDiyTableRowPageSize) 
-                    && self.SysMenuModel.DefaultPageSize 
+                if (self.DiyCommon.IsNull(cacheDiyTableRowPageSize)
+                    && self.SysMenuModel.DefaultPageSize
                     && self.SysMenuModel.DefaultPageSize > 0) {
                     self.DiyTableRowPageSize = self.SysMenuModel.DefaultPageSize;
                 }
@@ -5536,7 +5560,7 @@ export default {
                     self.DiyTableRowPageSize = 15;
                 }
             } catch (error) {
-               
+
             }
 
             //--------处理模块配置
