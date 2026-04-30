@@ -3737,6 +3737,16 @@ export default {
 
                         //传入V8、Param、callback,  必须执行SubmitCallback(DosResult)
                         let result = self.EventReplace.Submit(V8, param, SubmitCallback);
+                    } else if (typeof formParam._AlternateSubmit === "function") {
+                        // 事务合并钩子：把已构建好的 url/param 交给外部（如工作流合并端点），由其完成HTTP并回传 DosResult
+                        try {
+                            formParam._AlternateSubmit(url, param, async function (result) {
+                                SubmitCallback(result);
+                            });
+                        } catch (e) {
+                            formParam.SaveLoading = false;
+                            callback(false);
+                        }
                     } else {
                         self.DiyCommon.Post(
                             url,

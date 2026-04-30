@@ -2260,7 +2260,7 @@ export default {
           if (raw) {
             var pos = JSON.parse(raw);
             if (pos && typeof pos.right == 'number' && typeof pos.bottom == 'number') {
-              this.fabPosition = pos;
+              this.fabPosition = this.ClampFabPosition(pos.right, pos.bottom);
             }
           }
         } catch (e) { /* ignore */ }
@@ -2278,6 +2278,20 @@ export default {
         }
         return {};
       },
+      ClampFabPosition(right, bottom, btnSize) {
+        var size = btnSize || 54;
+        var minMargin = 8;
+        // 列表页底部一般有 tabbar，预留 90px
+        var tabBarEl = document.querySelector('.mobile-tab-bar, .van-tabbar, .el-tabbar, .tabbar, .mobile-bottom-nav');
+        var bottomReserved = tabBarEl && tabBarEl.offsetHeight ? (tabBarEl.offsetHeight + 8) : 90;
+        var topReserved = 60;
+        var maxRight = Math.max(minMargin, window.innerWidth - size - minMargin);
+        var maxBottom = Math.max(bottomReserved, window.innerHeight - size - topReserved);
+        return {
+          right: Math.max(minMargin, Math.min(maxRight, right)),
+          bottom: Math.max(bottomReserved, Math.min(maxBottom, bottom))
+        };
+      },
       OnFabPointerDown(e) {
         var self = this;
         var isTouch = e.type === 'touchstart';
@@ -2285,13 +2299,28 @@ export default {
         var pt = isTouch ? e.touches[0] : e;
         var startX = pt.clientX, startY = pt.clientY;
         var btnEl = e.currentTarget;
+        var containerEl = btnEl.closest('.mobile-fab-container');
+        if (!containerEl) return;
         var rect = btnEl.getBoundingClientRect();
         var btnW = rect.width, btnH = rect.height;
         var startRight = window.innerWidth - rect.right;
         var startBottom = window.innerHeight - rect.bottom;
         var moved = false;
         var threshold = 5;
+        var minMargin = 8;
+        var tabBarEl = document.querySelector('.mobile-tab-bar, .van-tabbar, .el-tabbar, .tabbar, .mobile-bottom-nav');
+        var bottomReserved = tabBarEl && tabBarEl.offsetHeight ? (tabBarEl.offsetHeight + 8) : 90;
+        var topReserved = 60;
+        var maxRight = window.innerWidth - btnW - minMargin;
+        var maxBottom = window.innerHeight - btnH - topReserved;
+        var lastRight = startRight, lastBottom = startBottom;
+        var rafId = null;
 
+        var applyDom = function() {
+          rafId = null;
+          containerEl.style.right = lastRight + 'px';
+          containerEl.style.bottom = lastBottom + 'px';
+        };
         var moveHandler = function(ev) {
           var p = isTouch ? (ev.touches[0] || ev.changedTouches[0]) : ev;
           if (!p) return;
@@ -2299,14 +2328,14 @@ export default {
           var dy = p.clientY - startY;
           if (!moved && Math.hypot(dx, dy) > threshold) moved = true;
           if (moved) {
-            var minMargin = 8;
-            var nr = Math.max(minMargin, Math.min(window.innerWidth - btnW - minMargin, startRight - dx));
-            var nb = Math.max(minMargin, Math.min(window.innerHeight - btnH - minMargin, startBottom - dy));
-            self.fabPosition = { right: nr, bottom: nb };
+            lastRight = Math.max(minMargin, Math.min(maxRight, startRight - dx));
+            lastBottom = Math.max(bottomReserved, Math.min(maxBottom, startBottom - dy));
+            if (rafId == null) rafId = requestAnimationFrame(applyDom);
             if (ev.cancelable) ev.preventDefault();
           }
         };
         var upHandler = function() {
+          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
           if (isTouch) {
             document.removeEventListener('touchmove', moveHandler, { passive: false });
             document.removeEventListener('touchend', upHandler);
@@ -2317,6 +2346,7 @@ export default {
           }
           if (moved) {
             self._fabDragJustMoved = true;
+            self.fabPosition = { right: lastRight, bottom: lastBottom };
             self.SaveFabPosition();
             setTimeout(function() { self._fabDragJustMoved = false; }, 50);
           }

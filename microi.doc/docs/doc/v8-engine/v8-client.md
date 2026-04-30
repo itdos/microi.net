@@ -348,6 +348,91 @@ V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 
 //option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
 ```
+>* 自定义html玩法，可以传入动态html字符串，来实现更丰富的提示框内容，如下图所示：
+<table>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips.png"/></td>
+    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips-2.png"/></td>
+  </tr>
+</table>
+
+::: details 动态html参考代码
+```JS
+// @cham 2026-04-30 快捷报工保存后，完成品弹出确认跳转入库
+if (V8.FormOutAction == 'Insert'
+  && V8.Form._GongDanLX == '生产工单'
+  && V8.Form._LinshiGX != 1) {
+
+  // 查询工位任务，判断是否为完成品（末道工序 ShifouMDGX == 1）
+  var gwrwRes = await V8.FormEngine.GetFormData('diy_gwrw', {
+      Id: V8.Form.GongweiRWID
+  });
+
+  if (gwrwRes.Code == 1 && gwrwRes.Data && gwrwRes.Data.ShifouMDGX == 1) {
+      // 附带查询条件跳转到本次报工的【快捷报工单】
+
+      // BaoGongD 为服务端自动生成，OutFormV8 的 V8.Form 中可能为空，需回查
+      var bgRes = await V8.FormEngine.GetFormData('diy_baogong', {
+          Id: V8.Form.Id,
+          _SelectFields: ['Id', 'BaoGongD']
+      });
+      var baoGongDan = (bgRes.Code == 1 && bgRes.Data) ? bgRes.Data.BaoGongD : '';
+
+      // 查询本次报工生成的箱码列表
+      var xmRes = await V8.FormEngine.GetTableData('diy_kjbgxm', {
+          _Where: [['DangqianBGDID', '=', V8.Form.Id], ['IsDeleted', '=', 0]],
+          _SelectFields: ['Xiangma', 'CunhuoMC', 'Tuhao', 'ZhuangxiangSL', 'RukuZT']
+      });
+      var xmList = (xmRes.Code == 1 && xmRes.Data) ? xmRes.Data : [];
+
+      // 构建箱码明细表格 HTML
+      var tdStyle = 'style="padding:4px 8px;border:1px solid #ddd;white-space:nowrap"';
+      var thStyle = 'style="padding:4px 8px;border:1px solid #ddd;background:#f5f5f5;white-space:nowrap"';
+      var rows = xmList.map(function(item, idx) {
+          return '<tr>'
+              + '<td ' + tdStyle + '>' + (idx + 1) + '</td>'
+              + '<td ' + tdStyle + '>' + (item.Xiangma || '') + '</td>'
+              + '<td ' + tdStyle + '>' + (item.CunhuoMC || '') + '</td>'
+              + '<td ' + tdStyle + '>' + (item.Tuhao || '') + '</td>'
+              + '<td ' + tdStyle + ' style="text-align:center">' + (item.ZhuangxiangSL || 0) + '</td>'
+              + '<td ' + tdStyle + '>' + (item.RukuZT || '-') + '</td>'
+              + '</tr>';
+      }).join('');
+
+      var html = '<div>'
+          + '<div style="margin-bottom:8px">报工单号：<b>' + baoGongDan + '</b>，共生成 <b>' + xmList.length + '</b> 个箱码，是否跳转到快捷报工单进行入库？</div>'
+          + '<div style="max-height:260px;overflow-y:auto">'
+          + '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+          + '<thead><tr>'
+          + '<th ' + thStyle + '>序号</th>'
+          + '<th ' + thStyle + '>箱码</th>'
+          + '<th ' + thStyle + '>存货名称</th>'
+          + '<th ' + thStyle + '>图号</th>'
+          + '<th ' + thStyle + '>装箱数量</th>'
+          + '<th ' + thStyle + '>入库状态</th>'
+          + '</tr></thead>'
+          + '<tbody>' + rows + '</tbody>'
+          + '</table>'
+          + '</div></div>';
+
+      V8.ConfirmTips(
+          html,
+          function () {
+              V8.Router.Push('/baogongdan?Keyword=' + baoGongDan);
+          },
+          function () { /* 用户取消 */ },
+          {
+              Title: '入库提示',
+              OkText: '前往入库',
+              CancelText: '稍后处理',
+              Icon: 'icon-exclamation-circle'
+              // Width: '780px'
+          }
+      );
+  }
+}
+```
+:::
 
 ## V8.ShowTableChildHideField
 >* 将子表已隐藏的字段强制显示出来，并且刷新子表。
