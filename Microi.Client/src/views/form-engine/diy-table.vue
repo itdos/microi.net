@@ -256,7 +256,7 @@
                                         <el-icon><QuestionFilled /></el-icon>{{ $t('Msg.ModuleDesign') }}
                                     </el-dropdown-item>
                                     <el-dropdown-item @click="$refs.refDiyPermissionDialog.show()">
-                                        <el-icon><CircleCheck /></el-icon>{{ $t('Msg.FormPermission') }}
+                                        <el-icon><CircleCheck /></el-icon>{{ $t('Msg.MenuPermission') }}
                                     </el-dropdown-item>
                                     <el-dropdown-item divided @click="ShowIndexManager = true">
                                         <el-icon><Grid /></el-icon>索引管理
@@ -268,7 +268,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -302,7 +302,8 @@
                         </div>
                     </transition>
                     <!--FAB主按钮-->
-                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }"
+                        @mousedown="OnFabPointerDown" @touchstart="OnFabPointerDown" @click="OnFabClick">
                         <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
                     </div>
                 </div>
@@ -1220,7 +1221,7 @@
             </el-row>
         </el-dialog>
 
-        <!-- 表单权限设置弹窗 -->
+        <!-- 菜单权限设置弹窗 -->
         <DiyPermissionDialog
             ref="refDiyPermissionDialog"
             :sysMenuModel="SysMenuModel"
@@ -2027,6 +2028,8 @@ export default {
             cardCompactMode: false,
             // 移动端FAB菜单状态
             showMobileFabMenu: false,
+            // 移动端FAB拖拽位置
+            fabPosition: null,
             // 索引管理弹窗
             ShowIndexManager: false,
             // BtnLoading:false,
@@ -2163,6 +2166,9 @@ export default {
         if (self.diyStore.IsPhoneView) {
             self.initMobileScroll();
         }
+
+        // 加载FAB拖拽位置
+        self.LoadFabPosition();
     },
     // 🔥 activated 钩子：组件被 keep-alive 激活时触发
     activated() {
@@ -2247,6 +2253,88 @@ export default {
         var self = this;
     },
     methods: {
+      // ========== 移动端FAB拖拽 ==========
+      LoadFabPosition() {
+        try {
+          var raw = localStorage.getItem('microi_fab_position_table');
+          if (raw) {
+            var pos = JSON.parse(raw);
+            if (pos && typeof pos.right == 'number' && typeof pos.bottom == 'number') {
+              this.fabPosition = pos;
+            }
+          }
+        } catch (e) { /* ignore */ }
+      },
+      SaveFabPosition() {
+        try {
+          if (this.fabPosition) {
+            localStorage.setItem('microi_fab_position_table', JSON.stringify(this.fabPosition));
+          }
+        } catch (e) { /* ignore */ }
+      },
+      GetFabContainerStyle() {
+        if (this.fabPosition) {
+          return { right: this.fabPosition.right + 'px', bottom: this.fabPosition.bottom + 'px' };
+        }
+        return {};
+      },
+      OnFabPointerDown(e) {
+        var self = this;
+        var isTouch = e.type === 'touchstart';
+        if (!isTouch && e.button !== 0) return;
+        var pt = isTouch ? e.touches[0] : e;
+        var startX = pt.clientX, startY = pt.clientY;
+        var btnEl = e.currentTarget;
+        var rect = btnEl.getBoundingClientRect();
+        var btnW = rect.width, btnH = rect.height;
+        var startRight = window.innerWidth - rect.right;
+        var startBottom = window.innerHeight - rect.bottom;
+        var moved = false;
+        var threshold = 5;
+
+        var moveHandler = function(ev) {
+          var p = isTouch ? (ev.touches[0] || ev.changedTouches[0]) : ev;
+          if (!p) return;
+          var dx = p.clientX - startX;
+          var dy = p.clientY - startY;
+          if (!moved && Math.hypot(dx, dy) > threshold) moved = true;
+          if (moved) {
+            var minMargin = 8;
+            var nr = Math.max(minMargin, Math.min(window.innerWidth - btnW - minMargin, startRight - dx));
+            var nb = Math.max(minMargin, Math.min(window.innerHeight - btnH - minMargin, startBottom - dy));
+            self.fabPosition = { right: nr, bottom: nb };
+            if (ev.cancelable) ev.preventDefault();
+          }
+        };
+        var upHandler = function() {
+          if (isTouch) {
+            document.removeEventListener('touchmove', moveHandler, { passive: false });
+            document.removeEventListener('touchend', upHandler);
+            document.removeEventListener('touchcancel', upHandler);
+          } else {
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup', upHandler);
+          }
+          if (moved) {
+            self._fabDragJustMoved = true;
+            self.SaveFabPosition();
+            setTimeout(function() { self._fabDragJustMoved = false; }, 50);
+          }
+        };
+        if (isTouch) {
+          document.addEventListener('touchmove', moveHandler, { passive: false });
+          document.addEventListener('touchend', upHandler);
+          document.addEventListener('touchcancel', upHandler);
+        } else {
+          document.addEventListener('mousemove', moveHandler);
+          document.addEventListener('mouseup', upHandler);
+        }
+      },
+      OnFabClick() {
+        if (this._fabDragJustMoved) return;
+        this.showMobileFabMenu = !this.showMobileFabMenu;
+      },
+
       // 移动端清楚复选框数据
       childClearSearch(e){
         this.InitSearch()
