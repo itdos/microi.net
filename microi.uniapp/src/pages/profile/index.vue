@@ -49,28 +49,48 @@
 
     <!-- 功能列表 -->
     <view class="func-list">
-      <!-- 图标网格快捷操作 -->
-      <view class="quick-grid">
-        <view class="quick-grid__item" @tap="showThemePanel = true">
-          <view class="quick-grid__icon quick-grid__icon--primary"><text class="q-icon">🎨</text></view>
-          <text class="quick-grid__label">{{ t('profile.themeSwitch') }}</text>
+      <!-- 主题与显示 -->
+      <view class="func-group">
+        <view class="func-item" @tap="showThemePanel = true">
+          <view class="item-left">
+            <view class="item-icon item-icon--primary">
+              <text>🎨</text>
+            </view>
+            <text class="item-title">{{ t('profile.themeSwitch') }}</text>
+          </view>
+          <view class="item-right">
+            <view class="theme-dot" :style="{ background: themeColor }"></view>
+            <text class="arrow">›</text>
+          </view>
         </view>
-        <view class="quick-grid__item" @tap="showLangPanel = true">
-          <view class="quick-grid__icon quick-grid__icon--cyan"><text class="q-icon">🌐</text></view>
-          <text class="quick-grid__label">{{ t('profile.langSwitch') }}</text>
-        </view>
-        <view class="quick-grid__item" v-if="isLoggedIn" @tap="showPasswordDialog = true">
-          <view class="quick-grid__icon quick-grid__icon--gold"><text class="q-icon">🔑</text></view>
-          <text class="quick-grid__label">{{ t('profile.changePassword') }}</text>
-        </view>
-        <view class="quick-grid__item" @tap="goAbout">
-          <view class="quick-grid__icon quick-grid__icon--pink"><text class="q-icon">ℹ️</text></view>
-          <text class="quick-grid__label">{{ t('profile.aboutSystem') }}</text>
+        <view class="func-item" @tap="showLangPanel = true">
+          <view class="item-left">
+            <view class="item-icon item-icon--cyan">
+              <text>🌐</text>
+            </view>
+            <text class="item-title">{{ t('profile.langSwitch') }}</text>
+          </view>
+          <view class="item-right">
+            <text class="item-value">{{ currentLangName }}</text>
+            <text class="arrow">›</text>
+          </view>
         </view>
       </view>
 
-      <!-- 横向列表 -->
+      <!-- 常用功能 -->
       <view class="func-group">
+        <view class="func-item" @tap="goAbout">
+          <view class="item-left">
+            <view class="item-icon item-icon--blue">
+              <text>ℹ️</text>
+            </view>
+            <text class="item-title">{{ t('profile.aboutSystem') }}</text>
+          </view>
+          <view class="item-right">
+            <text class="item-value">{{ version }}</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
         <view class="func-item" @tap="goPrivacy">
           <view class="item-left">
             <view class="item-icon item-icon--purple">
@@ -84,9 +104,31 @@
         </view>
       </view>
 
+      <!-- 账号相关 -->
+      <view class="func-group" v-if="isLoggedIn">
+        <view class="func-item" @tap="showPasswordDialog = true">
+          <view class="item-left">
+            <view class="item-icon item-icon--gold">
+              <text>🔑</text>
+            </view>
+            <text class="item-title">{{ t('profile.changePassword') }}</text>
+          </view>
+          <view class="item-right">
+            <text class="arrow">›</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 退出登录 -->
-      <view class="logout-btn" v-if="isLoggedIn" @tap="handleLogout">
-        <text class="logout-btn__text">{{ t('profile.logout') }}</text>
+      <view class="func-group" v-if="isLoggedIn">
+        <view class="func-item logout-item" @tap="handleLogout">
+          <view class="item-left">
+            <view class="item-icon item-icon--danger">
+              <text>🚪</text>
+            </view>
+            <text class="item-title">{{ t('profile.logout') }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- 未登录时的登录入口 -->
@@ -678,70 +720,9 @@ export default {
   color: var(--mci-text-tertiary);
 }
 
-/* 图标网格快捷操作 */
-.quick-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16rpx;
-  background: var(--mci-bg-elevated);
-  border-radius: var(--mci-radius-lg);
-  padding: 32rpx 16rpx;
-  margin-bottom: 20rpx;
-  box-shadow: var(--mci-shadow-card, var(--mci-shadow-md));
-  border: 1rpx solid var(--mci-border-color);
-
-  &__item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12rpx;
-
-    &:active { opacity: 0.75; }
-  }
-
-  &__icon {
-    width: 88rpx;
-    height: 88rpx;
-    border-radius: var(--mci-radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &--primary { background: var(--mci-gradient-primary); }
-    &--cyan    { background: linear-gradient(135deg, #06B6D4, #22D3EE); }
-    &--gold    { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
-    &--pink    { background: linear-gradient(135deg, #EC4899, #F472B6); }
-  }
-
-  &__label {
-    font-size: 24rpx;
-    color: var(--mci-text-secondary);
-    text-align: center;
-  }
-}
-
-.q-icon {
-  font-size: 40rpx;
-}
-
-/* 退出登录按钮 */
-.logout-btn {
-  margin-top: 8rpx;
-  width: 100%;
-  height: 88rpx;
-  border-radius: var(--mci-radius-full);
-  background: linear-gradient(135deg, #E8294A, #FB7185);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6rpx 20rpx rgba(232, 41, 74, 0.3);
-
-  &:active { opacity: 0.85; }
-
-  &__text {
-    font-size: 30rpx;
-    color: #fff;
-    font-weight: 600;
+.logout-item {
+  .item-title {
+    color: var(--mci-color-danger);
   }
 }
 
