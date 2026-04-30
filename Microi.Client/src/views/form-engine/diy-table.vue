@@ -89,6 +89,26 @@
                                 ? SysMenuModel.DiyConfig.AddBtnText
                                 : $t("Msg.Add") }}
                         </el-button>
+                        <!-- 表内编辑【提交一起保存】模式：批量提交 / 取消按钮 -->
+                        <template v-if="IsBatchSubmitMode() && SysMenuModel.InTableEdit">
+                            <el-button
+                                type="success"
+                                :loading="_BatchSaveLoading"
+                                :disabled="!HasPendingBatchChanges()"
+                                @click="SubmitBatchSave"
+                            >
+                                <fa-icon icon="far fa-save mr-1" />
+                                提交保存<template v-if="HasPendingBatchChanges()">（{{ GetPendingBatchSummary().total }}）</template>
+                            </el-button>
+                            <el-button
+                                v-if="HasPendingBatchChanges()"
+                                type="info"
+                                plain
+                                @click="CancelBatchSave"
+                            >
+                                取消变更
+                            </el-button>
+                        </template>
                         <!-- 更多页面按钮 PageBtns -->
                         <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
                                         && SysMenuModel.PageBtns
@@ -517,6 +537,7 @@
                                                     return FieldOnKeyup(event, field, scope);
                                                 }
                                             "
+                                            @CallbackInTableEditSave="OnInTableEditSave"
                                             :is="'Diy' + field.Component"
                                         />
                                     </div>
@@ -778,6 +799,7 @@
                                                                 :LoadType="'Table'"
                                                                 @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
                                                                 @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
+                                                                @CallbackInTableEditSave="OnInTableEditSave"
                                                                 :is="'Diy' + CardShowDiyFieldList[0].Component"
                                                             />
                                                         </div>
@@ -827,6 +849,7 @@
                                                             :LoadType="'Table'"
                                                             @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
                                                             @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
+                                                            @CallbackInTableEditSave="OnInTableEditSave"
                                                             :is="'Diy' + field.Component"
                                                         />
                                                     </div>
@@ -2121,7 +2144,14 @@ export default {
             _mobileWindowStart: 0, // 双向滚动：当前窗口起始位置
             _mobileTotalLoaded: 0, // 双向滚动：已加载总数
             _lastLoadTime: 0, // 上次加载完成的时间戳（用于防抖，避免连续触发）
-            _savedScrollTop: undefined // 保存的滚动位置（用于返回时恢复）
+            _savedScrollTop: undefined, // 保存的滚动位置（用于返回时恢复）
+            // ========== 表内编辑【提交一起保存】模式 ==========
+            // SysMenuModel.SaveType = 'Auto'(默认 值变更实时存) | 'Submit'(提交一起保存)
+            // _PendingSaveChanges 仅在 Submit 模式下使用，记录待提交变更
+            //   updates: { [rowId]: { __row: rowRef, __dataLog: [...], __snapshot: 完整_FormData } }
+            //   adds:    [ rowRef, ... ]
+            _PendingSaveChanges: { adds: [], updates: {} },
+            _BatchSaveLoading: false
         };
     },
     mounted() {
@@ -2391,6 +2421,174 @@ export default {
                 return fields.indexOf(fieldId) > -1;
             }
             return false;
+        },
+        /**
+         * ========== 表内编辑【SaveType】中央保存入口 ==========
+         * 来自字段子组件 (textarea/select/switch/select-tree) 的 @CallbackInTableEditSave 事件。
+         * payload = { row, field, oldValue, newValue, handled }
+         * - 设置 payload.handled = true 表示由本方法接管，子组件不再走默认单字段保存逻辑。
+         * - 行为：
+         *   1) SysMenuModel.SaveType === 'Submit' 仅记录到待提交队列，不调接口。
+         *   2) 其它（默认 Auto）取整行数据组装 _FormData，立即调 UptFormData。
+         */
+        OnInTableEditSave(payload) {
+            var self = this;
+            if (!payload || !payload.row || !payload.field) return;
+            var saveType = self.SysMenuModel && self.SysMenuModel.SaveType;
+            payload.handled = true;
+            if (saveType === 'Submit') {
+                self._RecordPendingChange(payload);
+                return;
+            }
+            self._SaveRowAuto(payload);
+        },
+        /** 提取整行可提交的 _FormData（剔除框架内部字段、模板渲染缓存等）。 */
+        _BuildFullRowFormData(row) {
+            var self = this;
+            if (!row) return {};
+            var formData = {};
+            var skipSuffix = '_TmpEngineResult';
+            for (var k in row) {
+                if (!Object.prototype.hasOwnProperty.call(row, k)) continue;
+                if (!k) continue;
+                if (k.charAt(0) === '_') continue; // _XXX 前端内部字段
+                if (k.length > skipSuffix.length && k.lastIndexOf(skipSuffix) === k.length - skipSuffix.length) continue;
+                if (k === 'IsVisibleDetail' || k === 'IsVisibleEdit' || k === 'IsVisibleDel') continue;
+                var v = row[k];
+                if (typeof v === 'function') continue;
+                formData[k] = v;
+            }
+            if (!self.DiyCommon.IsNull(row.Id)) formData.Id = row.Id;
+            try {
+                self.DiyCommon.ForRowModelHandler(formData, self.DiyFieldList);
+                formData = self.DiyCommon.ConvertRowModel(formData);
+            } catch (e) { /* ignore */ }
+            return formData;
+        },
+        _BuildDataLog(payload) {
+            return [{
+                Name: payload.field.Name,
+                Label: payload.field.Label || payload.field.Name,
+                Component: payload.field.Component,
+                OVal: payload.oldValue == null ? '' : payload.oldValue,
+                NVal: payload.newValue == null ? '' : payload.newValue
+            }];
+        },
+        /** Auto 模式：立即保存整行。 */
+        _SaveRowAuto(payload) {
+            var self = this;
+            var row = payload.row;
+            var formData = self._BuildFullRowFormData(row);
+            var formEngineKey = self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name ? self.CurrentDiyTableModel.Name : self.TableName;
+            var param = {
+                FormEngineKey: formEngineKey,
+                TableId: self.TableId,
+                Id: row.Id,
+                _FormData: formData,
+                _DataLog: JSON.stringify(self._BuildDataLog(payload))
+            };
+            var apiUrl = self.DiyApi.UptDiyTableRow;
+            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.ApiReplace && self.CurrentDiyTableModel.ApiReplace.Update) {
+                apiUrl = self.DiyCommon.RepalceUrlKey(self.CurrentDiyTableModel.ApiReplace.Update);
+            }
+            self.DiyCommon.Post(apiUrl, param, function (result) {
+                if (self.DiyCommon.Result(result)) {
+                    self.DiyCommon.Tips(self.$t('Msg.Success'));
+                }
+            });
+        },
+        /** Submit 模式：登记待提交。 */
+        _RecordPendingChange(payload) {
+            var self = this;
+            var row = payload.row;
+            if (!row) return;
+            if (row._IsInTableAdd === true) {
+                if (!self._PendingSaveChanges.adds.some(r => r === row || (r && row.Id && r.Id === row.Id))) {
+                    self._PendingSaveChanges.adds.push(row);
+                }
+                row._DataStatus = 'Add';
+                return;
+            }
+            if (!row.Id) return;
+            var entry = self._PendingSaveChanges.updates[row.Id];
+            if (!entry) {
+                entry = { __row: row, __dataLog: [] };
+                self._PendingSaveChanges.updates[row.Id] = entry;
+            } else {
+                entry.__row = row;
+            }
+            entry.__dataLog.push(self._BuildDataLog(payload)[0]);
+            row._DataStatus = 'Edit';
+        },
+        IsBatchSubmitMode() {
+            return this.SysMenuModel && this.SysMenuModel.SaveType === 'Submit';
+        },
+        HasPendingBatchChanges() {
+            var s = this._PendingSaveChanges;
+            if (!s) return false;
+            var addCount = (s.adds && s.adds.length) || 0;
+            var uptCount = s.updates ? Object.keys(s.updates).length : 0;
+            return (addCount + uptCount) > 0;
+        },
+        GetPendingBatchSummary() {
+            var s = this._PendingSaveChanges;
+            var addCount = (s && s.adds && s.adds.length) || 0;
+            var uptCount = (s && s.updates) ? Object.keys(s.updates).length : 0;
+            return { addCount: addCount, uptCount: uptCount, total: addCount + uptCount };
+        },
+        /** 一次性把待提交 adds + updates 同事务保存。 */
+        SubmitBatchSave() {
+            var self = this;
+            if (self._BatchSaveLoading) return;
+            if (!self.HasPendingBatchChanges()) {
+                self.DiyCommon.Tips('没有待提交的变更', false);
+                return;
+            }
+            var formEngineKey = self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name ? self.CurrentDiyTableModel.Name : self.TableName;
+            var addList = [];
+            var uptList = [];
+            if (self._PendingSaveChanges.adds && self._PendingSaveChanges.adds.length > 0) {
+                self._PendingSaveChanges.adds.forEach(function (row) {
+                    addList.push({
+                        FormEngineKey: formEngineKey,
+                        Id: row.Id,
+                        _FormData: self._BuildFullRowFormData(row)
+                    });
+                });
+            }
+            if (self._PendingSaveChanges.updates) {
+                Object.keys(self._PendingSaveChanges.updates).forEach(function (rowId) {
+                    var entry = self._PendingSaveChanges.updates[rowId];
+                    if (!entry || !entry.__row) return;
+                    uptList.push({
+                        FormEngineKey: formEngineKey,
+                        Id: rowId,
+                        _FormData: self._BuildFullRowFormData(entry.__row),
+                        _DataLog: JSON.stringify(entry.__dataLog || [])
+                    });
+                });
+            }
+            self._BatchSaveLoading = true;
+            self.DiyCommon.Post(self.DiyApi.SaveBatch, {
+                FormEngineKey: formEngineKey,
+                AddList: addList,
+                UptList: uptList
+            }, function (result) {
+                self._BatchSaveLoading = false;
+                if (self.DiyCommon.Result(result)) {
+                    self.DiyCommon.Tips(self.$t('Msg.Success'));
+                    self._PendingSaveChanges = { adds: [], updates: {} };
+                    self.GetDiyTableRow();
+                }
+            });
+        },
+        CancelBatchSave() {
+            var self = this;
+            if (!self.HasPendingBatchChanges()) return;
+            self.DiyCommon.OsConfirm('确认丢弃所有未保存的变更并重新加载？', function () {
+                self._PendingSaveChanges = { adds: [], updates: {} };
+                self.GetDiyTableRow();
+            });
         },
         /**
          * 初始化移动端滚动监听
