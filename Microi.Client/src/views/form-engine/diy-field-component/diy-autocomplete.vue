@@ -315,6 +315,10 @@ export default {
                 self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
                 //如果是表内编辑，失去因为已经失去焦点了，点击后才会执行下面这段
                 if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
+                    // 让父组件（diy-table）中央接管：实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
+                    var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                    self.$emit("CallbackInTableEditSave", __interceptPayload);
+                    if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
                     var param = {
                         TableId: self.TableId,
                         _TableRowId: self.FormDiyTableModel.Id,

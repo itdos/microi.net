@@ -242,6 +242,10 @@ export default {
             }
             //如果是表内编辑，要自动保存
             if (self.TableInEdit && self.FormDiyTableModel._IsInTableAdd !== true) {
+                // 让父组件（diy-table）中央接管：实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
+                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                self.$emit("CallbackInTableEditSave", __interceptPayload);
+                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
                 var param = {
                     TableId: self.TableId,
                     // _TableRowId : self.FormDiyTableModel.Id,
@@ -335,6 +339,10 @@ export default {
             //如果是表内编辑，失去焦点要自动保存
             //2021-11-28注意：下拉框 ，保存的时候不是保存整个值 ，整个值可能是个json，是只保存设置的存储字段
             if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
+                // 让父组件（diy-table）中央接管：实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
+                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                self.$emit("CallbackInTableEditSave", __interceptPayload);
+                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
                 var param = {
                     TableId: self.TableId,
                     Id: self.FormDiyTableModel.Id,

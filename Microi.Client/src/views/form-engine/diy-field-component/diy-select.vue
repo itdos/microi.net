@@ -757,6 +757,14 @@ export default {
             if (res === false) return;
             //如果是表内编辑，失去焦点要自动保存
             if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
+                // 让父组件（diy-table）中央接管：可实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
+                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                self.$emit("CallbackInTableEditSave", __interceptPayload);
+                if (__interceptPayload.handled === true) {
+                    self.LastModelValue = self.ModelValue;
+                    self.$emit("CallbackFormValueChange", self.field, saveItem);
+                    return;
+                }
                 var param = {
                     TableId: self.TableId,
                     Id: self.FormDiyTableModel.Id,
