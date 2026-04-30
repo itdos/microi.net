@@ -816,6 +816,118 @@ export default {
                 }
             );
         },
+
+        // ============================================================
+        // 单事务合并：表单保存 + StartWork（后端单一 DbTrans）
+        // 入参 param: { FormData, OldForm, FormMode }
+        // 返回值：一个 _AlternateSubmit(url, formApiParam, cb) 钩子函数，
+        // 供 diy-form.vue 的 FormSubmit 接管，把表单保存请求改为合并端点。
+        // 流程后处理（Tips、EndV8）与原 StartWork 完全一致。
+        // ============================================================
+        BuildStartWorkAlternateSubmit(param) {
+            var self = this;
+            return function (url, formApiParam, cb) {
+                // 通知字段（与 StartWork 一致）
+                var noticeFields = [];
+                if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
+                    var fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
+                    fieldsConfig.forEach(function (config) {
+                        if (config.Notice == true) {
+                            noticeFields.push({
+                                Id: config.Id,
+                                Name: config.Name,
+                                Label: config.Label,
+                                Value: param.FormData && param.FormData[config.Name] ? param.FormData[config.Name] : ""
+                            });
+                        }
+                    });
+                }
+                // FormData 序列化（与 StartWork 一致）
+                var _formData = param.FormData || {};
+                if (param.FormData) {
+                    self.DiyCommon.ForRowModelHandler(param.FormData, param.DiyFieldList);
+                    _formData = self.DiyCommon.ConvertRowModel(param.FormData);
+                }
+
+                var wfPayload = {
+                    FlowDesignId: self.CurrentFlowDesignId,
+                    FormData: JSON.stringify(_formData),
+                    TableRowId: formApiParam && formApiParam.Id ? formApiParam.Id : (param.FormData ? param.FormData.Id : null),
+                    NoticeFields: JSON.stringify(noticeFields),
+                    ApprovalIdea: self.CurrentApprovalIdea,
+                    AddUsers: self.CurrentAddUsers,
+                    SelectUsers: self.CurrentSelectUsers,
+                    ForceSelectUsers: self.ForceSelectUsers
+                };
+                // 表单 payload 标注动作（Add/Edit）
+                var formPayload = Object.assign({}, formApiParam || {});
+                formPayload._FormSubmitAction = param.FormMode || "Edit";
+
+                self.DiyCommon.Post(
+                    "/api/WorkFlow/StartWorkWithForm",
+                    {
+                        Wf: wfPayload,
+                        Form: formPayload
+                    },
+                    async function (result) {
+                        self.BtnLoading = false;
+                        if (self.DiyCommon.Result(result)) {
+                            // Tips（与 StartWork 一致）
+                            var receivers = "";
+                            try {
+                                if (result.Data && result.Data.Receivers) {
+                                    result.Data.Receivers.forEach(function (user) { receivers += user.Name + ","; });
+                                    receivers = receivers.replace(/,$/, "");
+                                }
+                            } catch (error) {}
+                            try {
+                                self.DiyCommon.Tips(
+                                    "流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data ? result.Data.ToNodeName : "") + "。",
+                                    true,
+                                    10
+                                );
+                            } catch (error) {}
+
+                            // EndV8 hook（与 StartWork 一致）
+                            if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
+                                var V8 = { EventName: "WFNodeEnd" };
+                                V8.Form = param.FormData;
+                                V8.OldForm = param.OldForm;
+                                V8.WF = {
+                                    ApprovalType: self.CurrentApprovalType,
+                                    ApprovalIdea: self.CurrentApprovalIdea,
+                                    AddUsers: self.CurrentAddUsers,
+                                    SelectUsers: self.CurrentSelectUsers,
+                                    CurrentFlowDesign: self.CurrentFlowDesign,
+                                    CurrentFlowDesignId: self.CurrentFlowDesignId,
+                                    CurrentNode: self.CurrentNodeModel,
+                                    WorkResult: result.Data
+                                };
+                                self.SetV8DefaultValue(V8, param.FormData);
+                                await self.DiyCommon.InitV8Code(V8, self.$router);
+                                try {
+                                    await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
+                                } catch (error) {
+                                    self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                                }
+                            }
+                            self.$emit("CallbackWFSubmit", { Code: 1 });
+                            // 通知 FormSubmit 表单保存"成功"（实际上整个事务已完成）
+                            var savedId = (result.DataAppend && result.DataAppend.FormSavedId) || (formApiParam ? formApiParam.Id : null);
+                            cb({ Code: 1, Data: { Id: savedId }, Msg: "保存并发起流程成功", _WfMergedResult: result });
+                        } else {
+                            self.$emit("CallbackWFSubmit", { Code: 0 });
+                            cb({ Code: 0, Data: null, Msg: result ? result.Msg : "事务失败", _WfMergedResult: result });
+                        }
+                    },
+                    function (error) {
+                        self.BtnLoading = false;
+                        cb({ Code: 0, Data: null, Msg: "请求失败" });
+                    }
+                );
+            };
+        },
+
         SendWork(param, callback) {
             var self = this;
             if (self.DiyCommon.IsNull(param.FormData)) {

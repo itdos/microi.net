@@ -85,41 +85,63 @@
                         </el-button>
                     </div>
                 </div>
-                <DiyForm
-                    v-if="TableId && TableRowId"
-                    ref="fieldFormPage"
-                    :FormMode="FormMode"
-                    :LoadMode="'Page'"
-                    :TableId="TableId"
-                    :TableRowId="TableRowId"
-                    @CallbackFormSubmit="CallbackFormSubmitPage"
-                    @CallbackSetFormData="CallbackSetFormData"
-                    @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                    @CallbackGetDiyField="CallbackGetDiyFieldPage"
-                    @CallbackReloadForm="CallbackReloadFormPage"
-                    @CallbackHideFormBtn="CallbackHideFormBtn"
-                    @CallbackFormValueChange="CallbackFormValueChange"
+                <el-row class="page-mode-row" :gutter="20">
+                    <el-col :span="ShowFormRight() && !diyStore.IsPhoneView ? 18 : 24" :xs="24">
+                        <DiyForm
+                            v-if="TableId && TableRowId"
+                            ref="fieldFormPage"
+                            :FormMode="FormMode"
+                            :LoadMode="'Page'"
+                            :TableId="TableId"
+                            :TableRowId="TableRowId"
+                            @CallbackFormSubmit="CallbackFormSubmitPage"
+                            @CallbackSetFormData="CallbackSetFormData"
+                            @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
+                            @CallbackGetDiyField="CallbackGetDiyFieldPage"
+                            @CallbackReloadForm="CallbackReloadFormPage"
+                            @CallbackHideFormBtn="CallbackHideFormBtn"
+                            @CallbackFormValueChange="CallbackFormValueChange"
 
-                    :FormWF="FormWF"
-                    :TableChildFormMode="TableChildFormMode"
-                    :TableName="TableName"
-                    :DefaultValues="FieldFormDefaultValues"
-                    :SelectFields="FieldFormSelectFields"
-                    :FixedTabs="FieldFormFixedTabs"
-                    :HideFields="FieldFormHideFields"
-                    :ParentForm="FatherFormModel"
-                    :ApiReplace="ApiReplace"
-                    :EventReplace="EventReplace"
-                    :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                    :CurrentTableData="DiyTableRowList"
-                    :ActiveDiyTableTab="CurrentTableRowListActiveTab"
-                    :ShowHideField="ShowHideField"
-                    :DataAppend="DataAppend"
-                    @ParentFormSet="ParentFormSet"
-                    @CallbackRefreshTable="CallbackRefreshTable"
-                    @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                    @CallbackFormClose="CallbackFormClose"
-                />
+                            :FormWF="FormWF"
+                            :TableChildFormMode="TableChildFormMode"
+                            :TableName="TableName"
+                            :DefaultValues="FieldFormDefaultValues"
+                            :SelectFields="FieldFormSelectFields"
+                            :FixedTabs="FieldFormFixedTabs"
+                            :HideFields="FieldFormHideFields"
+                            :ParentForm="FatherFormModel"
+                            :ApiReplace="ApiReplace"
+                            :EventReplace="EventReplace"
+                            :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
+                            :CurrentTableData="DiyTableRowList"
+                            :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                            :ShowHideField="ShowHideField"
+                            :DataAppend="DataAppend"
+                            @ParentFormSet="ParentFormSet"
+                            @CallbackRefreshTable="CallbackRefreshTable"
+                            @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                            @CallbackFormClose="CallbackFormClose"
+                        />
+                    </el-col>
+                    <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" class="page-right-col">
+                        <FormRightPanel
+                            ref="formRightPanel"
+                            v-model="FormRightType"
+                            v-model:commentContent="CommentContent"
+                            :openDiyFormWorkFlow="OpenDiyFormWorkFlow"
+                            :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
+                            :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
+                            :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                            :dataLogList="DataLogList"
+                            :dataLogListLoading="DataLogListLoading"
+                            :dataCommentList="DataCommentList"
+                            :dataCommentListLoading="DataCommentListLoading"
+                            :btnLoading="BtnLoading"
+                            @submit-comment="SubmitComment"
+                            @callback-start-work="CallbackStartWork"
+                        />
+                    </el-col>
+                </el-row>
 
                 <!--移动端底部固定操作条（Page模式）：保存/编辑常驻在底部-->
                 <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
@@ -138,6 +160,11 @@
                     </transition>
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <!--右侧信息（流程信息/数据日志/数据评论）-->
+                            <div class="mobile-fab-menu-item" v-if="ShowFormRight()" @click="showMobileFabMenu = false; showMobileRightDrawer = true">
+                                <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
+                            </div>
                             <!--取消编辑-->
                             <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit'" @click="showMobileFabMenu = false; FormMode = 'View'">
                                 <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -323,75 +350,23 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
-                    <el-tabs v-model="FormRightType">
-                        <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
-                            <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
-                            <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataLogList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span style="color: red">{{ log.Label }}</span
-                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
-                                            <span style="color: red">{{ log.NVal }}</span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
-                            <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
-                            </div>
-                            <div style="margin-top: 10px">
-                                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled">
-                                    {{ $t("Msg.Submit") }}
-                                </el-button>
-                            </div>
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataCommentList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span v-html="item.Content"></span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                    </el-tabs>
+                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="4" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                    <FormRightPanel
+                        ref="formRightPanel"
+                        v-model="FormRightType"
+                        v-model:commentContent="CommentContent"
+                        :openDiyFormWorkFlow="OpenDiyFormWorkFlow"
+                        :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
+                        :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
+                        :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                        :dataLogList="DataLogList"
+                        :dataLogListLoading="DataLogListLoading"
+                        :dataCommentList="DataCommentList"
+                        :dataCommentListLoading="DataCommentListLoading"
+                        :btnLoading="BtnLoading"
+                        @submit-comment="SubmitComment"
+                        @callback-start-work="CallbackStartWork"
+                    />
                 </el-col>
             </el-row>
 
@@ -419,6 +394,11 @@
                 </transition>
                 <transition name="fab-menu">
                     <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                        <!--右侧信息（流程信息/数据日志/数据评论）-->
+                        <div class="mobile-fab-menu-item" v-if="ShowFormRight()" @click="showMobileFabMenu = false; showMobileRightDrawer = true">
+                            <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
+                        </div>
                         <!--取消编辑-->
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -619,79 +599,23 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
-                    <el-tabs v-model="FormRightType">
-                        <el-tab-pane v-if="OpenDiyFormWorkFlow" :label="$t('Msg.WorkflowInfo')" name="WorkFlow">
-                            <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
-                            <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" :label="$t('Msg.DataLog')" name="DataLog">
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px">
-                                    <el-timeline-item
-                                        v-for="item in DataLogList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span style="color: red">{{ log.Label }}</span
-                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
-                                            <span style="color: red">{{ log.NVal }}</span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading" style="height: 50px; line-height: 50px">
-                                    <el-icon><Loading /></el-icon>
-                                    {{ $t("Msg.Loading") }}
-                                </div>
-                                <div v-if="!DataLogListLoading && DataLogList.length == 0" style="height: 50px; line-height: 50px">
-                                    {{ $t("Msg.NoMoreData") }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
-                            <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
-                            </div>
-                            <div style="margin-top: 10px">
-                                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled">
-                                    {{ $t("Msg.Submit") }}
-                                </el-button>
-                            </div>
-                            <div class="datalog-timeline">
-                                <el-timeline style="padding-left: 5px; margin-top: 20px">
-                                    <el-timeline-item
-                                        v-for="item in DataCommentList"
-                                        :key="item.Id"
-                                        :icon="$getIcon(item.Type == 'Update' ? 'edit' : 'delete')"
-                                        :type="'primary'"
-                                        :color="''"
-                                        :size="'large'"
-                                        :timestamp="item.CreateTime"
-                                    >
-                                        <template #dot>
-                                            <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
-                                        </template>
-                                        <div>{{ item.Title }}</div>
-                                        <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
-                                            <span v-html="item.Content"></span>
-                                        </div>
-                                    </el-timeline-item>
-                                </el-timeline>
-                                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
-                                </div>
-                            </div>
-                        </el-tab-pane>
-                    </el-tabs>
+                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="4" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                    <FormRightPanel
+                        ref="formRightPanel"
+                        v-model="FormRightType"
+                        v-model:commentContent="CommentContent"
+                        :openDiyFormWorkFlow="OpenDiyFormWorkFlow"
+                        :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
+                        :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
+                        :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                        :dataLogList="DataLogList"
+                        :dataLogListLoading="DataLogListLoading"
+                        :dataCommentList="DataCommentList"
+                        :dataCommentListLoading="DataCommentListLoading"
+                        :btnLoading="BtnLoading"
+                        @submit-comment="SubmitComment"
+                        @callback-start-work="CallbackStartWork"
+                    />
                 </el-col>
             </el-row>
 
@@ -719,6 +643,11 @@
                 </transition>
                 <transition name="fab-menu">
                     <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                        <!--右侧信息（流程信息/数据日志/数据评论）-->
+                        <div class="mobile-fab-menu-item" v-if="ShowFormRight()" @click="showMobileFabMenu = false; showMobileRightDrawer = true">
+                            <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
+                        </div>
                         <!--取消编辑-->
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -746,6 +675,43 @@
                 </div>
             </div>
         </el-drawer>
+
+        <!--移动端右侧信息抽屉（流程信息/数据日志/数据评论），三种模式共用-->
+        <el-drawer
+            v-if="diyStore.IsPhoneView && ShowFormRight()"
+            class="diy-form-right-drawer"
+            :model-value="showMobileRightDrawer"
+            @update:model-value="showMobileRightDrawer = $event"
+            direction="rtl"
+            size="92%"
+            :append-to-body="true"
+            :destroy-on-close="false"
+            :show-close="true"
+        >
+            <template #header>
+                <span style="font-size: 15px; font-weight: 600;">
+                    <fa-icon icon="far fa-list-alt" style="margin-right: 6px;" />
+                    {{ $t('Msg.WorkflowInfo') }}
+                </span>
+            </template>
+            <FormRightPanel
+                ref="formRightPanelMobile"
+                v-model="FormRightType"
+                v-model:commentContent="CommentContent"
+                :openDiyFormWorkFlow="OpenDiyFormWorkFlow"
+                :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
+                :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
+                :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                :dataLogList="DataLogList"
+                :dataLogListLoading="DataLogListLoading"
+                :dataCommentList="DataCommentList"
+                :dataCommentListLoading="DataCommentListLoading"
+                :btnLoading="BtnLoading"
+                :isMobileDrawer="true"
+                @submit-comment="SubmitComment"
+                @callback-start-work="CallbackStartWork"
+            />
+        </el-drawer>
     </div>
 </template>
 
@@ -759,7 +725,8 @@ export default {
     name: "diy-form-full",
     directives: {},
     components: {
-        DiyForm: defineAsyncComponent(() => import("@/views/form-engine/diy-form"))
+        DiyForm: defineAsyncComponent(() => import("@/views/form-engine/diy-form")),
+        FormRightPanel: defineAsyncComponent(() => import("@/views/form-engine/form-right-panel"))
     },
     setup() {
         const diyStore = useDiyStore();
@@ -995,6 +962,7 @@ export default {
 
             // ========== 移动端FAB ==========
             showMobileFabMenu: false,
+            showMobileRightDrawer: false,
             // FAB拖拽位置（相对视口右下角的偏移，单位 px），null 表示使用默认位置
             fabPosition: null
         };
@@ -1121,7 +1089,7 @@ export default {
                 if (raw) {
                     var pos = JSON.parse(raw);
                     if (pos && typeof pos.right == 'number' && typeof pos.bottom == 'number') {
-                        this.fabPosition = pos;
+                        this.fabPosition = this.ClampFabPosition(pos.right, pos.bottom);
                     }
                 }
             } catch (e) { /* ignore */ }
@@ -1139,21 +1107,50 @@ export default {
             }
             return {};
         },
+        // 夹紧位置：保证不被顶部/底部操作条遮挡
+        ClampFabPosition(right, bottom, btnSize) {
+            var size = btnSize || 54;
+            var minMargin = 8;
+            // 底部保留：兼顾底部操作条 + 底部安全区
+            var bottomBarEl = document.querySelector('.mobile-form-bottom-bar');
+            var bottomReserved = bottomBarEl && bottomBarEl.offsetHeight ? (bottomBarEl.offsetHeight + 8) : minMargin;
+            var topReserved = 60; // 顶部导航预留
+            var maxRight = Math.max(minMargin, window.innerWidth - size - minMargin);
+            var maxBottom = Math.max(bottomReserved, window.innerHeight - size - topReserved);
+            return {
+                right: Math.max(minMargin, Math.min(maxRight, right)),
+                bottom: Math.max(bottomReserved, Math.min(maxBottom, bottom))
+            };
+        },
         OnFabPointerDown(e) {
             var self = this;
             var isTouch = e.type === 'touchstart';
-            // 仅响应主键
             if (!isTouch && e.button !== 0) return;
             var pt = isTouch ? e.touches[0] : e;
             var startX = pt.clientX, startY = pt.clientY;
             var btnEl = e.currentTarget;
+            var containerEl = btnEl.closest('.mobile-fab-container');
+            if (!containerEl) return;
             var rect = btnEl.getBoundingClientRect();
             var btnW = rect.width, btnH = rect.height;
             var startRight = window.innerWidth - rect.right;
             var startBottom = window.innerHeight - rect.bottom;
             var moved = false;
             var threshold = 5;
+            var minMargin = 8;
+            var bottomBarEl = document.querySelector('.mobile-form-bottom-bar');
+            var bottomReserved = bottomBarEl && bottomBarEl.offsetHeight ? (bottomBarEl.offsetHeight + 8) : minMargin;
+            var topReserved = 60;
+            var maxRight = window.innerWidth - btnW - minMargin;
+            var maxBottom = window.innerHeight - btnH - topReserved;
+            var lastRight = startRight, lastBottom = startBottom;
+            var rafId = null;
 
+            var applyDom = function() {
+                rafId = null;
+                containerEl.style.right = lastRight + 'px';
+                containerEl.style.bottom = lastBottom + 'px';
+            };
             var moveHandler = function(ev) {
                 var p = isTouch ? (ev.touches[0] || ev.changedTouches[0]) : ev;
                 if (!p) return;
@@ -1161,14 +1158,14 @@ export default {
                 var dy = p.clientY - startY;
                 if (!moved && Math.hypot(dx, dy) > threshold) moved = true;
                 if (moved) {
-                    var minMargin = 8;
-                    var nr = Math.max(minMargin, Math.min(window.innerWidth - btnW - minMargin, startRight - dx));
-                    var nb = Math.max(minMargin, Math.min(window.innerHeight - btnH - minMargin, startBottom - dy));
-                    self.fabPosition = { right: nr, bottom: nb };
+                    lastRight = Math.max(minMargin, Math.min(maxRight, startRight - dx));
+                    lastBottom = Math.max(bottomReserved, Math.min(maxBottom, startBottom - dy));
+                    if (rafId == null) rafId = requestAnimationFrame(applyDom);
                     if (ev.cancelable) ev.preventDefault();
                 }
             };
             var upHandler = function() {
+                if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
                 if (isTouch) {
                     document.removeEventListener('touchmove', moveHandler, { passive: false });
                     document.removeEventListener('touchend', upHandler);
@@ -1179,6 +1176,7 @@ export default {
                 }
                 if (moved) {
                     self._fabDragJustMoved = true;
+                    self.fabPosition = { right: lastRight, bottom: lastBottom };
                     self.SaveFabPosition();
                     setTimeout(function() { self._fabDragJustMoved = false; }, 50);
                 }
@@ -2386,16 +2384,38 @@ export default {
             );
         },
 
+        // ========== 获取当前激活的右侧面板（PC=formRightPanel；移动端抽屉=formRightPanelMobile） ==========
+        GetActiveRightPanel() {
+            // 移动端时，若抽屉已渲染，优先使用移动端面板；否则回退至 PC 面板（PC 面板可能仍存在）
+            if (this.diyStore.IsPhoneView) {
+                if (this.$refs.formRightPanelMobile) return this.$refs.formRightPanelMobile;
+            }
+            return this.$refs.formRightPanel || this.$refs.formRightPanelMobile;
+        },
+        GetActiveWfWorkHandler() {
+            var p = this.GetActiveRightPanel();
+            return p && p.$refs ? p.$refs.refWfWorkHandler : null;
+        },
+        GetActiveWfHistory() {
+            var p = this.GetActiveRightPanel();
+            return p && p.$refs ? p.$refs.refWFHistory : null;
+        },
+
         // ========== 工作流回调（发起流程按钮点击时触发） ==========
+        // 单事务合并：表单保存 + StartWork 在后端单一 DbTrans 内完成（/api/WorkFlow/StartWorkWithForm）
         async CallbackStartWork(param, callback) {
             var self = this;
 
             try {
-                // 第1步：执行节点开始V8（可终止提交、修改表单值、获取审批信息）
                 var formData = self.$refs.fieldForm.GetFormData();
-                var v8Result = await self.$refs.refWfWorkHandler_2.RunNodeStartV8({
-                    Form: formData
-                });
+                var wfHandler = self.GetActiveWfWorkHandler();
+                if (!wfHandler) {
+                    if (callback) { callback(); }
+                    return;
+                }
+
+                // 第1步：执行节点开始V8（可终止提交、修改表单值、获取审批信息）
+                var v8Result = await wfHandler.RunNodeStartV8({ Form: formData });
                 if (v8Result.Result === false) {
                     if (callback) { callback(); }
                     return;
@@ -2406,35 +2426,31 @@ export default {
                     v8Result.Form = formData;
                 }
 
-                // 第2步：提交表单（首次Add，之后Edit防止重复数据）
+                var formMode = self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit";
+
+                // 第2步：通过 _AlternateSubmit 钩子，把"表单保存 + StartWork"合并为单事务后端调用
                 var formParam = {
-                    FormMode: self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit",
-                    SavedType: "Edit"
+                    FormMode: formMode,
+                    SavedType: "Edit",
+                    _AlternateSubmit: wfHandler.BuildStartWorkAlternateSubmit({
+                        FormData: v8Result.Form,
+                        OldForm: param ? param.OldForm : null,
+                        FormMode: formMode,
+                        DiyFieldList: param ? param.DiyFieldList : null
+                    })
                 };
 
-                self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData) {
+                self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData2) {
                     if (success == true) {
                         self.StartWorkSubmited = true;
                         self.FormMode = "Edit";
                         self.OpenDiyFormWorkFlowType.FormMode = "Edit";
-
-                        // 第3步：发起工作流
-                        self.$refs.refWfWorkHandler_2.StartWork(
-                            {
-                                FormData: v8Result.Form
-                            },
-                            function (result) {
-                                if (result.Code == 1) {
-                                    self.ShowFieldForm = false;
-                                    self.ShowFieldFormDrawer = false;
-                                    self.GetDiyTableRow();
-                                }
-                                if (callback) { callback(); }
-                            }
-                        );
-                    } else {
-                        if (callback) { callback(); }
+                        // 工作流已在事务中完成，无需再单独调用 StartWork
+                        self.ShowFieldForm = false;
+                        self.ShowFieldFormDrawer = false;
+                        self.GetDiyTableRow();
                     }
+                    if (callback) { callback(); }
                 });
             } catch (error) {
                 if (callback) { callback(); }
@@ -2470,8 +2486,9 @@ export default {
                                 var retryCount = 0;
                                 var maxRetries = 40;
                                 var tryInitHistory = function () {
-                                    if (self.$refs.refWFHistory) {
-                                        self.$refs.refWFHistory.Init(historyParam);
+                                    var hist = self.GetActiveWfHistory();
+                                    if (hist) {
+                                        hist.Init(historyParam);
                                     } else if (retryCount < maxRetries) {
                                         retryCount++;
                                         setTimeout(tryInitHistory, 50);
@@ -2490,6 +2507,10 @@ export default {
                 self.OpenDiyFormWorkFlow = true;
                 self.FormRightType = "WorkFlow";
                 self.FormWF = self.GetFormWF();
+                // 移动端 StartWork 必须打开右抽屉，否则 WFWorkHandler 无法挂载
+                if (self.diyStore.IsPhoneView) {
+                    self.showMobileRightDrawer = true;
+                }
                 var param = {
                     CurrentFlowDesignId: wfParam.FlowDesignId,
                     OpenFormMode: wfParam.FormMode,
@@ -2500,8 +2521,9 @@ export default {
                 var retryCount = 0;
                 var maxRetries = 40;
                 var tryInitStartWork = function () {
-                    if (self.$refs.refWfWorkHandler_2) {
-                        self.$refs.refWfWorkHandler_2.InitStartWork(param, function (callbackObj) {
+                    var handler = self.GetActiveWfWorkHandler();
+                    if (handler) {
+                        handler.InitStartWork(param, function (callbackObj) {
                         });
                     } else if (retryCount < maxRetries) {
                         retryCount++;
