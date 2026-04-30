@@ -231,6 +231,7 @@ export default {
         FormDesign: "表单设计",
         ModuleDesign: "模块设计",
         FormPermission: "表单权限",
+        MenuPermission: "菜单权限",
         DevDesign: "开发设计",
         SerialNo: "序号",
         SearchField: "搜索",

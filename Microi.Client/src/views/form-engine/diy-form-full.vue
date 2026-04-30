@@ -121,23 +121,23 @@
                     @CallbackFormClose="CallbackFormClose"
                 />
 
-                <!--移动端FAB浮动操作按钮（Page模式）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
+                <!--移动端底部固定操作条（Page模式）：保存/编辑常驻在底部-->
+                <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
+                    <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
+                        {{ $t('Msg.Save') }}
+                    </el-button>
+                    <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
+                        {{ $t('Msg.Edit') }}
+                    </el-button>
+                </div>
+
+                <!--移动端FAB浮动操作按钮（Page模式）：仅放置取消编辑/更多按钮，支持拖拽-->
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && HasFabMenuItemsPage" :style="GetFabContainerStyle()">
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                     </transition>
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
-                            <!--保存-->
-                            <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveDiyTableCommonPage(true)">
-                                <div class="mobile-fab-menu-icon save"><el-icon><SuccessFilled /></el-icon></div>
-                                <span class="mobile-fab-menu-label">{{ $t('Msg.Save') }}</span>
-                            </div>
-                            <!--编辑-->
-                            <div class="mobile-fab-menu-item" v-if="FormMode == 'View' && ShowUpdateBtn" @click="showMobileFabMenu = false; GotoEdit()">
-                                <div class="mobile-fab-menu-icon edit"><el-icon><Edit /></el-icon></div>
-                                <span class="mobile-fab-menu-label">{{ $t('Msg.Edit') }}</span>
-                            </div>
                             <!--取消编辑-->
                             <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit'" @click="showMobileFabMenu = false; FormMode = 'View'">
                                 <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -154,7 +154,8 @@
                             </template>
                         </div>
                     </transition>
-                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                    <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }"
+                        @mousedown="OnFabPointerDown" @touchstart="OnFabPointerDown" @click="OnFabClick">
                         <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
                     </div>
                 </div>
@@ -394,23 +395,30 @@
                 </el-col>
             </el-row>
 
-            <!--移动端FAB浮动操作按钮（Dialog模式）-->
-            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
+            <!--移动端底部固定操作条（Dialog模式）：保存/编辑常驻在底部-->
+            <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
+                (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+            )">
+                <el-button v-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                    :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    @click="SaveDiyTableCommon(true, 'Close')">
+                    {{ $t('Msg.Save') }}
+                </el-button>
+                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                    :loading="BtnLoading" type="primary" :icon="Edit" class="mobile-form-bottom-btn"
+                    @click="FormMode = 'Edit'">
+                    {{ $t('Msg.Edit') }}
+                </el-button>
+            </div>
+
+            <!--移动端FAB浮动操作按钮（Dialog模式）：仅放置取消编辑/更多/删除，支持拖拽-->
+            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && HasFabMenuItemsDialog" :style="GetFabContainerStyle()">
                 <transition name="fab-overlay">
                     <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                 </transition>
                 <transition name="fab-menu">
                     <div class="mobile-fab-menu" v-if="showMobileFabMenu">
-                        <!--保存-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View' && ShowSaveBtn" @click="showMobileFabMenu = false; SaveDiyTableCommon(true, 'Close')">
-                            <div class="mobile-fab-menu-icon save"><el-icon><SuccessFilled /></el-icon></div>
-                            <span class="mobile-fab-menu-label">{{ $t('Msg.Save') }}</span>
-                        </div>
-                        <!--编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'Edit'">
-                            <div class="mobile-fab-menu-icon edit"><el-icon><Edit /></el-icon></div>
-                            <span class="mobile-fab-menu-label">{{ $t('Msg.Edit') }}</span>
-                        </div>
                         <!--取消编辑-->
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -432,7 +440,8 @@
                         </div>
                     </div>
                 </transition>
-                <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }"
+                    @mousedown="OnFabPointerDown" @touchstart="OnFabPointerDown" @click="OnFabClick">
                     <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
                 </div>
             </div>
@@ -686,23 +695,30 @@
                 </el-col>
             </el-row>
 
-            <!--移动端FAB浮动操作按钮（Drawer模式）-->
-            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView">
+            <!--移动端底部固定操作条（Drawer模式）：保存/编辑常驻在底部-->
+            <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
+                (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+            )">
+                <el-button v-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                    :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    @click="SaveDiyTableCommon(true, 'Close')">
+                    {{ $t('Msg.Save') }}
+                </el-button>
+                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                    :loading="BtnLoading" type="primary" :icon="Edit" class="mobile-form-bottom-btn"
+                    @click="FormMode = 'Edit'">
+                    {{ $t('Msg.Edit') }}
+                </el-button>
+            </div>
+
+            <!--移动端FAB浮动操作按钮（Drawer模式）：仅放置取消编辑/更多/删除，支持拖拽-->
+            <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && HasFabMenuItemsDrawer" :style="GetFabContainerStyle()">
                 <transition name="fab-overlay">
                     <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
                 </transition>
                 <transition name="fab-menu">
                     <div class="mobile-fab-menu" v-if="showMobileFabMenu">
-                        <!--保存-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View' && ShowSaveBtn" @click="showMobileFabMenu = false; SaveDiyTableCommon(true, 'Close')">
-                            <div class="mobile-fab-menu-icon save"><el-icon><SuccessFilled /></el-icon></div>
-                            <span class="mobile-fab-menu-label">{{ $t('Msg.Save') }}</span>
-                        </div>
-                        <!--编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'Edit'">
-                            <div class="mobile-fab-menu-icon edit"><el-icon><Edit /></el-icon></div>
-                            <span class="mobile-fab-menu-label">{{ $t('Msg.Edit') }}</span>
-                        </div>
                         <!--取消编辑-->
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
@@ -724,7 +740,8 @@
                         </div>
                     </div>
                 </transition>
-                <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }" @click="showMobileFabMenu = !showMobileFabMenu">
+                <div class="mobile-fab-btn" :class="{ 'is-open': showMobileFabMenu }"
+                    @mousedown="OnFabPointerDown" @touchstart="OnFabPointerDown" @click="OnFabClick">
                     <el-icon class="mobile-fab-icon"><CloseBold v-if="showMobileFabMenu" /><MoreFilled v-else /></el-icon>
                 </div>
             </div>
@@ -860,6 +877,33 @@ export default {
                 return self.SysMenuModel.FormBtns.some(btn => btn.IsVisible);
             }
             return false;
+        },
+        // 判断当前表单FormBtns是否有可见按钮（用于FAB菜单是否显示）
+        HasVisibleFormBtns() {
+            var self = this;
+            if (self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) || self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) || self.SysMenuModel.FormBtns.length == 0) return false;
+            return self.SysMenuModel.FormBtns.some(btn => btn.IsVisible);
+        },
+        // Page模式：FAB菜单是否有内容（取消编辑 / 表单更多按钮）
+        HasFabMenuItemsPage() {
+            var self = this;
+            if (self.FormMode == 'Edit') return true;
+            if (self.HasVisibleFormBtns) return true;
+            return false;
+        },
+        // Dialog模式：FAB菜单是否有内容（取消编辑 / FormBtns / 删除）
+        HasFabMenuItemsDialog() {
+            var self = this;
+            if (self.FormMode == 'Edit' && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+            if (self.HasVisibleFormBtns) return true;
+            if (self.LimitDel && typeof self.LimitDel == 'function' && self.LimitDel()
+                && self.FormMode != 'Add' && self.ShowDeleteBtn
+                && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+            return false;
+        },
+        // Drawer模式：与Dialog相同
+        HasFabMenuItemsDrawer() {
+            return this.HasFabMenuItemsDialog;
         }
     },
     data() {
@@ -950,7 +994,9 @@ export default {
             _dialogGlobalHandler: null, // 对话框组件的全局处理函数
 
             // ========== 移动端FAB ==========
-            showMobileFabMenu: false
+            showMobileFabMenu: false,
+            // FAB拖拽位置（相对视口右下角的偏移，单位 px），null 表示使用默认位置
+            fabPosition: null
         };
     },
     activated() {
@@ -1063,8 +1109,94 @@ export default {
             // Page 模式下 DiyForm 组件通过 props 自动初始化，无需手动调用 Init()
             // 手动调用会导致与 CallbackReloadFormPage 形成死循环
         }
+
+        // 加载FAB拖拽位置
+        self.LoadFabPosition();
     },
     methods: {
+        // ========== 移动端FAB拖拽 ==========
+        LoadFabPosition() {
+            try {
+                var raw = localStorage.getItem('microi_fab_position_form');
+                if (raw) {
+                    var pos = JSON.parse(raw);
+                    if (pos && typeof pos.right == 'number' && typeof pos.bottom == 'number') {
+                        this.fabPosition = pos;
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        },
+        SaveFabPosition() {
+            try {
+                if (this.fabPosition) {
+                    localStorage.setItem('microi_fab_position_form', JSON.stringify(this.fabPosition));
+                }
+            } catch (e) { /* ignore */ }
+        },
+        GetFabContainerStyle() {
+            if (this.fabPosition) {
+                return { right: this.fabPosition.right + 'px', bottom: this.fabPosition.bottom + 'px' };
+            }
+            return {};
+        },
+        OnFabPointerDown(e) {
+            var self = this;
+            var isTouch = e.type === 'touchstart';
+            // 仅响应主键
+            if (!isTouch && e.button !== 0) return;
+            var pt = isTouch ? e.touches[0] : e;
+            var startX = pt.clientX, startY = pt.clientY;
+            var btnEl = e.currentTarget;
+            var rect = btnEl.getBoundingClientRect();
+            var btnW = rect.width, btnH = rect.height;
+            var startRight = window.innerWidth - rect.right;
+            var startBottom = window.innerHeight - rect.bottom;
+            var moved = false;
+            var threshold = 5;
+
+            var moveHandler = function(ev) {
+                var p = isTouch ? (ev.touches[0] || ev.changedTouches[0]) : ev;
+                if (!p) return;
+                var dx = p.clientX - startX;
+                var dy = p.clientY - startY;
+                if (!moved && Math.hypot(dx, dy) > threshold) moved = true;
+                if (moved) {
+                    var minMargin = 8;
+                    var nr = Math.max(minMargin, Math.min(window.innerWidth - btnW - minMargin, startRight - dx));
+                    var nb = Math.max(minMargin, Math.min(window.innerHeight - btnH - minMargin, startBottom - dy));
+                    self.fabPosition = { right: nr, bottom: nb };
+                    if (ev.cancelable) ev.preventDefault();
+                }
+            };
+            var upHandler = function() {
+                if (isTouch) {
+                    document.removeEventListener('touchmove', moveHandler, { passive: false });
+                    document.removeEventListener('touchend', upHandler);
+                    document.removeEventListener('touchcancel', upHandler);
+                } else {
+                    document.removeEventListener('mousemove', moveHandler);
+                    document.removeEventListener('mouseup', upHandler);
+                }
+                if (moved) {
+                    self._fabDragJustMoved = true;
+                    self.SaveFabPosition();
+                    setTimeout(function() { self._fabDragJustMoved = false; }, 50);
+                }
+            };
+            if (isTouch) {
+                document.addEventListener('touchmove', moveHandler, { passive: false });
+                document.addEventListener('touchend', upHandler);
+                document.addEventListener('touchcancel', upHandler);
+            } else {
+                document.addEventListener('mousemove', moveHandler);
+                document.addEventListener('mouseup', upHandler);
+            }
+        },
+        OnFabClick() {
+            if (this._fabDragJustMoved) return;
+            this.showMobileFabMenu = !this.showMobileFabMenu;
+        },
+
         /**
          * 初始化方法（外部调用入口）
          * 必传：TableId或TableName、FormMode（Add/Edit/View）、Id（当FormMode为View或Edit时，必传Id）
@@ -2639,6 +2771,7 @@ export default {
     background: var(--el-fill-color-light, #f5f7fa);
     min-height: 100vh;
     padding-top: calc(45px + var(--status-bar-height, 0px)) !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
 
     .el-row {
         margin: 0 !important;
@@ -2931,6 +3064,28 @@ export default {
     opacity: 0;
     transform: translateY(10px) scale(0.9);
 }
+
+// 移动端底部固定操作条（Page模式）
+.mobile-form-bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1900;
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--el-bg-color, #fff);
+    border-top: 1px solid var(--el-border-color-lighter, #f0f0f0);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+
+    .mobile-form-bottom-btn {
+        flex: 1;
+        height: 44px;
+        font-size: 15px;
+        border-radius: 8px;
+    }
+}
 </style>
 
 <style lang="scss">
@@ -2942,7 +3097,12 @@ export default {
         }
 
         .el-drawer__body {
-            padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        }
+    }
+    .diy-form-container.el-dialog {
+        .el-dialog__body {
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
         }
     }
 }
@@ -3086,5 +3246,27 @@ export default {
     .fab-menu-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
     .fab-menu-enter-from { opacity: 0; transform: translateY(10px) scale(0.9); }
     .fab-menu-leave-to { opacity: 0; transform: translateY(10px) scale(0.9); }
+
+    // 移动端底部固定操作条（Dialog/Drawer模式）
+    .mobile-form-bottom-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2050;
+        display: flex;
+        gap: 10px;
+        padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: var(--el-bg-color, #fff);
+        border-top: 1px solid var(--el-border-color-lighter, #f0f0f0);
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+
+        .mobile-form-bottom-btn {
+            flex: 1;
+            height: 44px;
+            font-size: 15px;
+            border-radius: 8px;
+        }
+    }
 }
 </style>

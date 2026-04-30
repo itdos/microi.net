@@ -232,6 +232,7 @@ export default {
         FormDesign: "Form Design",
         ModuleDesign: "Module Design",
         FormPermission: "Form Permission",
+        MenuPermission: "Menu Permission",
         DevDesign: "Dev Design",
         SerialNo: "No.",
         SearchField: "Search",
