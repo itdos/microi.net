@@ -664,7 +664,7 @@ export default {
 
 <style scoped>
 .sys-log-page {
-    padding: 12px;
+    padding: 0px;
     background-color: var(--el-bg-color-page, #f5f7fa);
     min-height: calc(100vh - 100px);
 }
