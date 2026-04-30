@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 
 namespace Microi.net.Api
@@ -182,6 +183,117 @@ namespace Microi.net.Api
             await DefaultParamList(param);
             var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(param);
             return Json(result);
+        }
+
+        /// <summary>
+        /// 表单数据"批量混合保存"（同一事务内：先按顺序新增 AddList，再按顺序更新 UptList）。
+        /// 用于 diy-table 表内编辑【提交一起保存（Submit）】模式：
+        /// 入参：
+        ///   {
+        ///     FormEngineKey: "表名",
+        ///     AddList: [ {字段...}, ... ],   // 可选
+        ///     UptList: [ {Id, 字段...}, ... ] // 可选
+        ///   }
+        /// 任一行失败整体回滚，全部成功统一提交。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> SaveBatch([FromBody] JObject param)
+        {
+            if (param == null)
+            {
+                return Json(new DosResult(0, null, "参数为空"));
+            }
+
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
+            var currentUser = currentTokenDynamic?.CurrentUser;
+            string osClient = currentTokenDynamic?.OsClient;
+
+            string formEngineKey = param["FormEngineKey"]?.ToString();
+            JArray addList = param["AddList"] as JArray;
+            JArray uptList = param["UptList"] as JArray;
+
+            if ((addList == null || addList.Count == 0) && (uptList == null || uptList.Count == 0))
+            {
+                return Json(new DosResult(0, null, "AddList / UptList 均为空，无可保存数据"));
+            }
+
+            // 注入身份信息到每行 payload
+            void Inject(JObject row)
+            {
+                if (!string.IsNullOrEmpty(formEngineKey) && row["FormEngineKey"] == null)
+                {
+                    row["FormEngineKey"] = formEngineKey;
+                }
+                row["_CurrentUser"] = JTokenEx.FromObject(currentUser);
+                row["OsClient"] = osClient;
+                row["_InvokeType"] = "Client";
+            }
+
+            // 取主库会话开启事务
+            var clientModel = OsClientExtend.GetClient(osClient);
+            if (clientModel == null || clientModel.Db == null)
+            {
+                return Json(new DosResult(0, null, "未找到 OsClient 对应的数据库会话"));
+            }
+            var dbSession = clientModel.Db;
+
+            DbTrans trans = null;
+            var addResults = new List<object>();
+            var uptResults = new List<object>();
+            try
+            {
+                trans = dbSession.BeginTransaction();
+
+                // 1) 新增（按顺序）
+                if (addList != null)
+                {
+                    for (int i = 0; i < addList.Count; i++)
+                    {
+                        var row = addList[i] as JObject;
+                        if (row == null) continue;
+                        Inject(row);
+                        var r = await MicroiEngine.FormEngine.AddFormDataAsync(row, trans);
+                        if (r == null || r.Code != 1)
+                        {
+                            try { trans.Rollback(); } catch { }
+                            string msg = r?.Msg ?? "新增数据失败";
+                            return Json(new DosResult(0, new { FailIndex = i, Stage = "Add", Detail = r }, "第" + (i + 1) + "条新增失败：" + msg));
+                        }
+                        addResults.Add(r.Data);
+                    }
+                }
+
+                // 2) 修改（按顺序）
+                if (uptList != null)
+                {
+                    for (int i = 0; i < uptList.Count; i++)
+                    {
+                        var row = uptList[i] as JObject;
+                        if (row == null) continue;
+                        Inject(row);
+                        var r = await MicroiEngine.FormEngine.UptFormDataAsync(row, trans);
+                        if (r == null || r.Code != 1)
+                        {
+                            try { trans.Rollback(); } catch { }
+                            string msg = r?.Msg ?? "修改数据失败";
+                            return Json(new DosResult(0, new { FailIndex = i, Stage = "Upt", Detail = r }, "第" + (i + 1) + "条修改失败：" + msg));
+                        }
+                        uptResults.Add(r.Data);
+                    }
+                }
+
+                trans.Commit();
+                return Json(new DosResult(1, new { AddResults = addResults, UptResults = uptResults }, "保存成功"));
+            }
+            catch (Exception ex)
+            {
+                if (trans != null) { try { trans.Rollback(); } catch { } }
+                return Json(new DosResult(0, null, "保存失败：" + ex.Message));
+            }
+            finally
+            {
+                if (trans != null) { try { trans.Close(); } catch { } }
+            }
         }
 
         /// <summary>

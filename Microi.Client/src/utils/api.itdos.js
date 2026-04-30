@@ -292,6 +292,7 @@ var DiyApi = {
     GetDiyTableRowModel: "/api/FormEngine/GetFormData",
     DelDiyTableRow: "/api/FormEngine/DelFormData",
     UptDiyTableRow: "/api/FormEngine/UptFormData",
+    SaveBatch: "/api/FormEngine/SaveBatch",
     UptDiyDataListByWhere: "/api/FormEngine/UptDiyDataListByWhere",
     GetDiyFieldSqlData: "/api/FormEngine/GetDiyFieldSqlData", // sql数据源来源
     GetDataSourceEngine: "/api/DataSourceEngine/Run", // 数据源引擎来源
