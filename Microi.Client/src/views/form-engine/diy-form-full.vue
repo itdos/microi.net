@@ -53,7 +53,11 @@
                         {{ GetOpenTitlePage() }}
                     </div>
                     <div class="form-actions">
-                        <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                        <!-- 工作流：醒目的【发起流程/处理工作】按钮（PageMode 顶部） -->
+                        <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                            {{ WfTopSubmitBtnText }}
+                        </el-button>
+                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
@@ -137,15 +141,21 @@
                             :dataCommentList="DataCommentList"
                             :dataCommentListLoading="DataCommentListLoading"
                             :btnLoading="BtnLoading"
+                            :hideInlineSubmit="ShowWfTopSubmitBtn"
                             @submit-comment="SubmitComment"
                             @callback-start-work="CallbackStartWork"
                         />
                     </el-col>
                 </el-row>
 
-                <!--移动端底部固定操作条（Page模式）：保存/编辑常驻在底部-->
-                <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
-                    <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
+                <!--移动端底部固定操作条（Page模式）：保存/编辑/发起流程常驻在底部 -->
+                <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (ShowWfTopSubmitBtn || FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
+                    <el-button v-if="ShowWfTopSubmitBtn"
+                        :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                        @click="TriggerWfSubmit()">
+                        {{ WfTopSubmitBtnText }}
+                    </el-button>
+                    <el-button v-else-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
                         {{ $t('Msg.Save') }}
                     </el-button>
                     <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
@@ -213,6 +223,10 @@
                     {{ GetOpenTitle() }}
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                    <!-- 工作流：醒目的【发起流程/处理工作】按钮（Dialog模式顶部） -->
+                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                        {{ WfTopSubmitBtnText }}
+                    </el-button>
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button
@@ -364,18 +378,25 @@
                         :dataCommentList="DataCommentList"
                         :dataCommentListLoading="DataCommentListLoading"
                         :btnLoading="BtnLoading"
+                        :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
                     />
                 </el-col>
             </el-row>
 
-            <!--移动端底部固定操作条（Dialog模式）：保存/编辑常驻在底部-->
+            <!--移动端底部固定操作条（Dialog模式）：保存/编辑/发起流程常驻在底部 -->
             <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
-                (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                ShowWfTopSubmitBtn
+                || (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
                 || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
             )">
-                <el-button v-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-if="ShowWfTopSubmitBtn"
+                    :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    @click="TriggerWfSubmit()">
+                    {{ WfTopSubmitBtnText }}
+                </el-button>
+                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                     :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
@@ -451,6 +472,10 @@
                     {{ GetOpenTitle() }}
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                    <!-- 工作流：醒目的【发起流程/处理工作】按钮（Drawer模式顶部） -->
+                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                        {{ WfTopSubmitBtnText }}
+                    </el-button>
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button
@@ -613,18 +638,25 @@
                         :dataCommentList="DataCommentList"
                         :dataCommentListLoading="DataCommentListLoading"
                         :btnLoading="BtnLoading"
+                        :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
                     />
                 </el-col>
             </el-row>
 
-            <!--移动端底部固定操作条（Drawer模式）：保存/编辑常驻在底部-->
+            <!--移动端底部固定操作条（Drawer模式）：保存/编辑/发起流程常驻在底部 -->
             <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
-                (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                ShowWfTopSubmitBtn
+                || (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
                 || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
             )">
-                <el-button v-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-if="ShowWfTopSubmitBtn"
+                    :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    @click="TriggerWfSubmit()">
+                    {{ WfTopSubmitBtnText }}
+                </el-button>
+                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                     :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
@@ -707,6 +739,7 @@
                 :dataCommentList="DataCommentList"
                 :dataCommentListLoading="DataCommentListLoading"
                 :btnLoading="BtnLoading"
+                :hideInlineSubmit="ShowWfTopSubmitBtn"
                 :isMobileDrawer="true"
                 @submit-comment="SubmitComment"
                 @callback-start-work="CallbackStartWork"
@@ -845,6 +878,18 @@ export default {
             }
             return false;
         },
+        // 工作流：是否在表单顶部/底部显示醒目的【发起流程/处理工作】按钮（替代右侧不醒目的小按钮）
+        ShowWfTopSubmitBtn() {
+            var self = this;
+            var wt = self.OpenDiyFormWorkFlowType && self.OpenDiyFormWorkFlowType.WorkType;
+            if (wt !== 'StartWork' && wt !== 'DoWork') return false;
+            return self.FormMode == 'Add' || self.FormMode == 'Edit';
+        },
+        WfTopSubmitBtnText() {
+            var self = this;
+            var wt = self.OpenDiyFormWorkFlowType && self.OpenDiyFormWorkFlowType.WorkType;
+            return wt === 'StartWork' ? '发起流程' : '处理工作';
+        },
         // 判断当前表单FormBtns是否有可见按钮（用于FAB菜单是否显示）
         HasVisibleFormBtns() {
             var self = this;
@@ -925,6 +970,8 @@ export default {
             OpenDiyFormWorkFlowType: {},
             FormWF: {},
             StartWorkSubmited: false,
+            // 表单顶部/底部【发起流程/处理工作】CTA 按钮防重入状态
+            WfSubmitting: false,
             FormRightType: "WorkFlow",
 
             // ========== 数据日志相关 ==========
@@ -2396,6 +2443,35 @@ export default {
             var p = this.GetActiveRightPanel();
             return p && p.$refs ? p.$refs.refWfWorkHandler : null;
         },
+        // 工作流：从表单顶部/底部触发右侧 WfWorkHandler 的 SubmitWF（醒目按钮入口，带防重入）
+        TriggerWfSubmit() {
+            var self = this;
+            if (self.WfSubmitting || self.BtnLoading) return;
+            var handler = self.GetActiveWfWorkHandler();
+            if (handler) {
+                if (handler.BtnLoading) return;
+                if (typeof handler.SubmitWF === 'function') {
+                    self.WfSubmitting = true;
+                    try { handler.SubmitWF(); } finally {
+                        // 异步处理中，handler.BtnLoading 会接手状态；这里略延后释放本地锁
+                        setTimeout(function () { self.WfSubmitting = false; }, 800);
+                    }
+                    return;
+                }
+            }
+            // 移动端可能未挂载右侧抽屉：先打开抽屉，再次重试
+            if (self.diyStore.IsPhoneView) {
+                self.showMobileRightDrawer = true;
+                self.WfSubmitting = true;
+                self.$nextTick(function () {
+                    setTimeout(function () {
+                        var h = self.GetActiveWfWorkHandler();
+                        if (h && !h.BtnLoading && typeof h.SubmitWF === 'function') h.SubmitWF();
+                        self.WfSubmitting = false;
+                    }, 150);
+                });
+            }
+        },
         GetActiveWfHistory() {
             var p = this.GetActiveRightPanel();
             return p && p.$refs ? p.$refs.refWFHistory : null;
@@ -2463,6 +2539,40 @@ export default {
             var self = this;
             self.OpenDiyFormWorkFlowType = wfParam;
             self.FormWF = self.GetFormWF();
+            // ========== DoWork：从【去处理】按钮进入，初始化处理工作面板 ==========
+            if (wfParam.WorkType == "DoWork") {
+                self.OpenDiyFormWorkFlow = true;
+                self.FormRightType = "WorkFlow";
+                self.FormWF = self.GetFormWF();
+                if (self.diyStore.IsPhoneView) {
+                    self.showMobileRightDrawer = true;
+                }
+                var doWorkParam = {
+                    CurrentFlowDesign: { Id: wfParam.FlowDesignId },
+                    CurrentFlowId: wfParam.CurrentFlowId,
+                    CurrentNodeId: wfParam.CurrentNodeId,
+                    CurrentWorkModel: wfParam.WorkModel || {},
+                    OpenFormMode: wfParam.FormMode || "Edit",
+                    CurrentTableId: self.TableId,
+                    CurrentTableRowId: self.TableRowId,
+                    OpenWorkType: wfParam.OpenWorkType
+                };
+                var retryCountDo = 0;
+                var maxRetriesDo = 40;
+                var tryInitSendWork = function () {
+                    var handler = self.GetActiveWfWorkHandler();
+                    if (handler && typeof handler.InitSendWork === 'function') {
+                        handler.InitSendWork(doWorkParam, function () { });
+                    } else if (retryCountDo < maxRetriesDo) {
+                        retryCountDo++;
+                        setTimeout(tryInitSendWork, 50);
+                    } else {
+                        console.error('[DiyFormFull] refWfWorkHandler 始终未挂载（DoWork），已重试' + maxRetriesDo + '次');
+                    }
+                };
+                self.$nextTick(tryInitSendWork);
+                return;
+            }
             if (wfParam.WorkType == "ViewWork") {
                 // 获取此数据对应的最后一个流程
                 if (self.FormMode != "Add" && self.FormMode != "Insert" && !self.DiyCommon.IsNull(self.TableRowId)) {

@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { PropType, ref, toRefs, watch, onBeforeUnmount, onActivated, onDeactivated, nextTick } from 'vue'
+import { PropType, ref, toRefs, watch, onBeforeUnmount, onActivated, onDeactivated, onMounted, nextTick } from 'vue'
 import { CreateComponentType } from '@goview/packages/index.d'
 
 const props = defineProps({
@@ -149,7 +149,8 @@ const {
   backgroundColor,
   showControls,
   gameManagerName,
-  waypointCount
+  waypointCount,
+  instanceName
 } = toRefs(props.chartConfig.option)
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -337,10 +338,12 @@ const initUnity = async () => {
 
     loading.value = false
     unityReady.value = true
+    emit('ready', publicApi)
   } catch (e: any) {
     loading.value = false
     errorMsg.value = 'Unity 加载失败: ' + (e?.message || e)
     console.error('[Unity3D]', e)
+    emit('error', e)
   }
 }
 
@@ -363,6 +366,181 @@ const sendMessage = (method: string, param?: string) => {
   }
 }
 
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║   对外暴露的相机/播放控制 API（供其它 go-view 插件事件调用）   ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+type UnityEventName = 'reachPosition' | 'playbackComplete' | 'debug' | 'notification' | 'ready' | 'error'
+const listeners: Record<UnityEventName, Function[]> = {
+  reachPosition: [],
+  playbackComplete: [],
+  debug: [],
+  notification: [],
+  ready: [],
+  error: []
+}
+const emit = (name: UnityEventName, ...args: any[]) => {
+  ;(listeners[name] || []).slice().forEach(fn => {
+    try { fn(...args) } catch (e) { console.error('[Unity3D] listener error:', name, e) }
+  })
+}
+const on = (name: UnityEventName, fn: Function) => {
+  if (!listeners[name]) return
+  listeners[name].push(fn)
+}
+const off = (name: UnityEventName, fn?: Function) => {
+  if (!listeners[name]) return
+  if (!fn) { listeners[name].length = 0; return }
+  const i = listeners[name].indexOf(fn)
+  if (i >= 0) listeners[name].splice(i, 1)
+}
+
+/**
+ * 公开 API：所有方法均可在其它插件的"基础事件/高级事件/交互事件"中调用
+ * 调用方式：
+ *   window.$microiUnity.first().jumpTo('position_1')
+ *   window.$microiUnity.get('factory3D').play()
+ *   window.$microiUnity.get('<chartId>').sendMessage('GameManager', 'CustomMethod', 'param')
+ */
+const publicApi = {
+  /** 是否已加载完成 */
+  isReady: () => unityReady.value && !loading.value && !errorMsg.value,
+  /** Unity 原始实例（高级用途） */
+  getInstance: () => unityInstance,
+  /** 通用消息发送：对应 unityInstance.SendMessage */
+  sendMessage: (methodOrTarget: string, methodOrParam?: string, param?: string) => {
+    // 兼容两种调用方式：
+    //   sendMessage('JumpToPosition', 'position_1')               → 用配置的 GameManager 名
+    //   sendMessage('GameManager', 'JumpToPosition', 'position_1') → 自定义目标对象
+    if (param !== undefined) {
+      // 三参形式：自定义目标
+      if (!unityInstance) return
+      try { unityInstance.SendMessage(methodOrTarget, methodOrParam!, param) }
+      catch (e) { console.error('[Unity3D] SendMessage failed:', e) }
+    } else {
+      sendMessage(methodOrTarget, methodOrParam)
+    }
+  },
+  /** 播放（若处于暂停则恢复） */
+  play: () => sendMessage('StartPlayback'),
+  /** 暂停 */
+  pause: () => sendMessage('PausePlayback'),
+  /** 恢复 */
+  resume: () => sendMessage('ResumePlayback'),
+  /** 停止 */
+  stop: () => sendMessage('StopPlayback'),
+  /** 重新播放 */
+  restart: () => sendMessage('RestartPlayback'),
+  /**
+   * 跳转到指定相机位置/路径点
+   * @param positionId 路径点 positionId 字段，或 'position_N' 索引格式（N 从 1 开始）
+   *                   也可以直接传数字 N，自动拼成 'position_N'
+   */
+  jumpTo: (positionId: string | number) => {
+    const id = typeof positionId === 'number' ? `position_${positionId}` : positionId
+    sendMessage('JumpToPosition', id)
+  },
+  /** 监听 Unity → JS 事件 */
+  on,
+  /** 取消监听 */
+  off,
+  /** 当前 chart id */
+  chartId: props.chartConfig.id,
+  /** 当前实例名（可在配置中设置） */
+  get name() { return instanceName?.value || '' }
+}
+
+// 注册到全局，让其它插件事件可以访问
+const ensureGlobalRegistry = () => {
+  const w = window as any
+  if (!w.$microiUnity) {
+    const map: Record<string, any> = {}
+    w.$microiUnity = {
+      _map: map,
+      register(key: string, api: any) { if (key) map[key] = api },
+      unregister(key: string) { if (key) delete map[key] },
+      get(key: string) { return map[key] },
+      first() {
+        const keys = Object.keys(map)
+        return keys.length ? map[keys[0]] : null
+      },
+      all() { return { ...map } },
+      list() { return Object.keys(map) }
+    }
+  }
+  return w.$microiUnity
+}
+
+const registerApi = () => {
+  const reg = ensureGlobalRegistry()
+  reg.register(props.chartConfig.id, publicApi)
+  if (instanceName?.value) reg.register(instanceName.value, publicApi)
+}
+const unregisterApi = () => {
+  const reg = (window as any).$microiUnity
+  if (!reg) return
+  reg.unregister(props.chartConfig.id)
+  if (instanceName?.value) reg.unregister(instanceName.value)
+}
+
+// instanceName 变化时重新注册
+watch(() => instanceName?.value, (v, old) => {
+  const reg = (window as any).$microiUnity
+  if (!reg) return
+  if (old) reg.unregister(old)
+  if (v) reg.register(v, publicApi)
+})
+
+// 设置 Unity → JS 全局回调（jslib 中通过 window.onUnityXxx 调用）
+// 注意：多个 Unity 实例共用同一组全局回调，因此用聚合方式分发
+const installGlobalUnityCallbacks = () => {
+  const w = window as any
+  const dispatch = (event: UnityEventName, ...args: any[]) => {
+    const reg = w.$microiUnity
+    if (!reg) return
+    Object.values(reg._map || {}).forEach((api: any) => {
+      try { (api as any)[`__emit_${event}`]?.(...args) } catch (_) {}
+    })
+  }
+  if (!w.__microiUnityCallbacksInstalled) {
+    w.__microiUnityCallbacksInstalled = true
+    const prevReach = w.onUnityReachPosition
+    w.onUnityReachPosition = (pos: string) => {
+      try { prevReach && prevReach(pos) } catch (_) {}
+      dispatch('reachPosition', pos)
+    }
+    const prevDone = w.onUnityPlaybackComplete
+    w.onUnityPlaybackComplete = () => {
+      try { prevDone && prevDone() } catch (_) {}
+      dispatch('playbackComplete')
+    }
+    const prevDebug = w.onUnityDebug
+    w.onUnityDebug = (msg: string) => {
+      try { prevDebug && prevDebug(msg) } catch (_) {}
+      dispatch('debug', msg)
+    }
+    const prevNotify = w.onUnityNotification
+    w.onUnityNotification = (title: string, msg: string) => {
+      try { prevNotify && prevNotify(title, msg) } catch (_) {}
+      dispatch('notification', title, msg)
+    }
+  }
+}
+
+// 给 publicApi 挂上分发钩子
+;(publicApi as any).__emit_reachPosition = (p: string) => emit('reachPosition', p)
+;(publicApi as any).__emit_playbackComplete = () => emit('playbackComplete')
+;(publicApi as any).__emit_debug = (m: string) => emit('debug', m)
+;(publicApi as any).__emit_notification = (t: string, m: string) => emit('notification', t, m)
+
+onMounted(() => {
+  installGlobalUnityCallbacks()
+  registerApi()
+})
+
+// 同时通过 defineExpose 暴露，让 go-view 高级事件也可通过 components[id].exposed 访问
+defineExpose(publicApi)
+
 // 监听核心 URL 变化，重新加载 Unity
 watch(
   [loaderUrl, dataUrl, frameworkUrl, codeUrl],
@@ -379,6 +557,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  unregisterApi()
   destroyPromise = destroyUnity()
 })
 

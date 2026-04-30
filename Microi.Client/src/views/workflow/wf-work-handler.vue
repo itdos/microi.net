@@ -46,7 +46,7 @@
                 <el-input type="textarea" :rows="4" placeholder="请输入意见/评论" v-model="CurrentApprovalIdea"> </el-input>
             </div>
             <!--提交-->
-            <div style="margin-top: 10px">
+            <div style="margin-top: 10px" v-if="!HideInlineSubmit">
                 <el-button @click="SubmitWF" :loading="BtnLoading" :disabled="DisableSubmitWF()" type="primary" :icon="QuestionFilled">
                     {{ CurrentStartType == "StartWork" ? "发起流程" : "处理工作" }}
                     <!-- $t('Msg.Submit') -->
@@ -108,6 +108,11 @@ export default {
             default() {
                 return {};
             }
+        },
+        // 隐藏内联的【发起流程/处理工作】提交按钮（由外部表单顶部/底部的CTA接管）
+        HideInlineSubmit: {
+            type: Boolean,
+            default: false
         }
     },
     watch: {},
