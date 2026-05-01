@@ -330,9 +330,13 @@ export default {
         this.pageIndex = 1
         this.noMore = false
       }
+      // 竞态保护：用版本号丢弃过期响应
+      this._loadProductsSeq = (this._loadProductsSeq || 0) + 1
+      const seq = this._loadProductsSeq
+      const requestPage = this.pageIndex
       try {
         const res = await getProductList({
-          pageIndex: this.pageIndex,
+          pageIndex: requestPage,
           pageSize: this.pageSize,
           categoryId: this.currentCategory,
           keyword: this.keyword,
@@ -340,6 +344,8 @@ export default {
           priceMin: this.appliedPriceMin,
           priceMax: this.appliedPriceMax
         })
+        // 已被新请求覆盖，丢弃
+        if (seq !== this._loadProductsSeq) return
         if (res.Code === 1) {
           const list = res.Data || []
           if (append) {
@@ -351,13 +357,21 @@ export default {
           if (list.length < this.pageSize) {
             this.noMore = true
           }
+        } else if (append) {
+          // 失败回滚 pageIndex，避免下次跳页
+          this.pageIndex = Math.max(1, this.pageIndex - 1)
         }
       } catch (e) {
         console.error('[Mall] loadProducts error:', e)
+        if (append) {
+          this.pageIndex = Math.max(1, this.pageIndex - 1)
+        }
       } finally {
-        this.loading = false
-        this.loadingMore = false
-        this.refreshing = false
+        if (seq === this._loadProductsSeq) {
+          this.loading = false
+          this.loadingMore = false
+          this.refreshing = false
+        }
       }
     },
 

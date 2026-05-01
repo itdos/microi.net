@@ -11,13 +11,50 @@
 | `V8.Cache.Remove(key)` | 删除缓存 | `boolean` |
 | `V8.Cache.Exists(key)` | 是否存在 | `boolean` |
 
-**过期时间格式：** `d.HH:mm:ss` 字符串
-- `'0.00:00:59'` = 59 秒
-- `'0.01:00:00'` = 1 小时
-- `'0.12:00:00'` = 12 小时
-- `'1.00:00:00'` = 1 天
-- `'7.00:00:00'` = 7 天
-- 不传则**永久缓存**
+**过期时间格式：** 支持两种写法
+- 整数（秒）：`V8.Cache.Set(key, value, 3600)` = 1 小时
+- 字符串 `d.HH:mm:ss`：
+  - `'0.00:00:59'` = 59 秒
+  - `'0.01:00:00'` = 1 小时
+  - `'0.12:00:00'` = 12 小时
+  - `'1.00:00:00'` = 1 天
+  - `'7.00:00:00'` = 7 天
+- 不传则**永久缓存**（直到手动 Remove 或 Redis 重启）
+
+## 🔑 Key 命名规范（必须遵守）
+
+平台统一使用 4 段式 Key：`Microi:${OsClient}:{Category}:{Key}`
+
+```javascript
+// ✅ 正确
+var k1 = 'Microi:' + V8.OsClient + ':User:' + userId;
+var k2 = 'Microi:' + V8.OsClient + ':SmsCode:' + phone;
+var k3 = 'Microi:' + V8.OsClient + ':Lock:OrderPay:' + orderId;
+
+// ❌ 错误：缺少 OsClient → 多租户串号
+var k = 'User:' + userId;
+```
+
+| 段 | 说明 |
+|----|------|
+| `Microi:` | 平台前缀，固定 |
+| `${V8.OsClient}` | 租户隔离 |
+| `{Category}` | 业务分类（User / SmsCode / Lock / Token / ImportStep …） |
+| `{Key}` | 具体业务 Key |
+
+> 系统已用前缀（避免冲突）：`Microi:${OsClient}:Token:`、`Microi:${OsClient}:User:`、`Microi:${OsClient}:OsClient`、`Microi:${OsClient}:DiyTable:`、`Microi:${OsClient}:Sys:`
+
+## 缓存层级（L1 + L2）
+
+平台内部对系统配置等场景实现了 **L1 进程内缓存 + L2 Redis 缓存**：
+
+- L1：.NET 进程内 `IMemoryCache`（每个容器独立）
+- L2：Redis（全集群共享）
+
+读取顺序：L1 命中 → L2 命中 → 数据库  
+写入顺序：DB → L2 → L1
+
+> ⚠️ 直接修改数据库未走 V8 引擎时，L1 不会自动失效，需要**重启 docker 容器**（或调 `刷新缓存` 接口）让 L1 重建
 
 ## 基本读写
 

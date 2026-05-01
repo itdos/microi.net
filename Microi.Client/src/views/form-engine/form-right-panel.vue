@@ -29,7 +29,13 @@
                     </span>
                 </template>
                 <div class="panel-card">
-                    <div class="datalog-timeline">
+                    <div class="panel-toolbar">
+                        <el-button size="small" :loading="dataLogListLoading" @click="OnRefreshDataLog" link type="primary">
+                            <el-icon v-if="!dataLogListLoading"><Refresh /></el-icon>
+                            {{ $t ? $t('Msg.Refresh') || '刷新' : '刷新' }}
+                        </el-button>
+                    </div>
+                    <div class="datalog-timeline" v-loading="dataLogListLoading">
                         <el-timeline v-if="dataLogList && dataLogList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataLogList"
@@ -75,6 +81,12 @@
                     </span>
                 </template>
                 <div class="panel-card">
+                    <div class="panel-toolbar">
+                        <el-button size="small" :loading="dataCommentListLoading" @click="OnRefreshDataComment" link type="primary">
+                            <el-icon v-if="!dataCommentListLoading"><Refresh /></el-icon>
+                            {{ $t ? $t('Msg.Refresh') || '刷新' : '刷新' }}
+                        </el-button>
+                    </div>
                     <div class="comment-input-wrapper">
                         <el-input
                             type="textarea"
@@ -97,7 +109,7 @@
                         </div>
                     </div>
 
-                    <div class="datalog-timeline">
+                    <div class="datalog-timeline" v-loading="dataCommentListLoading">
                         <el-timeline v-if="dataCommentList && dataCommentList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataCommentList"
@@ -145,7 +157,7 @@ export default {
         // 隐藏 wf-work-handler 内联的发起流程/处理工作提交按钮——由表单顶部的 CTA 接管
         hideInlineSubmit: { type: Boolean, default: false }
     },
-    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work"],
+    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "refresh-data-log", "refresh-data-comment"],
     data() {
         return {
             innerActiveTab: this.modelValue || "WorkFlow"
@@ -159,6 +171,18 @@ export default {
     methods: {
         OnTabChange(v) {
             this.$emit("update:modelValue", v);
+            // 切换 Tab 时懒加载：若列表为空且未在加载中，请求父组件重新获取。
+            if (v === "DataLog" && !this.dataLogListLoading && (!this.dataLogList || this.dataLogList.length === 0)) {
+                this.$emit("refresh-data-log");
+            } else if (v === "DataComment" && !this.dataCommentListLoading && (!this.dataCommentList || this.dataCommentList.length === 0)) {
+                this.$emit("refresh-data-comment");
+            }
+        },
+        OnRefreshDataLog() {
+            this.$emit("refresh-data-log");
+        },
+        OnRefreshDataComment() {
+            this.$emit("refresh-data-comment");
         },
         OnCallbackStartWork(payload) {
             this.$emit("callback-start-work", payload);
@@ -205,6 +229,20 @@ export default {
         padding: 12px;
         box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
         border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    }
+
+    .panel-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+        :deep(.el-button) {
+            font-size: 12px;
+            .el-icon {
+                font-size: 13px;
+            }
+        }
     }
 
     .panel-empty {

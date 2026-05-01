@@ -8,14 +8,37 @@
 
 ## 包含的 Skills
 
+### V8 引擎核心（后端）
+
 | Skill | 场景 | 文件 |
 |-------|------|------|
-| **v8-crud-api** | 创建增删改查接口引擎 | `v8-crud-api/SKILL.md` |
-| **v8-table-event** | 编写表单事件（提交前/后、打开/关闭） | `v8-table-event/SKILL.md` |
-| **v8-sql-query** | 安全的 SQL 查询（参数化、_Where 语法） | `v8-sql-query/SKILL.md` |
-| **v8-http-integration** | 调用外部 HTTP API（微信、支付、短信等） | `v8-http-integration/SKILL.md` |
-| **v8-cache-pattern** | Redis 缓存模式（防缓存穿透、过期策略） | `v8-cache-pattern/SKILL.md` |
-| **v8-security** | 安全最佳实践（权限校验、输入验证、防注入） | `v8-security/SKILL.md` |
+| **v8-crud-api** | 接口引擎增删改查 | `v8-crud-api/SKILL.md` |
+| **v8-sql-query** | 安全的 SQL 查询（参数化、_Where 语法、事务） | `v8-sql-query/SKILL.md` |
+| **v8-table-event** | 表单 V8 事件（提交前/后、DataFilter） | `v8-table-event/SKILL.md` |
+| **v8-cache-pattern** | Redis 缓存模式（L1+L2、Key 命名、防穿透） | `v8-cache-pattern/SKILL.md` |
+| **v8-http-integration** | 调用外部 HTTP API（含下载/上传） | `v8-http-integration/SKILL.md` |
+| **v8-mongodb** | MongoDB 增删改查（IoT、审计日志） | `v8-mongodb/SKILL.md` |
+| **v8-mq-mqtt** | RabbitMQ 消息队列与 MQTT 物联网 | `v8-mq-mqtt/SKILL.md` |
+| **v8-workflow** | 工作流（审批流程）V8 事件 | `v8-workflow/SKILL.md` |
+| **v8-api-config** | 接口引擎配置（匿名/锁/StopHttp/响应文件） | `v8-api-config/SKILL.md` |
+| **v8-saas-multi-tenant** | SaaS 多租户（OsClient/OsClientModel） | `v8-saas-multi-tenant/SKILL.md` |
+| **v8-file-upload** | 文件上传/下载/响应（HDFS、私有桶 URL） | `v8-file-upload/SKILL.md` |
+| **v8-export-import** | Excel 自定义导入导出（含进度跟踪） | `v8-export-import/SKILL.md` |
+| **v8-debugging** | 调试模式、异常捕获、系统日志 | `v8-debugging/SKILL.md` |
+| **v8-security** | 安全最佳实践（权限/输入验证/防注入） | `v8-security/SKILL.md` |
+
+### V8 引擎核心（前端）
+
+| Skill | 场景 | 文件 |
+|-------|------|------|
+| **v8-frontend-events** | 前端字段/按钮/列表事件（FieldValueChange 等） | `v8-frontend-events/SKILL.md` |
+| **v8-template-engine** | 表格/表单 V8 模板（HTML 渲染、徽章、图片列） | `v8-template-engine/SKILL.md` |
+| **v8-menu-buttons** | 菜单按钮 / Tab / 批量操作 JSON | `v8-menu-buttons/SKILL.md` |
+
+### 引擎模块
+
+| Skill | 场景 | 文件 |
+|-------|------|------|
 | **page-engine** | 界面引擎页面 JSON 生成 | `page-engine/SKILL.md` |
 | **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
 | **ui-design** | 酷炫潮流 UI 设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |

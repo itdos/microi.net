@@ -20,6 +20,47 @@
 - Postman 等直接调用接口 → 前端事件**不执行**，后端事件**仍执行**
 - 服务器端提交前/后 V8 事件在**同一事务**中执行
 
+## ⚠️ 关键陷阱（必读）
+
+### 1. 设计模式保护（前端事件必加）
+
+```javascript
+// 防止【表单设计器】中编辑字段时误触发事件
+if (V8.LoadMode === 'Design') return;
+```
+
+### 2. 死循环禁忌
+
+- ❌ **禁止** 在 `SubmitFormV8.js` 中调 `V8.FormSubmit()` —— 无限递归
+- ❌ **禁止** 在 `FieldValueChange` 中 `V8.FormSet(同字段, ...)` —— 循环触发
+- ❌ **禁止** 在后端 `SubmitBeforeServerV8.js` 中再 `UptFormData(本表, V8.Form.Id)` 不加 `_InvokeType:'Server'` —— 表单事件递归
+
+### 3. 阻止提交（后端）
+
+后端事件返回 `{ Code: 0, Msg: '错误' }` 平台自动回滚事务并阻止提交：
+
+```javascript
+if (V8.Form.Money > 100000 && V8.CurrentUser.RoleName.indexOf('总经理') === -1) {
+  return { Code: 0, Msg: '金额超过 10 万必须总经理提交' };
+}
+```
+
+### 4. 共享事务操作其它表
+
+```javascript
+// 在 SubmitBeforeServerV8 / SubmitAfterServerV8 中
+V8.FormEngine.UptFormData('OtherTable', { Id: 'x', Field: 'v' }, V8.DbTrans);
+V8.ApiEngine.Run('other-engine', { Form: V8.Form }, V8.DbTrans);
+// 不传 V8.DbTrans 会导致并行事务、可能死锁或脏读
+```
+
+### 5. 模板引擎与 DataFilterV8 的区别
+
+- 数据**加工**（计算字段、脱敏、查关联表名）→ 用 `DataFilterV8`（后端，每行执行，可用 `V8.CacheData` 防 N+1）
+- 数据**渲染**（颜色徽章、HTML、图片）→ 用【表格 V8 模板引擎】，详见 `v8-template-engine/SKILL.md`
+
+---
+
 ## 前端事件特有 API
 
 ```javascript

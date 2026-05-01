@@ -13,6 +13,8 @@
 
 ## POST 请求（对象参数格式）
 
+> `V8.Http.Get/Post` 还支持简洁形式：`V8.Http.Get(url)` / `V8.Http.Post(url, body, headers)`，但**对象参数格式更明确、推荐**。
+
 ```javascript
 // POST JSON（推荐使用对象参数格式）
 var result = V8.Http.Post({
@@ -91,6 +93,39 @@ if (resp.StatusCode !== 200) {
 var data = JSON.parse(resp.Content);
 ```
 
+## 下载远程文件（图片、PDF 等二进制）
+
+```javascript
+var resp = V8.Http.GetResponse({
+  Url: 'https://example.com/file.png',
+  Timeout: 30
+});
+if (resp.StatusCode !== 200) return { Code: 0, Msg: '下载失败' };
+
+var bytes = resp.RawBytes;                            // .NET byte[]
+var base64 = System.Convert.ToBase64String(bytes);
+
+// 转存到 HDFS
+var up = V8.Method.Upload({
+  FilesByteBase64: { 'remote.png': base64 },
+  Limit: false, Path: '/imported', OsClient: V8.OsClient
+});
+```
+
+> 文件上传/下载完整模式见 `v8-file-upload/SKILL.md`
+
+## 第三方密钥不要硬编码
+
+```javascript
+// ❌ 危险：密钥写死在代码
+var apiKey = 'sk-xxxxxxxx';
+
+// ✅ 正确：放在 SaaS 引擎的 OsClientModel
+var apiKey = V8.OsClientModel.OpenAIKey;
+var secret = V8.OsClientModel.WxPaySecret;
+```
+
+详见 `v8-saas-multi-tenant/SKILL.md`
 ```javascript
 // GET 完整响应
 var resp = V8.Http.GetResponse({

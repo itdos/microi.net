@@ -2,6 +2,34 @@
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。
 
+## 0. 敏感配置统一放 OsClientModel（不硬编码）
+
+第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。`sys_osclient` 表由表单引擎驱动，可自由扩展配置项，按租户独立配置：
+
+```javascript
+// ✅ 正确
+var openaiKey = V8.OsClientModel.OpenAIKey;
+var wxSecret  = V8.OsClientModel.WxPaySecret;
+var smtpPwd   = V8.OsClientModel.SmtpPassword;
+
+// ❌ 危险：密钥泄漏 / 跨租户串号
+var openaiKey = 'sk-xxxxxxxxxx';
+```
+
+> ⚠️ 不要把 `V8.OsClientModel` 整体序列化返回给前端。详见 `v8-saas-multi-tenant/SKILL.md`
+
+## 0.5 接口引擎配置安全
+
+代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
+
+| 配置 | 何时开启 |
+|------|---------|
+| `IsAnonymous = false` | 非公开接口默认关闭，防止匿名调用越权 |
+| `StopHttp = true` | 内部接口（核心扣款、内部计算）防止外部直接 HTTP 调用 |
+| `LockKey = ...` | 写操作类接口（对账、补单）防止并发执行 |
+| `RateLimit = 60/m` | 公开接口（验证码、登录）防爬虫 |
+| `LogParam = true` | 支付/审计类接口记录请求 |
+
 ## 1. 防 SQL 注入
 
 ### 必须：参数化查询

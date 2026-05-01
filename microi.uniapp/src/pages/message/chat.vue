@@ -294,7 +294,7 @@ export default {
       }
     } catch (e) {}
 
-    // 定期检查连接状态（事件丢失兜底）
+    // 定期检查连接状态（事件丢失兜底，间隔放宽到 15s 减轻压力）
     this._wsCheckTimer = setInterval(() => {
       try {
         const client = getSignalR()
@@ -307,7 +307,7 @@ export default {
           }
         }
       } catch (e) {}
-    }, 5000)
+    }, 15000)
   },
 
   onUnload() {
@@ -367,6 +367,9 @@ export default {
 
     // 加载聊天记录（通过 SignalR）
     async loadChatRecord() {
+      // 节流：避免 onLoad/onReconnected/_wsCheckTimer/重试 多路同时调用
+      if (this._loadingChatRecord) return
+      this._loadingChatRecord = true
       if (!this._loadRetryCount) this._loadRetryCount = 0
       // 标记已至少尝试过一次连接，这时才允许显示"正在重连"提示
       this.wsEverAttempted = true
@@ -547,6 +550,8 @@ export default {
         }
       } catch (e) {
         console.error('[Chat] loadChatRecord error:', e)
+      } finally {
+        this._loadingChatRecord = false
       }
     },
 
@@ -658,19 +663,33 @@ export default {
     },
 
     // Bug#3: 使用唯一值确保scroll-view每次都能触发滚动
+    // 节流：流式 AI 输出每个 chunk 都会调用此方法，限制最多每 100ms 滚动一次
     scrollToBottom() {
-      this.scrollToId = ''
-      this.$nextTick(() => {
-        // 先设置为空再设置为目标ID，强制scroll-view重新滚动
-        setTimeout(() => {
-          this.scrollToId = 'msg-bottom'
-        }, 50)
-      })
+      const now = Date.now()
+      if (this._scrollPending) return
+      const last = this._lastScrollAt || 0
+      const wait = Math.max(0, 100 - (now - last))
+      this._scrollPending = true
+      setTimeout(() => {
+        this._scrollPending = false
+        this._lastScrollAt = Date.now()
+        this.scrollToId = ''
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.scrollToId = 'msg-bottom'
+          }, 50)
+        })
+      }, wait)
     },
 
     // 格式化消息内容为 rich-text 节点（处理换行和基本HTML）
+    // 使用缓存避免每次渲染重新计算（流式 AI 输出场景下被列表中所有消息反复调用）
     formatContent(content) {
       if (!content) return ''
+      const key = content
+      if (!this._formatCache) this._formatCache = new Map()
+      const cached = this._formatCache.get(key)
+      if (cached !== undefined) return cached
       // 转义HTML特殊字符防止XSS，但保留换行
       let safe = String(content)
         .replace(/&/g, '&amp;')
@@ -679,6 +698,12 @@ export default {
         .replace(/"/g, '&quot;')
       // 将换行符转为<br>
       safe = safe.replace(/\n/g, '<br/>')
+      // 限制缓存大小，防止内存膨胀
+      if (this._formatCache.size > 200) {
+        const firstKey = this._formatCache.keys().next().value
+        this._formatCache.delete(firstKey)
+      }
+      this._formatCache.set(key, safe)
       return safe
     },
 

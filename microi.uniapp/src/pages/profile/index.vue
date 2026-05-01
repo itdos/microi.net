@@ -255,6 +255,7 @@ import appConfig from '@/config.js'
 import { themeMixin, setTheme } from '@/utils/theme.js'
 import { setLang } from '@/utils/i18n.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
+import { encryptPassword } from '@/utils/crypto.js'
 
 export default {
   mixins: [themeMixin],
@@ -275,19 +276,20 @@ export default {
         confirmPassword: ''
       },
       // 主题色（MCI 设计系统色板：紫色为默认主色，搭配蓝/青/粉/橙/红/绿等多彩选项）
-            themeColors: [
-              { name: this.t ? this.t('profile.purple') || '紫色' : '紫色', value: '#6C2BD9' },
-              { name: this.t ? this.t('profile.blue') : '蓝色', value: '#2196F3' },
-        { name: '青色', value: '#06B6D4' },
-        { name: '粉色', value: '#EC4899' },
-        { name: '橙色', value: '#F59E0B' },
-        { name: '红色', value: '#E8294A' },
-        { name: '绿色', value: '#27AE60' },
-              { name: '靛蓝', value: '#3F51B5' },
-        { name: '深橙', value: '#FF5722' },
-        { name: '灰蓝', value: '#607D8B' },
-        { name: '天蓝', value: '#409EFF' },
-              { name: '深紫', value: '#673AB7' }
+      // 注意：data() 阶段 this.t 尚未挂载，此处仅存放 value+i18nKey，由 computed 生成 name
+      themeColorDefs: [
+        { i18nKey: 'profile.purple',     fallback: '紫色',  value: '#6C2BD9' },
+        { i18nKey: 'profile.blue',       fallback: '蓝色',  value: '#2196F3' },
+        { i18nKey: 'profile.cyan',       fallback: '青色',  value: '#06B6D4' },
+        { i18nKey: 'profile.pink',       fallback: '粉色',  value: '#EC4899' },
+        { i18nKey: 'profile.orange',     fallback: '橙色',  value: '#F59E0B' },
+        { i18nKey: 'profile.red',        fallback: '红色',  value: '#E8294A' },
+        { i18nKey: 'profile.green',      fallback: '绿色',  value: '#27AE60' },
+        { i18nKey: 'profile.indigo',     fallback: '靛蓝',  value: '#3F51B5' },
+        { i18nKey: 'profile.deepOrange', fallback: '深橙',  value: '#FF5722' },
+        { i18nKey: 'profile.blueGrey',   fallback: '灰蓝',  value: '#607D8B' },
+        { i18nKey: 'profile.skyBlue',    fallback: '天蓝',  value: '#409EFF' },
+        { i18nKey: 'profile.deepPurple', fallback: '深紫',  value: '#673AB7' }
       ],
       // 语言
       currentLang: 'zh-CN',
@@ -302,6 +304,19 @@ export default {
     currentLangName() {
       const item = this.langOptions.find(l => l.value === this.currentLang)
       return item ? item.label : '中文'
+    },
+    // 主题色列表：通过 computed 生成 name，确保 i18n 切换后能响应式更新
+    themeColors() {
+      return this.themeColorDefs.map(def => {
+        let name = def.fallback
+        try {
+          if (typeof this.t === 'function') {
+            const txt = this.t(def.i18nKey)
+            if (txt && txt !== def.i18nKey) name = txt
+          }
+        } catch (e) {}
+        return { name, value: def.value }
+      })
     },
     // 组织信息：部门 + 角色
     orgInfo() {
@@ -413,9 +428,20 @@ export default {
         return
       }
 
+      // 与登录一致使用 RSA 加密，避免明文传输（OWASP A02:2021 加密失败）
+      let encOld, encNew
+      try {
+        encOld = encryptPassword(oldPassword)
+        encNew = encryptPassword(newPassword)
+      } catch (err) {
+        console.error('[Profile] encrypt password error:', err)
+        uni.showToast({ title: '加密失败，请重试', icon: 'none' })
+        return
+      }
+
       post('/api/SysUser/ChangePassword', {
-        OldPassword: oldPassword,
-        NewPassword: newPassword
+        OldPassword: encOld,
+        NewPassword: encNew
       }, true).then(res => {
         if (res.Code === 1) {
           uni.showToast({ title: this.t('profile.pwdChanged'), icon: 'success' })
@@ -426,7 +452,7 @@ export default {
             this.doLogout()
           }, 1500)
         } else {
-          uni.showToast({ title: res.Message || '修改失败', icon: 'none' })
+          uni.showToast({ title: res.Msg || res.Message || '修改失败', icon: 'none' })
         }
       }).catch(e => {
         uni.showToast({ title: '网络错误', icon: 'none' })
