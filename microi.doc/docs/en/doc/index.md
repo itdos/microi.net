@@ -123,7 +123,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <tr><td>🗄️ <strong>Cross-Database</strong></td><td>MySQL 5.5+ / SQL Server 2016+ / Oracle 11g+, supports read-write separation / sharding</td></tr>
 <tr><td>☁️ <strong>Distributed Deployment</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
 <tr><td>💾 <strong>Distributed Cache</strong></td><td>Redis Sentinel mode</td></tr>
-<tr><td>📂 <strong><a href="/en/doc/advanced/hdfs">Distributed Storage</a></strong></td><td>Aliyun OSS / MinIO / Amazon S3, extensible to more storage media</td></tr>
+<tr><td>📂 <strong><a href="/en/doc/more/hdfs">Distributed Storage</a></strong></td><td>Aliyun OSS / MinIO / Amazon S3, extensible to more storage media</td></tr>
 <tr><td>📨 <strong><a href="/en/doc/system-engine/mq">Message Queue</a></strong></td><td>RabbitMQ integration</td></tr>
 <tr><td>📡 <strong><a href="/en/doc/system-engine/mqtt-engine">IoT MQTT</a></strong></td><td>Integrated MQTT server with 485 / ZigBee / Bluetooth / Modbus gateway support</td></tr>
 <tr><td>🔍 <strong><a href="/en/doc/system-engine/search-engine">Search Engine</a></strong></td><td>ElasticSearch full-text search</td></tr>
@@ -138,7 +138,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 <tbody>
 <tr><td>📄 <strong>Template Engine</strong></td><td>Forms/tables support online HTML template rendering</td></tr>
 <tr><td>📂 <strong><a href="/en/doc/system-engine/databases">Database Management</a></strong></td><td>One-click loading of third-party databases, access any database from the API engine</td></tr>
-<tr><td>📑 <strong><a href="/en/doc/advanced/office">Office Engine</a></strong></td><td>Integrated OnlyOffice, local template design, export/print</td></tr>
+<tr><td>📑 <strong><a href="/en/doc/more/office">Office Engine</a></strong></td><td>Integrated OnlyOffice, local template design, export/print</td></tr>
 <tr><td>🔐 <strong>Fine-Grained Permissions</strong></td><td>Granular control down to every table, field, menu, button, and API</td></tr>
 <tr><td>🔑 <strong>Single Sign-On</strong></td><td>Bidirectional SSO between third-party systems and the low-code platform</td></tr>
 <tr><td>💬 <strong>WeChat Platform</strong></td><td>Multi-account / multi-mini-program configuration, template messages</td></tr>

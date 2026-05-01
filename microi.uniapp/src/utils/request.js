@@ -9,6 +9,32 @@ const USER_KEY = 'microi_user'
 
 // 全局 401 跳转节流：并发请求多个 401 时，只跳转一次
 let _redirectingToLogin = false
+
+// 并发限流：小程序平台 uni.request 默认并发上限通常为 10，应用启动时大量并发可能阻塞 UI 关键请求
+// 设置 8 槽位 + 队列，避免占满浏览器/小程序连接池
+const MAX_CONCURRENT = 8
+let _activeCount = 0
+const _waitingQueue = []
+function _acquireSlot() {
+  return new Promise(resolve => {
+    if (_activeCount < MAX_CONCURRENT) {
+      _activeCount++
+      resolve()
+    } else {
+      _waitingQueue.push(resolve)
+    }
+  })
+}
+function _releaseSlot() {
+  if (_waitingQueue.length > 0) {
+    _activeCount = _activeCount // 保持计数
+    const next = _waitingQueue.shift()
+    try { next() } catch (e) {}
+  } else {
+    _activeCount = Math.max(0, _activeCount - 1)
+  }
+}
+
 function redirectToLogin() {
   if (_redirectingToLogin) return
   _redirectingToLogin = true
@@ -116,48 +142,59 @@ export function request(options = {}) {
   const fullUrl = url.startsWith('http') ? url : appConfig.apiBase + url
 
   return new Promise((resolve, reject) => {
-    uni.request({
-      url: fullUrl,
-      method,
-      data,
-      header,
-      timeout: 30000,
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const result = res.data
-
-          // 自动从响应头提取并保存 Token（后端通过 header 返回 authorization）
-          if (res.header) {
-            const authHeader = res.header.authorization || res.header.Authorization
-            if (authHeader) {
-              const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader
-              setToken(token)
-            }
-          }
-
-          // 统一处理 Token 过期（覆盖 Microi 标准过期码：1001/1002，以及通用 401/-1）
-          const code = result && result.Code
-          if (auth && (code === 401 || code === -1 || code === 1001 || code === 1002)) {
-            removeToken()
-            redirectToLogin()
-            reject(new Error(result && result.Msg ? result.Msg : '登录已过期'))
-            return
-          }
-          resolve(result)
-        } else if (res.statusCode === 401) {
-          // HTTP 层级 401
-          if (auth) {
-            removeToken()
-            redirectToLogin()
-          }
-          reject(new Error('登录已过期'))
-        } else {
-          reject(new Error('请求失败: ' + res.statusCode))
-        }
-      },
-      fail: (err) => {
-        reject(err)
+    _acquireSlot().then(() => {
+      let released = false
+      const release = () => {
+        if (released) return
+        released = true
+        _releaseSlot()
       }
+      uni.request({
+        url: fullUrl,
+        method,
+        data,
+        header,
+        timeout: 30000,
+        success: (res) => {
+          if (res.statusCode === 200) {
+            const result = res.data
+
+            // 自动从响应头提取并保存 Token（后端通过 header 返回 authorization）
+            if (res.header) {
+              const authHeader = res.header.authorization || res.header.Authorization
+              if (authHeader) {
+                const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader
+                setToken(token)
+              }
+            }
+
+            // 统一处理 Token 过期（覆盖 Microi 标准过期码：1001/1002，以及通用 401/-1）
+            const code = result && result.Code
+            if (auth && (code === 401 || code === -1 || code === 1001 || code === 1002)) {
+              removeToken()
+              redirectToLogin()
+              reject(new Error(result && result.Msg ? result.Msg : '登录已过期'))
+              return
+            }
+            resolve(result)
+          } else if (res.statusCode === 401) {
+            // HTTP 层级 401
+            if (auth) {
+              removeToken()
+              redirectToLogin()
+            }
+            reject(new Error('登录已过期'))
+          } else {
+            reject(new Error('请求失败: ' + res.statusCode))
+          }
+        },
+        fail: (err) => {
+          reject(err)
+        },
+        complete: () => {
+          release()
+        }
+      })
     })
   })
 }

@@ -91,8 +91,9 @@ const initOrbitControls = () => {
 }
 
 // 渲染循环
+let animationId = null // 保存 rAF id 以便卸载时取消，防止内存泄漏
 const animate = () => {
-  requestAnimationFrame(animate)
+  animationId = requestAnimationFrame(animate)
   cameraParams.fov = camera.fov
   cameraParams.aspect = camera.aspect
   cameraParams.near = camera.near
@@ -372,8 +373,38 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 修复内存泄漏：取消动画、dispose controls、释放场景中的 geometry/material/texture
+  if (animationId) {
+    cancelAnimationFrame(animationId)
+    animationId = null
+  }
+  if (controls && typeof controls.dispose === 'function') {
+    try { controls.dispose() } catch (e) {}
+    controls = null
+  }
+  // 递归释放 Three.js 场景资源
+  try {
+    if (typeof scene !== 'undefined' && scene && scene.traverse) {
+      scene.traverse((obj) => {
+        if (obj.geometry && typeof obj.geometry.dispose === 'function') obj.geometry.dispose()
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+          mats.forEach((m) => {
+            for (const k in m) {
+              const v = m[k]
+              if (v && v.isTexture && typeof v.dispose === 'function') v.dispose()
+            }
+            if (typeof m.dispose === 'function') m.dispose()
+          })
+        }
+      })
+      if (scene.clear) scene.clear()
+    }
+  } catch (e) {}
+
   // 清理资源
-  renderer.dispose()
+  try { renderer.dispose() } catch (e) {}
+  try { renderer.forceContextLoss && renderer.forceContextLoss() } catch (e) {}
 
   // 清理 ResizeObserver
   if (resizeObserver) {

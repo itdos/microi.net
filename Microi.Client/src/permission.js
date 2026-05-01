@@ -11,6 +11,9 @@ import Cookies from "js-cookie";
 const whiteList = ["/login", "/auth-redirect"]; // no redirect whitelist
 
 router.beforeEach(async (to, from, next) => {
+    // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
+    // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
+    try {
     //   document.title = getPageTitle(to.meta.title)
     //2022-09-14 所有页面均需要token自动登录
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
@@ -28,7 +31,15 @@ router.beforeEach(async (to, from, next) => {
         }
         sessionStorage.setItem("Diy_Sso", JSON.stringify(diySsoArray));
     } else {
-        diySsoArray = JSON.parse(diySsoArray);
+        // 安全/稳定性修复：sessionStorage 数据可能损坏，避免 JSON.parse 抛错导致守卫卡死
+        try {
+            diySsoArray = JSON.parse(diySsoArray);
+            if (!Array.isArray(diySsoArray)) diySsoArray = [];
+        } catch (e) {
+            console.warn("[permission] Diy_Sso JSON 解析失败，已重置：", e && e.message);
+            diySsoArray = [];
+            try { sessionStorage.removeItem("Diy_Sso"); } catch (_) { }
+        }
     }
     if (diySsoArray.length > 0) {
     }
@@ -189,6 +200,19 @@ router.beforeEach(async (to, from, next) => {
             next();
         } else {
             next(`/login?redirect=${to.fullPath}`); //2022-03-31
+        }
+    }
+    } catch (e) {
+        // 守卫顶层错误兜底，避免 next 未调用导致整站卡死
+        console.error("[router.beforeEach] 守卫异常：", e);
+        try {
+            if (to.path === "/login" || (whiteList && whiteList.indexOf(to.path) !== -1)) {
+                next();
+            } else {
+                next(`/login?redirect=${to.fullPath || "/"}`);
+            }
+        } catch (_) {
+            next(false);
         }
     }
 });

@@ -15,7 +15,7 @@
         width: ${status.widths[i]}px;
       `"
         :align="status.aligns[i]"
-        v-html="headerItem"
+        v-safe-html="headerItem"
       />
     </div>
 
@@ -40,7 +40,7 @@
           :key="`${ceil}${ri}${ci}`"
           :style="`width: ${status.widths[ci]}px;`"
           :align="status.aligns[ci]"
-          v-html="ceil"
+          v-safe-html="ceil"
         />
       </div>
     </div>

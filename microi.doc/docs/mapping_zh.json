@@ -28,8 +28,7 @@
   "start-use.md" : "快速开始使用",
   "docker-run.md" : "Docker部署（一键安装）",
   "win-install-microi.md" : "Windows部署",
-  "local-run-server.md" : "源码本地运行-后端",
-  "local-run-client.md" : "源码本地运行-前端",
+  "local-run.md" : "源码本地运行",
 
   "v8-engine":"V8引擎",
   "ai-apiengine.md" : "AI 编程",
@@ -63,9 +62,9 @@
   "report-engine.md" : "报表引擎",
   "datasource-engine.md" : "数据源引擎",
   "databases.md" : "数据库扩展",
-  "web-plug-engine.md" : "前端插件引擎",
 
-  "advanced" : "其它文档",
+  "more" : "更多文档",
+  "dos-orm.md" : "Dos.ORM",
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",

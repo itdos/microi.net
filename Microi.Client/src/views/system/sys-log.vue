@@ -221,7 +221,7 @@
                         <div v-else class="docker-lines">
                             <div v-for="(line, idx) in filteredDockerLogs" :key="idx" class="docker-line" :class="getDockerLineClass(line)">
                                 <span class="docker-line-no">{{ idx + 1 }}</span>
-                                <span class="docker-line-text" v-html="highlightKeyword(line)"></span>
+                                <span class="docker-line-text" v-safe-html="highlightKeyword(line)"></span>
                             </div>
                         </div>
                     </div>

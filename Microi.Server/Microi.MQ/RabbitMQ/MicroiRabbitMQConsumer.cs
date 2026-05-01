@@ -285,13 +285,39 @@ namespace Microi.net
         //private void HandleMessage(MicroiMQReceiveInfo item,BasicDeliverEventArgs ea, IModel channel)
         private async Task HandleMessage(MicroiMQReceiveInfo item, BasicDeliverEventArgs ea, IChannel channel)
         {
+            // 2026-05-01 健壮性加固：HandleMessage 是 AsyncEventingBasicConsumer 的入口回调，
+            // 任何未捕获异常都会让 RabbitMQ 客户端关闭 channel 并停止派发，导致整个队列"假死"。
+            // 因此最外层必须吞掉所有异常，并尝试 Nack（若失败再忽略），保证消费者循环不退出。
             bool success = false;
             string receiveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             string statusInfo = "正常";
             string status = "成功";
-            var body = ea.Body.ToArray();
-            MicroiMQMessageModel messageModel = JsonConvert.DeserializeObject<MicroiMQMessageModel>(Encoding.UTF8.GetString(body));
-            var msg = messageModel.Message;
+            byte[] body = null;
+            string rawJson = null;
+            MicroiMQMessageModel messageModel = null;
+            object msg = null;
+            try
+            {
+                body = ea.Body.ToArray();
+                rawJson = Encoding.UTF8.GetString(body);
+                try
+                {
+                    messageModel = JsonConvert.DeserializeObject<MicroiMQMessageModel>(rawJson);
+                }
+                catch (Exception deserEx)
+                {
+                    // 消息体格式错误：不能 requeue（永远反序列化失败）→ 直接 Reject 进入 DLX
+                    Console.WriteLine($"Microi：【Error异常】MQ消息反序列化失败，丢弃消息。Queue={item.QueueName}, Body={rawJson}, Error={deserEx.Message}");
+                    try { await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false); } catch { }
+                    return;
+                }
+                if (messageModel == null)
+                {
+                    Console.WriteLine($"Microi：【Error异常】MQ消息为空，丢弃。Queue={item.QueueName}");
+                    try { await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false); } catch { }
+                    return;
+                }
+                msg = messageModel.Message;
             try
             {
                 if (item.Type.Equals(Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))) // 接口引擎处理业务逻辑
@@ -377,22 +403,44 @@ namespace Microi.net
                 }
             }
             // 写入消息日志
-            MicroiEngine.FormEngine.AddFormData(new
+            try
             {
-                FormEngineKey = MicroiMQConst.queueLogTable,
-                _RowModel = new Dictionary<string, object>()
+                MicroiEngine.FormEngine.AddFormData(new
+                {
+                    FormEngineKey = MicroiMQConst.queueLogTable,
+                    _RowModel = new Dictionary<string, object>()
+                        {
+                            { "Type", "接收"},
+                            { "QueueName", item.QueueName},
+                            { "Message", msg},
+                            { "ReceiveTime", receiveTime},
+                            { "CompleteTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")},
+                            { "Status", status},
+                            { "StatusInfo", statusInfo},
+                            { "MessageId", messageModel.Id}
+                        },
+                    OsClient = OsClientDefault.OsClient
+                });
+            }
+            catch (Exception logEx)
+            {
+                // 日志写入失败不应影响 MQ 消费者主流程
+                Console.WriteLine($"Microi：【Error异常】MQ日志写入失败：{logEx.Message}");
+            }
+            }
+            catch (Exception outerEx)
+            {
+                // 兜底：保证 HandleMessage 不向上抛出，否则 channel 会被关闭
+                Console.WriteLine($"Microi：【Error异常】MQ HandleMessage 顶层异常：{outerEx}");
+                try
+                {
+                    if (channel != null && channel.IsOpen)
                     {
-                        { "Type", "接收"},
-                        { "QueueName", item.QueueName},
-                        { "Message", msg},
-                        { "ReceiveTime", receiveTime},
-                        { "CompleteTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")},
-                        { "Status", status},
-                        { "StatusInfo", statusInfo},
-                        { "MessageId", messageModel.Id}
-                    },
-                OsClient = OsClientDefault.OsClient
-            });
+                        await channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
+                    }
+                }
+                catch { /* ignore */ }
+            }
         }
 
         //private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IModel channel,string msg)

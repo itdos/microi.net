@@ -2,7 +2,7 @@
     <div class="menu-bottom-bg" v-if="SysConfig && SysConfig.MenuBottomContent">
         <div class="container">
             <div class="row">
-                <div class="col-md-24 item" v-html="MenuBottomContent"></div>
+                <div class="col-md-24 item" v-safe-html="MenuBottomContent"></div>
             </div>
         </div>
     </div>

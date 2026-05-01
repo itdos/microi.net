@@ -1,6 +1,6 @@
-# 💻 源码本地运行 - 后端
+# 💻 源码本地运行
 
-> **在本地环境中运行 Microi吾码后端服务**
+> **在本地环境中运行 Microi吾码源码（前端 + 后端）**
 
 ---
 
@@ -11,14 +11,16 @@
 
 ---
 
-## 📦 下载源码与 .NET 环境
+## 一、后端运行
+
+### 📦 下载源码与 .NET 环境
 
 - 使用 Git 从开源地址拉取最新代码：[Gitee 仓库](https://gitee.com/ITdos/microi.net)
 - 下载并安装 .NET 10 SDK：[.NET 下载页](https://dotnet.microsoft.com/zh-cn/download)
 
 ---
 
-## 🛠️ 使用 VS Code 打开解决方案（Mac 推荐）
+### 🛠️ 使用 VS Code 打开解决方案（Mac 推荐）
 
 1. 下载并安装 [VS Code](https://code.visualstudio.com/)
 2. 安装插件：**C#**、**C# Dev Kit**、**.NET Install Tool**
@@ -52,7 +54,7 @@
 
 ---
 
-## 🖥️ 使用 Visual Studio 2022 打开解决方案（Windows 推荐）
+### 🖥️ 使用 Visual Studio 2022 打开解决方案（Windows 推荐）
 
 1. 下载并安装 [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hans/)
 2. 双击打开 `/Microi.net.sln`，稍等片刻右键 `Microi.net.Api` 项目 → 重新生成
@@ -61,7 +63,7 @@
 
 ---
 
-## ⚙️ 配置必须参数
+### ⚙️ 配置必须参数
 
 ::: tip 最低要求
 要使项目跑起来，至少需要 **数据库 + Redis** 两个环境，缺一不可。
@@ -69,7 +71,7 @@
 
 ---
 
-## 📝 环境配置注意事项
+### 📝 环境配置注意事项
 
 | 环境 | 影响功能 |
 | :-- | :-- |
@@ -80,7 +82,7 @@
 
 ---
 
-## 🐳 本地编译发布到 Docker 镜像
+### 🐳 本地编译发布到 Docker 镜像
 
 1. 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 2. 在 `Microi.net.Api` 项目目录下执行：
@@ -90,3 +92,49 @@ dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
 ```
 
 3. 进入 `./bin/Release/` 目录，执行 `publish-demo.sh` 脚本（记得先修改里面的配置）
+
+---
+
+## 二、前端运行
+
+### 📦 下载源码与开发工具
+
+- 使用 Git 从开源地址拉取最新代码：[Gitee 仓库](https://gitee.com/ITdos/microi.net)
+- 下载并安装 [VS Code](https://code.visualstudio.com/)
+- 下载并安装 nvm：[Windows 版](https://nvm.uihtm.com/) | [MacBook 版](https://blog.csdn.net/qq973702/article/details/143637128)
+```shell
+# 记住安装路径，一路往下安装即可
+# 打开 nvm安装路径（我的是【D:\Users\Administrator\AppData\Local\nvm】），找到 settings.txt 文件，新增2行配置
+node_mirror: https://npmmirror.com/mirrors/node/
+npm_mirror: https://npmmirror.com/mirrors/npm/
+# 打开cmd窗口,执行
+nvm list available
+nvm install 18
+nvm install 14
+# 常用命令
+nvm ls
+nvm use 18
+node -v
+```
+
+---
+
+### ▶️ 运行前端源码
+
+1. 在 VS Code 打开 `/Microi.Client/` 文件夹
+2. 查看 `/Microi.Client/README.md`，执行以下命令：
+
+```bash
+nvm use 20
+nrm use taobao
+npm install
+npm run dev
+```
+
+---
+
+### 🐳 本地编译发布到 Docker 镜像
+
+1. 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+2. 执行 `npm run build` 命令打包
+3. 进入 `bin/Release/` 目录，执行 `publish-demo.sh` 脚本（记得先修改里面的配置）

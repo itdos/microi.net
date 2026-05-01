@@ -258,9 +258,12 @@ onMounted(async () => {
 
   // 接收父窗体跨域token
   messageHandler = async function (event) {
-    // if (event.origin !== '你的网址') {
-    //   return
-    // }
+    // 安全修复：限定同源，避免外部 origin 注入 token
+    try {
+      if (event.origin && event.origin !== window.location.origin && event.origin !== 'null') {
+        return
+      }
+    } catch (e) { return }
     let receivedData = event.data
     let token = receivedData?.iframeToken
     if (token) {
@@ -271,7 +274,12 @@ onMounted(async () => {
     // 父窗体有传数据过来
     let iframeFormData = receivedData?.iframeFormData
     if (iframeFormData) {
-      pageInfo.remoteData = JSON.parse(iframeFormData)
+      try {
+        pageInfo.remoteData = JSON.parse(iframeFormData)
+      } catch (e) {
+        console.warn('[print-doprint] iframeFormData JSON 解析失败：', e && e.message)
+        return
+      }
       //如果动态api数据接口存在,则重新读一遍
       if (pageInfo.remoteData.DataApi) {
         loadDataApi(pageInfo.remoteData.DataApi)

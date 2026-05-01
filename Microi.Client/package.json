@@ -62,6 +62,7 @@
     "deepmerge": "^4.3.1",
     "dhtmlx-gantt": "^9.1.1",
     "dom-helpers": "^6.0.1",
+    "dompurify": "^3.2.7",
     "dxf-parser": "^1.1.2",
     "echarts": "^6.0.0",
     "echarts-liquidfill": "^3.1.0",
