@@ -5,12 +5,12 @@
             <!-- 如果有 tag 样式 -->
             <div v-if="hasTag" class="tech-divider__tag">
                 <fa-icon v-if="hasIcon" :icon="field.Config.Divider.Icon" class="tech-divider__icon" />
-                <span class="tech-divider__text" v-html="field.Label"></span>
+                <span class="tech-divider__text" v-safe-html="field.Label"></span>
             </div>
             <!-- 普通文字 -->
             <div v-else class="tech-divider__label">
                 <fa-icon v-if="hasIcon" :icon="field.Config.Divider.Icon" class="tech-divider__icon" />
-                <span class="tech-divider__text" v-html="field.Label"></span>
+                <span class="tech-divider__text" v-safe-html="field.Label"></span>
             </div>
         </div>
     </div>

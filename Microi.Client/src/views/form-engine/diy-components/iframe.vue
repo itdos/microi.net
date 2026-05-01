@@ -1,13 +1,15 @@
 <template>
     <!-- onLoad="iFrameHeight()" -->
-    <!--  -->
+    <!-- 安全处理：默认不再允许摄头/麦克风/地理位置/剪贴板访问，避免任意外部 URL 获取这些敏感能力。 -->
+    <!-- 加上 sandbox 限制脚本/表单/同源能力。如业务确需某项能力，在可信白名单下重新开启。 -->
     <iframe
         :src="Url"
         id="iframepage"
         name="mainIFrame"
         frameBorder="0"
         allowtransparency="true"
-        allow="camera; microphone; geolocation; clipboard-read; clipboard-write"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
+        referrerpolicy="no-referrer"
         style="background-color: transparent; height: calc(100vh - 100px); overflow: auto"
         scrolling="yes"
         width="100%"

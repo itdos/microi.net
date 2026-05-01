@@ -670,7 +670,7 @@ const openV8Docs = () => {
     const docUrl = props.v8CodeType === "server" 
         ? "https://microi.net/doc/v8-engine/v8-server.html" 
         : "https://microi.net/doc/v8-engine/v8-client.html";
-    window.open(docUrl, "_blank");
+    window.open(docUrl, "_blank", "noopener,noreferrer");
 };
 
 const Init = async () => {

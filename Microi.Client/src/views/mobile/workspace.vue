@@ -224,7 +224,7 @@ const handleSubMenuClick = (item) => {
 const navigateToMenu = (menu) => {
     if (menu.path) {
         if (menu.Link && (menu.Link.startsWith('http://') || menu.Link.startsWith('https://'))) {
-            window.open(menu.Link, '_blank');
+            window.open(menu.Link, '_blank', 'noopener,noreferrer');
             return;
         }
         router.push(menu.path);

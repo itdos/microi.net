@@ -8,7 +8,7 @@
     >
       <div class="ranking-info">
         <div class="rank" :style="`color: ${color};font-size: ${indexFontSize}px`">No.{{ item.ranking }}</div>
-        <div class="info-name" :style="`font-size: ${leftFontSize}px`" v-html="item.name" />
+        <div class="info-name" :style="`font-size: ${leftFontSize}px`" v-safe-html="item.name" />
         <div class="ranking-value" :style="`color: ${textColor};font-size: ${rightFontSize}px`">
           {{
             typeof status.mergedConfig.valueFormatter === 'function'

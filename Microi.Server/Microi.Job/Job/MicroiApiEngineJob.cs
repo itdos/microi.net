@@ -78,6 +78,10 @@ namespace Microi.net
                 {
                     Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】写入日志失败（{osClient}）: {logEx.Message}");
                 }
+                // 2026-05-01 健壮性加固：以 JobExecutionException 包装并向 Quartz 抛出，
+                // 让调度器感知失败状态、生成 misfire 记录，并支持 @DisallowConcurrentExecution 的串行控制。
+                // refireImmediately=false：不立即重试，等待下一次正常调度，避免错误风暴。
+                throw new JobExecutionException(errorMsg, ex, refireImmediately: false);
             }
             //2025-12-12 注释 by anderson
             // await Task.CompletedTask;

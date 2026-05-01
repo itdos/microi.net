@@ -14,7 +14,7 @@
 </template>
 
 <script setup name="linebar-widget">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
@@ -32,7 +32,8 @@ const props = defineProps({
 
 const chartRef = ref()
 let chartInstance = null
-const chartSet = ref({
+// 使用 shallowRef 避免 echarts 配置大对象被深度 Proxy 化
+const chartSet = shallowRef({
   title: {
     text: '',
     subtext: '',

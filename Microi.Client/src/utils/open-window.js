@@ -17,7 +17,8 @@ export default function openWindow(url, title, w, h) {
     const newWindow = window.open(
         url,
         title,
-        "toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=yes, copyhistory=no, width=" + w + ", height=" + h + ", top=" + top + ", left=" + left
+        // 安全修复：加 noopener,noreferrer 防止反向 tabnabbing（CWE-1022）
+        "toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=yes, copyhistory=no, noopener=yes, noreferrer=yes, width=" + w + ", height=" + h + ", top=" + top + ", left=" + left
     );
 
     // Puts focus on the newWindow

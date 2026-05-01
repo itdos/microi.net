@@ -17,21 +17,24 @@ export const loadMonacoEditor = () => {
     });
 };
 
-// Monaco Workers 懒加载
+// Monaco Workers 懒加载：使用 allSettled 避免单个 worker chunk 加载失败导致整个编辑器不可用
 export const loadMonacoWorkers = async () => {
-    const [jsonWorker, cssWorker, htmlWorker, tsWorker, editorWorker] = await Promise.all([
+    const results = await Promise.allSettled([
         import('monaco-editor/esm/vs/language/json/json.worker?worker'),
         import('monaco-editor/esm/vs/language/css/css.worker?worker'),
         import('monaco-editor/esm/vs/language/html/html.worker?worker'),
         import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
         import('monaco-editor/esm/vs/editor/editor.worker?worker')
     ]);
+    const pick = (i) => (results[i].status === 'fulfilled' ? results[i].value.default : null);
+    // 缺失的 worker 用 editorWorker 兼容兑底
+    const editorWorker = pick(4);
     return {
-        jsonWorker: jsonWorker.default,
-        cssWorker: cssWorker.default,
-        htmlWorker: htmlWorker.default,
-        tsWorker: tsWorker.default,
-        editorWorker: editorWorker.default
+        jsonWorker: pick(0) || editorWorker,
+        cssWorker: pick(1) || editorWorker,
+        htmlWorker: pick(2) || editorWorker,
+        tsWorker: pick(3) || editorWorker,
+        editorWorker: editorWorker
     };
 };
 

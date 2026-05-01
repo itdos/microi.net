@@ -465,7 +465,7 @@
                             <template #default="scope">
                                 <!--如果使用了模板引擎-->
                                 <template v-if="isMuban(field, scope)">
-                                    <div style="line-height: 22px" v-html="scope.row[field.Name + '_TmpEngineResult']"></div>
+                                    <div style="line-height: 22px" v-safe-html="scope.row[field.Name + '_TmpEngineResult']"></div>
                                 </template>
                                 <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
                                 <template v-else-if="NeedDiyTemplateFieldLst.indexOf(field.Component) > -1">
@@ -842,7 +842,7 @@
                                                     </div>
                                                 </template>
                                                 <template v-else-if="isMuban(CardShowDiyFieldList[0], { row: item })">
-                                                    <span v-html="item[CardShowDiyFieldList[0].Name + '_TmpEngineResult']"></span>
+                                                    <span v-safe-html="item[CardShowDiyFieldList[0].Name + '_TmpEngineResult']"></span>
                                                 </template>
                                                 <template v-else>
                                                     {{ GetColValue({ row: item }, CardShowDiyFieldList[0]) }}
@@ -852,7 +852,7 @@
                                             <div class="card-title-tags" v-if="CardTitleTagFieldList && CardTitleTagFieldList.length > 0">
                                                 <template v-for="tagField in CardTitleTagFieldList" :key="'title-tag-' + tagField.Id">
                                                     <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
-                                                        <span v-if="isMuban(tagField, { row: item })" v-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                        <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
                                                         <el-tag v-else size="small" class="card-title-tag" effect="light">{{ GetColValue({ row: item }, tagField) }}</el-tag>
                                                     </template>
                                                 </template>
@@ -898,7 +898,7 @@
                                             <!-- V8TmpEngineTable 模板引擎 -->
                                             <template v-else-if="isMuban(field, { row: item })">
                                                 <span class="card-field-label">{{ field.Label }}</span>
-                                                <span class="card-field-value" v-html="item[field.Name + '_TmpEngineResult']"></span>
+                                                <span class="card-field-value" v-safe-html="item[field.Name + '_TmpEngineResult']"></span>
                                             </template>
                                             <!--普通字段-->
                                             <template v-else>
@@ -912,7 +912,7 @@
                                                 <template v-if="CardBottomTagFieldList && CardBottomTagFieldList.length > 0">
                                                     <template v-for="tagField in CardBottomTagFieldList" :key="'bottom-tag-' + tagField.Id">
                                                         <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
-                                                            <span v-if="isMuban(tagField, { row: item })" v-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
                                                             <el-tag v-else size="small" class="card-bottom-tag" effect="plain" type="info">{{ GetColValue({ row: item }, tagField) }}</el-tag>
                                                         </template>
                                                     </template>
@@ -6670,7 +6670,7 @@ export default {
                     }
                     // self.$set(self.FormDiyTableModel, field.Name + '_' + fileId + '_RealPath', result);
                     // resolve(result);
-                    window.open(result);
+                    window.open(result, "_blank", "noopener,noreferrer");
                 }
             );
         },

@@ -1,5 +1,5 @@
 <template>
-  <div v-html="computedHtml" style="width: 100%; height: 100%"></div>
+  <div v-safe-html="computedHtml" style="width: 100%; height: 100%"></div>
 </template>
 
 <script setup name="html-widget">
