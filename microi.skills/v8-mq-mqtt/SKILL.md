@@ -91,10 +91,17 @@ try {
 
 在 SaaS 引擎配置 MQ 连接参数：`MQHost`, `MQPort`, `MQUserName`, `MQPassword`, `MQVitrualHost`
 
-在 `diy_queue_receive` 表新增记录：
-- `Type`: 接口引擎
-- `QueueName`: 队列名
-- `ApiEngineKey`: 消费者接口引擎 Key
+在 `diy_queue_receive` 表新增记录后，平台启动时自动订阅：
+
+| 字段 | 含义 |
+|------|------|
+| `Type` | `接口引擎`（固定） |
+| `QueueName` | 队列名（生产端 `V8.MQ.SendMsg(queueName, ...)` 与此一致） |
+| `ApiEngineKey` | 消费者接口引擎 Key |
+| `IsEnable` | 是否启用 |
+| `OsClient` | 所属租户（多租户隔离） |
+
+> ⚠️ 修改 `diy_queue_receive` 后需重启平台才会生效订阅。
 
 ---
 

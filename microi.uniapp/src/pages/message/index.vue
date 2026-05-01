@@ -281,6 +281,8 @@ export default {
     // 初始化 SignalR 连接并注册事件
     async initSignalR() {
       this.loading = true
+      // 先停止可能存在的旧轮询，避免重复启动
+      this.stopPolling()
       try {
         const client = await connectSignalR()
         this.wsConnected = client.isConnected
@@ -382,8 +384,18 @@ export default {
 
     // 兜底轮询（SignalR 连接失败时使用）
     startPollingFallback() {
+      // 防止重复启动导致内存泄漏与多次请求
+      if (this._pollTimer) return
       this._pollTimer = setInterval(() => {
         if (getToken()) {
+          // 若 SignalR 已恢复连接则停止轮询
+          try {
+            const c = getSignalR()
+            if (c && c.isConnected) {
+              this.stopPolling()
+              return
+            }
+          } catch (e) {}
           this.requestLastContacts()
         }
       }, 30000)
@@ -508,18 +520,26 @@ export default {
         clearTimeout(this._loadingTimeout)
         this._loadingTimeout = null
       }
-      const client = getSignalR()
-      if (this._onReceiveLastContacts) {
-        client.off('ReceiveSendLastContacts', this._onReceiveLastContacts)
-      }
-      if (this._onReceiveMessage) {
-        client.off('ReceiveSendToUser', this._onReceiveMessage)
-      }
-      if (this._onReceiveUnreadCount) {
-        client.off('ReceiveSendUnreadCountToUser', this._onReceiveUnreadCount)
-      }
-      if (this._onReconnected) {
-        client.off('_connected', this._onReconnected)
+      try {
+        const client = getSignalR()
+        if (this._onReceiveLastContacts) {
+          client.off('ReceiveSendLastContacts', this._onReceiveLastContacts)
+          this._onReceiveLastContacts = null
+        }
+        if (this._onReceiveMessage) {
+          client.off('ReceiveSendToUser', this._onReceiveMessage)
+          this._onReceiveMessage = null
+        }
+        if (this._onReceiveUnreadCount) {
+          client.off('ReceiveSendUnreadCountToUser', this._onReceiveUnreadCount)
+          this._onReceiveUnreadCount = null
+        }
+        if (this._onReconnected) {
+          client.off('_connected', this._onReconnected)
+          this._onReconnected = null
+        }
+      } catch (e) {
+        console.warn('[Message] cleanupSignalREvents error:', e)
       }
     },
 

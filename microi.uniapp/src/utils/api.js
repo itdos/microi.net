@@ -119,7 +119,8 @@ export function getProductList({ pageIndex = 1, pageSize = 10, categoryId, keywo
   }
   // 价格区间筛选（同时匹配租赁价和现价）
   if (priceMin || priceMax) {
-    if (priceMin) {
+    if (priceMin && priceMax) {
+      // 两端都有：用一对 GroupStart/GroupEnd 包裹
       data._Where.push({
         AndOr: 'AND',
         GroupStart: true,
@@ -127,22 +128,29 @@ export function getProductList({ pageIndex = 1, pageSize = 10, categoryId, keywo
         Value: priceMin,
         Type: '>='
       })
-    }
-    if (priceMax) {
       data._Where.push({
         AndOr: 'AND',
         Name: 'ZulinXJ',
         Value: priceMax,
         Type: '<=',
-        GroupEnd: !priceMin ? false : true
+        GroupEnd: true
       })
-      if (!priceMin) {
-        // only max set
-        data._Where[data._Where.length - 1].GroupEnd = true
-      }
     } else if (priceMin) {
-      // only min set, close the group
-      data._Where[data._Where.length - 1].GroupEnd = true
+      // 只有最低价
+      data._Where.push({
+        AndOr: 'AND',
+        Name: 'ZulinXJ',
+        Value: priceMin,
+        Type: '>='
+      })
+    } else {
+      // 只有最高价
+      data._Where.push({
+        AndOr: 'AND',
+        Name: 'ZulinXJ',
+        Value: priceMax,
+        Type: '<='
+      })
     }
   }
   return post('/api/FormEngine/GetTableDataAnonymous', data, false)

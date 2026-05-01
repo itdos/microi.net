@@ -46,6 +46,15 @@ var result = V8.FormEngine.GetTableData('SysUser', {
 [['CreateTime', '>=', '2024-01-01'], ['AND', 'CreateTime', '<', '2024-02-01']]
 ```
 
+### 旧版 _Where 兼容（V8.Method.ParseWhere）
+
+老版本前端可能传旧格式（`{Name, Value, Type, AndOr, Group}`），转换成新格式：
+
+```javascript
+var newWhere = V8.Method.ParseWhere(V8.Param._Where);
+V8.FormEngine.GetTableData('Table', { _Where: newWhere });
+```
+
 ## 次选：V8.Db.FromSql（参数化占位符）
 
 当 `_Where` 无法满足复杂查询（多表 JOIN、子查询、聚合统计）时使用 `V8.Db`。

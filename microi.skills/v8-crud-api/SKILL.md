@@ -11,6 +11,33 @@
 - 返回结果统一格式：`{ Code: 1, Data: any, Msg: '成功' }`
 - 所有 FormEngine 方法在服务器端支持第三个参数传入 `V8.DbTrans`（事务对象）
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
+- 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
+
+## DosResult 状态码
+
+| Code | 含义 |
+|------|------|
+| `1` | 成功 |
+| `0` | 业务失败（自动回滚） |
+| `2` | `GetFormData` 数据不存在（特殊值，仍属正常查询）|
+| `1001` | Token 失效 |
+| `1002` | 身份验证失败 |
+
+```javascript
+// GetFormData Code=2 的处理
+var r = V8.FormEngine.GetFormData('Order', { Id: V8.Param.id });
+if (r.Code === 2) return { Code: 0, Msg: '订单不存在' };
+if (r.Code !== 1) return r;
+// r.Data 才是真实数据
+```
+
+## 全局日期函数
+
+```javascript
+DateNow('yyyy-MM-dd HH:mm:ss')                // 当前时间字符串
+DateFormat(new Date(), 'yyyy-MM-dd')          // 格式化
+DateAdd(new Date(), 'd', 7, 'yyyy-MM-dd')     // 加减（s/m/h/d/w/q/M/y）
+```
 
 ## 查询列表（分页）
 
@@ -209,6 +236,45 @@ V8.FormEngine.UptFormData('Table2', { Id: 'xxx', Status: 1 }, V8.DbTrans);
 
 // 调用其他接口引擎也可共享事务
 V8.ApiEngine.Run('other-engine-key', { Id: 'xxx' }, V8.DbTrans);
+```
+
+## 异步执行（不阻塞响应）
+
+```javascript
+// setTimeout：接口立即返回，后台继续执行
+setTimeout(function() {
+  V8.FormEngine.UptFormData('Order', { Id: V8.Param.id, SyncStatus: 'done' });
+  V8.Http.Post({ Url: 'https://other.com/notify', PostParam: {} });
+}, 100);
+
+return { Code: 1, Msg: '已接收，后台处理中' };
+```
+
+> 长任务（>30s）应改用 MQ 消费者模式，见 `v8-mq-mqtt/SKILL.md`
+
+## 动态加字段（运行时改表结构）
+
+```javascript
+V8.FormEngine.AddField({
+  TableName: 'diy_test',
+  Name: 'Age',
+  Type: 'int',          // varchar / nvarchar / int / decimal / datetime / text
+  Label: '年龄',
+  Component: 'NumberText',
+  TableWidth: '100',
+  Visible: 1
+});
+```
+
+> 风险：会执行 DDL（ALTER TABLE）。仅在低代码自定义配置场景使用，业务运行时**不要**频繁调用。
+
+## 旧版 _Where 兼容
+
+```javascript
+// 老版本前端 / 老接口可能传旧格式 _Where：[{ Name, Value, Type, AndOr, Group }, ...]
+// 转换成新格式：
+var newWhere = V8.Method.ParseWhere(V8.Param._Where);
+V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 ```
 
 ## _Where 条件语法速查
