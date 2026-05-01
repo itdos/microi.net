@@ -222,12 +222,18 @@ class SignalRClient {
     this.connecting = false
     this._handshakeDone = false
     this._messageBuffer = ''
+    // 复位握手 Promise resolver，避免 _doConnect 卡死
+    if (this._handshakeReject) {
+      try { this._handshakeReject(new Error('Disconnected')) } catch (e) {}
+    }
+    this._handshakeResolve = null
+    this._handshakeReject = null
 
     // 清理 pending calls
     for (const id of Object.keys(this._pendingCalls)) {
       const p = this._pendingCalls[id]
       clearTimeout(p.timer)
-      p.reject(new Error('Disconnected'))
+      try { p.reject(new Error('Disconnected')) } catch (e) {}
       delete this._pendingCalls[id]
     }
   }
@@ -282,6 +288,10 @@ class SignalRClient {
         const wasConnected = this.connected
         this.connected = false
         this.connecting = false
+        this._handshakeDone = false
+        this._messageBuffer = ''
+        // 释放 socketTask 引用，避免后续 _sendRaw 向已关闭 socket 发送
+        this.socketTask = null
         if (wasConnected && !this._destroyed) {
           this._emit('_disconnected')
           this._scheduleReconnect()
@@ -300,6 +310,10 @@ class SignalRClient {
 
   _sendRaw(data) {
     if (!this.socketTask) return
+    if (!this.connected && !this._handshakeResolve) {
+      // 既未连接、也不在握手阶段，避免向已关闭 socket 发送
+      return
+    }
     try {
       this.socketTask.send({ data })
     } catch (e) {
@@ -392,12 +406,12 @@ class SignalRClient {
 
   _startHeartbeat() {
     this._stopHeartbeat()
-    // 每 15 秒发送 Ping
+    // 每 30 秒发送 Ping（SignalR 默认 keepAlive 15s，30s 心跳足以保活并减轻流量）
     this._heartbeatTimer = setInterval(() => {
       if (this.connected) {
         this._sendRaw(JSON.stringify({ type: 6 }) + RS)
       }
-    }, 15000)
+    }, 30000)
   }
 
   _stopHeartbeat() {
@@ -411,6 +425,12 @@ class SignalRClient {
     if (this._destroyed) return
     this._clearReconnect()
 
+    // Token 已失效（用户已登出）则不再重连
+    if (!getToken()) {
+      console.warn('[SignalR] Skip reconnect: no token')
+      return
+    }
+
     if (this._reconnectAttempts >= this._maxReconnectAttempts) {
       console.warn('[SignalR] Max reconnect attempts reached')
       this._emit('_reconnectFailed')
@@ -422,7 +442,7 @@ class SignalRClient {
 
     console.log(`[SignalR] Reconnect in ${delay}ms (attempt ${this._reconnectAttempts})`)
     this._reconnectTimer = setTimeout(() => {
-      if (!this._destroyed && !this.connected && !this.connecting) {
+      if (!this._destroyed && !this.connected && !this.connecting && getToken()) {
         this.connect()
       }
     }, delay)

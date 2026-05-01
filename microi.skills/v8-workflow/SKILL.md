@@ -2,6 +2,39 @@
 
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。
 
+## 工作流物理表
+
+| 表名 | 说明 |
+|------|------|
+| `wf_flowdesign` | 流程设计（流程定义） |
+| `wf_node` | 流程节点 |
+| `wf_line` | 节点间连线/条件 |
+| `wf_flow` | 流程实例（一次发起对应一行） |
+| `wf_work` | 待办/已办工作 |
+| `wf_history` | 审批历史（每次同意/拒绝/撤回的记录） |
+
+直接 SQL 查询常用场景：
+
+```javascript
+// 我的待办
+var todo = V8.Db.FromSql(
+  'SELECT * FROM wf_work WHERE TodoUserId = @p0 AND Status = @p1 ORDER BY CreateTime DESC',
+  V8.CurrentUser.Id, 'Pending'
+).ToArray();
+
+// 我发起的
+var mine = V8.Db.FromSql(
+  'SELECT * FROM wf_flow WHERE CreateUserId = @p0 ORDER BY CreateTime DESC',
+  V8.CurrentUser.Id
+).ToArray();
+
+// 流程历史
+var history = V8.Db.FromSql(
+  'SELECT * FROM wf_history WHERE FlowId = @p0 ORDER BY CreateTime ASC',
+  V8.Param.flowId
+).ToArray();
+```
+
 ## 流程 V8 事件执行顺序
 
 1. 用户点击发起流程或处理工作

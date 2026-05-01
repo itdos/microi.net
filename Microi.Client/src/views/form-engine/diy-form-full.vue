@@ -144,6 +144,8 @@
                             :hideInlineSubmit="ShowWfTopSubmitBtn"
                             @submit-comment="SubmitComment"
                             @callback-start-work="CallbackStartWork"
+                            @refresh-data-log="LoadDataLog"
+                            @refresh-data-comment="LoadDataComment"
                         />
                     </el-col>
                 </el-row>
@@ -381,6 +383,8 @@
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
+                        @refresh-data-log="LoadDataLog"
+                        @refresh-data-comment="LoadDataComment"
                     />
                 </el-col>
             </el-row>
@@ -641,6 +645,8 @@
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
+                        @refresh-data-log="LoadDataLog"
+                        @refresh-data-comment="LoadDataComment"
                     />
                 </el-col>
             </el-row>
@@ -743,6 +749,8 @@
                 :isMobileDrawer="true"
                 @submit-comment="SubmitComment"
                 @callback-start-work="CallbackStartWork"
+                @refresh-data-log="LoadDataLog"
+                @refresh-data-comment="LoadDataComment"
             />
         </el-drawer>
     </div>
@@ -976,11 +984,14 @@ export default {
 
             // ========== 数据日志相关 ==========
             isCheckDataLog: true,
-            DataLogListLoading: true,
+            DataLogListLoading: false,
             DataLogList: [],
-            DataCommentListLoading: true,
+            DataCommentListLoading: false,
             DataCommentList: [],
             CommentContent: "",
+            // 防止重复请求 + 标记是否已加载（用于切换 Tab 时懒加载）
+            _DataLogLoadToken: 0,
+            _DataCommentLoadToken: 0,
 
             // ========== 全新页面模式相关 ==========
             SaveDiyTableCommonLoding: false,
@@ -1335,55 +1346,84 @@ export default {
                     self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                 });
 
-                // 加载数据日志（角色权限检查）
-                self.isCheckDataLog = false;
-                if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
-                    var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
-                    DataLogRole.forEach((item) => {
-                        if (self.GetCurrentUser.RoleIds && self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
-                            self.isCheckDataLog = true;
-                        }
-                    });
-                } else {
-                    self.isCheckDataLog = true;
-                }
-
-                if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
-                    self.DataLogListLoading = true;
-                    self.DataLogList = [];
-                    self.DiyCommon.FormEngine.GetTableData(
-                        {
-                            FormEngineKey: "microi_datalog",
-                            _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
-                        },
-                        function (result) {
-                            if (result.Code == 1) {
-                                result.Data.forEach((item) => {
-                                    if (item.Content) {
-                                        item.Content = JSON.parse(item.Content);
-                                    } else {
-                                        item.Content = [];
-                                    }
-                                    if (item.Avatar) {
-                                        item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                                    } else {
-                                        item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                    }
-                                });
-                                self.DataLogList = result.Data;
-                            } else {
-                                self.DataLogList = [];
-                            }
-                            self.DataLogListLoading = false;
-                        }
-                    );
-                }
-
-                // 加载数据评论
-                if (self.CurrentDiyTableModel.EnableDataComment) {
-                    self.GetCommentList();
-                }
+                // 加载数据日志 + 评论（角色权限校验在 LoadDataLog 内部完成）
+                self.LoadDataLog();
+                self.LoadDataComment();
             }
+        },
+
+        // ========== 加载数据日志（可重复调用：保存后、切换 Tab 时） ==========
+        LoadDataLog(force) {
+            var self = this;
+            // 角色权限检查
+            self.isCheckDataLog = false;
+            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
+                var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
+                DataLogRole.forEach((item) => {
+                    if (self.GetCurrentUser.RoleIds && self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
+                        self.isCheckDataLog = true;
+                    }
+                });
+            } else {
+                self.isCheckDataLog = true;
+            }
+
+            if (!self.CurrentDiyTableModel || !self.CurrentDiyTableModel.EnableDataLog || !self.isCheckDataLog) {
+                self.DataLogListLoading = false;
+                return;
+            }
+            if (self.DiyCommon.IsNull(self.TableRowId)) {
+                self.DataLogList = [];
+                self.DataLogListLoading = false;
+                return;
+            }
+
+            // token 机制：防止旧请求覆盖新结果
+            var token = ++self._DataLogLoadToken;
+            self.DataLogListLoading = true;
+            self.DiyCommon.FormEngine.GetTableData(
+                {
+                    FormEngineKey: "microi_datalog",
+                    _Where: [["DataId", "=", self.TableRowId]],
+                    _OrderBy: "CreateTime",
+                    _OrderByType: "DESC"
+                },
+                function (result) {
+                    // 旧请求被新请求覆盖，丢弃
+                    if (token !== self._DataLogLoadToken) return;
+                    try {
+                        if (result && result.Code == 1 && Array.isArray(result.Data)) {
+                            result.Data.forEach((item) => {
+                                if (item.Content) {
+                                    try { item.Content = JSON.parse(item.Content); } catch (e) { item.Content = []; }
+                                } else {
+                                    item.Content = [];
+                                }
+                                if (item.Avatar) {
+                                    item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
+                                } else {
+                                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+                                }
+                            });
+                            self.DataLogList = result.Data;
+                        } else {
+                            self.DataLogList = [];
+                        }
+                    } finally {
+                        self.DataLogListLoading = false;
+                    }
+                }
+            );
+        },
+
+        // ========== 加载数据评论（可重复调用） ==========
+        LoadDataComment() {
+            var self = this;
+            if (!self.CurrentDiyTableModel || !self.CurrentDiyTableModel.EnableDataComment) {
+                self.DataCommentListLoading = false;
+                return;
+            }
+            self.GetCommentList();
         },
 
         async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
@@ -1900,6 +1940,11 @@ export default {
                     } else {
                         //刷新子表
                         self.$refs.fieldForm.RefreshAllChildTable();
+                        // 表单未关闭：刷新右侧的"数据日志/数据评论"，让用户立即看到最新变更
+                        self.$nextTick(function () {
+                            try { self.LoadDataLog && self.LoadDataLog(); } catch (e) {}
+                            try { self.LoadDataComment && self.LoadDataComment(); } catch (e) {}
+                        });
                     }
 
                     self.$emit("CallbackGetDiyTableRow", formParam);
@@ -2406,27 +2451,38 @@ export default {
         },
         GetCommentList() {
             var self = this;
+            if (self.DiyCommon.IsNull(self.TableRowId)) {
+                self.DataCommentList = [];
+                self.DataCommentListLoading = false;
+                return;
+            }
+            var token = ++self._DataCommentLoadToken;
             self.DataCommentListLoading = true;
-            self.DataCommentList = [];
             self.DiyCommon.FormEngine.GetTableData(
                 {
                     FormEngineKey: "mic_data_comment",
-                    _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
+                    _Where: [["DataId", "=", self.TableRowId]],
+                    _OrderBy: "CreateTime",
+                    _OrderByType: "DESC"
                 },
                 function (result) {
-                    if (result.Code == 1) {
-                        result.Data.forEach((item) => {
-                            if (item.Avatar) {
-                                item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                            } else {
-                                item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                            }
-                        });
-                        self.DataCommentList = result.Data;
-                    } else {
-                        self.DataCommentList = [];
+                    if (token !== self._DataCommentLoadToken) return;
+                    try {
+                        if (result && result.Code == 1 && Array.isArray(result.Data)) {
+                            result.Data.forEach((item) => {
+                                if (item.Avatar) {
+                                    item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
+                                } else {
+                                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+                                }
+                            });
+                            self.DataCommentList = result.Data;
+                        } else {
+                            self.DataCommentList = [];
+                        }
+                    } finally {
+                        self.DataCommentListLoading = false;
                     }
-                    self.DataCommentListLoading = false;
                 }
             );
         },
