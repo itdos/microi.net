@@ -67,7 +67,7 @@ const click = () => {
   if (target === '_self') {
     window.location.href = url
   } else {
-    window.open(url)
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 }
 </script>

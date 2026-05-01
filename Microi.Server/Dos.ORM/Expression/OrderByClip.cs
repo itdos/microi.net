@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using Dos.ORM;
 using Dos.ORM.Common;
 
@@ -40,6 +41,29 @@ namespace Dos.ORM
     public class OrderByClip
     {
 
+        /// <summary>
+        /// 2026-05-01 安全加固：合法的排序字段名格式（防止 SQL 注入）。
+        /// 允许：字母 / 数字 / 下划线 / 点（用于 表名.字段名）/ 中括号 [] / 反引号 ` /
+        ///       双引号 " / 空格(用于"col asc"形式) / 逗号(多字段) / 大括号 {} 。
+        /// 大括号 {0}{1} 是 Dos.ORM 内部的标识符引用占位符（在 DataUtils.FormatSql 中按
+        /// 数据库类型替换为 `,[],"），并非用户输入，必须放行。
+        /// 同时保留对真正 SQL 注入字符（;、--、/*、*/、'）的拒绝。
+        /// </summary>
+        private static readonly Regex _validFieldNameRegex = new Regex(
+            @"^[\p{L}\p{N}_\.\[\]`""\s,\{\}]+$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// 验证字段名是否安全；不安全时抛异常。
+        /// </summary>
+        private static void EnsureSafeFieldName(string fieldName)
+        {
+            if (string.IsNullOrEmpty(fieldName)) return;
+            if (!_validFieldNameRegex.IsMatch(fieldName))
+            {
+                throw new ArgumentException($"OrderBy 字段名包含非法字符，已被安全策略阻止：{fieldName}");
+            }
+        }
 
         private Dictionary<string, OrderByOperater> orderByClip = new Dictionary<string, OrderByOperater>();
 
@@ -52,6 +76,7 @@ namespace Dos.ORM
 
         public OrderByClip(string fieldName, OrderByOperater orderBy)
         {
+            EnsureSafeFieldName(fieldName);
             orderByClip.Add(fieldName, orderBy);
         }
 

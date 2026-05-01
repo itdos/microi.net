@@ -139,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { getDashboardStats } from '../api'
 import * as echarts from 'echarts'
@@ -224,7 +224,19 @@ async function refreshData() {
 
 onMounted(() => {
   refreshData()
-  window.addEventListener('resize', () => chartInstance?.resize())
+  window.addEventListener('resize', onResize)
+})
+
+// 修复内存泄漏：使用命名函数以便卸载时 remove，且 dispose echarts 实例
+function onResize() {
+  chartInstance?.resize()
+}
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 </script>
 

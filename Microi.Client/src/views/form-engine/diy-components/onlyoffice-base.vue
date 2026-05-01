@@ -43,7 +43,7 @@ export default {
     mounted() {
         this.initOnlyOffice();
     },
-    beforeDestroy() {
+    beforeUnmount() {
         // 清理
         if (this.docEditor) {
             this.docEditor.destroyEditor();

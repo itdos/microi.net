@@ -15,7 +15,7 @@ const getUserStore = () => useUserStore(pinia);
 const service = axios.create({
     baseURL: import.meta.env.VITE_BASE_API, // url = base url + request url
     // withCredentials: true, // send cookies when cross-domain requests
-    timeout: 5000 // request timeout
+    timeout: 30000 // request timeout：原 5000ms 对上传/导出/AI 流式接口过短，提高到 30s
 });
 
 // request interceptor
@@ -53,31 +53,22 @@ service.interceptors.response.use(
     (response) => {
         const res = response.data;
 
-        // if the custom code is not 20000, it is judged as an error.
-        if (res.code !== 20000) {
+        // 修复：适配 Microi 后端返回格式 { Code: 1, Data, Msg }
+        // 原模板代码使用 res.code !== 20000 与实际不符，会导致所有请求被误报，且 Token 失效不能重登录。
+        if (res && res.Code !== 1) {
             Message({
-                message: res.message || "Error",
+                message: res.Msg || "Error",
                 type: "error",
                 duration: 5 * 1000
             });
 
-            // 50008: Illegal token; 50012: Other clients logged in; 50014: Token expired;
-            if (res.code === 50008 || res.code === 50012 || res.code === 50014) {
-                // to re-login
-                MessageBox.confirm("You have been logged out, you can cancel to stay on this page, or log in again", "Confirm logout", {
-                    confirmButtonText: "Re-Login",
-                    cancelButtonText: "Cancel",
-                    type: "warning"
-                }).then(() => {
-                    console.log("iTdos request response 50008：");
-                    console.log(error);
-                    const userStore = getUserStore();
-                    userStore.resetToken().then(() => {
-                        location.reload();
-                    });
-                });
+            // 1001: Token 失效; 1002: 身份验证失败
+            if (res.Code === 1001 || res.Code === 1002) {
+                if (DiyCommon && typeof DiyCommon.OpenLogin === "function") {
+                    DiyCommon.OpenLogin();
+                }
             }
-            return Promise.reject(new Error(res.message || "Error"));
+            return Promise.reject(new Error(res.Msg || "Error"));
         } else {
             return res;
         }

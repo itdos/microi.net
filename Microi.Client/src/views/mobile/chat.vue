@@ -58,7 +58,7 @@
                             </span>
 
                             <div v-if="msg.Type === 'data'" class="bubble bubble-data">
-                                <div v-html="renderDataTable(msg.Content)"></div>
+                                <div v-safe-html="renderDataTable(msg.Content)"></div>
                             </div>
 
                             <div
@@ -70,7 +70,7 @@
                                     <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
                                     正在思考
                                 </span>
-                                <span v-html="formatMessageContent(msg.Content || msg.content)"></span>
+                                <span v-safe-html="formatMessageContent(msg.Content || msg.content)"></span>
                                 <span v-if="msg.isStreaming && !msg.isThinking" class="typing-cursor">▋</span>
                             </div>
 

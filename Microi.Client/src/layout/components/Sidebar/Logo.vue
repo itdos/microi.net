@@ -110,7 +110,7 @@ export default {
             var self = this;
             if (!self.DiyCommon.IsNull(self.SysConfig.SysLogoLink)) {
                 if (self.SysConfig.SysLogoLink.indexOf("http") > -1) {
-                    window.open(self.SysConfig.SysLogoLink);
+                    window.open(self.SysConfig.SysLogoLink, "_blank", "noopener,noreferrer");
                     return;
                 }
                 self.$router.push(self.SysConfig.SysLogoLink);

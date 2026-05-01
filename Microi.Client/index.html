@@ -411,8 +411,13 @@
     <!-- 微信 JSSDK：支持小程序 WebView 内 H5 与小程序通信 -->
     <script>
       // 仅在小程序 WebView 环境下加载 JSSDK
+      // 安全修复：避免 document.write，改用动态 <script> 节点插入；同时使用明确版本 URL
       if (window.__wxjs_environment === 'miniprogram' || /source=miniprogram/.test(location.search)) {
-        document.write('<script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"><\/script>');
+        var s = document.createElement('script');
+        s.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js';
+        s.async = false;
+        s.crossOrigin = 'anonymous';
+        document.head.appendChild(s);
       }
     </script>
     <!-- 5+App (Wap2App) 环境：返回键 + 状态栏高度 -->

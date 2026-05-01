@@ -76,19 +76,35 @@ namespace Microi.net
                     {
                         claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
                     }
-                    catch (System.Exception)
+                    catch (System.Exception ex)
                     {
-
+                        // 2026-05-01 安全审计：记录 JWT 解析失败（可能是伪造、篡改或格式错误的 Token）
+                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】JWT 解析失败: {ex.Message}");
                     }
                 }
                 var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
 
-                //如果不对等，可能是B租户在调用A租户的公开接口，此时需要将CurrentUser置空
-                if(!tokenOsClient.DosIsNullOrWhiteSpace() 
-                    && !osClient.DosIsNullOrWhiteSpace() 
+                //2026-05-01 修复跨租户越权：如果 Token 中的 OsClient 与请求参数中的 OsClient 不一致，
+                //说明 B 租户携带 A 租户 Token 调用，必须清空登录身份强制按匿名处理（防止越权）。
+                //保留原 osClient（请求参数指定的租户），但当前用户身份不再生效。
+                if (!tokenOsClient.DosIsNullOrWhiteSpace()
+                    && !osClient.DosIsNullOrWhiteSpace()
                     && tokenOsClient != osClient)
                 {
-                    
+                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】跨租户调用：Token.OsClient={tokenOsClient}，请求 OsClient={osClient}，已清空当前用户身份");
+                    try
+                    {
+                        if (context.User?.Identity is ClaimsIdentity ci)
+                        {
+                            // 移除 ClaimsIdentity 中的所有 Claim，使后续 GetCurrentToken/GetCurrentUser 拿不到身份
+                            var allClaims = ci.Claims.ToList();
+                            foreach (var c in allClaims) ci.TryRemoveClaim(c);
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Console.WriteLine($"Microi：【⚠️安全】清空跨租户身份失败：{ex.Message}");
+                    }
                 }
 
                 if (osClient.DosIsNullOrWhiteSpace())

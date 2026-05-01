@@ -123,7 +123,7 @@
                                 </template>
                                 <div class="log-card">
                                     <div class="log-title">{{ item.Title }}</div>
-                                    <div class="log-comment-content" v-html="item.Content"></div>
+                                    <div class="log-comment-content" v-safe-html="item.Content"></div>
                                 </div>
                             </el-timeline-item>
                         </el-timeline>

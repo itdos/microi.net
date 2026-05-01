@@ -828,7 +828,7 @@ const updateSingleImageName = () => {
 const openImagePreview = (img) => {
     const imagePath = props.FormDiyTableModel[props.field.Name + '_' + img.Id + '_RealPath'];
     if (!DiyCommon.IsNull(imagePath) && imagePath !== './static/img/loading.gif') {
-        window.open(imagePath, '_blank');
+        window.open(imagePath, '_blank', 'noopener,noreferrer');
     }
 };
 

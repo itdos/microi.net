@@ -160,7 +160,7 @@
                 <h3 class="about-title">{{ systemName }}</h3>
                 <p class="about-version">{{ version }}</p>
                 <p class="about-company" v-if="companyName">{{ companyName }}</p>
-                <div v-if="loginBottomContent" class="about-footer" v-html="loginBottomContent"></div>
+                <div v-if="loginBottomContent" class="about-footer" v-safe-html="loginBottomContent"></div>
             </div>
         </el-dialog>
 

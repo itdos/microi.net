@@ -204,11 +204,11 @@
             v-for="item in langOptions"
             :key="item.value"
             class="lang-item"
-            :class="{ active: currentLang === item.value }"
+            :class="{ active: _currentLang === item.value }"
             @tap="changeLang(item.value)"
           >
             <text class="lang-name">{{ item.label }}</text>
-            <text class="lang-check" v-if="currentLang === item.value">✓</text>
+            <text class="lang-check" v-if="_currentLang === item.value">✓</text>
           </view>
         </view>
       </view>
@@ -291,8 +291,7 @@ export default {
         { i18nKey: 'profile.skyBlue',    fallback: '天蓝',  value: '#409EFF' },
         { i18nKey: 'profile.deepPurple', fallback: '深紫',  value: '#673AB7' }
       ],
-      // 语言
-      currentLang: 'zh-CN',
+      // 语言选项：当前语言使用 mixin 提供的 _currentLang
       langOptions: [
         { label: '中文', value: 'zh-CN' },
         { label: 'English', value: 'en' }
@@ -302,7 +301,7 @@ export default {
 
   computed: {
     currentLangName() {
-      const item = this.langOptions.find(l => l.value === this.currentLang)
+      const item = this.langOptions.find(l => l.value === this._currentLang)
       return item ? item.label : '中文'
     },
     // 主题色列表：通过 computed 生成 name，确保 i18n 切换后能响应式更新
@@ -349,7 +348,7 @@ export default {
     } catch (e) {}
     try {
       const savedLang = uni.getStorageSync('microi_language')
-      if (savedLang) this.currentLang = savedLang
+      if (savedLang) this._currentLang = savedLang
     } catch (e) {}
     this.loadSysConfig()
   },
@@ -405,7 +404,6 @@ export default {
 
     // 切换语言
     changeLang(lang) {
-      this.currentLang = lang
       this._currentLang = lang
       setLang(lang)
       this.showLangPanel = false

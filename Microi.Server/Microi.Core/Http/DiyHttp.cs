@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -22,6 +24,128 @@ namespace Microi.net
             ThrowOnAnyError = false,
             MaxTimeout = 300000 // 5分钟默认超时
         });
+
+        #region 2026-05-01 SSRF 防护
+        /// <summary>
+        /// 是否启用 SSRF（Server-Side Request Forgery）防护，默认开启。
+        /// 开启后会阻止 V8 脚本和接口引擎发起到 localhost / 私网 / 云元数据服务的 HTTP 请求。
+        /// 如需在内部场景显式访问内网，请通过 appsettings.json 设置 "DisableSsrfProtection":"true" 关闭，
+        /// 或将目标主机加入 SsrfAllowedHosts 白名单。
+        /// </summary>
+        private static readonly bool _ssrfProtectionEnabled =
+            !string.Equals(ConfigHelper.GetAppSettings("DisableSsrfProtection"), "true",
+                StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// SSRF 主机白名单（通过 appsettings.json "SsrfAllowedHosts" 逗号分隔配置）
+        /// </summary>
+        private static readonly HashSet<string> _ssrfAllowedHosts = new HashSet<string>(
+            (ConfigHelper.GetAppSettings("SsrfAllowedHosts") ?? "")
+                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().ToLowerInvariant())
+                .Where(s => !string.IsNullOrEmpty(s)),
+            StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// 校验 URL 是否被 SSRF 策略允许。返回 (allowed, reason)。
+        /// 防护策略：
+        ///   1. 仅允许 http/https 协议
+        ///   2. 阻止解析到私网/回环/链路本地/云元数据 IP 的目标
+        ///   3. 阻止 169.254.169.254（AWS/Azure/阿里云元数据服务）
+        ///   4. 显式白名单可绕过（通过 SsrfAllowedHosts 配置）
+        /// 注：DNS rebinding 攻击通过解析后再次校验真实 IP 缓解。
+        /// </summary>
+        private static (bool allowed, string reason) ValidateSsrfUrl(string url)
+        {
+            if (!_ssrfProtectionEnabled) return (true, null);
+            if (string.IsNullOrWhiteSpace(url)) return (false, "URL 为空");
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return (false, "URL 格式非法");
+            }
+            // 仅允许 HTTP(S)
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            {
+                return (false, $"不允许的协议: {uri.Scheme}");
+            }
+            var host = uri.Host?.ToLowerInvariant() ?? "";
+            // 显式白名单
+            if (_ssrfAllowedHosts.Contains(host)) return (true, null);
+
+            // 解析 IP（如果 host 已经是 IP 直接用；否则 DNS 查）
+            IPAddress[] addresses;
+            if (IPAddress.TryParse(host, out var directIp))
+            {
+                addresses = new[] { directIp };
+            }
+            else
+            {
+                // 阻止常见的 localhost 别名
+                if (host == "localhost" || host.EndsWith(".localhost", StringComparison.Ordinal))
+                {
+                    return (false, $"禁止访问回环地址: {host}");
+                }
+                try
+                {
+                    addresses = Dns.GetHostAddresses(host);
+                }
+                catch (Exception ex)
+                {
+                    return (false, $"DNS 解析失败: {ex.Message}");
+                }
+            }
+            foreach (var ip in addresses)
+            {
+                if (IsBlockedIp(ip))
+                {
+                    return (false, $"禁止访问内网/特殊地址: {host} -> {ip}");
+                }
+            }
+            return (true, null);
+        }
+
+        /// <summary>
+        /// 判断 IP 是否在禁用范围（回环 / 私网 / 链路本地 / 云元数据）
+        /// </summary>
+        private static bool IsBlockedIp(IPAddress ip)
+        {
+            if (ip == null) return false;
+            if (IPAddress.IsLoopback(ip)) return true;                     // 127.0.0.0/8, ::1
+            // AWS / Azure / 阿里云元数据服务
+            var ipStr = ip.ToString();
+            if (ipStr == "169.254.169.254" || ipStr == "100.100.100.200") return true;
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var bytes = ip.GetAddressBytes();
+                // 0.0.0.0/8
+                if (bytes[0] == 0) return true;
+                // 10.0.0.0/8
+                if (bytes[0] == 10) return true;
+                // 172.16.0.0/12
+                if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
+                // 192.168.0.0/16
+                if (bytes[0] == 192 && bytes[1] == 168) return true;
+                // 169.254.0.0/16 链路本地
+                if (bytes[0] == 169 && bytes[1] == 254) return true;
+                // 224.0.0.0/4 多播
+                if (bytes[0] >= 224 && bytes[0] <= 239) return true;
+            }
+            else if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal) return true;
+                if (ip.IsIPv6Multicast) return true;
+                // ULA fc00::/7
+                var bytes = ip.GetAddressBytes();
+                if ((bytes[0] & 0xfe) == 0xfc) return true;
+                // IPv4-mapped 检测
+                if (ip.IsIPv4MappedToIPv6)
+                {
+                    return IsBlockedIp(ip.MapToIPv4());
+                }
+            }
+            return false;
+        }
+        #endregion
 
         public DiyHttpParam DynamicToDiyHttpParam(dynamic dynamicParam)
         {
@@ -184,6 +308,15 @@ namespace Microi.net
         private RestClientAndRequest GetRestClientAndRequest(DiyHttpParam param)
         {
             //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
+
+            // 2026-05-01 SSRF 防护：在所有 HTTP 调用入口校验目标 URL，
+            // 拒绝访问 localhost / 私网 / 链路本地 / 云元数据服务等危险地址。
+            var (allowed, reason) = ValidateSsrfUrl(param.Url);
+            if (!allowed)
+            {
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】SSRF 防护拦截：{reason} (URL={param.Url})");
+                throw new InvalidOperationException($"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfAllowedHosts。");
+            }
 
             // 使用共享的 RestClient 实例，避免每次请求创建新实例导致 Socket 耗尽
             RestClient client = _sharedClient;

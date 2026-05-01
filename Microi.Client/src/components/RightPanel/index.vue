@@ -56,9 +56,11 @@ export default {
     mounted() {
         this.insertToBody();
     },
-    beforeDestroy() {
+    beforeUnmount() {
+        // 卸载前移除全局点击监听，避免内存泄漏
+        window.removeEventListener("click", this.closeSidebar);
         const elx = this.$refs.rightPanel;
-        elx.remove();
+        if (elx && elx.remove) elx.remove();
     },
     methods: {
         addEventClick() {

@@ -41,7 +41,7 @@ export default {
         // 加载表单数据
         await this.loadFormData();
     },
-    beforeDestroy() {
+    beforeUnmount() {
         // 移除所有事件监听
         this.removeEventListeners();
     },

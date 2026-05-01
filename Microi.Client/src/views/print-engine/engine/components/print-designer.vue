@@ -879,9 +879,12 @@ onMounted(async () => {
 
   // 接收父窗体跨域token
   messageHandler = async function (event) {
-    // if (event.origin !== '你的网址') {
-    //   return
-    // }
+    // 安全修复：限定同源，避免外部 origin 注入 token
+    try {
+      if (event.origin && event.origin !== window.location.origin && event.origin !== 'null') {
+        return
+      }
+    } catch (e) { return }
     let receivedData = event.data
     let token = receivedData?.iframeToken
     if (token) {
@@ -892,13 +895,23 @@ onMounted(async () => {
     // 父窗体有传数据过来
     let iframeFormData = receivedData?.iframeFormData
     if (iframeFormData) {
-      pageInfo.remoteData = JSON.parse(iframeFormData)
+      try {
+        pageInfo.remoteData = JSON.parse(iframeFormData)
+      } catch (e) {
+        console.warn('[print-designer] iframeFormData JSON 解析失败：', e && e.message)
+        return
+      }
 
       if (
         pageInfo.remoteData.PrintObj &&
         typeof pageInfo.remoteData.PrintObj === 'string'
       ) {
-        pageInfo.remoteData.PrintObj = JSON.parse(pageInfo.remoteData.PrintObj)
+        try {
+          pageInfo.remoteData.PrintObj = JSON.parse(pageInfo.remoteData.PrintObj)
+        } catch (e) {
+          console.warn('[print-designer] PrintObj JSON 解析失败：', e && e.message)
+          pageInfo.remoteData.PrintObj = null
+        }
       }
       buildDesigner() //重新builder
 

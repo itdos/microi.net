@@ -59,6 +59,9 @@ RegMicroiComponents(app);
 // 注册 drag 指令 (Vue 3 方式)
 import drag from "@/utils/dos.common";
 app.directive("drag", drag);
+// 注册安全 HTML 指令 v-safe-html，替代直接 v-html，防止 XSS
+import { SafeHtmlDirective } from "@/utils/safe-html";
+app.directive("safe-html", SafeHtmlDirective);
 // 注册 chat 组件 (Vue 3 方式)
 import chatComponents from "@/views/chat/components.js";
 app.use(chatComponents);
@@ -89,19 +92,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     icons[key] = markRaw(component);
 }
 app.config.globalProperties.$icons = icons;
-// 全局混入：让所有组件都能在模板中使用图标
-app.mixin({
-    computed: {
-        ...Object.fromEntries(
-            Object.entries(ElementPlusIconsVue).map(([key, value]) => [
-                key,
-                function () {
-                    return value;
-                }
-            ])
-        )
-    }
-});
+// 修复性能：原全局 mixin 会为每个组件实例挂上几百个 computed，启动与 HMR 明显变慢。
+// 现有 app.component(key, component) 注册 + globalProperties.$icons 已足够覆盖用法，删除 mixin。
+// 原代码：app.mixin({ computed: { ...Object.fromEntries(Object.entries(ElementPlusIconsVue).map(...)) } })
 // 导入图标兼容工具
 import { getIconComponent, convertIconName } from "./utils/icon-compat.js";
 // 全局方法：将旧版 el-icon-xxx 转换为图标组件

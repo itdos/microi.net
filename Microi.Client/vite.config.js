@@ -107,9 +107,25 @@ export default defineConfig({
             output: {
                 chunkFileNames: 'static/js/[name]-[hash].js',
                 entryFileNames: 'static/js/[name]-[hash].js',
-                assetFileNames: 'static/[ext]/[name]-[hash].[ext]'
-                // 🎯 使用 Vite 默认智能分割策略
-                // 自动按依赖关系分割，无循环依赖，压缩效果最佳
+                assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
+                // 优化：手动划分重量级依赖到独立 chunk，以提高浏览器缓存命中率、
+                // 避免所有重包集中进入主包。
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return
+                    if (id.includes('monaco-editor')) return 'monaco'
+                    if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
+                    if (id.includes('@visactor')) return 'vchart'
+                    if (id.includes('three')) return 'three'
+                    if (id.includes('fullcalendar') || id.includes('@fullcalendar')) return 'fullcalendar'
+                    if (id.includes('@wangeditor') || id.includes('@codemirror') || id.includes('codemirror')) return 'editors'
+                    if (id.includes('element-plus')) return 'element-plus'
+                    if (id.includes('@element-plus/icons-vue')) return 'element-icons'
+                    if (id.includes('@fortawesome')) return 'fontawesome'
+                    if (id.includes('dhtmlx-gantt')) return 'gantt'
+                    if (id.includes('@vue-office') || id.includes('xlsx')) return 'office'
+                    if (id.includes('html2canvas') || id.includes('jspdf')) return 'export'
+                    if (id.includes('lodash') || id.includes('underscore')) return 'utils'
+                }
             }
         }
     },
@@ -123,12 +139,9 @@ export default defineConfig({
             'echarts',
             'dayjs',
             'js-cookie',
-            'qs',
-            'monaco-editor/esm/vs/language/json/json.worker',
-            'monaco-editor/esm/vs/language/css/css.worker',
-            'monaco-editor/esm/vs/language/html/html.worker',
-            'monaco-editor/esm/vs/language/typescript/ts.worker',
-            'monaco-editor/esm/vs/editor/editor.worker'
+            'qs'
+            // 修复：monaco worker 通过 ?worker 后缀走 Vite 专用流水线，不应加入 optimizeDeps。
+            // 以前加入后会被预构建为常规 ES 模块，导致重复包与 MonacoEnvironment 状态变脱。
         ]
     },
     esbuild: {

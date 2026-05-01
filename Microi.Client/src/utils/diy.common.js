@@ -94,6 +94,24 @@ var DiyCommon = {
     PageSizes: [10, 15, 20, 30, 40, 50, 100], //, 200, 300, 500, 1000
     TokenKey: "Microi.Token",
     TokenExpiresKey: "Microi.Token.Expires",
+    // 401 重登录節流标志：避免并发请求 Token 同时失效时弹出 N 个登录框
+    _LoginPending: false,
+    /**
+     * 安全解析 JSON，避免裸 JSON.parse 抛错导致页面崩溃
+     * @param {*} str 待解析内容
+     * @param {*} fallback 解析失败时返回值，默认 null
+     */
+    SafeJsonParse: function (str, fallback) {
+        if (fallback === undefined) fallback = null;
+        if (str === null || str === undefined) return fallback;
+        if (typeof str !== "string") return str;
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            console.warn("[DiyCommon.SafeJsonParse] 解析失败：", e && e.message);
+            return fallback;
+        }
+    },
     OsClient: "",
     DefaultFieldNames: ["Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"], //"ParentId",
     SysDefaultField: [
@@ -1604,8 +1622,20 @@ var DiyCommon = {
                         console.log(error);
                         DiyCommon.setToken("");
                         removeToken();
-                        // 弹出登录
-                        DiyCommon.OpenLogin();
+                        // 弹出登录（并发节流：多个请求同时 401 只弹一次）
+                        if (!DiyCommon._LoginPending) {
+                            DiyCommon._LoginPending = true;
+                            try {
+                                var ret = DiyCommon.OpenLogin();
+                                if (ret && typeof ret.finally === "function") {
+                                    ret.finally(function () { DiyCommon._LoginPending = false; });
+                                } else {
+                                    setTimeout(function () { DiyCommon._LoginPending = false; }, 3000);
+                                }
+                            } catch (e) {
+                                DiyCommon._LoginPending = false;
+                            }
+                        }
                     }
                     DiyCommon.Tips(error.response.status + " " + error.message, false);
                 } else {
@@ -1703,8 +1733,20 @@ var DiyCommon = {
                         DiyCommon.setToken("");
                         removeToken();
 
-                        // 弹出登录
-                        DiyCommon.OpenLogin();
+                        // 弹出登录（并发节流）
+                        if (!DiyCommon._LoginPending) {
+                            DiyCommon._LoginPending = true;
+                            try {
+                                var ret = DiyCommon.OpenLogin();
+                                if (ret && typeof ret.finally === "function") {
+                                    ret.finally(function () { DiyCommon._LoginPending = false; });
+                                } else {
+                                    setTimeout(function () { DiyCommon._LoginPending = false; }, 3000);
+                                }
+                            } catch (e) {
+                                DiyCommon._LoginPending = false;
+                            }
+                        }
                         DiyCommon.Tips(error.response.status + " " + error.message, false);
                     } else {
                         DiyCommon.Tips(error.response.status + " " + error.message, false);
@@ -3541,6 +3583,11 @@ var DiyCommon = {
                     link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
                     document.body.appendChild(link);
                     link.click();
+                    // 修复内存泄漏：释放 Blob URL 与 DOM 节点
+                    setTimeout(() => {
+                        try { document.body.removeChild(link); } catch (e) {}
+                        try { window.URL.revokeObjectURL(url); } catch (e) {}
+                    }, 0);
                     if (callback) {
                         callback();
                     }
@@ -3932,7 +3979,8 @@ var DiyCommon = {
                 },
                 Window : {
                     Open: function (url) {
-                        window.open(url);
+                        // 安全修复：外部链接默认 noopener,noreferrer
+                        window.open(url, "_blank", "noopener,noreferrer");
                     }
                 },
                 Post : DiyCommon.Post,

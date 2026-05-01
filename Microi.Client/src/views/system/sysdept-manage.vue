@@ -353,11 +353,11 @@ export default {
             self.$nextTick(function () {
                 //self.FastClick.attach(document.querySelector(".layx-window"));
             });
-            if (self.Lang == "zh-CN") {
-                self.sysMenuTreeProps.lable = "Name";
-            } else {
-                self.sysMenuTreeProps.lable = "EnName";
-            }
+            // 修复：原来错误地写成 lable（拼写错误）；改为重新赋值整个对象以触发 el-tree 重渲染
+            self.sysMenuTreeProps = {
+                ...self.sysMenuTreeProps,
+                label: self.Lang == "zh-CN" ? "Name" : "EnName"
+            };
             // self.SetDiyFieldSort();
             self.GetTenantList();
         },

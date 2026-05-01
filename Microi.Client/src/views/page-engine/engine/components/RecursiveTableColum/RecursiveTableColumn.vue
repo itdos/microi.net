@@ -58,7 +58,7 @@
           v-model="scope.row[column.prop]"
         />
 
-        <span v-else v-html="scope.row[column.prop]" style="margin-left: 5px">
+        <span v-else v-safe-html="scope.row[column.prop]" style="margin-left: 5px">
         </span>
       </div>
     </template>

@@ -25,7 +25,7 @@
     </div>
     <div v-else>
         <!-- 预览模式 -->
-        <div v-html="modelValue"></div>
+        <div v-safe-html="modelValue"></div>
     </div>
 
     <!-- 配置弹窗 - 设计模式下可用 -->

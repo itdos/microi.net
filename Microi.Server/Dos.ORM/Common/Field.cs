@@ -142,6 +142,16 @@ namespace Dos.ORM
         public static readonly Field All = new Field("*");
 
         /// <summary>
+        /// 2026-05-01 性能优化：缓存 FieldName getter 计算结果。
+        /// Field 是不可变值对象（fieldName 一旦构造完不再变化），
+        /// 但 FieldName/TableName 在生成 SQL 时被高频访问（一次查询会被读 N 次）。
+        /// 缓存后 SELECT/WHERE/ORDER 字段读取从 7 次 IndexOf 降为 1 次字段读。
+        /// </summary>
+        private string _cachedFieldName;
+        private string _cachedTableName;
+        private string _cachedTableFieldName;
+
+        /// <summary>
         /// 值 
         /// </summary>
         //public object value;//2016-02-02新增
@@ -166,26 +176,37 @@ namespace Dos.ORM
         }
 
         /// <summary>
-        /// 返回 字段名
+        /// 返回 字段名（带 {0}{1} 占位符的形式，由 DataUtils.FormatSQL 在最终生成 SQL 时按数据库类型替换）
+        /// 2026-05-01：增加结果缓存，避免每次访问都执行 7 次 IndexOf 检查（热路径）。
         /// </summary>
         public string FieldName
         {
             get
             {
-                if (fieldName.Trim() == "*" || fieldName.IndexOf('\'') >= 0
-                    || fieldName.IndexOf('(') >= 0 || fieldName.IndexOf(')') >= 0
-                    || fieldName.Contains("{0}") || fieldName.Contains("{1}")
-                    || fieldName.IndexOf(" as ", StringComparison.OrdinalIgnoreCase) >= 0
-                    || fieldName.Contains("*")
-                    || fieldName.IndexOf("distinct ", StringComparison.OrdinalIgnoreCase) >= 0
-                    || fieldName.IndexOf('[') >= 0 || fieldName.IndexOf(']') >= 0
-                    || fieldName.IndexOf('"') >= 0 || fieldName.IndexOf('`') >= 0)
-                {
-                    return fieldName;
-                }
-
-                return string.Concat("{0}", fieldName, "{1}");
+                var cached = _cachedFieldName;
+                if (cached != null) return cached;
+                cached = ComputeFieldName(fieldName);
+                _cachedFieldName = cached;
+                return cached;
             }
+        }
+
+        private static string ComputeFieldName(string fieldName)
+        {
+            if (string.IsNullOrEmpty(fieldName)) return fieldName;
+            // 已有特殊字符（如表达式、别名、星号、关键字、已加引号）→ 不再额外加占位符
+            if (fieldName.Trim() == "*" || fieldName.IndexOf('\'') >= 0
+                || fieldName.IndexOf('(') >= 0 || fieldName.IndexOf(')') >= 0
+                || fieldName.Contains("{0}") || fieldName.Contains("{1}")
+                || fieldName.IndexOf(" as ", StringComparison.OrdinalIgnoreCase) >= 0
+                || fieldName.Contains("*")
+                || fieldName.IndexOf("distinct ", StringComparison.OrdinalIgnoreCase) >= 0
+                || fieldName.IndexOf('[') >= 0 || fieldName.IndexOf(']') >= 0
+                || fieldName.IndexOf('"') >= 0 || fieldName.IndexOf('`') >= 0)
+            {
+                return fieldName;
+            }
+            return string.Concat("{0}", fieldName, "{1}");
         }
 
 
@@ -196,10 +217,16 @@ namespace Dos.ORM
         {
             get
             {
+                var cached = _cachedTableName;
+                if (cached != null) return cached;
                 if (string.IsNullOrEmpty(tableName))
+                {
+                    _cachedTableName = tableName ?? "";
                     return tableName;
-
-                return string.Concat("{0}", tableName, "{1}");
+                }
+                cached = string.Concat("{0}", tableName, "{1}");
+                _cachedTableName = cached;
+                return cached;
             }
         }
 
@@ -252,16 +279,19 @@ namespace Dos.ORM
         }
 
         /// <summary>
-        /// 返回  表名.字段名
+        /// 返回  表名.字段名（缓存版）
         /// </summary>
         public string TableFieldName
         {
             get
             {
-                if (string.IsNullOrEmpty(tableName))
-                    return FieldName;
-
-                return string.Concat(TableName, ".", FieldName);
+                var cached = _cachedTableFieldName;
+                if (cached != null) return cached;
+                cached = string.IsNullOrEmpty(tableName)
+                    ? FieldName
+                    : string.Concat(TableName, ".", FieldName);
+                _cachedTableFieldName = cached;
+                return cached;
             }
         }
 

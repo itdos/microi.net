@@ -1116,6 +1116,14 @@ onMounted(async () => {
 onUnmounted(() => {
   // 移除键盘事件监听
   document.removeEventListener('keydown', handleKeyDown)
+  // 修复内存泄漏：dhtmlx-gantt 是全局单例，组件卸载时需手动解绑事件与清理数据，
+  // 否则下次进入页面时旧任务与事件链仍在，且上次组件 setup 闭包被事件持有。
+  try {
+    if (typeof gantt !== 'undefined' && gantt) {
+      if (typeof gantt.detachAllEvents === 'function') gantt.detachAllEvents()
+      if (typeof gantt.clearAll === 'function') gantt.clearAll()
+    }
+  } catch (e) {}
 })
 </script>
 

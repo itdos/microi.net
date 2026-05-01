@@ -14,7 +14,7 @@
 </template>
 
 <script setup name="line-widget">
-import { ref, watch, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
+import { ref, shallowRef, watch, onMounted, nextTick, onBeforeUnmount, computed } from 'vue'
 import * as echarts from 'echarts'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
@@ -38,7 +38,7 @@ const autoHeight = computed(() => {
   return props.widgetObj.widgetOption.height - searchHeight + 'px'
 })
 
-const chartSet = ref({})
+const chartSet = shallowRef({})
 chartSet.value = {
   title: {
     show: true,

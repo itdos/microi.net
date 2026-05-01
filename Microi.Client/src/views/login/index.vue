@@ -166,7 +166,7 @@
                             <span>立即绑定</span>
                         </el-button>
                     </p>
-                    <div class="bottom-content" v-html="LoginBottomContent"></div>
+                    <div class="bottom-content" v-safe-html="LoginBottomContent"></div>
                 </div>
             </div>
             <div class="divLoginTime">
@@ -185,7 +185,7 @@
                 :close-on-click-modal="false"
                 draggable
                 align-center>
-                <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
+                <div v-safe-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
             </el-dialog>
 
             <!-- 用户注册对话框 -->

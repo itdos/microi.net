@@ -3980,7 +3980,7 @@ export default {
                 self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
                 self.$emit("CallbackFormClose");
             } else {
-                window.open(url, "_blank");
+                window.open(url, "_blank", "noopener,noreferrer");
             }
         },
         //2025-02-12

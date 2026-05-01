@@ -153,9 +153,13 @@ let messageHandler = null
 onMounted(() => {
   // 接收父窗体跨域token
   messageHandler = function (event) {
-    // if (event.origin !== '你的网址') {
-    //   return
-    // }
+    // 安全修复：增加 origin 校验，仅信任与当前页面同源的来源
+    // 否则任意外部站点把本应用嵌为 iframe 即可发 postMessage 写入 Token，劫持会话。
+    try {
+      if (event.origin && event.origin !== window.location.origin && event.origin !== 'null') {
+        return
+      }
+    } catch (e) { return }
     let receivedData = event.data
     let token = receivedData?.iframeToken
     if (token) {
@@ -165,7 +169,13 @@ onMounted(() => {
     // 父窗体有传数据过来
     let iframeFormData = receivedData?.iframeFormData
     if (iframeFormData) {
-      let obj = JSON.parse(iframeFormData)
+      let obj
+      try {
+        obj = JSON.parse(iframeFormData)
+      } catch (e) {
+        console.warn('[form-designer] iframeFormData JSON 解析失败:', e && e.message)
+        return
+      }
       if (!obj.JsonObj || isEmpty(obj.JsonObj)) {
         obj.JsonObj = buildDefaultJsonObj()
       }

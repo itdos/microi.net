@@ -113,7 +113,7 @@ export const logout = () => {
  * @param url
  */
 export const openNewWindow = (url: string) => {
-  return window.open(url, '_blank')
+  return window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 /**

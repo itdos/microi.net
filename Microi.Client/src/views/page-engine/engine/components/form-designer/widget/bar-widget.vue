@@ -14,7 +14,7 @@
 </template>
 
 <script setup name="bar-widget">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
@@ -40,8 +40,8 @@ const autoHeight = computed(() => {
   return props.widgetObj.widgetOption.height - searchHeight + 'px'
 })
 
-//图表配置
-const chartSet = ref({
+//图表配置：使用 shallowRef 避免 echarts 配置大对象被深度 Proxy 化
+const chartSet = shallowRef({
   title: {
     text: '',
     subtext: '',

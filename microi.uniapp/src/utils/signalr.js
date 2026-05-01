@@ -177,6 +177,12 @@ class SignalRClient {
         this._handshakeReject = reject
         setTimeout(() => {
           if (!this._handshakeDone) {
+            // 握手超时主动关闭 socket，避免泄漏未握手的连接
+            try {
+              if (this.socketTask) {
+                this.socketTask.close({ code: 1011, reason: 'Handshake timeout' })
+              }
+            } catch (e) {}
             reject(new Error('Handshake timeout'))
           }
         }, 10000)

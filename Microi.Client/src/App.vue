@@ -160,7 +160,7 @@ export default {
             self.timers.push(timer);
         });
     },
-    beforeDestroy() {
+    beforeUnmount() {
         var self = this;
         // 清理窗口大小监听
         window.removeEventListener('resize', self.WindowResize);

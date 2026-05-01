@@ -221,14 +221,14 @@
                                             </div>
                                             <!-- 数据表格消息 -->
                                             <div v-else-if="chat.Type == 'data'" class="msg msg-data-table">
-                                                <div v-html="renderDataTable(chat.Content)"></div>
+                                                <div v-safe-html="renderDataTable(chat.Content)"></div>
                                             </div>
                                             <!-- 普通消息 -->
                                             <div v-else class="msg" :class="{ 'streaming-message': chat.isStreaming }">
                                                 <span v-if="chat.isThinking" class="thinking-indicator">
                                                     <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> 正在思考
                                                 </span>
-                                                <span v-else v-html="formatMessageContent(chat.Content)"></span>
+                                                <span v-else v-safe-html="formatMessageContent(chat.Content)"></span>
                                                 <span v-if="chat.isStreaming && !chat.isThinking" class="typing-cursor">▌</span>
                                             </div>
                                         </div>

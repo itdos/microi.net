@@ -242,7 +242,8 @@ export default {
             self.loadLang();
         }, 2000);
 
-        setInterval(function () {
+        // 保存定时器引用以便组件卸载时清理，防止内存泄漏
+        self._blinkTimer = setInterval(function () {
             self.ShowUnreadCount = !self.ShowUnreadCount;
         }, 700);
 
@@ -270,6 +271,11 @@ export default {
     beforeUnmount() {
         if (this._fullscreenChangeHandler) {
             document.removeEventListener('fullscreenchange', this._fullscreenChangeHandler);
+        }
+        // 清理未读计数闪烁定时器
+        if (this._blinkTimer) {
+            clearInterval(this._blinkTimer);
+            this._blinkTimer = null;
         }
     },
     methods: {
@@ -329,8 +335,18 @@ export default {
                 const dataToSend = {
                     iframeFormData: JSON.stringify(demoObj)
                 };
-                // 使用 postMessage 发送数据给 iframe
-                iframe.contentWindow.postMessage(dataToSend, "*");
+                // 安全修复：限定同源发送，避免 userSig 被任意第三方 origin 拦截
+                try {
+                    var iframeOrigin = window.location.origin;
+                    try {
+                        if (iframe && iframe.src) {
+                            iframeOrigin = new URL(iframe.src, window.location.href).origin;
+                        }
+                    } catch (_) { /* fallback to current origin */ }
+                    iframe.contentWindow.postMessage(dataToSend, iframeOrigin);
+                } catch (e) {
+                    console.warn('[Navbar] IM iframe postMessage 失败：', e && e.message);
+                }
             }
         },
         GetNavbarMicroiStyle() {

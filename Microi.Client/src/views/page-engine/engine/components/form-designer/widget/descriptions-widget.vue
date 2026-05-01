@@ -8,12 +8,12 @@
   >
     <!-- 使用具名插槽 title -->
     <template #title>
-      <span v-html="widgetObj.widgetParams[5]?.value"></span>
+      <span v-safe-html="widgetObj.widgetParams[5]?.value"></span>
     </template>
 
     <!-- 使用具名插槽 extra -->
     <template #extra>
-      <span v-html="widgetObj.widgetParams[6]?.value"></span>
+      <span v-safe-html="widgetObj.widgetParams[6]?.value"></span>
     </template>
 
     <template
@@ -27,7 +27,7 @@
         :label-align="item.labelAlign ? item.labelAlign : 'center'"
       >
         <template #label>
-          <span v-html="item.label"></span>
+          <span v-safe-html="item.label"></span>
         </template>
 
         <template #default>
@@ -61,7 +61,7 @@
             />
           </div>
 
-          <span v-else v-html="item.value" />
+          <span v-else v-safe-html="item.value" />
         </template>
       </el-descriptions-item>
     </template>

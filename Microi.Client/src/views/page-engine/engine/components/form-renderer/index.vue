@@ -206,9 +206,12 @@ onMounted(() => {
 
   // 接收父窗体跨域token 和 初始数据
   messageHandler = function (event) {
-    // if (event.origin !== '你的网址') {
-    //   return
-    // }
+    // 安全修复：增加 origin 校验，避免任意外部站点通过 iframe 嵌入注入 Token
+    try {
+      if (event.origin && event.origin !== window.location.origin && event.origin !== 'null') {
+        return
+      }
+    } catch (e) { return }
     let receivedData = event.data
     let token = receivedData?.iframeToken
     if (token) {

@@ -356,8 +356,12 @@ const handleMoreClick = () => {
       key: 'cartMoreLink',
       value: linkUrl,
     }
-    //iframe 通信
-    window.parent.postMessage(dataToSend, '*')
+    // iframe 通信（安全修复：限定同源父窗体，避免 targetOrigin = '*' 泄露）
+    try {
+      window.parent.postMessage(dataToSend, window.location.origin)
+    } catch (e) {
+      console.warn('[pannel-wrapper] postMessage 失败：', e && e.message)
+    }
     console.log('卡片连接跳转消息已发出:', dataToSend) // 添加日志输出
   } else {
     console.log('链接跳转已禁用')

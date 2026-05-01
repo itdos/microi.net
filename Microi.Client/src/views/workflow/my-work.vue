@@ -96,7 +96,7 @@
                         </el-table-column>
                         <el-table-column :label="'内容'" show-overflow-tooltip>
                             <template #default="scope">
-                                <span v-html="GetNotice(scope.row)"></span>
+                                <span v-safe-html="GetNotice(scope.row)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column :label="'发送人'" width="100">
@@ -106,7 +106,7 @@
                         </el-table-column>
                         <el-table-column :label="'节点名称'" show-overflow-tooltip width="120">
                             <template #default="scope">
-                                <span v-html="GetNodeName(scope.row)"></span>
+                                <span v-safe-html="GetNodeName(scope.row)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column :label="'发起人'" width="100">
@@ -153,12 +153,12 @@
                         </el-table-column>
                         <el-table-column :label="'内容'" show-overflow-tooltip>
                             <template #default="scope">
-                                <span v-html="GetNotice(scope.row)"></span>
+                                <span v-safe-html="GetNotice(scope.row)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column v-if="WorkType != 'Sender'" :label="'节点名称'" show-overflow-tooltip width="120">
                             <template #default="scope">
-                                <span v-html="GetNodeName(scope.row)"></span>
+                                <span v-safe-html="GetNodeName(scope.row)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column :label="'发起人'" width="100">
@@ -168,7 +168,7 @@
                         </el-table-column>
                         <el-table-column :label="'流程状态'" width="100">
                             <template #default="scope">
-                                <span v-html="GetFlowState(scope.row.FlowState)"></span>
+                                <span v-safe-html="GetFlowState(scope.row.FlowState)"></span>
                             </template>
                         </el-table-column>
                         <el-table-column :label="$t('Msg.CreateTime')" width="150">
@@ -232,7 +232,7 @@
                                     {{ item.FlowState == 'Running' ? '运行中' : item.FlowState == 'End' ? '已结束' : item.FlowState == 'Cancel' ? '已作废' : item.FlowState }}
                                 </el-tag>
                             </div>
-                            <div class="wf-card-body" v-html="GetNotice(item)"></div>
+                            <div class="wf-card-body" v-safe-html="GetNotice(item)"></div>
                             <div class="wf-card-meta">
                                 <span v-if="WorkType == 'Todo' && item.Sender" class="wf-card-meta-item">
                                     <fa-icon :icon="'fas fa-user'" class="wf-card-meta-icon" /> {{ item.Sender }}
@@ -316,7 +316,7 @@
                                 </div>
                                 <span class="notice-date">{{ (item.CreateTime || "").substring(0, 16) }}</span>
                             </div>
-                            <div class="notice-body" v-if="item._expanded" v-html="item.Neirong"></div>
+                            <div class="notice-body" v-if="item._expanded" v-safe-html="item.Neirong"></div>
                         </div>
                     </div>
                     <el-empty v-else :description="noticeLoading ? '加载中...' : '暂无公告'" />

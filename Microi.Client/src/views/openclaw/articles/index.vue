@@ -62,7 +62,7 @@
           <span class="oc-preview-model">模型: {{ previewData.LLMModel }}</span>
           <span>{{ previewData.WordCount }} 字</span>
         </div>
-        <div class="oc-preview-content" v-html="renderContent(previewData.Content)"></div>
+        <div class="oc-preview-content" v-safe-html="renderContent(previewData.Content)"></div>
         <div class="oc-preview-tags">
           <span v-for="tag in parseTags(previewData.Tags)" :key="tag" class="oc-tag-chip">{{ tag }}</span>
         </div>

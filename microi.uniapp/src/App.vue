@@ -6,6 +6,15 @@ export default {
   onLaunch() {
     console.log('App Launch')
     initializeThemeSystem()
+    // 全局错误兜底：避免未捕获错误导致小程序白屏
+    try {
+      uni.onError && uni.onError((err) => {
+        console.error('[App] uni.onError:', err)
+      })
+      uni.onUnhandledRejection && uni.onUnhandledRejection((res) => {
+        console.warn('[App] UnhandledRejection:', res && res.reason)
+      })
+    } catch (e) {}
   },
   onShow() {
     console.log('App Show')

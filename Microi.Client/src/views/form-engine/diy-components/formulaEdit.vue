@@ -98,7 +98,7 @@
                                 </span>
                             </div></template
                         >
-                        <div class="addCodeDetail" v-if="funTitle" v-html="funDetail"></div>
+                        <div class="addCodeDetail" v-if="funTitle" v-safe-html="funDetail"></div>
                         <div style="margin: -10px -20px" v-else>
                             <ul style="color: #5e6d82; font-size: 15px">
                                 <li style="margin-bottom: 5px">从左侧面板选择字段名和函数，或输入函数</li>

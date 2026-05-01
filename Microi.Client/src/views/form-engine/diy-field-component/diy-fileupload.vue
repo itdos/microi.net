@@ -574,7 +574,7 @@ const openCadPreview = (url, fileName, fileObj) => {
             (result) => {
                 if (DiyCommon.Result(result) && result.Data) {
                     const params = new URLSearchParams({ url: result.Data, name: fileName || '' });
-                    window.open(`#/mic/cad-preview?${params.toString()}`, '_blank');
+                    window.open(`#/mic/cad-preview?${params.toString()}`, '_blank', 'noopener,noreferrer');
                 } else {
                     DiyCommon.Tips('预览文件获取失败，可能文件尚未转换完成', false);
                 }
@@ -587,7 +587,7 @@ const openCadPreview = (url, fileName, fileObj) => {
         // 公开文件：直接用GetServerPath拼URL
         const previewUrl = DiyCommon.GetServerPath(previewStoragePath);
         const params = new URLSearchParams({ url: previewUrl, name: fileName || '' });
-        window.open(`#/mic/cad-preview?${params.toString()}`, '_blank');
+        window.open(`#/mic/cad-preview?${params.toString()}`, '_blank', 'noopener,noreferrer');
     }
 };
 
@@ -1001,7 +1001,7 @@ const GoUrl = (url) => {
     ) {
         emit('CallbackGoUrl', url);
     } else {
-        window.open(url, '_blank');
+        window.open(url, '_blank', 'noopener,noreferrer');
     }
 };
 
