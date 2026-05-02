@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { MicroiClient, DbTable, DbField } from './microi-client.js';
+import { registerAdvancedTools } from './advanced-tools.js';
 
 /** MCP Server 上下文（用于区分不同租户） */
 export interface McpServerContext {
@@ -118,6 +119,15 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
 5. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
 6. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
+
+## 更高一层编排与验收工具
+- **microi_plan_system** — 从完整 Manifest 生成干跑计划，不写入
+- **microi_generate_system** — 按 Manifest 一次性编排表、字段、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收；真实写入必须传 confirmExecution
+- **microi_validate_system** — 对生成结果做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流是否存在
+- **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
+- **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
+- **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
+- **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
 主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
@@ -456,9 +466,14 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         .record(z.unknown())
         .optional()
         .describe('Optional parameters to pass to the engine (available via V8.Param in the engine code)'),
+      confirmExecution: z.string().optional().describe('Required because engine execution may write data. Use apiEngineKey or EXECUTE.'),
     },
-    async ({ apiEngineKey, params }) => {
+    async ({ apiEngineKey, params, confirmExecution }) => {
       try {
+        if (confirmExecution !== apiEngineKey && confirmExecution !== 'EXECUTE') {
+          return { content: [{ type: 'text', text: `执行已拦截：microi_run_engine 可能产生写入或外部调用，请重新调用并传 confirmExecution="${apiEngineKey}" 或 "EXECUTE"。` }], isError: true };
+        }
+        await client.writeAuditLog('microi_run_engine', apiEngineKey, JSON.stringify(params || {}));
         const result = await client.executeEngine(apiEngineKey, params);
 
         const lines = [
@@ -931,6 +946,8 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       }
     },
   );
+
+  registerAdvancedTools(server, client, context);
 
   return server;
 }

@@ -328,6 +328,146 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListRoles(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            var result = await V8McpLogic.ListRoles(osClient, param?["Keyword"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveRole([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.SaveRole(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListModules(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            var result = await V8McpLogic.ListModules(osClient, param?["Keyword"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetModule(string osClient, string moduleId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            moduleId = moduleId ?? param?["ModuleId"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (moduleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
+            var result = await V8McpLogic.GetModule(osClient, moduleId);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateModule([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var moduleId = param["ModuleId"].Val<string>() ?? param["Id"].Val<string>();
+            if (moduleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
+            var result = await V8McpLogic.UpdateModule(osClient, moduleId, param);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListDataSources(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            var result = await V8McpLogic.ListDataSources(osClient, param?["Keyword"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveDataSource([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.SaveDataSource(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListPrintTemplates(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            var result = await V8McpLogic.ListPrintTemplates(osClient, param?["Keyword"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SavePrintTemplate([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.SavePrintTemplate(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveWorkflowPackage([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.SaveWorkflowPackage(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveJob([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.SaveJob(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ValidateLowCodeSystem([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.ValidateLowCodeSystem(osClient, param["Manifest"] as JObject ?? param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> WriteMcpAuditLog([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.WriteMcpAuditLog(osClient,
+                param["Action"].Val<string>(), param["Target"].Val<string>(), param["Content"].Val<string>(), token);
+            return Ok(result);
+        }
+
         #region 界面引擎（Page Engine）
 
         [HttpGet, HttpPost]

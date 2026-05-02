@@ -30,6 +30,22 @@ export const API = {
   ADD_FIELD: '/api/V8Engine/AddField',
   CREATE_MODULE: '/api/V8Engine/CreateModule',
   SET_ROLE_PERMISSION: '/api/V8Engine/SetRolePermission',
+  LIST_ROLES: '/api/V8Engine/ListRoles',
+  SAVE_ROLE: '/api/V8Engine/SaveRole',
+  LIST_MODULES: '/api/V8Engine/ListModules',
+  GET_MODULE: '/api/V8Engine/GetModule',
+  UPDATE_MODULE: '/api/V8Engine/UpdateModule',
+  LIST_DATA_SOURCES: '/api/V8Engine/ListDataSources',
+  SAVE_DATA_SOURCE: '/api/V8Engine/SaveDataSource',
+  LIST_PRINT_TEMPLATES: '/api/V8Engine/ListPrintTemplates',
+  SAVE_PRINT_TEMPLATE: '/api/V8Engine/SavePrintTemplate',
+  SAVE_WORKFLOW_PACKAGE: '/api/V8Engine/SaveWorkflowPackage',
+  SAVE_JOB: '/api/V8Engine/SaveJob',
+  VALIDATE_LOW_CODE_SYSTEM: '/api/V8Engine/ValidateLowCodeSystem',
+  WRITE_MCP_AUDIT_LOG: '/api/V8Engine/WriteMcpAuditLog',
+
+  // 原生引擎接口（用于验收/调试）
+  RUN_DATA_SOURCE: '/api/DataSourceEngine/Run',
 
   // 界面引擎（Page Engine）
   GET_PAGE_ENGINE_LIST: '/api/V8Engine/GetPageEngineList',
