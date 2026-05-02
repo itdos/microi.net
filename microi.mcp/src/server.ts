@@ -10,6 +10,30 @@ export interface McpServerContext {
   label: string;
 }
 
+function unwrapList<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (!data || typeof data !== 'object') return [];
+  const record = data as Record<string, unknown>;
+  if (Array.isArray(record.List)) return record.List as T[];
+  if (Array.isArray(record.Data)) return record.Data as T[];
+  return [];
+}
+
+function getStringField(data: unknown, ...keys: string[]): string {
+  if (!data || typeof data !== 'object') return '';
+  const record = data as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+}
+
+function includesKeyword(value: unknown, keyword?: string): boolean {
+  if (!keyword) return true;
+  return String(value || '').toLowerCase().includes(keyword.toLowerCase());
+}
+
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
 function formatDbTables(tables: DbTable[]): string {
   if (!tables.length) return 'No tables found.';
@@ -96,12 +120,12 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 6. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
 
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
-所有写入工具（microi_create_table / microi_add_field / microi_create_module / microi_create_engine）**已实现幂等 + 并发安全**：
+主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
 - 后端使用 Ulid 随机段（非时间戳）生成唯一 URL 后缀，碰撞自动重试最多 5 次
 - 重复 Name/字段会幂等返回 Skipped:true 而非报错
 - "已存在唯一值" 错误会自动重试并追加随机后缀
 **鼓励**：为同一张表批量添加 N 个字段时，可一次性发起 N 个并发 microi_add_field 调用以缩短总耗时；
-不同表的 microi_create_table 也可并发；菜单模块同理。
+不同表的 microi_create_table 也可并发；菜单模块同理。接口引擎请先 list/get 再 create，避免重复 ApiEngineKey。
 
 ## ⚖️ 何时创建接口引擎（microi_create_engine）
 **绑定了 diyTableId 的菜单模块已经自动具备完整的基础 CRUD**（新增/编辑/删除/列表/搜索/导入/导出），无需额外接口引擎。
@@ -354,7 +378,15 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
 
-        const engines = Array.isArray(result.Data) ? result.Data : [];
+        let engines = unwrapList<Record<string, unknown>>(result.Data);
+        if (keyword) {
+          engines = engines.filter((e) =>
+            includesKeyword(e.ApiEngineKey, keyword) ||
+            includesKeyword(e.ApiName, keyword) ||
+            includesKeyword(e.Category, keyword) ||
+            includesKeyword(e.ApiRemark, keyword),
+          );
+        }
         if (!engines.length) {
           return { content: [{ type: 'text', text: 'No engines found.' }] };
         }
@@ -365,7 +397,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           '|---|-----------|------|----------|-------------|',
         ];
         engines.forEach((e, i) => {
-          lines.push(`| ${i + 1} | ${e.ApiEngineKey} | ${e.ApiName || ''} | ${e.Category || ''} | ${e.Description || ''} |`);
+          lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${e.ApiRemark || e.Description || ''} |`);
         });
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -392,14 +424,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
 
         const engine = result.Data;
+        const code = getStringField(engine, 'ApiV8Code', 'Code', 'V8Code');
         const lines = [
           `## API Engine: ${engine?.ApiEngineKey || apiEngineKey}`,
           engine?.ApiName ? `- **Name**: ${engine.ApiName}` : '',
           engine?.Category ? `- **Category**: ${engine.Category}` : '',
           engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
+          engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
           '',
           '```javascript',
-          engine?.Code || '// No code available',
+          code || '// No code available',
           '```',
         ].filter(Boolean);
 
@@ -463,7 +497,15 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
 
-        const events = Array.isArray(result.Data) ? result.Data : [];
+        let events = unwrapList<Record<string, unknown>>(result.Data);
+        if (keyword) {
+          events = events.filter((ev) =>
+            includesKeyword(ev.FormEngineKey, keyword) ||
+            includesKeyword(ev.TableName, keyword) ||
+            includesKeyword(ev.Description, keyword) ||
+            includesKeyword(ev.EventType, keyword),
+          );
+        }
         if (!events.length) {
           return { content: [{ type: 'text', text: 'No events found.' }] };
         }
@@ -557,13 +599,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
 
         const event = result.Data;
+        const code = getStringField(event, 'V8Code', 'Code');
         const lines = [
           `## V8 Event: ${formEngineKey} / ${eventType}`,
+          event?.EventName ? `- **Name**: ${event.EventName}` : '',
+          event?.Description ? `- **Table**: ${event.Description}` : '',
           '',
           '```javascript',
-          event?.Code || '// No code available',
+          code || '// No code available',
           '```',
-        ];
+        ].filter(Boolean);
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       } catch (e: unknown) {
