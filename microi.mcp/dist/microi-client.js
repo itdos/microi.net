@@ -181,7 +181,7 @@ export class MicroiClient {
         return this.post(API.EXECUTE_ENGINE, {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
-            ...(params || {}),
+            Param: params || {},
         });
     }
     async saveEngineCode(apiEngineKey, code) {

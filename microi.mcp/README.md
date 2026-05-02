@@ -20,7 +20,7 @@
 
 ---
 
-## 提供的 AI 能力（10 个 Tools）
+## 提供的 AI 能力（17 个 Tools）
 
 | Tool | 功能 | 读/写 |
 |------|------|-------|
@@ -34,6 +34,13 @@
 | `microi_list_events` | 列出所有 V8 表单事件 | 只读 |
 | `microi_get_event_code` | 获取 V8 事件源码 | 只读 |
 | `microi_save_event_code` | 保存 V8 事件代码 | 读写 |
+| `microi_create_table` | 创建低代码自定义表（diy_table + 物理表） | 读写 |
+| `microi_add_field` | 为自定义表添加字段和表单控件配置 | 读写 |
+| `microi_create_module` | 创建菜单模块并绑定表、按钮、Tab、列表配置 | 读写 |
+| `microi_set_role_permission` | 为角色授予菜单权限 | 读写 |
+| `microi_list_pages` | 列出界面引擎页面 | 只读 |
+| `microi_get_page` | 获取界面引擎页面 JSON | 只读 |
+| `microi_save_page` | 创建或更新界面引擎页面 | 读写 |
 
 ---
 
@@ -223,6 +230,12 @@ AI：[调用 microi_list_engines] → 返回引擎列表
 
 你：执行一下 order-statistics 接口引擎
 AI：[调用 microi_run_engine] → 返回执行结果
+
+你：帮我生成一套 CRM 客户管理模块，包含客户表、字段、菜单和管理员权限
+AI：[调用 microi_get_db_schema → microi_create_table → microi_add_field → microi_create_module → microi_set_role_permission] → 平台中直接出现可用模块
+
+你：给订单列表增加“审核通过/驳回”行按钮，并把业务逻辑放到接口引擎
+AI：[调用 microi_create_engine → microi_create_module 或 microi_save_engine_code] → 生成按钮配置和后端 V8 逻辑
 ```
 
 ---
