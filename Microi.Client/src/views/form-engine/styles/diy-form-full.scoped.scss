@@ -1,0 +1,321 @@
+// 移动端表单页面样式（页面模式）
+.mobile-form-page {
+    padding: 0 10px !important;
+    background: var(--el-fill-color-light, #f5f7fa);
+    min-height: 100vh;
+    padding-top: calc(45px + var(--status-bar-height, 0px)) !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+
+    .el-row {
+        margin: 0 !important;
+    }
+
+    .el-col {
+        padding: 0 !important;
+    }
+
+    .mobile-form-header {
+        // PC端头部样式（在移动端可隐藏）
+        display: block;
+    }
+
+    .mobile-form-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+
+        .el-button {
+            margin: 0 !important;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+    }
+
+    :deep(.el-form) {
+        padding: 0px;
+
+        .el-form-item {
+            margin-bottom: 16px;
+        }
+
+        .el-form-item__label {
+            font-size: 13px;
+            color: var(--el-text-color-regular, #606266);
+        }
+
+        .el-input,
+        .el-select,
+        .el-textarea {
+            width: 100%;
+        }
+    }
+}
+.mobile-form-page.mini-program{
+    padding-top: calc(0px + var(--status-bar-height, 0px)) !important;
+}
+
+// 表单头部默认样式（页面模式）
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    background: var(--el-fill-color-light, linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%));
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+// 移动端顶部导航栏样式（页面模式）
+.mobile-form-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    padding-top: calc(12px + var(--status-bar-height, 0px));
+    background: var(--el-bg-color, #fff);
+    border-bottom: 1px solid var(--el-border-color-lighter, #f0f0f0);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+
+    .mobile-header-left,
+    .mobile-header-right {
+        // flex: 0 0 40px;
+        display: flex;
+        align-items: center;
+
+        .back-icon,
+        .more-icon {
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--el-text-color-primary, #333);
+
+            &:active {
+                opacity: 0.6;
+            }
+        }
+    }
+
+    .mobile-header-center {
+        flex: 1;
+        text-align: center;
+        overflow: hidden;
+
+        .mobile-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--el-text-color-primary, #333);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+    }
+
+    .mobile-header-right {
+        justify-content: flex-end;
+    }
+}
+
+// 移动端FAB浮动操作按钮样式（Page模式）
+.mobile-fab-container {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    z-index: 2000;
+}
+
+.mobile-fab-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+}
+
+.mobile-fab-btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary, #409eff), #267be0);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 26px;
+    z-index: 2002;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(64, 158, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+        transform: scale(0.92);
+        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+    }
+
+    &.is-open {
+        background: linear-gradient(135deg, #f56c6c, #e04040);
+        box-shadow: 0 4px 16px rgba(245, 108, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .mobile-fab-icon {
+        font-size: 26px;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+}
+
+.mobile-fab-menu {
+    position: absolute;
+    bottom: 66px;
+    right: 0;
+    z-index: 2001;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    padding-bottom: 4px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.mobile-fab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    animation: fabItemSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+
+    &:active {
+        opacity: 0.7;
+        transform: scale(0.96);
+    }
+}
+
+@for $i from 1 through 10 {
+    .mobile-fab-menu-item:nth-child(#{$i}) {
+        animation-delay: #{$i * 0.04}s;
+    }
+}
+
+.mobile-fab-menu-label {
+    background: var(--el-bg-color, #fff);
+    color: var(--el-text-color-primary, #333);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.mobile-fab-menu-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+
+    &.save {
+        background: linear-gradient(135deg, #f56c6c, #e04040);
+    }
+    &.edit {
+        background: linear-gradient(135deg, #409eff, #267be0);
+    }
+    &.cancel {
+        background: linear-gradient(135deg, #909399, #73767a);
+    }
+    &.v8 {
+        background: linear-gradient(135deg, #409eff, #267be0);
+    }
+    &.delete {
+        background: linear-gradient(135deg, #f56c6c, #c62828);
+    }
+}
+
+@keyframes fabItemSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.fab-overlay-enter-active {
+    transition: opacity 0.25s ease;
+}
+.fab-overlay-leave-active {
+    transition: opacity 0.2s ease;
+}
+.fab-overlay-enter-from,
+.fab-overlay-leave-to {
+    opacity: 0;
+}
+
+.fab-menu-enter-active {
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fab-menu-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.fab-menu-enter-from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+}
+.fab-menu-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+}
+
+// 移动端底部固定操作条（Page模式）
+.mobile-form-bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1900;
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--el-bg-color, #fff);
+    border-top: 1px solid var(--el-border-color-lighter, #f0f0f0);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+
+    .mobile-form-bottom-btn {
+        flex: 1;
+        height: 44px;
+        font-size: 15px;
+        border-radius: 8px;
+    }
+}

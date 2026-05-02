@@ -1,0 +1,197 @@
+@import "@/styles/diy-form.scss";
+
+/* ==================== 骨架屏样式 ==================== */
+.form-skeleton-container {
+    padding: 20px;
+}
+
+.form-skeleton {
+    .skeleton-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 24px;
+
+        .skeleton-field {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+}
+
+/* ==================== 设计器样式 ==================== */
+
+/* 设计模式下的字段样式 */
+.design-mode-field {
+    position: relative;
+    padding: 0px;
+    margin-bottom: 0px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--el-fill-color-light, #f5f7fa);
+
+        .drag-handle {
+            opacity: 1;
+        }
+
+        .width-resize-handle {
+            opacity: 1;
+        }
+    }
+}
+
+/* draggable 容器添加间距 */
+.draggable-with-gutter {
+    min-height: 50px;
+    :deep(.el-col) {
+        padding-left: 0px;
+        padding-right: 0px;
+        margin-bottom: 0px;
+    }
+}
+
+
+/* 选中状态的字段 */
+.selected-field {
+    outline: 2px solid var(--el-color-primary, #409EFF) !important;
+    // outline-offset: 2px;
+    background-color: var(--el-color-primary-light-9, #ecf5ff) !important;
+    border-radius: 4px;
+}
+
+/* 字段操作工具栏 */
+.field-toolbar {
+    position: absolute;
+    top: -45px;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--el-bg-color-overlay, white);
+    padding: 8px 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+
+    :deep(.el-button) {
+        padding: 6px;
+        height: 28px;
+        width: 28px;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    }
+
+    .width-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background-color: var(--el-fill-color-light, #f5f7fa);
+        border-radius: 4px;
+
+        .width-display {
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+            color: var(--el-color-primary, #409EFF);
+            font-size: 13px;
+        }
+
+        :deep(.el-button) {
+            padding: 4px;
+            min-height: 24px;
+        }
+    }
+}
+
+/* 拖拽手柄 */
+.drag-handle {
+    position: absolute;
+    // left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: move;
+    color: var(--el-color-primary, #409EFF);
+    font-size: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+
+    :deep(.el-icon) {
+        display: block;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        text-align: center;
+        background: var(--el-bg-color-overlay, white);
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &:hover {
+            color: var(--el-color-primary-light-3, #66b1ff);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+    }
+}
+
+/* 宽度调整手柄 */
+.width-resize-handle {
+    position: absolute;
+    right: -3px;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    background: linear-gradient(to right, transparent, var(--el-color-primary, #409EFF));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+
+    &:hover {
+        background: var(--el-color-primary, #409EFF);
+    }
+
+    &.resizing {
+        opacity: 1 !important;
+        background: var(--el-color-primary-light-3, #66b1ff);
+    }
+}
+
+/* vuedraggable 拖拽状态样式 */
+:deep(.sortable-ghost) {
+    opacity: 0.4;
+    background-color: var(--el-color-primary-light-7, #c8ebfb) !important;
+    border: 2px dashed var(--el-color-primary, #409EFF);
+}
+
+:deep(.sortable-drag) {
+    opacity: 0.8;
+    background-color: var(--el-bg-color-overlay, white);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    transform: rotate(2deg);
+}
+
+/* 拖拽时的占位符 */
+:deep(.sortable-chosen) {
+    cursor: move;
+}
+/* 针对移动端，启用原生滚动 */
+@media (max-width: 768px) {
+  :deep(.el-tabs__nav-scroll) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+    scrollbar-width: none; /* Firefox 隐藏滚动条 */
+  }
+
+  :deep(.el-tabs__nav-scroll::-webkit-scrollbar) {
+    display: none; /* Chrome/Safari 隐藏滚动条 */
+  }
+
+  :deep(.el-tabs__nav) {
+    flex-wrap: nowrap;
+  }
+}

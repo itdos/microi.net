@@ -23,6 +23,15 @@ export interface ApiResponse<T = unknown> {
   Data: T;
   Msg: string;
   Total?: number;
+  DataCount?: number;
+}
+
+export interface ListEnvelope<T> {
+  OsClient?: string;
+  OsClientType?: string;
+  OsClientNetwork?: string;
+  List?: T[];
+  Total?: number;
 }
 
 export interface DbTable {
@@ -49,8 +58,11 @@ export interface ApiEngine {
   ApiEngineKey: string;
   ApiAddress: string;
   Category: string;
-  Code: string;
+  ApiV8Code?: string;
+  Code?: string;
+  ApiRemark?: string;
   Description?: string;
+  UpdateTime?: string;
 }
 
 export interface V8Event {
@@ -58,8 +70,11 @@ export interface V8Event {
   FormEngineKey: string;
   Description: string;
   EventType: string;
-  Code: string;
+  EventName?: string;
+  V8Code?: string;
+  Code?: string;
   TableName?: string;
+  UpdateTime?: string;
 }
 
 /**
@@ -237,7 +252,7 @@ export class MicroiClient {
     });
   }
 
-  async getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[]>> {
+  async getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>> {
     return this.post(API.GET_ENGINE_LIST, {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
@@ -291,7 +306,7 @@ export class MicroiClient {
     });
   }
 
-  async getEventList(keyword?: string): Promise<ApiResponse<V8Event[]>> {
+  async getEventList(keyword?: string): Promise<ApiResponse<V8Event[] | ListEnvelope<V8Event>>> {
     return this.post(API.GET_EVENT_LIST, {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
