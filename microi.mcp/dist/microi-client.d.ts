@@ -169,6 +169,20 @@ export declare class MicroiClient {
         CardBottomTagFields?: string;
     }): Promise<ApiResponse>;
     setRolePermission(roleId: string, menuIds: string[]): Promise<ApiResponse>;
+    listRoles(keyword?: string): Promise<ApiResponse>;
+    saveRole(data: Record<string, unknown>): Promise<ApiResponse>;
+    listModules(keyword?: string): Promise<ApiResponse>;
+    getModule(moduleId: string): Promise<ApiResponse>;
+    updateModule(data: Record<string, unknown>): Promise<ApiResponse>;
+    listDataSources(keyword?: string): Promise<ApiResponse>;
+    saveDataSource(data: Record<string, unknown>): Promise<ApiResponse>;
+    runDataSource(dataSourceKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;
+    listPrintTemplates(keyword?: string): Promise<ApiResponse>;
+    savePrintTemplate(data: Record<string, unknown>): Promise<ApiResponse>;
+    saveWorkflowPackage(data: Record<string, unknown>): Promise<ApiResponse>;
+    saveJob(data: Record<string, unknown>): Promise<ApiResponse>;
+    validateLowCodeSystem(manifest: Record<string, unknown>): Promise<ApiResponse>;
+    writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse>;
     getPageEngineList(keyword?: string): Promise<ApiResponse>;
     getPageEngineDetail(pageId: string): Promise<ApiResponse>;
     savePageEngine(data: {

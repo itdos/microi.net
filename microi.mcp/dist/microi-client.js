@@ -246,6 +246,93 @@ export class MicroiClient {
             MenuIds: menuIds,
         });
     }
+    async listRoles(keyword) {
+        return this.post(API.LIST_ROLES, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async saveRole(data) {
+        return this.post(API.SAVE_ROLE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async listModules(keyword) {
+        return this.post(API.LIST_MODULES, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async getModule(moduleId) {
+        return this.post(API.GET_MODULE, {
+            OsClient: this.config.osClient,
+            ModuleId: moduleId,
+        });
+    }
+    async updateModule(data) {
+        return this.post(API.UPDATE_MODULE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async listDataSources(keyword) {
+        return this.post(API.LIST_DATA_SOURCES, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async saveDataSource(data) {
+        return this.post(API.SAVE_DATA_SOURCE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async runDataSource(dataSourceKey, params) {
+        return this.post(API.RUN_DATA_SOURCE, {
+            OsClient: this.config.osClient,
+            DataSourceKey: dataSourceKey,
+            ...(params || {}),
+        });
+    }
+    async listPrintTemplates(keyword) {
+        return this.post(API.LIST_PRINT_TEMPLATES, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async savePrintTemplate(data) {
+        return this.post(API.SAVE_PRINT_TEMPLATE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async saveWorkflowPackage(data) {
+        return this.post(API.SAVE_WORKFLOW_PACKAGE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async saveJob(data) {
+        return this.post(API.SAVE_JOB, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async validateLowCodeSystem(manifest) {
+        return this.post(API.VALIDATE_LOW_CODE_SYSTEM, {
+            OsClient: this.config.osClient,
+            Manifest: manifest,
+        });
+    }
+    async writeAuditLog(action, target, content) {
+        return this.post(API.WRITE_MCP_AUDIT_LOG, {
+            OsClient: this.config.osClient,
+            Action: action,
+            Target: target,
+            Content: content,
+        });
+    }
     // ---------- 界面引擎 API 方法 ----------
     async getPageEngineList(keyword) {
         return this.post(API.GET_PAGE_ENGINE_LIST, {
