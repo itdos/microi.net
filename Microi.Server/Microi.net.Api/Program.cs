@@ -1,6 +1,7 @@
 //【MacOS VS Code】折叠代码快捷键：【command + K + 0】
 
 #region using
+using System.Text;
 using System.Diagnostics;
 using Dos.Common;
 using Microi.net;
@@ -22,6 +23,10 @@ using StackExchange.Redis;
 using Newtonsoft.Json.Linq;
 #endregion
 
+// 调试/集成终端下中文与 emoji 输出更稳定（Windows 默认代码页易导致乱码）
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+
 // ⚙️ 注册Console输出拦截器，捕获所有Console.WriteLine到内存环形缓冲区（用于系统监控-应用日志）
 Console.SetOut(new Microi.net.ConsoleLogInterceptor(Console.Out));
 
@@ -34,6 +39,10 @@ Environment.SetEnvironmentVariable("DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HT
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】HTTP/2非加密支持已启用");
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine(
+    $"Microi：【诊断】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】EnvironmentName={builder.Environment.EnvironmentName}，" +
+    "ASPNETCORE_ENVIRONMENT=" + (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "(null)") + "，" +
+    "DOTNET_ENVIRONMENT=" + (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "(null)"));
 
 #region Microi.net 初始化
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
@@ -329,7 +338,7 @@ app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromMinutes(20)
 });
-app.UseMiddleware<Microi.net.Api.V8DebugWebSocketMiddleware>(); // V8 逐行调试 WebSocket
+app.UseMiddleware<V8DebugWebSocketMiddleware>(); // V8 逐行调试 WebSocket
 if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 {
     app.UseSwagger();
@@ -381,7 +390,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
-Console.WriteLine($"------------------------------------------------------------------------------");
-Console.WriteLine($"------------------------------------------------------------------------------");
+Console.WriteLine("------------------------------------------------------------------------------");
+Console.WriteLine("------------------------------------------------------------------------------");
 
 app.Run();
