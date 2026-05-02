@@ -642,7 +642,8 @@ namespace Microi.net
             "SubmitFormV8",
             "ServerDataV8",
             "InFormV8",
-            "OutFormV8"
+            "OutFormV8",
+            "DataFilterV8"
         };
 
         /// <summary>
@@ -656,6 +657,7 @@ namespace Microi.net
             "ServerDataV8" => "服务器端数据",
             "InFormV8" => "进入表单",
             "OutFormV8" => "离开表单",
+            "DataFilterV8" => "数据过滤/脱敏",
             _ => field
         };
 
@@ -816,7 +818,7 @@ namespace Microi.net
         /// </summary>
         private static readonly string[] ValidEventTypes = new[] {
             "SubmitBeforeServerV8", "SubmitAfterServerV8", "SubmitFormV8",
-            "ServerDataV8", "InFormV8", "OutFormV8"
+            "ServerDataV8", "InFormV8", "OutFormV8", "DataFilterV8"
         };
 
         /// <summary>
@@ -1407,6 +1409,12 @@ namespace Microi.net
                     effectiveConfig = configJson;
                 }
 
+                if (!string.IsNullOrWhiteSpace(effectiveConfig))
+                {
+                    var configCheck = ValidateJsonIfPresent("Config", effectiveConfig);
+                    if (!configCheck.Ok) return new DosResult<object>(0, null, configCheck.Msg);
+                }
+
                 var fieldParam = new DiyFieldParam
                 {
                     OsClient = osClient,
@@ -1586,6 +1594,20 @@ namespace Microi.net
                     }
                 }
 
+                var buttonWarnings = new List<string>();
+                var moreBtnsNormalized = NormalizeMenuJsonArray("MoreBtns", moreBtns, buttonWarnings);
+                if (!moreBtnsNormalized.Ok) return new DosResult<object>(0, null, moreBtnsNormalized.Msg);
+                var formBtnsNormalized = NormalizeMenuJsonArray("FormBtns", formBtns, buttonWarnings);
+                if (!formBtnsNormalized.Ok) return new DosResult<object>(0, null, formBtnsNormalized.Msg);
+                var batchBtnsNormalized = NormalizeMenuJsonArray("BatchSelectMoreBtns", batchSelectMoreBtns, buttonWarnings);
+                if (!batchBtnsNormalized.Ok) return new DosResult<object>(0, null, batchBtnsNormalized.Msg);
+                var pageTabsNormalized = NormalizeMenuJsonArray("PageTabs", pageTabs, buttonWarnings);
+                if (!pageTabsNormalized.Ok) return new DosResult<object>(0, null, pageTabsNormalized.Msg);
+                var exportBtnsNormalized = NormalizeMenuJsonArray("ExportMoreBtns", exportMoreBtns, buttonWarnings);
+                if (!exportBtnsNormalized.Ok) return new DosResult<object>(0, null, exportBtnsNormalized.Msg);
+                var pageBtnsNormalized = NormalizeMenuJsonArray("PageBtns", pageBtns, buttonWarnings);
+                if (!pageBtnsNormalized.Ok) return new DosResult<object>(0, null, pageBtnsNormalized.Msg);
+
                 var menuData = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -1611,12 +1633,12 @@ namespace Microi.net
                 if (!string.IsNullOrWhiteSpace(sqlWhere)) menuData["SqlWhere"] = sqlWhere;
                 if (!string.IsNullOrWhiteSpace(diyConfig)) menuData["DiyConfig"] = diyConfig;
                 // 业务按钮 / 高级配置（统一存为 sys_menu 的 JSON 字符串列）
-                if (!string.IsNullOrWhiteSpace(moreBtns)) menuData["MoreBtns"] = moreBtns;
-                if (!string.IsNullOrWhiteSpace(formBtns)) menuData["FormBtns"] = formBtns;
-                if (!string.IsNullOrWhiteSpace(batchSelectMoreBtns)) menuData["BatchSelectMoreBtns"] = batchSelectMoreBtns;
-                if (!string.IsNullOrWhiteSpace(pageTabs)) menuData["PageTabs"] = pageTabs;
-                if (!string.IsNullOrWhiteSpace(exportMoreBtns)) menuData["ExportMoreBtns"] = exportMoreBtns;
-                if (!string.IsNullOrWhiteSpace(pageBtns)) menuData["PageBtns"] = pageBtns;
+                if (!string.IsNullOrWhiteSpace(moreBtnsNormalized.Value)) menuData["MoreBtns"] = moreBtnsNormalized.Value;
+                if (!string.IsNullOrWhiteSpace(formBtnsNormalized.Value)) menuData["FormBtns"] = formBtnsNormalized.Value;
+                if (!string.IsNullOrWhiteSpace(batchBtnsNormalized.Value)) menuData["BatchSelectMoreBtns"] = batchBtnsNormalized.Value;
+                if (!string.IsNullOrWhiteSpace(pageTabsNormalized.Value)) menuData["PageTabs"] = pageTabsNormalized.Value;
+                if (!string.IsNullOrWhiteSpace(exportBtnsNormalized.Value)) menuData["ExportMoreBtns"] = exportBtnsNormalized.Value;
+                if (!string.IsNullOrWhiteSpace(pageBtnsNormalized.Value)) menuData["PageBtns"] = pageBtnsNormalized.Value;
                 if (!string.IsNullOrWhiteSpace(sortFieldIds)) menuData["SortFieldIds"] = sortFieldIds;
                 if (!string.IsNullOrWhiteSpace(notShowFields)) menuData["NotShowFields"] = notShowFields;
                 if (!string.IsNullOrWhiteSpace(sqlJoin)) menuData["SqlJoin"] = sqlJoin;
@@ -1659,7 +1681,8 @@ namespace Microi.net
                         Message = $"功能模块 [{name}] 创建成功",
                         ModuleId = id,
                         DiyTableId = diyTableId,
-                        Url = effectiveUrl
+                        Url = effectiveUrl,
+                        Warnings = buttonWarnings
                     });
                 }
 
@@ -1858,6 +1881,637 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return new DosResult<object>(0, null, "保存界面引擎失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
+        #region MCP 高级建模与验收
+
+        private static readonly string[] MenuJsonArrayFields = new[]
+        {
+            "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns"
+        };
+
+        private static string TruncateForLog(string value, int maxLength = 4000)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
+        }
+
+        private static JToken CloneToken(JToken token)
+        {
+            return token == null ? null : token.DeepClone();
+        }
+
+        private static string ToJsonString(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null) return "";
+            if (token.Type == JTokenType.String) return token.Val<string>() ?? "";
+            return token.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private static (bool Ok, string Value, string Msg) NormalizeMenuJsonArray(string fieldName, string rawValue, List<string> warnings = null)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue)) return (true, rawValue ?? "", "");
+            JArray array;
+            try
+            {
+                array = JArray.Parse(rawValue);
+            }
+            catch (Exception ex)
+            {
+                return (false, rawValue, $"{fieldName} 必须是 JSON 数组：{ex.Message}");
+            }
+
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < array.Count; i++)
+            {
+                if (!(array[i] is JObject item))
+                {
+                    return (false, rawValue, $"{fieldName}[{i}] 必须是 JSON 对象");
+                }
+
+                var name = item["Name"].Val<string>();
+                if (name.DosIsNullOrWhiteSpace()) return (false, rawValue, $"{fieldName}[{i}].Name 不能为空");
+
+                var v8Code = item["V8Code"].Val<string>();
+                var url = item["Url"].Val<string>();
+                if (v8Code.DosIsNullOrWhiteSpace() && url.DosIsNullOrWhiteSpace())
+                {
+                    return (false, rawValue, $"{fieldName}[{i}] 必须配置 V8Code 或 Url");
+                }
+
+                var id = item["Id"].Val<string>();
+                if (id.DosIsNullOrWhiteSpace())
+                {
+                    id = Ulid.NewUlid().ToString();
+                    item["Id"] = id;
+                    warnings?.Add($"{fieldName}[{i}] 未传 Id，已自动生成 {id}");
+                }
+                if (!ids.Add(id)) return (false, rawValue, $"{fieldName} 中存在重复 Id：{id}");
+
+                if (item["Sort"] == null) item["Sort"] = i * 10;
+                if (item["IsVisible"] == null) item["IsVisible"] = true;
+                if (fieldName == "MoreBtns" && item["ShowRow"] == null) item["ShowRow"] = true;
+
+                var codeShow = item["V8CodeShow"].Val<string>();
+                if (!codeShow.DosIsNullOrWhiteSpace() && !codeShow.Contains("V8.Result"))
+                {
+                    warnings?.Add($"{fieldName}[{i}].V8CodeShow 建议显式赋值 V8.Result=true/false");
+                }
+            }
+
+            return (true, array.ToString(Newtonsoft.Json.Formatting.None), "");
+        }
+
+        private static (bool Ok, string Msg) ValidateJsonIfPresent(string fieldName, string rawValue, bool arrayOnly = false)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue)) return (true, "");
+            try
+            {
+                var token = JToken.Parse(rawValue);
+                if (arrayOnly && token.Type != JTokenType.Array)
+                {
+                    return (false, $"{fieldName} 必须是 JSON 数组");
+                }
+                return (true, "");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"{fieldName} 不是合法 JSON：{ex.Message}");
+            }
+        }
+
+        private static JObject BuildDataFromParam(string osClient, JObject param, IEnumerable<string> fields, string id = null)
+        {
+            var data = new JObject
+            {
+                ["OsClient"] = osClient,
+                ["_InvokeType"] = "Client"
+            };
+            if (!id.DosIsNullOrWhiteSpace()) data["Id"] = id;
+            else if (param["Id"] != null) data["Id"] = CloneToken(param["Id"]);
+
+            foreach (var field in fields)
+            {
+                if (param[field] != null) data[field] = CloneToken(param[field]);
+            }
+            return data;
+        }
+
+        private static async Task<DosResult<object>> UpsertRecordByIdOrKey(
+            string osClient, string tableName, JObject data, string uniqueField, string displayName)
+        {
+            var id = data["Id"].Val<string>();
+            if (!id.DosIsNullOrWhiteSpace())
+            {
+                var existingById = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(tableName, new
+                {
+                    OsClient = osClient,
+                    Id = id
+                });
+                if (existingById.Code == 1 && existingById.Data != null)
+                {
+                    var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(tableName, data);
+                    if (uptResult.Code != 1) return new DosResult<object>(uptResult.Code, uptResult.Data, uptResult.Msg);
+                    return new DosResult<object>(1, new { Id = id, Message = $"{displayName} 已更新", Updated = true });
+                }
+            }
+
+            if (!uniqueField.DosIsNullOrWhiteSpace())
+            {
+                var keyValue = data[uniqueField].Val<string>();
+                if (!keyValue.DosIsNullOrWhiteSpace())
+                {
+                    var existingByKey = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(tableName, new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>() { new List<object>() { uniqueField, "=", keyValue } }
+                    });
+                    if (existingByKey.Code == 1 && existingByKey.Data != null)
+                    {
+                        data["Id"] = (string)existingByKey.Data.Id;
+                        var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(tableName, data);
+                        if (uptResult.Code != 1) return new DosResult<object>(uptResult.Code, uptResult.Data, uptResult.Msg);
+                        return new DosResult<object>(1, new { Id = (string)existingByKey.Data.Id, Message = $"{displayName} 已按 {uniqueField} 更新", Updated = true });
+                    }
+                }
+            }
+
+            if (data["Id"].Val<string>().DosIsNullOrWhiteSpace()) data["Id"] = Ulid.NewUlid().ToString();
+            var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(tableName, data);
+            if (addResult.Code != 1) return new DosResult<object>(addResult.Code, addResult.Data, addResult.Msg);
+            return new DosResult<object>(1, new { Id = data["Id"].Val<string>(), Message = $"{displayName} 已创建", Created = true });
+        }
+
+        private static List<object> BuildKeywordWhere(string keyword, params string[] fields)
+        {
+            var where = new List<object>();
+            if (keyword.DosIsNullOrWhiteSpace() || fields == null || fields.Length == 0) return where;
+            where.Add(new List<object>() { fields[0], "Like", keyword });
+            for (var i = 1; i < fields.Length; i++)
+            {
+                where.Add(new List<object>() { "OR", fields[i], "Like", keyword });
+            }
+            return where;
+        }
+
+        public static async Task<DosResult<object>> ListRoles(string osClient, string keyword = null)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_role", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "Name", "Level", "Sort", "Remark", "DeptIds", "BaseLimit" },
+                    _Where = BuildKeywordWhere(keyword, "Name", "Remark"),
+                    _OrderBy = "Level",
+                    _OrderByType = "DESC",
+                    _PageSize = 200
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
+                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取角色列表失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> SaveRole(string osClient, JObject param)
+        {
+            try
+            {
+                var name = param["Name"].Val<string>();
+                if (name.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "Name 不能为空");
+                var data = BuildDataFromParam(osClient, param,
+                    new[] { "Name", "Level", "Sort", "Remark", "DeptIds", "BaseLimit", "TenantId", "TenantName", "Class" },
+                    param["RoleId"].Val<string>() ?? param["Id"].Val<string>());
+                if (data["Class"] == null) data["Class"] = osClient;
+                return await UpsertRecordByIdOrKey(osClient, "sys_role", data, "Name", "角色");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存角色失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> ListModules(string osClient, string keyword = null)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_menu", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] {
+                        "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName", "ComponentPath",
+                        "OpenType", "Display", "AppDisplay", "Sort", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds",
+                        "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "UpdateTime"
+                    },
+                    _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName"),
+                    _OrderBy = "Sort",
+                    _OrderByType = "ASC",
+                    _PageSize = 1000
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
+                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取菜单模块列表失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> GetModule(string osClient, string moduleId)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_menu", new
+                {
+                    OsClient = osClient,
+                    Id = moduleId
+                });
+                if (result.Code != 1 || result.Data == null) return new DosResult<object>(0, null, "菜单模块不存在");
+                return new DosResult<object>(1, result.Data);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取菜单模块失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> UpdateModule(string osClient, string moduleId, JObject param)
+        {
+            try
+            {
+                var allowed = new[] {
+                    "Name", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
+                    "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere", "DiyConfig",
+                    "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
+                    "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
+                    "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText"
+                };
+                var data = BuildDataFromParam(osClient, param, allowed, moduleId);
+                var warnings = new List<string>();
+                foreach (var field in MenuJsonArrayFields)
+                {
+                    if (data[field] == null) continue;
+                    var normalized = NormalizeMenuJsonArray(field, ToJsonString(data[field]), warnings);
+                    if (!normalized.Ok) return new DosResult<object>(0, null, normalized.Msg);
+                    data[field] = normalized.Value;
+                }
+                var result = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", data);
+                if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
+                return new DosResult<object>(1, new { ModuleId = moduleId, Message = "菜单模块已更新", Warnings = warnings });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "更新菜单模块失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> ListDataSources(string osClient, string keyword = null)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_datasource", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "DataSourceName", "DataSourceKey", "DataSourceType", "IsEnable", "AllowAnonymous", "UpdateTime" },
+                    _Where = BuildKeywordWhere(keyword, "DataSourceName", "DataSourceKey", "DataSourceType"),
+                    _OrderBy = "UpdateTime",
+                    _OrderByType = "DESC",
+                    _PageSize = 500
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
+                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取数据源列表失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> SaveDataSource(string osClient, JObject param)
+        {
+            try
+            {
+                var key = param["DataSourceKey"].Val<string>();
+                var name = param["DataSourceName"].Val<string>() ?? param["Name"].Val<string>();
+                if (key.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "DataSourceKey 不能为空");
+                if (name.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "DataSourceName 不能为空");
+
+                var data = BuildDataFromParam(osClient, param,
+                    new[] { "DataSourceName", "DataSourceKey", "DataSourceType", "SqlDataSource", "V8DataSource", "JsonDataSource", "TestParam", "TestResult", "DataSourceRole", "AllowAnonymous", "IsEnable" },
+                    param["DataSourceId"].Val<string>() ?? param["Id"].Val<string>());
+                data["DataSourceName"] = name;
+                if (data["DataSourceType"] == null) data["DataSourceType"] = "V8";
+                if (data["IsEnable"] == null) data["IsEnable"] = 1;
+                if (data["AllowAnonymous"] == null) data["AllowAnonymous"] = 0;
+
+                var type = data["DataSourceType"].Val<string>() ?? "";
+                if (type.IndexOf("Json", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var check = ValidateJsonIfPresent("JsonDataSource", data["JsonDataSource"].Val<string>());
+                    if (!check.Ok) return new DosResult<object>(0, null, check.Msg);
+                }
+
+                return await UpsertRecordByIdOrKey(osClient, "sys_datasource", data, "DataSourceKey", "数据源");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存数据源失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> ListPrintTemplates(string osClient, string keyword = null)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mic_print", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "Title", "Number", "Desc", "DataApi", "UpdateTime" },
+                    _Where = BuildKeywordWhere(keyword, "Title", "Number", "Desc"),
+                    _OrderBy = "UpdateTime",
+                    _OrderByType = "DESC",
+                    _PageSize = 500
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
+                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取打印模板列表失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> SavePrintTemplate(string osClient, JObject param)
+        {
+            try
+            {
+                var title = param["Title"].Val<string>();
+                if (title.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "Title 不能为空");
+                var pageObj = ToJsonString(param["PageObj"]);
+                if (pageObj.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "PageObj 不能为空");
+                var pageCheck = ValidateJsonIfPresent("PageObj", pageObj);
+                if (!pageCheck.Ok) return new DosResult<object>(0, null, pageCheck.Msg);
+                var printObj = ToJsonString(param["PrintObj"]);
+                var printCheck = ValidateJsonIfPresent("PrintObj", printObj);
+                if (!printCheck.Ok) return new DosResult<object>(0, null, printCheck.Msg);
+
+                var data = BuildDataFromParam(osClient, param,
+                    new[] { "Title", "Number", "Desc", "DataApi" },
+                    param["PrintId"].Val<string>() ?? param["Id"].Val<string>());
+                data["PageObj"] = pageObj;
+                data["PrintObj"] = printObj.DosIsNullOrWhiteSpace() ? "{}" : printObj;
+                return await UpsertRecordByIdOrKey(osClient, "mic_print", data, "Number", "打印模板");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存打印模板失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> SaveWorkflowPackage(string osClient, JObject param)
+        {
+            try
+            {
+                var flow = param["FlowDesign"] as JObject ?? param["flowDesign"] as JObject;
+                if (flow == null) return new DosResult<object>(0, null, "FlowDesign 不能为空");
+                var flowName = flow["FlowName"].Val<string>() ?? flow["Name"].Val<string>();
+                if (flowName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "FlowDesign.FlowName 不能为空");
+
+                var flowData = BuildDataFromParam(osClient, flow,
+                    new[] { "FlowName", "Category", "IsEnable", "Description", "JsonData", "StartV8", "EndV8", "LineValueV8", "Remark", "Sort", "Roles", "Preview", "TableId" },
+                    flow["FlowDesignId"].Val<string>() ?? flow["Id"].Val<string>());
+                flowData["FlowName"] = flowName;
+                if (flowData["IsEnable"] == null) flowData["IsEnable"] = 1;
+                var flowResult = await UpsertRecordByIdOrKey(osClient, "wf_flowdesign", flowData, "FlowName", "工作流设计");
+                if (flowResult.Code != 1) return flowResult;
+                var flowId = JObject.FromObject(flowResult.Data)["Id"].Val<string>();
+
+                var nodeResults = new List<object>();
+                var nodes = param["Nodes"] as JArray ?? param["nodes"] as JArray ?? new JArray();
+                foreach (var token in nodes)
+                {
+                    if (!(token is JObject node)) continue;
+                    var nodeName = node["NodeName"].Val<string>() ?? node["Name"].Val<string>();
+                    if (nodeName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "节点 NodeName 不能为空");
+                    var nodeData = BuildDataFromParam(osClient, node,
+                        new[] { "NodeName", "NodeType", "Roles", "Users", "Depts", "Description", "Remark", "StartV8", "StartV8Server", "EndV8", "EndV8Server", "LineValueV8", "Timeout", "AllowSelectUsers", "AllowRecall", "AllowAddUsers", "SameDeptApprove", "BackNodes", "PositionLeft", "PositionTop", "Icon", "DisplayFields", "HideFields", "EditFields", "FieldsConfig", "CopyUsers" },
+                        node["NodeId"].Val<string>() ?? node["Id"].Val<string>());
+                    nodeData["NodeName"] = nodeName;
+                    nodeData["FlowDesignId"] = flowId;
+                    var nodeResult = await UpsertRecordByIdOrKey(osClient, "wf_node", nodeData, "Id", "工作流节点");
+                    if (nodeResult.Code != 1) return nodeResult;
+                    nodeResults.Add(nodeResult.Data);
+                }
+
+                var lineResults = new List<object>();
+                var lines = param["Lines"] as JArray ?? param["lines"] as JArray ?? new JArray();
+                foreach (var token in lines)
+                {
+                    if (!(token is JObject line)) continue;
+                    var lineData = BuildDataFromParam(osClient, line,
+                        new[] { "LineName", "FromNodeId", "ToNodeId", "V8Code", "LineValue" },
+                        line["LineId"].Val<string>() ?? line["Id"].Val<string>());
+                    lineData["FlowDesignId"] = flowId;
+                    var lineResult = await UpsertRecordByIdOrKey(osClient, "wf_line", lineData, "Id", "工作流连线");
+                    if (lineResult.Code != 1) return lineResult;
+                    lineResults.Add(lineResult.Data);
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    FlowDesignId = flowId,
+                    Nodes = nodeResults,
+                    Lines = lineResults,
+                    Message = $"工作流 [{flowName}] 保存成功"
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存工作流失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> SaveJob(string osClient, JObject param)
+        {
+            try
+            {
+                var jobName = param["JobName"].Val<string>();
+                var cronExpression = param["CronExpression"].Val<string>();
+                var jobType = param["JobType"].Val<string>() ?? "1";
+                if (jobName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "JobName 不能为空");
+                if (cronExpression.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "CronExpression 不能为空");
+
+                var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_schedule_job", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>() { new List<object>() { "JobName", "=", jobName } }
+                });
+                var id = param["JobId"].Val<string>() ?? param["Id"].Val<string>();
+                if (id.DosIsNullOrWhiteSpace() && existing.Code == 1 && existing.Data != null) id = (string)existing.Data.Id;
+                if (id.DosIsNullOrWhiteSpace()) id = Ulid.NewUlid().ToString();
+
+                var model = new MicroiAddJobModel
+                {
+                    Id = id,
+                    JobName = jobName,
+                    DllName = param["DllName"].Val<string>() ?? "",
+                    JobPath = param["JobPath"].Val<string>() ?? "",
+                    JobDesc = param["JobDesc"].Val<string>() ?? param["Description"].Val<string>() ?? "",
+                    JobParam = param["JobParam"].Val<string>() ?? "",
+                    CronDesc = param["CronDesc"].Val<string>() ?? "",
+                    CronExpression = cronExpression,
+                    JobType = jobType,
+                    ApiEngineKey = param["ApiEngineKey"].Val<string>() ?? "",
+                    OsClient = osClient
+                };
+
+                var result = existing.Code == 1 && existing.Data != null
+                    ? await MicroiEngine.Job.UpdateJob(model)
+                    : await MicroiEngine.Job.AddJob(model);
+                if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
+                return new DosResult<object>(1, new { JobId = id, JobName = jobName, Message = "定时任务已保存" });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "保存定时任务失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> ValidateLowCodeSystem(string osClient, JObject manifest)
+        {
+            try
+            {
+                var errors = new List<string>();
+                var warnings = new List<string>();
+
+                var tableResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_table", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "Name", "Description" },
+                    _PageSize = 10000
+                });
+                var fieldResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Config" },
+                    _PageSize = 50000
+                });
+                var tables = tableResult.Code == 1 && tableResult.Data != null ? tableResult.Data.ToList() : new List<dynamic>();
+                var fields = fieldResult.Code == 1 && fieldResult.Data != null ? fieldResult.Data.ToList() : new List<dynamic>();
+                var tableByName = tables.ToDictionary(t => ((string)t.Name ?? "").ToLower(), t => t);
+                var fieldsByTable = fields.GroupBy(f => (string)f.TableId ?? "").ToDictionary(g => g.Key, g => g.ToList());
+
+                var manifestTables = manifest["tables"] as JArray ?? manifest["Tables"] as JArray ?? new JArray();
+                foreach (var token in manifestTables)
+                {
+                    if (!(token is JObject table)) continue;
+                    var name = table["name"].Val<string>() ?? table["Name"].Val<string>();
+                    if (name.DosIsNullOrWhiteSpace()) { errors.Add("表定义缺少 name"); continue; }
+                    if (!tableByName.TryGetValue(name.ToLower(), out var tableModel))
+                    {
+                        errors.Add($"缺少表：{name}");
+                        continue;
+                    }
+                    var tableFields = fieldsByTable.ContainsKey((string)tableModel.Id) ? fieldsByTable[(string)tableModel.Id] : new List<dynamic>();
+                    var fieldNames = new HashSet<string>(tableFields.Select(f => ((string)f.Name ?? "").ToLower()));
+                    var manifestFields = table["fields"] as JArray ?? table["Fields"] as JArray ?? new JArray();
+                    foreach (var fieldToken in manifestFields)
+                    {
+                        if (!(fieldToken is JObject field)) continue;
+                        var fieldName = field["name"].Val<string>() ?? field["Name"].Val<string>();
+                        if (fieldName.DosIsNullOrWhiteSpace()) { errors.Add($"表 {name} 中存在无 name 字段定义"); continue; }
+                        if (!fieldNames.Contains(fieldName.ToLower())) errors.Add($"表 {name} 缺少字段：{fieldName}");
+                    }
+                }
+
+                async Task CheckByKey(string tableName, string keyField, JArray items, string itemName)
+                {
+                    foreach (var token in items)
+                    {
+                        if (!(token is JObject item)) continue;
+                        var key = item[keyField].Val<string>() ?? item[keyField.Substring(0, 1).ToLower() + keyField.Substring(1)].Val<string>();
+                        if (key.DosIsNullOrWhiteSpace()) continue;
+                        var exist = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(tableName, new
+                        {
+                            OsClient = osClient,
+                            _Where = new List<object>() { new List<object>() { keyField, "=", key } }
+                        });
+                        if (exist.Code != 1 || exist.Data == null) errors.Add($"缺少{itemName}：{key}");
+                    }
+                }
+
+                await CheckByKey("sys_apiengine", "ApiEngineKey", manifest["engines"] as JArray ?? manifest["Engines"] as JArray ?? new JArray(), "接口引擎");
+                await CheckByKey("sys_menu", "Name", manifest["modules"] as JArray ?? manifest["Modules"] as JArray ?? new JArray(), "菜单模块");
+                await CheckByKey("sys_datasource", "DataSourceKey", manifest["dataSources"] as JArray ?? manifest["DataSources"] as JArray ?? new JArray(), "数据源");
+                await CheckByKey("mic_print", "Title", manifest["printTemplates"] as JArray ?? manifest["PrintTemplates"] as JArray ?? new JArray(), "打印模板");
+                await CheckByKey("wf_flowdesign", "FlowName", manifest["workflows"] as JArray ?? manifest["Workflows"] as JArray ?? new JArray(), "工作流");
+
+                var events = manifest["events"] as JArray ?? manifest["Events"] as JArray ?? new JArray();
+                foreach (var token in events)
+                {
+                    if (!(token is JObject ev)) continue;
+                    var eventType = ev["eventType"].Val<string>() ?? ev["EventType"].Val<string>();
+                    if (!eventType.DosIsNullOrWhiteSpace() && !ValidEventTypes.Contains(eventType))
+                    {
+                        errors.Add($"无效 V8 事件类型：{eventType}");
+                    }
+                }
+
+                if (manifestTables.Count == 0) warnings.Add("Manifest 未声明 tables，无法验收字段级结果");
+                return new DosResult<object>(1, new
+                {
+                    Passed = errors.Count == 0,
+                    Errors = errors,
+                    Warnings = warnings,
+                    Summary = new
+                    {
+                        TableCount = tables.Count,
+                        FieldCount = fields.Count,
+                        CheckedTables = manifestTables.Count
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "验收低代码系统失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> WriteMcpAuditLog(string osClient, string action, string target, string content, dynamic currentToken)
+        {
+            try
+            {
+                var currentUser = currentToken?.CurrentUser;
+                var userId = "";
+                var userName = "";
+                if (currentUser != null)
+                {
+                    var userObj = currentUser is JObject jObject ? jObject : JObject.FromObject(currentUser);
+                    userId = userObj["Id"].Val<string>() ?? "";
+                    userName = userObj["Name"].Val<string>() ?? userObj["Account"].Val<string>() ?? "";
+                }
+                var result = await MicroiEngine.MongoDB.AddSysLog(new SysLogParam
+                {
+                    OsClient = osClient,
+                    Type = "MCP",
+                    Title = action ?? "MCP Operation",
+                    Content = TruncateForLog(content ?? ""),
+                    Remark = target ?? "",
+                    UserId = userId,
+                    UserName = userName,
+                    AppId = "microi.mcp"
+                });
+                return new DosResult<object>(result.Code, new { Action = action, Target = target }, result.Msg);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(1, new { Warning = "审计日志写入失败：" + ex.Message }, "审计日志写入失败但业务操作不回滚");
             }
         }
 

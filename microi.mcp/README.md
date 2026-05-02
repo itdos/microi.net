@@ -20,7 +20,7 @@
 
 ---
 
-## 提供的 AI 能力（17 个 Tools）
+## 提供的 AI 能力（35 个 Tools）
 
 | Tool | 功能 | 读/写 |
 |------|------|-------|
@@ -41,6 +41,64 @@
 | `microi_list_pages` | 列出界面引擎页面 | 只读 |
 | `microi_get_page` | 获取界面引擎页面 JSON | 只读 |
 | `microi_save_page` | 创建或更新界面引擎页面 | 读写 |
+| `microi_plan_system` | 从完整系统 Manifest 生成 dry-run 执行计划 | 只读 |
+| `microi_generate_system` | 按 Manifest 编排表、字段、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收 | 读写（需确认） |
+| `microi_validate_system` | 对生成后的系统做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流等是否存在 | 只读 |
+| `microi_validate_menu_buttons` | 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON | 只读 |
+| `microi_build_field_config` | 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段 Data/Config JSON | 只读 |
+| `microi_upsert_engine` | 接口引擎存在则更新，不存在则创建 | 读写（需确认） |
+| `microi_list_roles` | 列出角色 | 只读 |
+| `microi_save_role` | 创建或更新角色 | 读写（需确认） |
+| `microi_list_modules` | 列出菜单模块 | 只读 |
+| `microi_get_module` | 获取菜单模块详情 | 只读 |
+| `microi_update_module` | 增量更新菜单模块、按钮、Tab、列表配置 | 读写（需确认） |
+| `microi_list_data_sources` | 列出数据源引擎 | 只读 |
+| `microi_save_data_source` | 创建或更新数据源引擎（SQL/V8/JSON） | 读写（需确认） |
+| `microi_run_data_source` | 执行数据源引擎用于验收 | 读写（需确认） |
+| `microi_list_print_templates` | 列出打印模板 | 只读 |
+| `microi_save_print_template` | 创建或更新打印模板 | 读写（需确认） |
+| `microi_save_workflow_package` | 一次性保存工作流设计、节点和连线 | 读写（需确认） |
+| `microi_save_job` | 创建或更新定时任务 | 读写（需确认） |
+
+### 高级编排 Manifest
+
+`microi_generate_system` 面向“自然语言生成完整系统”的场景。建议流程：
+
+1. 先调用 `microi_get_db_schema` 获取现有模型。
+2. 生成 Manifest 后先调用 `microi_plan_system`，确认执行顺序和结构问题。
+3. 调用 `microi_generate_system` 且 `dryRun: true` 时只返回计划，不写入。
+4. 确认要真实写入时，传 `dryRun: false` 和 `confirmExecution: "<当前 OsClient>"` 或 `"EXECUTE"`。
+5. 写入完成后会自动调用 `microi_validate_system`，也可单独再次验收。
+
+Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。
+
+```json
+{
+  "name": "CRM客户管理",
+  "roles": [
+    { "Name": "CRM管理员", "Level": 900 }
+  ],
+  "tables": [
+    {
+      "name": "Crm_Customer",
+      "description": "客户信息",
+      "fields": [
+        { "name": "CustomerName", "label": "客户名称", "type": "varchar(200)", "component": "Text", "notEmpty": 1 },
+        { "name": "Status", "label": "状态", "type": "varchar(50)", "component": "Select", "configSource": { "sourceType": "KeyValue", "data": "active|启用,disabled|停用" } }
+      ]
+    }
+  ],
+  "engines": [
+    { "apiEngineKey": "crm-customer-stat", "apiName": "客户统计", "code": "return { Code:1, Data:{} };" }
+  ],
+  "modules": [
+    { "name": "客户管理", "table": "Crm_Customer", "moreBtns": [{ "Name": "统计", "V8Code": "V8.ApiEngine.Run('crm-customer-stat', { Id: V8.Form.Id });" }] }
+  ],
+  "permissions": [
+    { "roleName": "CRM管理员", "moduleNames": ["客户管理"] }
+  ]
+}
+```
 
 ---
 
@@ -229,13 +287,19 @@ AI：[调用 microi_get_db_schema] → 返回完整字段列表
 AI：[调用 microi_list_engines] → 返回引擎列表
 
 你：执行一下 order-statistics 接口引擎
-AI：[调用 microi_run_engine] → 返回执行结果
+AI：[调用 microi_run_engine，需 confirmExecution] → 返回执行结果
 
 你：帮我生成一套 CRM 客户管理模块，包含客户表、字段、菜单和管理员权限
 AI：[调用 microi_get_db_schema → microi_create_table → microi_add_field → microi_create_module → microi_set_role_permission] → 平台中直接出现可用模块
 
 你：给订单列表增加“审核通过/驳回”行按钮，并把业务逻辑放到接口引擎
 AI：[调用 microi_create_engine → microi_create_module 或 microi_save_engine_code] → 生成按钮配置和后端 V8 逻辑
+
+你：帮我生成一套完整的进销存系统，但先不要写入
+AI：[调用 microi_get_db_schema → microi_plan_system → microi_generate_system(dryRun:true)] → 返回执行计划和风险提示
+
+你：确认写入刚才这套系统
+AI：[调用 microi_generate_system(dryRun:false, confirmExecution:"EXECUTE") → microi_validate_system] → 平台中生成可验收系统
 ```
 
 ---
@@ -247,6 +311,8 @@ AI：[调用 microi_create_engine → microi_create_module 或 microi_save_engin
 - SSE 模式每个连接独立认证，仅知道 URL 无法访问
 - Token 自动刷新（每 12 分钟），无需明文存储长期密码
 - 不同租户（OsClient）数据完全隔离
+- 高风险执行类工具（`microi_run_engine`、`microi_generate_system`、角色/菜单增量更新、数据源执行、打印/工作流/定时任务保存等）要求显式 `confirmExecution`
+- 高级写入工具会调用后端 `WriteMcpAuditLog` 记录 MCP 操作审计
 
 ---
 

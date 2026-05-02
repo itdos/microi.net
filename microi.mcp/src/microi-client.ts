@@ -375,6 +375,107 @@ export class MicroiClient {
     });
   }
 
+  async listRoles(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.LIST_ROLES, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async saveRole(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_ROLE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async listModules(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.LIST_MODULES, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async getModule(moduleId: string): Promise<ApiResponse> {
+    return this.post(API.GET_MODULE, {
+      OsClient: this.config.osClient,
+      ModuleId: moduleId,
+    });
+  }
+
+  async updateModule(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.UPDATE_MODULE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async listDataSources(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.LIST_DATA_SOURCES, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async saveDataSource(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_DATA_SOURCE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async runDataSource(dataSourceKey: string, params?: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.RUN_DATA_SOURCE, {
+      OsClient: this.config.osClient,
+      DataSourceKey: dataSourceKey,
+      ...(params || {}),
+    });
+  }
+
+  async listPrintTemplates(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.LIST_PRINT_TEMPLATES, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async savePrintTemplate(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_PRINT_TEMPLATE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async saveWorkflowPackage(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_WORKFLOW_PACKAGE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async saveJob(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_JOB, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async validateLowCodeSystem(manifest: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.VALIDATE_LOW_CODE_SYSTEM, {
+      OsClient: this.config.osClient,
+      Manifest: manifest,
+    });
+  }
+
+  async writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse> {
+    return this.post(API.WRITE_MCP_AUDIT_LOG, {
+      OsClient: this.config.osClient,
+      Action: action,
+      Target: target,
+      Content: content,
+    });
+  }
+
   // ---------- 界面引擎 API 方法 ----------
 
   async getPageEngineList(keyword?: string): Promise<ApiResponse> {
