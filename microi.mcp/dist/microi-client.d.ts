@@ -12,6 +12,14 @@ export interface ApiResponse<T = unknown> {
     Data: T;
     Msg: string;
     Total?: number;
+    DataCount?: number;
+}
+export interface ListEnvelope<T> {
+    OsClient?: string;
+    OsClientType?: string;
+    OsClientNetwork?: string;
+    List?: T[];
+    Total?: number;
 }
 export interface DbTable {
     Id: string;
@@ -35,16 +43,22 @@ export interface ApiEngine {
     ApiEngineKey: string;
     ApiAddress: string;
     Category: string;
-    Code: string;
+    ApiV8Code?: string;
+    Code?: string;
+    ApiRemark?: string;
     Description?: string;
+    UpdateTime?: string;
 }
 export interface V8Event {
     Id: string;
     FormEngineKey: string;
     Description: string;
     EventType: string;
-    Code: string;
+    EventName?: string;
+    V8Code?: string;
+    Code?: string;
     TableName?: string;
+    UpdateTime?: string;
 }
 /**
  * Microi 后端 HTTP 客户端
@@ -75,7 +89,7 @@ export declare class MicroiClient {
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
     }>>;
-    getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[]>>;
+    getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;
     saveEngineCode(apiEngineKey: string, code: string): Promise<ApiResponse>;
@@ -87,7 +101,7 @@ export declare class MicroiClient {
     }): Promise<ApiResponse>;
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse>;
-    getEventList(keyword?: string): Promise<ApiResponse<V8Event[]>>;
+    getEventList(keyword?: string): Promise<ApiResponse<V8Event[] | ListEnvelope<V8Event>>>;
     createTable(name: string, description?: string, options?: {
         Tabs?: string;
         IsTree?: number;

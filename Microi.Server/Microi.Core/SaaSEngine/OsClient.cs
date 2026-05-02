@@ -140,6 +140,7 @@ namespace Microi.net
             {
                 throw new Exception("OsClient.GetClient出现错误：OsClient为空！");
             }
+            osClient = osClient.DosTrim();
 
             // 【分布式缓存优先策略】
             // 第一步：尝试从L2缓存（Redis）获取配置
@@ -154,6 +155,24 @@ namespace Microi.net
 
             // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
             ClientList.TryGetValue(osClient, out var client);
+
+            // 本机尚未加载该租户时，允许从 Redis 中的 SaaS 配置恢复本机 ClientList。
+            // 这样 V8.ReloadOsClient 在多实例部署中写入 Redis 后，其他实例也能立即识别新租户。
+            if (client == null && cachedConfig != null)
+            {
+                var cachedOsClient = cachedConfig["OsClient"]?.Val<string>();
+                if (cachedOsClient.DosIsNullOrWhiteSpace())
+                {
+                    cachedOsClient = osClient;
+                }
+
+                client = new OsClientSecret
+                {
+                    OsClient = cachedOsClient,
+                    OsClientModel = cachedConfig
+                };
+                ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
+            }
 
             if (client != null)
             {
