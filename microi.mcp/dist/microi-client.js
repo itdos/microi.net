@@ -309,10 +309,15 @@ export class MicroiClient {
         });
     }
     async createEngine(data) {
-        return this.post(API.CREATE_ENGINE, {
+        // 默认 ApiAddress 为 /apiengine/{key}，否则平台路由匹配会 404
+        const payload = {
             OsClient: this.config.osClient,
             ...data,
-        });
+        };
+        if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
+            payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
+        }
+        return this.post(API.CREATE_ENGINE, payload);
     }
     async getEventCode(formEngineKey, eventType) {
         return this.post(API.GET_EVENT_CODE, {

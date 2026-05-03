@@ -121,6 +121,7 @@ export declare class MicroiClient {
         ApiName: string;
         Category?: string;
         Code?: string;
+        ApiAddress?: string;
     }): Promise<ApiResponse>;
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse>;

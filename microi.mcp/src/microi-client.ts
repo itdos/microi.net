@@ -402,11 +402,16 @@ export class MicroiClient {
     });
   }
 
-  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string }): Promise<ApiResponse> {
-    return this.post(API.CREATE_ENGINE, {
+  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string; ApiAddress?: string }): Promise<ApiResponse> {
+    // 默认 ApiAddress 为 /apiengine/{key}，否则平台路由匹配会 404
+    const payload: any = {
       OsClient: this.config.osClient,
       ...data,
-    });
+    };
+    if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
+      payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
+    }
+    return this.post(API.CREATE_ENGINE, payload);
   }
 
   async getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>> {

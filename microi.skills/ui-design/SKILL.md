@@ -1024,3 +1024,60 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 }
 </style>
 ```
+
+
+---
+
+## 🚨 移动端低代码项目落地踩坑（必�?- 2026.5�?
+
+实战中频繁出现的 7 类问题，团队复盘后总结为强制规范：
+
+### 1. 路由前缀不要硬编码租户名
+- �?`manifest.json` �?`"router": { "base": "/lsg/" }`
+- �?`"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量 + 请求头完�?
+- 任何形如 `https://api.itdos.com/{tenant}/...` �?URL 都是错误的，平台对外只暴�?`/`、`/api/...`、`/apiengine/...`
+
+### 2. tabBar 必须�?PNG 图标
+- uniapp / 微信小程序的 tabBar `iconPath` / `selectedIconPath` **只接受静�?PNG 文件路径**
+- 不允许：emoji 字符、字体图标、SVG（部分平台不支持）、远�?URL
+- 推荐尺寸�?0×60 ~ 81×81 px，未选中�?`#9898B0`，选中�?= 品牌主色
+- 可用 PowerShell + System.Drawing 一次性生�?5×2 = 10 个图标，保证统一风格
+
+### 3. font-size 严禁通配 `.parent text { ... }`
+SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 子标�?`<text class="fz-22">`，导致标签字体被强行放大�?
+- �?`.qo text { font-size: 40rpx; }`
+- �?`.qo .qo-emoji { font-size: 40rpx; } .qo .qo-label { font-size: 22rpx; }`
+- 凡同一容器内同时含图标与文字，**必须**给图标和文字各自的具�?class
+
+### 4. 我的�?/ 详情页菜单优先用网格单元格而非纵向列表
+参�?"乐闪�?�?环球捕手"�?云集" 等线上商城：
+- 5 列资产汇总条 �?4-5 列彩色图标网�?�?多行 4 列服务网�?
+- 单元�?cell 结构：`80rpx 圆角图标背景�?+ 22rpx 标签`，间�?16~24rpx
+- 不要�?"图标 �?文字 �?�?箭头" 的横排长列表（除非是设置类深层菜单）
+
+### 5. 必备微动效（每个可点击元素都要有反馈�?
+```scss
+.cell, .entry-item, .product-card, .zone-card {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.cell:active, .entry-item:active { transform: scale(0.94); }
+
+@keyframes fadein-up {
+  from { opacity: 0; transform: translateY(16rpx); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadein { animation: fadein-up .45s ease both; }
+```
+
+### 6. 品牌�?/ Logo 在所有标题位置统一替换
+- `manifest.json`: `name`、`h5.title`
+- `pages.json`: 每个页面 `navigationBarTitleText`、`globalStyle.navigationBarTitleText`
+- 各页面顶�?brand 文本（首�?hero、登录页 logo 区、注册页标题�?
+- 控制�?`console.log('[lsg-mall]')` 等技术代号可保留，但用户可见文案必须统一为产品名（如 `乐闪购`�?
+
+### 7. 接口路径必须自动包含 ApiAddress（MCP 创建接口的硬规则�?
+平台动态路�?`/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` �?Redis 中查找�?*ApiAddress 为空 = 全部 404�?*
+- MCP `microi_create_engine` 已自�?`ApiAddress = '/apiengine/{apiEngineKey}'`
+- 手工 SQL / 直接 INSERT 创建的接口请补全 `ApiAddress` 字段，并写入缓存�?
+  `Microi:{osClient}:FormData:sys_apiengine:{apiAddress.toLowerCase()}` �?整行模型对象
+- 修复脚本可用一次�?V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })` �?`V8.Cache.Set` 三个键（key、Id、ApiAddress �?lowercase�?

@@ -498,6 +498,35 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 批量插入样例数据 (Sample Data Seeding)
+  // ========================
+  server.tool(
+    'microi_seed_table_data',
+    `Seed sample/demo rows into any low-code table for OsClient "${osClient}". Wraps V8.FormEngine.AddTableData. Use this for filling商品/订单/会员等样例数据。Each row will get Id/CreateTime/OsClient auto-filled by the platform.`,
+    {
+      tableName: z.string().describe('Target diy_table name (e.g. "mall_product")'),
+      rows: z.array(z.record(z.unknown())).describe('Array of row objects. Each object = one record. Field names must match diy_field PascalCase names.'),
+      skipIfExists: z.boolean().optional().describe('When true, skips seeding if table already has any rows. Default: false.'),
+      confirmExecution: z.string().optional().describe('Required because this writes to DB. Use tableName or "EXECUTE".'),
+    },
+    async ({ tableName, rows, skipIfExists, confirmExecution }) => {
+      try {
+        if (confirmExecution !== tableName && confirmExecution !== 'EXECUTE') {
+          return { content: [{ type: 'text', text: `执行已拦截：microi_seed_table_data 会写入 ${rows.length} 条到表 ${tableName}，请重新调用并传 confirmExecution="${tableName}" 或 "EXECUTE"。` }], isError: true };
+        }
+        await client.writeAuditLog('microi_seed_table_data', tableName, JSON.stringify({ count: rows.length, skipIfExists: !!skipIfExists }));
+        const result = await client.executeEngine('_mcp_seed_table_data', { tableName, rows, skipIfExists: !!skipIfExists });
+        return {
+          content: [{ type: 'text', text: `## Seed: ${tableName}\n- **Code**: ${result.Code}\n- **Msg**: ${result.Msg ?? ''}\n\n\`\`\`json\n${JSON.stringify(result.Data, null, 2)}\n\`\`\`` }],
+          isError: result.Code !== 1,
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 列出 V8 事件
   // ========================
   server.tool(
@@ -578,14 +607,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       apiName: z.string().describe('Display name of the engine'),
       category: z.string().optional().describe('Category to organize engines'),
       code: z.string().optional().describe('Initial JavaScript code for the engine'),
+      apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
     },
-    async ({ apiEngineKey, apiName, category, code }) => {
+    async ({ apiEngineKey, apiName, category, code, apiAddress }) => {
       try {
         const result = await client.createEngine({
           ApiEngineKey: apiEngineKey,
           ApiName: apiName,
           Category: category,
           Code: code,
+          ApiAddress: apiAddress,
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
