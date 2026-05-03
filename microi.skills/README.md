@@ -42,6 +42,7 @@
 | **page-engine** | 界面引擎页面 JSON 生成 | `page-engine/SKILL.md` |
 | **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
 | **ui-design** | 酷炫潮流 UI 设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |
+| **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
 
 ---
 

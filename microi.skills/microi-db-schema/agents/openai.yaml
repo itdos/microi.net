@@ -1,0 +1,4 @@
+interface:
+  display_name: "Microi DB Schema"
+  short_description: "Use the Microi database dictionary and core table relationships."
+  default_prompt: "Use the Microi DB schema skill to inspect platform tables, fields, V8 event storage, menu configuration, workflow metadata, and system table relationships."

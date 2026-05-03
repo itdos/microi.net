@@ -48,6 +48,100 @@ function getStringArray(record, ...keys) {
     }
     return [];
 }
+function getValue(record, ...keys) {
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(record, key))
+            return record[key];
+    }
+    return undefined;
+}
+function normalizeKey(value) {
+    return value.trim().toLowerCase();
+}
+function fieldLookupKey(tableRef, fieldRef) {
+    return `${normalizeKey(tableRef)}::${normalizeKey(fieldRef)}`;
+}
+function isSystemFieldName(value) {
+    return ['Id', 'CreateTime', 'UpdateTime', 'CreateUserId', 'CreateUserName', 'UpdateUserId', 'UpdateUserName', 'OsClient', 'IsDeleted']
+        .some((name) => name.toLowerCase() === value.toLowerCase());
+}
+function jsonArrayOrSplit(value) {
+    const trimmed = value.trim();
+    if (!trimmed)
+        return [];
+    if (trimmed.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed))
+                return parsed;
+        }
+        catch {
+            // Fall through to loose splitting.
+        }
+    }
+    return trimmed.split(/[,;\n\uFF0C\uFF1B\u3001]+/).map((item) => item.trim()).filter(Boolean);
+}
+function getFieldRefs(record, ...keys) {
+    for (const key of keys) {
+        const value = getValue(record, key);
+        if (value === undefined || value === null || value === '')
+            continue;
+        const values = Array.isArray(value) ? value : (typeof value === 'string' ? jsonArrayOrSplit(value) : [value]);
+        return values.map((item) => {
+            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+                return { ref: String(item).trim() };
+            }
+            const source = asRecord(item);
+            return {
+                ref: getString(source, 'field', 'Field', 'fieldName', 'FieldName', 'name', 'Name', 'id', 'Id', 'fieldId', 'FieldId'),
+                asName: getString(source, 'asName', 'AsName', 'alias', 'Alias') || undefined,
+                type: getString(source, 'type', 'Type') || undefined,
+                displayType: getString(source, 'displayType', 'DisplayType') || undefined,
+                displaySelect: typeof source.displaySelect === 'boolean'
+                    ? source.displaySelect
+                    : (typeof source.DisplaySelect === 'boolean' ? source.DisplaySelect : undefined),
+            };
+        }).filter((item) => item.ref);
+    }
+    return [];
+}
+function createFieldLookup() {
+    return { byTableAndRef: new Map(), fieldsByTable: new Map() };
+}
+function addFieldMeta(lookup, meta) {
+    const tableRefs = [meta.tableId, meta.tableName].filter(Boolean);
+    const fieldRefs = [meta.id, meta.name, meta.label].filter(Boolean);
+    for (const tableRef of tableRefs) {
+        for (const fieldRef of fieldRefs)
+            lookup.byTableAndRef.set(fieldLookupKey(tableRef, fieldRef), meta);
+        const key = normalizeKey(tableRef);
+        const existing = lookup.fieldsByTable.get(key) || [];
+        if (!existing.some((item) => item.id === meta.id || normalizeKey(item.name) === normalizeKey(meta.name))) {
+            existing.push(meta);
+            lookup.fieldsByTable.set(key, existing);
+        }
+    }
+}
+function findFieldMeta(lookup, tableRef, ref) {
+    if (!tableRef || !ref)
+        return undefined;
+    return lookup.byTableAndRef.get(fieldLookupKey(tableRef, ref));
+}
+function getFieldsForTable(lookup, tableRef) {
+    return lookup.fieldsByTable.get(normalizeKey(tableRef)) || [];
+}
+function systemFieldMeta(tableId, tableName, fieldName) {
+    return {
+        id: fieldName,
+        name: fieldName,
+        label: fieldName,
+        tableId,
+        tableName,
+        tableDescription: tableName,
+        component: 'Text',
+        type: 'varchar(255)',
+    };
+}
 function compactObject(record) {
     return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && value !== null && value !== ''));
 }
@@ -228,6 +322,156 @@ function buildFieldConfig(sourceType, options) {
     warnings.push(`未知 sourceType: ${sourceType}，已返回空配置`);
     return { config: {}, warnings };
 }
+function toSearchFieldModel(meta, ref) {
+    return compactObject({
+        Id: meta.id,
+        AsName: ref?.asName || '',
+        Name: meta.name,
+        Label: meta.label || meta.name,
+        TableId: meta.tableId,
+        TableName: meta.tableName,
+        TableDescription: meta.tableDescription || meta.tableName,
+        DisplayType: ref?.displayType || 'Out',
+        DisplaySelect: ref?.displaySelect ?? false,
+    });
+}
+function resolveFieldRefs(lookup, tableId, tableName, refs, context) {
+    return refs.map((ref) => {
+        const meta = findFieldMeta(lookup, tableId, ref.ref)
+            || findFieldMeta(lookup, tableName, ref.ref)
+            || (isSystemFieldName(ref.ref) ? systemFieldMeta(tableId, tableName, ref.ref) : undefined);
+        if (!meta)
+            throw new Error(`${context}: unknown field "${ref.ref}" on table "${tableName || tableId}"`);
+        return { meta, ref };
+    });
+}
+function getExplicitJsonString(record, ...keys) {
+    for (const key of keys) {
+        const value = getValue(record, key);
+        if (value === undefined || value === null || value === '')
+            continue;
+        return typeof value === 'string' ? value : JSON.stringify(value);
+    }
+    return '';
+}
+function defaultListFields(fields) {
+    const hidden = new Set(['Id', 'OsClient', 'IsDeleted']);
+    const businessFields = fields.filter((field) => !hidden.has(field.name) && !field.component.toLowerCase().includes('hidden'));
+    const source = businessFields.length ? businessFields : fields;
+    return source.slice(0, Math.min(8, source.length));
+}
+function defaultSearchFields(fields) {
+    const searchableComponents = new Set(['Text', 'Textarea', 'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'DateTime', 'Date', 'NumberText', 'AutoNumber']);
+    return fields.filter((field) => searchableComponents.has(field.component || 'Text')).slice(0, 4);
+}
+function buildDefaultOrderBy(module, lookup, tableId, tableName) {
+    const canonical = getValue(module, 'DefaultOrderBy');
+    if (canonical !== undefined && canonical !== null && canonical !== '') {
+        return typeof canonical === 'string' ? canonical : JSON.stringify(canonical);
+    }
+    const natural = getValue(module, 'defaultOrderBy');
+    if (natural !== undefined && natural !== null && natural !== '') {
+        const refs = Array.isArray(natural) || (typeof natural === 'string' && natural.trim().startsWith('['))
+            ? getFieldRefs({ value: natural }, 'value')
+            : [{ ref: String(natural).trim(), type: 'DESC' }];
+        return JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, refs, 'module.defaultOrderBy').map(({ meta, ref }, index) => ({
+            Id: meta.id,
+            Name: meta.name,
+            Type: ref.type || 'DESC',
+            Sort: index,
+        })));
+    }
+    const refs = getFieldRefs(module, 'orderBy', 'OrderBy', 'defaultSort', 'DefaultSort', 'sortBy', 'SortBy');
+    if (!refs.length)
+        return undefined;
+    return JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, refs, 'module.defaultOrderBy').map(({ meta, ref }, index) => ({
+        Id: meta.id,
+        Name: meta.name,
+        Type: ref.type || 'DESC',
+        Sort: index,
+    })));
+}
+function resolveModuleFields(module, lookup, tableId, tableName) {
+    if (!tableId && !tableName)
+        return {};
+    const tableFields = getFieldsForTable(lookup, tableId).length ? getFieldsForTable(lookup, tableId) : getFieldsForTable(lookup, tableName);
+    const output = {};
+    const searchRefs = getFieldRefs(module, 'searchFields', 'SearchFields', 'searchFieldNames', 'SearchFieldNames');
+    const resolvedSearch = searchRefs.length
+        ? resolveFieldRefs(lookup, tableId, tableName, searchRefs, 'module.searchFields')
+        : defaultSearchFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name } }));
+    if (!getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') && resolvedSearch.length) {
+        output.SearchFieldIds = JSON.stringify(resolvedSearch.map(({ meta, ref }) => toSearchFieldModel(meta, ref)));
+    }
+    const listRefs = getFieldRefs(module, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns');
+    const resolvedList = listRefs.length
+        ? resolveFieldRefs(lookup, tableId, tableName, listRefs, 'module.listFields')
+        : defaultListFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name } }));
+    if (!getExplicitJsonString(module, 'tableDiyFieldIds', 'TableDiyFieldIds') && resolvedList.length) {
+        output.TableDiyFieldIds = JSON.stringify(resolvedList.map(({ meta }) => meta.id));
+    }
+    if (!getExplicitJsonString(module, 'selectFields', 'SelectFields') && resolvedList.length) {
+        output.SelectFields = JSON.stringify(resolvedList.map(({ meta, ref }) => toSearchFieldModel(meta, ref)));
+    }
+    const listFieldConfigs = [
+        { canonical: 'SortFieldIds', explicitKeys: ['sortFieldIds', 'SortFieldIds'], refKeys: ['sortFields', 'SortFields'] },
+        { canonical: 'NotShowFields', explicitKeys: ['notShowFields', 'NotShowFields'], refKeys: ['hiddenFields', 'HiddenFields', 'notShowFieldsByName', 'NotShowFieldsByName'] },
+        { canonical: 'InTableEditFields', explicitKeys: ['inTableEditFields', 'InTableEditFields'], refKeys: ['editableFields', 'EditableFields', 'inTableEditFieldsByName', 'InTableEditFieldsByName'] },
+        { canonical: 'MobileListFields', explicitKeys: ['mobileListFields', 'MobileListFields'], refKeys: ['mobileFields', 'MobileFields'], objectArray: true },
+        { canonical: 'CardTitleTagFields', explicitKeys: ['cardTitleTagFields', 'CardTitleTagFields'], refKeys: ['cardTitleFields', 'CardTitleFields'], objectArray: true },
+        { canonical: 'CardBottomTagFields', explicitKeys: ['cardBottomTagFields', 'CardBottomTagFields'], refKeys: ['cardBottomFields', 'CardBottomFields'], objectArray: true },
+    ];
+    for (const item of listFieldConfigs) {
+        if (getExplicitJsonString(module, ...item.explicitKeys))
+            continue;
+        const refs = getFieldRefs(module, ...item.refKeys);
+        if (!refs.length)
+            continue;
+        const resolved = resolveFieldRefs(lookup, tableId, tableName, refs, `module.${item.canonical}`);
+        output[item.canonical] = JSON.stringify(item.objectArray
+            ? resolved.map(({ meta, ref }) => toSearchFieldModel(meta, ref))
+            : resolved.map(({ meta }) => meta.id));
+    }
+    const statisticsRefs = getFieldRefs(module, 'statisticsFieldNames', 'StatisticsFieldNames', 'statFields', 'StatFields');
+    if (!getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields') && statisticsRefs.length) {
+        output.StatisticsFields = JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, statisticsRefs, 'module.statisticsFields').map(({ meta, ref }) => ({
+            Id: meta.id,
+            Type: ref.type || 'SUM',
+        })));
+    }
+    const defaultOrderBy = buildDefaultOrderBy(module, lookup, tableId, tableName);
+    if (defaultOrderBy)
+        output.DefaultOrderBy = defaultOrderBy;
+    return output;
+}
+function populateFieldLookupFromSchema(lookup, schemaData, tableIdByName) {
+    const tables = asArray(asRecord(schemaData).Tables);
+    for (const table of tables) {
+        const tableId = getString(table, 'Id', 'id');
+        const tableName = getString(table, 'Name', 'name');
+        if (!tableId || !tableName)
+            continue;
+        tableIdByName?.set(tableName.toLowerCase(), tableId);
+        const fieldsValue = getValue(table, '_Fields', 'Fields', 'fields');
+        const fields = Array.isArray(fieldsValue) ? asArray(fieldsValue) : [];
+        for (const field of fields) {
+            const id = getString(field, 'Id', 'id');
+            const name = getString(field, 'Name', 'name');
+            if (!id || !name)
+                continue;
+            addFieldMeta(lookup, {
+                id,
+                name,
+                label: getString(field, 'Label', 'label') || name,
+                tableId,
+                tableName,
+                tableDescription: getString(table, 'Description', 'description') || tableName,
+                component: getString(field, 'Component', 'component') || 'Text',
+                type: getString(field, 'Type', 'type') || 'varchar(255)',
+            });
+        }
+    }
+}
 function buildPlan(manifest) {
     const errors = [];
     const warnings = [];
@@ -243,6 +487,7 @@ function buildPlan(manifest) {
     const workflows = getArray(manifest, 'workflows', 'Workflows');
     const jobs = getArray(manifest, 'jobs', 'Jobs');
     const permissions = getArray(manifest, 'permissions', 'Permissions');
+    const manifestFieldsByTable = new Map();
     if (!tables.length && !engines.length && !modules.length && !pages.length) {
         warnings.push('Manifest 未声明 tables/engines/modules/pages，可能不是完整系统计划');
     }
@@ -252,6 +497,8 @@ function buildPlan(manifest) {
         if (!name)
             errors.push(`tables[${tableIndex}].name 不能为空`);
         plan.push(`create_table ${name || `(index ${tableIndex})`}`);
+        if (name)
+            manifestFieldsByTable.set(name.toLowerCase(), new Set());
         getArray(table, 'fields', 'Fields').forEach((field, fieldIndex) => {
             const fieldName = getString(field, 'name', 'Name');
             const label = getString(field, 'label', 'Label');
@@ -259,6 +506,10 @@ function buildPlan(manifest) {
                 errors.push(`tables[${tableIndex}].fields[${fieldIndex}].name 不能为空`);
             if (!label)
                 errors.push(`tables[${tableIndex}].fields[${fieldIndex}].label 不能为空`);
+            if (name && fieldName)
+                manifestFieldsByTable.get(name.toLowerCase())?.add(fieldName.toLowerCase());
+            if (name && label)
+                manifestFieldsByTable.get(name.toLowerCase())?.add(label.toLowerCase());
             plan.push(`add_field ${name}.${fieldName}`);
         });
     });
@@ -269,6 +520,28 @@ function buildPlan(manifest) {
         const normalized = normalizeAllMenuJson(item);
         errors.push(...normalized.errors);
         warnings.push(...normalized.warnings);
+        const tableRef = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+        const moduleName = getString(item, 'name', 'Name');
+        if (tableRef && manifestFieldsByTable.has(tableRef.toLowerCase())) {
+            const fields = manifestFieldsByTable.get(tableRef.toLowerCase()) || new Set();
+            const fieldGroups = [
+                ['listFields', getFieldRefs(item, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns')],
+                ['searchFields', getFieldRefs(item, 'searchFields', 'SearchFields', 'searchFieldNames', 'SearchFieldNames')],
+                ['sortFields', getFieldRefs(item, 'sortFields', 'SortFields')],
+                ['hiddenFields', getFieldRefs(item, 'hiddenFields', 'HiddenFields', 'notShowFieldsByName', 'NotShowFieldsByName')],
+                ['mobileFields', getFieldRefs(item, 'mobileFields', 'MobileFields')],
+            ];
+            for (const [groupName, refs] of fieldGroups) {
+                for (const ref of refs) {
+                    if (!fields.has(ref.ref.toLowerCase()) && !isSystemFieldName(ref.ref)) {
+                        errors.push(`modules.${moduleName || tableRef}.${groupName} references unknown field "${ref.ref}" on table "${tableRef}"`);
+                    }
+                }
+            }
+        }
+        if (tableRef && !getFieldRefs(item, 'listFields', 'ListFields', 'tableFields', 'TableFields', 'columns', 'Columns').length && !getExplicitJsonString(item, 'TableDiyFieldIds', 'SelectFields')) {
+            warnings.push(`module ${moduleName || tableRef} has no listFields; generator will use the first business fields from ${tableRef}`);
+        }
         plan.push(`create_or_update_module ${getString(item, 'name', 'Name')}`);
     });
     permissions.forEach((item) => plan.push(`set_permission ${getString(item, 'roleId', 'RoleId') || 'admin'}`));
@@ -297,14 +570,17 @@ async function upsertEngine(client, engine) {
     }
     return client.createEngine({ ApiEngineKey: apiEngineKey, ApiName: apiName, Category: category, Code: code });
 }
-function modulePayload(module, tableIdByName, moduleIdByName) {
+function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
     const tableRef = getString(module, 'table', 'tableName', 'diyTableName', 'DiyTableName');
     const normalized = normalizeAllMenuJson(module);
     if (normalized.errors.length)
         throw new Error(normalized.errors.join('\n'));
     const diyTableId = getString(module, 'diyTableId', 'DiyTableId') || (tableRef ? tableIdByName.get(tableRef.toLowerCase()) : '');
+    const tableName = tableRef || getString(module, 'DiyTableName', 'diyTableName');
+    const resolvedFields = fieldLookup ? resolveModuleFields(module, fieldLookup, diyTableId || '', tableName) : {};
     const payload = compactObject({
         ...normalized.data,
+        ...resolvedFields,
         Name: getString(module, 'name', 'Name'),
         DiyTableId: diyTableId,
         ParentId: getString(module, 'parentId', 'ParentId') || (moduleIdByName ? moduleIdByName.get(getString(module, 'parentName', 'ParentName').toLowerCase()) : undefined),
@@ -316,10 +592,21 @@ function modulePayload(module, tableIdByName, moduleIdByName) {
         Url: getString(module, 'url', 'Url'),
         Sort: getNumber(module, 'sort', 'Sort'),
         Icon: getString(module, 'icon', 'Icon'),
-        SearchFieldIds: getString(module, 'searchFieldIds', 'SearchFieldIds'),
-        TableDiyFieldIds: getString(module, 'tableDiyFieldIds', 'TableDiyFieldIds'),
-        DefaultOrderBy: getString(module, 'defaultOrderBy', 'DefaultOrderBy'),
+        SearchFieldIds: getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') || resolvedFields.SearchFieldIds,
+        TableDiyFieldIds: getExplicitJsonString(module, 'tableDiyFieldIds', 'TableDiyFieldIds') || resolvedFields.TableDiyFieldIds,
+        SelectFields: getExplicitJsonString(module, 'selectFields', 'SelectFields') || resolvedFields.SelectFields,
+        DefaultOrderBy: getExplicitJsonString(module, 'DefaultOrderBy') || resolvedFields.DefaultOrderBy,
         SqlWhere: getString(module, 'sqlWhere', 'SqlWhere'),
+        SqlJoin: getString(module, 'sqlJoin', 'SqlJoin'),
+        JoinTables: getExplicitJsonString(module, 'joinTables', 'JoinTables'),
+        SortFieldIds: getExplicitJsonString(module, 'sortFieldIds', 'SortFieldIds') || resolvedFields.SortFieldIds,
+        NotShowFields: getExplicitJsonString(module, 'notShowFields', 'NotShowFields') || resolvedFields.NotShowFields,
+        StatisticsFields: getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields') || resolvedFields.StatisticsFields,
+        InTableEdit: getNumber(module, 'inTableEdit', 'InTableEdit'),
+        InTableEditFields: getExplicitJsonString(module, 'inTableEditFields', 'InTableEditFields') || resolvedFields.InTableEditFields,
+        MobileListFields: getExplicitJsonString(module, 'mobileListFields', 'MobileListFields') || resolvedFields.MobileListFields,
+        CardTitleTagFields: getExplicitJsonString(module, 'cardTitleTagFields', 'CardTitleTagFields') || resolvedFields.CardTitleTagFields,
+        CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
         DiyConfig: stringifyConfig(module.diyConfig ?? module.DiyConfig),
     });
     return payload;
@@ -379,8 +666,72 @@ function jobPayload(job) {
         JobPath: getString(job, 'JobPath', 'jobPath'),
     });
 }
+function manifestGuide(osClient) {
+    return {
+        osClient,
+        workflow: [
+            'Call microi_get_db_schema first to inspect existing tables.',
+            'Call microi_get_manifest_schema to draft a manifest from the user requirement.',
+            'Call microi_plan_system with the manifest and fix all errors.',
+            'Call microi_generate_system with dryRun=true.',
+            `Call microi_generate_system with dryRun=false and confirmExecution="${osClient || 'EXECUTE'}" only after the user confirms writes.`,
+            'Call microi_validate_system after generation if you need an independent validation pass.',
+        ],
+        manifestShape: {
+            name: 'System name',
+            roles: [{ name: 'Admin', level: 999 }],
+            tables: [{
+                    name: 'Biz_Order',
+                    description: 'Order main table',
+                    fields: [
+                        { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
+                        { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', notEmpty: 1, tableWidth: 160, sort: 20 },
+                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
+                    ],
+                }],
+            engines: [{ apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" }],
+            events: [{ formEngineKey: 'Biz_Order', eventType: 'SubmitBeforeServerV8', code: "if (!V8.Form.OrderNo) return { Code: 0, Msg: 'OrderNo required' };" }],
+            modules: [{
+                    name: 'Orders',
+                    table: 'Biz_Order',
+                    icon: 'Document',
+                    listFields: ['OrderNo', 'CustomerName', 'Status', 'CreateTime'],
+                    searchFields: ['OrderNo', 'CustomerName', 'Status'],
+                    sortFields: ['CreateTime'],
+                    defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
+                    moreBtns: [{ Name: 'Submit', BtnStyle: 'primary', V8CodeShow: "V8.Result=V8.Form.Status=='Draft';", V8Code: "var r=await V8.ApiEngine.Run({ApiEngineKey:'biz_order_submit',Id:V8.Form.Id});V8.Result=r;" }],
+                }],
+            permissions: [{ roleId: 'admin', moduleNames: ['Orders'] }],
+            dataSources: [],
+            pages: [],
+            printTemplates: [],
+            workflows: [],
+            jobs: [],
+        },
+        naturalFieldKeys: {
+            modules: {
+                table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
+                listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields.',
+                searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array.',
+                sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds.',
+                hiddenFields: 'Field names/labels/ids to hide. Produces NotShowFields.',
+                editableFields: 'Field names/labels/ids for in-table editing. Produces InTableEditFields.',
+                mobileFields: 'Field names/labels/ids for mobile card list. Produces MobileListFields.',
+                cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields.',
+                cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields.',
+            },
+        },
+        rules: [
+            'Use table and field names in manifests; do not ask the user for diy_field ids.',
+            'Put business logic in API engines and call them from menu button V8Code.',
+            'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
+            'Use dryRun=true until the user explicitly asks to write.',
+        ],
+    };
+}
 export function registerAdvancedTools(server, client, context) {
     const osClient = context.osClient;
+    server.tool('microi_get_manifest_schema', 'Return the recommended full-system manifest schema for natural-language Microi generation, including field-name based module configuration.', {}, async () => textResult(JSON.stringify(manifestGuide(osClient), null, 2)));
     server.tool('microi_validate_menu_buttons', 'Validate and normalize sys_menu button/tab JSON arrays (MoreBtns/FormBtns/BatchSelectMoreBtns/PageTabs/ExportMoreBtns/PageBtns). Returns canonical JSON strings with generated Id/Sort/default visibility.', {
         moreBtns: z.unknown().optional(),
         formBtns: z.unknown().optional(),
@@ -429,6 +780,7 @@ export function registerAdvancedTools(server, client, context) {
         const tableIdByName = new Map();
         const moduleIdByName = new Map();
         const roleIdByName = new Map();
+        const fieldLookup = createFieldLookup();
         try {
             await audit(client, 'microi_generate_system:start', getString(manifest, 'name', 'Name') || 'manifest', manifest);
             for (const role of getArray(manifest, 'roles', 'Roles')) {
@@ -486,7 +838,29 @@ export function registerAdvancedTools(server, client, context) {
                     results.push({ step: 'addField', tableName, fieldName: getString(field, 'name', 'Name'), response: addResponse });
                     if (addResponse.Code !== 1)
                         return textResult(JSON.stringify({ ok: false, failedAt: 'addField', tableName, field, response: addResponse, results }, null, 2), true);
+                    const fieldId = getString(asRecord(addResponse.Data), 'FieldId', 'Id');
+                    const fieldName = getString(fieldPayload, 'Name');
+                    if (fieldId && fieldName) {
+                        addFieldMeta(fieldLookup, {
+                            id: fieldId,
+                            name: fieldName,
+                            label: getString(fieldPayload, 'Label') || fieldName,
+                            tableId,
+                            tableName,
+                            tableDescription: getString(table, 'description', 'Description') || tableName,
+                            component: getString(fieldPayload, 'Component') || 'Text',
+                            type: getString(fieldPayload, 'Type') || 'varchar(255)',
+                        });
+                    }
                 }
+            }
+            const schemaResponse = await client.getDbSchema();
+            results.push({ step: 'refreshDbSchema', response: { Code: schemaResponse.Code, Msg: schemaResponse.Msg, Summary: asRecord(asRecord(schemaResponse.Data).Summary) } });
+            if (schemaResponse.Code === 1) {
+                populateFieldLookupFromSchema(fieldLookup, schemaResponse.Data, tableIdByName);
+            }
+            else {
+                plan.warnings.push(`Could not refresh schema before module field resolution: ${schemaResponse.Msg || schemaResponse.Code}`);
             }
             for (const dataSource of getArray(manifest, 'dataSources', 'DataSources')) {
                 const payload = dataSourcePayload(dataSource);
@@ -508,7 +882,7 @@ export function registerAdvancedTools(server, client, context) {
                     return textResult(JSON.stringify({ ok: false, failedAt: 'saveEvent', event, response, results }, null, 2), true);
             }
             for (const module of getArray(manifest, 'modules', 'Modules')) {
-                const payload = modulePayload(module, tableIdByName, moduleIdByName);
+                const payload = modulePayload(module, tableIdByName, moduleIdByName, fieldLookup);
                 const response = await client.createModule(payload);
                 results.push({ step: 'createModule', moduleName: payload.Name, response });
                 if (response.Code !== 1)

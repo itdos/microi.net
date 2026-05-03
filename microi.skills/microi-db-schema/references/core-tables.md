@@ -1,314 +1,17 @@
-# Microi吾码数据库字典
+# Core Microi Tables
 
-> 本文基于 `ai-helper/microi/db.json` 重写，覆盖 Microi吾码低代码平台的核心元数据表、系统表和主要业务配置表。当前导出包含 75 张表、975 个可配置字段。
+Use this reference when exact field names are needed for core platform configuration tables.
 
-## 阅读重点
+## Core Table Notes
 
-- `diy_table` 是表单/表定义中心，保存表级配置、表单 V8 事件、后端提交事件、树形/缓存/匿名访问/数据日志等能力。
-- `diy_field` 是字段定义中心，保存每张表的字段名、字段类型、控件、数据源、校验、显隐、字段 V8 事件和模板 V8。
-- `sys_menu` 是模块/菜单中心，把 `diy_table` 变成可访问的页面模块，并保存列表查询、按钮、导入导出、卡片、移动端、工作流和权限配置。
-- `sys_apiengine`、`sys_datasource`、`microi_database`、`Sys_Config`、`sys_osclients` 分别支撑接口引擎、数据源引擎、扩展数据库、系统配置和 SaaS 租户配置。
-- `wf_*` 表构成工作流引擎；`sys_user/sys_role/sys_rolelimit/sys_dept` 构成用户、角色、权限和组织体系。
-
-## 全局约定
-
-### 字典来源与边界
-
-`db.json` 是平台表结构字典，结构为表数组：每个表包含 `Id`、`Name`、`Description`、`_Fields`，每个字段包含 `Name`、`Label`、`Description`、`Type`、`Component`、`TableChildTableId`、`TableChildSysMenuId`。它不是完整 DDL，也不包含业务数据。
-
-### 固定字段
-
-平台创建 DIY 表时会自动带一组固定字段，`db.json` 的 `_Fields` 通常只展示可配置字段。固定字段来自 `DiyCommon.FixedDiyField`：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `Id` | `varchar(36)` | 主键 Guid |
-| `CreateTime` | `datetime` | 创建时间 |
-| `UpdateTime` | `datetime` | 修改时间 |
-| `UserId` | `varchar(36)` | 创建人 Id |
-| `UserName` | `varchar(255)` | 创建人 |
-| `IsDeleted` | `int` | 逻辑删除标记，常规查询默认排除 `IsDeleted = 1` |
-
-### 非真实数据库字段组件
-
-`OpenTable`、`DevComponent`、`PhoneSMS`、`TableChild`、`Button`、`Divider` 属于配置/交互型组件，不应按普通业务列理解；其中 `TableChild` 通过 `TableChildTableId` 和 `TableChildSysMenuId` 指向子表和子模块。
-
-## 核心关系
-
-| 关系 | 说明 |
-|---|---|
-| `diy_table.Id` -> `diy_field.TableId` | 一张表对应多条字段配置。 |
-| `diy_table.Name` -> 业务表名 | `V8.FormEngine.*` 的第一个参数通常使用表名/表 Key。 |
-| `sys_menu.DiyTableId` -> `diy_table.Id` | 菜单模块绑定一张表单。 |
-| `sys_menu.DiyTableName` -> `diy_table.Name` | 模块运行时也常按表名取数。 |
-| `diy_field.TableChildTableId` -> `diy_table.Id` | 子表组件绑定目标表。 |
-| `diy_field.TableChildSysMenuId` -> `sys_menu.Id` | 子表组件绑定目标菜单模块。 |
-| `sys_rolelimit.FkId` + `RoleId` | 保存角色对菜单、按钮、数据等对象的授权。 |
-| `wf_flowdesign.TableId` -> `diy_table.Id` | 工作流设计绑定业务表单。 |
-| `wf_node.FlowDesignId` / `wf_line.FlowDesignId` -> `wf_flowdesign.Id` | 节点和连线属于同一个流程图。 |
-| `wf_flow.TableRowId` -> 业务表 `Id` | 流程实例对应某条表单数据。 |
-| `sys_apiengine.ApiEngineKey` | 通过 `V8.ApiEngine.Run(key, param)` 调用。 |
-| `microi_database.DbKey` | 通过 `V8.Dbs.<DbKey>.FromSql(...)` 访问扩展库。 |
-
-### 当前字典中的子表引用
-
-| 主表 | 字段 | 标签 | 子表 | 子菜单Id |
-|---|---|---|---|---|
-| `diy_license` | `ShouquanRZ` | 授权日志 | `diy_license_log` | `96de82ce-bf8d-4998-ab19-5eae581b87e3` |
-| `diy_queue_receive` | `RizhiXX` | 日志信息 | `diy_queue_receive_log` | `ca93d252-b69b-474a-81da-89c0f8657692` |
-| `diy_schedule_job` | `RizhiLB` | 日志列表 | `diy_schedule_job_log` | `29ae2648-10bb-489e-ba78-64a43f233141` |
-| `mci_mqtt_client` | `MqttLogs` | 通讯日志 | `mci_mqtt_log` | `2a1292d5-32ed-410f-89d8-38dca487d181` |
-| `mic_ai` | `AiModelLog` |  | `mic_ai_record` | `01KJ8AAPZVHAQKY9E5JXE511MW` |
-| `mic_msgset` | `TableChild99` |  | `mic_msg_event_log` | `5380cf1b-cd4c-4587-a42d-506449284d8b` |
-| `Rpt_Report` | `RptFieldList` | 字段配置 | `diy_field` | `4aa7036f-92e7-457e-8ddb-5f7461f75d5f` |
-
-## V8代码存储位置
-
-| 表 | 字段 | 运行位置 | 用途 |
-|---|---|---|---|
-| `diy_table` | `InFormV8` | 前端 | 表单打开/进入时执行，初始化字段显隐、默认值、联动状态。 |
-| `diy_table` | `SubmitFormV8` | 前端 | 表单提交前执行，做前端校验和提交前加工。 |
-| `diy_table` | `OutFormV8` | 前端 | 表单提交后/关闭后执行，常用于刷新、跳转和提示。 |
-| `diy_table` | `SubmitBeforeServerV8` | 后端 | 数据写入数据库前、事务内执行，失败返回 Code=0 可阻止提交。 |
-| `diy_table` | `SubmitAfterServerV8` | 后端 | 数据写入数据库后、提交前执行，常用于同步其它表、通知、日志。 |
-| `diy_table` | `ServerDataV8` | 后端 | 后端数据处理事件，常用于行数据加工。 |
-| `diy_table` | `ApiReplace` | 后端 | 表单接口替换/增强入口。 |
-| `diy_field` | `V8Code` | 前端 | 字段值变更事件。 |
-| `diy_field` | `KeyupV8Code` | 前端 | 键盘事件。 |
-| `diy_field` | `V8TmpEngineTable` | 前端/渲染 | 表格模板 V8，用于列表单元格渲染。 |
-| `diy_field` | `V8TmpEngineForm` | 前端/渲染 | 表单模板 V8，用于表单展示。 |
-| `sys_menu` | `AddCodeShowV8` | 前端 | [新增]按钮显示条件。 |
-| `sys_menu` | `EditCodeShowV8` | 前端 | [编辑]按钮显示条件。 |
-| `sys_menu` | `DelCodeShowV8` | 前端 | [删除]按钮显示条件。 |
-| `sys_menu` | `DetailPageV8` | 前端 | 详情按钮行为。 |
-| `sys_menu` | `DiyConfig` | 前端/模块 | 模块级自定义配置。 |
-| `sys_menu` | `SqlJoin` | 后端查询 | 列表查询 JOIN 片段。默认主表别名为 A。 |
-| `sys_menu` | `SqlWhere` | 后端查询 | 模块级 Where 片段，可使用 CurrentUser 变量。 |
-| `sys_menu` | `ImportV8` | 导入 | 导入处理扩展。 |
-| `sys_menu` | `ExportV8` | 导出 | 导出处理扩展。 |
-| `sys_apiengine` | `ApiV8Code` | 后端 | 接口引擎服务器端 JavaScript。 |
-| `sys_datasource` | `V8DataSource` | 后端 | V8 数据源。 |
-| `sys_datasource` | `SqlDataSource` | 后端 | SQL 数据源。 |
-| `sys_datasource` | `JsonDataSource` | 配置 | 静态 JSON 数据源。 |
-| `Sys_Config` | `GlobalV8Code` | 前端全局 | 前端全局 V8 初始化。 |
-| `Sys_Config` | `GlobalServerV8Code` | 后端全局 | 每次后端 V8 执行时加载的全局函数。 |
-| `wf_flowdesign` | `StartV8 / EndV8` | 工作流 | 流程开始/结束事件。 |
-| `wf_node` | `StartV8 / EndV8 / StartV8Server / EndV8Server / LineValueV8` | 工作流节点 | 节点进入、结束、条件判断和服务器端节点扩展。 |
-| `wf_line` | `V8Code` | 工作流线 | 流程连线条件代码。 |
-
-## 三张最关键的配置表
-
-### `diy_table`：表单/表定义中心
-
-`diy_table` 代表所有由表单引擎管理的表。它不只描述物理表，还保存表单布局、表级权限、缓存、匿名访问、树形结构、数据日志、加密、报表绑定以及表级 V8 事件。开发时看到一个 `FormEngineKey`、表名或表单配置，最终通常都能回到这张表。
-
-- 身份与数据库：`Name`、`Description`、`DataBaseId`、`DataBaseName`、`DataSourceId`。
-- 表单布局：`Column`、`Tabs`、`TableTabs`、`FormOpenType`、`FormOpenWidth`、`FormLabelPosition`、`InputBorderStyle`、`FieldBorder`。
-- V8 事件：`InFormV8`、`SubmitFormV8`、`SubmitBeforeServerV8`、`SubmitAfterServerV8`、`OutFormV8`、`ServerDataV8`、`ApiReplace`。
-- 访问与数据能力：`BindRole`、`IsAnonymousRead`、`IsAnonymousAdd`、`EnableCache`、`CacheParentKey`、`EnableDataLog`、`DataLogRole`、`EnableDataComment`、`DataEncryptSave`、`DataEncryptTransfer`。
-- 树形表：`IsTree`、`TreeParentField`、`TreeParentFields`、`TreeLazy`、`TreeHasChildren`。
-
-### `diy_field`：字段定义中心
-
-`diy_field` 是每张 DIY 表的字段元数据。字段是否真的落库，取决于 `Type`、`Component` 和组件类型；`TableChild`、`Button`、`Divider` 等偏交互组件不应当按普通物理列处理。
-
-- 归属与物理列：`TableId`、`TableName`、`Name`、`Type`、`Component`、`IsVirtual`、`IsLockField`、`NameConfirm`。
-- 展示与交互：`Label`、`Description`、`Placeholder`、`Sort`、`Visible`、`AppVisible`、`Readonly`、`FormWidth`、`TableWidth`、`ComponentWidth`、`Tab`、`FormLabelPosition`。
-- 校验与权限：`NotEmpty`、`Unique`、`BindRole`、`Encrypt`、`InTableEdit`。
-- 数据源与配置：`Data`、`DataAppend`、`Config`、`DefaultValue`、`Code`、`Remark`。
-- 字段事件与模板：`V8Code`、`KeyupV8Code`、`V8TmpEngineTable`、`V8TmpEngineForm`。
-
-### `sys_menu`：模块/菜单中心
-
-`sys_menu` 把一张 DIY 表包装成用户可访问的模块页面。它决定模块路由、父子菜单、打开方式、绑定表单、查询列、搜索列、JOIN/WHERE、按钮、导入导出、卡片、移动端展示、工作流绑定和微服务能力。
-
-- 菜单与路由：`Name`、`Code`、`ModuleEngineKey`、`ParentId`、`ParentIds`、`Url`、`OpenType`、`ComponentName`、`ComponentPath`、`PageTemplate`、`IconClass`、`IconComponent`、`Icon`、`Display`、`AppDisplay`。
-- 表单绑定：`DiyTableId`、`DiyTableName`、`FlowDesignId`、`ReportId`、`ReportName`。
-- 列表查询：`SelectFields`、`SearchFieldIds`、`SortFieldIds`、`DefaultOrderBy`、`NotShowFields`、`FixedFields`、`SqlJoin`、`SqlWhere`、`JoinTables`、`TableHeaders`、`StatisticsFields`。
-- 按钮体系：`PageBtns`、`MoreBtns`、`FormBtns`、`BatchSelectMoreBtns`、`ExportMoreBtns`、`AddBtnType`、`AddBtnText`、`SaveBtnText`、`AddCodeShowV8`、`EditCodeShowV8`、`DelCodeShowV8`、`DetailPageV8`。
-- 导入导出：`ImportApi`、`ImportProgressApi`、`ExportApi`、`ImportTemplate`、`ImportTemplateName`、`ImportV8`、`ExportV8`。
-- 视图形态：`TableCardImgField`、`TableCardImgPosition`、`TableCardImgStyle`、`TableCardCol`、`CardTitleTagFields`、`CardBottomTagFields`、`MobileListFields`、`PageTabs`。
-
-## 关键系统表
-
-| 表名 | 作用 | 常用字段 |
-|---|---|---|
-| `sys_apiengine` | 接口引擎定义表 | `ApiEngineKey`、`ApiV8Code`、`ApiAddress`、`StopHttp`、`AllowAnonymous`、`ResponseFile`、`Lock`、`LockKey`、`Timeout`、`MaxStatements`、`LimitMemory`、`LimitRecursion` |
-| `sys_datasource` | 数据源引擎定义表 | `DataSourceKey`、`DataSourceType`、`V8DataSource`、`SqlDataSource`、`JsonDataSource`、`AllowAnonymous`、`DataSourceRole` |
-| `microi_database` | 扩展数据库连接配置 | `DbKey`、`DbType`、`DbConn`、`DbReadConn`、`DbName`、`DbVersion`、`IsEnable` |
-| `Sys_Config` | 全局系统配置 | `SysTitle`、`ApiBase`、`FileServer`、`HDFS`、`GlobalV8Code`、`GlobalServerV8Code`、`PwdV8`、`EnableSwagger`、`EnableCaptcha` |
-| `sys_osclients` | SaaS 租户/客户端配置 | `OsClient`、`ClientName`、`DbType`、`DbConn`、`DbReadConn`、`RedisHost`、`AuthSecret`、`DomainName`、`CorsAllowOrigins`、`HDFS`、`Mqtt*`、`MQ*` |
-| `sys_user` | 用户/员工账号 | `Account`、`Name`、`Pwd`、`PwdEncode`、`RoleIds`、`DeptId`、`DeptIds`、`Level`、`State`、`TenantId` |
-| `sys_role` | 角色 | `Name`、`Level`、`DeptIds`、`TenantId`、`BaseLimit` |
-| `sys_rolelimit` | 角色授权明细 | `RoleId`、`FkId`、`Type`、`Permission`、`Customer` |
-| `sys_dept` | 组织机构 | `Name`、`ParentId`、`Code`、`State`、`TenantId` |
-| `wf_flowdesign` | 流程图设计 | `FlowName`、`TableId`、`JsonData`、`StartV8`、`EndV8`、`Roles`、`IsEnable` |
-| `wf_node` | 流程节点配置 | `FlowDesignId`、`NodeName`、`NodeType`、`Roles`、`Users`、`StartV8`、`EndV8`、`StartV8Server`、`EndV8Server`、`LineValueV8` |
-| `wf_line` | 流程连线/条件 | `FlowDesignId`、`FromNodeId`、`ToNodeId`、`LineValue`、`V8Code` |
-| `wf_flow` | 流程实例 | `FlowDesignId`、`TableId`、`TableRowId`、`FlowNo`、`FlowState`、`FormData` |
-| `wf_work` | 待办工作 | `FlowId`、`NodeId`、`ReceiverId`、`WorkState`、`Timeout`、`TableRowId` |
-| `wf_history` | 流程轨迹 | `FlowId`、`WorkId`、`ApprovalType`、`ApprovalIdea`、`LineValue`、`FormData` |
-
-## 表分类总览
-
-### 低代码元数据与引擎配置
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `diy_table` | 43 | Diy_Table |
-| `diy_field` | 36 | Diy_Field |
-| `diy_component` | 11 | 表单引擎组件 |
-| `sys_menu` | 91 | 模块引擎 |
-| `sys_apiengine` | 26 | 接口引擎 |
-| `sys_datasource` | 12 | 数据源引擎 |
-| `microi_database` | 10 | 数据库管理 |
-| `mic_page` | 6 | 界面引擎 |
-| `mic_print` | 6 | 打印引擎 |
-| `microi_print_template` | 3 | 导出模板 |
-| `Rpt_Report` | 15 | 报表引擎 |
-| `rpt_user_setting` | 6 | [系统]个人设置 |
-| `diy_LeftJoinRightView` | 31 | 左右结构配置表 |
-
-### 系统、租户、权限与审计
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `Sys_Config` | 70 | 系统设置 |
-| `sys_osclients` | 92 | OsClients |
-| `sys_user` | 37 | 员工信息 |
-| `sys_role` | 9 | Sys_Role |
-| `sys_rolelimit` | 5 | sys_rolelimit |
-| `sys_dept` | 9 | Sys_Dept |
-| `diy_tenant` | 1 | 租户管理 |
-| `sys_basedata` | 9 | sys_basedata |
-| `sys_log` | 11 | sys_log |
-| `microi_datalog` | 9 | 数据日志 |
-| `diy_lang` | 12 | 多语言 |
-| `sys_servernode` | 6 | 服务器节点管理 |
-| `sys_microiservice` | 6 | 微服务 |
-
-### 工作流引擎
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `wf_flowdesign` | 12 | 工作流设计 |
-| `wf_node` | 28 | 流程引擎节点属性 |
-| `wf_line` | 6 | 工作流程条件引擎线属性 |
-| `wf_flow` | 15 | 流程实例 |
-| `wf_work` | 21 | 工作流工作 |
-| `wf_history` | 23 | 流程轨迹/历史/记录 |
-| `wf_nodelist` | 5 | 节点列表 |
-
-### 消息、集成与自动化
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `diy_queue_receive` | 11 | 消息队列管理 |
-| `diy_queue_receive_log` | 9 | 消息队列日志 |
-| `mci_mqtt_client` | 5 | MQTT客户端 |
-| `mci_mqtt_log` | 4 | MQTT记录 |
-| `diy_schedule_job` | 22 | 定时任务表 |
-| `diy_schedule_job_log` | 2 | 定时任务日志 |
-| `diy_feishu_app` | 4 | 应用列表 |
-| `diy_qiwei_app` | 5 | 企业微信应用 |
-| `wx_mp` | 7 | 微信公众号配置 |
-| `wx_menu` | 3 | 微信公众号自定义菜单 |
-| `wx_mini_program` | 3 | 微信小程序 |
-| `wx_tpl_msg` | 10 | 公众号模板消息 |
-| `mic_email_server` | 7 | 邮件配置 |
-| `mic_msgset` | 10 | 消息通知设置 |
-| `mic_msg_event_log` | 5 | 消息通知事件日志 |
-
-### 内容、运营与平台功能
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `diy_document` | 7 | 低代码平台文档 |
-| `diy_news` | 2 | 网站文章 |
-| `diy_notice` | 4 | 公告 |
-| `diy_tips` | 5 | 提醒 |
-| `diy_wallpaper` | 4 | 壁纸管理 |
-| `diy_modulehits` | 9 | 模块访问次数统计 |
-| `diy_menufavorite` | 4 | 菜单收藏夹 |
-| `mic_ai` | 19 | AI模型管理 |
-| `mic_ai_record` | 5 | mic_ai_record |
-| `mic_data_dashboard` | 5 | 数据大屏 |
-| `mic_data_version` | 10 | 数据版本 |
-| `mic_day_word` | 2 | 每日一言 |
-| `microi_calendar` | 6 | 日历 |
-| `microi_icon` | 3 | 图标管理 |
-| `diy_searchengine_name_alias` | 2 | 搜索引擎index名称和别名对应关系表 |
-| `diy_sso` | 6 | 单点登陆 |
-
-### 授权、商城与示例业务
-
-| 表名 | 字段数 | 说明 |
-|---|---:|---|
-| `diy_license` | 19 | 授权管理 |
-| `diy_license_log` | 9 | 授权日志 |
-| `sys_microistore` | 21 | 应用商城 |
-| `sys_microistoreversion` | 1 | 应用商城应用版本 |
-| `sys_appinstalled` | 6 | 已安装应用 |
-| `sys_microiuptlog` | 7 | 框架更新日志 |
-| `b2c_product` | 19 | b2c_product |
-| `diy_course` | 3 | 课程表 |
-| `eban` | 5 | EBAN |
-| `mic_memo` | 3 | 备忘录 |
-| `mic_3d_engine` | 0 | 3D引擎 |
-
-## 组件与字段类型统计
-
-### 控件组件 Top 20
-
-| 组件 | 字段数 |
-|---|---:|
-| `Text` | 403 |
-| `Switch` | 108 |
-| `Textarea` | 94 |
-| `NumberText` | 55 |
-| `Guid` | 53 |
-| `Radio` | 47 |
-| `CodeEditor` | 47 |
-| `Select` | 35 |
-| `MultipleSelect` | 22 |
-| `ImgUpload` | 17 |
-| `JsonTable` | 16 |
-| `DateTime` | 12 |
-| `Button` | 10 |
-| `RichText` | 7 |
-| `TableChild` | 7 |
-| `ColorPicker` | 6 |
-| `SelectTree` | 5 |
-| `Cascader` | 5 |
-| `FileUpload` | 4 |
-| `AutoNumber` | 4 |
-
-### 字段类型 Top 20
-
-| 类型 | 字段数 |
-|---|---:|
-| `varchar(50)` | 337 |
-| `mediumtext` | 212 |
-| `int` | 128 |
-| `varchar(36)` | 66 |
-| `varchar(255)` | 63 |
-| `varchar(100)` | 36 |
-| `varchar(500)` | 28 |
-| `(空)` | 21 |
-| `bit` | 20 |
-| `varchar(25)` | 20 |
-| `int(11)` | 15 |
-| `varchar(200)` | 7 |
-| `decimal(19,2)` | 5 |
-| `varchar(1000)` | 4 |
-| `VARCHAR2` | 4 |
-| `datetime` | 3 |
-| `varchar(3600)` | 1 |
-| `decimal(18, 2)` | 1 |
-| `varchar(150)` | 1 |
-| `varchar(220)` | 1 |
-
-## 核心表字段明细
+- `diy_table`: table/form metadata and table-level events.
+- `diy_field`: field metadata and field-level events/templates.
+- `sys_menu`: module/menu/list/button/query configuration.
+- `sys_apiengine`: API engine scripts and execution controls.
+- `sys_datasource`: V8/SQL/JSON datasource definitions.
+- `sys_osclients`: SaaS tenant, storage, Redis, MQ, MQTT, auth, and domain config.
+- `Sys_Config`: global platform settings and global V8 code.
+- `wf_*`: workflow design and runtime tables.
 
 ### `diy_table` - Diy_Table
 
@@ -443,7 +146,7 @@
 | `ImportTemplate` | 导入模板 | `varchar(255)` | `FileUpload` | 导入模板 |
 | `StoreId` | StoreId | `varchar(36)` | `Text` | StoreId |
 | `BatchSelectMoreBtns` | [批量选择]更多按钮 | `mediumtext` | `JsonTable` | [批量选择]更多按钮 |
-| `SqlJoin` | Join关联 | `mediumtext` | `CodeEditor` | 示例：INNER JOIN Sys_User B ON A.UserId = B.Id<br>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'… |
+| `SqlJoin` | Join关联 | `mediumtext` | `CodeEditor` | 示例：INNER JOIN Sys_User B ON A.UserId = B.Id<br>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'<br>注意：默认选择的DIY表已经占用了表别名A。<br>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$Cur… |
 | `TableCardImgField` | 卡片图片字段 | `varchar(50)` | `Text` | 卡片图片字段 |
 | `ParentIds` | ParentIds | `mediumtext` | `Text` | ParentIds |
 | `Link` | Link | `varchar(500)` | `Text` | Link |
@@ -484,7 +187,7 @@
 | `ImportTemplateName` | 导入模板名称 | `varchar(255)` | `Text` | 导入模板名称 |
 | `IsMicroiService` | 微服务 | `int` | `Switch` | 微服务 |
 | `StatisticsFields` | 统计列 | `mediumtext` | `JsonTable` | 统计列 |
-| `SqlWhere` | Where条件 | `mediumtext` | `CodeEditor` | 示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：<br>(A.UserId = '$CurrentUser.Id$' OR (B.Level > $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.De… |
+| `SqlWhere` | Where条件 | `mediumtext` | `CodeEditor` | 示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：<br>(A.UserId = '$CurrentUser.Id$' OR (B.Level > $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))<br>注意：默认选择的DIY表已经占用了表别名A。<br>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.D… |
 | `NotShowFields` | 不显示列 | `mediumtext` | `MultipleSelect` | 不显示列 |
 | `DiyTableId` | 选择表单 | `varchar(36)` | `Select` | 选择表单 |
 | `SecondMenuWidth` | 二级目录宽度 | `varchar(50)` | `Text` | 二级目录宽度 |
@@ -980,20 +683,3 @@
 | `TableId` | TableId | `varchar(36)` | `Guid` | TableId |
 | `FormData` | FormData | `mediumtext` | `Textarea` | FormData |
 | `LineValue` | LineValue | `varchar(50)` | `Text` | LineValue |
-
-## 使用建议
-
-- 写业务 CRUD 时优先通过 `V8.FormEngine` 和 `_Where` 使用表名/字段名，不要直接拼 SQL。
-- 写平台配置查询时先定位 `sys_menu`，再通过 `DiyTableId` 找 `diy_table`，最后通过 `diy_field.TableId` 找字段。
-- 判断一段 V8 代码在哪执行，先看它存在哪张表：表级事件在 `diy_table`，字段事件在 `diy_field`，按钮/模块行为在 `sys_menu`，接口逻辑在 `sys_apiengine`，工作流逻辑在 `wf_*`。
-- 修改 `diy_table` 或 `diy_field` 会影响运行时缓存和物理表结构，生产环境需要谨慎发布和回滚。
-- `sys_menu.SqlJoin` / `SqlWhere` 是模块查询增强点，默认主表别名为 `A`，应避免拼接未校验的用户输入。
-
-## AI Skills
-
-本次已新增 `microi.skills/microi-db-schema`，后续让 AI 分析 Microi 数据库、生成 V8 查询、判断字段归属或解释模块配置时，可优先引用：
-
-- `microi.skills/microi-db-schema/SKILL.md`
-- `microi.skills/microi-db-schema/references/schema-overview.md`
-- `microi.skills/microi-db-schema/references/core-tables.md`
-- `microi.skills/microi-db-schema/references/table-catalog.md`
