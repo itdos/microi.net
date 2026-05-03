@@ -6,6 +6,8 @@ export interface MicroiConfig {
     rsaPublicKey?: string;
     /** 直接传入已有 Token（跳过帐号密码登录，适用于需要验证码的服务器） */
     token?: string;
+    /** Token 文件路径（VS Code 扩展写入；MCP 自身刷新时也会回写以保持同步） */
+    tokenFilePath?: string;
 }
 export interface ApiResponse<T = unknown> {
     Code: number;
@@ -70,21 +72,42 @@ export declare class MicroiClient {
     private token;
     private refreshTimer?;
     private rsaPublicKey;
+    /** 同一时刻只允许一个刷新请求在飞 */
+    private inflightRefresh?;
     constructor(config: MicroiConfig);
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     private rsaEncrypt;
     /** 外部更新 token（由 VS Code 扩展 token 文件同步） */
     updateToken(newToken: string): void;
-    /** 登录并获取 JWT token（若已有 token 则直接启动刷新） */
-    login(options?: {
+    /** 登录并获取 JWT token（若已有 token 则直接启动刷新）
+     *  注意：即便传入了 token（来自 VS Code 扩展的 token 文件），也始终启动 MCP 自身的自动刷新作为兜底，
+     *  避免 VS Code 关闭时 token 不再续期导致 MCP 调用失败。
+     */
+    login(_options?: {
         skipAutoRefresh?: boolean;
     }): Promise<void>;
-    /** 每 12 分钟自动刷新 token（token 有效期 15 分钟） */
+    /** 每 12 分钟自动刷新 token（token 有效期通常 15 分钟） */
     private startAutoRefresh;
-    /** 通用 POST 请求 */
+    /** 立即调用 /api/SysUser/RefreshToken 以旧换新；成功后回写 token 文件。
+     *  并发请求会复用同一个 in-flight Promise。
+     */
+    refreshTokenNow(): Promise<boolean>;
+    /** 从 token 文件重新读取（VS Code 扩展可能刚刚写入了新 token）。返回是否更新了 this.token。 */
+    reloadTokenFromFile(): boolean;
+    /** 把当前 token 回写到 token 文件（保持与 VS Code 扩展同步） */
+    private writeTokenToFile;
+    /** 检测是否是 token 失效响应（Code=1001 NoLogin），若是则尝试恢复 token。
+     *  恢复策略：1) 重新读取 token 文件（VS Code 扩展可能刚写入新 token）；
+     *           2) 若 token 没变化或仍失效，调用 RefreshToken API 主动刷新；
+     *           3) 仍失败则用 username/password 重新登录（兜底）。
+     *  返回 true 表示 token 已更新，调用方可重试请求。
+     */
+    private tryRecoverFromAuthFailure;
+    /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
     private post;
-    /** 通用 GET 请求 */
+    /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
     private get;
+    private requestJson;
     getStatus(): Promise<ApiResponse>;
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
