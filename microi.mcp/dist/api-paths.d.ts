@@ -17,6 +17,10 @@ export declare const API: {
     readonly UPDATE_EVENT_CODE: "/api/V8Engine/UpdateV8EventCode";
     readonly CREATE_TABLE: "/api/V8Engine/CreateTable";
     readonly ADD_FIELD: "/api/V8Engine/AddField";
+    readonly UPDATE_FIELD: "/api/V8Engine/UpdateField";
+    readonly UPDATE_TABLE: "/api/V8Engine/UpdateTable";
+    readonly REFRESH_SCHEMA_CACHE: "/api/V8Engine/RefreshSchemaCache";
+    readonly SET_ENGINE_ANONYMOUS: "/api/V8Engine/SetEngineAnonymous";
     readonly CREATE_MODULE: "/api/V8Engine/CreateModule";
     readonly SET_ROLE_PERMISSION: "/api/V8Engine/SetRolePermission";
     readonly LIST_ROLES: "/api/V8Engine/ListRoles";

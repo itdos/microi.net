@@ -157,6 +157,10 @@ export declare class MicroiClient {
         Encrypt?: number;
         InTableEdit?: number;
     }): Promise<ApiResponse>;
+    updateField(patch: Record<string, unknown>): Promise<ApiResponse>;
+    updateTable(patch: Record<string, unknown>): Promise<ApiResponse>;
+    refreshSchemaCache(tables: string[]): Promise<ApiResponse>;
+    setEngineAnonymous(apiEngineKeys: string[], allowAnonymous?: number): Promise<ApiResponse>;
     createModule(data: {
         Name: string;
         DiyTableId?: string;

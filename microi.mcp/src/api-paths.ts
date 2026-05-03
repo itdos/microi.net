@@ -28,6 +28,10 @@ export const API = {
   // 低代码系统设计
   CREATE_TABLE: '/api/V8Engine/CreateTable',
   ADD_FIELD: '/api/V8Engine/AddField',
+  UPDATE_FIELD: '/api/V8Engine/UpdateField',
+  UPDATE_TABLE: '/api/V8Engine/UpdateTable',
+  REFRESH_SCHEMA_CACHE: '/api/V8Engine/RefreshSchemaCache',
+  SET_ENGINE_ANONYMOUS: '/api/V8Engine/SetEngineAnonymous',
   CREATE_MODULE: '/api/V8Engine/CreateModule',
   SET_ROLE_PERMISSION: '/api/V8Engine/SetRolePermission',
   LIST_ROLES: '/api/V8Engine/ListRoles',

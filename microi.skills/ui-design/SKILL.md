@@ -1028,34 +1028,34 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 
 ---
 
-## 🚨 移动端低代码项目落地踩坑（必�?- 2026.5�?
+## 🚨 移动端低代码项目落地踩坑（必�?- 2026.5�?
 
 实战中频繁出现的 7 类问题，团队复盘后总结为强制规范：
 
 ### 1. 路由前缀不要硬编码租户名
-- �?`manifest.json` �?`"router": { "base": "/lsg/" }`
-- �?`"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量 + 请求头完�?
-- 任何形如 `https://api.itdos.com/{tenant}/...` �?URL 都是错误的，平台对外只暴�?`/`、`/api/...`、`/apiengine/...`
+- �?`manifest.json` �?`"router": { "base": "/lsg/" }`
+- �?`"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量 + 请求头完�?
+- 任何形如 `https://api.itdos.com/{tenant}/...` �?URL 都是错误的，平台对外只暴�?`/`、`/api/...`、`/apiengine/...`
 
-### 2. tabBar 必须�?PNG 图标
-- uniapp / 微信小程序的 tabBar `iconPath` / `selectedIconPath` **只接受静�?PNG 文件路径**
-- 不允许：emoji 字符、字体图标、SVG（部分平台不支持）、远�?URL
-- 推荐尺寸�?0×60 ~ 81×81 px，未选中�?`#9898B0`，选中�?= 品牌主色
-- 可用 PowerShell + System.Drawing 一次性生�?5×2 = 10 个图标，保证统一风格
+### 2. tabBar 必须�?PNG 图标
+- uniapp / 微信小程序的 tabBar `iconPath` / `selectedIconPath` **只接受静�?PNG 文件路径**
+- 不允许：emoji 字符、字体图标、SVG（部分平台不支持）、远�?URL
+- 推荐尺寸�?0×60 ~ 81×81 px，未选中�?`#9898B0`，选中�?= 品牌主色
+- 可用 PowerShell + System.Drawing 一次性生�?5×2 = 10 个图标，保证统一风格
 
 ### 3. font-size 严禁通配 `.parent text { ... }`
-SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 子标�?`<text class="fz-22">`，导致标签字体被强行放大�?
-- �?`.qo text { font-size: 40rpx; }`
-- �?`.qo .qo-emoji { font-size: 40rpx; } .qo .qo-label { font-size: 22rpx; }`
-- 凡同一容器内同时含图标与文字，**必须**给图标和文字各自的具�?class
+SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 子标�?`<text class="fz-22">`，导致标签字体被强行放大�?
+- �?`.qo text { font-size: 40rpx; }`
+- �?`.qo .qo-emoji { font-size: 40rpx; } .qo .qo-label { font-size: 22rpx; }`
+- 凡同一容器内同时含图标与文字，**必须**给图标和文字各自的具�?class
 
-### 4. 我的�?/ 详情页菜单优先用网格单元格而非纵向列表
-参�?"乐闪�?�?环球捕手"�?云集" 等线上商城：
-- 5 列资产汇总条 �?4-5 列彩色图标网�?�?多行 4 列服务网�?
-- 单元�?cell 结构：`80rpx 圆角图标背景�?+ 22rpx 标签`，间�?16~24rpx
-- 不要�?"图标 �?文字 �?�?箭头" 的横排长列表（除非是设置类深层菜单）
+### 4. 我的�?/ 详情页菜单优先用网格单元格而非纵向列表
+参�?"乐闪�?�?环球捕手"�?云集" 等线上商城：
+- 5 列资产汇总条 �?4-5 列彩色图标网�?�?多行 4 列服务网�?
+- 单元�?cell 结构：`80rpx 圆角图标背景�?+ 22rpx 标签`，间�?16~24rpx
+- 不要�?"图标 �?文字 �?�?箭头" 的横排长列表（除非是设置类深层菜单）
 
-### 5. 必备微动效（每个可点击元素都要有反馈�?
+### 5. 必备微动效（每个可点击元素都要有反馈�?
 ```scss
 .cell, .entry-item, .product-card, .zone-card {
   transition: transform .2s ease, box-shadow .2s ease;
@@ -1069,15 +1069,173 @@ SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 
 .animate-fadein { animation: fadein-up .45s ease both; }
 ```
 
-### 6. 品牌�?/ Logo 在所有标题位置统一替换
+### 6. 品牌�?/ Logo 在所有标题位置统一替换
 - `manifest.json`: `name`、`h5.title`
 - `pages.json`: 每个页面 `navigationBarTitleText`、`globalStyle.navigationBarTitleText`
-- 各页面顶�?brand 文本（首�?hero、登录页 logo 区、注册页标题�?
-- 控制�?`console.log('[lsg-mall]')` 等技术代号可保留，但用户可见文案必须统一为产品名（如 `乐闪购`�?
+- 各页面顶�?brand 文本（首�?hero、登录页 logo 区、注册页标题�?
+- 控制�?`console.log('[lsg-mall]')` 等技术代号可保留，但用户可见文案必须统一为产品名（如 `乐闪购`�?
 
-### 7. 接口路径必须自动包含 ApiAddress（MCP 创建接口的硬规则�?
-平台动态路�?`/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` �?Redis 中查找�?*ApiAddress 为空 = 全部 404�?*
-- MCP `microi_create_engine` 已自�?`ApiAddress = '/apiengine/{apiEngineKey}'`
-- 手工 SQL / 直接 INSERT 创建的接口请补全 `ApiAddress` 字段，并写入缓存�?
-  `Microi:{osClient}:FormData:sys_apiengine:{apiAddress.toLowerCase()}` �?整行模型对象
-- 修复脚本可用一次�?V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })` �?`V8.Cache.Set` 三个键（key、Id、ApiAddress �?lowercase�?
+### 7. 接口路径必须自动包含 ApiAddress（MCP 创建接口的硬规则�?
+平台动态路�?`/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` �?Redis 中查找�?*ApiAddress 为空 = 全部 404�?*
+- MCP `microi_create_engine` 已自�?`ApiAddress = '/apiengine/{apiEngineKey}'`
+- 手工 SQL / 直接 INSERT 创建的接口请补全 `ApiAddress` 字段，并写入缓存�?
+  `Microi:{osClient}:FormData:sys_apiengine:{apiAddress.toLowerCase()}` �?整行模型对象
+- 修复脚本可用一次�?V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })` �?`V8.Cache.Set` 三个键（key、Id、ApiAddress �?lowercase�?
+
+
+## 🔗 外键字段必须使用 Id+Name 双控件设计（强制规范�?
+
+> **错误做法**：只建一�?`XxxId` 字段并设�?Select 下拉，存的是 Id，列表中显示的也�?Id —�?用户根本看不懂�?
+>
+> **正确做法**：`XxxId`（隐�?Text�? `XxxName`（显�?Select+SQL 数据源）成对出现。Name 控件的值变�?V8 事件自动�?Id 控件赋值�?
+
+### 字段对结�?
+
+| 字段 | Component | Visible | 用�?|
+|------|-----------|---------|------|
+| `XxxId` | Text | **0**（隐藏） | 实际外键 Id（数据库索引 / 关联查询用） |
+| `XxxName` | Select | 1 | 用户在表�?列表里看到的关联记录名称 |
+
+### XxxName 字段 Config（Sql 数据源）
+
+```jsonc
+{
+  "DataSource": "Sql",
+  "Sql": "select Id, Name from <关联�? where Name like '%$Keyword$%' limit 0,20",
+  "SelectLabel": "Name",          // 下拉显示字段
+  "SelectSaveField": "Name",      // 保存�?XxxName 的字段（注意保存的是 Name 而非 Id�?
+  "SelectSaveFormat": "Text",
+  "EnableSearch": true,
+  "DataSourceSqlRemote": true,    // 必须 true：每次输入关键字向后端查�?
+  "V8Code": "if (V8.ThisValue && typeof V8.ThisValue === 'object') { V8.Form.XxxId = V8.ThisValue.Id || ''; } else if (!V8.ThisValue) { V8.Form.XxxId = ''; }"
+}
+```
+
+**关键�?*�?
+1. `SelectSaveField` �?**Name 而非 Id** —�?`XxxName` 存的是名称，列表直接显示就有意义
+2. `DataSourceSqlRemote: true` —�?远程搜索，避免一次性把整张表拉到前�?
+3. `V8Code` 中通过 `V8.ThisValue` 拿到完整选项对象（包�?Id �?Name），赋值给 `V8.Form.XxxId` 即可同步外键 Id
+4. SQL �?`$Keyword$` 是占位符，会被替换为用户输入的关键字
+5. 若关联表"name 字段"叫别的（�?`mall_member.NickName`、`mall_shop.ShopName`、`mall_product.Title`、`mall_address.Receiver`、`mall_pickup_apply.ApplyNo`），需�?SQL �?Config 中相应替�?
+
+### 命名规范
+
+| 关联场景 | baseName | 字段�?| joinTable.joinNameField |
+|---------|---------|--------|------------------------|
+| 商品分类 | Category | CategoryId / CategoryName | mall_category.Name |
+| 会员（直推上�?/ 买家 / 卖家 / 持有�?/ 发起�?/ 目标人） | Parent / Buyer / Seller / Owner / Initiator / Target | XxxId / XxxName | mall_member.NickName |
+| 店铺 | Shop / ShopOwner | ShopId / ShopName | mall_shop.ShopName |
+| 商品 | Product / AnchorProduct | ProductId / ProductName | mall_product.Title |
+| 收货地址 | Address | AddressId / AddressName | mall_address.Receiver |
+
+### MCP 工具支持
+
+#### 新建外键对：`microi_add_join_field`
+```jsonc
+{
+  "tableId": "01XXX...",
+  "baseName": "Category",
+  "label": "分类",
+  "joinTableName": "mall_category",
+  "joinIdField": "Id",      // 默认 "Id"
+  "joinNameField": "Name",  // 默认 "Name"
+  "tab": "",
+  "sort": 100
+}
+```
+
+#### 修复存量字段：`microi_fix_join_field`（或直接调用 `_mcp_fix_join_field` 接口引擎�?
+- 自动隐藏 `XxxId`（Visible=0/AppVisible=0�?
+- 自动创建/更新 `XxxName` �?Select+SQL+V8Code 三件�?
+- 自动回填：遍历目标表所有非�?`XxxId` 行，�?Id 查询关联表的 Name，UPDATE �?`XxxName`
+- 幂等：重复调用不会重复创建字段，只会刷新 Config
+
+调用示例（dryRun 先看计划）：
+```jsonc
+microi_run_engine "_mcp_fix_join_field" {
+  "tableName": "mall_buy_order",
+  "baseName": "Buyer",
+  "label": "买家",
+  "joinTableName": "mall_member",
+  "joinNameField": "NickName",
+  "dryRun": true
+}
+```
+
+### 何时跳过 Name 字段
+
+只在以下场景下保留单 `XxxId` 字段（不�?Name 对）�?
+- 关联表完全没有可�?名称字段"（如�?Id 表）
+- 多态关联（同一字段可能指向多张不同表，�?`RelOrderId`�?
+- 高频写入的日志表外键，且管理后台不需要列表展�?
+
+其他所有业务表的外�?**必须** �?Id+Name 对�?
+
+---
+
+## 表单布局规范（Column）
+
+> 平台默认设计标准：所有 `diy_table` **应使用双列布局** (`Column = 2`)，更紧凑现代，符合主流后台 SaaS 视觉密度。
+
+### 创建表时
+
+```jsonc
+microi_create_table {
+  "name": "Crm_Customer",
+  "description": "客户",
+  "column": 2     // ✅ 默认就是 2，无需显式传，但推荐写明
+}
+```
+
+### 修复存量表（一次性把所有 `Column=null` 改成 2）
+
+```jsonc
+microi_update_table {
+  "name": "Crm_Customer",
+  "column": 2
+}
+```
+
+### 何时使用 Column=1（单列）
+
+- 工作流审批表单（字段少且需要专注）
+- 移动端优先表单（手机宽度不够双列）
+- 含大量富文本/长文本字段的内容编辑表
+
+### 何时使用 Column=3（三列）
+
+- 字段≥18 的"基础档案"类大表（员工、商品 SKU、设备清单）
+- 桌面分辨率≥1920px 的内部管理后台
+
+> 修改 `Column` 后会自动清缓存（`microi_update_table` 后端走 `UptFormData('diy_table')` + 主动 `RefreshSchemaCache`），前端硬刷新（Ctrl+Shift+R）即可看到效果。
+
+---
+
+## 缓存刷新（解决"我改了字段但页面不变"问题）
+
+平台对 `diy_field` 的字段列表有 Redis 缓存，键格式 `Microi:{OsClient}:FormData:diy_table_field_list:{TableId|TableName}`。
+
+**何时缓存会失效**：
+- ✅ 通过 `microi_add_field` / `microi_update_field` / `microi_update_table` 走原生 API → 自动清
+- ✅ 通过低代码后台界面操作（diy_table 表单事件触发）→ 自动清
+- ❌ 直接 `V8.FormEngine.UptFormData('diy_field', ...)` → **不会触发清缓存**（这是历史 bug）
+
+**何时手动清**：
+```jsonc
+microi_refresh_schema_cache { "tables": ["mall_address", "mall_member"] }
+```
+该工具会清除每张表的 6 个 key 变种（`diy_table` / `Diy_Table` / `diy_table_field_list` × `id|name`）。
+
+---
+
+## 接口引擎匿名访问
+
+登录、注册、首页公共数据等接口必须 `AllowAnonymous=1`，否则未登录用户调用会拿到 `null`：
+
+```jsonc
+microi_set_engine_anonymous {
+  "apiEngineKeys": ["mall_member_login", "mall_member_register", "mall_home_data"],
+  "allowAnonymous": 1
+}
+```
+
