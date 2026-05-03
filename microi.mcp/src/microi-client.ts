@@ -469,6 +469,35 @@ export class MicroiClient {
     });
   }
 
+  async updateField(patch: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.UPDATE_FIELD, {
+      OsClient: this.config.osClient,
+      ...patch,
+    });
+  }
+
+  async updateTable(patch: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.UPDATE_TABLE, {
+      OsClient: this.config.osClient,
+      ...patch,
+    });
+  }
+
+  async refreshSchemaCache(tables: string[]): Promise<ApiResponse> {
+    return this.post(API.REFRESH_SCHEMA_CACHE, {
+      OsClient: this.config.osClient,
+      Tables: tables,
+    });
+  }
+
+  async setEngineAnonymous(apiEngineKeys: string[], allowAnonymous = 1): Promise<ApiResponse> {
+    return this.post(API.SET_ENGINE_ANONYMOUS, {
+      OsClient: this.config.osClient,
+      ApiEngineKeys: apiEngineKeys,
+      AllowAnonymous: allowAnonymous,
+    });
+  }
+
   async createModule(data: {
     Name: string; DiyTableId?: string; ParentId?: string;
     ComponentName?: string; ComponentPath?: string;

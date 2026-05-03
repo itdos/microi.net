@@ -355,6 +355,31 @@ export class MicroiClient {
             ...data,
         });
     }
+    async updateField(patch) {
+        return this.post(API.UPDATE_FIELD, {
+            OsClient: this.config.osClient,
+            ...patch,
+        });
+    }
+    async updateTable(patch) {
+        return this.post(API.UPDATE_TABLE, {
+            OsClient: this.config.osClient,
+            ...patch,
+        });
+    }
+    async refreshSchemaCache(tables) {
+        return this.post(API.REFRESH_SCHEMA_CACHE, {
+            OsClient: this.config.osClient,
+            Tables: tables,
+        });
+    }
+    async setEngineAnonymous(apiEngineKeys, allowAnonymous = 1) {
+        return this.post(API.SET_ENGINE_ANONYMOUS, {
+            OsClient: this.config.osClient,
+            ApiEngineKeys: apiEngineKeys,
+            AllowAnonymous: allowAnonymous,
+        });
+    }
     async createModule(data) {
         return this.post(API.CREATE_MODULE, {
             OsClient: this.config.osClient,

@@ -601,13 +601,13 @@ export function createMcpServer(client, context) {
         description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
         tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Name":"基本信息"},{"Name":"详细信息"}]\'). Groups fields into tabs.'),
         isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
-        column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 1'),
+        column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
         formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
         formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
     }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth }) => {
         try {
             const result = await client.createTable(name, description, {
-                Tabs: tabs, IsTree: isTree, Column: column,
+                Tabs: tabs, IsTree: isTree, Column: column ?? 2,
                 FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
             });
             if (result.Code !== 1) {
@@ -667,6 +667,234 @@ export function createMcpServer(client, context) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
             return { content: [{ type: 'text', text: `✅ Field "${label}(${name})" added to table.` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 添加外键关联字段对（Id 隐藏 + Name 可见 Select+SQL）
+    // ========================
+    server.tool('microi_add_join_field', `Add a foreign-key field PAIR to a custom table for OsClient "${osClient}". Creates TWO fields atomically: (1) {baseName}Id — hidden varchar(50) Text storing the FK Id; (2) {baseName}Name — visible varchar(200) Select with DataSource:Sql showing and storing the Name, plus a FieldValueChange V8Code that copies the selected option's Id into the {baseName}Id field. This is the CORRECT pattern for any FK relationship in Microi — do NOT use a single Id-only field, as the list view cannot show the related Name without a join. IDEMPOTENT.`, {
+        tableId: z.string().describe('The TableId of the table to add fields into'),
+        baseName: z.string().describe('Base field name without Id/Name suffix, e.g. "Category", "Supplier", "Customer". The tool creates "{baseName}Id" + "{baseName}Name".'),
+        label: z.string().describe('Chinese display label, e.g. "分类", "供应商". Used as label of the visible Name field; the hidden Id field gets "{label}Id".'),
+        joinTableName: z.string().describe('Name of the related table to query, e.g. "mall_category", "mall_supplier"'),
+        joinIdField: z.string().optional().describe('Id field name in the related table. Default: "Id"'),
+        joinNameField: z.string().optional().describe('Display name field in the related table. Default: "Name"'),
+        joinWhere: z.string().optional().describe('Extra SQL WHERE clause appended to the lookup, e.g. "Status=\'Active\'". Do NOT include the leading AND.'),
+        tab: z.string().optional().describe('Form tab group both fields share'),
+        sort: z.number().optional().describe('Sort order applied to the visible Name field (Id field gets sort+1). Default: 100'),
+        notEmpty: z.number().optional().describe('Required flag, applied to the visible Name field (1=required). Default: 0'),
+        tableWidth: z.number().optional().describe('Column width in list view for the Name field. Default: 120'),
+        placeholder: z.string().optional().describe('Placeholder for the Name select. Default: "请选择{label}"'),
+    }, async ({ tableId, baseName, label, joinTableName, joinIdField, joinNameField, joinWhere, tab, sort, notEmpty, tableWidth, placeholder }) => {
+        try {
+            const idName = `${baseName}Id`;
+            const nameName = `${baseName}Name`;
+            const idField = joinIdField || 'Id';
+            const nameField = joinNameField || 'Name';
+            const sortVal = sort ?? 100;
+            const wherePart = joinWhere ? ` AND ${joinWhere}` : '';
+            // 1) 隐藏 Id 字段
+            const idResult = await client.addField({
+                TableId: tableId, Name: idName, Label: `${label}Id`,
+                Type: 'varchar(50)', Component: 'Text',
+                Visible: 0, AppVisible: 0, Tab: tab,
+                Sort: sortVal + 1, TableWidth: 0,
+            });
+            if (idResult.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error creating ${idName}: ${idResult.Msg}` }], isError: true };
+            }
+            // 2) 可见 Name 字段（Select + SQL 数据源 + V8Code 回填 Id）
+            const sql = `select ${idField}, ${nameField} from ${joinTableName} where ${nameField} like '%$Keyword$%'${wherePart} limit 0,20`;
+            const v8Code = `// 选中变更后将关联表的 Id 回填到隐藏字段 ${idName}\nif (V8.ThisValue && typeof V8.ThisValue === 'object') {\n  V8.Form.${idName} = V8.ThisValue.${idField} || '';\n} else if (!V8.ThisValue) {\n  V8.Form.${idName} = '';\n}`;
+            const config = {
+                DataSource: 'Sql',
+                Sql: sql,
+                SelectLabel: nameField,
+                SelectSaveField: nameField,
+                DataSourceSqlRemote: true,
+                EnableSearch: true,
+                V8Code: v8Code,
+            };
+            const nameResult = await client.addField({
+                TableId: tableId, Name: nameName, Label: label,
+                Type: 'varchar(200)', Component: 'Select',
+                Visible: 1, AppVisible: 1, Tab: tab,
+                Sort: sortVal, TableWidth: tableWidth ?? 120,
+                NotEmpty: notEmpty ?? 0,
+                Placeholder: placeholder || `请选择${label}`,
+                Config: JSON.stringify(config),
+            });
+            if (nameResult.Code !== 1) {
+                return { content: [{ type: 'text', text: `Created ${idName} but failed ${nameName}: ${nameResult.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: `✅ Join field pair created: ${idName} (hidden) + ${nameName} (Select from ${joinTableName}.${nameField}, V8Code copies ${idField} to ${idName}).` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 修复已有外键字段（补建 Name 字段并回填）
+    // ========================
+    server.tool('microi_fix_join_field', `Retrofit an existing FK-only field to the proper Id+Name pair design for OsClient "${osClient}". For a table that has only "{baseName}Id" but no "{baseName}Name", this tool delegates to the helper API engine "_mcp_fix_join_field" to: (1) flip {baseName}Id field to hidden; (2) create {baseName}Name varchar(200) Select with SQL DataSource and FieldValueChange V8Code (does ALTER TABLE + diy_field insert); (3) backfill {baseName}Name from join table for existing rows. Use this to fix tables produced before microi_add_join_field was available. ⚠️ Requires the helper engine "_mcp_fix_join_field" to exist on the server (auto-installed by the MCP team).`, {
+        tableName: z.string().describe('Physical table name to fix, e.g. "mall_product"'),
+        baseName: z.string().describe('Base name of the FK, e.g. "Category" — looks for {baseName}Id and creates {baseName}Name'),
+        label: z.string().describe('Chinese label for the visible Name field, e.g. "分类"'),
+        joinTableName: z.string().describe('Related table to query, e.g. "mall_category"'),
+        joinIdField: z.string().optional().describe('Default: "Id"'),
+        joinNameField: z.string().optional().describe('Default: "Name"'),
+        joinWhere: z.string().optional().describe('Extra WHERE clause for the lookup'),
+        tab: z.string().optional(),
+        sort: z.number().optional(),
+        backfill: z.boolean().optional().describe('Backfill existing rows. Default: true.'),
+        confirmExecution: z.string().optional().describe('Pass "EXECUTE" to apply changes; otherwise dry-run.'),
+    }, async ({ tableName, baseName, label, joinTableName, joinIdField, joinNameField, joinWhere, tab, sort, backfill, confirmExecution }) => {
+        try {
+            const dryRun = confirmExecution !== 'EXECUTE';
+            const result = await client.executeEngine('_mcp_fix_join_field', {
+                tableName, baseName, label, joinTableName,
+                joinIdField: joinIdField || 'Id',
+                joinNameField: joinNameField || 'Name',
+                joinWhere: joinWhere || '',
+                tab: tab || '',
+                sort: sort ?? 100,
+                backfill: backfill !== false,
+                dryRun,
+            });
+            if (!result || result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result?.Msg || 'helper engine _mcp_fix_join_field call failed'}` }], isError: true };
+            }
+            const data = result.Data || result;
+            const summary = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+            return { content: [{ type: 'text', text: (dryRun ? '[DRY-RUN]\n' : '✅ ') + summary }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 修改字段（走原生 API，自动清缓存）
+    // ========================
+    server.tool('microi_update_field', `Update a single diy_field for OsClient "${osClient}". Calls FormEngine.UptDiyField on the backend, which automatically clears the diy_table_field_list Redis cache so the frontend immediately sees the change. Locate the field by either Id or (TableId/TableName + Name). Only fields included in the patch are updated.`, {
+        id: z.string().optional().describe('FieldId (preferred). If absent, must provide TableId/TableName + Name.'),
+        tableId: z.string().optional().describe('TableId (alternative locator). Use with name.'),
+        tableName: z.string().optional().describe('TableName (alternative locator). Use with name.'),
+        name: z.string().optional().describe('Field Name (FK locator with TableId/TableName).'),
+        label: z.string().optional(),
+        type: z.string().optional(),
+        component: z.string().optional(),
+        visible: z.number().optional(),
+        appVisible: z.number().optional(),
+        readonly: z.number().optional(),
+        notEmpty: z.number().optional(),
+        unique: z.number().optional(),
+        sort: z.number().optional(),
+        formWidth: z.number().optional(),
+        tableWidth: z.number().optional(),
+        placeholder: z.string().optional(),
+        defaultValue: z.string().optional(),
+        tab: z.string().optional(),
+        data: z.string().optional(),
+        config: z.string().optional(),
+        description: z.string().optional(),
+        inTableEdit: z.number().optional(),
+    }, async (args) => {
+        try {
+            const patch = {};
+            const map = {
+                id: 'Id', tableId: 'TableId', tableName: 'TableName', name: 'Name',
+                label: 'Label', type: 'Type', component: 'Component',
+                visible: 'Visible', appVisible: 'AppVisible', readonly: 'Readonly',
+                notEmpty: 'NotEmpty', unique: 'Unique', sort: 'Sort',
+                formWidth: 'FormWidth', tableWidth: 'TableWidth',
+                placeholder: 'Placeholder', defaultValue: 'DefaultValue', tab: 'Tab',
+                data: 'Data', config: 'Config', description: 'Description',
+                inTableEdit: 'InTableEdit',
+            };
+            for (const [k, v] of Object.entries(args)) {
+                if (v !== undefined && map[k])
+                    patch[map[k]] = v;
+            }
+            const result = await client.updateField(patch);
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: `✅ Field updated. ${JSON.stringify(result.Data)}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 修改 diy_table 属性（如表单列数 Column）
+    // ========================
+    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (e.g. set Column=2 for a two-column form layout, change Description, IsTree, etc). Automatically clears diy_table + diy_table_field_list Redis caches.`, {
+        id: z.string().optional().describe('TableId (preferred locator)'),
+        name: z.string().optional().describe('Table Name (alternative locator)'),
+        column: z.number().optional().describe('Form columns: 1, 2 or 3'),
+        description: z.string().optional(),
+        isTree: z.number().optional(),
+        tabs: z.string().optional(),
+        formOpenType: z.string().optional(),
+        formOpenWidth: z.string().optional(),
+    }, async (args) => {
+        try {
+            const patch = {};
+            if (args.id)
+                patch.Id = args.id;
+            if (args.name)
+                patch.Name = args.name;
+            if (args.column !== undefined)
+                patch.Column = args.column;
+            if (args.description !== undefined)
+                patch.Description = args.description;
+            if (args.isTree !== undefined)
+                patch.IsTree = args.isTree;
+            if (args.tabs !== undefined)
+                patch.Tabs = args.tabs;
+            if (args.formOpenType !== undefined)
+                patch.FormOpenType = args.formOpenType;
+            if (args.formOpenWidth !== undefined)
+                patch.FormOpenWidth = args.formOpenWidth;
+            const result = await client.updateTable(patch);
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: `✅ Table updated. ${JSON.stringify(result.Data)}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 手动刷新表结构 Redis 缓存
+    // ========================
+    server.tool('microi_refresh_schema_cache', `Manually invalidate Redis caches for diy_table / diy_field / diy_table_field_list for the given tables (OsClient "${osClient}"). Useful after bulk DB changes or when caches go stale.`, {
+        tables: z.array(z.string()).describe('Array of table names or TableIds. All cache key variants for each will be cleared.'),
+    }, async ({ tables }) => {
+        try {
+            const result = await client.refreshSchemaCache(tables);
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: `✅ Cache refreshed. ${JSON.stringify(result.Data)}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 批量设置接口引擎是否允许匿名
+    // ========================
+    server.tool('microi_set_engine_anonymous', `Batch set sys_apiengine.AllowAnonymous for one or more API engines (OsClient "${osClient}"). Use 1 for login/register/public endpoints that need to be callable without a token; use 0 to require login. Automatically clears the corresponding sys_apiengine cache entries.`, {
+        apiEngineKeys: z.array(z.string()).describe('Array of ApiEngineKey strings'),
+        allowAnonymous: z.number().optional().describe('1 = allow anonymous (default), 0 = require login'),
+    }, async ({ apiEngineKeys, allowAnonymous }) => {
+        try {
+            const result = await client.setEngineAnonymous(apiEngineKeys, allowAnonymous ?? 1);
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: `✅ ${JSON.stringify(result.Data, null, 2)}` }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

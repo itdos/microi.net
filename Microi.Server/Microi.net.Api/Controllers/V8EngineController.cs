@@ -25,7 +25,7 @@ namespace Microi.net.Api
     [Route("api/V8Debug/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    public class V8EngineController : Controller
+    public partial class V8EngineController : Controller
     {
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
