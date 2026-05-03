@@ -41,6 +41,7 @@
 | `microi_list_pages` | 列出界面引擎页面 | 只读 |
 | `microi_get_page` | 获取界面引擎页面 JSON | 只读 |
 | `microi_save_page` | 创建或更新界面引擎页面 | 读写 |
+| `microi_get_manifest_schema` | 获取完整系统 Manifest 协议、示例和字段名配置规范 | 只读 |
 | `microi_plan_system` | 从完整系统 Manifest 生成 dry-run 执行计划 | 只读 |
 | `microi_generate_system` | 按 Manifest 编排表、字段、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收 | 读写（需确认） |
 | `microi_validate_system` | 对生成后的系统做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流等是否存在 | 只读 |
@@ -65,10 +66,16 @@
 `microi_generate_system` 面向“自然语言生成完整系统”的场景。建议流程：
 
 1. 先调用 `microi_get_db_schema` 获取现有模型。
-2. 生成 Manifest 后先调用 `microi_plan_system`，确认执行顺序和结构问题。
-3. 调用 `microi_generate_system` 且 `dryRun: true` 时只返回计划，不写入。
-4. 确认要真实写入时，传 `dryRun: false` 和 `confirmExecution: "<当前 OsClient>"` 或 `"EXECUTE"`。
-5. 写入完成后会自动调用 `microi_validate_system`，也可单独再次验收。
+2. 调用 `microi_get_manifest_schema` 获取 Manifest 协议、示例和字段名配置规范。
+3. 生成 Manifest 后先调用 `microi_plan_system`，确认执行顺序和结构问题。
+4. 调用 `microi_generate_system` 且 `dryRun: true` 时只返回计划，不写入。
+5. 确认要真实写入时，传 `dryRun: false` 和 `confirmExecution: "<当前 OsClient>"` 或 `"EXECUTE"`。
+6. 写入完成后会自动调用 `microi_validate_system`，也可单独再次验收。
+
+Manifest 的 `modules` 支持直接使用字段名配置列表和搜索，不需要先手工查询 `diy_field.Id`。常用自然字段键：
+- `listFields` / `tableFields` / `columns`：列表列，自动生成 `TableDiyFieldIds` 和 `SelectFields`。
+- `searchFields`：搜索字段，自动生成 `SearchFieldIds` 对象数组。
+- `sortFields`、`hiddenFields`、`editableFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`：分别生成 `SortFieldIds`、`NotShowFields`、`InTableEditFields`、`MobileListFields`、卡片标签字段配置。
 
 Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。
 
@@ -296,7 +303,7 @@ AI：[调用 microi_get_db_schema → microi_create_table → microi_add_field �
 AI：[调用 microi_create_engine → microi_create_module 或 microi_save_engine_code] → 生成按钮配置和后端 V8 逻辑
 
 你：帮我生成一套完整的进销存系统，但先不要写入
-AI：[调用 microi_get_db_schema → microi_plan_system → microi_generate_system(dryRun:true)] → 返回执行计划和风险提示
+AI：[调用 microi_get_db_schema → microi_get_manifest_schema → microi_plan_system → microi_generate_system(dryRun:true)] → 返回执行计划和风险提示
 
 你：确认写入刚才这套系统
 AI：[调用 microi_generate_system(dryRun:false, confirmExecution:"EXECUTE") → microi_validate_system] → 平台中生成可验收系统
