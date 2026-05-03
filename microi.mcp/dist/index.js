@@ -36,6 +36,7 @@ async function main() {
     // Token 文件优先级最高（VS Code 扩展持续刷新写入）
     const tokenFilePath = process.env.MICROI_TOKEN_FILE;
     if (tokenFilePath) {
+        config.tokenFilePath = tokenFilePath;
         const fileToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
         if (fileToken) {
             config.token = fileToken;
@@ -67,9 +68,8 @@ async function main() {
             console.error('  MICROI_OS_CLIENT    - OsClient identifier');
             process.exit(1);
         }
-        const useTokenFile = !!tokenFilePath;
         const client = new MicroiClient(config);
-        await client.login({ skipAutoRefresh: useTokenFile });
+        await client.login();
         const serverContext = { osClient: config.osClient || '', apiBaseUrl: config.apiBaseUrl, label: process.env.MICROI_LABEL || '' };
         const server = createMcpServer(client, serverContext);
         await startStdio(server);

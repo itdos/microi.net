@@ -474,9 +474,27 @@ console.log('调试信息')                                  // 控制台输出�
 
 ---
 
+## 数据库结构
+
+数据库结构不会写入本基础知识库文件，避免不同开发者连接不同服务器后产生提交冲突。
+
+编写 `V8.FormEngine` 或 `V8.Db` 代码时：
+- 优先通过 MCP 工具 `microi_get_db_schema` 获取当前服务器的实时表结构。
+- 如需读取本地快照，请查看当前引擎文件所属 OsClient 目录下的 `.microi-db-schema.md`。
+
+从自然语言需求创建完整 Microi 低代码系统时：
+- 先调用 `microi_get_db_schema` 了解已有表、菜单、字段，避免重复建模。
+- 再调用 `microi_get_manifest_schema` 获取完整 Manifest 协议和示例。
+- 将需求整理为 Manifest，模块配置优先写字段名：`listFields`、`searchFields`、`sortFields`、`hiddenFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`。MCP 会自动解析为 `diy_field.Id`、`SelectFields`、`SearchFieldIds` 等 `sys_menu` 所需格式。
+- 调用 `microi_plan_system` 做本地结构检查，再调用 `microi_generate_system` 且保持 `dryRun:true`。
+- 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
+
+
+---
+
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 20 个）：
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 21 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -493,7 +511,8 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/v8-security/SKILL.md` — Microi V8 安全最佳实践
 - `microi.skills/v8-frontend-events/SKILL.md` — Microi V8 前端事件大全
 - `microi.skills/v8-template-engine/SKILL.md` — Microi V8 模板引擎（表格/表单 V8 模板）
-- `microi.skills/v8-menu-buttons/SKILL.md` — 菜单按钮 / Tab / 批量操作 V8 写法
+- `microi.skills/v8-menu-buttons/SKILL.md` — v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
+- `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema

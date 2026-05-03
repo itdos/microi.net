@@ -59,6 +59,9 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 // 匿名查询（无需登录）
 var result = V8.FormEngine.GetTableDataAnonymous('Article', { _PageSize: 10 });
 
+// 匿名新增（无需登录，需谨慎开放）
+var result = V8.FormEngine.AddFormDataAnonymous('Feedback', { Title: '意见', Content: '...' });
+
 // 获取总数
 var result = V8.FormEngine.GetTableDataCount('Sys_User', { _Where: [['Status', '=', 1]] });
 
@@ -71,6 +74,10 @@ var result = V8.FormEngine.AddFormData('Sys_User', { Account: 'test', Name: '测
 // 批量新增
 var addList = [{ FormEngineKey:'表名', Age:18 }, { FormEngineKey:'表名', Age:20 }];
 V8.FormEngine.AddTableData(addList);
+
+// 批量更新 / 批量删除
+V8.FormEngine.UptTableData('Sys_User', [{ Id:'id1', Status:1 }, { Id:'id2', Status:0 }]);
+V8.FormEngine.DelTableData('Sys_User', [{ Id:'id1' }, { Id:'id2' }]);
 
 // 更新数据（需传Id）
 var result = V8.FormEngine.UptFormData('Sys_User', {
@@ -136,7 +143,7 @@ _Where: [['Field', '<>', null]]   // IS NOT NULL
 _Where: [['CreateTime', '>', DateFormat(new Date(), 'yyyy-MM-dd HH:mm:ss')]]
 ```
 
-**支持的操作符：** `=`, `==`, `<>`, `!=`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `NotStartLike`, `NotEndLike`, `In`, `NotIn`
+**支持的操作符：** `=`, `==`, `Equal`, `<>`, `!=`, `NotEqual`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `NotStartLike`, `NotEndLike`, `In`, `NotIn`
 
 ---
 
@@ -180,6 +187,11 @@ V8.Cache.Set('key', 'value', '0.00:00:59');    // d.HH:mm:ss 格式
 var val = V8.Cache.Get('key');
 V8.Cache.Remove('key');
 var exists = V8.Cache.Exists('key');
+var exists2 = V8.Cache.KeyExist('key');        // 真实接口名
+V8.Cache.HashSet('hashKey', 'field1', 'value');
+var hashVal = V8.Cache.HashGet('hashKey', 'field1');
+var hashAll = V8.Cache.HashGetAll('hashKey');
+V8.Cache.HashDelete('hashKey', 'field1');
 // Key命名规范：Microi:${V8.OsClient}:{分类}:{Key}
 ```
 
@@ -248,7 +260,8 @@ V8.Method.RefreshLoginUser(userId, osClient);
 var url = V8.Method.GetPrivateFileUrl({ FilePathName:'...' });
 V8.Method.AddSysLog({ Type:'', Title:'', Content:'', Level:1 });
 var guid = V8.Method.NewGuid();
-var snowId = V8.Method.SnowflakeId();
+var ulid = V8.Method.NewUlid();
+var ts = V8.Method.GetTimestamp();             // Unix秒级时间戳
 var oldWhere = V8.Method.ParseWhere(V8.Param._Where);     // 新版→旧版Where转换
 // 文件上传
 var upResult = V8.Method.Upload({
@@ -263,7 +276,9 @@ var upResult = V8.Method.Upload({
 
 ```js
 V8.EncryptHelper.MD5Encrypt('text');
-V8.EncryptHelper.SHA256Encrypt('text');
+V8.EncryptHelper.SHA256('text');
+V8.EncryptHelper.SHA1('text');
+V8.EncryptHelper.SHA512('text');
 V8.EncryptHelper.Sha256Hex('text');
 V8.EncryptHelper.HmacSha256(key, data);
 V8.EncryptHelper.AESEncrypt('text', 'key');
@@ -298,6 +313,7 @@ var excelResult = V8.Office.ExportExcel({
   ExcelData: dataList,
   ExcelHeader: [{Name:'字段名',Label:'显示名',Component:'Text',Config:{}}]
 });
+var rows = V8.Office.ExcelToList({ FileByteBase64: base64, SheetIndex: 0 });
 ```
 
 ---
@@ -460,23 +476,43 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## 数据库结构
 
-编写 `V8.FormEngine` 或 `V8.Db` 代码时，请参考当前编辑文件所属 OsClient 目录下的 `.microi-db-schema.md` 获取表名和字段信息。
+数据库结构不会写入本基础知识库文件，避免不同开发者连接不同服务器后产生提交冲突。
 
-数据库结构文件列表：
-- `microi-v8-engine/乐闪购 (api.itdos.com)\lsg.Product.Internal\.microi-db-schema.md`
+编写 `V8.FormEngine` 或 `V8.Db` 代码时：
+- 优先通过 MCP 工具 `microi_get_db_schema` 获取当前服务器的实时表结构。
+- 如需读取本地快照，请查看当前引擎文件所属 OsClient 目录下的 `.microi-db-schema.md`。
+
+从自然语言需求创建完整 Microi 低代码系统时：
+- 先调用 `microi_get_db_schema` 了解已有表、菜单、字段，避免重复建模。
+- 再调用 `microi_get_manifest_schema` 获取完整 Manifest 协议和示例。
+- 将需求整理为 Manifest，模块配置优先写字段名：`listFields`、`searchFields`、`sortFields`、`hiddenFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`。MCP 会自动解析为 `diy_field.Id`、`SelectFields`、`SearchFieldIds` 等 `sys_menu` 所需格式。
+- 调用 `microi_plan_system` 做本地结构检查，再调用 `microi_generate_system` 且保持 `dryRun:true`。
+- 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 
 
 ---
 
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范：
-- `microi.skills/v8-crud-api/SKILL.md` — 增删改查（含批量操作）
-- `microi.skills/v8-table-event/SKILL.md` — 表单事件（含 DataFilter、前后端事件）
-- `microi.skills/v8-sql-query/SKILL.md` — SQL 查询（参数化、事务）
-- `microi.skills/v8-http-integration/SKILL.md` — HTTP 集成（对象参数格式）
-- `microi.skills/v8-cache-pattern/SKILL.md` — Redis 缓存
-- `microi.skills/v8-security/SKILL.md` — 安全规范
-- `microi.skills/v8-workflow/SKILL.md` — 工作流审批事件
-- `microi.skills/v8-mongodb/SKILL.md` — MongoDB 操作
-- `microi.skills/v8-mq-mqtt/SKILL.md` — 消息队列与 MQTT
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 21 个）：
+- `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
+- `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
+- `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
+- `microi.skills/v8-cache-pattern/SKILL.md` — Microi V8 Redis 缓存模式
+- `microi.skills/v8-http-integration/SKILL.md` — Microi V8 HTTP 外部接口集成
+- `microi.skills/v8-mongodb/SKILL.md` — Microi V8 MongoDB 操作
+- `microi.skills/v8-mq-mqtt/SKILL.md` — Microi V8 消息队列与 MQTT
+- `microi.skills/v8-workflow/SKILL.md` — Microi V8 工作流事件开发
+- `microi.skills/v8-api-config/SKILL.md` — Microi V8 接口引擎配置
+- `microi.skills/v8-saas-multi-tenant/SKILL.md` — Microi V8 SaaS 多租户引擎
+- `microi.skills/v8-file-upload/SKILL.md` — Microi V8 文件上传下载
+- `microi.skills/v8-export-import/SKILL.md` — Microi V8 Excel 导入导出
+- `microi.skills/v8-debugging/SKILL.md` — Microi V8 调试与日志
+- `microi.skills/v8-security/SKILL.md` — Microi V8 安全最佳实践
+- `microi.skills/v8-frontend-events/SKILL.md` — Microi V8 前端事件大全
+- `microi.skills/v8-template-engine/SKILL.md` — Microi V8 模板引擎（表格/表单 V8 模板）
+- `microi.skills/v8-menu-buttons/SKILL.md` — v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
+- `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
+- `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
+- `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
+- `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema

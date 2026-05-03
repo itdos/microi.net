@@ -1,5 +1,10 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { API } from './api-paths.js';
+
+/** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
+const NO_LOGIN_CODE = 1001;
 
 const DEFAULT_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
@@ -16,6 +21,8 @@ export interface MicroiConfig {
   rsaPublicKey?: string;
   /** 直接传入已有 Token（跳过帐号密码登录，适用于需要验证码的服务器） */
   token?: string;
+  /** Token 文件路径（VS Code 扩展写入；MCP 自身刷新时也会回写以保持同步） */
+  tokenFilePath?: string;
 }
 
 export interface ApiResponse<T = unknown> {
@@ -87,6 +94,8 @@ export class MicroiClient {
   private token = '';
   private refreshTimer?: ReturnType<typeof setInterval>;
   private rsaPublicKey: string;
+  /** 同一时刻只允许一个刷新请求在飞 */
+  private inflightRefresh?: Promise<boolean>;
 
   constructor(config: MicroiConfig) {
     this.config = config;
@@ -111,14 +120,15 @@ export class MicroiClient {
     this.token = newToken;
   }
 
-  /** 登录并获取 JWT token（若已有 token 则直接启动刷新） */
-  async login(options?: { skipAutoRefresh?: boolean }): Promise<void> {
+  /** 登录并获取 JWT token（若已有 token 则直接启动刷新）
+   *  注意：即便传入了 token（来自 VS Code 扩展的 token 文件），也始终启动 MCP 自身的自动刷新作为兜底，
+   *  避免 VS Code 关闭时 token 不再续期导致 MCP 调用失败。
+   */
+  async login(_options?: { skipAutoRefresh?: boolean }): Promise<void> {
     // 若通过 token 初始化，跳过登录
     if (this.token) {
-      if (!options?.skipAutoRefresh) {
-        this.startAutoRefresh();
-      }
-      console.error('[microi-mcp] Using provided token (skip login)');
+      this.startAutoRefresh();
+      console.error('[microi-mcp] Using provided token (auto-refresh enabled)');
       return;
     }
 
@@ -159,10 +169,21 @@ export class MicroiClient {
     console.error('[microi-mcp] Login successful');
   }
 
-  /** 每 12 分钟自动刷新 token（token 有效期 15 分钟） */
+  /** 每 12 分钟自动刷新 token（token 有效期通常 15 分钟） */
   private startAutoRefresh(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
-    this.refreshTimer = setInterval(async () => {
+    this.refreshTimer = setInterval(() => {
+      this.refreshTokenNow().catch((e) => console.error('[microi-mcp] Token refresh failed:', e));
+    }, 12 * 60 * 1000);
+  }
+
+  /** 立即调用 /api/SysUser/RefreshToken 以旧换新；成功后回写 token 文件。
+   *  并发请求会复用同一个 in-flight Promise。
+   */
+  async refreshTokenNow(): Promise<boolean> {
+    if (this.inflightRefresh) return this.inflightRefresh;
+    if (!this.token) return false;
+    this.inflightRefresh = (async () => {
       try {
         const res = await fetch(`${this.config.apiBaseUrl}${API.REFRESH_TOKEN}`, {
           method: 'POST',
@@ -170,74 +191,173 @@ export class MicroiClient {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${this.token}`,
           },
+          // 同时把旧 token 放在 body 里（后端 SysUserController.RefreshToken 兼容两种位置）
+          body: JSON.stringify({
+            authorization: this.token,
+            OsClient: this.config.osClient || undefined,
+          }),
         });
         const newToken = res.headers.get('authorization');
-        if (newToken) {
+        const text = await res.text();
+        let json: ApiResponse | null = null;
+        try { json = JSON.parse(text) as ApiResponse; } catch { /* ignore */ }
+        if (newToken && json?.Code === 1) {
           this.token = newToken;
+          this.writeTokenToFile();
           console.error('[microi-mcp] Token refreshed');
+          return true;
+        }
+        console.error(`[microi-mcp] Refresh rejected: Code=${json?.Code} Msg=${json?.Msg || ''}`);
+        return false;
+      } catch (e) {
+        console.error('[microi-mcp] Refresh request error:', e);
+        return false;
+      } finally {
+        this.inflightRefresh = undefined;
+      }
+    })();
+    return this.inflightRefresh;
+  }
+
+  /** 从 token 文件重新读取（VS Code 扩展可能刚刚写入了新 token）。返回是否更新了 this.token。 */
+  reloadTokenFromFile(): boolean {
+    const filePath = this.config.tokenFilePath;
+    if (!filePath) return false;
+    try {
+      const tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, string>;
+      const apiUrl = this.config.apiBaseUrl;
+      const osClient = this.config.osClient || '';
+      const fileToken = (osClient && tokens[`${apiUrl}|${osClient}`]) || tokens[apiUrl];
+      if (fileToken && fileToken !== this.token) {
+        this.token = fileToken;
+        return true;
+      }
+    } catch { /* ignore */ }
+    return false;
+  }
+
+  /** 把当前 token 回写到 token 文件（保持与 VS Code 扩展同步） */
+  private writeTokenToFile(): void {
+    const filePath = this.config.tokenFilePath;
+    if (!filePath || !this.token) return;
+    try {
+      let tokens: Record<string, string> = {};
+      try {
+        tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, string>;
+      } catch { /* file may not exist yet */ }
+      const apiUrl = this.config.apiBaseUrl;
+      const osClient = this.config.osClient || '';
+      tokens[apiUrl] = this.token;
+      if (osClient) tokens[`${apiUrl}|${osClient}`] = this.token;
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify(tokens, null, 2), { encoding: 'utf-8', mode: 0o600 });
+    } catch (e) {
+      console.error('[microi-mcp] Write token file failed:', e);
+    }
+  }
+
+  /** 检测是否是 token 失效响应（Code=1001 NoLogin），若是则尝试恢复 token。
+   *  恢复策略：1) 重新读取 token 文件（VS Code 扩展可能刚写入新 token）；
+   *           2) 若 token 没变化或仍失效，调用 RefreshToken API 主动刷新；
+   *           3) 仍失败则用 username/password 重新登录（兜底）。
+   *  返回 true 表示 token 已更新，调用方可重试请求。
+   */
+  private async tryRecoverFromAuthFailure(): Promise<boolean> {
+    // 1. 先尝试读文件，可能 VS Code 已经刷过了
+    if (this.reloadTokenFromFile()) {
+      console.error('[microi-mcp] Token reloaded from file after auth failure');
+      return true;
+    }
+    // 2. 主动刷新
+    if (await this.refreshTokenNow()) return true;
+    // 3. 兜底：用账号密码重新登录
+    if (this.config.username && this.config.password) {
+      try {
+        const oldToken = this.token;
+        this.token = '';
+        await this.login();
+        if (this.token && this.token !== oldToken) {
+          this.writeTokenToFile();
+          console.error('[microi-mcp] Re-logged in after auth failure');
+          return true;
         }
       } catch (e) {
-        console.error('[microi-mcp] Token refresh failed:', e);
+        console.error('[microi-mcp] Re-login failed:', e);
       }
-    }, 12 * 60 * 1000);
+    }
+    return false;
   }
 
-  /** 通用 POST 请求 */
-  private async post<T = unknown>(path: string, body: unknown): Promise<ApiResponse<T>> {
-    const url = `${this.config.apiBaseUrl}${path}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.token}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const newToken = res.headers.get('authorization');
-    if (newToken) this.token = newToken;
-
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
-    }
-    if (!text) {
-      throw new Error(`HTTP ${res.status} — empty response body`);
-    }
-    try {
-      return JSON.parse(text) as ApiResponse<T>;
-    } catch {
-      throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
-    }
+  /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
+  private async post<T = unknown>(reqPath: string, body: unknown): Promise<ApiResponse<T>> {
+    return this.requestJson<T>('POST', reqPath, body, undefined, true);
   }
 
-  /** 通用 GET 请求 */
-  private async get<T = unknown>(path: string, params?: Record<string, string>): Promise<ApiResponse<T>> {
-    let url = `${this.config.apiBaseUrl}${path}`;
-    if (params) {
+  /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
+  private async get<T = unknown>(reqPath: string, params?: Record<string, string>): Promise<ApiResponse<T>> {
+    return this.requestJson<T>('GET', reqPath, undefined, params, true);
+  }
+
+  private async requestJson<T = unknown>(
+    method: 'GET' | 'POST',
+    reqPath: string,
+    body?: unknown,
+    params?: Record<string, string>,
+    allowRetryOnAuthFailure = true,
+  ): Promise<ApiResponse<T>> {
+    let url = `${this.config.apiBaseUrl}${reqPath}`;
+    if (method === 'GET' && params) {
       const qs = new URLSearchParams(params).toString();
       if (qs) url += `?${qs}`;
     }
 
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (method === 'POST') headers['Content-Type'] = 'application/json';
+
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${this.token}` },
+      method,
+      headers,
+      ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
     });
 
     const newToken = res.headers.get('authorization');
-    if (newToken) this.token = newToken;
+    if (newToken) {
+      this.token = newToken;
+      this.writeTokenToFile();
+    }
 
     const text = await res.text();
+
+    // HTTP 401 → 刷新后重试一次
+    if (res.status === 401 && allowRetryOnAuthFailure) {
+      if (await this.tryRecoverFromAuthFailure()) {
+        return this.requestJson<T>(method, reqPath, body, params, false);
+      }
+      throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
+    }
+
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
     }
     if (!text) {
       throw new Error(`HTTP ${res.status} — empty response body`);
     }
+    let parsed: ApiResponse<T>;
     try {
-      return JSON.parse(text) as ApiResponse<T>;
+      parsed = JSON.parse(text) as ApiResponse<T>;
     } catch {
       throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
     }
+
+    // Microi 用 Code=1001 表达"登录身份已过期"（HTTP 仍是 200）
+    if (parsed?.Code === NO_LOGIN_CODE && allowRetryOnAuthFailure) {
+      console.error(`[microi-mcp] Auth expired (Code=${NO_LOGIN_CODE}: ${parsed.Msg || ''}), attempting recovery...`);
+      if (await this.tryRecoverFromAuthFailure()) {
+        return this.requestJson<T>(method, reqPath, body, params, false);
+      }
+    }
+    return parsed;
   }
 
   // ---------- API 方法 ----------
