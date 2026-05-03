@@ -25,7 +25,7 @@ namespace Microi.net
     /// <summary>
     /// V8 MCP 核心业务逻辑（不依赖 MVC Controller）
     /// </summary>
-    public static class V8McpLogic
+    public static partial class V8McpLogic
     {
         #region 权限校验
 
