@@ -25,7 +25,7 @@ namespace Microi.net.Api
     [Route("api/V8Debug/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    public partial class V8EngineController : Controller
+    public class V8EngineController : Controller
     {
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
@@ -510,6 +510,59 @@ namespace Microi.net.Api
             var result = await V8McpLogic.SavePageEngine(
                 osClient, param["PageId"].Val<string>(), title,
                 param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr);
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region MCP 扩展（字段/表/缓存/匿名）
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateField([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.UpdateField(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateTable([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.UpdateTable(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RefreshSchemaCache([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var arr = (param["Tables"] as JArray) ?? (param["TableNames"] as JArray);
+            var list = arr?.ToObject<List<string>>() ?? new List<string>();
+            var result = await V8McpLogic.RefreshSchemaCache(osClient, list);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetEngineAnonymous([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var arr = (param["ApiEngineKeys"] as JArray);
+            var list = arr?.ToObject<List<string>>() ?? new List<string>();
+            var allow = param["AllowAnonymous"]?.Val<int>() ?? 1;
+            var result = await V8McpLogic.SetEngineAnonymous(osClient, list, allow);
             return Ok(result);
         }
 

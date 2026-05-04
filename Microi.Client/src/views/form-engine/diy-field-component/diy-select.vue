@@ -878,20 +878,32 @@ export default {
                 if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
                     apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
                 }
-                self.DiyCommon.Post(
-                    apiGetDiyFieldSqlData,
-                    postData,
-                    function (result) {
-                        if (self.DiyCommon.Result(result)) {
-                            self.NeedResetDataSourse = false;
-                            field.Data = result.Data;
+                // 安全兜底：无论请求成功/失败/异常/空结果，都必须重置 loading 为 false，
+                // 并把 field.Data 规整为数组，避免 el-select 在 remote 模式下卡在"加载中"
+                var finishLoading = function (data) {
+                    self.NeedResetDataSourse = false;
+                    field.Data = Array.isArray(data) ? data : [];
+                    field.Config.DataSourceSqlRemoteLoading = false;
+                };
+                try {
+                    self.DiyCommon.Post(
+                        apiGetDiyFieldSqlData,
+                        postData,
+                        function (result) {
+                            if (result && result.Code == 1) {
+                                finishLoading(result.Data);
+                            } else {
+                                // 接口返回失败：保留原数据但必须关闭 loading
+                                field.Config.DataSourceSqlRemoteLoading = false;
+                            }
+                        },
+                        function (error) {
+                            field.Config.DataSourceSqlRemoteLoading = false;
                         }
-                        field.Config.DataSourceSqlRemoteLoading = false;
-                    },
-                    function (error) {
-                        field.Config.DataSourceSqlRemoteLoading = false;
-                    }
-                );
+                    );
+                } catch (e) {
+                    field.Config.DataSourceSqlRemoteLoading = false;
+                }
             }
         },
         // ==================== 配置弹窗相关方法 ====================

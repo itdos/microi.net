@@ -85,6 +85,18 @@ const FIELD_TYPE_MAP: Record<string, string> = {
   json: 'mediumtext',
 };
 
+/** 每个表的字段 Sort 自增计数器（同一会话内有效）；
+ *  作用：当 AI 不传 sort 时，按调用顺序自动 +10，避免所有字段 Sort=100 撞车导致列表/表单顺序乱。
+ *  起始 100、步进 10，给手动插入留空隙。
+ */
+const TABLE_FIELD_SORT_COUNTER: Map<string, number> = new Map();
+function nextSortFor(tableId: string): number {
+  const cur = TABLE_FIELD_SORT_COUNTER.get(tableId) ?? 100;
+  const next = cur + 10;
+  TABLE_FIELD_SORT_COUNTER.set(tableId, next);
+  return cur;
+}
+
 /** 将 AI 可能传入的编程语言类型自动映射为平台允许的列类型；并强制拦截 datetime/date/timestamp */
 function normalizeFieldType(type?: string): string {
   if (!type) return 'varchar(500)';
@@ -736,7 +748,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       appVisible: z.number().optional().describe('Is visible in mobile app (1=yes, 0=no). Default: 1'),
       tab: z.string().optional().describe('Form tab group name (for organizing fields into tabs)'),
       tableWidth: z.number().optional().describe('Column width in list view (pixels). Default: 120'),
-      sort: z.number().optional().describe('Field display order. Default: 100'),
+      sort: z.number().optional().describe('Field display order (smaller = front). If omitted, MCP auto-increments per table starting at 100, step 10 — so adding fields in business-meaningful order produces correct list/form ordering automatically. Override only when you need a specific position.'),
       readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
       notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
       unique: z.number().optional().describe('Unique constraint (1=unique, 0=allow duplicates). Default: 0'),
@@ -762,7 +774,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           TableId: tableId, Name: name, Label: label,
           Type: normalizedType, Component: component,
           Visible: visible, AppVisible: appVisible,
-          Tab: tab, TableWidth: tableWidth, Sort: sort,
+          Tab: tab, TableWidth: tableWidth, Sort: sort ?? nextSortFor(tableId),
           Readonly: readonlyVal,
           NotEmpty: notEmpty, Unique: unique,
           DefaultValue: defaultValue, Placeholder: placeholder,
