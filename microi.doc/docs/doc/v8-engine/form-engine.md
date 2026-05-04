@@ -18,6 +18,97 @@
 :::
 >* __<font color="red">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</font>__
 
+## 🌐 HTTP 直接调用（重要）
+
+> 移动端/外部系统不通过 V8 引擎调用 FormEngine 时，必须使用以下 RESTful 路由。**不要拼出 `/formengine/{表名}/gettabledata` 这种地址，那是错误写法，会得到 404。**
+
+平台路由由 `Microi.net.Api/Handler/DynamicApiEngine.cs` 的 `FormEngineRoutes` 字典决定，所有 FormEngine HTTP 接口共有两种调用形式：
+
+### 形式一：标准 Controller 路由（推荐，FormEngineKey 放 Body）
+
+| Method | URL | Body |
+| --- | --- | --- |
+| POST | `/api/formengine/GetFormData`     | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "_Where":[...] }` |
+| POST | `/api/formengine/GetTableData`    | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "_Where":[...], "_PageIndex":1, "_PageSize":20 }` |
+| POST | `/api/formengine/AddFormData`     | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", ...字段 }` |
+| POST | `/api/formengine/UptFormData`     | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "Id":"...", ...字段 }` |
+| POST | `/api/formengine/UptFormDataByWhere` | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "_Where":[...], ...字段 }` |
+| POST | `/api/formengine/DelFormData`     | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "Id":"..." }` 或 `{ "Ids":[...] }` |
+| POST | `/api/formengine/DelFormDataByWhere` | `{ "OsClient":"xxx", "FormEngineKey":"<表名>", "_Where":[...] }` |
+
+匿名版本（无需 Token，需在 `diy_table.IsAnonymous` 中允许）：
+| POST | `/api/formengine/GetFormDataAnonymous`     | 同上 |
+| POST | `/api/formengine/GetTableDataAnonymous`    | 同上 |
+| POST | `/api/formengine/AddFormDataAnonymous`     | 同上 |
+
+### 形式二：动态短路由别名（FormEngineKey 写在 URL 里）
+
+`DynamicApiEngine` 维护以下前缀映射，效果与形式一完全一致：
+
+```
+POST /api/formengine/getformdata-{表名}        → GetFormData
+POST /api/formengine/get-formdata-{表名}       → GetFormData
+POST /api/formengine/gettabledata-{表名}       → GetTableData
+POST /api/formengine/get-tabledata-{表名}      → GetTableData
+POST /api/formengine/addformdata-{表名}        → AddFormData
+POST /api/formengine/add-formdata-{表名}       → AddFormData
+POST /api/formengine/uptformdata-{表名}        → UptFormData
+POST /api/formengine/upt-formdata-{表名}       → UptFormData
+POST /api/formengine/delformdata-{表名}        → DelFormData
+POST /api/formengine/del-formdata-{表名}       → DelFormData
+```
+
+URL 中的表名建议小写。Body 仍可传 `FormEngineKey` 用于校验，多余时以 URL 为准。
+
+### 必传 Header
+
+| Header | 说明 |
+| --- | --- |
+| `Content-Type` | `application/json`（推荐）或 `application/x-www-form-urlencoded` |
+| `OsClient` | 当前租户标识；也可作为 querystring `?OsClient=xxx` 或 body 字段传入 |
+| `Token` | 登录后获得的 Token；匿名接口可省略 |
+
+### 常见错误对照
+
+| 错误现象 | 原因 |
+| --- | --- |
+| 404 Not Found | URL 写成 `/formengine/{表名}/gettabledata`、缺少 `/api/` 前缀、或表名与动作之间写成 `/` 而非 `-` |
+| `Code:1001 登录身份已过期` | 未带 Token、Token 过期、或 Redis 缓存被清空 |
+| `Code:1002 身份验证失败` | OsClient 与 Token 不匹配 |
+| `Code:0 表不存在` | `FormEngineKey` 大小写或拼写错误（实际不区分大小写，但表必须存在于 `diy_table`） |
+
+### 移动端 uni-app 调用示例
+
+```javascript
+const BASE = 'https://api.itdos.com';
+const OS_CLIENT = 'lsg';
+function formEngineGet(table, where = {}) {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: `${BASE}/api/formengine/gettabledata-${table}`,
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json',
+        'OsClient': OS_CLIENT,
+        'Token': uni.getStorageSync('token') || ''
+      },
+      data: { OsClient: OS_CLIENT, FormEngineKey: table, ...where },
+      success: (res) => resolve(res.data),
+      fail: reject
+    });
+  });
+}
+// 使用
+const r = await formEngineGet('mall_product', {
+  _Where: [['Status','=','OnSale']],
+  _OrderBy: 'SoldCount',
+  _OrderByType: 'DESC',
+  _PageSize: 20
+});
+```
+
+---
+
 ## 前端V8异步、同步用法
 ```javascript
 //前端同步执行：

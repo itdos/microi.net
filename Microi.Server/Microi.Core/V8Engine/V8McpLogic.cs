@@ -27,6 +27,19 @@ namespace Microi.net
     /// </summary>
     public static class V8McpLogic
     {
+        /// <summary>
+        /// 安全格式化数据库读出来的 UpdateTime（可能是 string、DateTime、DateTimeOffset 或 null）。
+        /// 平台约定 datetime 类字段以 varchar(25) 存储，但部分历史表仍是 DateTime，需要兼容。
+        /// </summary>
+        private static string FormatDbDateTime(object value)
+        {
+            if (value == null) return "";
+            if (value is string s) return s;
+            if (value is DateTime dt) return dt.ToString("yyyy-MM-dd HH:mm:ss");
+            if (value is DateTimeOffset dto) return dto.ToString("yyyy-MM-dd HH:mm:ss");
+            try { return Convert.ToString(value) ?? ""; } catch { return ""; }
+        }
+
         #region 权限校验
 
         /// <summary>
@@ -173,7 +186,7 @@ namespace Microi.net
                         IsEnable = item.IsEnable,
                         ApiRemark = (string)item.ApiRemark ?? "",
                         ApiV8Code = apiV8Code,
-                        UpdateTime = item.UpdateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""
+                        UpdateTime = FormatDbDateTime(item.UpdateTime)
                     });
                 }
 
@@ -216,7 +229,7 @@ namespace Microi.net
                     {
                         ApiEngineKey = apiEngineKey,
                         ApiV8Code = apiV8Code,
-                        UpdateTime = result.Data.UpdateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""
+                        UpdateTime = FormatDbDateTime(result.Data.UpdateTime)
                     });
                 }
 
@@ -275,7 +288,7 @@ namespace Microi.net
                             IsEnable = item.IsEnable,
                             ApiRemark = (string)item.ApiRemark ?? "",
                             ApiV8Code = apiV8Code,
-                            UpdateTime = item.UpdateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+                            UpdateTime = FormatDbDateTime(item.UpdateTime),
                             IsDeleted = item.IsDeleted
                         });
                     }
