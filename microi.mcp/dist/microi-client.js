@@ -282,6 +282,12 @@ export class MicroiClient {
             OsClient: this.config.osClient,
         });
     }
+    async getPlaywrightContext(keyword) {
+        return this.post(API.GET_PLAYWRIGHT_CONTEXT, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
     async getEngineList(keyword) {
         return this.post(API.GET_ENGINE_LIST, {
             OsClient: this.config.osClient,

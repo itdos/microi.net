@@ -44,6 +44,12 @@
 | **ui-design** | 酷炫潮流 UI 设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |
 | **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
 
+### 自动化测试
+
+| Skill | 场景 | 文件 |
+|-------|------|------|
+| **playwright-e2e** | Playwright 端到端自动化测试、接口引擎断言、冒烟验收与 CI | `playwright-e2e/SKILL.md` |
+
 ---
 
 ## 快速开始：如何使用 Skills

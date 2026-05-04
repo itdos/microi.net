@@ -62,6 +62,49 @@ export interface V8Event {
     TableName?: string;
     UpdateTime?: string;
 }
+export interface PlaywrightEngineInfo {
+    Id: string;
+    ApiName: string;
+    ApiEngineKey: string;
+    Category: string;
+    ApiAddress: string;
+    ApiRemark: string;
+    AllowAnonymous: number;
+    StopHttp: number;
+    IsEnable: number;
+    UpdateTime?: string;
+}
+export interface PlaywrightModuleInfo {
+    Id: string;
+    Name: string;
+    ParentId: string;
+    DiyTableId: string;
+    DiyTableName: string;
+    Url: string;
+    ComponentName: string;
+    ComponentPath: string;
+    OpenType: string;
+    Display: number;
+    AppDisplay: number;
+    Sort: number;
+    Icon: string;
+    UpdateTime?: string;
+}
+export interface PlaywrightContextData {
+    OsClient: string;
+    ApiBaseUrl?: string;
+    Keyword?: string;
+    Engines: PlaywrightEngineInfo[];
+    Modules: PlaywrightModuleInfo[];
+    RecommendedEnv?: Record<string, string>;
+    Summary?: {
+        EngineCount?: number;
+        PublicEngineCount?: number;
+        ProtectedEngineCount?: number;
+        ModuleCount?: number;
+    };
+    Warnings?: string[];
+}
 /**
  * Microi 后端 HTTP 客户端
  * - RSA 加密登录（与 Microi 前端 JSEncrypt 兼容）
@@ -112,6 +155,7 @@ export declare class MicroiClient {
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
     }>>;
+    getPlaywrightContext(keyword?: string): Promise<ApiResponse<PlaywrightContextData>>;
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;

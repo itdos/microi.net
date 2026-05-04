@@ -51,6 +51,124 @@ function formatDbTables(tables) {
     }
     return lines.join('\n');
 }
+function moduleRoute(module) {
+    const raw = (module.Url || '').trim();
+    if (!raw)
+        return '';
+    if (/^https?:\/\//i.test(raw))
+        return raw;
+    if (raw.startsWith('/'))
+        return raw;
+    return `/${raw}`;
+}
+function isPublicEngine(engine) {
+    return Number(engine.AllowAnonymous) === 1 && Number(engine.StopHttp) !== 1 && Number(engine.IsEnable) !== 0;
+}
+function isCallableEngine(engine) {
+    return Number(engine.StopHttp) !== 1 && Number(engine.IsEnable) !== 0;
+}
+function formatPlaywrightContext(data, fallbackApiBaseUrl) {
+    const engines = Array.isArray(data.Engines) ? data.Engines : [];
+    const modules = Array.isArray(data.Modules) ? data.Modules : [];
+    const publicEngines = engines.filter(isPublicEngine);
+    const protectedEngines = engines.filter((engine) => isCallableEngine(engine) && !isPublicEngine(engine));
+    const routeModules = modules.filter((module) => moduleRoute(module));
+    const apiBase = data.ApiBaseUrl || fallbackApiBaseUrl;
+    const lines = [
+        `# Playwright Context for ${data.OsClient || 'current tenant'}`,
+        '',
+        '## Recommended Environment',
+        '```bash',
+        `PW_API_BASE=${apiBase}`,
+        `PW_OS_CLIENT=${data.OsClient || ''}`,
+        'PW_BASE_URL=http://127.0.0.1:5180',
+        'PW_HOME_PATH=/',
+        '```',
+        '',
+        `## Summary`,
+        `- Engines: ${engines.length}`,
+        `- Public callable engines: ${publicEngines.length}`,
+        `- Protected callable engines: ${protectedEngines.length}`,
+        `- Menu routes: ${routeModules.length}`,
+    ];
+    if (data.Warnings?.length) {
+        lines.push('', '## Warnings', ...data.Warnings.map((warning) => `- ${warning}`));
+    }
+    lines.push('', '## Public API Engines');
+    if (!publicEngines.length) {
+        lines.push('_No public callable engines found._');
+    }
+    else {
+        lines.push('| Engine Key | Name | Category | Address |', '|---|---|---|---|');
+        publicEngines.slice(0, 80).forEach((engine) => {
+            lines.push(`| ${engine.ApiEngineKey || ''} | ${engine.ApiName || ''} | ${engine.Category || ''} | ${engine.ApiAddress || `/apiengine/${engine.ApiEngineKey}`} |`);
+        });
+    }
+    lines.push('', '## Protected API Engines');
+    if (!protectedEngines.length) {
+        lines.push('_No protected callable engines found._');
+    }
+    else {
+        lines.push('| Engine Key | Name | Category | Address |', '|---|---|---|---|');
+        protectedEngines.slice(0, 80).forEach((engine) => {
+            lines.push(`| ${engine.ApiEngineKey || ''} | ${engine.ApiName || ''} | ${engine.Category || ''} | ${engine.ApiAddress || `/apiengine/${engine.ApiEngineKey}`} |`);
+        });
+    }
+    lines.push('', '## Menu Routes');
+    if (!routeModules.length) {
+        lines.push('_No menu routes found._');
+    }
+    else {
+        lines.push('| Route | Name | Table | Component | PC | Mobile |', '|---|---|---|---|---|---|');
+        routeModules.slice(0, 120).forEach((module) => {
+            lines.push(`| ${moduleRoute(module)} | ${module.Name || ''} | ${module.DiyTableName || module.DiyTableId || ''} | ${module.ComponentName || module.ComponentPath || ''} | ${module.Display === 1 ? 'yes' : 'no'} | ${module.AppDisplay === 1 ? 'yes' : 'no'} |`);
+        });
+    }
+    return lines.join('\n');
+}
+function buildPlaywrightPlanText(args) {
+    const appType = args.appType || 'uniapp-h5';
+    const testDir = 'tests/e2e';
+    const homePath = args.homePath || (appType === 'uniapp-h5' ? '/#/pages/index/index' : '/');
+    const loginEngine = args.loginEngineKey || args.context?.Engines?.find((engine) => /login|登录/i.test(`${engine.ApiEngineKey} ${engine.ApiName}`))?.ApiEngineKey || 'member_login';
+    const smokeEngine = args.smokeEngineKey || args.context?.Engines?.find(isPublicEngine)?.ApiEngineKey || 'home_data';
+    const route = args.context?.Modules?.map(moduleRoute).find(Boolean) || homePath;
+    return [
+        `# Playwright E2E Plan`,
+        '',
+        '## Naming',
+        'Keep the skill/folder name `playwright-e2e`: E2E means End-to-End, and the suffix signals browser-level delivery validation.',
+        '',
+        '## Environment',
+        '```bash',
+        `PW_BASE_URL=${args.frontendBaseUrl || 'http://127.0.0.1:5180'}`,
+        `PW_API_BASE=${args.apiBaseUrl}`,
+        `PW_OS_CLIENT=${args.osClient}`,
+        `PW_LOGIN_ENGINE=${loginEngine}`,
+        `PW_SMOKE_ENGINE=${smokeEngine}`,
+        `PW_HOME_PATH=${homePath}`,
+        '```',
+        '',
+        '## Files to create',
+        `- playwright.config.js`,
+        `- ${testDir}/helpers/microi.js`,
+        `- ${testDir}/specs/smoke.spec.js`,
+        `- ${testDir}/specs/auth.spec.js`,
+        '',
+        '## Minimum smoke tests',
+        `1. Open ${homePath} and assert body plus one stable app element.`,
+        `2. Call /apiengine/${smokeEngine} with Playwright request and assert DosResult shape.`,
+        `3. Call /apiengine/${loginEngine} with a dedicated test account and assert Token.`,
+        `4. Inject Token into storage, open ${route}, and assert the page is visible.`,
+        '5. Capture screenshots only for key pages or failures.',
+        '',
+        '## Microi rules',
+        '- Always send `OsClient` in API headers.',
+        '- Use a dedicated test account and repeatable seed data for write scenarios.',
+        '- Prefer API login plus storage injection over clicking the login form in every test.',
+        '- Use MCP `microi_get_playwright_context` before adding business-flow specs.',
+    ].join('\n');
+}
 /** 常用编程类型→平台允许的列类型映射（防止 AI 传入无效类型）
  *  ⚠️ 平台禁止使用 datetime/date/timestamp 物理列，统一存为 varchar(25)
  *  平台允许的列类型：varchar(N) | mediumtext | longtext | int | bigint | decimal(18,N)
@@ -129,6 +247,7 @@ IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When 
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
+- **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
 主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
@@ -347,6 +466,53 @@ export function createMcpServer(client, context) {
                 tables = tables.filter((t) => t.Name.toLowerCase().includes(keyword) || (t.Description && t.Description.toLowerCase().includes(keyword)));
             }
             return { content: [{ type: 'text', text: formatDbTables(tables) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 获取 Playwright 测试上下文
+    // ========================
+    server.tool('microi_get_playwright_context', `Get Playwright E2E testing context for OsClient "${osClient}". Returns callable API engines, anonymous/public flags, and menu routes for writing browser automation tests.`, {
+        keyword: z.string().optional().describe('Optional keyword to filter engines/modules by name, key, route, category, or table name.'),
+    }, async ({ keyword }) => {
+        try {
+            const result = await client.getPlaywrightContext(keyword);
+            if (result.Code !== 1 || !result.Data) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg || 'GetPlaywrightContext failed'}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: formatPlaywrightContext(result.Data, context.apiBaseUrl) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 生成 Playwright E2E 计划
+    // ========================
+    server.tool('microi_plan_playwright_e2e', `Create a Playwright E2E starter plan for a Microi frontend connected to OsClient "${osClient}". Use this before scaffolding tests in a PC Vue or uni-app H5 project.`, {
+        appType: z.enum(['pc-vue', 'uniapp-h5', 'web']).optional().describe('Frontend type. Default: uniapp-h5.'),
+        frontendBaseUrl: z.string().optional().describe('Local frontend URL, e.g. http://127.0.0.1:5180.'),
+        homePath: z.string().optional().describe('Home route, e.g. /#/pages/index/index for uni-app H5.'),
+        loginEngineKey: z.string().optional().describe('ApiEngineKey used for login.'),
+        smokeEngineKey: z.string().optional().describe('Public ApiEngineKey used for API smoke assertion.'),
+        keyword: z.string().optional().describe('Keyword to focus context on a module or business area.'),
+    }, async ({ appType, frontendBaseUrl, homePath, loginEngineKey, smokeEngineKey, keyword }) => {
+        try {
+            const contextResult = await client.getPlaywrightContext(keyword);
+            const playwrightContext = contextResult.Code === 1 ? contextResult.Data : undefined;
+            const text = buildPlaywrightPlanText({
+                osClient,
+                apiBaseUrl: playwrightContext?.ApiBaseUrl || context.apiBaseUrl,
+                frontendBaseUrl,
+                appType,
+                homePath,
+                loginEngineKey,
+                smokeEngineKey,
+                context: playwrightContext,
+            });
+            return { content: [{ type: 'text', text }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
