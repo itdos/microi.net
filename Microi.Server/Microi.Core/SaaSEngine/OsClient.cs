@@ -213,7 +213,14 @@ namespace Microi.net
                         }
 
                         var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbReadTypeString);
-                        client.DbRead = MicroiORMExtensions.CreateDbSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
+                        // 【防御】DbReadConn 为空时回退到 DbConn（读写共用主库连接），避免 ArgumentNullException
+                        var dbReadConnStr = client.OsClientModel["DbReadConn"]?.Val<string>();
+                        if (dbReadConnStr.DosIsNullOrWhiteSpace())
+                        {
+                            dbReadConnStr = client.OsClientModel["DbConn"].Val<string>();
+                            dbReadType = dbType;
+                        }
+                        client.DbRead = MicroiORMExtensions.CreateDbSession(dbReadConnStr, dbReadType);
                     }
                     catch (Exception ex)
                     {

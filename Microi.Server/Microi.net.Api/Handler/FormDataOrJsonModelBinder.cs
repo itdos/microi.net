@@ -226,25 +226,23 @@ namespace Microi.net.Api
 
         /// <summary>
         /// 获取参数名称（处理 ModelName 为空的情况）
+        /// ⚠️ 不可使用 FirstOrDefault(ParameterType==modelType) 兜底——多个同类型参数会全部命中第一个，
+        /// 导致 string apiEngineKey 错误地读到 osClient 的 JSON 值。
         /// </summary>
         private static string GetModelName(ModelBindingContext bindingContext, Type modelType)
         {
             var modelName = bindingContext.ModelName;
-
             if (!string.IsNullOrEmpty(modelName))
                 return modelName;
 
-            // 从 ActionDescriptor 获取参数名
-            if (bindingContext.ActionContext.ActionDescriptor is ControllerActionDescriptor actionDescriptor)
-            {
-                var parameter = actionDescriptor.Parameters
-                    .FirstOrDefault(p => p.ParameterType == modelType && p.BindingInfo?.BindingSource == null);
+            // bindingContext.FieldName 在顶层绑定时通常等于参数名
+            var fieldName = bindingContext.FieldName;
+            if (!string.IsNullOrEmpty(fieldName))
+                return fieldName;
 
-                if (parameter != null)
-                    return parameter.Name;
-            }
-
-            return modelName;
+            // 实在拿不到名字就返回空字符串——让本绑定器失败，框架回退到默认绑定（参数为 null）
+            // 之后控制器内部 `osClient ?? param?["OsClient"]` 的 fallback 仍可工作。
+            return string.Empty;
         }
 
         #endregion

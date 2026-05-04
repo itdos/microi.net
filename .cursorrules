@@ -516,4 +516,4 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
-- `microi.skills/playwright-e2e/SKILL.md` — Microi Playwright 端到端测试
+- `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 — Playwright 端到端测试
