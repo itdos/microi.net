@@ -963,7 +963,106 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 });
 ```
 
+### uni-app（H5/小程序通用）主题切换
+
+uni-app 中没有 `document` 对象（小程序端），所以推荐两套方案并存：
+
+**方案A · H5 直接操作 documentElement（最简单）**
+
+```scss
+/* 在 mci-design.scss 加暗色定义 */
+.theme-dark, page.theme-dark {
+  --mci-color-primary: #8B5CF6;
+  --mci-bg-base: #0B0B1F;
+  --mci-bg-card: rgba(28, 28, 60, 0.85);
+  --mci-text-primary: #F5F5FF;
+  --mci-text-secondary: #B8B8D8;
+  --mci-border-color: rgba(255, 255, 255, 0.08);
+  --mci-shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.5);
+}
+@media (prefers-color-scheme: dark) {
+  page.theme-auto, :root.theme-auto {
+    /* 同上，跟随系统 */
+  }
+}
+```
+
+```js
+// utils/theme.js
+const KEY = 'mci_theme';
+function applyClass(theme) {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    const cls = document.documentElement.classList;
+    cls.remove('theme-light', 'theme-dark', 'theme-auto');
+    cls.add('theme-' + theme);
+  }
+}
+export function getTheme() { try { return uni.getStorageSync(KEY) || 'light'; } catch (e) { return 'light'; } }
+export function setTheme(theme) {
+  if (!['light','dark','auto'].includes(theme)) theme = 'light';
+  try { uni.setStorageSync(KEY, theme); } catch(e) {}
+  applyClass(theme); return theme;
+}
+export function toggleTheme() { return setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
+export function initTheme() { applyClass(getTheme()); }
+```
+
+```vue
+// App.vue
+<script>
+import { initTheme } from '@/utils/theme.js';
+export default { onLaunch() { initTheme(); } };
+</script>
+```
+
+```vue
+// 页面里加切换按钮
+<button @click="toggle">切换主题</button>
+<script setup>
+import { toggleTheme, getTheme } from '@/utils/theme.js';
+const cur = ref(getTheme());
+function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换为' + (cur.value==='dark'?'暗色':'亮色') }); }
+</script>
+```
+
+**方案B · 小程序端通过 `<page-meta>` + `root-font-size`**（如需小程序原生暗色，否则推荐 wx 的 `themeChange` 事件）
+
+```vue
+<template>
+  <page-meta :root-class="themeClass">
+    <view class="content">...</view>
+  </page-meta>
+</template>
+```
+
+### 主题切换 UI 入口规范
+
+- 入口位置：「我的」页面服务菜单 / 顶部状态栏图标 / 设置页第一项
+- 形式：图标 + 文案（🌙 暗色 / ☀️ 亮色 / 🌗 跟随系统），点击后立即生效，弹 Toast 反馈
+- 切换后立刻持久化（uni.setStorageSync），下次启动 App 在 `onLaunch` 自动 `initTheme()` 应用
+
+### 主题颜色变量必须用 var(--mci-*) 而非硬编码
+
+设计页面时所有颜色、阴影、边框 **强制用变量**，否则切到暗色后只换底色不换文字，会出现"白底白字"。常见违规：
+
+```scss
+/* ❌ 错误 */
+.card { background: #fff; color: #333; box-shadow: 0 8rpx 20rpx rgba(0,0,0,0.05); }
+
+/* ✅ 正确 */
+.card {
+  background: var(--mci-bg-card);
+  color: var(--mci-text-primary);
+  box-shadow: var(--mci-shadow-md);
+}
+```
+
+### 渐变色处理
+
+渐变色在暗色下需要重新调色（亮色用 #FF8A5C → 暗色 #B14CA0 之类），定义 `--mci-gradient-*` 变量并在 `.theme-dark` 下覆盖。
+
 ---
+
 
 ## 命名规范
 
