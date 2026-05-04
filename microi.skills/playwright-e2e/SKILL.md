@@ -1,16 +1,14 @@
 ---
 name: playwright-e2e
-description: 在 Microi 移动端（uni-app H5）/ PC Vue 项目中编写 Playwright 端到端测试，串联接口引擎+前端页面，跑通登录→下单→支付等关键路径
+description: 在 Microi 吾码低代码平台的前端项目（PC Vue / uni-app H5）中编写 Playwright 端到端测试，串联接口引擎+前端页面，跑通登录→业务流程→结算等关键路径
 ---
 
-# Microi Playwright 端到端测试
+# Microi 吾码 — Playwright 端到端测试
 
-> 适用：`ai-helper/数字经济商城/mci.lsg.uniapp`、`Microi.Client`、其它 Vite/Vue 前端。
-> 目标：用 Playwright 自动启动开发服务器、模拟用户操作、断言后端 V8 接口返回值。
+> 适用场景：Microi 吾码（开源 AI 低代码平台）下的任何 Vite/Vue 前端项目，包括 PC 后台 `Microi.Client`、移动端 uni-app H5、官网、租户自建小程序/H5。
+> 目标：用 Playwright 自动启动开发服务器、模拟用户操作、断言后端 V8 接口引擎返回值，保证一套低代码系统从注册→登录→主流程能跑通。
 
 ## 1. 安装
-
-在前端项目根目录：
 
 ```bash
 npm i -D @playwright/test
@@ -22,11 +20,11 @@ npx playwright install chromium
 ```
 <前端项目>/
   e2e/
-    fixtures/login.ts       # 登录辅助：直接 POST 接口拿 token，写 localStorage
+    fixtures/login.ts
     pages/
-      home.spec.ts          # 首页冒烟
-      login.spec.ts         # 登录
-      product-buy.spec.ts   # 商品详情→立即购买
+      home.spec.ts
+      login.spec.ts
+      <业务流程>.spec.ts
     playwright.config.ts
 ```
 
@@ -38,42 +36,45 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:5180',
+    baseURL: process.env.PW_BASE_URL || 'http://localhost:5180',
     trace: 'on-first-retry',
-    viewport: { width: 390, height: 844 }, // iPhone 12 模拟移动端
     extraHTTPHeaders: {
-      'X-OsClient': 'lsg' // Microi 多租户标识
+      // Microi 多租户标识，必填；OsClient 名称按你的项目配
+      'OsClient': process.env.PW_OS_CLIENT || 'demo'
     }
   },
   webServer: {
-    command: 'npm run dev:h5',
+    command: 'npm run dev',           // 或 npm run dev:h5
     url: 'http://localhost:5180',
     reuseExistingServer: true,
     timeout: 120_000
   },
   projects: [
-    { name: 'mobile', use: { ...devices['iPhone 12'] } }
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile',  use: { ...devices['iPhone 12'] } }
   ]
 });
 ```
 
 ## 4. 与 Microi V8 接口对接的登录 fixture
 
+接口引擎地址固定形如 `${API}/apiengine/{ApiEngineKey}`。把 `API` / `OS` / 登录引擎 Key 改成你项目的实际值。
+
 ```ts
 // e2e/fixtures/login.ts
 import { request } from '@playwright/test';
-const API = 'https://api.itdos.com';
-const OS = 'lsg';
+const API = process.env.PW_API_BASE || 'https://api.your-domain.com';
+const OS  = process.env.PW_OS_CLIENT || 'demo';
 
-export async function login(phone = '13800000000', pwd = 'admin888') {
+export async function login(account: string, pwd: string, engineKey = 'member_login') {
   const ctx = await request.newContext();
-  const r = await ctx.post(`${API}/apiengine/mall_member_login`, {
-    headers: { 'OsClient': OS, 'Content-Type': 'application/json' },
-    data: { Phone: phone, Pwd: pwd }
+  const r = await ctx.post(`${API}/apiengine/${engineKey}`, {
+    headers: { OsClient: OS, 'Content-Type': 'application/json' },
+    data: { Account: account, Pwd: pwd }
   });
   const json = await r.json();
   if (json.Code !== 1) throw new Error('登录失败: ' + json.Msg);
-  return json.Data; // { Token, Member }
+  return json.Data;
 }
 ```
 
@@ -84,65 +85,76 @@ export async function login(phone = '13800000000', pwd = 'admin888') {
 import { test, expect } from '@playwright/test';
 import { login } from '../fixtures/login';
 
-test('会员登录走通 mall_member_login', async ({ page }) => {
-  const data = await login();
+test('会员登录拿到 Token 并能进入首页', async ({ page }) => {
+  const data = await login('admin', 'admin888');
   expect(data.Token).toBeTruthy();
-  await page.addInitScript((token) => {
-    localStorage.setItem('mci_token', token);
-  }, data.Token);
+  await page.addInitScript((t) => localStorage.setItem('Token', t), data.Token);
   await page.goto('/');
-  await expect(page.getByText('乐闪购')).toBeVisible();
+  await expect(page.locator('body')).toBeVisible();
 });
 ```
 
 ```ts
-// e2e/pages/product-buy.spec.ts
-test('商品详情立即购买跳购物车', async ({ page }) => {
-  await page.goto('/#/pages/product/detail?id=<ProductId>');
-  await page.getByText('立即购买').click();
-  await expect(page).toHaveURL(/cart/);
-  await expect(page.getByText('结算')).toBeVisible();
+// 业务流程：列表 → 详情 → 主操作 → 验证落库
+test('详情页主操作可用', async ({ page }) => {
+  await page.goto('/#/pages/business/detail?id=<RecordId>');
+  await page.getByRole('button', { name: '提交' }).click();
+  await expect(page.getByText('成功')).toBeVisible();
 });
 ```
 
-## 6. 断言后端接口
+## 6. 直接断言接口引擎返回
 
 ```ts
 import { request as r } from '@playwright/test';
-test('mall_home_data 允许匿名', async () => {
+test('home_data 接口允许匿名且返回正常', async () => {
   const ctx = await r.newContext();
-  const res = await ctx.post('https://api.itdos.com/apiengine/mall_home_data', {
-    headers: { OsClient: 'lsg' }, data: {}
+  const res = await ctx.post(`${process.env.PW_API_BASE}/apiengine/home_data`, {
+    headers: { OsClient: process.env.PW_OS_CLIENT! }, data: {}
   });
   const j = await res.json();
   expect(j.Code).toBe(1);
-  expect(Array.isArray(j.Data.HotProducts)).toBeTruthy();
 });
 ```
 
 ## 7. 运行
 
 ```bash
-npx playwright test                # 全部
-npx playwright test login.spec.ts  # 单个
-npx playwright test --ui           # 交互模式
-npx playwright show-report         # 查看 HTML 报告
+npx playwright test
+npx playwright test login.spec.ts
+npx playwright test --ui
+npx playwright show-report
 ```
 
-## 8. 与 Microi 的协作要点
+## 8. 与 Microi 的协作要点（通用）
 
-- 登录类接口必须 `AllowAnonymous=1`（用 `microi_run_engine _mcp_set_engine_anonymous` 修复）。
-- token 字段名固定 `mci_token`；接口要在 Header 加 `Token` 或 Body 传 `_Token`。
-- uni-app H5 路由模式 `hash`（`/#/pages/...`），所有 Playwright 跳转都要带 `#`。
-- CI 中跑：把 `webServer.command` 改成 `npm run build:h5 && npx serve dist/build/h5`，避免 vite dev 的 HMR 噪声。
-- 调试技巧：`await page.pause()` 暂停，`PWDEBUG=1` 启动调试器。
+- **匿名访问**：登录/注册/首页公开数据等接口必须 `AllowAnonymous=1`。可在低代码后台勾选，或用 MCP `microi_set_engine_anonymous` 批量设置。
+- **Token 透传**：业务接口在 Header 加 `Token`；fixture 写 `localStorage` 即可被前端拦截器拾取。
+- **多租户**：所有请求必须带 `OsClient`，否则后端无法路由到对应租户库。
+- **uni-app H5 路由**：通常 `hash` 模式，URL 形如 `/#/pages/...`，Playwright 跳转必须带 `#`。
+- **静态资源路径**：uni-app H5 部署到子路径时 `vite.config.js` 必须 `base: './'`。
+- **CI 模式**：`webServer.command` 可以改成 `npm run build && npx serve dist`，避开 HMR 干扰。
+- **调试**：`await page.pause()` 或 `PWDEBUG=1 npx playwright test`。
 
-## 9. 常见坑
+## 9. 常见坑速查表
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| 登录返回 null | 引擎 `AllowAnonymous=0` | 在低代码后台或用 `_mcp_set_engine_anonymous` 改成 1 |
-| 静态资源 404 | `vite.config.js` 没 `base: './'` | 加上后重新 build |
-| tabBar 图标缺失 | dist 中 `static/tabbar/*.png` 没拷贝 | 检查 `src/static/tabbar/` 源文件是否齐全 |
-| H5 横向滚动条 | 内部 scroll-x 撑出页面 | 根容器加 `overflow-x:hidden;max-width:100vw` |
-| Jint `V8.Db` is null | MCP `run_engine` 上下文没有数据库会话 | 用 `V8.FormEngine.UptFormData` 代替原生 SQL |
+| 登录接口返回 Code=0 / null | 引擎 AllowAnonymous=0 | `microi_set_engine_anonymous` 改 1 |
+| 静态资源 404 | `vite.config.js` 缺 `base: './'` | 加上后重新 build |
+| H5 横向滚动条 | 子组件 swiper/scroll-x 撑出 viewport | 根容器 `overflow-x:hidden;max-width:100vw` |
+| 列表查不到数据 | 排序倒序 / 无默认 PageSize | 用 `microi_run_engine` 验接口返回 |
+| 接口引擎里 V8.Db is null | MCP run_engine 不带 DB 会话 | 用 `V8.FormEngine.*` 替代原生 SQL |
+| 权限不足 | 当前账号 Level<9999 | 用超管账号登录再跑 MCP 工具 |
+
+## 10. 推荐的最少冒烟集
+
+任何 Microi 业务系统建议至少覆盖：
+
+1. 公开首页能打开，关键文案 / banner 可见
+2. 注册：表单提交→进入首页或登录页，DB 出现新用户
+3. 登录：拿到 Token、本地存储写入、跳首页
+4. 一条主业务主线（如：列表→详情→提交→列表能查到）
+5. 退出登录：清 Token、跳登录页
+
+跑通这 5 条 = 客户最低交付条件。
