@@ -7,6 +7,7 @@ export declare const API: {
     readonly REFRESH_TOKEN: "/api/SysUser/RefreshToken";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
     readonly GET_DB_SCHEMA: "/api/V8Engine/GetDbSchema";
+    readonly GET_PLAYWRIGHT_CONTEXT: "/api/V8Engine/GetPlaywrightContext";
     readonly GET_ENGINE_LIST: "/api/V8Engine/GetApiEngineList";
     readonly GET_ENGINE_CODE: "/api/V8Engine/GetApiEngineCode";
     readonly UPDATE_ENGINE_CODE: "/api/V8Engine/UpdateApiEngineCode";

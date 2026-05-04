@@ -10,6 +10,7 @@ export const API = {
     GET_STATUS: '/api/V8Engine/GetStatus',
     // 数据库结构
     GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
+    GET_PLAYWRIGHT_CONTEXT: '/api/V8Engine/GetPlaywrightContext',
     // 接口引擎
     GET_ENGINE_LIST: '/api/V8Engine/GetApiEngineList',
     GET_ENGINE_CODE: '/api/V8Engine/GetApiEngineCode',
