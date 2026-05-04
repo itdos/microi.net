@@ -1128,6 +1128,136 @@ namespace Microi.net
 
         #endregion
 
+        #region GetPlaywrightContext
+
+        /// <summary>
+        /// 获取 Playwright 自动化测试上下文（接口引擎、菜单路由、推荐环境变量）
+        /// </summary>
+        public static async Task<DosResult<object>> GetPlaywrightContext(string osClient, string keyword = null, string apiBaseUrl = null)
+        {
+            try
+            {
+                var engineResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] {
+                        "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRemark",
+                        "AllowAnonymous", "StopHttp", "IsEnable", "UpdateTime"
+                    },
+                    _Where = BuildKeywordWhere(keyword, "ApiName", "ApiEngineKey", "Category", "ApiRemark", "ApiAddress"),
+                    _OrderBy = "Category",
+                    _OrderByType = "ASC",
+                    _PageSize = 1000
+                });
+
+                if (engineResult.Code != 1)
+                {
+                    return new DosResult<object>(engineResult.Code, null, "获取接口引擎测试上下文失败：" + engineResult.Msg);
+                }
+
+                var engines = new List<object>();
+                var publicEngineCount = 0;
+                var protectedEngineCount = 0;
+                foreach (var item in engineResult.Data ?? new List<dynamic>())
+                {
+                    var row = JObject.FromObject(item);
+                    var allowAnonymous = row["AllowAnonymous"]?.Val<int>() ?? 0;
+                    var stopHttp = row["StopHttp"]?.Val<int>() ?? 0;
+                    var isEnable = row["IsEnable"]?.Val<int>() ?? 1;
+                    if (allowAnonymous == 1 && stopHttp != 1 && isEnable != 0) publicEngineCount++;
+                    if (allowAnonymous != 1 && stopHttp != 1 && isEnable != 0) protectedEngineCount++;
+
+                    engines.Add(new
+                    {
+                        Id = row["Id"]?.Val<string>() ?? "",
+                        ApiName = row["ApiName"]?.Val<string>() ?? "",
+                        ApiEngineKey = row["ApiEngineKey"]?.Val<string>() ?? "",
+                        Category = row["Category"]?.Val<string>() ?? "未分类",
+                        ApiAddress = row["ApiAddress"]?.Val<string>() ?? "",
+                        ApiRemark = row["ApiRemark"]?.Val<string>() ?? "",
+                        AllowAnonymous = allowAnonymous,
+                        StopHttp = stopHttp,
+                        IsEnable = isEnable,
+                        UpdateTime = row["UpdateTime"]?.ToString() ?? ""
+                    });
+                }
+
+                var moduleWarnings = new List<string>();
+                var moduleResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_menu", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] {
+                        "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName",
+                        "ComponentPath", "OpenType", "Display", "AppDisplay", "Sort", "Icon", "UpdateTime"
+                    },
+                    _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName", "ComponentName"),
+                    _OrderBy = "Sort",
+                    _OrderByType = "ASC",
+                    _PageSize = 1000
+                });
+
+                var modules = new List<object>();
+                if (moduleResult.Code == 1 && moduleResult.Data != null)
+                {
+                    foreach (var item in moduleResult.Data)
+                    {
+                        var row = JObject.FromObject(item);
+                        modules.Add(new
+                        {
+                            Id = row["Id"]?.Val<string>() ?? "",
+                            Name = row["Name"]?.Val<string>() ?? "",
+                            ParentId = row["ParentId"]?.Val<string>() ?? "",
+                            DiyTableId = row["DiyTableId"]?.Val<string>() ?? "",
+                            DiyTableName = row["DiyTableName"]?.Val<string>() ?? "",
+                            Url = row["Url"]?.Val<string>() ?? "",
+                            ComponentName = row["ComponentName"]?.Val<string>() ?? "",
+                            ComponentPath = row["ComponentPath"]?.Val<string>() ?? "",
+                            OpenType = row["OpenType"]?.Val<string>() ?? "",
+                            Display = row["Display"]?.Val<int>() ?? 0,
+                            AppDisplay = row["AppDisplay"]?.Val<int>() ?? 0,
+                            Sort = row["Sort"]?.Val<int>() ?? 0,
+                            Icon = row["Icon"]?.Val<string>() ?? "",
+                            UpdateTime = row["UpdateTime"]?.ToString() ?? ""
+                        });
+                    }
+                }
+                else if (moduleResult.Code != 1)
+                {
+                    moduleWarnings.Add("菜单路由读取失败：" + moduleResult.Msg);
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    OsClient = osClient,
+                    ApiBaseUrl = apiBaseUrl ?? "",
+                    Keyword = keyword ?? "",
+                    Engines = engines,
+                    Modules = modules,
+                    RecommendedEnv = new
+                    {
+                        PW_API_BASE = apiBaseUrl ?? "",
+                        PW_OS_CLIENT = osClient,
+                        PW_BASE_URL = "http://127.0.0.1:5180",
+                        PW_HOME_PATH = "/"
+                    },
+                    Summary = new
+                    {
+                        EngineCount = engines.Count,
+                        PublicEngineCount = publicEngineCount,
+                        ProtectedEngineCount = protectedEngineCount,
+                        ModuleCount = modules.Count
+                    },
+                    Warnings = moduleWarnings
+                }, "获取 Playwright 测试上下文成功");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取 Playwright 测试上下文失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
         #region CreateTable
 
         /// <summary>

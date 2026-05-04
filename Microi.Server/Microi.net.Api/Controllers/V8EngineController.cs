@@ -212,6 +212,20 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetPlaywrightContext(string osClient, string keyword, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            keyword = keyword ?? param?["Keyword"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var apiBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}".TrimEnd('/');
+            var result = await V8McpLogic.GetPlaywrightContext(osClient, keyword, apiBaseUrl);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateTable([FromBody] JObject param)
         {

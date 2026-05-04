@@ -84,6 +84,52 @@ export interface V8Event {
   UpdateTime?: string;
 }
 
+export interface PlaywrightEngineInfo {
+  Id: string;
+  ApiName: string;
+  ApiEngineKey: string;
+  Category: string;
+  ApiAddress: string;
+  ApiRemark: string;
+  AllowAnonymous: number;
+  StopHttp: number;
+  IsEnable: number;
+  UpdateTime?: string;
+}
+
+export interface PlaywrightModuleInfo {
+  Id: string;
+  Name: string;
+  ParentId: string;
+  DiyTableId: string;
+  DiyTableName: string;
+  Url: string;
+  ComponentName: string;
+  ComponentPath: string;
+  OpenType: string;
+  Display: number;
+  AppDisplay: number;
+  Sort: number;
+  Icon: string;
+  UpdateTime?: string;
+}
+
+export interface PlaywrightContextData {
+  OsClient: string;
+  ApiBaseUrl?: string;
+  Keyword?: string;
+  Engines: PlaywrightEngineInfo[];
+  Modules: PlaywrightModuleInfo[];
+  RecommendedEnv?: Record<string, string>;
+  Summary?: {
+    EngineCount?: number;
+    PublicEngineCount?: number;
+    ProtectedEngineCount?: number;
+    ModuleCount?: number;
+  };
+  Warnings?: string[];
+}
+
 /**
  * Microi 后端 HTTP 客户端
  * - RSA 加密登录（与 Microi 前端 JSEncrypt 兼容）
@@ -369,6 +415,13 @@ export class MicroiClient {
   async getDbSchema(): Promise<ApiResponse<{ Tables: DbTable[] }>> {
     return this.post(API.GET_DB_SCHEMA, {
       OsClient: this.config.osClient,
+    });
+  }
+
+  async getPlaywrightContext(keyword?: string): Promise<ApiResponse<PlaywrightContextData>> {
+    return this.post(API.GET_PLAYWRIGHT_CONTEXT, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
     });
   }
 
