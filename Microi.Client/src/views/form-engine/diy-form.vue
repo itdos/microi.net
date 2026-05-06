@@ -149,6 +149,7 @@
                                                 @CallbackParentFormSubmit="CallbackParentFormSubmit"
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
+                                                @CallbackGroupCollapseChange="handleGroupCollapseChange"
                                             />
                                         </el-form-item>
                                     </div>
@@ -219,6 +220,7 @@
                                                 @CallbackParentFormSubmit="CallbackParentFormSubmit"
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
+                                                @CallbackGroupCollapseChange="handleGroupCollapseChange"
                                             />
                                         </el-form-item>
                                     </div>
