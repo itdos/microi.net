@@ -252,11 +252,9 @@ export default {
                             });
                         });
                         if (!haveLimit) {
-                            field.Visible = false;
                             return false;
                         }
                     } else {
-                        field.Visible = false;
                         return false;
                     }
                 }

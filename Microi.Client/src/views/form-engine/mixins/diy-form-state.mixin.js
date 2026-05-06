@@ -45,9 +45,7 @@ export default {
             }
         },
         // 性能优化：预先按 tab 分组字段，避免在 v-for 中每次渲染都重新计算
-        // 同时预计算每个字段的显示状态、span、class 等，减少模板中的方法调用
-        // 🔥 新增：支持分批渲染，首次只渲染部分字段，后续按需加载
-        // ⚠️ 内存优化：避免在计算属性中创建闭包，使用纯计算逻辑
+        // 注意：computed 必须保持纯计算，不能写 field._xxx，否则会触发 ElRow 递归更新。
         DiyFieldListGrouped() {
             var self = this;
             var grouped = {};
@@ -63,29 +61,6 @@ export default {
                 return grouped;
             }
 
-            // 触发依赖收集：确保这些属性变化时重新计算
-            // ⚠️ 内存优化：不要在这里创建数组，只读取值
-            var _deps = [
-                self.ColSpan,
-                self.DiyTableModel.ColSpan,
-                self.ShowFields.length,
-                self.HideFields.length,
-                self.DiyTableModel.DisplayDefaultField
-            ];
-            // 🔥 渲染字段数量变化时重新计算（使用 JSON.stringify 避免对象引用）
-            var _renderedCountsKey = JSON.stringify(self.renderedFieldCounts);
-            var _collapseGroupStateKey = JSON.stringify(self.CollapseGroupState || {});
-
-            var tabNameSet = new Set();
-
-            // 收集所有有效的 tab 标识
-            showTabs.forEach((tabModel) => {
-                if (tabModel) {
-                    tabNameSet.add(tabModel.Name);
-                    tabNameSet.add(tabModel.Id);
-                }
-            });
-
             // 初始化每个 tab 的数组
             showTabs.forEach((tab) => {
                 if (tab) {
@@ -96,9 +71,6 @@ export default {
                 }
             });
 
-            // 预计算常用值，避免循环中重复计算
-            var isDesignMode = self.LoadMode === "Design";
-
             // 防御性检查：确保所有必要的数据都已准备好
             if (!self.DiyTableModel || typeof self.DiyTableModel !== 'object' || self.DiyTableModel instanceof Promise) {
                 return grouped;
@@ -107,14 +79,7 @@ export default {
                 return grouped;
             }
 
-            var displayDefaultField = self.DiyTableModel.DisplayDefaultField;
-            var defaultFieldNames = self.DiyCommon.DefaultFieldNames || [];
-            var isAdmin = self.GetCurrentUser._IsAdmin === true;
-            var userRoles = self.GetCurrentUser._Roles || [];
-            var defaultColSpan = self.DiyTableModel.ColSpan || 12;
-            var propsColSpan = self.ColSpan;
-
-            // 遍历字段，分配到对应的 tab，并预计算属性
+            // 遍历字段，分配到对应的 tab。这里不能写字段运行态属性。
             self.DiyFieldList.forEach((field) => {
                 // 🔥 添加字段有效性检查
                 if (!field || typeof field !== 'object') {
@@ -128,47 +93,6 @@ export default {
                      self.HideFields.indexOf(field.Name) === -1);
 
                 if (!shouldShow) return;
-
-                // ==================== 预计算 _isShow ====================
-                var isShow = true;
-                // 检查是否是默认审计字段
-                if (defaultFieldNames.indexOf(field.Name) > -1 && !displayDefaultField) {
-                    isShow = false;
-                } else if (isDesignMode) {
-                    isShow = true;
-                } else if (!self.DiyCommon.IsNull(field.BindRole) && field.BindRole.length > 0) {
-                    // 检查角色权限
-                    if (!isAdmin) {
-                        var haveLimit = false;
-                        if (userRoles.length > 0) {
-                            for (var i = 0; i < field.BindRole.length; i++) {
-                                for (var j = 0; j < userRoles.length; j++) {
-                                    if (userRoles[j].Id && userRoles[j].Id.toLowerCase() === field.BindRole[i].toLowerCase()) {
-                                        haveLimit = true;
-                                        break;
-                                    }
-                                }
-                                if (haveLimit) break;
-                            }
-                        }
-                        if (!haveLimit) {
-                            isShow = false;
-                        }
-                    }
-                }
-                // 最终检查 Visible 属性
-                if (isShow && !isDesignMode) {
-                    isShow = self.FieldIsVisible(field);//self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
-                }
-                field._isShow = isShow;
-
-                // ==================== 预计算 _span ====================
-                field._span = self.GetDiyTableColumnSpan(field);
-
-                // ==================== 预计算 _class ====================
-                var fieldClass = 'field-item field_' + field.Name + ' field_' + field.Component;
-                field._class = fieldClass;
-                field._activeClass = fieldClass + ' active-field';
 
                 // 找到字段所属的 tab
                 var assigned = false;
@@ -199,128 +123,263 @@ export default {
                 var key = tab.Id || tab.Name;
                 if (key && grouped[key]) {
                     grouped[key].sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
-                    self.ApplyCollapseGroupState(grouped[key], key);
                 }
             });
-
-            // 🔥 性能优化：分批渲染 - 只返回已渲染的字段
-            // 对每个 tab 的字段列表进行截取，实现渐进式渲染
-            var limitedGrouped = {};
-            showTabs.forEach((tab) => {
-                var key = tab.Id || tab.Name;
-                if (key && grouped[key]) {
-                    var allFields = grouped[key];
-                    var renderedCount = self.renderedFieldCounts[key] || self.BATCH_SIZE_FIRST;
-                    // 限制返回的字段数量
-                    limitedGrouped[key] = allFields.slice(0, renderedCount);
-
-                    // 如果还有未渲染的字段，安排下一批渲染
-                    if (renderedCount < allFields.length && !self._isDestroyed) {
-                        self.safeTimeout(() => {
-                            if (self._isDestroyed) return;
-                            self.renderedFieldCounts[key] = Math.min(
-                                renderedCount + self.BATCH_SIZE_NEXT,
-                                allFields.length
-                            );
-                        }, 100); // 100ms 后渲染下一批
-                    }
-                }
-            });
-            console.log('limitedGrouped',limitedGrouped);
-            return limitedGrouped;
+            return grouped;
         },
     },
     methods: {
+        SetFieldRuntimeValue(field, key, value) {
+            if (field && field[key] !== value) {
+                field[key] = value;
+            }
+        },
+        GetBaseFieldIsShow(field) {
+            var self = this;
+            if (!field) return false;
+
+            if ((self.DiyCommon.DefaultFieldNames || []).indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
+                return false;
+            }
+
+            if (self.LoadMode === "Design") {
+                return true;
+            }
+
+            if (!self.DiyCommon.IsNull(field.BindRole) && field.BindRole.length > 0 && self.GetCurrentUser._IsAdmin !== true) {
+                var userRoles = self.GetCurrentUser._Roles || [];
+                var haveLimit = false;
+                for (var i = 0; i < field.BindRole.length; i++) {
+                    for (var j = 0; j < userRoles.length; j++) {
+                        if (userRoles[j].Id && userRoles[j].Id.toLowerCase() === field.BindRole[i].toLowerCase()) {
+                            haveLimit = true;
+                            break;
+                        }
+                    }
+                    if (haveLimit) break;
+                }
+                if (!haveLimit) return false;
+            }
+
+            return self.FieldIsVisible(field);
+        },
+        ApplyBaseFieldRuntimeState(field) {
+            var self = this;
+            if (!field || typeof field !== "object") return;
+            var isShow = self.GetBaseFieldIsShow(field);
+            var fieldClass = 'field-item field_' + field.Name + ' field_' + field.Component;
+            self.SetFieldRuntimeValue(field, '_isShow', isShow);
+            self.SetFieldRuntimeValue(field, '_baseIsShow', isShow);
+            self.SetFieldRuntimeValue(field, '_span', self.GetDiyTableColumnSpan(field));
+            self.SetFieldRuntimeValue(field, '_class', fieldClass);
+            self.SetFieldRuntimeValue(field, '_activeClass', fieldClass + ' active-field');
+        },
+        RefreshDiyFieldRuntimeState(tabKey) {
+            var self = this;
+            if (!Array.isArray(self.DiyFieldList) || self.DiyFieldList.length === 0) {
+                return;
+            }
+
+            self.DiyFieldList.forEach((field) => {
+                self.ApplyBaseFieldRuntimeState(field);
+            });
+
+            var grouped = self.DiyFieldListGrouped || {};
+            Object.keys(grouped).forEach((key) => {
+                if (tabKey && key !== tabKey) return;
+                self.ApplyCollapseGroupState(grouped[key], key);
+            });
+        },
+        GetCollapseStateKey(field, tabKey, index) {
+            return field.Id || field.Name || (tabKey + "_" + index);
+        },
+        GetCollapseGroupConfig(field) {
+            return (field && field.Config && field.Config.CollapseGroup) ? field.Config.CollapseGroup : {};
+        },
         ApplyCollapseGroupState(fields, tabKey) {
             var self = this;
             if (!Array.isArray(fields) || fields.length === 0) {
                 return fields;
             }
 
+            var metaMap = new Map();
             fields.forEach((field) => {
                 if (!field || typeof field !== "object") return;
-                field._collapseHidden = false;
-                field._collapsedByFieldId = "";
-                field._collapseChildCount = 0;
-                field._collapseCollapsed = false;
-                field._collapseGroupTheme = "";
-                field._collapseGroupIndex = -1;
-                field._collapseGroupChildIndex = -1;
+                metaMap.set(field, {
+                    _collapseHidden: false,
+                    _collapsedByFieldId: "",
+                    _collapseChildCount: 0,
+                    _collapseCollapsed: false,
+                    _collapseGroupTheme: "",
+                    _collapseGroupIndex: -1,
+                    _collapseGroupChildIndex: -1,
+                    _collapseStateKey: "",
+                    _collapseClass: "",
+                    _isShow: field._baseIsShow !== false
+                });
             });
 
             fields.forEach((field, index) => {
                 if (!field || field.Component !== "CollapseGroup") return;
 
-                var groupConfig = (field.Config && field.Config.CollapseGroup) || {};
-                var stateKey = field.Id || field.Name || (tabKey + "_" + index);
+                var groupConfig = self.GetCollapseGroupConfig(field);
+                var stateKey = self.GetCollapseStateKey(field, tabKey, index);
                 var hasState = self.CollapseGroupState && Object.prototype.hasOwnProperty.call(self.CollapseGroupState, stateKey);
                 var defaultCollapsed = groupConfig.DefaultCollapsed === true || groupConfig.DefaultCollapsed === 1 || groupConfig.DefaultCollapsed === "true";
                 var collapsed = hasState ? self.CollapseGroupState[stateKey] : defaultCollapsed;
-                var scopeMode = groupConfig.ScopeMode || "UntilNextGroup";
-                var theme = groupConfig.Theme || "default";
-                var fieldCount = parseInt(groupConfig.FieldCount, 10);
-                if (!fieldCount || fieldCount < 1) {
-                    fieldCount = 10;
+                if (self.LoadMode === "Design") {
+                    collapsed = false;
                 }
+                self.ApplyCollapseGroupVisualState(fields, index, tabKey, collapsed, metaMap);
+            });
 
-                field._collapseCollapsed = collapsed;
-                field._collapseGroupTheme = theme;
-                field._class += " collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
-                field._activeClass += " collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
-                var childCount = 0;
-                var childFields = [];
-
-                for (var childIndex = index + 1; childIndex < fields.length; childIndex++) {
-                    var childField = fields[childIndex];
-                    if (!childField) continue;
-                    if (childField.Component === "CollapseGroup") {
-                        break;
-                    }
-
-                    childCount++;
-                    childFields.push(childField);
-                    childField._collapseGroupTheme = theme;
-                    childField._collapseGroupIndex = index;
-                    childField._collapseGroupChildIndex = childCount - 1;
-                    childField._class += " collapse-group-item collapse-group-theme-" + theme;
-                    childField._activeClass += " collapse-group-item collapse-group-theme-" + theme;
-
-                    if (collapsed) {
-                        childField._collapseHidden = true;
-                        childField._collapsedByFieldId = stateKey;
-                        childField._isShow = false;
-                    }
-
-                    if (scopeMode === "FieldCount" && childCount >= fieldCount) {
-                        break;
-                    }
-                }
-
-                field._collapseChildCount = childCount;
-                childFields.forEach((childField, childFieldIndex) => {
-                    if (childFieldIndex === 0) {
-                        childField._class += " collapse-group-first";
-                        childField._activeClass += " collapse-group-first";
-                    }
-                    if (childFieldIndex === childFields.length - 1) {
-                        childField._class += " collapse-group-last";
-                        childField._activeClass += " collapse-group-last";
-                    }
+            fields.forEach((field) => {
+                var meta = metaMap.get(field);
+                if (!meta) return;
+                Object.keys(meta).forEach((key) => {
+                    self.SetFieldRuntimeValue(field, key, meta[key]);
                 });
             });
 
             return fields;
         },
+        ApplyCollapseGroupVisualState(fields, groupIndex, tabKey, collapsed, metaMap) {
+            var self = this;
+            var field = fields[groupIndex];
+            if (!field || field.Component !== "CollapseGroup") return;
+            if (!metaMap) {
+                metaMap = new Map();
+                fields.forEach((item) => {
+                    if (!item) return;
+                    metaMap.set(item, {
+                        _collapseHidden: false,
+                        _collapsedByFieldId: "",
+                        _collapseChildCount: 0,
+                        _collapseCollapsed: false,
+                        _collapseGroupTheme: "",
+                        _collapseGroupIndex: -1,
+                        _collapseGroupChildIndex: -1,
+                        _collapseStateKey: "",
+                        _collapseClass: "",
+                        _isShow: item._baseIsShow !== false
+                    });
+                });
+            }
+
+            var groupConfig = self.GetCollapseGroupConfig(field);
+            var stateKey = self.GetCollapseStateKey(field, tabKey, groupIndex);
+            var scopeMode = groupConfig.ScopeMode || "UntilNextGroup";
+            var theme = groupConfig.Theme || "default";
+            var fieldCount = parseInt(groupConfig.FieldCount, 10);
+            if (!fieldCount || fieldCount < 1) {
+                fieldCount = 10;
+            }
+
+            var groupMeta = metaMap.get(field);
+            if (groupMeta) {
+                groupMeta._collapseStateKey = stateKey;
+                groupMeta._collapseCollapsed = collapsed;
+                groupMeta._collapseGroupTheme = theme;
+                groupMeta._collapseClass = "collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
+            }
+
+            var childFields = [];
+            for (var childIndex = groupIndex + 1; childIndex < fields.length; childIndex++) {
+                var childField = fields[childIndex];
+                if (!childField) continue;
+                if (childField.Component === "CollapseGroup") {
+                    break;
+                }
+
+                childFields.push(childField);
+                if (scopeMode === "FieldCount" && childFields.length >= fieldCount) {
+                    break;
+                }
+            }
+
+            var visibleChildFields = [];
+            childFields.forEach((childField, childFieldIndex) => {
+                var baseVisible = childField._baseIsShow !== false;
+                var childMeta = metaMap.get(childField);
+                if (childMeta) {
+                    childMeta._collapseGroupTheme = theme;
+                    childMeta._collapseGroupIndex = groupIndex;
+                    childMeta._collapseGroupChildIndex = childFieldIndex;
+                    childMeta._collapseHidden = collapsed;
+                    childMeta._collapsedByFieldId = collapsed ? stateKey : "";
+                    childMeta._isShow = baseVisible && !collapsed;
+                    childMeta._collapseClass = "collapse-group-item collapse-group-theme-" + theme + (baseVisible ? "" : " collapse-group-origin-hidden");
+                }
+                if (baseVisible) {
+                    visibleChildFields.push(childField);
+                }
+            });
+
+            if (groupMeta) {
+                groupMeta._collapseChildCount = visibleChildFields.length;
+            }
+            self.ApplyCollapseGroupRowClasses(visibleChildFields, metaMap);
+        },
+        ApplyCollapseGroupRowClasses(visibleChildFields, metaMap) {
+            if (!Array.isArray(visibleChildFields) || visibleChildFields.length === 0) return;
+
+            var rows = [];
+            var currentRow = [];
+            var currentSpan = 0;
+            var pushCurrentRow = function () {
+                if (currentRow.length > 0) {
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentSpan = 0;
+                }
+            };
+
+            visibleChildFields.forEach((childField) => {
+                var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                if (!span || span < 1) span = 24;
+                if (span > 24) span = 24;
+
+                if (currentRow.length > 0 && currentSpan + span > 24) {
+                    pushCurrentRow();
+                }
+                currentRow.push(childField);
+                currentSpan += span;
+                if (currentSpan >= 24) {
+                    pushCurrentRow();
+                }
+            });
+            pushCurrentRow();
+
+            var firstMeta = metaMap.get(visibleChildFields[0]);
+            var lastMeta = metaMap.get(visibleChildFields[visibleChildFields.length - 1]);
+            if (firstMeta) firstMeta._collapseClass += " collapse-group-visible-first";
+            if (lastMeta) lastMeta._collapseClass += " collapse-group-visible-last";
+
+            rows.forEach((row, rowIndex) => {
+                row.forEach((childField, colIndex) => {
+                    var childMeta = metaMap.get(childField);
+                    if (!childMeta) return;
+                    childMeta._collapseClass += " collapse-group-row collapse-group-row-" + rowIndex;
+                    if (rowIndex === 0) childMeta._collapseClass += " collapse-group-row-first";
+                    if (rowIndex === rows.length - 1) childMeta._collapseClass += " collapse-group-row-last";
+                    if (colIndex === 0) childMeta._collapseClass += " collapse-group-row-start";
+                    if (colIndex === row.length - 1) childMeta._collapseClass += " collapse-group-row-end";
+                });
+            });
+        },
         handleGroupCollapseChange(field, collapsed) {
             var self = this;
             if (!field) return;
-            var stateKey = field.Id || field.Name;
+            var stateKey = field._collapseStateKey || field.Id || field.Name;
             if (!stateKey) return;
-            field._collapseCollapsed = collapsed;
-            self.CollapseGroupState = {
-                ...self.CollapseGroupState,
+            if (self.CollapseGroupState && self.CollapseGroupState[stateKey] === collapsed) {
+                self.RefreshDiyFieldRuntimeState();
+                return;
+            }
+            self.CollapseGroupState = Object.assign({}, self.CollapseGroupState, {
                 [stateKey]: collapsed
-            };
+            });
+            self.RefreshDiyFieldRuntimeState();
         }
     },
     data() {
