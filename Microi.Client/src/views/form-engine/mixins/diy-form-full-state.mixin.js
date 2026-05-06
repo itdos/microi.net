@@ -136,6 +136,7 @@ export default {
             OpenDiyFormWorkFlow: false,
             OpenDiyFormWorkFlowType: {},
             FormWF: {},
+            WfFormData: {},
             StartWorkSubmited: false,
             // 表单顶部/底部【发起流程/处理工作】CTA 按钮防重入状态
             WfSubmitting: false,

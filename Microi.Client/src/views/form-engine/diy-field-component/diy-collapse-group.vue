@@ -52,17 +52,17 @@
 
             <el-form-item label="图标">
                 <div class="collapse-icon-picker">
-                    <el-button class="collapse-icon-picker__preview" @click="iconPickerRef && iconPickerRef.show()">
+                    <el-button class="collapse-icon-picker__preview" @click="openIconPicker">
                         <fa-icon :icon="configForm.Icon || 'fas fa-layer-group'" />
                     </el-button>
                     <div class="collapse-icon-picker__text">
                         <div class="collapse-icon-picker__label">{{ configForm.Icon || "未选择图标" }}</div>
                         <div class="collapse-icon-picker__tip">点击左侧图标从图标库选择</div>
                     </div>
-                    <el-button link type="primary" @click="iconPickerRef && iconPickerRef.show()">选择</el-button>
+                    <el-button link type="primary" @click="openIconPicker">选择</el-button>
                     <el-button link type="danger" @click="configForm.Icon = ''">清空</el-button>
                 </div>
-                <Fontawesome ref="iconPickerRef" v-model:model="configForm.Icon" />
+                <Fontawesome v-if="iconPickerMounted" ref="iconPickerRef" v-model:model="configForm.Icon" />
             </el-form-item>
 
             <el-form-item label="视觉风格">
@@ -87,9 +87,10 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, ref } from "vue";
+import { computed, defineAsyncComponent, getCurrentInstance, nextTick, ref } from "vue";
 import { ArrowDown, ArrowRight } from "@element-plus/icons-vue";
-import Fontawesome from "./dos.fontawesome/Fontawesome.vue";
+
+const Fontawesome = defineAsyncComponent(() => import("./dos.fontawesome/Fontawesome.vue"));
 
 defineOptions({
     name: "diy-collapse-group",
@@ -104,6 +105,10 @@ const props = defineProps({
     FormMode: {
         type: String,
         default: ""
+    },
+    LoadMode: {
+        type: String,
+        default: ""
     }
 });
 
@@ -114,6 +119,7 @@ const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
 
 const configDialogVisible = ref(false);
 const iconPickerRef = ref(null);
+const iconPickerMounted = ref(false);
 const configForm = ref({
     DefaultCollapsed: false,
     ScopeMode: "UntilNextGroup",
@@ -125,13 +131,7 @@ const configForm = ref({
 });
 
 const groupConfig = computed(() => {
-    if (!props.field.Config) {
-        props.field.Config = {};
-    }
-    if (!props.field.Config.CollapseGroup) {
-        props.field.Config.CollapseGroup = {};
-    }
-    return props.field.Config.CollapseGroup;
+    return props.field && props.field.Config && props.field.Config.CollapseGroup ? props.field.Config.CollapseGroup : {};
 });
 
 const title = computed(() => props.field.Label || groupConfig.value.Title || "折叠分组");
@@ -142,10 +142,24 @@ const childCount = computed(() => props.field._collapseChildCount || 0);
 const showFieldCount = computed(() => groupConfig.value.ShowFieldCount !== false);
 const isCollapsed = computed(() => props.field._collapseCollapsed === true);
 
-const toggleCollapse = () => {
+const toggleCollapse = (event) => {
+    if (props.LoadMode === "Design") {
+        return;
+    }
+    if (event && event.stopPropagation) {
+        event.stopPropagation();
+    }
     const nextCollapsed = !isCollapsed.value;
-    props.field._collapseCollapsed = nextCollapsed;
     emit("CallbackGroupCollapseChange", props.field, nextCollapsed);
+};
+
+const openIconPicker = () => {
+    iconPickerMounted.value = true;
+    nextTick(() => {
+        if (iconPickerRef.value && iconPickerRef.value.show) {
+            iconPickerRef.value.show();
+        }
+    });
 };
 
 const openConfig = () => {
@@ -159,14 +173,22 @@ const openConfig = () => {
         Theme: cfg.Theme || "default",
         ShowFieldCount: cfg.ShowFieldCount !== false
     };
+    iconPickerMounted.value = false;
     configDialogVisible.value = true;
 };
 
 const saveConfig = () => {
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.CollapseGroup) {
+        props.field.Config.CollapseGroup = {};
+    }
     props.field.Config.CollapseGroup = {
         ...groupConfig.value,
         ...configForm.value
     };
+    emit("CallbackGroupCollapseChange", props.field, isCollapsed.value);
     configDialogVisible.value = false;
     DiyCommon.Tips("配置已保存", true);
 };

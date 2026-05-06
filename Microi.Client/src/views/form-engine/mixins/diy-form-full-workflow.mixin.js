@@ -13,6 +13,31 @@ export default {
             var p = this.GetActiveRightPanel();
             return p && p.$refs ? p.$refs.refWfWorkHandler : null;
         },
+        NormalizeRef(ref) {
+            return Array.isArray(ref) ? ref[0] : ref;
+        },
+        GetActiveFieldForm() {
+            var pageForm = this.NormalizeRef(this.$refs.fieldFormPage);
+            var fieldForm = this.NormalizeRef(this.$refs.fieldForm);
+            if (this.IsPageMode && pageForm) return pageForm;
+            return fieldForm || pageForm;
+        },
+        CallbackGetFormData() {
+            var form = this.GetActiveFieldForm();
+            this.WfFormData = form && typeof form.GetFormData === "function" ? form.GetFormData() : {};
+        },
+        CallbackFieldSet(fieldName, attrName, value) {
+            var form = this.GetActiveFieldForm();
+            if (form && typeof form.FieldSet === "function") {
+                form.FieldSet(fieldName, attrName, value);
+            }
+        },
+        OnNeedSelectUsers() {
+            this.FormRightType = "WorkFlow";
+            if (this.diyStore.IsPhoneView) {
+                this.showMobileRightDrawer = true;
+            }
+        },
         // 工作流：从表单顶部/底部触发右侧 WfWorkHandler 的 SubmitWF（醒目按钮入口，带防重入）
         TriggerWfSubmit() {
             var self = this;
@@ -22,9 +47,14 @@ export default {
                 if (handler.BtnLoading) return;
                 if (typeof handler.SubmitWF === 'function') {
                     self.WfSubmitting = true;
-                    try { handler.SubmitWF(); } finally {
+                    var submitResult = null;
+                    try { submitResult = handler.SubmitWF(); } finally {
                         // 异步处理中，handler.BtnLoading 会接手状态；这里略延后释放本地锁
-                        setTimeout(function () { self.WfSubmitting = false; }, 800);
+                        if (submitResult && typeof submitResult.finally === "function") {
+                            submitResult.finally(function () { self.WfSubmitting = false; });
+                        } else {
+                            setTimeout(function () { self.WfSubmitting = false; }, 800);
+                        }
                     }
                     return;
                 }
@@ -36,7 +66,13 @@ export default {
                 self.$nextTick(function () {
                     setTimeout(function () {
                         var h = self.GetActiveWfWorkHandler();
-                        if (h && !h.BtnLoading && typeof h.SubmitWF === 'function') h.SubmitWF();
+                        if (h && !h.BtnLoading && typeof h.SubmitWF === 'function') {
+                            var submitResult = h.SubmitWF();
+                            if (submitResult && typeof submitResult.finally === "function") {
+                                submitResult.finally(function () { self.WfSubmitting = false; });
+                                return;
+                            }
+                        }
                         self.WfSubmitting = false;
                     }, 150);
                 });
@@ -52,21 +88,23 @@ export default {
             var self = this;
 
             try {
-                var formData = self.$refs.fieldForm.GetFormData();
+                var form = self.GetActiveFieldForm();
                 var wfHandler = self.GetActiveWfWorkHandler();
-                if (!wfHandler) {
+                if (!form || !wfHandler) {
                     if (callback) { callback(); }
                     return;
                 }
+                var formData = form.GetFormData();
+                var oldFormData = typeof form.GetOldFormData === "function" ? form.GetOldFormData() : null;
 
                 // 第1步：执行节点开始V8（可终止提交、修改表单值、获取审批信息）
-                var v8Result = await wfHandler.RunNodeStartV8({ Form: formData });
+                var v8Result = await wfHandler.RunNodeStartV8({ Form: formData, OldForm: oldFormData });
                 if (v8Result.Result === false) {
                     if (callback) { callback(); }
                     return;
                 }
                 if (v8Result.Form) {
-                    self.$refs.fieldForm.SetFormData(v8Result.Form);
+                    form.SetFormData(v8Result.Form);
                 } else {
                     v8Result.Form = formData;
                 }
@@ -79,13 +117,13 @@ export default {
                     SavedType: "Edit",
                     _AlternateSubmit: wfHandler.BuildStartWorkAlternateSubmit({
                         FormData: v8Result.Form,
-                        OldForm: param ? param.OldForm : null,
+                        OldForm: oldFormData,
                         FormMode: formMode,
                         DiyFieldList: param ? param.DiyFieldList : null
                     })
                 };
 
-                self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData2) {
+                form.FormSubmit(formParam, async function (success, formData2) {
                     if (success == true) {
                         self.StartWorkSubmited = true;
                         self.FormMode = "Edit";
@@ -103,6 +141,55 @@ export default {
             }
         },
         // ========== 工作流面板初始化（从diy-table-rowlist.vue移植） ==========
+        async CallbackSendWork(param, callback) {
+            var self = this;
+
+            try {
+                var form = self.GetActiveFieldForm();
+                var wfHandler = self.GetActiveWfWorkHandler();
+                if (!form || !wfHandler) {
+                    if (callback) { callback(); }
+                    return;
+                }
+                var formData = form.GetFormData();
+                var oldFormData = typeof form.GetOldFormData === "function" ? form.GetOldFormData() : null;
+
+                var v8Result = await wfHandler.RunNodeStartV8({ Form: formData, OldForm: oldFormData });
+                if (v8Result.Result === false) {
+                    if (callback) { callback(); }
+                    return;
+                }
+                if (v8Result.Form) {
+                    form.SetFormData(v8Result.Form);
+                } else {
+                    v8Result.Form = formData;
+                }
+
+                var formParam = {
+                    FormMode: "Edit",
+                    SavedType: "Edit",
+                    _AlternateSubmit: wfHandler.BuildSendWorkAlternateSubmit({
+                        FormData: v8Result.Form,
+                        OldForm: oldFormData,
+                        FormMode: "Edit",
+                        DiyFieldList: param ? param.DiyFieldList : null
+                    })
+                };
+
+                form.FormSubmit(formParam, async function (success, formData2) {
+                    if (success == true) {
+                        self.FormMode = "Edit";
+                        self.ShowFieldForm = false;
+                        self.ShowFieldFormDrawer = false;
+                        self.GetDiyTableRow();
+                    }
+                    if (callback) { callback(); }
+                });
+            } catch (error) {
+                if (callback) { callback(); }
+                throw error;
+            }
+        },
         InitWorkFlow(wfParam) {
             var self = this;
             self.OpenDiyFormWorkFlowType = wfParam;

@@ -21,14 +21,14 @@
 
         <template v-if="OpenFormMode == 'Edit' || OpenFormMode == 'Add'">
             <!--选择审批人：之前是NextNodeConfirmUsersData.AllowSelectUsers && NextNodeConfirmUsersData.SelectUsers  && NextNodeConfirmUsersData.SelectUsers.length > 0-->
-            <div style="margin-top: 10px" v-if="CurrentNodeModel.AllowSelectUsers">
+            <div style="margin-top: 10px" v-if="AllowSelectUsers()">
                 <div style="margin-bottom: 5px">选择审批人：</div>
                 <el-checkbox-group v-model="CurrentSelectUsers" :max="50">
                     <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :value="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
                 </el-checkbox-group>
             </div>
             <!--添加审批人：之前是NextNodeConfirmUsersData.AllowAddUsers-->
-            <div style="margin-top: 10px" v-if="CurrentNodeModel.AllowAddUsers && CurrentApprovalType != 'HandOver'">
+            <div style="margin-top: 10px" v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'">
                 <div style="margin-bottom: 5px">添加审批人：</div>
                 <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
                     <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
@@ -150,7 +150,9 @@ export default {
             CurrentAddHandOverUsers: [],
             SysUserList: [],
             OpenWorkType: "",
-            ForceSelectUsers: []
+            ForceSelectUsers: [],
+            NextNodeConfirmUsersLoading: false,
+            NextNodeConfirmUsersSubmitReady: false
         };
     },
     mounted() {
@@ -158,6 +160,82 @@ export default {
         self.GetSysUser();
     },
     methods: {
+        IsTrueValue(val) {
+            return val === true || val === 1 || val === "1" || val === "true" || val === "True";
+        },
+        AllowSelectUsers() {
+            return this.IsTrueValue(this.CurrentNodeModel.AllowSelectUsers);
+        },
+        AllowAddUsers() {
+            return this.IsTrueValue(this.CurrentNodeModel.AllowAddUsers);
+        },
+        NeedManualNextNodeUsers() {
+            return this.AllowSelectUsers() || this.AllowAddUsers();
+        },
+        GetApprovalTypeForNextNodeConfirm() {
+            var self = this;
+            if (self.CurrentStartType == "StartWork") {
+                return "Auto";
+            } else if (self.CurrentNodeModel.NodeType == "Business") {
+                return "Agree";
+            }
+            return self.CurrentApprovalType;
+        },
+        SetDefaultSelectUsers() {
+            var self = this;
+            if (!self.AllowSelectUsers()) {
+                self.CurrentSelectUsers = [];
+                return;
+            }
+            var selectUsers = self.NextNodeConfirmUsersData && self.NextNodeConfirmUsersData.SelectUsers;
+            if (!selectUsers || !selectUsers.length) {
+                self.CurrentSelectUsers = [];
+                return;
+            }
+            var userIds = [];
+            selectUsers.forEach(function (user) {
+                if (user && user.Id && userIds.indexOf(user.Id) === -1) {
+                    userIds.push(user.Id);
+                }
+            });
+            self.CurrentSelectUsers = userIds;
+        },
+        PromptSelectUsersBeforeSubmit() {
+            var self = this;
+            self.NextNodeConfirmUsersSubmitReady = true;
+            self.$emit("CallbackNeedSelectUsers", {
+                CurrentNodeModel: self.CurrentNodeModel,
+                NextNodeConfirmUsersData: self.NextNodeConfirmUsersData,
+                CurrentSelectUsers: self.CurrentSelectUsers
+            });
+            self.DiyCommon.Tips("请确认下一节点审批人后再次提交。", false);
+        },
+        async PrepareNextNodeConfirmUsersBeforeSubmit() {
+            var self = this;
+            if (!self.NeedManualNextNodeUsers()) {
+                return true;
+            }
+            if (self.CurrentStartType != "StartWork"
+                && self.CurrentNodeModel.NodeType != "Business"
+                && self.DiyCommon.IsNull(self.CurrentApprovalType)) {
+                return true;
+            }
+            if (self.CurrentApprovalType == "Disagree" && self.DiyCommon.IsNull(self.CurrentBackNodeId)) {
+                self.DiyCommon.Tips("请选择退回节点。", false);
+                return false;
+            }
+            if (!self.IsNextNodeConfirmUsers) {
+                var result = await self.GetNextNodeConfirmUsers();
+                if (!self.DiyCommon.Result(result)) {
+                    return false;
+                }
+            }
+            if (self.HideInlineSubmit && self.NeedManualNextNodeUsers() && !self.NextNodeConfirmUsersSubmitReady) {
+                self.PromptSelectUsersBeforeSubmit();
+                return false;
+            }
+            return true;
+        },
         async RunAllowAddUserV8Code(code) {
             var self = this;
             if (!self.DiyCommon.IsNull(code)) {
@@ -416,31 +494,30 @@ export default {
                 }
             );
         },
-        GetNextNodeConfirmUsers() {
+        GetNextNodeConfirmUsers(callback) {
             var self = this;
             self.$emit("CallbackGetFormData", {});
+            return new Promise(function (resolve) {
             self.$nextTick(function () {
                 self.IsNextNodeConfirmUsers = false;
-                var approvalType = "";
-                if (self.CurrentStartType == "StartWork") {
-                    approvalType = "Auto";
-                } else if (self.CurrentNodeModel.NodeType == "Business") {
-                    approvalType = "Agree";
-                } else {
-                    approvalType = self.CurrentApprovalType;
-                }
+                self.NextNodeConfirmUsersLoading = true;
+                var approvalType = self.GetApprovalTypeForNextNodeConfirm();
                 self.DiyCommon.Post(
                     "/api/WorkFlow/getNextNodeConfirmUsers",
                     {
-                        NodeId: self.CurrentNodeId,
-                        ApprovalType: approvalType,
-                        BackNodeId: self.CurrentBackNodeId,
-                        WorkId: self.CurrentWorkModel.Id
-                    },
+                            NodeId: self.CurrentNodeId,
+                            ApprovalType: approvalType,
+                            BackNodeId: self.CurrentBackNodeId,
+                            WorkId: self.CurrentWorkModel.Id,
+                            TableRowId: self.CurrentTableRowId,
+                            FormData: JSON.stringify(self.FormData || {})
+                        },
                     async function (result) {
+                        self.NextNodeConfirmUsersLoading = false;
                         if (self.DiyCommon.Result(result)) {
-                            self.NextNodeConfirmUsersData = result.Data;
+                            self.NextNodeConfirmUsersData = result.Data || {};
                             self.IsNextNodeConfirmUsers = true;
+                            self.SetDefaultSelectUsers();
                             //2023-12-10 新增：V8指定可添加审批人
                             //之前用的是： if (self.NextNodeConfirmUsersData.AllowAddUserV8Code) {
                             if (self.CurrentNodeModel.AllowAddUserV8Code) {
@@ -451,12 +528,26 @@ export default {
                                 }
                             }
                         }
+                        if (callback) {
+                            callback(result);
+                        }
+                        resolve(result);
+                    },
+                    function (error) {
+                        self.NextNodeConfirmUsersLoading = false;
+                        var result = { Code: 0, Msg: "getNextNodeConfirmUsers request failed", Error: error };
+                        if (callback) {
+                            callback(result);
+                        }
+                        resolve(result);
                     }
                 );
+            });
             });
         },
         ChangeCurrentApprovalType(val) {
             var self = this;
+            self.NextNodeConfirmUsersSubmitReady = false;
             if (val == "Agree" || (val == "Disagree" && !self.DiyCommon.IsNull(self.CurrentBackNodeId))) {
                 self.GetNextNodeConfirmUsers();
             } else if (val == "HandOver") {
@@ -465,6 +556,7 @@ export default {
         },
         ChangeCurrentBackNodeId(val) {
             var self = this;
+            self.NextNodeConfirmUsersSubmitReady = false;
             if (!self.DiyCommon.IsNull(val)) {
                 self.GetNextNodeConfirmUsers();
             }
@@ -476,6 +568,9 @@ export default {
             var self = this;
 
             self.CurrentStartType = "StartWork";
+            self.NextNodeConfirmUsersSubmitReady = false;
+            self.IsNextNodeConfirmUsers = false;
+            self.CurrentSelectUsers = [];
 
             self.CurrentFlowDesign = param.CurrentFlowDesign;
             self.CurrentFlowDesignId = param.CurrentFlowDesign ? param.CurrentFlowDesign.Id : param.CurrentFlowDesignId;
@@ -484,11 +579,13 @@ export default {
 
             //----HISTORY
             self.$nextTick(function () {
-                self.$refs.refWFHistory.Init({
-                    CurrentFlowId: self.CurrentFlowId,
-                    CurrentFlowDesignId: self.CurrentFlowDesignId,
-                    CurrentNodeId: self.CurrentNodeId
-                });
+                if (self.$refs.refWFHistory && typeof self.$refs.refWFHistory.Init === "function") {
+                    self.$refs.refWFHistory.Init({
+                        CurrentFlowId: self.CurrentFlowId,
+                        CurrentFlowDesignId: self.CurrentFlowDesignId,
+                        CurrentNodeId: self.CurrentNodeId
+                    });
+                }
             });
 
             self.CurrentHideFields = [];
@@ -546,7 +643,9 @@ export default {
                                             CurrentReadonlyFields: self.CurrentReadonlyFields
                                         });
                                     }
-                                    self.GetNextNodeConfirmUsers();
+                                    if (!self.HideInlineSubmit) {
+                                        self.GetNextNodeConfirmUsers();
+                                    }
                                 });
                             }
                         }
@@ -564,15 +663,20 @@ export default {
             self.OpenWorkType = param.OpenWorkType;
 
             self.CurrentStartType = "SendWork";
+            self.NextNodeConfirmUsersSubmitReady = false;
+            self.IsNextNodeConfirmUsers = false;
+            self.CurrentSelectUsers = [];
             self.CurrentNodeId = param.CurrentNodeId;
             self.CurrentFlowId = param.CurrentFlowId;
             //----HISTORY
             self.$nextTick(function () {
-                self.$refs.refWFHistory.Init({
-                    CurrentFlowId: self.CurrentFlowId,
-                    CurrentFlowDesignId: self.CurrentFlowDesignId,
-                    CurrentNodeId: self.CurrentNodeId
-                });
+                if (self.$refs.refWFHistory && typeof self.$refs.refWFHistory.Init === "function") {
+                    self.$refs.refWFHistory.Init({
+                        CurrentFlowId: self.CurrentFlowId,
+                        CurrentFlowDesignId: self.CurrentFlowDesignId,
+                        CurrentNodeId: self.CurrentNodeId
+                    });
+                }
             });
             self.CurrentWorkModel = param.CurrentWorkModel;
             self.OpenFormMode = param.OpenFormMode;
@@ -643,7 +747,9 @@ export default {
 
                     if (self.CurrentNodeModel.NodeType == "Business") {
                         self.CurrentApprovalType = "Auto";
-                        self.GetNextNodeConfirmUsers();
+                        if (!self.HideInlineSubmit) {
+                            self.GetNextNodeConfirmUsers();
+                        }
                     }
                 }
             });
@@ -651,14 +757,20 @@ export default {
         /**
          * 提交流程  可能是发起工作，也可能是处理工作
          */
-        SubmitWF() {
+        async SubmitWF() {
             var self = this;
             if (self.CurrentApprovalType === "HandOver") {
                 self.SubmitHandOverWork();
             } else if (self.CurrentStartType == "StartWork") {
                 self.CurrentApprovalType = "Auto";
+                if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit())) {
+                    return;
+                }
                 self.SubmitStartWork();
             } else {
+                if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit())) {
+                    return;
+                }
                 self.SubmitSendWork();
             }
         },
@@ -920,6 +1032,108 @@ export default {
                             // 通知 FormSubmit 表单保存"成功"（实际上整个事务已完成）
                             var savedId = (result.DataAppend && result.DataAppend.FormSavedId) || (formApiParam ? formApiParam.Id : null);
                             cb({ Code: 1, Data: { Id: savedId }, Msg: "保存并发起流程成功", _WfMergedResult: result });
+                        } else {
+                            self.$emit("CallbackWFSubmit", { Code: 0 });
+                            cb({ Code: 0, Data: null, Msg: result ? result.Msg : "事务失败", _WfMergedResult: result });
+                        }
+                    },
+                    function (error) {
+                        self.BtnLoading = false;
+                        cb({ Code: 0, Data: null, Msg: "请求失败" });
+                    }
+                );
+            };
+        },
+
+        BuildSendWorkAlternateSubmit(param) {
+            var self = this;
+            return function (url, formApiParam, cb) {
+                var noticeFields = [];
+                if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
+                    var fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
+                    fieldsConfig.forEach(function (config) {
+                        if (config.Notice == true) {
+                            noticeFields.push({
+                                Id: config.Id,
+                                Name: config.Name,
+                                Label: config.Label,
+                                Value: param.FormData && param.FormData[config.Name] ? param.FormData[config.Name] : ""
+                            });
+                        }
+                    });
+                }
+
+                var _formData = param.FormData || {};
+                if (param.FormData) {
+                    self.DiyCommon.ForRowModelHandler(param.FormData, param.DiyFieldList);
+                    _formData = self.DiyCommon.ConvertRowModel(param.FormData);
+                }
+
+                var wfPayload = {
+                    WorkId: self.CurrentWorkModel.Id,
+                    FlowId: self.CurrentWorkModel.FlowId,
+                    FormData: JSON.stringify(_formData),
+                    ApprovalType: self.CurrentApprovalType,
+                    ApprovalIdea: self.CurrentApprovalIdea,
+                    BackNodeId: self.CurrentBackNodeId,
+                    NoticeFields: JSON.stringify(noticeFields),
+                    AddUsers: self.CurrentAddUsers,
+                    SelectUsers: self.CurrentSelectUsers,
+                    ForceSelectUsers: self.ForceSelectUsers
+                };
+                var formPayload = Object.assign({}, formApiParam || {});
+                formPayload._FormSubmitAction = param.FormMode || "Edit";
+
+                self.DiyCommon.Post(
+                    "/api/WorkFlow/SendWorkWithForm",
+                    {
+                        Wf: wfPayload,
+                        Form: formPayload
+                    },
+                    async function (result) {
+                        self.BtnLoading = false;
+                        if (self.DiyCommon.Result(result)) {
+                            var receivers = "";
+                            try {
+                                if (result.Data && result.Data.Receivers) {
+                                    result.Data.Receivers.forEach(function (user) { receivers += user.Name + ","; });
+                                    receivers = receivers.replace(/,$/, "");
+                                }
+                            } catch (error) {}
+                            try {
+                                if (result.Data && result.Data.FlowEnd) {
+                                    self.DiyCommon.Tips("流程处理成功！<br>流程已结束！", true, 10);
+                                } else if (self.CurrentNodeModel.NodeType != "End" || receivers) {
+                                    self.DiyCommon.Tips("流程处理成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data ? result.Data.ToNodeName : "") + "。", true, 10);
+                                }
+                            } catch (error) {}
+
+                            if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
+                                var V8 = { EventName: "WFNodeEnd" };
+                                V8.Form = param.FormData;
+                                V8.OldForm = param.OldForm;
+                                V8.WF = {
+                                    ApprovalType: self.CurrentApprovalType,
+                                    ApprovalIdea: self.CurrentApprovalIdea,
+                                    AddUsers: self.CurrentAddUsers,
+                                    SelectUsers: self.CurrentSelectUsers,
+                                    CurrentFlowDesign: self.CurrentFlowDesign,
+                                    CurrentFlowDesignId: self.CurrentFlowDesignId,
+                                    CurrentNode: self.CurrentNodeModel,
+                                    WorkResult: result.Data,
+                                    BackNodeId: self.CurrentBackNodeId
+                                };
+                                self.SetV8DefaultValue(V8, param.FormData);
+                                await self.DiyCommon.InitV8Code(V8, self.$router);
+                                try {
+                                    await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
+                                } catch (error) {
+                                    self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                                }
+                            }
+                            self.$emit("CallbackWFSubmit", { Code: 1 });
+                            var savedId = (result.DataAppend && result.DataAppend.FormSavedId) || (formApiParam ? formApiParam.Id : null);
+                            cb({ Code: 1, Data: { Id: savedId }, Msg: "保存并处理流程成功", _WfMergedResult: result });
                         } else {
                             self.$emit("CallbackWFSubmit", { Code: 0 });
                             cb({ Code: 0, Data: null, Msg: result ? result.Msg : "事务失败", _WfMergedResult: result });
