@@ -513,7 +513,7 @@ export default {
             TableRowListActiveTab: "", //TableRowList
             FormMode: "View",
             NeedDiyTemplateFieldLst: ["DevComponent", "TableChild", "Map", "MapArea", "FontAwesome", "ImgUpload"], //'Switch',
-            FixedNotShowField: ["Divider"], //, 'ImgUpload', 'FileUpload'
+            FixedNotShowField: ["Divider", "CollapseGroup", "Alert", "StaticText", "Html", "HTML"], //, 'ImgUpload', 'FileUpload'
             FieldFormDefaultValues: {},
             StatisticsFields: null,
             BtnLoading: false,

@@ -124,12 +124,110 @@
     .field_DevComponent,
     .field_JoinForm,
     .field_Checkbox,
+    .field_TagInput,
+    .field_Transfer,
+    .field_CollapseGroup,
+    .field_Alert,
+    .field_StaticText,
+    .field_Html,
     .field_MapArea,
     .field_Qrcode,
     .field_HTML {
         .el-form-item--mini .el-form-item__content,
         .el-form-item--mini .el-form-item__label {
             height: auto;
+        }
+    }
+
+    .collapse-group-theme-default {
+        --collapse-group-color: var(--el-color-primary);
+        --collapse-group-bg: color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color) 95%);
+        --collapse-group-border: color-mix(in srgb, var(--el-color-primary) 20%, var(--el-border-color-light) 80%);
+    }
+
+    .collapse-group-theme-primary {
+        --collapse-group-color: var(--el-color-primary);
+        --collapse-group-bg: color-mix(in srgb, var(--el-color-primary) 6%, var(--el-bg-color) 94%);
+        --collapse-group-border: color-mix(in srgb, var(--el-color-primary) 28%, var(--el-border-color-light) 72%);
+    }
+
+    .collapse-group-theme-success {
+        --collapse-group-color: var(--el-color-success);
+        --collapse-group-bg: color-mix(in srgb, var(--el-color-success) 6%, var(--el-bg-color) 94%);
+        --collapse-group-border: color-mix(in srgb, var(--el-color-success) 28%, var(--el-border-color-light) 72%);
+    }
+
+    .collapse-group-theme-warning {
+        --collapse-group-color: var(--el-color-warning);
+        --collapse-group-bg: color-mix(in srgb, var(--el-color-warning) 7%, var(--el-bg-color) 93%);
+        --collapse-group-border: color-mix(in srgb, var(--el-color-warning) 30%, var(--el-border-color-light) 70%);
+    }
+
+    .collapse-group-theme-danger {
+        --collapse-group-color: var(--el-color-danger);
+        --collapse-group-bg: color-mix(in srgb, var(--el-color-danger) 6%, var(--el-bg-color) 94%);
+        --collapse-group-border: color-mix(in srgb, var(--el-color-danger) 28%, var(--el-border-color-light) 72%);
+    }
+
+    .collapse-group-header {
+        margin-top: 8px;
+
+        .container-form-item {
+            margin-bottom: 0;
+        }
+
+        &.collapse-group-expanded {
+            .diy-collapse-group {
+                border-bottom-color: transparent;
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+            }
+        }
+    }
+
+    .collapse-group-item {
+        background: var(--collapse-group-bg);
+        border-left: 1px solid var(--collapse-group-border);
+        border-right: 1px solid var(--collapse-group-border);
+        transition: background 0.2s ease, border-color 0.2s ease;
+
+        .container-form-item {
+            padding: 8px 8px 2px;
+            border-radius: 4px;
+        }
+
+        .el-form-item {
+            margin-bottom: 12px;
+        }
+
+        &:hover {
+            background: color-mix(in srgb, var(--collapse-group-color) 8%, var(--el-bg-color) 92%);
+        }
+    }
+
+    .collapse-group-first {
+        border-top: 1px solid var(--collapse-group-border);
+        padding-top: 8px;
+    }
+
+    .collapse-group-last {
+        border-bottom: 1px solid var(--collapse-group-border);
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .collapse-group-item {
+            border-left-width: 1px;
+            border-right-width: 1px;
+
+            .container-form-item {
+                padding-left: 6px;
+                padding-right: 6px;
+            }
         }
     }
 

@@ -1,57 +1,46 @@
 <template>
-    <!--输入框-->
-    <!--
-    FormDiyTableModel[field.Name]
--->
-    <el-input
-        v-if="field.Component == 'Text' || field.Component == 'Guid'"
-        v-model="ModelValue"
-        :clearable="TableInEdit ? false : true"
-        :disabled="GetFieldReadOnly(field)"
-        :placeholder="GetFieldPlaceholder(field)"
-        :show-password="DiyCommon.IsNull(field.Config.TextShowPassword) ? false : field.Config.TextShowPassword"
-        @focus="SelectField(field)"
-        @change="
-            (item) => {
-                return CommonV8CodeChange(item, field);
-            }
-        "
-        @blur="
-            (item) => {
-                return InputOnBlur(item, field);
-            }
-        "
-        @input="
-            (item) => {
-                return InputInputEvent(item, field);
-            }
-        "
-        @keyup="FieldOnKeyup($event, field)"
-    >
-        <template #suffix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" :class="field.Config.TextIcon" /></template>
-        <template #prefix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" :class="field.Config.TextIcon" /></template>
+    <div class="diy-html" :style="htmlStyle" v-safe-html="htmlContent"></div>
 
-        <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" #prepend>{{ field.Config.TextApend }}</template>
-        <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" #append>{{ field.Config.TextApend }}</template>
-    </el-input>
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="HTML内容配置"
+        width="680px"
+        draggable
+        align-center
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="110px" label-position="top" size="small">
+            <el-form-item label="内容来源">
+                <el-radio-group v-model="configForm.UseFieldValue">
+                    <el-radio :value="false">使用配置内容</el-radio>
+                    <el-radio :value="true">使用字段值</el-radio>
+                </el-radio-group>
+            </el-form-item>
+            <el-form-item v-if="!configForm.UseFieldValue" label="HTML内容">
+                <el-input v-model="configForm.Content" type="textarea" :rows="8" placeholder="支持已启用的安全 HTML" />
+            </el-form-item>
+            <el-form-item label="最小高度">
+                <el-input v-model="configForm.MinHeight" placeholder="如：80px，可为空" />
+            </el-form-item>
+            <el-form-item label="内边距">
+                <el-input v-model="configForm.Padding" placeholder="如：8px 12px，可为空" />
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
-import _ from "underscore";
 export default {
     name: "diy-html",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
-    data() {
-        return {
-            ModelValue: "",
-            LastModelValue: ""
-        };
-    },
-    model: {
-        prop: "ModelProps",
-        event: "ModelChange"
-    },
+    emits: ["ModelChange", "CallbackSelectField", "update:modelValue"],
     props: {
         modelValue: {},
         ModelProps: {},
@@ -67,190 +56,77 @@ export default {
                 return {};
             }
         },
-        //表单模式Add、Edit、View
         FormMode: {
             type: String,
-            default: "" //View
-        },
-        // ['FieldName1','FieldName2']
-        ReadonlyFields: {
-            type: Array,
-            default: () => []
-        },
-        FieldReadonly: {
-            type: Boolean,
-            default: null
-        },
-        TableInEdit: {
-            type: Boolean,
-            default: false
-        },
-        TableId: {
-            type: String,
-            default: "" //View
-        },
-        DiyConfig: {
-            type: Object,
-            default() {
-                return {};
-            }
+            default: ""
         }
     },
-
-    watch: {
-        modelValue: function (newVal, oldVal) {
-            var self = this;
-            if (newVal != oldVal) {
-                self.ModelValue = newVal;
+    data() {
+        return {
+            configDialogVisible: false,
+            configForm: {
+                Content: "",
+                UseFieldValue: false,
+                MinHeight: "",
+                Padding: ""
             }
+        };
+    },
+    computed: {
+        htmlConfig() {
+            if (!this.field.Config) {
+                this.field.Config = {};
+            }
+            if (!this.field.Config.Html) {
+                this.field.Config.Html = {};
+            }
+            return this.field.Config.Html;
         },
-        ModelProps: function (newVal, oldVal) {
-            var self = this;
-            if (newVal != oldVal) {
-                self.ModelValue = self.ModelProps;
+        htmlContent() {
+            if (this.htmlConfig.UseFieldValue === true) {
+                var fieldName = this.DiyCommon.IsNull(this.field.AsName) ? this.field.Name : this.field.AsName;
+                return this.FormDiyTableModel[fieldName] || "";
             }
+            return this.htmlConfig.Content || this.field.Description || "";
+        },
+        htmlStyle() {
+            return {
+                minHeight: this.htmlConfig.MinHeight || "",
+                padding: this.htmlConfig.Padding || ""
+            };
         }
     },
-
-    components: {},
-
-    computed: {},
-
-    //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
-    mounted() {
-        var self = this;
-        self.Init();
-    },
-
     methods: {
-        Init() {
-            var self = this;
-            self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+        openConfig() {
+            this.configForm = {
+                Content: this.htmlConfig.Content || "",
+                UseFieldValue: this.htmlConfig.UseFieldValue === true,
+                MinHeight: this.htmlConfig.MinHeight || "",
+                Padding: this.htmlConfig.Padding || ""
+            };
+            this.configDialogVisible = true;
         },
-        GetFieldValue(field, form) {
-            var self = this;
-            if (!self.DiyCommon.IsNull(field.AsName)) {
-                return form[field.AsName];
-            }
-            return form[field.Name];
-        },
-        ModelChangeMethods(item) {
-            var self = this;
-            self.ModelValue = item;
-            self.$emit("ModelChange", self.ModelValue);
-            self.$emit("update:modelValue", self.ModelValue);
-        },
-        InputInputEvent(item, field) {
-            var self = this;
-            self.ModelChangeMethods(item);
-            self.CommonV8CodeChange(item, field);
-        },
-        FieldOnKeyup(event, field) {
-            var self = this;
-            var keyCode = event.keyCode;
-            // 判断需要执行的V8
-            if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
-                self.$emit("CallbakOnKeyup", event, field);
-            }
-        },
-        InputOnBlur(item, field) {
-            var self = this;
-            self.CommonV8CodeChange(item, field);
-            //如果是表内编辑，失去焦点要自动保存
-            if (self.TableInEdit && self.LastModelValue != self.ModelValue) {
-                // 让父组件（diy-table）中央接管：实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
-                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
-                self.$emit("CallbackInTableEditSave", __interceptPayload);
-                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
-                var param = {
-                    TableId: self.TableId,
-                    _TableRowId: self.FormDiyTableModel.Id,
-                    _FormData: {}
-                };
-                param._FormData[self.field.Name] = self.ModelValue;
-                let dataLog = [
-                    {
-                        Name: field.Name,
-                        Label: field.Label || key,
-                        Component: field.Component,
-                        OVal: self.LastModelValue || "", //老值
-                        NVal: self.ModelValue || "" //新值
-                    }
-                ];
-                param._DataLog = JSON.stringify(dataLog);
-                //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
-                if (self.DiyConfig && self.DiyConfig.AddBtnType == "InTable" && self.DiyConfig.SaveType == "提交一起保存") {
-                    if (!self.FormDiyTableModel._DataStatus) {
-                        // 如果是新增的行，设置为Add状态，否则设置为Edit状态
-                        if (self.FormDiyTableModel._IsInTableAdd === true) {
-                            self.FormDiyTableModel["_DataStatus"] = "Add";
-                        } else {
-                            self.FormDiyTableModel["_DataStatus"] = "Edit";
-                        }
-                    }
-                    return;
-                }
-                self.DiyCommon.UptDiyTableRow(param, function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.LastModelValue = self.ModelValue;
-                        self.DiyCommon.Tips(self.$t("Msg.Success"));
-                    }
-                });
-            }
-        },
-        CommonV8CodeChange(item, field) {
-            var self = this;
-            if (field.V8Code || field.Config.V8Code) {
-                // self.RunV8Code(field, item)
-                self.$emit("CallbackRunV8Code", { field: field, thisValue: item });
-            }
-        },
-        GetFieldReadOnly(field) {
-            var self = this;
-            if (self.FieldReadonly == true) {
-                return true;
-            }
-            //如果按钮设置了预览可点击
-            //并且按钮Readonly属性不为true，
-            //并且ReadonlyFields不包含此字段
-            //则返回false(不禁用)
-            // if(field.Component == 'Button'
-            //     // && field.Config.Button.PreviewCanClick === true
-            //     && !field.Readonly
-            //     && !(self.ReadonlyFields.indexOf(field.Name) > -1)){
-            //     return false;
-            // }
-
-            if (self.FormMode == "View") {
-                return true;
-            }
-            if (self.ReadonlyFields.indexOf(field.Name) > -1) {
-                return true;
-            }
-            return field.Readonly ? true : false;
-        },
-        GetFieldPlaceholder(field) {
-            var self = this;
-            var result = "";
-            if (!self.DiyCommon.IsNull(field.Placeholder)) {
-                result = field.Placeholder;
-            }
-            if (!self.DiyCommon.IsNull(field.Code)) {
-                if (!self.DiyCommon.IsNull(field.Placeholder)) {
-                    result += "(" + field.Code + ")";
-                } else {
-                    result = field.Code;
-                }
-            }
-            return result;
+        saveConfig() {
+            this.field.Config.Html = {
+                ...this.htmlConfig,
+                ...this.configForm
+            };
+            this.configDialogVisible = false;
+            this.DiyCommon.Tips("配置已保存", true);
         },
         SelectField(field) {
-            var self = this;
-            self.$emit("CallbackSelectField", field);
+            this.$emit("CallbackSelectField", field);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.diy-html {
+    width: 100%;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--el-text-color-regular);
+    word-break: break-word;
+}
+</style>

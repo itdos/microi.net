@@ -239,6 +239,7 @@ import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
 import lodash, { set } from "lodash";
 import { defineAsyncComponent } from "vue";
+import LocalDiyComponentList from "./diy-field-component/diy-component-list.json";
 
 // 异步加载完整表单组件用于预览（与 diy-table 保持一致的复用方式）
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -641,10 +642,51 @@ export default {
                 },
                 function (data) {
                     if (!self.DiyCommon.IsNull(data)) {
-                        self.DiyComponentList = data.Data;
+                        self.DiyComponentList = self.MergeDiyComponentList(data.Data);
+                    } else {
+                        self.DiyComponentList = self.MergeDiyComponentList([]);
                     }
                 }
             );
+        },
+        MergeDiyComponentList(dbComponentList) {
+            var localList = Array.isArray(LocalDiyComponentList) ? LocalDiyComponentList : [];
+            var dbList = Array.isArray(dbComponentList) ? dbComponentList : [];
+            var componentMap = {};
+
+            localList.forEach((component) => {
+                if (!component || !component.Control) return;
+                componentMap[component.Control] = {
+                    ...component,
+                    _Source: "Local"
+                };
+            });
+
+            dbList.forEach((component) => {
+                if (!component || !component.Control) return;
+                var localComponent = componentMap[component.Control] || {};
+                componentMap[component.Control] = {
+                    ...localComponent,
+                    ...component,
+                    Type: component.Type || localComponent.Type || "Base",
+                    FieldType: component.FieldType || localComponent.FieldType || "varchar(255)",
+                    Icon: component.Icon || localComponent.Icon || "far fa-square",
+                    Sort: component.Sort || localComponent.Sort || 9999,
+                    _Source: localComponent.Control ? "Database+Local" : "Database"
+                };
+            });
+
+            return Object.keys(componentMap)
+                .map((key) => componentMap[key])
+                .filter((component) => component && component.Control && component.Display !== false && component.Disabled !== true)
+                .sort((a, b) => {
+                    var sortA = Number(a.Sort || 9999);
+                    var sortB = Number(b.Sort || 9999);
+                    if (sortA === sortB) {
+                        return String(a.Control).localeCompare(String(b.Control));
+                    }
+                    return sortA - sortB;
+                });
         },
         SwitchFormClient(tab) {
             var self = this;
@@ -1543,7 +1585,7 @@ export default {
             }
             
             // param.OsClient = self.OsClient
-            var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "Map", "MapArea", "DataTable", "TableChild", "Address", "DevComponent"];
+            var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "CollapseGroup", "Alert", "StaticText", "Html", "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"];
             if (width100.indexOf(param.Component) > -1) {
                 param.FormWidth = 24;
             }
@@ -1780,7 +1822,14 @@ export default {
                 TableChild: ["TableChild"],
                 AutoNumber: ["AutoNumber"],
                 JsonTable: ["JsonTable"],
-                TreeCheckbox: ["TreeCheckbox"]
+                TreeCheckbox: ["TreeCheckbox"],
+                Slider: ["Slider"],
+                TagInput: ["TagInput"],
+                Transfer: ["Transfer"],
+                CollapseGroup: ["CollapseGroup"],
+                Alert: ["Alert"],
+                StaticText: ["StaticText"],
+                Html: ["Html"]
             };
 
             var keepBlocks = new Set(componentBlocks[component] || []);

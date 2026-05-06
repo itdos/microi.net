@@ -48,6 +48,9 @@ const DiySelect = defineAsyncComponent(() => import("@/views/form-engine/diy-fie
 const DiyMultipleSelect = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-select"));
 const DiyRadio = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-radio"));
 const DiyProgress = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-progress.vue"));
+const DiySlider = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-slider.vue"));
+const DiyTagInput = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-taginput.vue"));
+const DiyTransfer = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-transfer.vue"));
 const DiyCheckbox = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-checkbox.vue"));
 const DiyInputNumber = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input-number"));
 const DiyNumberText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-input-number"));
@@ -60,6 +63,9 @@ const DiyButton = defineAsyncComponent(() => import("@/views/form-engine/diy-fie
 const DiyFileUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-fileupload.vue"));
 const DiyImgUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-imgupload.vue"));
 const DiyDivider = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-divider.vue"));
+const DiyCollapseGroup = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-collapse-group.vue"));
+const DiyAlert = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-alert.vue"));
+const DiyStaticText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-statictext.vue"));
 const DiyHtml = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-html.vue"));
 const DiyRichText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-richtext.vue"));
 const DiyOpenTable = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-opentable.vue"));
@@ -149,6 +155,9 @@ function RegMicroiComponents(app) {
     app.component("DiyMultipleSelect", DiyMultipleSelect);
     app.component("DiyRadio", DiyRadio);
     app.component("DiyProgress", DiyProgress);
+    app.component("DiySlider", DiySlider);
+    app.component("DiyTagInput", DiyTagInput);
+    app.component("DiyTransfer", DiyTransfer);
     app.component("DiyCheckbox", DiyCheckbox);
     app.component("DiyInputNumber", DiyInputNumber);
     app.component("DiyNumberText", DiyNumberText);
@@ -161,7 +170,11 @@ function RegMicroiComponents(app) {
     app.component("DiyFileUpload", DiyFileUpload);
     app.component("DiyImgUpload", DiyImgUpload);
     app.component('DiyDivider', DiyDivider);
+    app.component('DiyCollapseGroup', DiyCollapseGroup);
+    app.component('DiyAlert', DiyAlert);
+    app.component('DiyStaticText', DiyStaticText);
     app.component('DiyHtml', DiyHtml);
+    app.component('DiyHTML', DiyHtml);
     app.component('DiyRichText', DiyRichText);
     app.component('DiyOpenTable', DiyOpenTable);
     app.component('DiyMap', DiyMap);
@@ -226,11 +239,17 @@ export {
     DiyMultipleSelect,
     DiyRadio,
     DiyProgress,
+    DiySlider,
+    DiyTagInput,
+    DiyTransfer,
     DiyCheckbox,
     DiyInputNumber,
     DiyNumberText,
     DiyDateTime,
     DiyTextarea,
+    DiyCollapseGroup,
+    DiyAlert,
+    DiyStaticText,
     DiyCustomDialog,
     Fontawesome,
     DiyCodeEditor,
