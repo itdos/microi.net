@@ -29,6 +29,30 @@ function includesKeyword(value, keyword) {
         return true;
     return String(value || '').toLowerCase().includes(keyword.toLowerCase());
 }
+function sanitizeServerNamePart(value) {
+    return value
+        .normalize('NFKD')
+        .replace(/[^\x00-\x7F]/g, '')
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase()
+        .substring(0, 48);
+}
+function buildRuntimeServerName(context) {
+    let hostPart = '';
+    try {
+        hostPart = sanitizeServerNamePart(new URL(context.apiBaseUrl).host);
+    }
+    catch {
+        hostPart = sanitizeServerNamePart(context.apiBaseUrl || '');
+    }
+    const basePart = sanitizeServerNamePart(context.osClient || '')
+        || sanitizeServerNamePart(context.label || '')
+        || hostPart
+        || 'default';
+    return `microi_${basePart}`;
+}
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
 function formatDbTables(tables) {
     if (!tables.length)
@@ -229,6 +253,12 @@ function buildInstructions(ctx) {
 - OsClient (tenant): ${ctx.osClient}
 
 IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When the user specifies a different tenant name, do NOT use this server.
+BOUNDARY RULES:
+- Bound API Server: ${ctx.apiBaseUrl}
+- Bound OsClient: ${ctx.osClient || '(default)'}
+- Before any write tool call, compare the user's requested server/tenant with the bound API and OsClient above.
+- Never satisfy a request for another Microi server or another OsClient with this MCP instance; ask the user to select the correct MCP instead.
+- If multiple Microi MCP servers are available, keep all reads and writes for one system on the same bound server.
 
 ## 低代码系统设计工作流（按顺序执行）
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
@@ -430,9 +460,9 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
  * @param context - 服务器上下文（OsClient、API地址），用于在 instructions 中标识身份
  */
 export function createMcpServer(client, context) {
-    const { osClient, label } = context;
+    const { osClient } = context;
     // 服务器名称与 mcp.json key 保持一致：单服务器用 'microi'，多服务器用 'microi-{label}'
-    const serverName = label ? `microi-${label}` : `microi-${osClient || 'default'}`;
+    const serverName = buildRuntimeServerName(context);
     const server = new McpServer({ name: serverName, version: '1.0.0' }, { instructions: buildInstructions(context) });
     // ========================
     // Tool: 获取服务器状态
