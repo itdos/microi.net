@@ -22,20 +22,17 @@ export default {
             if (this.IsPageMode && pageForm) return pageForm;
             return fieldForm || pageForm;
         },
-        CallbackGetFormData() {
+        CallbackGetFormData(payload) {
             var form = this.GetActiveFieldForm();
             this.WfFormData = form && typeof form.GetFormData === "function" ? form.GetFormData() : {};
+            if (payload && typeof payload.callback === "function") {
+                payload.callback(this.WfFormData);
+            }
         },
         CallbackFieldSet(fieldName, attrName, value) {
             var form = this.GetActiveFieldForm();
             if (form && typeof form.FieldSet === "function") {
                 form.FieldSet(fieldName, attrName, value);
-            }
-        },
-        OnNeedSelectUsers() {
-            this.FormRightType = "WorkFlow";
-            if (this.diyStore.IsPhoneView) {
-                this.showMobileRightDrawer = true;
             }
         },
         // 工作流：从表单顶部/底部触发右侧 WfWorkHandler 的 SubmitWF（醒目按钮入口，带防重入）

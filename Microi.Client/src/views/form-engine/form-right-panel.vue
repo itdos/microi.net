@@ -20,7 +20,6 @@
                         @CallbackSendWork="OnCallbackSendWork"
                         @CallbackGetFormData="OnCallbackGetFormData"
                         @CallbackFieldSet="OnCallbackFieldSet"
-                        @CallbackNeedSelectUsers="OnCallbackNeedSelectUsers"
                     ></WFWorkHandler>
                 </div>
             </el-tab-pane>
@@ -163,7 +162,7 @@ export default {
         // 隐藏 wf-work-handler 内联的发起流程/处理工作提交按钮——由表单顶部的 CTA 接管
         hideInlineSubmit: { type: Boolean, default: false }
     },
-    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "callback-send-work", "callback-get-form-data", "callback-field-set", "need-select-users", "refresh-data-log", "refresh-data-comment"],
+    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "callback-send-work", "callback-get-form-data", "callback-field-set", "refresh-data-log", "refresh-data-comment"],
     data() {
         return {
             innerActiveTab: this.modelValue || "WorkFlow"
@@ -201,9 +200,6 @@ export default {
         },
         OnCallbackFieldSet(fieldName, attrName, value) {
             this.$emit("callback-field-set", fieldName, attrName, value);
-        },
-        OnCallbackNeedSelectUsers(payload) {
-            this.$emit("need-select-users", payload);
         }
     }
 };
