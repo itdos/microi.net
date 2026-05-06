@@ -27,6 +27,13 @@
                     <el-option v-for="user in SysUserList" :key="'addUser2_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
                 </el-select>
             </div>
+            <!--添加审批人：允许添加审批人时常驻右侧显示-->
+            <div style="margin-top: 10px" v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'">
+                <div style="margin-bottom: 5px">添加审批人：</div>
+                <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
+                    <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
+                </el-select>
+            </div>
             <!--请输入意见/评论-->
             <div style="margin-top: 10px">
                 <el-input type="textarea" :rows="4" placeholder="请输入意见/评论" v-model="CurrentApprovalIdea"> </el-input>
@@ -69,11 +76,8 @@
                     </template>
                     <div v-else class="wf-next-user-dialog__empty">暂无可选审批人</div>
                 </div>
-                <div v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'" class="wf-next-user-dialog__section">
-                    <div class="wf-next-user-dialog__title">添加审批人：</div>
-                    <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
-                        <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
-                    </el-select>
+                <div v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'" class="wf-next-user-dialog__tip">
+                    需要额外添加审批人时，请先在右侧“添加审批人”中选择后再提交。
                 </div>
             </div>
             <template #footer>
@@ -212,7 +216,7 @@ export default {
             return this.IsTrueValue(this.CurrentNodeModel.AllowAddUsers);
         },
         NeedManualNextNodeUsers() {
-            return this.AllowSelectUsers() || this.AllowAddUsers();
+            return this.AllowSelectUsers();
         },
         ToggleSelectAllUsers(checked) {
             var self = this;
@@ -271,6 +275,38 @@ export default {
                 });
             });
         },
+        GetWorkflowFormDataForSubmit(formApiParam, fallbackFormData) {
+            var self = this;
+            var workflowFormData = {};
+            if (formApiParam && formApiParam._FormData) {
+                workflowFormData = Object.assign({}, formApiParam._FormData);
+            } else if (fallbackFormData) {
+                self.DiyCommon.ForRowModelHandler(fallbackFormData, self.DiyFieldList);
+                workflowFormData = self.DiyCommon.ConvertRowModel(fallbackFormData);
+            }
+            if (formApiParam && formApiParam.Id && !workflowFormData.Id) {
+                workflowFormData.Id = formApiParam.Id;
+            }
+            return workflowFormData;
+        },
+        BuildNoticeFields(formData) {
+            var self = this;
+            var noticeFields = [];
+            if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
+                var fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
+                fieldsConfig.forEach(function (config) {
+                    if (config.Notice == true) {
+                        noticeFields.push({
+                            Id: config.Id,
+                            Name: config.Name,
+                            Label: config.Label,
+                            Value: formData && formData[config.Name] ? formData[config.Name] : ""
+                        });
+                    }
+                });
+            }
+            return noticeFields;
+        },
         GetApprovalTypeForNextNodeConfirm() {
             var self = this;
             if (self.CurrentStartType == "StartWork") {
@@ -299,7 +335,7 @@ export default {
             });
             self.CurrentSelectUsers = userIds;
         },
-        async PrepareNextNodeConfirmUsersBeforeSubmit() {
+        async PrepareNextNodeConfirmUsersBeforeSubmit(formData) {
             var self = this;
             if (!self.NeedManualNextNodeUsers()) {
                 return true;
@@ -313,7 +349,7 @@ export default {
                 self.DiyCommon.Tips("请选择退回节点。", false);
                 return false;
             }
-            var result = await self.GetNextNodeConfirmUsers();
+            var result = await self.GetNextNodeConfirmUsers(null, formData);
             if (!self.DiyCommon.Result(result)) {
                 return false;
             }
@@ -573,9 +609,9 @@ export default {
                 }
             );
         },
-        async GetNextNodeConfirmUsers(callback) {
+        async GetNextNodeConfirmUsers(callback, formData) {
             var self = this;
-            var latestFormData = await self.GetLatestFormDataForWorkflow();
+            var latestFormData = formData || await self.GetLatestFormDataForWorkflow();
             return new Promise(function (resolve) {
                 self.IsNextNodeConfirmUsers = false;
                 self.NextNodeConfirmUsersLoading = true;
@@ -834,14 +870,8 @@ export default {
                 self.SubmitHandOverWork();
             } else if (self.CurrentStartType == "StartWork") {
                 self.CurrentApprovalType = "Auto";
-                if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit())) {
-                    return;
-                }
                 self.SubmitStartWork();
             } else {
-                if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit())) {
-                    return;
-                }
                 self.SubmitSendWork();
             }
         },
@@ -1014,50 +1044,38 @@ export default {
         // ============================================================
         BuildStartWorkAlternateSubmit(param) {
             var self = this;
-            return function (url, formApiParam, cb) {
-                // 通知字段（与 StartWork 一致）
-                var noticeFields = [];
-                if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
-                    var fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
-                    fieldsConfig.forEach(function (config) {
-                        if (config.Notice == true) {
-                            noticeFields.push({
-                                Id: config.Id,
-                                Name: config.Name,
-                                Label: config.Label,
-                                Value: param.FormData && param.FormData[config.Name] ? param.FormData[config.Name] : ""
-                            });
-                        }
-                    });
-                }
-                // FormData 序列化（与 StartWork 一致）
-                var _formData = param.FormData || {};
-                if (param.FormData) {
-                    self.DiyCommon.ForRowModelHandler(param.FormData, param.DiyFieldList);
-                    _formData = self.DiyCommon.ConvertRowModel(param.FormData);
-                }
+            return async function (url, formApiParam, cb) {
+                try {
+                    var formPayload = Object.assign({}, formApiParam || {});
+                    formPayload._FormSubmitAction = param.FormMode || "Edit";
+                    var workflowFormData = self.GetWorkflowFormDataForSubmit(formPayload, param.FormData);
 
-                var wfPayload = {
-                    FlowDesignId: self.CurrentFlowDesignId,
-                    FormData: JSON.stringify(_formData),
-                    TableRowId: formApiParam && formApiParam.Id ? formApiParam.Id : (param.FormData ? param.FormData.Id : null),
-                    NoticeFields: JSON.stringify(noticeFields),
-                    ApprovalIdea: self.CurrentApprovalIdea,
-                    AddUsers: self.CurrentAddUsers,
-                    SelectUsers: self.CurrentSelectUsers,
-                    ForceSelectUsers: self.ForceSelectUsers
-                };
-                // 表单 payload 标注动作（Add/Edit）
-                var formPayload = Object.assign({}, formApiParam || {});
-                formPayload._FormSubmitAction = param.FormMode || "Edit";
+                    if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit(workflowFormData))) {
+                        self.BtnLoading = false;
+                        cb({ Code: 0, Data: null, Msg: "已取消提交" });
+                        return;
+                    }
 
-                self.DiyCommon.Post(
-                    "/api/WorkFlow/StartWorkWithForm",
-                    {
-                        Wf: wfPayload,
-                        Form: formPayload
-                    },
-                    async function (result) {
+                    var noticeFields = self.BuildNoticeFields(workflowFormData);
+
+                    var wfPayload = {
+                        FlowDesignId: self.CurrentFlowDesignId,
+                        FormData: JSON.stringify(workflowFormData),
+                        TableRowId: formPayload && formPayload.Id ? formPayload.Id : (workflowFormData ? workflowFormData.Id : null),
+                        NoticeFields: JSON.stringify(noticeFields),
+                        ApprovalIdea: self.CurrentApprovalIdea,
+                        AddUsers: self.CurrentAddUsers,
+                        SelectUsers: self.CurrentSelectUsers,
+                        ForceSelectUsers: self.ForceSelectUsers
+                    };
+
+                    self.DiyCommon.Post(
+                        "/api/WorkFlow/StartWorkWithForm",
+                        {
+                            Wf: wfPayload,
+                            Form: formPayload
+                        },
+                        async function (result) {
                         self.BtnLoading = false;
                         if (self.DiyCommon.Result(result)) {
                             // Tips（与 StartWork 一致）
@@ -1079,7 +1097,7 @@ export default {
                             // EndV8 hook（与 StartWork 一致）
                             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                                 var V8 = { EventName: "WFNodeEnd" };
-                                V8.Form = param.FormData;
+                                V8.Form = workflowFormData;
                                 V8.OldForm = param.OldForm;
                                 V8.WF = {
                                     ApprovalType: self.CurrentApprovalType,
@@ -1091,7 +1109,7 @@ export default {
                                     CurrentNode: self.CurrentNodeModel,
                                     WorkResult: result.Data
                                 };
-                                self.SetV8DefaultValue(V8, param.FormData);
+                                self.SetV8DefaultValue(V8, workflowFormData);
                                 await self.DiyCommon.InitV8Code(V8, self.$router);
                                 try {
                                     await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
@@ -1107,61 +1125,55 @@ export default {
                             self.$emit("CallbackWFSubmit", { Code: 0 });
                             cb({ Code: 0, Data: null, Msg: result ? result.Msg : "事务失败", _WfMergedResult: result });
                         }
-                    },
-                    function (error) {
-                        self.BtnLoading = false;
-                        cb({ Code: 0, Data: null, Msg: "请求失败" });
-                    }
-                );
+                        },
+                        function (error) {
+                            self.BtnLoading = false;
+                            cb({ Code: 0, Data: null, Msg: "请求失败" });
+                        }
+                    );
+                } catch (error) {
+                    self.BtnLoading = false;
+                    cb({ Code: 0, Data: null, Msg: error && error.message ? error.message : "请求失败" });
+                }
             };
         },
 
         BuildSendWorkAlternateSubmit(param) {
             var self = this;
-            return function (url, formApiParam, cb) {
-                var noticeFields = [];
-                if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
-                    var fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
-                    fieldsConfig.forEach(function (config) {
-                        if (config.Notice == true) {
-                            noticeFields.push({
-                                Id: config.Id,
-                                Name: config.Name,
-                                Label: config.Label,
-                                Value: param.FormData && param.FormData[config.Name] ? param.FormData[config.Name] : ""
-                            });
-                        }
-                    });
-                }
+            return async function (url, formApiParam, cb) {
+                try {
+                    var formPayload = Object.assign({}, formApiParam || {});
+                    formPayload._FormSubmitAction = param.FormMode || "Edit";
+                    var workflowFormData = self.GetWorkflowFormDataForSubmit(formPayload, param.FormData);
 
-                var _formData = param.FormData || {};
-                if (param.FormData) {
-                    self.DiyCommon.ForRowModelHandler(param.FormData, param.DiyFieldList);
-                    _formData = self.DiyCommon.ConvertRowModel(param.FormData);
-                }
+                    if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit(workflowFormData))) {
+                        self.BtnLoading = false;
+                        cb({ Code: 0, Data: null, Msg: "已取消提交" });
+                        return;
+                    }
 
-                var wfPayload = {
-                    WorkId: self.CurrentWorkModel.Id,
-                    FlowId: self.CurrentWorkModel.FlowId,
-                    FormData: JSON.stringify(_formData),
-                    ApprovalType: self.CurrentApprovalType,
-                    ApprovalIdea: self.CurrentApprovalIdea,
-                    BackNodeId: self.CurrentBackNodeId,
-                    NoticeFields: JSON.stringify(noticeFields),
-                    AddUsers: self.CurrentAddUsers,
-                    SelectUsers: self.CurrentSelectUsers,
-                    ForceSelectUsers: self.ForceSelectUsers
-                };
-                var formPayload = Object.assign({}, formApiParam || {});
-                formPayload._FormSubmitAction = param.FormMode || "Edit";
+                    var noticeFields = self.BuildNoticeFields(workflowFormData);
 
-                self.DiyCommon.Post(
-                    "/api/WorkFlow/SendWorkWithForm",
-                    {
-                        Wf: wfPayload,
-                        Form: formPayload
-                    },
-                    async function (result) {
+                    var wfPayload = {
+                        WorkId: self.CurrentWorkModel.Id,
+                        FlowId: self.CurrentWorkModel.FlowId,
+                        FormData: JSON.stringify(workflowFormData),
+                        ApprovalType: self.CurrentApprovalType,
+                        ApprovalIdea: self.CurrentApprovalIdea,
+                        BackNodeId: self.CurrentBackNodeId,
+                        NoticeFields: JSON.stringify(noticeFields),
+                        AddUsers: self.CurrentAddUsers,
+                        SelectUsers: self.CurrentSelectUsers,
+                        ForceSelectUsers: self.ForceSelectUsers
+                    };
+
+                    self.DiyCommon.Post(
+                        "/api/WorkFlow/SendWorkWithForm",
+                        {
+                            Wf: wfPayload,
+                            Form: formPayload
+                        },
+                        async function (result) {
                         self.BtnLoading = false;
                         if (self.DiyCommon.Result(result)) {
                             var receivers = "";
@@ -1181,7 +1193,7 @@ export default {
 
                             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                                 var V8 = { EventName: "WFNodeEnd" };
-                                V8.Form = param.FormData;
+                                V8.Form = workflowFormData;
                                 V8.OldForm = param.OldForm;
                                 V8.WF = {
                                     ApprovalType: self.CurrentApprovalType,
@@ -1194,7 +1206,7 @@ export default {
                                     WorkResult: result.Data,
                                     BackNodeId: self.CurrentBackNodeId
                                 };
-                                self.SetV8DefaultValue(V8, param.FormData);
+                                self.SetV8DefaultValue(V8, workflowFormData);
                                 await self.DiyCommon.InitV8Code(V8, self.$router);
                                 try {
                                     await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
@@ -1209,12 +1221,16 @@ export default {
                             self.$emit("CallbackWFSubmit", { Code: 0 });
                             cb({ Code: 0, Data: null, Msg: result ? result.Msg : "事务失败", _WfMergedResult: result });
                         }
-                    },
-                    function (error) {
-                        self.BtnLoading = false;
-                        cb({ Code: 0, Data: null, Msg: "请求失败" });
-                    }
-                );
+                        },
+                        function (error) {
+                            self.BtnLoading = false;
+                            cb({ Code: 0, Data: null, Msg: "请求失败" });
+                        }
+                    );
+                } catch (error) {
+                    self.BtnLoading = false;
+                    cb({ Code: 0, Data: null, Msg: error && error.message ? error.message : "请求失败" });
+                }
             };
         },
 
