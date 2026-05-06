@@ -38,18 +38,7 @@
             </template>
             <!--DIY子表-->
             <el-card :class="'box-card box-card-table-row-list' + ((diyStore.IsPhoneView || TableDisplayMode == 'Card') ? ' mobile-box-card' : '')">
-                <!-- 统计面板（数据来自 sys_menu.TableReport） -->
-                <div v-if="tableReportItems && tableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
-                    <div v-for="item in tableReportItems" :key="item.Id || item.Label" class="table-report-card" :style="{ '--report-color': item.Color || '#409eff' }">
-                        <div class="table-report-icon">
-                            <fa-icon :icon="item.Icon || 'fas fa-chart-bar'" />
-                        </div>
-                        <div class="table-report-body">
-                            <div class="table-report-value">{{ item.Value }}</div>
-                            <div class="table-report-label">{{ item.Label }}</div>
-                        </div>
-                    </div>
-                </div>
+                
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
                 <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && ShowAddByRoute" class="mobile-header">
@@ -304,6 +293,24 @@
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
+                    </div>
+                </div>
+
+                <!-- 统计面板（数据来自 sys_menu.TableReport，卡片模式追加 StatisticsFields） -->
+                <div v-if="tableReportItems && tableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
+                    <div
+                        v-for="item in tableReportItems"
+                        :key="item.Id || item.Label"
+                        :class="['table-report-card', item.Source === 'StatisticsFields' ? 'table-report-card--statistics' : '']"
+                        :style="{ '--report-color': item.Color || '#409eff' }"
+                    >
+                        <div class="table-report-icon">
+                            <fa-icon :icon="item.Icon || 'fas fa-chart-bar'" />
+                        </div>
+                        <div class="table-report-body">
+                            <div class="table-report-value">{{ item.Value }}</div>
+                            <div class="table-report-label" :title="item.Label">{{ item.Label }}</div>
+                        </div>
                     </div>
                 </div>
 
