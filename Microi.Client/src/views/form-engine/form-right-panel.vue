@@ -14,8 +14,13 @@
                     <WFWorkHandler
                         v-if="openDiyFormWorkFlowType.WorkType == 'StartWork' || openDiyFormWorkFlowType.WorkType == 'DoWork'"
                         ref="refWfWorkHandler"
+                        :form-data="formData"
                         :HideInlineSubmit="hideInlineSubmit"
                         @CallbackStartWork="OnCallbackStartWork"
+                        @CallbackSendWork="OnCallbackSendWork"
+                        @CallbackGetFormData="OnCallbackGetFormData"
+                        @CallbackFieldSet="OnCallbackFieldSet"
+                        @CallbackNeedSelectUsers="OnCallbackNeedSelectUsers"
                     ></WFWorkHandler>
                 </div>
             </el-tab-pane>
@@ -154,10 +159,11 @@ export default {
         commentContent: { type: String, default: "" },
         btnLoading: { type: Boolean, default: false },
         isMobileDrawer: { type: Boolean, default: false },
+        formData: { type: Object, default: () => ({}) },
         // 隐藏 wf-work-handler 内联的发起流程/处理工作提交按钮——由表单顶部的 CTA 接管
         hideInlineSubmit: { type: Boolean, default: false }
     },
-    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "refresh-data-log", "refresh-data-comment"],
+    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "callback-send-work", "callback-get-form-data", "callback-field-set", "need-select-users", "refresh-data-log", "refresh-data-comment"],
     data() {
         return {
             innerActiveTab: this.modelValue || "WorkFlow"
@@ -184,8 +190,20 @@ export default {
         OnRefreshDataComment() {
             this.$emit("refresh-data-comment");
         },
-        OnCallbackStartWork(payload) {
-            this.$emit("callback-start-work", payload);
+        OnCallbackStartWork(payload, callback) {
+            this.$emit("callback-start-work", payload, callback);
+        },
+        OnCallbackSendWork(payload, callback) {
+            this.$emit("callback-send-work", payload, callback);
+        },
+        OnCallbackGetFormData(payload) {
+            this.$emit("callback-get-form-data", payload);
+        },
+        OnCallbackFieldSet(fieldName, attrName, value) {
+            this.$emit("callback-field-set", fieldName, attrName, value);
+        },
+        OnCallbackNeedSelectUsers(payload) {
+            this.$emit("need-select-users", payload);
         }
     }
 };

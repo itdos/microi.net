@@ -127,16 +127,14 @@
 </template>
 
 <script>
-// ⚠️ 不再单独引入图标，使用 main.js 中全局注册的图标
-// import { Delete, Plus } from "@element-plus/icons-vue";
+import { Delete, Plus } from "@element-plus/icons-vue";
 
 export default {
     name: 'DiyDataSourceConfig',
-    // ⚠️ 不再注册 components，图标已全局可用
-    // components: {
-    //     Delete,
-    //     Plus
-    // },
+    components: {
+        Delete,
+        Plus
+    },
     props: {
         // 配置对象
         config: {
@@ -186,6 +184,8 @@ export default {
             ApiEngineList: [],
             newDataItem: '',
             newKeyValueItem: { Key: '', Value: '' },
+            Delete,
+            Plus
         };
     },
     mounted() {

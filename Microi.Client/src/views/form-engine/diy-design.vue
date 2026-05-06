@@ -63,11 +63,11 @@
             <el-aside class="aside aside-left" width="250px">
                 <el-row id="row-field" :gutter="10" class="row-field">
                     <el-col :span="24">
-                        <el-divider content-position="center">基础控件</el-divider>
+                        <el-divider content-position="center">表单控件</el-divider>
                     </el-col>
                     <draggable
                         class="draggable-components-wrapper"
-                        :list="DiyComponentListBaseListen"
+                        :list="DiyComponentListListen"
                         :group="{ name: 'field-components', pull: 'clone', put: false }"
                         :clone="cloneComponent"
                         :sort="false"
@@ -76,27 +76,9 @@
                     >
                         <template #item="{ element }">
                             <el-col :key="element.Control" :data-field="element.Control" class="field-drag" :span="12">
-                                <el-tag type="info"><fa-icon :class="element.Icon" />{{ element.Name }}</el-tag>
-                            </el-col>
-                        </template>
-                    </draggable>
-
-                    <el-col :span="24">
-                        <el-divider content-position="center">高级控件</el-divider>
-                    </el-col>
-
-                    <draggable
-                        class="draggable-components-wrapper"
-                        :list="DiyComponentListAdvancedListen"
-                        :group="{ name: 'field-components', pull: 'clone', put: false }"
-                        :clone="cloneComponent"
-                        :sort="false"
-                        :move="onComponentMove"
-                        item-key="Control"
-                    >
-                        <template #item="{ element }">
-                            <el-col :key="element.Control" :data-field="element.Control" class="field-drag" :span="12">
-                                <el-tag type="info"><fa-icon :class="element.Icon" />{{ element.Name }}</el-tag>
+                                <el-tag :class="'component-tag component-tag--' + GetComponentCategoryClass(element)" type="info">
+                                    <fa-icon :class="element.Icon" />{{ element.Name }}
+                                </el-tag>
                             </el-col>
                         </template>
                     </draggable>
@@ -259,20 +241,10 @@ export default {
         return { diyStore, SysConfig };
     },
     computed: {
-        DiyComponentListBaseListen: {
+        DiyComponentListListen: {
             get() {
                 // 返回副本避免拖拽时修改原数组
-                return _.where(this.DiyComponentList, {
-                    Type: "Base"
-                }).slice();
-            }
-        },
-        DiyComponentListAdvancedListen: {
-            get() {
-                // 返回副本避免拖拽时修改原数组
-                return _.where(this.DiyComponentList, {
-                    Type: "Advanced"
-                }).slice();
+                return (this.DiyComponentList || []).slice();
             }
         }
         // TabListListen : {
@@ -688,6 +660,19 @@ export default {
                     return sortA - sortB;
                 });
         },
+        GetComponentCategoryClass(component) {
+            if (!component) return "default";
+            if (["Divider", "CollapseGroup", "Alert", "StaticText", "Html"].indexOf(component.Control) > -1) {
+                return "layout";
+            }
+            if (["OpenTable", "JoinTable", "JoinForm", "TableChild", "Department", "SelectTree", "TreeCheckbox", "Transfer"].indexOf(component.Control) > -1) {
+                return "relation";
+            }
+            if (component.Type === "Advanced") {
+                return "advanced";
+            }
+            return "base";
+        },
         SwitchFormClient(tab) {
             var self = this;
             self.FormClient = tab.name;
@@ -982,7 +967,6 @@ export default {
          * @returns {Object} - 克隆的组件对象（用于显示，但不会真正添加）
          */
         cloneComponent(component) {
-            console.log('[diy-design] cloneComponent 被调用:', component);
             // 返回克隆对象用于拖拽显示，实际添加在 onAdd 中处理
             // 将组件信息存储到克隆对象中，方便onAdd时获取
             const cloned = { 
@@ -990,7 +974,6 @@ export default {
                 _originalComponent: component,
                 _cloneTimestamp: Date.now()
             };
-            console.log('[diy-design] 克隆后的对象:', cloned);
             return cloned;
         },
         /**
@@ -1009,22 +992,12 @@ export default {
          */
         onComponentAdd(evt) {
             var self = this;
-            console.log('========== [diy-design] onComponentAdd 开始 ==========');
-            console.log('[diy-design] evt 对象:', evt);
-            console.log('[diy-design] evt.item:', evt.item);
-            console.log('[diy-design] evt.clone:', evt.clone);
-            console.log('[diy-design] evt.to:', evt.to);
-            console.log('[diy-design] evt.from:', evt.from);
-            console.log('[diy-design] evt.newIndex:', evt.newIndex);
-            console.log('[diy-design] evt.oldIndex:', evt.oldIndex);
             
             // 获取当前活动的 tab
             var tab = self.$refs.fieldForm.FieldActiveTab;
-            console.log('[diy-design] 当前tab:', tab);
             if (tab == "none" || tab == "info" || !tab) {
                 tab = "";
             }
-            console.log('[diy-design] 最终tab:', tab);
             
             // 从多个可能的位置获取组件信息
             var component = null;
@@ -1032,27 +1005,22 @@ export default {
             // 方法1: 从 clone 的 _originalComponent 获取
             if (evt.clone && evt.clone._originalComponent) {
                 component = evt.clone._originalComponent;
-                console.log('[diy-design] 方法1: 从 clone._originalComponent 获取:', component);
             }
             
             // 方法2: 从 item 的 data-field 属性获取
             if (!component && evt.item.dataset && evt.item.dataset.field) {
                 const controlName = evt.item.dataset.field;
-                console.log('[diy-design] 方法2: 从 dataset.field 获取 controlName:', controlName);
                 component = _.findWhere(self.DiyComponentList, { Control: controlName });
-                console.log('[diy-design] 方法2: 查找到的component:', component);
             }
             
             // 方法3: 从 draggable context 获取
             if (!component && evt.item.__draggable_context?.element) {
                 component = evt.item.__draggable_context.element;
-                console.log('[diy-design] 方法3: 从 __draggable_context 获取:', component);
             }
             
             // 方法4: 尝试从 clone 本身获取
             if (!component && evt.clone && evt.clone.Control) {
                 component = evt.clone;
-                console.log('[diy-design] 方法4: 从 clone 本身获取:', component);
             }
             
             if (!component) {
@@ -1069,21 +1037,15 @@ export default {
                 if (evt.item && evt.item.parentNode) {
                     evt.item.parentNode.removeChild(evt.item);
                 }
-                console.log('========== [diy-design] onComponentAdd 结束(失败) ==========');
                 return;
             }
-            
-            console.log('[diy-design] 最终获取到的component:', component);
             
             // 查找完整的组件模型
             var componentModel = _.findWhere(self.DiyComponentList, {
                 Control: component.Control || component
             });
             
-            console.log('[diy-design] DiyComponentList长度:', self.DiyComponentList.length);
-            console.log('[diy-design] 查找的Control:', component.Control || component);
-            console.log('[diy-design] 查找到的componentModel:', componentModel);
-            
+
             if (componentModel) {
                 const fieldData = {
                     Name: "",
@@ -1098,11 +1060,8 @@ export default {
                     Readonly: componentModel.Readonly ? 1 : 0,
                     _insertIndex: evt.newIndex
                 };
-                console.log('[diy-design] 即将添加的字段数据:', fieldData);
-                
                 // 添加新字段（带插入位置）
                 self.AddDiyField(fieldData);
-                console.log('[diy-design] AddDiyField 调用完成');
             } else {
                 console.error('[diy-design] ❗找不到对应的组件模型！');
             }
@@ -1114,7 +1073,6 @@ export default {
             //     console.log('[diy-design] 移除临时DOM元素');
             //     evt.item.parentNode.removeChild(evt.item);
             // }
-            console.log('========== [diy-design] onComponentAdd 结束(成功) ==========');
         },
         /**
          * vuedraggable 字段排序变化回调：当字段在表单中拖拽排序时触发
@@ -1124,7 +1082,6 @@ export default {
             var self = this;
             // 字段顺序已经在 DiyFieldListGrouped 中自动更新（因为绑定了 :list）
             // 这里可以添加保存逻辑或其他需要的处理
-            console.log('字段顺序已改变:', data);
             // 可选：自动保存字段顺序
             // self.SaveAllDiyField();
         },
@@ -1510,52 +1467,39 @@ export default {
         },
         AddDiyField(param) {
             var self = this;
-            console.log('[diy-design] ========== AddDiyField 开始 ==========');
-            console.log('[diy-design] 传入参数:', param);
             
             // 保存插入位置（如果有）
             var insertIndex = param._insertIndex;
-            console.log('[diy-design] insertIndex:', insertIndex);
             delete param._insertIndex;  // 删除临时参数，不传给后端
             
             param.TableId = self.$route.params.Id;
-            console.log('[diy-design] TableId:', param.TableId);
             
             // 🔥 关键修复：根据insertIndex计算Sort值
-            // 获取当前tab的所有字段（使用DiyFieldListGrouped获取已渲染的字段）
+            // 获取当前tab的所有真实字段，不使用DiyFieldListGrouped，避免临时拖拽克隆项污染排序
             if (typeof insertIndex === 'number' && insertIndex >= 0) {
                 var currentTab = param.Tab || '';
-                console.log('[diy-design] 当前tab:', currentTab);
-                
-                // 从 fieldForm 的 DiyFieldListGrouped 获取当前tab的字段（已按Sort排序）
-                var tabFields = [];
-                if (self.$refs.fieldForm && self.$refs.fieldForm.DiyFieldListGrouped) {
-                    tabFields = self.$refs.fieldForm.DiyFieldListGrouped[currentTab] || [];
-                    console.log('[diy-design] 从 DiyFieldListGrouped 获取的字段数:', tabFields.length);
-                } else {
-                    // 备用方案：手动过滤和排序
-                    var allFields = self.$refs.fieldForm ? self.$refs.fieldForm.DiyFieldList : [];
-                    tabFields = allFields.filter(f => f.Tab === currentTab);
-                    tabFields.sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
-                    console.log('[diy-design] 从 DiyFieldList 过滤的字段数:', tabFields.length);
-                }
-                
-                console.log('[diy-design] 当前tab的字段数:', tabFields.length);
-                console.log('[diy-design] insertIndex:', insertIndex);
+                var allFields = self.$refs.fieldForm ? self.$refs.fieldForm.DiyFieldList : [];
+                var activeTab = self.$refs.fieldForm && self.$refs.fieldForm.FormTabs
+                    ? self.$refs.fieldForm.FormTabs.find((tab) => tab && (tab.Id === currentTab || tab.Name === currentTab))
+                    : null;
+                var tabFields = allFields.filter((field) => {
+                    var fieldTab = field.Tab || '';
+                    if (activeTab) {
+                        return fieldTab === (activeTab.Id || '') || fieldTab === (activeTab.Name || '');
+                    }
+                    return fieldTab === currentTab;
+                }).sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
                 
                 if (tabFields.length === 0) {
                     // 第一个字段，使用默认Sort
                     param.Sort = 100;
-                    console.log('[diy-design] 第一个字段，Sort设为:', param.Sort);
                 } else if (insertIndex === 0) {
                     // 插入到最前面，使用最小Sort - 100
                     param.Sort = (tabFields[0].Sort || 100) - 100;
-                    console.log('[diy-design] 插入到最前面，Sort设为:', param.Sort, '(第一个字段Sort:', tabFields[0].Sort, ')');
                 } else if (insertIndex >= tabFields.length) {
                     // 插入到最后面，使用最大Sort + 100
                     var lastField = tabFields[tabFields.length - 1];
                     param.Sort = (lastField?.Sort || 0) + 100;
-                    console.log('[diy-design] 插入到最后面，Sort设为:', param.Sort, '(最后一个字段Sort:', lastField?.Sort, ')');
                 } else {
                     // 插入到中间，使用前后字段Sort的中间值
                     var prevField = tabFields[insertIndex - 1];
@@ -1563,23 +1507,16 @@ export default {
                     var prevSort = prevField?.Sort || 0;
                     var nextSort = nextField?.Sort || (prevSort + 200);
                     
-                    console.log('[diy-design] 准备插入到中间位置', insertIndex);
-                    console.log('[diy-design] 前一个字段:', prevField?.Label, '(index:', insertIndex - 1, ') Sort:', prevSort);
-                    console.log('[diy-design] 后一个字段:', nextField?.Label, '(index:', insertIndex, ') Sort:', nextSort);
-                    
                     // 🔥 关键：确保Sort是整数，如果前后Sort相同或相邻，使用前一个+1
                     if (nextSort <= prevSort) {
                         // 顺序错误，使用前一个+100
                         param.Sort = prevSort + 100;
-                        console.log('[diy-design] ⚠️ 检测到Sort顺序异常，使用 prevSort+100:', param.Sort);
                     } else if (nextSort - prevSort <= 1) {
                         // 间隙太小，使用前一个+1
                         param.Sort = prevSort + 1;
-                        console.log('[diy-design] 间隙太小，使用 prevSort+1:', param.Sort);
                     } else {
                         // 使用中间值（向下取整确保整数）
                         param.Sort = Math.floor((prevSort + nextSort) / 2);
-                        console.log('[diy-design] 使用中间值:', param.Sort, '=', 'Math.floor((' + prevSort, '+', nextSort + ') / 2)');
                     }
                 }
             }
@@ -1602,16 +1539,10 @@ export default {
                     _FormData: _rowModel
                 };
             }
-            console.log('[diy-design] API URL:', apiUrl);
-            console.log('[diy-design] 发送到后端的参数:', param);
-            
             self.DiyCommon.Post(apiUrl, param, function (result) {
-                console.log('[diy-design] API响应结果:', result);
                 if (self.DiyCommon.Result(result)) {
-                    console.log('[diy-design] ✅ API调用成功');
                     self.DiyCommon.Tips(self.$t("Msg.Success"));
                     // self.DiyFieldList.push(result.Data);
-                    console.log('[diy-design] 返回的字段数据:', result.Data);
                     
                     self.DiyCommon.DiyFieldConfigStrToJson(result.Data);
                     self.$refs.fieldForm.DiyFieldStrToJson(result.Data);
@@ -1626,10 +1557,8 @@ export default {
                     self.FormDiyTableModel[self.CurrentDiyFieldModel.Name] = self.CurrentDiyFieldModel.Data;
                     self.AsideRightActiveTab = "Field";
 
-                    console.log('[diy-design] 准备调用AddDiyFieldArr, insertIndex:', insertIndex);
                     // self.GetDiyField();
                     self.$refs.fieldForm.AddDiyFieldArr(result.Data, insertIndex);  // 传入插入位置
-                    console.log('[diy-design] ========== AddDiyField 结束 ==========');
                 } else {
                     console.error('[diy-design] ❌ API调用失败:', result);
                     // 🔥 关键：API失败时显示错误信息，不添加字段
@@ -2059,6 +1988,41 @@ export default {
             margin-bottom: 5px;
             // border-left: solid 2px #242B49;
             border-radius: 4px;
+        }
+
+        .component-tag {
+            border: 1px solid transparent;
+            font-weight: 500;
+
+            .svg-inline--fa,
+            .fa-icon,
+            i {
+                margin-right: 5px;
+            }
+        }
+
+        .component-tag--base {
+            color: #1f3f78;
+            background: #eef5ff;
+            border-color: #cfe2ff;
+        }
+
+        .component-tag--layout {
+            color: #5b32a3;
+            background: #f3edff;
+            border-color: #ddccff;
+        }
+
+        .component-tag--advanced {
+            color: #0f5f59;
+            background: #eaf8f5;
+            border-color: #c5ece4;
+        }
+
+        .component-tag--relation {
+            color: #7a4a08;
+            background: #fff5df;
+            border-color: #f5dfad;
         }
 
         .el-tag:hover {
