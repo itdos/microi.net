@@ -20,20 +20,6 @@
         </template>
 
         <template v-if="OpenFormMode == 'Edit' || OpenFormMode == 'Add'">
-            <!--选择审批人：之前是NextNodeConfirmUsersData.AllowSelectUsers && NextNodeConfirmUsersData.SelectUsers  && NextNodeConfirmUsersData.SelectUsers.length > 0-->
-            <div style="margin-top: 10px" v-if="AllowSelectUsers()">
-                <div style="margin-bottom: 5px">选择审批人：</div>
-                <el-checkbox-group v-model="CurrentSelectUsers" :max="50">
-                    <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :value="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
-                </el-checkbox-group>
-            </div>
-            <!--添加审批人：之前是NextNodeConfirmUsersData.AllowAddUsers-->
-            <div style="margin-top: 10px" v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'">
-                <div style="margin-bottom: 5px">添加审批人：</div>
-                <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
-                    <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
-                </el-select>
-            </div>
             <!--指定移交人：-->
             <div style="margin-top: 10px" v-if="CurrentApprovalType === 'HandOver' && !CurrentNodeModel.HideHandOverSelect">
                 <div style="margin-bottom: 5px">指定移交人：</div>
@@ -53,6 +39,48 @@
                 </el-button>
             </div>
         </template>
+
+        <el-dialog
+            v-model="NextNodeConfirmDialogVisible"
+            title="选择下一节点审批人"
+            width="560px"
+            draggable
+            append-to-body
+            :close-on-click-modal="false"
+            @closed="OnNextNodeConfirmDialogClosed"
+        >
+            <div class="wf-next-user-dialog">
+                <div v-if="NextNodeConfirmUsersData.NextNode && NextNodeConfirmUsersData.NextNode.NodeName" class="wf-next-user-dialog__node">
+                    下一节点：{{ NextNodeConfirmUsersData.NextNode.NodeName }}
+                </div>
+                <div v-if="AllowSelectUsers()" class="wf-next-user-dialog__section">
+                    <div class="wf-next-user-dialog__title">选择审批人：</div>
+                    <template v-if="NextNodeSelectableUsers.length > 0">
+                        <el-checkbox
+                            :model-value="IsNextNodeSelectAll"
+                            :indeterminate="NextNodeSelectIndeterminate"
+                            @change="ToggleSelectAllUsers"
+                        >全选</el-checkbox>
+                        <el-checkbox-group v-model="CurrentSelectUsers" class="wf-next-user-dialog__checks">
+                            <el-checkbox v-for="user in NextNodeSelectableUsers" :value="user.Id" :key="user.Id">
+                                {{ user.Name }}
+                            </el-checkbox>
+                        </el-checkbox-group>
+                    </template>
+                    <div v-else class="wf-next-user-dialog__empty">暂无可选审批人</div>
+                </div>
+                <div v-if="AllowAddUsers() && CurrentApprovalType != 'HandOver'" class="wf-next-user-dialog__section">
+                    <div class="wf-next-user-dialog__title">添加审批人：</div>
+                    <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
+                        <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
+                    </el-select>
+                </div>
+            </div>
+            <template #footer>
+                <el-button @click="CancelNextNodeUsers">取消</el-button>
+                <el-button type="primary" @click="ConfirmNextNodeUsers">确定</el-button>
+            </template>
+        </el-dialog>
 
         <template v-if="OpenWorkType == 'Recall' || OpenWorkType == 'Cancel'">
             <!--撤回、作废-->
@@ -116,6 +144,18 @@ export default {
         }
     },
     watch: {},
+    computed: {
+        NextNodeSelectableUsers() {
+            var users = this.NextNodeConfirmUsersData && this.NextNodeConfirmUsersData.SelectUsers;
+            return Array.isArray(users) ? users : [];
+        },
+        IsNextNodeSelectAll() {
+            return this.NextNodeSelectableUsers.length > 0 && this.CurrentSelectUsers.length === this.NextNodeSelectableUsers.length;
+        },
+        NextNodeSelectIndeterminate() {
+            return this.CurrentSelectUsers.length > 0 && this.CurrentSelectUsers.length < this.NextNodeSelectableUsers.length;
+        }
+    },
     data() {
         return {
             DefaultSelect: true,
@@ -152,7 +192,9 @@ export default {
             OpenWorkType: "",
             ForceSelectUsers: [],
             NextNodeConfirmUsersLoading: false,
-            NextNodeConfirmUsersSubmitReady: false
+            NextNodeConfirmDialogVisible: false,
+            NextNodeConfirmDialogResolve: null,
+            NextNodeConfirmDialogResolved: false
         };
     },
     mounted() {
@@ -171,6 +213,63 @@ export default {
         },
         NeedManualNextNodeUsers() {
             return this.AllowSelectUsers() || this.AllowAddUsers();
+        },
+        ToggleSelectAllUsers(checked) {
+            var self = this;
+            self.CurrentSelectUsers = checked ? self.NextNodeSelectableUsers.map(function (user) { return user.Id; }).filter(function (id) { return !!id; }) : [];
+        },
+        ResolveNextNodeConfirmDialog(confirmed) {
+            var self = this;
+            if (self.NextNodeConfirmDialogResolved) return;
+            self.NextNodeConfirmDialogResolved = true;
+            self.NextNodeConfirmDialogVisible = false;
+            var resolve = self.NextNodeConfirmDialogResolve;
+            self.NextNodeConfirmDialogResolve = null;
+            if (resolve) {
+                resolve(confirmed === true);
+            }
+        },
+        ConfirmNextNodeUsers() {
+            var self = this;
+            var hasAddUsers = self.CurrentAddUsers && self.CurrentAddUsers.length > 0;
+            if (self.AllowSelectUsers() && self.NextNodeSelectableUsers.length === 0 && !hasAddUsers) {
+                self.DiyCommon.Tips("未找到可选审批人！", false);
+                return;
+            }
+            if (self.AllowSelectUsers() && self.NextNodeSelectableUsers.length > 0 && self.CurrentSelectUsers.length === 0 && !hasAddUsers) {
+                self.DiyCommon.Tips("请选择审批人！", false);
+                return;
+            }
+            self.ResolveNextNodeConfirmDialog(true);
+        },
+        CancelNextNodeUsers() {
+            this.ResolveNextNodeConfirmDialog(false);
+        },
+        OnNextNodeConfirmDialogClosed() {
+            this.ResolveNextNodeConfirmDialog(false);
+        },
+        OpenNextNodeConfirmDialog() {
+            var self = this;
+            self.NextNodeConfirmDialogResolved = false;
+            self.NextNodeConfirmDialogVisible = true;
+            return new Promise(function (resolve) {
+                self.NextNodeConfirmDialogResolve = resolve;
+            });
+        },
+        GetLatestFormDataForWorkflow() {
+            var self = this;
+            return new Promise(function (resolve) {
+                var resolved = false;
+                var finish = function (formData) {
+                    if (resolved) return;
+                    resolved = true;
+                    resolve(formData || self.FormData || {});
+                };
+                self.$emit("CallbackGetFormData", { callback: finish });
+                self.$nextTick(function () {
+                    finish(self.FormData || {});
+                });
+            });
         },
         GetApprovalTypeForNextNodeConfirm() {
             var self = this;
@@ -200,16 +299,6 @@ export default {
             });
             self.CurrentSelectUsers = userIds;
         },
-        PromptSelectUsersBeforeSubmit() {
-            var self = this;
-            self.NextNodeConfirmUsersSubmitReady = true;
-            self.$emit("CallbackNeedSelectUsers", {
-                CurrentNodeModel: self.CurrentNodeModel,
-                NextNodeConfirmUsersData: self.NextNodeConfirmUsersData,
-                CurrentSelectUsers: self.CurrentSelectUsers
-            });
-            self.DiyCommon.Tips("请确认下一节点审批人后再次提交。", false);
-        },
         async PrepareNextNodeConfirmUsersBeforeSubmit() {
             var self = this;
             if (!self.NeedManualNextNodeUsers()) {
@@ -224,25 +313,19 @@ export default {
                 self.DiyCommon.Tips("请选择退回节点。", false);
                 return false;
             }
-            if (!self.IsNextNodeConfirmUsers) {
-                var result = await self.GetNextNodeConfirmUsers();
-                if (!self.DiyCommon.Result(result)) {
-                    return false;
-                }
-            }
-            if (self.HideInlineSubmit && self.NeedManualNextNodeUsers() && !self.NextNodeConfirmUsersSubmitReady) {
-                self.PromptSelectUsersBeforeSubmit();
+            var result = await self.GetNextNodeConfirmUsers();
+            if (!self.DiyCommon.Result(result)) {
                 return false;
             }
-            return true;
+            return await self.OpenNextNodeConfirmDialog();
         },
-        async RunAllowAddUserV8Code(code) {
+        async RunAllowAddUserV8Code(code, formData) {
             var self = this;
             if (!self.DiyCommon.IsNull(code)) {
                 var V8 = {
                     EventName: "WFNodeAllowAddUserV8Code"
                 };
-                V8.Form = self.FormData;
+                V8.Form = formData || self.FormData;
                 // V8.OldForm = param.OldForm;
                 V8.WF = {
                     ApprovalType: self.CurrentApprovalType,
@@ -467,11 +550,7 @@ export default {
         },
         DisableSubmitWF() {
             var self = this;
-            //如果已经请求了下个节点可能要确认的人、或者是业务节点，则可以直接提交了
-            if (self.IsNextNodeConfirmUsers == true || self.CurrentNodeModel.NodeType == "Business") {
-                return false;
-            }
-            return true;
+            return self.BtnLoading || self.NextNodeConfirmUsersLoading;
         },
         GetSysUser() {
             var self = this;
@@ -494,11 +573,10 @@ export default {
                 }
             );
         },
-        GetNextNodeConfirmUsers(callback) {
+        async GetNextNodeConfirmUsers(callback) {
             var self = this;
-            self.$emit("CallbackGetFormData", {});
+            var latestFormData = await self.GetLatestFormDataForWorkflow();
             return new Promise(function (resolve) {
-            self.$nextTick(function () {
                 self.IsNextNodeConfirmUsers = false;
                 self.NextNodeConfirmUsersLoading = true;
                 var approvalType = self.GetApprovalTypeForNextNodeConfirm();
@@ -510,7 +588,7 @@ export default {
                             BackNodeId: self.CurrentBackNodeId,
                             WorkId: self.CurrentWorkModel.Id,
                             TableRowId: self.CurrentTableRowId,
-                            FormData: JSON.stringify(self.FormData || {})
+                            FormData: JSON.stringify(latestFormData || {})
                         },
                     async function (result) {
                         self.NextNodeConfirmUsersLoading = false;
@@ -522,7 +600,7 @@ export default {
                             //之前用的是： if (self.NextNodeConfirmUsersData.AllowAddUserV8Code) {
                             if (self.CurrentNodeModel.AllowAddUserV8Code) {
                                 //之前用的是：  var userList = await self.RunAllowAddUserV8Code(self.NextNodeConfirmUsersData.AllowAddUserV8Code);
-                                var userList = await self.RunAllowAddUserV8Code(self.CurrentNodeModel.AllowAddUserV8Code);
+                                var userList = await self.RunAllowAddUserV8Code(self.CurrentNodeModel.AllowAddUserV8Code, latestFormData);
                                 if (userList && userList.length > 0) {
                                     self.SysUserList = userList;
                                 }
@@ -543,23 +621,20 @@ export default {
                     }
                 );
             });
-            });
         },
         ChangeCurrentApprovalType(val) {
             var self = this;
-            self.NextNodeConfirmUsersSubmitReady = false;
-            if (val == "Agree" || (val == "Disagree" && !self.DiyCommon.IsNull(self.CurrentBackNodeId))) {
-                self.GetNextNodeConfirmUsers();
-            } else if (val == "HandOver") {
-                self.IsNextNodeConfirmUsers = true;
-            }
+            self.IsNextNodeConfirmUsers = false;
+            self.NextNodeConfirmUsersData = {};
+            self.CurrentSelectUsers = [];
+            self.CurrentAddUsers = [];
         },
         ChangeCurrentBackNodeId(val) {
             var self = this;
-            self.NextNodeConfirmUsersSubmitReady = false;
-            if (!self.DiyCommon.IsNull(val)) {
-                self.GetNextNodeConfirmUsers();
-            }
+            self.IsNextNodeConfirmUsers = false;
+            self.NextNodeConfirmUsersData = {};
+            self.CurrentSelectUsers = [];
+            self.CurrentAddUsers = [];
         },
         /**
          * 初始化发起流程
@@ -568,9 +643,10 @@ export default {
             var self = this;
 
             self.CurrentStartType = "StartWork";
-            self.NextNodeConfirmUsersSubmitReady = false;
             self.IsNextNodeConfirmUsers = false;
+            self.NextNodeConfirmUsersData = {};
             self.CurrentSelectUsers = [];
+            self.CurrentAddUsers = [];
 
             self.CurrentFlowDesign = param.CurrentFlowDesign;
             self.CurrentFlowDesignId = param.CurrentFlowDesign ? param.CurrentFlowDesign.Id : param.CurrentFlowDesignId;
@@ -643,9 +719,6 @@ export default {
                                             CurrentReadonlyFields: self.CurrentReadonlyFields
                                         });
                                     }
-                                    if (!self.HideInlineSubmit) {
-                                        self.GetNextNodeConfirmUsers();
-                                    }
                                 });
                             }
                         }
@@ -663,9 +736,10 @@ export default {
             self.OpenWorkType = param.OpenWorkType;
 
             self.CurrentStartType = "SendWork";
-            self.NextNodeConfirmUsersSubmitReady = false;
             self.IsNextNodeConfirmUsers = false;
+            self.NextNodeConfirmUsersData = {};
             self.CurrentSelectUsers = [];
+            self.CurrentAddUsers = [];
             self.CurrentNodeId = param.CurrentNodeId;
             self.CurrentFlowId = param.CurrentFlowId;
             //----HISTORY
@@ -747,9 +821,6 @@ export default {
 
                     if (self.CurrentNodeModel.NodeType == "Business") {
                         self.CurrentApprovalType = "Auto";
-                        if (!self.HideInlineSubmit) {
-                            self.GetNextNodeConfirmUsers();
-                        }
                     }
                 }
             });
@@ -1319,4 +1390,45 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.wf-next-user-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.wf-next-user-dialog__node {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-regular);
+    font-size: 13px;
+}
+
+.wf-next-user-dialog__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wf-next-user-dialog__title {
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+}
+
+.wf-next-user-dialog__checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px 10px;
+    max-height: 260px;
+    overflow: auto;
+    padding: 8px 10px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+}
+
+.wf-next-user-dialog__empty {
+    color: var(--el-text-color-secondary);
+    font-size: 13px;
+}
+</style>
