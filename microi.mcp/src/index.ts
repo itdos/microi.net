@@ -15,8 +15,7 @@ function readTokenFromFile(filePath: string, apiUrl: string, osClient: string): 
   try {
     const tokens: Record<string, string> = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     if (osClient) {
-      const exact = tokens[`${apiUrl}|${osClient}`];
-      if (exact) return exact;
+      return tokens[`${apiUrl}|${osClient}`] || undefined;
     }
     return tokens[apiUrl] || undefined;
   } catch {

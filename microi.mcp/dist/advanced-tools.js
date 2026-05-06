@@ -667,6 +667,7 @@ function jobPayload(job) {
     });
 }
 function manifestGuide(osClient) {
+    const confirmTarget = osClient || 'EXECUTE';
     return {
         osClient,
         workflow: [
@@ -674,7 +675,7 @@ function manifestGuide(osClient) {
             'Call microi_get_manifest_schema to draft a manifest from the user requirement.',
             'Call microi_plan_system with the manifest and fix all errors.',
             'Call microi_generate_system with dryRun=true.',
-            `Call microi_generate_system with dryRun=false and confirmExecution="${osClient || 'EXECUTE'}" only after the user confirms writes.`,
+            `Call microi_generate_system with dryRun=false and confirmExecution="${confirmTarget}" only after the user confirms writes.`,
             'Call microi_validate_system after generation if you need an independent validation pass.',
         ],
         manifestShape: {
@@ -731,6 +732,7 @@ function manifestGuide(osClient) {
 }
 export function registerAdvancedTools(server, client, context) {
     const osClient = context.osClient;
+    const systemConfirmTarget = osClient || 'EXECUTE';
     server.tool('microi_get_manifest_schema', 'Return the recommended full-system manifest schema for natural-language Microi generation, including field-name based module configuration.', {}, async () => textResult(JSON.stringify(manifestGuide(osClient), null, 2)));
     server.tool('microi_validate_menu_buttons', 'Validate and normalize sys_menu button/tab JSON arrays (MoreBtns/FormBtns/BatchSelectMoreBtns/PageTabs/ExportMoreBtns/PageBtns). Returns canonical JSON strings with generated Id/Sort/default visibility.', {
         moreBtns: z.unknown().optional(),
@@ -763,18 +765,18 @@ export function registerAdvancedTools(server, client, context) {
             return textResult(`Error: ${error instanceof Error ? error.message : String(error)}`, true);
         }
     });
-    server.tool('microi_generate_system', `Generate a complete Microi low-code system from a manifest. Supports dryRun execution plans and post-generation validation. Writes require confirmExecution="${osClient || 'EXECUTE'}" or "EXECUTE". OsClient: ${osClient}`, {
+    server.tool('microi_generate_system', `Generate a complete Microi low-code system from a manifest. Supports dryRun execution plans and post-generation validation. Writes require confirmExecution="${systemConfirmTarget}". OsClient: ${osClient}`, {
         manifest: jsonRecordSchema.describe('System manifest with tables, fields, dataSources, engines, events, modules, permissions, pages, printTemplates, workflows and jobs'),
         dryRun: z.boolean().optional().describe('Default true. When true, only returns an execution plan.'),
-        confirmExecution: z.string().optional().describe('Required when dryRun=false. Use current OsClient or EXECUTE.'),
+        confirmExecution: z.string().optional().describe(`Required when dryRun=false. Must equal "${systemConfirmTarget}".`),
     }, async ({ manifest, dryRun = true, confirmExecution }) => {
         const plan = buildPlan(manifest);
         if (plan.errors.length > 0)
             return textResult(JSON.stringify({ ok: false, ...plan }, null, 2), true);
         if (dryRun)
             return textResult(JSON.stringify({ ok: true, dryRun: true, ...plan }, null, 2));
-        if (confirmExecution !== osClient && confirmExecution !== 'EXECUTE') {
-            return textResult(`写入已拦截：请重新调用并传 confirmExecution="${osClient || 'EXECUTE'}" 或 "EXECUTE"。\n\n${JSON.stringify({ plan: plan.plan, warnings: plan.warnings }, null, 2)}`, true);
+        if (confirmExecution !== systemConfirmTarget) {
+            return textResult(`写入已拦截：请重新调用并传 confirmExecution="${systemConfirmTarget}"。\n\n${JSON.stringify({ plan: plan.plan, warnings: plan.warnings }, null, 2)}`, true);
         }
         const results = [];
         const tableIdByName = new Map();

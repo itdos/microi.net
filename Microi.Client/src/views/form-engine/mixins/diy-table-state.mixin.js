@@ -12,26 +12,63 @@ export default {
           // return path.startsWith('/diy/table') || path.startsWith('/diy/list');
           return true;
         },
-        // 统计面板数据（来自 SysMenuModel.TableReport JSON）
+        // 统计面板数据（来自 SysMenuModel.TableReport JSON；卡片模式追加 StatisticsFields）
         tableReportItems() {
             var self = this;
-            if (!self.SysMenuModel || self.DiyCommon.IsNull(self.SysMenuModel.TableReport)) return [];
+            var reportItems = [];
+            var statisticItems = self.TableDisplayMode === 'Card' ? self.statisticsReportItems : [];
+            if (!self.SysMenuModel || self.DiyCommon.IsNull(self.SysMenuModel.TableReport)) return statisticItems;
             try {
                 var items = typeof self.SysMenuModel.TableReport === 'string'
                     ? JSON.parse(self.SysMenuModel.TableReport)
                     : self.SysMenuModel.TableReport;
-                return Array.isArray(items) ? items : [];
+                reportItems = Array.isArray(items) ? items : [];
             } catch (e) {
-                return [];
+                reportItems = [];
             }
+            return reportItems.concat(statisticItems);
+        },
+        // 卡片模式统计列数据（来自接口返回 DataAppend.StatisticsFields）
+        statisticsReportItems() {
+            var self = this;
+            if (!self.StatisticsFields) return [];
+
+            var statisticKeys = Object.keys(self.StatisticsFields).filter(function (fieldName) {
+                return !self.DiyCommon.IsNull(fieldName) && !self.DiyCommon.IsNull(self.StatisticsFields[fieldName]);
+            });
+            if (statisticKeys.length === 0) return [];
+
+            var statisticColors = ['#2f7cf6', '#13a8a8', '#67c23a', '#e6a23c', '#8b5cf6', '#f56c6c'];
+            var fieldList = [].concat(self.DiyFieldList || [], self._allFieldList || [], self.ShowDiyFieldList || [], (self.SysMenuModel && self.SysMenuModel.SelectFields) || []);
+
+            return statisticKeys.map(function (fieldName, index) {
+                var fieldModel = fieldList.find(function (field) {
+                    return field && (field.Name === fieldName || field.AsName === fieldName);
+                }) || {};
+                var rawValue = self.StatisticsFields[fieldName];
+                var numericValue = Number(rawValue);
+                var value = rawValue;
+                if (rawValue !== '' && rawValue !== null && rawValue !== undefined && !isNaN(numericValue)) {
+                    value = numericValue.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+                }
+
+                return {
+                    Id: 'StatisticsFields_' + fieldName,
+                    Label: (fieldModel.Label || fieldName) + '合计',
+                    Value: value,
+                    Icon: 'fas fa-calculator',
+                    Color: statisticColors[index % statisticColors.length],
+                    Source: 'StatisticsFields'
+                };
+            });
         },
         // 自适应列数
         tableReportGridCols() {
             var n = this.tableReportItems.length;
             if (n <= 0) return '';
-            if (n <= 4) return 'repeat(' + n + ', 1fr)';
-            if (n <= 6) return 'repeat(' + n + ', 1fr)';
-            return 'repeat(auto-fill, minmax(180px, 1fr))';
+            if (n <= 2) return 'repeat(' + n + ', minmax(180px, 1fr))';
+            if (n <= 4) return 'repeat(' + n + ', minmax(160px, 1fr))';
+            return 'repeat(auto-fit, minmax(180px, 1fr))';
         },
         // 列头菜单当前排序状态
         _colMenuSortState() {

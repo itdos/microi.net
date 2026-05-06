@@ -307,6 +307,7 @@ export default {
     setup() {
         // Pinia stores
         const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const settingsStore = useSettingsStore();
         const userStore = useUserStore();
         const permissionStore = usePermissionStore();
@@ -327,6 +328,7 @@ export default {
         return {
             // Pinia store 实例
             diyStore,
+            GetCurrentUser,
             settingsStore,
             userStore,
             permissionStore,
@@ -812,32 +814,6 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         self.diyStore.setState("SystemStyle", "WebOS");
                         self.GotoSystem();
                     } else {
-                        if (result.DataAppend.SysConfig) {
-                            self.diyStore.setSysConfig(result.DataAppend.SysConfig);
-                            if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
-                                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
-                                try {
-                                    V8.EventName = "LoginEnd";
-                                    await eval("(async () => {\n " + result.DataAppend.SysConfig.LoginEndV8Code + " \n})()");
-                                } catch (error) {
-                                    console.error("执行登录结束V8代码出现错误：" + error.message);
-                                } finally {
-                                    // 清理V8引用防止内存泄漏
-                                    if (V8) {
-                                        try {
-                                            var keys = Object.keys(V8);
-                                            for (var i = 0; i < keys.length; i++) {
-                                                V8[keys[i]] = null;
-                                            }
-                                            for (var i = 0; i < keys.length; i++) {
-                                                delete V8[keys[i]];
-                                            }
-                                        } catch (e) { /* ignore */ }
-                                    }
-                                }
-                            }
-                        }
-
                         if (self.DiyCommon.IsNull(self.SystemStyle)) {
                             self.diyStore.setState("SystemStyle", "Classic");
                         }
@@ -953,6 +929,37 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                     }
                 });
             }
+
+            self.$nextTick(async function () {
+                if (self.LoginResult.DataAppend.SysConfig) {
+                    self.diyStore.setSysConfig(self.LoginResult.DataAppend.SysConfig);
+                    if (!self.DiyCommon.IsNull(self.LoginResult.DataAppend.SysConfig.LoginEndV8Code)) {
+                        var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                        if (!V8.CurrentUser) {
+                            V8.CurrentUser = self.GetCurrentUser;
+                        }
+                        try {
+                            V8.EventName = "LoginEnd";
+                            await eval("(async () => {\n " + self.LoginResult.DataAppend.SysConfig.LoginEndV8Code + " \n})()");
+                        } catch (error) {
+                            console.error("执行登录结束V8代码出现错误：" + error.message);
+                        } finally {
+                            // 清理V8引用防止内存泄漏
+                            if (V8) {
+                                try {
+                                    var keys = Object.keys(V8);
+                                    for (var i = 0; i < keys.length; i++) {
+                                        V8[keys[i]] = null;
+                                    }
+                                    for (var i = 0; i < keys.length; i++) {
+                                        delete V8[keys[i]];
+                                    }
+                                } catch (e) { /* ignore */ }
+                            }
+                        }
+                    }
+                }
+            });
         }
     }
 };
