@@ -9,9 +9,7 @@ function readTokenFromFile(filePath, apiUrl, osClient) {
     try {
         const tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         if (osClient) {
-            const exact = tokens[`${apiUrl}|${osClient}`];
-            if (exact)
-                return exact;
+            return tokens[`${apiUrl}|${osClient}`] || undefined;
         }
         return tokens[apiUrl] || undefined;
     }
