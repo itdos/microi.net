@@ -148,7 +148,6 @@
                             @callback-send-work="CallbackSendWork"
                             @callback-get-form-data="CallbackGetFormData"
                             @callback-field-set="CallbackFieldSet"
-                            @need-select-users="OnNeedSelectUsers"
                             @refresh-data-log="LoadDataLog"
                             @refresh-data-comment="LoadDataComment"
                         />
@@ -392,7 +391,6 @@
                         @callback-send-work="CallbackSendWork"
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
-                        @need-select-users="OnNeedSelectUsers"
                         @refresh-data-log="LoadDataLog"
                         @refresh-data-comment="LoadDataComment"
                     />
@@ -659,7 +657,6 @@
                         @callback-send-work="CallbackSendWork"
                         @callback-get-form-data="CallbackGetFormData"
                         @callback-field-set="CallbackFieldSet"
-                        @need-select-users="OnNeedSelectUsers"
                         @refresh-data-log="LoadDataLog"
                         @refresh-data-comment="LoadDataComment"
                     />
@@ -768,7 +765,6 @@
                 @callback-send-work="CallbackSendWork"
                 @callback-get-form-data="CallbackGetFormData"
                 @callback-field-set="CallbackFieldSet"
-                @need-select-users="OnNeedSelectUsers"
                 @refresh-data-log="LoadDataLog"
                 @refresh-data-comment="LoadDataComment"
             />
