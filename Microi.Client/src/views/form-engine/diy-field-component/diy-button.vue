@@ -197,6 +197,7 @@ export default {
          */
         ComponentButtonClick(field) {
             var self = this;
+            console.log(field,8888888888)
             // 触发V8代码执行
             self.$emit("CallbackRunV8Code", {
                 field: field,
@@ -253,7 +254,7 @@ export default {
                       };
                       // console.log(detail,888888888888);
                       setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('page-refresh', { detail }));
+                          window.dispatchEvent(new CustomEvent('table-refresh', { detail }));
                       }, 100);
                   } catch (e) {
                       // 忽略派发失败，不影响主流程
