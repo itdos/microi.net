@@ -74,6 +74,7 @@ export default {
             ];
             // 🔥 渲染字段数量变化时重新计算（使用 JSON.stringify 避免对象引用）
             var _renderedCountsKey = JSON.stringify(self.renderedFieldCounts);
+            var _collapseGroupStateKey = JSON.stringify(self.CollapseGroupState || {});
 
             var tabNameSet = new Set();
 
@@ -198,6 +199,7 @@ export default {
                 var key = tab.Id || tab.Name;
                 if (key && grouped[key]) {
                     grouped[key].sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+                    self.ApplyCollapseGroupState(grouped[key], key);
                 }
             });
 
@@ -228,6 +230,99 @@ export default {
             return limitedGrouped;
         },
     },
+    methods: {
+        ApplyCollapseGroupState(fields, tabKey) {
+            var self = this;
+            if (!Array.isArray(fields) || fields.length === 0) {
+                return fields;
+            }
+
+            fields.forEach((field) => {
+                if (!field || typeof field !== "object") return;
+                field._collapseHidden = false;
+                field._collapsedByFieldId = "";
+                field._collapseChildCount = 0;
+                field._collapseCollapsed = false;
+                field._collapseGroupTheme = "";
+                field._collapseGroupIndex = -1;
+                field._collapseGroupChildIndex = -1;
+            });
+
+            fields.forEach((field, index) => {
+                if (!field || field.Component !== "CollapseGroup") return;
+
+                var groupConfig = (field.Config && field.Config.CollapseGroup) || {};
+                var stateKey = field.Id || field.Name || (tabKey + "_" + index);
+                var hasState = self.CollapseGroupState && Object.prototype.hasOwnProperty.call(self.CollapseGroupState, stateKey);
+                var defaultCollapsed = groupConfig.DefaultCollapsed === true || groupConfig.DefaultCollapsed === 1 || groupConfig.DefaultCollapsed === "true";
+                var collapsed = hasState ? self.CollapseGroupState[stateKey] : defaultCollapsed;
+                var scopeMode = groupConfig.ScopeMode || "UntilNextGroup";
+                var theme = groupConfig.Theme || "default";
+                var fieldCount = parseInt(groupConfig.FieldCount, 10);
+                if (!fieldCount || fieldCount < 1) {
+                    fieldCount = 10;
+                }
+
+                field._collapseCollapsed = collapsed;
+                field._collapseGroupTheme = theme;
+                field._class += " collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
+                field._activeClass += " collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
+                var childCount = 0;
+                var childFields = [];
+
+                for (var childIndex = index + 1; childIndex < fields.length; childIndex++) {
+                    var childField = fields[childIndex];
+                    if (!childField) continue;
+                    if (childField.Component === "CollapseGroup") {
+                        break;
+                    }
+
+                    childCount++;
+                    childFields.push(childField);
+                    childField._collapseGroupTheme = theme;
+                    childField._collapseGroupIndex = index;
+                    childField._collapseGroupChildIndex = childCount - 1;
+                    childField._class += " collapse-group-item collapse-group-theme-" + theme;
+                    childField._activeClass += " collapse-group-item collapse-group-theme-" + theme;
+
+                    if (collapsed) {
+                        childField._collapseHidden = true;
+                        childField._collapsedByFieldId = stateKey;
+                        childField._isShow = false;
+                    }
+
+                    if (scopeMode === "FieldCount" && childCount >= fieldCount) {
+                        break;
+                    }
+                }
+
+                field._collapseChildCount = childCount;
+                childFields.forEach((childField, childFieldIndex) => {
+                    if (childFieldIndex === 0) {
+                        childField._class += " collapse-group-first";
+                        childField._activeClass += " collapse-group-first";
+                    }
+                    if (childFieldIndex === childFields.length - 1) {
+                        childField._class += " collapse-group-last";
+                        childField._activeClass += " collapse-group-last";
+                    }
+                });
+            });
+
+            return fields;
+        },
+        handleGroupCollapseChange(field, collapsed) {
+            var self = this;
+            if (!field) return;
+            var stateKey = field.Id || field.Name;
+            if (!stateKey) return;
+            field._collapseCollapsed = collapsed;
+            self.CollapseGroupState = {
+                ...self.CollapseGroupState,
+                [stateKey]: collapsed
+            };
+        }
+    },
     data() {
         const self = this;
         return {
@@ -239,6 +334,7 @@ export default {
             currentTabIndex: 0,
             PageType: "", //可以是Report
             FormTabs: [],
+            CollapseGroupState: {},
             // 性能优化：跟踪已渲染的标签页，实现懒加载
             // Set 结构存储已渲染的 tab id/name，首次只渲染第一个 tab
             renderedTabs: new Set(),
