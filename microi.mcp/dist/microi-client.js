@@ -146,9 +146,9 @@ export class MicroiClient {
             return false;
         try {
             const tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const apiUrl = this.config.apiBaseUrl;
+            const apiUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
             const osClient = this.config.osClient || '';
-            const fileToken = (osClient && tokens[`${apiUrl}|${osClient}`]) || tokens[apiUrl];
+            const fileToken = osClient ? tokens[`${apiUrl}|${osClient}`] : tokens[apiUrl];
             if (fileToken && fileToken !== this.token) {
                 this.token = fileToken;
                 return true;
@@ -168,11 +168,14 @@ export class MicroiClient {
                 tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
             }
             catch { /* file may not exist yet */ }
-            const apiUrl = this.config.apiBaseUrl;
+            const apiUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
             const osClient = this.config.osClient || '';
-            tokens[apiUrl] = this.token;
-            if (osClient)
+            if (osClient) {
                 tokens[`${apiUrl}|${osClient}`] = this.token;
+            }
+            else {
+                tokens[apiUrl] = this.token;
+            }
             const dir = path.dirname(filePath);
             if (!fs.existsSync(dir))
                 fs.mkdirSync(dir, { recursive: true });
