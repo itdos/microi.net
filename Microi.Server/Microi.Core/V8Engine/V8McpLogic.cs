@@ -1874,9 +1874,29 @@ namespace Microi.net
         /// </summary>
         public static string ResolveOsClient(string osClient, dynamic currentToken)
         {
+            string tokenOsClient = null;
+            try
+            {
+                tokenOsClient = currentToken?.OsClient;
+            }
+            catch
+            {
+                tokenOsClient = null;
+            }
+
+            if (!tokenOsClient.DosIsNullOrWhiteSpace())
+            {
+                if (!osClient.DosIsNullOrWhiteSpace()
+                    && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"OsClient mismatch: request OsClient '{osClient}' does not match token OsClient '{tokenOsClient}'.");
+                }
+                return tokenOsClient;
+            }
+
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = currentToken.OsClient ?? ConfigHelper.GetAppSettings("OsClient");
+                osClient = ConfigHelper.GetAppSettings("OsClient");
             }
             return osClient;
         }
@@ -2716,7 +2736,7 @@ namespace Microi.net
                         _Where = new List<object>()
                         {
                             new List<object>() { "RoleId", "=", roleId },
-                            new List<object>() { "FkId", "=", menuId }
+                            new List<object>() { "AND", "FkId", "=", menuId }
                         }
                     });
 
