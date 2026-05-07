@@ -42,7 +42,7 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.GetApiEngineList(osClient);
             return Ok(result);
         }
@@ -562,7 +562,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var arr = (param["Tables"] as JArray) ?? (param["TableNames"] as JArray);
             var list = arr?.ToObject<List<string>>() ?? new List<string>();
             var result = await V8McpLogic.RefreshSchemaCache(osClient, list);

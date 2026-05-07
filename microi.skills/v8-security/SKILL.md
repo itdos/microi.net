@@ -1,3 +1,8 @@
+---
+name: v8-security
+description: Microi V8 security guidance. Use when reviewing API engine security, secret management, SQL injection, permission checks, anonymous endpoints, file upload safety, and tenant isolation.
+---
+
 # Microi V8 安全最佳实践
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。

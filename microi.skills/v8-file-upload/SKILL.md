@@ -1,3 +1,8 @@
+---
+name: v8-file-upload
+description: Microi V8 file upload and download guidance. Use when handling V8.FilesByteBase64, V8.Method.Upload, private file URLs, file responses, HDFS, OSS, MinIO, and S3 storage.
+---
+
 # Microi V8 文件上传下载
 
 你正在为 Microi 吾码平台编写文件上传/下载/返回相关代码。平台分布式存储（HDFS）支持阿里云OSS、MinIO、亚马逊S3，存储方案由 SaaS 引擎按租户配置。

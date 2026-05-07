@@ -39,6 +39,12 @@ function sanitizeServerNamePart(value) {
         .toLowerCase()
         .substring(0, 48);
 }
+function withMicroiServerPrefix(value) {
+    const name = String(value || '').trim();
+    if (!name)
+        return '';
+    return /^microi[-_]/i.test(name) ? name : `Microi-${name}`;
+}
 function buildRuntimeServerName(context) {
     let hostPart = '';
     try {
@@ -47,11 +53,13 @@ function buildRuntimeServerName(context) {
     catch {
         hostPart = sanitizeServerNamePart(context.apiBaseUrl || '');
     }
+    const titlePart = (context.label || '').trim();
+    if (titlePart)
+        return withMicroiServerPrefix(titlePart);
     const basePart = sanitizeServerNamePart(context.osClient || '')
-        || sanitizeServerNamePart(context.label || '')
         || hostPart
         || 'default';
-    return `microi_${basePart}`;
+    return `Microi-${basePart}`;
 }
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
 function formatDbTables(tables) {
@@ -468,7 +476,7 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
  */
 export function createMcpServer(client, context) {
     const { osClient } = context;
-    // 服务器名称与 mcp.json key 保持一致：单服务器用 'microi'，多服务器用 'microi-{label}'
+    // 服务器名称与 mcp.json key 保持一致：统一使用 Microi- 前缀，如 Microi-乐闪购。
     const serverName = buildRuntimeServerName(context);
     const server = new McpServer({ name: serverName, version: '1.0.0' }, { instructions: buildInstructions(context) });
     // ========================
@@ -1103,7 +1111,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 批量设置接口引擎是否允许匿名
     // ========================
-    server.tool('microi_set_engine_anonymous', `Batch set sys_apiengine.AllowAnonymous for one or more API engines (OsClient "${osClient}"). Use 1 for login/register/public endpoints that need to be callable without a token; use 0 to require login. Automatically clears the corresponding sys_apiengine cache entries.`, {
+    server.tool('microi_set_engine_anonymous', `Batch set sys_apiengine.AllowAnonymous for one or more API engines (OsClient "${osClient}"). Use 1 for login/register/public endpoints that need to be callable without a token; use 0 to require login. The backend also keeps the engine HTTP-callable (IsEnable=1, StopHttp=0) and clears the corresponding sys_apiengine cache entries.`, {
         apiEngineKeys: z.array(z.string()).describe('Array of ApiEngineKey strings'),
         allowAnonymous: z.number().optional().describe('1 = allow anonymous (default), 0 = require login'),
     }, async ({ apiEngineKeys, allowAnonymous }) => {
