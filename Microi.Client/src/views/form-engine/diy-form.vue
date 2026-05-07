@@ -155,6 +155,7 @@
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
                                                 @CallbackGroupCollapseChange="handleGroupCollapseChange"
+                                                @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
                                     </div>
@@ -226,6 +227,7 @@
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
                                                 @CallbackGroupCollapseChange="handleGroupCollapseChange"
+                                                @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
                                     </div>
@@ -954,6 +956,9 @@ export default {
                             self.FieldActiveTab = self.FormTabs[self.currentTabIndex]?.Id || self.FormTabs[self.currentTabIndex]?.Name;
                         }
                     }
+
+                    self.CollapseGroupState = {};
+                    self.FieldTabsState = {};
 
                     // 性能优化：初始化第一个 tab 为已渲染（懒加载优化）
                     self.renderedTabs.clear(); // 清空之前的记录

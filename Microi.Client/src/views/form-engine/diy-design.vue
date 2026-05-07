@@ -662,7 +662,7 @@ export default {
         },
         GetComponentCategoryClass(component) {
             if (!component) return "default";
-            if (["Divider", "CollapseGroup", "Alert", "StaticText", "Html"].indexOf(component.Control) > -1) {
+            if (["Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html"].indexOf(component.Control) > -1) {
                 return "layout";
             }
             if (["OpenTable", "JoinTable", "JoinForm", "TableChild", "Department", "SelectTree", "TreeCheckbox", "Transfer"].indexOf(component.Control) > -1) {
@@ -1522,7 +1522,7 @@ export default {
             }
             
             // param.OsClient = self.OsClient
-            var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "CollapseGroup", "Alert", "StaticText", "Html", "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"];
+            var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"];
             if (width100.indexOf(param.Component) > -1) {
                 param.FormWidth = 24;
             }
@@ -1756,6 +1756,7 @@ export default {
                 TagInput: ["TagInput"],
                 Transfer: ["Transfer"],
                 CollapseGroup: ["CollapseGroup"],
+                Tabs: ["FieldTabs"],
                 Alert: ["Alert"],
                 StaticText: ["StaticText"],
                 Html: ["Html"]
