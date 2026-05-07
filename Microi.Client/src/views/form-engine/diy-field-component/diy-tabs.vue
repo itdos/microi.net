@@ -32,13 +32,6 @@
                 </template>
             </el-tab-pane>
         </el-tabs>
-        <div v-if="LoadMode === 'Design'" class="diy-field-tabs__designbar" @click.stop>
-            <el-tag size="small" effect="plain">{{ scopeModeText }}</el-tag>
-            <el-tag v-if="totalFieldCountText" size="small" effect="plain">{{ totalFieldCountText }}</el-tag>
-            <el-button size="small" type="primary" plain :icon="Setting" @click.stop="openConfig">
-                字段归属
-            </el-button>
-        </div>
     </div>
 
     <el-dialog
@@ -199,7 +192,7 @@
 
 <script setup>
 import { computed, getCurrentInstance, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Delete, Plus, Setting } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowUp, Delete, Plus } from "@element-plus/icons-vue";
 
 defineOptions({
     name: "diy-tabs",
@@ -288,15 +281,6 @@ const tabPosition = computed(() => {
 });
 const stretch = computed(() => normalizeBoolean(config.value.Stretch, false));
 const showFieldCount = computed(() => config.value.ShowFieldCount !== false);
-const scopeModeText = computed(() => {
-    return (config.value.ScopeMode || "FieldCount") === "Manual" ? "手动选择字段" : "按字段数分配";
-});
-const totalFieldCountText = computed(() => {
-    var total = parseInt(config.value.TotalFieldCount, 10);
-    if (!total || total < 1) return "直到下一个页签分组";
-    return "总字段数 " + total;
-});
-
 const getDefaultActiveKey = () => {
     var paneList = panes.value;
     if (!paneList.length) return "";
@@ -356,21 +340,19 @@ const getFieldKey = (fieldModel) => {
 };
 
 const manualFieldOptions = computed(() => {
-    var fields = Array.isArray(props.ParentFieldList) ? props.ParentFieldList.slice() : [];
+    var fields = Array.isArray(props.ParentFieldList)
+        ? props.ParentFieldList.slice().sort((a, b) => (a.Sort || 0) - (b.Sort || 0))
+        : [];
     var currentKey = getFieldKey(props.field);
-    var currentTab = props.field && props.field.Tab ? props.field.Tab : "";
-    var sameTabFields = fields
-        .filter((item) => item && (item.Tab || "") === currentTab)
-        .sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
-    var startIndex = sameTabFields.findIndex((item) => getFieldKey(item) === currentKey);
+    var startIndex = fields.findIndex((item) => getFieldKey(item) === currentKey);
     if (startIndex < 0) return [];
 
     var total = parseInt(configForm.value.TotalFieldCount, 10);
     if (!total || total < 0) total = 0;
 
     var result = [];
-    for (var index = startIndex + 1; index < sameTabFields.length; index++) {
-        var item = sameTabFields[index];
+    for (var index = startIndex + 1; index < fields.length; index++) {
+        var item = fields[index];
         if (!item) continue;
         if (item.Component === "Tabs") break;
         var key = getFieldKey(item);
@@ -534,15 +516,6 @@ defineExpose({
     &--success { --field-tabs-color: var(--el-color-success); }
     &--warning { --field-tabs-color: var(--el-color-warning); }
     &--danger { --field-tabs-color: var(--el-color-danger); }
-
-    &__designbar {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 8px;
-        padding: 7px 0 8px;
-        border-top: 1px dashed var(--field-tabs-border);
-    }
 }
 
 .tabs-config-list {
