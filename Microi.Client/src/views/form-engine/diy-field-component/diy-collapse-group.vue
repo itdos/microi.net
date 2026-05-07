@@ -1,10 +1,10 @@
 <template>
     <div class="diy-collapse-group" :class="'diy-collapse-group--' + theme" @click="toggleCollapse">
         <div class="diy-collapse-group__header">
-            <el-icon class="diy-collapse-group__arrow">
+           <!-- <el-icon class="diy-collapse-group__arrow">
                 <ArrowRight v-if="isCollapsed" />
                 <ArrowDown v-else />
-            </el-icon>
+            </el-icon> -->
             <fa-icon v-if="currentIcon" :icon="currentIcon" class="diy-collapse-group__icon" />
             <div class="diy-collapse-group__main">
                 <div class="diy-collapse-group__title" v-safe-html="title"></div>
@@ -13,6 +13,11 @@
             <el-tag v-if="showFieldCount" size="small" effect="plain" class="diy-collapse-group__count">
                 {{ childCount }} 项
             </el-tag>
+            <!-- zhy箭头改到右侧 -->
+            <el-icon class="diy-collapse-group__arrow">
+                 <ArrowRight v-if="isCollapsed" />
+                 <ArrowDown v-else />
+             </el-icon>
         </div>
     </div>
 
@@ -204,24 +209,26 @@ defineExpose({
     --group-bg: color-mix(in srgb, var(--group-color) 7%, var(--el-bg-color) 93%);
     --group-border: var(--el-border-color-light);
     width: 100%;
-    border: 1px solid var(--group-border);
-    border-radius: 8px;
-    background: var(--group-bg);
+    //zhy去掉头部边框，和背景
+    // border: 1px solid var(--group-border);
+    // border-radius: 8px;
+    // background: var(--group-bg);
     cursor: pointer;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    // box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-        border-color: var(--group-color);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
-    }
+   //zhy前面已经将边框去掉，用的是表单的下边框所以此处隐藏
+   // &:hover {
+   //      border-color: var(--group-color);
+   //      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+   // }
 
     &__header {
-        min-height: 42px;
+        // min-height: 42px;
+        min-height: 30px;//zhy头部高度改小
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 9px 12px;
+        // padding: 9px 12px;、//zhy去掉内边距保持头部两边原宽度
     }
 
     &__arrow,
@@ -234,7 +241,9 @@ defineExpose({
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        background: color-mix(in srgb, var(--group-color) 12%, var(--el-bg-color) 88%);
+        //zhy去掉图标背景,增大箭头图标大小
+        font-size: 18px;
+        // background: color-mix(in srgb, var(--group-color) 12%, var(--el-bg-color) 88%);
     }
 
     &__icon {
