@@ -137,7 +137,7 @@ export default {
             type: String,
             default: "" //View
         },
-        DiyConfig: {
+        SysMenuModel: {
             type: Object,
             default() {
                 return {};
@@ -271,7 +271,7 @@ export default {
                     apiUrl = self.DiyTableModel.ApiReplace.Update;
                 }
                 //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
-                if (self.DiyConfig && self.DiyConfig.AddBtnType == "InTable" && self.DiyConfig.SaveType == "提交一起保存") {
+                if (self.SysMenuModel && self.SysMenuModel.AddBtnType == "InTable" && self.SysMenuModel.SaveType == "提交一起保存") {
                     if (!self.FormDiyTableModel._DataStatus) {
                         // 如果是新增的行，设置为Add状态，否则设置为Edit状态
                         if (self.FormDiyTableModel._IsInTableAdd === true) {

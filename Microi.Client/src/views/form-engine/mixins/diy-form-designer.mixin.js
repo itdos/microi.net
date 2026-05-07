@@ -87,11 +87,55 @@ customPaste(editor, event, callback) {
             // callback(false); // 返回 false ，阻止默认粘贴行为
             callback(true); // 返回 true ，继续默认的粘贴行为
         },
+getActiveTabFieldsForSort() {
+            var self = this;
+            var currentTab = self.FieldActiveTab || '';
+            var tabs = self.FormTabs || [];
+            var activeTabIndex = tabs.findIndex((tab) => tab && (tab.Id === currentTab || tab.Name === currentTab));
+            var activeTab = activeTabIndex > -1 ? tabs[activeTabIndex] : null;
+            return (self.DiyFieldList || [])
+                .filter((field) => {
+                    if (!field) return false;
+                    var shouldShow = self.ShowHideField === true ||
+                        ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
+                         self.HideFields.indexOf(field.Name) === -1);
+                    if (!shouldShow) return false;
+                    var fieldTab = field.Tab || '';
+                    if (activeTab) {
+                        if (fieldTab === (activeTab.Id || '') || fieldTab === (activeTab.Name || '')) {
+                            return true;
+                        }
+                        if (activeTabIndex === 0) {
+                            var assignedToAnyTab = tabs.some((tab) => tab && (fieldTab === (tab.Id || '') || fieldTab === (tab.Name || '')));
+                            return !assignedToAnyTab;
+                        }
+                        return false;
+                    }
+                    return fieldTab === currentTab || (!currentTab && !fieldTab);
+                })
+                .sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+        },
+applyTabFieldSort(tabFields) {
+            var self = this;
+            tabFields.forEach((field, index) => {
+                var originalField = self.DiyFieldList.find((item) => item && field && item.Id === field.Id);
+                if (originalField) {
+                    originalField.Sort = (index + 1) * 100;
+                }
+            });
+            self.DiyFieldList = [...self.DiyFieldList].sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+            if (typeof self.RefreshDiyFieldRuntimeState === 'function') {
+                self.RefreshDiyFieldRuntimeState();
+            }
+        },
 onFieldAdd(evt) {
             var self = this;
             // 从设计器拖入时，由 diy-design.vue 处理添加逻辑
             // 这里只是一个占位符，确保事件能正确触发
             self.$emit('CallbackFieldAdd', evt);
+            if (evt && evt.pullMode === 'clone' && evt.item && evt.item.parentNode) {
+                evt.item.parentNode.removeChild(evt.item);
+            }
         },
 onFieldDragEnd(evt) {
             var self = this;
@@ -102,33 +146,17 @@ onFieldDragEnd(evt) {
             // 非设计模式不处理
             if (self.LoadMode !== 'Design') return;
 
-            // 获取当前 tab 标识
-            var currentTab = self.FieldActiveTab;
-
-            // 从 DiyFieldListGrouped 获取当前 tab 的字段列表（这是 computed 属性的副本）
-            var tabFieldsFromGrouped = self.DiyFieldListGrouped[currentTab] || [];
-            if (tabFieldsFromGrouped.length === 0) return;
-
-            // 由于 :list 绑定，draggable 已经修改了 tabFieldsFromGrouped 的顺序
-            // 我们需要按新顺序更新每个字段的 Sort 值
-            tabFieldsFromGrouped.forEach((field, index) => {
-                // 找到原始 DiyFieldList 中的对应字段并更新 Sort
-                var originalField = self.DiyFieldList.find(f => f.Id === field.Id);
-                if (originalField) {
-                    originalField.Sort = (index + 1) * 100;
-                }
-            });
-
-            // 强制触发 Vue 响应式更新
-            // 通过创建新数组引用来触发 computed 重新计算
-            self.DiyFieldList = [...self.DiyFieldList];
-
-            console.log('字段顺序已改变:', { oldIndex: evt.oldIndex, newIndex: evt.newIndex });
+            var tabFields = self.getActiveTabFieldsForSort();
+            var movedField = tabFields.splice(evt.oldIndex, 1)[0];
+            if (!movedField) return;
+            tabFields.splice(evt.newIndex, 0, movedField);
+            self.applyTabFieldSort(tabFields);
 
             // 通知父组件字段顺序已改变
             self.$emit('CallbackFieldOrderChanged', {
                 oldIndex: evt.oldIndex,
-                newIndex: evt.newIndex
+                newIndex: evt.newIndex,
+                fieldIds: tabFields.map((field) => field.Id)
             });
 
             // 通知父组件更新字段列表
@@ -140,69 +168,15 @@ onFieldDragUpdate(evt) {
             if (self.LoadMode !== 'Design') return;
             // 位置没变化不处理
             if (evt.oldIndex === evt.newIndex) return;
-
-            // 获取当前 tab 标识
-            var currentTab = self.FieldActiveTab;
-
-            // 获取 v-model 绑定的数组（已经被 draggable 更新了顺序）
-            var tabFields = self.DiyFieldListGrouped[currentTab] || [];
-
-            if (tabFields.length === 0) return;
-
-            // 重新计算该 tab 下所有字段的 Sort 值
-            tabFields.forEach((field, index) => {
-                field.Sort = (index + 1) * 100;
-            });
-
-            // 强制触发 Vue 响应式更新
-            self.DiyFieldList = [...self.DiyFieldList];
-
-            // 通知父组件字段顺序已改变
-            self.$emit('CallbackFieldOrderChanged', {
-                oldIndex: evt.oldIndex,
-                newIndex: evt.newIndex
-            });
-
-            // 通知父组件更新字段列表
-            self.$emit('CallbackGetDiyField', self.DiyFieldList);
+            self.onFieldDragEnd(evt);
         },
 updateFieldOrder(oldIndex, newIndex) {
             var self = this;
-            // 获取当前 tab 的字段列表
-            var currentTab = self.FieldActiveTab;
-            var tabFields = self.DiyFieldListGrouped[currentTab] || [];
-
-            if (tabFields.length === 0) return;
-
-            // 在 DiyFieldList 中找到这些字段并更新顺序
-            var movedField = tabFields[oldIndex];
+            var tabFields = self.getActiveTabFieldsForSort();
+            var movedField = tabFields.splice(oldIndex, 1)[0];
             if (!movedField) return;
-
-            // 移除原位置的字段
-            var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === movedField.Id);
-            if (fieldIndex === -1) return;
-
-            self.DiyFieldList.splice(fieldIndex, 1);
-
-            // 计算新位置
-            var targetField = tabFields[newIndex];
-            var targetIndex = targetField ? self.DiyFieldList.findIndex(f => f.Id === targetField.Id) : self.DiyFieldList.length;
-
-            // 插入到新位置
-            if (oldIndex < newIndex) {
-                // 向后移动，插入到目标位置之后
-                self.DiyFieldList.splice(targetIndex, 0, movedField);
-            } else {
-                // 向前移动，插入到目标位置
-                self.DiyFieldList.splice(targetIndex, 0, movedField);
-            }
-
-            // 重新分配 Sort 值（100递增）
-            self.DiyFieldList.forEach((field, index) => {
-                field.Sort = (index + 1) * 100;
-            });
-
-            // 通知父组件更新字段列表
+            tabFields.splice(newIndex, 0, movedField);
+            self.applyTabFieldSort(tabFields);
             self.$emit('CallbackGetDiyField', self.DiyFieldList);
         },
 showFieldToolbar(field, event) {
@@ -252,6 +226,9 @@ adjustFieldWidth(field, delta) {
             // 更新字段宽度
             field.FormWidth = newWidth;
             field._span = newWidth;
+            if (typeof self.RefreshDiyFieldRuntimeState === 'function') {
+                self.RefreshDiyFieldRuntimeState();
+            }
 
             // 通知父组件字段已更新
             self.$emit('CallbackFieldWidthChanged', {
@@ -326,40 +303,12 @@ SelectField(field) {
         },
 AddDiyFieldArr(field, insertIndex) {
             var self = this;
-            console.log('[diy-form] ========== AddDiyFieldArr 开始 ==========');
-            console.log('[diy-form] 字段数据:', field);
-            console.log('[diy-form] insertIndex:', insertIndex);
-            console.log('[diy-form] 当前DiyFieldList长度:', self.DiyFieldList.length);
-            console.log('[diy-form] 添加前的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
-            console.log('[diy-form] 当前活动Tab:', self.FieldActiveTab);
-            console.log('[diy-form] 新字段的Tab:', field.Tab);
-
-            // 如果有指定位置，就插入到该位置；否则添加到末尾
-            if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= self.DiyFieldList.length) {
-                console.log('[diy-form] 插入到位置:', insertIndex);
-                self.DiyFieldList.splice(insertIndex, 0, field);
-            } else {
-                console.log('[diy-form] 添加到末尾');
-                self.DiyFieldList.push(field);
+            self.DiyFieldList.push(field);
+            self.DiyFieldList.sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+            self.DiyFieldList = [...self.DiyFieldList];
+            if (typeof self.RefreshDiyFieldRuntimeState === 'function') {
+                self.RefreshDiyFieldRuntimeState();
             }
-
-            console.log('[diy-form] 添加后的DiyFieldList长度:', self.DiyFieldList.length);
-            console.log('[diy-form] 添加后的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
-
-            // 🔥 强制触发computed重新计算：修改renderedFieldCounts
-            console.log('[diy-form] 触发computed重新计算...');
-            self.$nextTick(() => {
-                // 修改renderedFieldCounts以触发DiyFieldListGrouped重新计算
-                if (!self.renderedFieldCounts) {
-                    self.renderedFieldCounts = {};
-                }
-                var currentTab = field.Tab || '';
-                self.renderedFieldCounts[currentTab] = (self.renderedFieldCounts[currentTab] || 0) + 1;
-                console.log('[diy-form] 更新renderedFieldCounts:', JSON.parse(JSON.stringify(self.renderedFieldCounts)));
-                console.log('[diy-form] DiyFieldListGrouped已重新计算');
-            });
-
-            console.log('[diy-form] ========== AddDiyFieldArr 结束 ==========');
         },
 UptDiyFieldArr(field) {
             var self = this;
@@ -386,6 +335,9 @@ DelDiyFieldArr(field) {
                 }
                 index++;
             });
+            if (typeof self.RefreshDiyFieldRuntimeState === 'function') {
+                self.RefreshDiyFieldRuntimeState();
+            }
         },
     }
 };

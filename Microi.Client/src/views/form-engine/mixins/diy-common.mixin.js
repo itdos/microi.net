@@ -180,6 +180,12 @@ export default {
                     || field.Component == "JoinTable"
                     || field.Component == "JoinForm"
                     || field.Component == "TableChild"
+                    || field.Component == "CollapseGroup"
+                    || field.Component == "Tabs"
+                    || field.Component == "Alert"
+                    || field.Component == "StaticText"
+                    || field.Component == "Html"
+                    || field.Component == "HTML"
                 ) {
                     return "top";
                 }
@@ -200,7 +206,7 @@ export default {
             var selectComponents = [
                 "SelectTree", "FontAwesome", "Department", "Cascader", 
                 "MapArea", "Map", "ColorPicker", "Rate", "DateTime", 
-                "MultipleSelect", "Select", "Checkbox", "Radio", "Switch"
+                "MultipleSelect", "Select", "Checkbox", "Radio", "Switch", "Slider", "Transfer"
             ];
             var uploadComponents = ["FileUpload", "ImgUpload"];
             
@@ -221,6 +227,12 @@ export default {
          */
         GetFieldIsShow(field) {
             var self = this;
+            if (field && field._collapseHidden === true) {
+                return false;
+            }
+            if (field && field._fieldTabsHidden === true) {
+                return false;
+            }
             // 默认不显示审计字段，需手动在表单属性中开启
             if (self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
                 return false;
@@ -244,11 +256,9 @@ export default {
                             });
                         });
                         if (!haveLimit) {
-                            field.Visible = false;
                             return false;
                         }
                     } else {
-                        field.Visible = false;
                         return false;
                     }
                 }

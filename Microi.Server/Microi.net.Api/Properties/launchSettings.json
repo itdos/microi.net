@@ -13,8 +13,8 @@
       "launchBrowser": true,
       "applicationUrl": "https://0.0.0.0:7266",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "iTdos",
-        "DOTNET_ENVIRONMENT": "iTdos"
+        "ASPNETCORE_ENVIRONMENT": "renyiPro",
+        "DOTNET_ENVIRONMENT": "renyiPro"
       }
     },
     "IIS Express": {
