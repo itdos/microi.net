@@ -40,6 +40,20 @@ namespace Microi.net
             try { return Convert.ToString(value) ?? ""; } catch { return ""; }
         }
 
+        private static string SafeJString(JObject row, string fieldName, string fallback = "")
+        {
+            var token = row?[fieldName];
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return fallback;
+            var value = token.ToString();
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private static int SafeJInt(JObject row, string fieldName, int fallback = 0)
+        {
+            var text = SafeJString(row, fieldName);
+            return int.TryParse(text, out var value) ? value : fallback;
+        }
+
         #region 权限校验
 
         /// <summary>
@@ -1146,10 +1160,11 @@ namespace Microi.net
         /// <summary>
         /// 获取 Playwright 自动化测试上下文（接口引擎、菜单路由、推荐环境变量）
         /// </summary>
-        public static async Task<DosResult<object>> GetPlaywrightContext(string osClient, string keyword = null, string apiBaseUrl = null)
+        public static async Task<DosResult<object>> GetPlaywrightContext(string osClient, string keyword = null, string apiBaseUrl = null, int pageSize = 5000)
         {
             try
             {
+                var normalizedPageSize = Math.Min(Math.Max(pageSize <= 0 ? 5000 : pageSize, 100), 20000);
                 var engineResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -1160,7 +1175,7 @@ namespace Microi.net
                     _Where = BuildKeywordWhere(keyword, "ApiName", "ApiEngineKey", "Category", "ApiRemark", "ApiAddress"),
                     _OrderBy = "Category",
                     _OrderByType = "ASC",
-                    _PageSize = 1000
+                    _PageSize = normalizedPageSize
                 });
 
                 if (engineResult.Code != 1)
@@ -1169,33 +1184,34 @@ namespace Microi.net
                 }
 
                 var engines = new List<object>();
+                var warnings = new List<string>();
                 var publicEngineCount = 0;
                 var protectedEngineCount = 0;
                 foreach (var item in engineResult.Data ?? new List<dynamic>())
                 {
                     var row = JObject.FromObject(item);
-                    var allowAnonymous = row["AllowAnonymous"]?.Val<int>() ?? 0;
-                    var stopHttp = row["StopHttp"]?.Val<int>() ?? 0;
-                    var isEnable = row["IsEnable"]?.Val<int>() ?? 1;
+                    var allowAnonymous = SafeJInt(row, "AllowAnonymous", 0);
+                    var stopHttp = SafeJInt(row, "StopHttp", 0);
+                    var isEnable = SafeJInt(row, "IsEnable", 1);
                     if (allowAnonymous == 1 && stopHttp != 1 && isEnable != 0) publicEngineCount++;
                     if (allowAnonymous != 1 && stopHttp != 1 && isEnable != 0) protectedEngineCount++;
 
                     engines.Add(new
                     {
-                        Id = row["Id"]?.Val<string>() ?? "",
-                        ApiName = row["ApiName"]?.Val<string>() ?? "",
-                        ApiEngineKey = row["ApiEngineKey"]?.Val<string>() ?? "",
-                        Category = row["Category"]?.Val<string>() ?? "未分类",
-                        ApiAddress = row["ApiAddress"]?.Val<string>() ?? "",
-                        ApiRemark = row["ApiRemark"]?.Val<string>() ?? "",
+                        Id = SafeJString(row, "Id"),
+                        ApiName = SafeJString(row, "ApiName"),
+                        ApiEngineKey = SafeJString(row, "ApiEngineKey"),
+                        Category = SafeJString(row, "Category", "未分类"),
+                        ApiAddress = SafeJString(row, "ApiAddress"),
+                        ApiRemark = SafeJString(row, "ApiRemark"),
                         AllowAnonymous = allowAnonymous,
                         StopHttp = stopHttp,
                         IsEnable = isEnable,
-                        UpdateTime = row["UpdateTime"]?.ToString() ?? ""
+                        UpdateTime = SafeJString(row, "UpdateTime")
                     });
                 }
+                if (engines.Count >= normalizedPageSize) warnings.Add($"接口引擎数量达到 PageSize={normalizedPageSize} 上限，建议提高 PageSize 或按 Keyword 分批获取。");
 
-                var moduleWarnings = new List<string>();
                 var moduleResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_menu", new
                 {
                     OsClient = osClient,
@@ -1206,7 +1222,7 @@ namespace Microi.net
                     _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName", "ComponentName"),
                     _OrderBy = "Sort",
                     _OrderByType = "ASC",
-                    _PageSize = 1000
+                    _PageSize = normalizedPageSize
                 });
 
                 var modules = new List<object>();
@@ -1217,26 +1233,27 @@ namespace Microi.net
                         var row = JObject.FromObject(item);
                         modules.Add(new
                         {
-                            Id = row["Id"]?.Val<string>() ?? "",
-                            Name = row["Name"]?.Val<string>() ?? "",
-                            ParentId = row["ParentId"]?.Val<string>() ?? "",
-                            DiyTableId = row["DiyTableId"]?.Val<string>() ?? "",
-                            DiyTableName = row["DiyTableName"]?.Val<string>() ?? "",
-                            Url = row["Url"]?.Val<string>() ?? "",
-                            ComponentName = row["ComponentName"]?.Val<string>() ?? "",
-                            ComponentPath = row["ComponentPath"]?.Val<string>() ?? "",
-                            OpenType = row["OpenType"]?.Val<string>() ?? "",
-                            Display = row["Display"]?.Val<int>() ?? 0,
-                            AppDisplay = row["AppDisplay"]?.Val<int>() ?? 0,
-                            Sort = row["Sort"]?.Val<int>() ?? 0,
-                            Icon = row["Icon"]?.Val<string>() ?? "",
-                            UpdateTime = row["UpdateTime"]?.ToString() ?? ""
+                            Id = SafeJString(row, "Id"),
+                            Name = SafeJString(row, "Name"),
+                            ParentId = SafeJString(row, "ParentId"),
+                            DiyTableId = SafeJString(row, "DiyTableId"),
+                            DiyTableName = SafeJString(row, "DiyTableName"),
+                            Url = SafeJString(row, "Url"),
+                            ComponentName = SafeJString(row, "ComponentName"),
+                            ComponentPath = SafeJString(row, "ComponentPath"),
+                            OpenType = SafeJString(row, "OpenType"),
+                            Display = SafeJInt(row, "Display", 0),
+                            AppDisplay = SafeJInt(row, "AppDisplay", 0),
+                            Sort = SafeJInt(row, "Sort", 0),
+                            Icon = SafeJString(row, "Icon"),
+                            UpdateTime = SafeJString(row, "UpdateTime")
                         });
                     }
+                    if (modules.Count >= normalizedPageSize) warnings.Add($"菜单数量达到 PageSize={normalizedPageSize} 上限，建议提高 PageSize 或按 Keyword 分批获取。");
                 }
                 else if (moduleResult.Code != 1)
                 {
-                    moduleWarnings.Add("菜单路由读取失败：" + moduleResult.Msg);
+                    warnings.Add("菜单路由读取失败：" + moduleResult.Msg);
                 }
 
                 return new DosResult<object>(1, new
@@ -1251,16 +1268,18 @@ namespace Microi.net
                         PW_API_BASE = apiBaseUrl ?? "",
                         PW_OS_CLIENT = osClient,
                         PW_BASE_URL = "http://127.0.0.1:5180",
-                        PW_HOME_PATH = "/"
+                        PW_HOME_PATH = "/",
+                        PW_CONTEXT_PAGE_SIZE = normalizedPageSize.ToString()
                     },
                     Summary = new
                     {
                         EngineCount = engines.Count,
                         PublicEngineCount = publicEngineCount,
                         ProtectedEngineCount = protectedEngineCount,
-                        ModuleCount = modules.Count
+                        ModuleCount = modules.Count,
+                        PageSize = normalizedPageSize
                     },
-                    Warnings = moduleWarnings
+                    Warnings = warnings
                 }, "获取 Playwright 测试上下文成功");
             }
             catch (Exception ex)
@@ -1884,9 +1903,9 @@ namespace Microi.net
                 tokenOsClient = null;
             }
 
-            if (!tokenOsClient.DosIsNullOrWhiteSpace())
+            if (!string.IsNullOrWhiteSpace(tokenOsClient))
             {
-                if (!osClient.DosIsNullOrWhiteSpace()
+                if (!string.IsNullOrWhiteSpace(osClient)
                     && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException($"OsClient mismatch: request OsClient '{osClient}' does not match token OsClient '{tokenOsClient}'.");
@@ -1894,7 +1913,7 @@ namespace Microi.net
                 return tokenOsClient;
             }
 
-            if (osClient.DosIsNullOrWhiteSpace())
+            if (string.IsNullOrWhiteSpace(osClient))
             {
                 osClient = ConfigHelper.GetAppSettings("OsClient");
             }

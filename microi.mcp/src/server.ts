@@ -173,6 +173,7 @@ function buildPlaywrightPlanText(args: {
   homePath?: string;
   loginEngineKey?: string;
   smokeEngineKey?: string;
+  pageSize?: number;
   context?: PlaywrightContextData;
 }): string {
   const appType = args.appType || 'uniapp-h5';
@@ -195,6 +196,7 @@ function buildPlaywrightPlanText(args: {
     `PW_LOGIN_ENGINE=${loginEngine}`,
     `PW_SMOKE_ENGINE=${smokeEngine}`,
     `PW_HOME_PATH=${homePath}`,
+    `PW_CONTEXT_PAGE_SIZE=${args.pageSize || args.context?.Summary?.PageSize || 5000}`,
     '```',
     '',
     '## Files to create',
@@ -202,19 +204,25 @@ function buildPlaywrightPlanText(args: {
     `- ${testDir}/helpers/microi.js`,
     `- ${testDir}/specs/smoke.spec.js`,
     `- ${testDir}/specs/auth.spec.js`,
+    `- ${testDir}/specs/api-contract.spec.js`,
+    `- ${testDir}/specs/network.spec.js`,
+    `- ${testDir}/specs/business-flow.spec.js`,
     '',
-    '## Minimum smoke tests',
+    '## Required quality gates',
     `1. Open ${homePath} and assert body plus one stable app element.`,
     `2. Call /apiengine/${smokeEngine} with Playwright request and assert DosResult shape.`,
     `3. Call /apiengine/${loginEngine} with a dedicated test account and assert Token.`,
     `4. Inject Token into storage, open ${route}, and assert the page is visible.`,
-    '5. Capture screenshots only for key pages or failures.',
+    '5. Intercept all API responses and fail on HTTP 404/5xx, empty body, string `null`, invalid JSON, or unexpected `Code=0`.',
+    '6. Cover at least one real write flow with repeatable seed data and assert the state change by querying the backend.',
+    '7. Verify unauthenticated protected actions redirect to login or return Code=1001/1002.',
     '',
     '## Microi rules',
     '- Always send `OsClient` in API headers.',
     '- Use a dedicated test account and repeatable seed data for write scenarios.',
     '- Prefer API login plus storage injection over clicking the login form in every test.',
     '- Use MCP `microi_get_playwright_context` before adding business-flow specs.',
+    '- For mobile member apps, do not call platform FormEngine directly with a mall member token; use tenant ApiEngines or a safe query proxy.',
   ].join('\n');
 }
 
@@ -556,10 +564,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Get Playwright E2E testing context for OsClient "${osClient}". Returns callable API engines, anonymous/public flags, and menu routes for writing browser automation tests.`,
     {
       keyword: z.string().optional().describe('Optional keyword to filter engines/modules by name, key, route, category, or table name.'),
+      pageSize: z.number().int().min(100).max(20000).optional().describe('Maximum number of engines/modules returned by the backend context API. Default: 5000.'),
     },
-    async ({ keyword }) => {
+    async ({ keyword, pageSize }) => {
       try {
-        const result = await client.getPlaywrightContext(keyword);
+        const result = await client.getPlaywrightContext(keyword, pageSize);
         if (result.Code !== 1 || !result.Data) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg || 'GetPlaywrightContext failed'}` }], isError: true };
         }
@@ -583,10 +592,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       loginEngineKey: z.string().optional().describe('ApiEngineKey used for login.'),
       smokeEngineKey: z.string().optional().describe('Public ApiEngineKey used for API smoke assertion.'),
       keyword: z.string().optional().describe('Keyword to focus context on a module or business area.'),
+      pageSize: z.number().int().min(100).max(20000).optional().describe('Maximum number of engines/modules requested from the backend context API. Default: 5000.'),
     },
-    async ({ appType, frontendBaseUrl, homePath, loginEngineKey, smokeEngineKey, keyword }) => {
+    async ({ appType, frontendBaseUrl, homePath, loginEngineKey, smokeEngineKey, keyword, pageSize }) => {
       try {
-        const contextResult = await client.getPlaywrightContext(keyword);
+        const contextResult = await client.getPlaywrightContext(keyword, pageSize);
         const playwrightContext = contextResult.Code === 1 ? contextResult.Data : undefined;
         const text = buildPlaywrightPlanText({
           osClient,
@@ -596,6 +606,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           homePath,
           loginEngineKey,
           smokeEngineKey,
+          pageSize,
           context: playwrightContext,
         });
         return { content: [{ type: 'text', text }] };
