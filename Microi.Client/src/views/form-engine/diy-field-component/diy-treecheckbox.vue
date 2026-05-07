@@ -197,8 +197,8 @@ export default {
             type: String,
             default: ''
         },
-        // DiyConfig 配置
-        DiyConfig: {
+        // SysMenuModel 配置
+        SysMenuModel: {
             type: Object,
             default: () => ({})
         }

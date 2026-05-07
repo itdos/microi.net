@@ -53,7 +53,7 @@
         <!--            @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"-->
         <!--          >{{ $t("Msg.Edit") }}</el-button-->
         <!--          >-->
-        <!--          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">-->
+        <!--          <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">-->
         <!--            <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">-->
         <!--              &lt;!&ndash; v-if="LimitMoreBtn(btn)" &ndash;&gt;-->
         <!--              <el-button-->
@@ -180,7 +180,7 @@
                     @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
                     >{{ $t("Msg.Edit") }}</el-button
                 >
-                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                     <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                         <!-- v-if="LimitMoreBtn(btn)" -->
                         <el-button :key="'more_btn_formbtns_' + btnIndex" v-if="btn.IsVisible" type="primary" :loading="BtnLoading" @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
@@ -593,7 +593,7 @@ export default {
             // });
 
             //-------GetPageTabs()提前预生成
-            if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
+            if (!self.DiyCommon.IsNull(result.Data) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
                 //url带上tab参数，  2022-06-01
                 var queryTab = self.$route.query.Tab;
                 if (!self.DiyCommon.IsNull(queryTab)) {

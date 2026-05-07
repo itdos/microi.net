@@ -76,8 +76,8 @@
                             icon="Promotion"
                             @click="StartWorkFlow()"
                         >
-                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText
-                                ? SysMenuModel.DiyConfig.AddBtnText
+                            {{ SysMenuModel && SysMenuModel.AddBtnText
+                                ? SysMenuModel.AddBtnText
                                 : '发起流程' }}
                         </el-button>
                         <!-- 普通新增按钮（OpenType!=WorkFlow 或未配置 FlowDesignId 时显示） -->
@@ -94,8 +94,8 @@
                             :icon="BtnLoading ? '' : CirclePlusFilled"
                             @click="OpenDetail(null, 'Add')"
                         >
-                            {{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText
-                                ? SysMenuModel.DiyConfig.AddBtnText
+                            {{ SysMenuModel && SysMenuModel.AddBtnText
+                                ? SysMenuModel.AddBtnText
                                 : $t("Msg.Add") }}
                         </el-button>
                         <!-- 表内编辑【提交一起保存】模式：批量提交 / 取消按钮 -->
@@ -139,7 +139,7 @@
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
 
                         <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
-                                        && SysMenuModel.DiyConfig
+                                        && SysMenuModel
                                         && SysMenuModel.BatchSelectMoreBtns
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
@@ -184,7 +184,7 @@
                                 </el-button>
                                 <template #dropdown
                                     ><el-dropdown-menu class="table-more-btn">
-                                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0">
+                                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0">
                                             <template v-for="(btn, btnIndex) in SysMenuModel.ExportMoreBtns">
                                                 <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_export_' + btnIndex" @click="ExportDiyTableRow(btn)">
                                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
@@ -201,8 +201,8 @@
                     <!-- 通用搜索 -->
                     <div class="search-input-group"
                         v-if="IsPermission('NoSearch')
-                            && SysMenuModel.DiyConfig
-                            && SysMenuModel.DiyConfig.GeneralSeaarch !== 1"
+                            && SysMenuModel
+                            && SysMenuModel.GeneralSeaarch !== 1"
                         style="display: flex;align-items: center;gap: 10px;justify-content: center;">
                         <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                             <template #prepend><el-button :icon="RefreshLeft" @click="InitSearch();GetDiyTableRow({ _PageIndex: 1 });"></el-button></template>
@@ -326,12 +326,12 @@
                             <!--工作流-发起申请按钮-->
                             <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
                                 <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>
-                                <span class="mobile-fab-menu-label">{{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText ? SysMenuModel.DiyConfig.AddBtnText : '发起流程' }}</span>
+                                <span class="mobile-fab-menu-label">{{ SysMenuModel && SysMenuModel.AddBtnText ? SysMenuModel.AddBtnText : '发起流程' }}</span>
                             </div>
                             <!--新增按钮-->
                             <div class="mobile-fab-menu-item" v-if="!IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; OpenDetail(null, 'Add')">
                                 <div class="mobile-fab-menu-icon add"><el-icon><Plus /></el-icon></div>
-                                <span class="mobile-fab-menu-label">{{ SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.AddBtnText ? SysMenuModel.DiyConfig.AddBtnText : $t('Msg.Add') }}</span>
+                                <span class="mobile-fab-menu-label">{{ SysMenuModel && SysMenuModel.AddBtnText ? SysMenuModel.AddBtnText : $t('Msg.Add') }}</span>
                             </div>
                             <!--V8页面按钮 PageBtns-->
                             <template v-if="SysMenuModel.PageBtns && SysMenuModel.PageBtns.length > 0">
@@ -343,7 +343,7 @@
                                 </template>
                             </template>
                             <!--批量操作按钮-->
-                            <template v-if="SysMenuModel.DiyConfig && SysMenuModel.BatchSelectMoreBtns && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                            <template v-if="SysMenuModel && SysMenuModel.BatchSelectMoreBtns && SysMenuModel.BatchSelectMoreBtns.length > 0">
                                 <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns" :key="'fab_batchbtn_' + btnIndex">
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
                                         <div class="mobile-fab-menu-icon batch"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -365,7 +365,7 @@
                 <div class="keyword-search" v-if="false">
                   <div class="search-box">
                     <div class="search-input-group" style="max-width:240px;"
-                      v-if=" IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" >
+                      v-if=" IsPermission('NoSearch') && SysMenuModel && SysMenuModel.GeneralSeaarch !== 1" >
                       <el-input class="keyword-input"   v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })"
                         :placeholder="$t('Msg.Search')">
                         <template #append><el-button :icon="Search"
@@ -443,7 +443,7 @@
                         width="55"
                         align="center"
                         :index="indexMethod"
-                        v-if="DiyCommon.IsNull(SysMenuModel.DiyConfig) || (!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex)"
+                        v-if="DiyCommon.IsNull(SysMenuModel) || (!DiyCommon.IsNull(SysMenuModel) && !SysMenuModel.HiddenIndex)"
                     >
                     </el-table-column>
                     <template v-for="(field, fieldIndex) in ShowDiyFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
@@ -554,7 +554,7 @@
                                             :FormMode="TableChildFormMode"
                                             :TableId="TableId"
                                             :TableName="TableName"
-                                            :DiyConfig="SysMenuModel.DiyConfig"
+                                            :SysMenuModel="SysMenuModel"
                                             :FieldReadonly="GetFieldIsReadOnly(field)"
                                             :DiyTableModel="CurrentDiyTableModel"
                                             :DiyFieldList="DiyFieldList"
@@ -835,7 +835,7 @@
                                                                 :FormMode="TableChildFormMode"
                                                                 :TableId="TableId"
                                                                 :TableName="TableName"
-                                                                :DiyConfig="SysMenuModel.DiyConfig"
+                                                                :SysMenuModel="SysMenuModel"
                                                                 :FieldReadonly="GetFieldIsReadOnly(CardShowDiyFieldList[0])"
                                                                 :DiyTableModel="CurrentDiyTableModel"
                                                                 :DiyFieldList="DiyFieldList"
@@ -885,7 +885,7 @@
                                                             :FormMode="TableChildFormMode"
                                                             :TableId="TableId"
                                                             :TableName="TableName"
-                                                            :DiyConfig="SysMenuModel.DiyConfig"
+                                                            :SysMenuModel="SysMenuModel"
                                                             :FieldReadonly="GetFieldIsReadOnly(field)"
                                                             :DiyTableModel="CurrentDiyTableModel"
                                                             :DiyFieldList="DiyFieldList"
@@ -1327,7 +1327,7 @@
         >
             <!-- 移动端更多搜索 -->
             <!-- zhy将点击选择单个值后弹框自动关闭改为点击遮罩层关闭或上方关闭按钮关闭，不然无法选中多个条件 @keyup.enter，@click，@CallbackGetDiyTableRow处的showMobileSearch = false移除-->
-            <div class="mobile-keyword-search" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1" style="margin-bottom: 12px;">
+            <div class="mobile-keyword-search" v-if="IsPermission('NoSearch') && SysMenuModel && SysMenuModel.GeneralSeaarch !== 1" style="margin-bottom: 12px;">
                 <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" clearable @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })">
                     <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
                 </el-input>
@@ -1989,6 +1989,7 @@ export default {
             if (isOpenWorkFlowForm) {
                 isOpenPage = false;
             }
+            debugger;
             if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {
@@ -2001,7 +2002,7 @@ export default {
             }
             if (self.CurrentDiyTableModel.FormOpenType == "Dialog" || self.CurrentDiyTableModel.FormOpenType == "Drawer" || self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)) {
                 //2021-10-29新增，如果是行内新增
-                if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.AddBtnType == "InTable" && formMode == "Add") {
+                if (self.SysMenuModel && self.SysMenuModel.AddBtnType == "InTable" && formMode == "Add") {
                     //2022-02-13 提前将Id赋值好，以便删除
                     var newIdResult = await self.DiyCommon.PostAsync("/api/FormEngine/NewGuid", {});
                     //加入回写默认值  2021-12-06

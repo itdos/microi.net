@@ -89,7 +89,11 @@ app.component("FaIcon", FaIcon);
 import { markRaw } from "vue";
 const icons = {};
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    icons[key] = markRaw(component);
+    const rawIcon = markRaw(component);
+    icons[key] = rawIcon;
+    if (!app.config.globalProperties[key]) {
+        app.config.globalProperties[key] = rawIcon;
+    }
 }
 app.config.globalProperties.$icons = icons;
 // 修复性能：原全局 mixin 会为每个组件实例挂上几百个 computed，启动与 HMR 明显变慢。

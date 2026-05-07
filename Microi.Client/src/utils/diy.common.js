@@ -513,7 +513,6 @@ var DiyCommon = {
         "MobileListFields",
         "SearchFieldIds",
         "SortFieldIds",
-        "DiyConfig",
         "StatisticsFields",
         "MoreBtns",
         "ExportMoreBtns",
@@ -1886,6 +1885,67 @@ var DiyCommon = {
             Divider: {
                 Icon: ""
             },
+            CollapseGroup: {
+                DefaultCollapsed: false,
+                ScopeMode: "UntilNextGroup",
+                FieldCount: 10,
+                Description: "",
+                Icon: "fas fa-layer-group",
+                Theme: "default",
+                ShowFieldCount: true
+            },
+            FieldTabs: {
+                DefaultActiveKey: "tab1",
+                Type: "card",
+                Position: "top",
+                Stretch: false,
+                ShowFieldCount: true,
+                CaptureRest: true,
+                Description: "",
+                Theme: "default",
+                Tabs: [
+                    { Key: "tab1", Title: "基础信息", Icon: "fas fa-id-card", FieldCount: 4, Disabled: false },
+                    { Key: "tab2", Title: "扩展信息", Icon: "fas fa-layer-group", FieldCount: 4, Disabled: false }
+                ]
+            },
+            Alert: {
+                Title: "",
+                Content: "",
+                Type: "info",
+                Effect: "light",
+                ShowIcon: true
+            },
+            StaticText: {
+                Title: "",
+                Content: "",
+                Align: "left",
+                Theme: "default"
+            },
+            Html: {
+                Content: "",
+                UseFieldValue: false,
+                MinHeight: "",
+                Padding: ""
+            },
+            Slider: {
+                Min: 0,
+                Max: 100,
+                Step: 1,
+                Range: false,
+                ShowInput: false,
+                ShowStops: false
+            },
+            TagInput: {
+                Placeholder: "请输入或选择标签",
+                Options: [],
+                MaxCount: 0
+            },
+            Transfer: {
+                LeftTitle: "可选项",
+                RightTitle: "已选项",
+                Filterable: true,
+                Options: []
+            },
             DataSource: "",
             DataSourceSqlRemote: false,
             DataSourceSqlRemoteLoading: false,
@@ -2219,6 +2279,35 @@ var DiyCommon = {
                 return value;
             }
         },
+        "TagInput": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            }
+        },
+        "Transfer": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            }
+        },
+        "Slider": {
+            valueType: "dynamic",
+            defaultValue: 0,
+            process: function(field, formData, ctx) {
+                var config = field.Config && field.Config.Slider ? field.Config.Slider : {};
+                if (config.Range === true) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, true);
+                }
+                var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) ? null : formData[field.Name];
+                if (DiyCommon.IsNull(rawValue)) {
+                    return Number(config.Min || 0);
+                }
+                return Number(rawValue);
+            }
+        },
         
         // ==================== 单选下拉类组件 ====================
         "Select": {
@@ -2506,6 +2595,34 @@ var DiyCommon = {
             defaultValue: null,
             process: function(field, formData, ctx) {
                 return null; // 按钮不需要值
+            }
+        },
+        "CollapseGroup": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 折叠分组不需要值
+            }
+        },
+        "Tabs": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 页签分组不需要值
+            }
+        },
+        "Alert": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 提示说明不需要值
+            }
+        },
+        "StaticText": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 静态文本不需要值
             }
         },
         
@@ -2866,9 +2983,16 @@ var DiyCommon = {
         var field = typeof fieldOrComponent === "object" ? fieldOrComponent : null;
 
         // 常规需要数组类型的组件
-        var arrayComponents = ["Checkbox", "MultipleSelect"];
+        var arrayComponents = ["Checkbox", "MultipleSelect", "TagInput", "Transfer"];
         if (arrayComponents.indexOf(component) > -1) {
             return "array";
+        }
+
+        if (component === "Slider") {
+            if (field && field.Config && field.Config.Slider && field.Config.Slider.Range === true) {
+                return "array";
+            }
+            return null;
         }
 
         // ImgUpload 和 FileUpload：只有在配置了 Multiple 时才期望数组
@@ -3422,11 +3546,7 @@ var DiyCommon = {
 
         DiyCommon.SysMenuNeedConvertField.forEach((convertField) => {
             if (DiyCommon.IsNull(data[convertField])) {
-                if (convertField == "DiyConfig") {
-                    data[convertField] = {};
-                } else {
-                    data[convertField] = [];
-                }
+                data[convertField] = [];
             } else if (typeof data[convertField] == "string") {
                 if (convertField == "StatisticsFields") {
                     var tempResult = [];
@@ -3467,8 +3587,6 @@ var DiyCommon = {
                             });
                         }
                     }
-                } else if (convertField == "DiyConfig" && data[convertField] == "[]") {
-                    data[convertField] = {};
                 } else {
                     try {
                         data[convertField] = JSON.parse(data[convertField]);

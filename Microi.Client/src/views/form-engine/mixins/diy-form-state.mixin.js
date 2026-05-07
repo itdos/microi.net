@@ -45,9 +45,7 @@ export default {
             }
         },
         // 性能优化：预先按 tab 分组字段，避免在 v-for 中每次渲染都重新计算
-        // 同时预计算每个字段的显示状态、span、class 等，减少模板中的方法调用
-        // 🔥 新增：支持分批渲染，首次只渲染部分字段，后续按需加载
-        // ⚠️ 内存优化：避免在计算属性中创建闭包，使用纯计算逻辑
+        // 注意：computed 必须保持纯计算，不能写 field._xxx，否则会触发 ElRow 递归更新。
         DiyFieldListGrouped() {
             var self = this;
             var grouped = {};
@@ -63,28 +61,6 @@ export default {
                 return grouped;
             }
 
-            // 触发依赖收集：确保这些属性变化时重新计算
-            // ⚠️ 内存优化：不要在这里创建数组，只读取值
-            var _deps = [
-                self.ColSpan,
-                self.DiyTableModel.ColSpan,
-                self.ShowFields.length,
-                self.HideFields.length,
-                self.DiyTableModel.DisplayDefaultField
-            ];
-            // 🔥 渲染字段数量变化时重新计算（使用 JSON.stringify 避免对象引用）
-            var _renderedCountsKey = JSON.stringify(self.renderedFieldCounts);
-
-            var tabNameSet = new Set();
-
-            // 收集所有有效的 tab 标识
-            showTabs.forEach((tabModel) => {
-                if (tabModel) {
-                    tabNameSet.add(tabModel.Name);
-                    tabNameSet.add(tabModel.Id);
-                }
-            });
-
             // 初始化每个 tab 的数组
             showTabs.forEach((tab) => {
                 if (tab) {
@@ -95,9 +71,6 @@ export default {
                 }
             });
 
-            // 预计算常用值，避免循环中重复计算
-            var isDesignMode = self.LoadMode === "Design";
-
             // 防御性检查：确保所有必要的数据都已准备好
             if (!self.DiyTableModel || typeof self.DiyTableModel !== 'object' || self.DiyTableModel instanceof Promise) {
                 return grouped;
@@ -106,14 +79,7 @@ export default {
                 return grouped;
             }
 
-            var displayDefaultField = self.DiyTableModel.DisplayDefaultField;
-            var defaultFieldNames = self.DiyCommon.DefaultFieldNames || [];
-            var isAdmin = self.GetCurrentUser._IsAdmin === true;
-            var userRoles = self.GetCurrentUser._Roles || [];
-            var defaultColSpan = self.DiyTableModel.ColSpan || 12;
-            var propsColSpan = self.ColSpan;
-
-            // 遍历字段，分配到对应的 tab，并预计算属性
+            // 遍历字段，分配到对应的 tab。这里不能写字段运行态属性。
             self.DiyFieldList.forEach((field) => {
                 // 🔥 添加字段有效性检查
                 if (!field || typeof field !== 'object') {
@@ -127,47 +93,6 @@ export default {
                      self.HideFields.indexOf(field.Name) === -1);
 
                 if (!shouldShow) return;
-
-                // ==================== 预计算 _isShow ====================
-                var isShow = true;
-                // 检查是否是默认审计字段
-                if (defaultFieldNames.indexOf(field.Name) > -1 && !displayDefaultField) {
-                    isShow = false;
-                } else if (isDesignMode) {
-                    isShow = true;
-                } else if (!self.DiyCommon.IsNull(field.BindRole) && field.BindRole.length > 0) {
-                    // 检查角色权限
-                    if (!isAdmin) {
-                        var haveLimit = false;
-                        if (userRoles.length > 0) {
-                            for (var i = 0; i < field.BindRole.length; i++) {
-                                for (var j = 0; j < userRoles.length; j++) {
-                                    if (userRoles[j].Id && userRoles[j].Id.toLowerCase() === field.BindRole[i].toLowerCase()) {
-                                        haveLimit = true;
-                                        break;
-                                    }
-                                }
-                                if (haveLimit) break;
-                            }
-                        }
-                        if (!haveLimit) {
-                            isShow = false;
-                        }
-                    }
-                }
-                // 最终检查 Visible 属性
-                if (isShow && !isDesignMode) {
-                    isShow = self.FieldIsVisible(field);//self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
-                }
-                field._isShow = isShow;
-
-                // ==================== 预计算 _span ====================
-                field._span = self.GetDiyTableColumnSpan(field);
-
-                // ==================== 预计算 _class ====================
-                var fieldClass = 'field-item field_' + field.Name + ' field_' + field.Component;
-                field._class = fieldClass;
-                field._activeClass = fieldClass + ' active-field';
 
                 // 找到字段所属的 tab
                 var assigned = false;
@@ -200,33 +125,475 @@ export default {
                     grouped[key].sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
                 }
             });
+            return grouped;
+        },
+    },
+    methods: {
+        SetFieldRuntimeValue(field, key, value) {
+            if (field && field[key] !== value) {
+                field[key] = value;
+            }
+        },
+        GetBaseFieldIsShow(field) {
+            var self = this;
+            if (!field) return false;
 
-            // 🔥 性能优化：分批渲染 - 只返回已渲染的字段
-            // 对每个 tab 的字段列表进行截取，实现渐进式渲染
-            var limitedGrouped = {};
-            showTabs.forEach((tab) => {
-                var key = tab.Id || tab.Name;
-                if (key && grouped[key]) {
-                    var allFields = grouped[key];
-                    var renderedCount = self.renderedFieldCounts[key] || self.BATCH_SIZE_FIRST;
-                    // 限制返回的字段数量
-                    limitedGrouped[key] = allFields.slice(0, renderedCount);
+            if ((self.DiyCommon.DefaultFieldNames || []).indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
+                return false;
+            }
 
-                    // 如果还有未渲染的字段，安排下一批渲染
-                    if (renderedCount < allFields.length && !self._isDestroyed) {
-                        self.safeTimeout(() => {
-                            if (self._isDestroyed) return;
-                            self.renderedFieldCounts[key] = Math.min(
-                                renderedCount + self.BATCH_SIZE_NEXT,
-                                allFields.length
-                            );
-                        }, 100); // 100ms 后渲染下一批
+            if (self.LoadMode === "Design") {
+                return true;
+            }
+
+            if (!self.DiyCommon.IsNull(field.BindRole) && field.BindRole.length > 0 && self.GetCurrentUser._IsAdmin !== true) {
+                var userRoles = self.GetCurrentUser._Roles || [];
+                var haveLimit = false;
+                for (var i = 0; i < field.BindRole.length; i++) {
+                    for (var j = 0; j < userRoles.length; j++) {
+                        if (userRoles[j].Id && userRoles[j].Id.toLowerCase() === field.BindRole[i].toLowerCase()) {
+                            haveLimit = true;
+                            break;
+                        }
                     }
+                    if (haveLimit) break;
+                }
+                if (!haveLimit) return false;
+            }
+
+            return self.FieldIsVisible(field);
+        },
+        ApplyBaseFieldRuntimeState(field) {
+            var self = this;
+            if (!field || typeof field !== "object") return;
+            var isShow = self.GetBaseFieldIsShow(field);
+            var fieldClass = 'field-item field_' + field.Name + ' field_' + field.Component;
+            self.SetFieldRuntimeValue(field, '_isShow', isShow);
+            self.SetFieldRuntimeValue(field, '_baseIsShow', isShow);
+            self.SetFieldRuntimeValue(field, '_span', self.GetDiyTableColumnSpan(field));
+            self.SetFieldRuntimeValue(field, '_class', fieldClass);
+            self.SetFieldRuntimeValue(field, '_activeClass', fieldClass + ' active-field');
+        },
+        RefreshDiyFieldRuntimeState(tabKey) {
+            var self = this;
+            if (!Array.isArray(self.DiyFieldList) || self.DiyFieldList.length === 0) {
+                return;
+            }
+
+            self.DiyFieldList.forEach((field) => {
+                self.ApplyBaseFieldRuntimeState(field);
+            });
+
+            var grouped = self.DiyFieldListGrouped || {};
+            Object.keys(grouped).forEach((key) => {
+                if (tabKey && key !== tabKey) return;
+                self.ApplyCollapseGroupState(grouped[key], key);
+                self.ApplyFieldTabsState(grouped[key], key);
+            });
+        },
+        GetCollapseStateKey(field, tabKey, index) {
+            return field.Id || field.Name || (tabKey + "_" + index);
+        },
+        GetCollapseGroupConfig(field) {
+            return (field && field.Config && field.Config.CollapseGroup) ? field.Config.CollapseGroup : {};
+        },
+        ApplyCollapseGroupState(fields, tabKey) {
+            var self = this;
+            if (!Array.isArray(fields) || fields.length === 0) {
+                return fields;
+            }
+
+            var metaMap = new Map();
+            fields.forEach((field) => {
+                if (!field || typeof field !== "object") return;
+                metaMap.set(field, {
+                    _collapseHidden: false,
+                    _collapsedByFieldId: "",
+                    _collapseChildCount: 0,
+                    _collapseCollapsed: false,
+                    _collapseGroupTheme: "",
+                    _collapseGroupIndex: -1,
+                    _collapseGroupChildIndex: -1,
+                    _collapseStateKey: "",
+                    _collapseClass: "",
+                    _isShow: field._baseIsShow !== false
+                });
+            });
+
+            fields.forEach((field, index) => {
+                if (!field || field.Component !== "CollapseGroup") return;
+
+                var groupConfig = self.GetCollapseGroupConfig(field);
+                var stateKey = self.GetCollapseStateKey(field, tabKey, index);
+                var hasState = self.CollapseGroupState && Object.prototype.hasOwnProperty.call(self.CollapseGroupState, stateKey);
+                var defaultCollapsed = groupConfig.DefaultCollapsed === true || groupConfig.DefaultCollapsed === 1 || groupConfig.DefaultCollapsed === "true";
+                var collapsed = hasState ? self.CollapseGroupState[stateKey] : defaultCollapsed;
+                if (self.LoadMode === "Design") {
+                    collapsed = false;
+                }
+                self.ApplyCollapseGroupVisualState(fields, index, tabKey, collapsed, metaMap);
+            });
+
+            fields.forEach((field) => {
+                var meta = metaMap.get(field);
+                if (!meta) return;
+                Object.keys(meta).forEach((key) => {
+                    self.SetFieldRuntimeValue(field, key, meta[key]);
+                });
+            });
+
+            return fields;
+        },
+        ApplyCollapseGroupVisualState(fields, groupIndex, tabKey, collapsed, metaMap) {
+            var self = this;
+            var field = fields[groupIndex];
+            if (!field || field.Component !== "CollapseGroup") return;
+            if (!metaMap) {
+                metaMap = new Map();
+                fields.forEach((item) => {
+                    if (!item) return;
+                    metaMap.set(item, {
+                        _collapseHidden: false,
+                        _collapsedByFieldId: "",
+                        _collapseChildCount: 0,
+                        _collapseCollapsed: false,
+                        _collapseGroupTheme: "",
+                        _collapseGroupIndex: -1,
+                        _collapseGroupChildIndex: -1,
+                        _collapseStateKey: "",
+                        _collapseClass: "",
+                        _isShow: item._baseIsShow !== false
+                    });
+                });
+            }
+
+            var groupConfig = self.GetCollapseGroupConfig(field);
+            var stateKey = self.GetCollapseStateKey(field, tabKey, groupIndex);
+            var scopeMode = groupConfig.ScopeMode || "UntilNextGroup";
+            var theme = groupConfig.Theme || "default";
+            var fieldCount = parseInt(groupConfig.FieldCount, 10);
+            if (!fieldCount || fieldCount < 1) {
+                fieldCount = 10;
+            }
+
+            var groupMeta = metaMap.get(field);
+            if (groupMeta) {
+                groupMeta._collapseStateKey = stateKey;
+                groupMeta._collapseCollapsed = collapsed;
+                groupMeta._collapseGroupTheme = theme;
+                groupMeta._collapseClass = "collapse-group-header collapse-group-theme-" + theme + (collapsed ? " collapse-group-collapsed" : " collapse-group-expanded");
+            }
+
+            var childFields = [];
+            for (var childIndex = groupIndex + 1; childIndex < fields.length; childIndex++) {
+                var childField = fields[childIndex];
+                if (!childField) continue;
+                if (childField.Component === "CollapseGroup" || childField.Component === "Tabs") {
+                    break;
+                }
+
+                childFields.push(childField);
+                if (scopeMode === "FieldCount" && childFields.length >= fieldCount) {
+                    break;
+                }
+            }
+
+            var visibleChildFields = [];
+            childFields.forEach((childField, childFieldIndex) => {
+                var baseVisible = childField._baseIsShow !== false;
+                var childMeta = metaMap.get(childField);
+                if (childMeta) {
+                    childMeta._collapseGroupTheme = theme;
+                    childMeta._collapseGroupIndex = groupIndex;
+                    childMeta._collapseGroupChildIndex = childFieldIndex;
+                    childMeta._collapseHidden = collapsed;
+                    childMeta._collapsedByFieldId = collapsed ? stateKey : "";
+                    childMeta._isShow = baseVisible && !collapsed;
+                    childMeta._collapseClass = "collapse-group-item collapse-group-theme-" + theme + (baseVisible ? "" : " collapse-group-origin-hidden");
+                }
+                if (baseVisible) {
+                    visibleChildFields.push(childField);
                 }
             });
-            console.log('limitedGrouped',limitedGrouped);
-            return limitedGrouped;
+
+            if (groupMeta) {
+                groupMeta._collapseChildCount = visibleChildFields.length;
+            }
+            self.ApplyCollapseGroupRowClasses(visibleChildFields, metaMap);
         },
+        ApplyCollapseGroupRowClasses(visibleChildFields, metaMap) {
+            if (!Array.isArray(visibleChildFields) || visibleChildFields.length === 0) return;
+
+            var rows = [];
+            var currentRow = [];
+            var currentSpan = 0;
+            var pushCurrentRow = function () {
+                if (currentRow.length > 0) {
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentSpan = 0;
+                }
+            };
+
+            visibleChildFields.forEach((childField) => {
+                var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                if (!span || span < 1) span = 24;
+                if (span > 24) span = 24;
+
+                if (currentRow.length > 0 && currentSpan + span > 24) {
+                    pushCurrentRow();
+                }
+                currentRow.push(childField);
+                currentSpan += span;
+                if (currentSpan >= 24) {
+                    pushCurrentRow();
+                }
+            });
+            pushCurrentRow();
+
+            var firstMeta = metaMap.get(visibleChildFields[0]);
+            var lastMeta = metaMap.get(visibleChildFields[visibleChildFields.length - 1]);
+            if (firstMeta) firstMeta._collapseClass += " collapse-group-visible-first";
+            if (lastMeta) lastMeta._collapseClass += " collapse-group-visible-last";
+
+            rows.forEach((row, rowIndex) => {
+                row.forEach((childField, colIndex) => {
+                    var childMeta = metaMap.get(childField);
+                    if (!childMeta) return;
+                    childMeta._collapseClass += " collapse-group-row collapse-group-row-" + rowIndex;
+                    if (rowIndex === 0) childMeta._collapseClass += " collapse-group-row-first";
+                    if (rowIndex === rows.length - 1) childMeta._collapseClass += " collapse-group-row-last";
+                    if (colIndex === 0) childMeta._collapseClass += " collapse-group-row-start";
+                    if (colIndex === row.length - 1) childMeta._collapseClass += " collapse-group-row-end";
+                });
+            });
+        },
+        GetFieldTabsStateKey(field, tabKey, index) {
+            return field.Id || field.Name || (tabKey + "_tabs_" + index);
+        },
+        GetFieldTabsConfig(field) {
+            return (field && field.Config && field.Config.FieldTabs) ? field.Config.FieldTabs : {};
+        },
+        NormalizeFieldTabsPanes(config) {
+            var defaultPanes = [
+                { Key: "tab1", Title: "基础信息", Icon: "fas fa-id-card", FieldCount: 4, Disabled: false },
+                { Key: "tab2", Title: "扩展信息", Icon: "fas fa-layer-group", FieldCount: 4, Disabled: false }
+            ];
+            var source = config && Array.isArray(config.Tabs) && config.Tabs.length > 0 ? config.Tabs : defaultPanes;
+            var usedKeys = {};
+            return source.map((pane, index) => {
+                var rawKey = pane && pane.Key ? String(pane.Key).trim() : "";
+                var key = rawKey || ("tab" + (index + 1));
+                if (usedKeys[key]) {
+                    key = key + "_" + (index + 1);
+                }
+                usedKeys[key] = true;
+                var fieldCount = parseInt(pane && pane.FieldCount, 10);
+                if (!fieldCount || fieldCount < 1) fieldCount = 1;
+                return {
+                    Key: key,
+                    Title: (pane && (pane.Title || pane.Name || pane.Label)) || ("页签" + (index + 1)),
+                    Icon: (pane && pane.Icon) || "",
+                    FieldCount: fieldCount,
+                    Disabled: pane && (pane.Disabled === true || pane.Disabled === 1 || pane.Disabled === "1" || pane.Disabled === "true")
+                };
+            });
+        },
+        ResolveFieldTabsActiveKey(config, panes, stateKey) {
+            var self = this;
+            if (!Array.isArray(panes) || panes.length === 0) return "";
+            var configuredKey = self.FieldTabsState && Object.prototype.hasOwnProperty.call(self.FieldTabsState, stateKey)
+                ? self.FieldTabsState[stateKey]
+                : (config.DefaultActiveKey || "");
+            var activePane = panes.find((pane) => pane.Key === configuredKey && pane.Disabled !== true);
+            if (activePane) return activePane.Key;
+            var firstEnabled = panes.find((pane) => pane.Disabled !== true);
+            return (firstEnabled || panes[0]).Key;
+        },
+        AppendFieldRuntimeClass(field, className) {
+            var self = this;
+            if (!field || !className) return;
+            var current = field._collapseClass || "";
+            self.SetFieldRuntimeValue(field, "_collapseClass", (current + " " + className).trim());
+        },
+        ApplyFieldTabsState(fields, tabKey) {
+            var self = this;
+            if (!Array.isArray(fields) || fields.length === 0) {
+                return fields;
+            }
+
+            fields.forEach((field) => {
+                if (!field || typeof field !== "object") return;
+                self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
+                self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneTitle", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneIndex", -1);
+                self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", 0);
+                self.SetFieldRuntimeValue(field, "_fieldTabsPanes", []);
+            });
+
+            fields.forEach((field, index) => {
+                if (!field || field.Component !== "Tabs") return;
+                self.ApplyFieldTabsVisualState(fields, index, tabKey);
+            });
+
+            return fields;
+        },
+        ApplyFieldTabsVisualState(fields, tabsIndex, tabKey) {
+            var self = this;
+            var field = fields[tabsIndex];
+            if (!field || field.Component !== "Tabs") return;
+
+            var tabsConfig = self.GetFieldTabsConfig(field);
+            var panes = self.NormalizeFieldTabsPanes(tabsConfig);
+            var stateKey = self.GetFieldTabsStateKey(field, tabKey, tabsIndex);
+            var activeKey = self.ResolveFieldTabsActiveKey(tabsConfig, panes, stateKey);
+            var captureRest = tabsConfig.CaptureRest !== false;
+            var theme = tabsConfig.Theme || "default";
+
+            var stopIndex = fields.length;
+            for (var scanIndex = tabsIndex + 1; scanIndex < fields.length; scanIndex++) {
+                var scanField = fields[scanIndex];
+                if (scanField && scanField.Component === "Tabs") {
+                    stopIndex = scanIndex;
+                    break;
+                }
+            }
+
+            var availableFields = fields.slice(tabsIndex + 1, stopIndex);
+            var cursor = 0;
+            var runtimePanes = [];
+            var totalChildCount = 0;
+
+            panes.forEach((pane, paneIndex) => {
+                var remaining = Math.max(availableFields.length - cursor, 0);
+                var paneFieldCount = pane.FieldCount;
+                if (captureRest && paneIndex === panes.length - 1) {
+                    paneFieldCount = remaining;
+                }
+                paneFieldCount = Math.max(0, Math.min(paneFieldCount, remaining));
+                var paneFields = availableFields.slice(cursor, cursor + paneFieldCount);
+                cursor += paneFieldCount;
+
+                var visibleCount = paneFields.filter((childField) => childField && childField._baseIsShow !== false).length;
+                totalChildCount += visibleCount;
+                runtimePanes.push({
+                    ...pane,
+                    _fieldCount: visibleCount
+                });
+
+                var visiblePaneFields = [];
+                paneFields.forEach((childField, childIndex) => {
+                    if (!childField) return;
+                    var visibleBeforeTabs = childField._isShow !== false;
+                    var isActivePane = pane.Key === activeKey;
+                    var shouldShow = visibleBeforeTabs && (isActivePane || self.LoadMode === "Design");
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsHidden", !isActivePane && self.LoadMode !== "Design");
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsStateKey", stateKey);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsActiveKey", activeKey);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneKey", pane.Key);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneTitle", pane.Title);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneIndex", paneIndex);
+                    self.SetFieldRuntimeValue(childField, "_isShow", shouldShow);
+                    self.AppendFieldRuntimeClass(
+                        childField,
+                        "field-tabs-item field-tabs-theme-" + theme +
+                        " field-tabs-pane-" + paneIndex +
+                        " field-tabs-child-" + childIndex +
+                        (isActivePane ? " field-tabs-active-pane" : " field-tabs-inactive-pane")
+                    );
+                    if (shouldShow) {
+                        visiblePaneFields.push(childField);
+                    }
+                });
+
+                self.ApplyFieldTabsRowClasses(visiblePaneFields);
+            });
+
+            self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
+            self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", stateKey);
+            self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", activeKey);
+            self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", totalChildCount);
+            self.SetFieldRuntimeValue(field, "_fieldTabsPanes", runtimePanes);
+            self.AppendFieldRuntimeClass(field, "field-tabs-header field-tabs-theme-" + theme);
+        },
+        ApplyFieldTabsRowClasses(visibleChildFields) {
+            var self = this;
+            if (!Array.isArray(visibleChildFields) || visibleChildFields.length === 0) return;
+
+            var rows = [];
+            var currentRow = [];
+            var currentSpan = 0;
+            var pushCurrentRow = function () {
+                if (currentRow.length > 0) {
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentSpan = 0;
+                }
+            };
+
+            visibleChildFields.forEach((childField) => {
+                var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                if (!span || span < 1) span = 24;
+                if (span > 24) span = 24;
+
+                if (currentRow.length > 0 && currentSpan + span > 24) {
+                    pushCurrentRow();
+                }
+                currentRow.push(childField);
+                currentSpan += span;
+                if (currentSpan >= 24) {
+                    pushCurrentRow();
+                }
+            });
+            pushCurrentRow();
+
+            self.AppendFieldRuntimeClass(visibleChildFields[0], "field-tabs-visible-first");
+            self.AppendFieldRuntimeClass(visibleChildFields[visibleChildFields.length - 1], "field-tabs-visible-last");
+
+            rows.forEach((row, rowIndex) => {
+                row.forEach((childField, colIndex) => {
+                    self.AppendFieldRuntimeClass(
+                        childField,
+                        "field-tabs-row field-tabs-row-" + rowIndex +
+                        (rowIndex === 0 ? " field-tabs-row-first" : "") +
+                        (rowIndex === rows.length - 1 ? " field-tabs-row-last" : "") +
+                        (colIndex === 0 ? " field-tabs-row-start" : "") +
+                        (colIndex === row.length - 1 ? " field-tabs-row-end" : "")
+                    );
+                });
+            });
+        },
+        handleGroupCollapseChange(field, collapsed) {
+            var self = this;
+            if (!field) return;
+            var stateKey = field._collapseStateKey || field.Id || field.Name;
+            if (!stateKey) return;
+            if (self.CollapseGroupState && self.CollapseGroupState[stateKey] === collapsed) {
+                self.RefreshDiyFieldRuntimeState();
+                return;
+            }
+            self.CollapseGroupState = Object.assign({}, self.CollapseGroupState, {
+                [stateKey]: collapsed
+            });
+            self.RefreshDiyFieldRuntimeState();
+        },
+        handleFieldTabsChange(field, activeKey) {
+            var self = this;
+            if (!field) return;
+            var stateKey = field._fieldTabsStateKey || field.Id || field.Name;
+            if (!stateKey) return;
+            if (self.FieldTabsState && self.FieldTabsState[stateKey] === activeKey) {
+                self.RefreshDiyFieldRuntimeState();
+                return;
+            }
+            self.FieldTabsState = Object.assign({}, self.FieldTabsState, {
+                [stateKey]: activeKey
+            });
+            self.RefreshDiyFieldRuntimeState();
+        }
     },
     data() {
         const self = this;
@@ -239,6 +606,8 @@ export default {
             currentTabIndex: 0,
             PageType: "", //可以是Report
             FormTabs: [],
+            CollapseGroupState: {},
+            FieldTabsState: {},
             // 性能优化：跟踪已渲染的标签页，实现懒加载
             // Set 结构存储已渲染的 tab id/name，首次只渲染第一个 tab
             renderedTabs: new Set(),
