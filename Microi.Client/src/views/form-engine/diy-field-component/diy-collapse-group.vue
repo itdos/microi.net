@@ -143,10 +143,7 @@ const showFieldCount = computed(() => groupConfig.value.ShowFieldCount !== false
 const isCollapsed = computed(() => props.field._collapseCollapsed === true);
 
 const toggleCollapse = (event) => {
-    if (props.LoadMode === "Design") {
-        return;
-    }
-    if (event && event.stopPropagation) {
+    if (props.LoadMode !== "Design" && event && event.stopPropagation) {
         event.stopPropagation();
     }
     const nextCollapsed = !isCollapsed.value;

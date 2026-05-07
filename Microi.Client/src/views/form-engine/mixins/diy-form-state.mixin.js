@@ -228,9 +228,6 @@ export default {
                 var hasState = self.CollapseGroupState && Object.prototype.hasOwnProperty.call(self.CollapseGroupState, stateKey);
                 var defaultCollapsed = groupConfig.DefaultCollapsed === true || groupConfig.DefaultCollapsed === 1 || groupConfig.DefaultCollapsed === "true";
                 var collapsed = hasState ? self.CollapseGroupState[stateKey] : defaultCollapsed;
-                if (self.LoadMode === "Design") {
-                    collapsed = false;
-                }
                 self.ApplyCollapseGroupVisualState(fields, index, tabKey, collapsed, metaMap);
             });
 
@@ -395,9 +392,14 @@ export default {
                     Title: (pane && (pane.Title || pane.Name || pane.Label)) || ("页签" + (index + 1)),
                     Icon: (pane && pane.Icon) || "",
                     FieldCount: fieldCount,
+                    FieldKeys: Array.isArray(pane && pane.FieldKeys) ? pane.FieldKeys.map((item) => String(item)) : [],
+                    FieldNames: Array.isArray(pane && pane.FieldNames) ? pane.FieldNames.map((item) => String(item)) : [],
                     Disabled: pane && (pane.Disabled === true || pane.Disabled === 1 || pane.Disabled === "1" || pane.Disabled === "true")
                 };
             });
+        },
+        GetFieldTabsChildKey(field) {
+            return field ? String(field.Id || field.Name || "") : "";
         },
         ResolveFieldTabsActiveKey(config, panes, stateKey) {
             var self = this;
@@ -451,7 +453,12 @@ export default {
             var stateKey = self.GetFieldTabsStateKey(field, tabKey, tabsIndex);
             var activeKey = self.ResolveFieldTabsActiveKey(tabsConfig, panes, stateKey);
             var captureRest = tabsConfig.CaptureRest !== false;
+            var scopeMode = tabsConfig.ScopeMode || "FieldCount";
             var theme = tabsConfig.Theme || "default";
+            var totalFieldCount = parseInt(tabsConfig.TotalFieldCount, 10);
+            if (!totalFieldCount || totalFieldCount < 0) {
+                totalFieldCount = 0;
+            }
 
             var stopIndex = fields.length;
             for (var scanIndex = tabsIndex + 1; scanIndex < fields.length; scanIndex++) {
@@ -463,19 +470,38 @@ export default {
             }
 
             var availableFields = fields.slice(tabsIndex + 1, stopIndex);
+            if (totalFieldCount > 0) {
+                availableFields = availableFields.slice(0, totalFieldCount);
+            }
             var cursor = 0;
             var runtimePanes = [];
             var totalChildCount = 0;
+            var manualUsedKeys = {};
 
             panes.forEach((pane, paneIndex) => {
-                var remaining = Math.max(availableFields.length - cursor, 0);
-                var paneFieldCount = pane.FieldCount;
-                if (captureRest && paneIndex === panes.length - 1) {
-                    paneFieldCount = remaining;
+                var paneFields = [];
+                if (scopeMode === "Manual") {
+                    var fieldKeys = Array.isArray(pane.FieldKeys) ? pane.FieldKeys.map((item) => String(item)) : [];
+                    var fieldNames = Array.isArray(pane.FieldNames) ? pane.FieldNames.map((item) => String(item)) : [];
+                    paneFields = availableFields.filter((childField) => {
+                        var childKey = self.GetFieldTabsChildKey(childField);
+                        if (!childKey || manualUsedKeys[childKey]) return false;
+                        var matched = fieldKeys.indexOf(childKey) > -1 || fieldNames.indexOf(childField.Name || "") > -1;
+                        if (matched) {
+                            manualUsedKeys[childKey] = true;
+                        }
+                        return matched;
+                    });
+                } else {
+                    var remaining = Math.max(availableFields.length - cursor, 0);
+                    var paneFieldCount = pane.FieldCount;
+                    if (captureRest && paneIndex === panes.length - 1) {
+                        paneFieldCount = remaining;
+                    }
+                    paneFieldCount = Math.max(0, Math.min(paneFieldCount, remaining));
+                    paneFields = availableFields.slice(cursor, cursor + paneFieldCount);
+                    cursor += paneFieldCount;
                 }
-                paneFieldCount = Math.max(0, Math.min(paneFieldCount, remaining));
-                var paneFields = availableFields.slice(cursor, cursor + paneFieldCount);
-                cursor += paneFieldCount;
 
                 var visibleCount = paneFields.filter((childField) => childField && childField._baseIsShow !== false).length;
                 totalChildCount += visibleCount;
