@@ -401,7 +401,7 @@ export default {
             // });
 
             //-------GetPageTabs()提前预生成
-            if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
+            if (!self.DiyCommon.IsNull(result.Data) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
                 //url带上tab参数，  2022-06-01
                 var queryTab = self.$route.query.Tab;
                 if (!self.DiyCommon.IsNull(queryTab)) {

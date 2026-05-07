@@ -327,7 +327,7 @@ export default {
             TableId: "",
             TableRowId: "",
             SysRoleList: [],
-            // SysMenuNeedConvertField: ['TableDiyFieldIds', 'SearchFieldIds', 'SortFieldIds', 'DiyConfig', 'StatisticsFields'],
+            // SysMenuNeedConvertField: ['TableDiyFieldIds', 'SearchFieldIds', 'SortFieldIds', 'StatisticsFields'],
             //'ImgUpload', 'FileUpload','Map',
             CantUptComponentList: [], //'DevComponent', 'TableChild', 'Divider'
             SysDataSourceList: [],

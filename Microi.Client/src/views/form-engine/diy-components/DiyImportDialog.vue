@@ -111,16 +111,14 @@ export default {
     },
     computed: {
         importApi() {
-            if (this.sysMenuModel &&
-                (this.sysMenuModel.ImportApi || (this.sysMenuModel.DiyConfig && this.sysMenuModel.DiyConfig.ImportApi))
-            ) {
-                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi || this.sysMenuModel.DiyConfig.ImportApi);
+            if (this.sysMenuModel && this.sysMenuModel.ImportApi) {
+                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi);
             }
             return this.DiyCommon.GetApiBase() + "/api/FormEngine/ImportDiyTableRow";
         },
         importProgressApi() {
-            if (this.sysMenuModel && this.sysMenuModel.DiyConfig && this.sysMenuModel.DiyConfig.ImportProgressApi) {
-                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.DiyConfig.ImportProgressApi);
+            if (this.sysMenuModel && this.sysMenuModel.ImportProgressApi) {
+                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportProgressApi);
             }
             return this.DiyApi.GetImportDiyTableRowStep;
         },
