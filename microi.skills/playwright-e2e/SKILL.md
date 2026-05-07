@@ -173,11 +173,25 @@ export async function loginByEngine(request, account, password) {
   return { token, data };
 }
 
-export async function injectH5Storage(page, token, member) {
-  await page.addInitScript(({ tokenValue, memberValue }) => {
-    localStorage.setItem('mall_token', tokenValue);
-    if (memberValue) localStorage.setItem('mall_member', JSON.stringify(memberValue));
-  }, { tokenValue: token, memberValue: member || null });
+export async function injectStorage(page, values) {
+  await page.addInitScript((storageValues) => {
+    for (const [key, value] of Object.entries(storageValues)) {
+      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+    }
+  }, values);
+}
+
+export async function injectH5Storage(page, token, member = null) {
+  return injectStorage(page, {
+    mall_token: token,
+    mall_member: member || {}
+  });
+}
+
+export function assertDosResultShape(json, label = 'DosResult') {
+  expect(json, label).toBeTruthy();
+  expect(json, label).toHaveProperty('Code');
+  expect(typeof json.Code, `${label}.Code type`).toBe('number');
 }
 ```
 
@@ -229,6 +243,35 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
 4. 一条主业务路径能跑通。
 5. 底部 Tab、菜单或核心导航都能加载。
 6. 退出登录能清理 Token 并回到登录页。
+
+## 完整业务验收门槛
+
+当用户要求“完整测试”“全面测试”“不要让我手工测出接口 null/404/权限漏洞”时，不能只生成浅冒烟。至少补齐以下测试文件：
+
+```text
+tests/e2e/
+  helpers/microi.js
+  smoke.spec.js           # 首屏、导航、图片、布局
+  api-contract.spec.js    # 所有接口引擎契约：HTTP ok、非 null、合法 JSON、DosResult.Code
+  network.spec.js         # 页面运行期拦截 404/5xx、空响应、字符串 null、意外 Code=0
+  auth.spec.js            # 未登录/登录/过期 Token/退出登录
+  business-flow.spec.js   # 至少一条真实写操作闭环，写后再查后端状态
+```
+
+必备断言：
+
+1. API 响应不能是空 body、字符串 `null`、非 JSON，除明确允许外不能返回 `Code=0`。
+2. 公开接口必须可匿名调用；受保护接口未登录必须返回 `Code=1001/1002` 或跳转登录。
+3. 写操作必须做“前置清理 → 执行动作 → 后端查询确认 → 用例清理”。
+4. UI 点击不能只断言 toast；必须用 `page.waitForResponse()` 捕捉对应接口，并验证响应体。
+5. 任何 FormEngine HTTP 路由必须使用 `/api/formengine/{action}-{table}`，不要生成 `/formengine/{table}/{action}`。
+
+移动商城/会员 H5 额外规则：
+
+- 商城会员 Token 来自业务接口引擎（如 `mall_member_login`），不是平台 `Sys_User` Token。
+- 移动端会员数据查询不要直连平台 FormEngine；使用租户 ApiEngine 或安全查询代理。
+- 商品详情“加入购物车”必须登录；登录后必须写服务端购物车，再进入购物车页验证同一商品可见。
+- 购物车、订单、资产、团队、提货、地址、收款方式等会员数据都必须按会员 Id 做后端范围过滤。
 
 ## 与 MCP 的配合
 
