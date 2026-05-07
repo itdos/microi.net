@@ -40,7 +40,7 @@ export default {
             var self = this;
             if (self.FormMode != 'View') return true;
             if (self.FormMode == 'View' && self.ShowUpdateBtn) return true;
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) && self.SysMenuModel.FormBtns.length > 0) {
+            if (!self.DiyCommon.IsNull(self.SysMenuModel) && !self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) && self.SysMenuModel.FormBtns.length > 0) {
                 return self.SysMenuModel.FormBtns.some(btn => btn.IsVisible);
             }
             return false;
@@ -60,7 +60,7 @@ export default {
         // 判断当前表单FormBtns是否有可见按钮（用于FAB菜单是否显示）
         HasVisibleFormBtns() {
             var self = this;
-            if (self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) || self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) || self.SysMenuModel.FormBtns.length == 0) return false;
+            if (self.DiyCommon.IsNull(self.SysMenuModel) || self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) || self.SysMenuModel.FormBtns.length == 0) return false;
             return self.SysMenuModel.FormBtns.some(btn => btn.IsVisible);
         },
         // Page模式：FAB菜单是否有内容（取消编辑 / 表单更多按钮）
@@ -136,6 +136,7 @@ export default {
             OpenDiyFormWorkFlow: false,
             OpenDiyFormWorkFlowType: {},
             FormWF: {},
+            WfFormData: {},
             StartWorkSubmited: false,
             // 表单顶部/底部【发起流程/处理工作】CTA 按钮防重入状态
             WfSubmitting: false,
