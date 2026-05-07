@@ -1,0 +1,348 @@
+[
+  {
+    "Control": "Text",
+    "Name": "单行文本",
+    "Type": "Base",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-font",
+    "Sort": 10
+  },
+  {
+    "Control": "Guid",
+    "Name": "GUID",
+    "Type": "Base",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-fingerprint",
+    "Sort": 15,
+    "Readonly": true
+  },
+  {
+    "Control": "Textarea",
+    "Name": "多行文本",
+    "Type": "Base",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-align-left",
+    "Sort": 20
+  },
+  {
+    "Control": "NumberText",
+    "Name": "数字输入",
+    "Type": "Base",
+    "FieldType": "decimal(18, 2)",
+    "Icon": "fas fa-hashtag",
+    "Sort": 30
+  },
+  {
+    "Control": "DateTime",
+    "Name": "日期时间",
+    "Type": "Base",
+    "FieldType": "varchar(50)",
+    "Icon": "far fa-calendar-alt",
+    "Sort": 40
+  },
+  {
+    "Control": "Select",
+    "Name": "下拉单选",
+    "Type": "Base",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-caret-square-down",
+    "Sort": 50
+  },
+  {
+    "Control": "MultipleSelect",
+    "Name": "下拉多选",
+    "Type": "Base",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-tasks",
+    "Sort": 60
+  },
+  {
+    "Control": "Radio",
+    "Name": "单选框",
+    "Type": "Base",
+    "FieldType": "varchar(255)",
+    "Icon": "far fa-dot-circle",
+    "Sort": 70
+  },
+  {
+    "Control": "Checkbox",
+    "Name": "复选框",
+    "Type": "Base",
+    "FieldType": "mediumtext",
+    "Icon": "far fa-check-square",
+    "Sort": 80
+  },
+  {
+    "Control": "Switch",
+    "Name": "开关",
+    "Type": "Base",
+    "FieldType": "bit",
+    "Icon": "fas fa-toggle-on",
+    "Sort": 90
+  },
+  {
+    "Control": "Rate",
+    "Name": "评分",
+    "Type": "Base",
+    "FieldType": "int",
+    "Icon": "fas fa-star-half-alt",
+    "Sort": 100
+  },
+  {
+    "Control": "Progress",
+    "Name": "进度条",
+    "Type": "Base",
+    "FieldType": "int",
+    "Icon": "fas fa-tasks",
+    "Sort": 110
+  },
+  {
+    "Control": "Slider",
+    "Name": "滑块",
+    "Type": "Base",
+    "FieldType": "decimal(18, 2)",
+    "Icon": "fas fa-sliders-h",
+    "Sort": 115
+  },
+  {
+    "Control": "ColorPicker",
+    "Name": "颜色选择",
+    "Type": "Base",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-palette",
+    "Sort": 120
+  },
+  {
+    "Control": "AutoNumber",
+    "Name": "自动编号",
+    "Type": "Base",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-sort-numeric-down",
+    "Sort": 130,
+    "Readonly": true
+  },
+  {
+    "Control": "Button",
+    "Name": "按钮",
+    "Type": "Base",
+    "FieldType": "varchar(50)",
+    "Icon": "far fa-hand-pointer",
+    "Sort": 140
+  },
+  {
+    "Control": "Divider",
+    "Name": "分割线",
+    "Type": "Advanced",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-minus",
+    "Sort": 1000
+  },
+  {
+    "Control": "CollapseGroup",
+    "Name": "折叠分组",
+    "Type": "Advanced",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-layer-group",
+    "Sort": 1010
+  },
+  {
+    "Control": "Alert",
+    "Name": "提示说明",
+    "Type": "Advanced",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-info-circle",
+    "Sort": 1020
+  },
+  {
+    "Control": "StaticText",
+    "Name": "静态文本",
+    "Type": "Advanced",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-paragraph",
+    "Sort": 1030
+  },
+  {
+    "Control": "Html",
+    "Name": "HTML内容",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-code",
+    "Sort": 1040
+  },
+  {
+    "Control": "RichText",
+    "Name": "富文本",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-file-alt",
+    "Sort": 1050
+  },
+  {
+    "Control": "CodeEditor",
+    "Name": "代码编辑器",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-laptop-code",
+    "Sort": 1060
+  },
+  {
+    "Control": "JsonTable",
+    "Name": "JSON表格",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-table",
+    "Sort": 1070
+  },
+  {
+    "Control": "ImgUpload",
+    "Name": "图片上传",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "far fa-images",
+    "Sort": 1080
+  },
+  {
+    "Control": "FileUpload",
+    "Name": "文件上传",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "far fa-file-upload",
+    "Sort": 1090
+  },
+  {
+    "Control": "Autocomplete",
+    "Name": "自动完成",
+    "Type": "Advanced",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-search",
+    "Sort": 1100
+  },
+  {
+    "Control": "TagInput",
+    "Name": "标签输入",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-tags",
+    "Sort": 1105
+  },
+  {
+    "Control": "Transfer",
+    "Name": "穿梭框",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-exchange-alt",
+    "Sort": 1108
+  },
+  {
+    "Control": "Cascader",
+    "Name": "级联选择",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-sitemap",
+    "Sort": 1110
+  },
+  {
+    "Control": "Address",
+    "Name": "省市区地址",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-map-signs",
+    "Sort": 1120
+  },
+  {
+    "Control": "Department",
+    "Name": "部门选择",
+    "Type": "Advanced",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-building",
+    "Sort": 1130
+  },
+  {
+    "Control": "SelectTree",
+    "Name": "树形选择",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-project-diagram",
+    "Sort": 1140
+  },
+  {
+    "Control": "TreeCheckbox",
+    "Name": "树形权限",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-stream",
+    "Sort": 1150
+  },
+  {
+    "Control": "OpenTable",
+    "Name": "弹出表格",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-external-link-alt",
+    "Sort": 1160
+  },
+  {
+    "Control": "JoinTable",
+    "Name": "关联表格",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-link",
+    "Sort": 1170
+  },
+  {
+    "Control": "JoinForm",
+    "Name": "关联表单",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-window-restore",
+    "Sort": 1180
+  },
+  {
+    "Control": "TableChild",
+    "Name": "子表",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-table",
+    "Sort": 1190
+  },
+  {
+    "Control": "Map",
+    "Name": "地图定位",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-map-marker-alt",
+    "Sort": 1200
+  },
+  {
+    "Control": "MapArea",
+    "Name": "地图区域",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "far fa-map",
+    "Sort": 1210
+  },
+  {
+    "Control": "Qrcode",
+    "Name": "二维码",
+    "Type": "Advanced",
+    "FieldType": "varchar(255)",
+    "Icon": "fas fa-qrcode",
+    "Sort": 1220
+  },
+  {
+    "Control": "FontAwesome",
+    "Name": "图标选择",
+    "Type": "Advanced",
+    "FieldType": "varchar(255)",
+    "Icon": "far fa-smile",
+    "Sort": 1230
+  },
+  {
+    "Control": "DevComponent",
+    "Name": "自定义组件",
+    "Type": "Advanced",
+    "FieldType": "mediumtext",
+    "Icon": "fas fa-puzzle-piece",
+    "Sort": 1240
+  }
+]
