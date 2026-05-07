@@ -42,6 +42,14 @@
                 <div class="form-item-tip">开启后在预览/查看模式下按钮仍可点击</div>
             </el-form-item>
 
+            <el-form-item label="点击后刷新表格">
+                <el-radio-group v-model="configForm.Button.RefreshTableAfterClick">
+                    <el-radio :value="true">是</el-radio>
+                    <el-radio :value="false">否</el-radio>
+                </el-radio-group>
+                <div class="form-item-tip">开启后，按钮V8执行成功后刷新当前表格；也可在V8中手动调用 V8.RefreshTable({ _PageIndex: 1 })</div>
+            </el-form-item>
+
             <el-form-item label="图标">
                 <div style="display: flex; align-items: center;">
                     <span class="hand" style="display: inline-block; padding: 5px 10px; cursor: pointer; border: 1px solid #dcdfe6; border-radius: 4px; margin-right: 10px;" @click="$refs.refButtonIcon && $refs.refButtonIcon.show()">
@@ -80,6 +88,7 @@ export default {
                 Button: {
                     Type: '',
                     PreviewCanClick: false,
+                    RefreshTableAfterClick: false,
                     Icon: ''
                 }
             }
@@ -192,6 +201,72 @@ export default {
             }
             return "";
         },
+        NormalizeBoolean(value, defaultValue) {
+            if (value === undefined || value === null || value === "") {
+                return defaultValue;
+            }
+            return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true";
+        },
+        ShouldRefreshTableAfterClick(field) {
+            var self = this;
+            return !!(field
+                && field.Config
+                && field.Config.Button
+                && self.NormalizeBoolean(field.Config.Button.RefreshTableAfterClick, false));
+        },
+        GetRefreshEventDetail() {
+            var self = this;
+            // 尝试从可用来源获取标识，以供 diy-table 精确匹配
+            var sysMenuId = null;
+            var tableId = null;
+
+            // 优先从当前组件自身的已知字段取
+            if (self.SysMenuModel && self.SysMenuModel.SysMenuId) sysMenuId = self.SysMenuModel.SysMenuId;
+            if (!sysMenuId && self.FormDiyTableModel && self.FormDiyTableModel.SysMenuId) sysMenuId = self.FormDiyTableModel.SysMenuId;
+            if (!sysMenuId && self.DiyTableModel && self.DiyTableModel.SysMenuId) sysMenuId = self.DiyTableModel.SysMenuId;
+            if (!tableId && self.TableId) tableId = self.TableId;
+            if (!tableId && self.FormDiyTableModel && self.FormDiyTableModel.TableId) tableId = self.FormDiyTableModel.TableId;
+            if (!tableId && self.DiyTableModel && self.DiyTableModel.Id) tableId = self.DiyTableModel.Id;
+
+            try {
+                var vm = self.$parent;
+                var safety = 0;
+                while (vm && safety++ < 20 && (!sysMenuId || !tableId)) {
+                    if (!sysMenuId) {
+                        if (vm.SysMenuId) sysMenuId = vm.SysMenuId;
+                        else if (vm.PropsSysMenuId) sysMenuId = vm.PropsSysMenuId;
+                        else if (vm.SysMenuModel && vm.SysMenuModel.Id) sysMenuId = vm.SysMenuModel.Id;
+                    }
+                    if (!tableId) {
+                        if (vm.TableId) tableId = vm.TableId;
+                        else if (vm.PropsTableId) tableId = vm.PropsTableId;
+                        else if (vm.DiyTableModel && vm.DiyTableModel.Id) tableId = vm.DiyTableModel.Id;
+                    }
+                    if (sysMenuId && tableId) break;
+                    vm = vm.$parent;
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            // 最后回退到路由上的 meta
+            if (!sysMenuId && self.$route && self.$route.meta) sysMenuId = self.$route.meta.Id || self.$route.meta.SysMenuId || null;
+            if (!tableId && self.$route && self.$route.meta) tableId = self.$route.meta.DiyTableId || self.$route.meta.TableId || null;
+
+            return {
+                sysMenuId: sysMenuId,
+                tableId: tableId,
+                formModelId: (self.FormDiyTableModel && self.FormDiyTableModel.Id) || null,
+                timestamp: new Date().getTime()
+            };
+        },
+        DispatchTableRefresh(param) {
+            var detail = this.GetRefreshEventDetail();
+            detail.param = param || { _PageIndex: 1 };
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('table-refresh', { detail }));
+            }, 100);
+        },
         /**
          * 按钮点击事件
          */
@@ -202,63 +277,14 @@ export default {
                 field: field,
                 thisValue: self.ModelValue,
                 callback: (res) => {
-                  // zhy处理审核按钮点击后页面不刷新的问题,采用全局监听再次手动触发监听
-                  try {
-                      // 如果回调显式返回 false，则认为不刷新
-                      if (typeof res !== 'undefined' && res === false) return;
-
-                      // 尝试从可用来源获取标识，以供 diy-table 精确匹配
-                      var sysMenuId = null;
-                      var tableId = null;
-
-                      // 优先从当前组件自身的已知字段取
-                      if (self.SysMenuModel && self.SysMenuModel.SysMenuId) sysMenuId = self.SysMenuModel.SysMenuId;
-                      if (!sysMenuId && self.FormDiyTableModel && self.FormDiyTableModel.SysMenuId) sysMenuId = self.FormDiyTableModel.SysMenuId;
-                      if (!sysMenuId && self.DiyTableModel && self.DiyTableModel.SysMenuId) sysMenuId = self.DiyTableModel.SysMenuId;
-                      if (!tableId && self.TableId) tableId = self.TableId;
-                      if (!tableId && self.FormDiyTableModel && self.FormDiyTableModel.TableId) tableId = self.FormDiyTableModel.TableId;
-                      if (!tableId && self.DiyTableModel && self.DiyTableModel.Id) tableId = self.DiyTableModel.Id;
-
-                      // 向上遍历父组件，查找最近的子表/表单组件上的 SysMenuId 或 PropsSysMenuId
-                      try {
-                          var vm = self.$parent;
-                          var safety = 0;
-                          while (vm && safety++ < 20 && (!sysMenuId || !tableId)) {
-                              if (!sysMenuId) {
-                                  if (vm.SysMenuId) sysMenuId = vm.SysMenuId;
-                                  else if (vm.PropsSysMenuId) sysMenuId = vm.PropsSysMenuId;
-                                  else if (vm.SysMenuModel && vm.SysMenuModel.Id) sysMenuId = vm.SysMenuModel.Id;
-                              }
-                              if (!tableId) {
-                                  if (vm.TableId) tableId = vm.TableId;
-                                  else if (vm.PropsTableId) tableId = vm.PropsTableId;
-                                  else if (vm.DiyTableModel && vm.DiyTableModel.Id) tableId = vm.DiyTableModel.Id;
-                              }
-                              if (sysMenuId && tableId) break;
-                              vm = vm.$parent;
-                          }
-                      } catch (e) {
-                          // ignore
-                      }
-                      // 最后回退到路由上的 meta
-                      if (!sysMenuId && self.$route && self.$route.meta) sysMenuId = self.$route.meta.Id || self.$route.meta.SysMenuId || null;
-                      if (!tableId && self.$route && self.$route.meta) tableId = self.$route.meta.DiyTableId || self.$route.meta.TableId || null;
-                      var formModelId = (self.FormDiyTableModel && self.FormDiyTableModel.Id) || null;
-
-                      var detail = {
-                          sysMenuId: sysMenuId,
-                          tableId: tableId,
-                          formModelId: formModelId,
-                          timestamp: new Date().getTime()
-                      };
-                      // console.log(detail,888888888888);
-                      setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('page-refresh', { detail }));
-                      }, 100);
-                  } catch (e) {
-                      // 忽略派发失败，不影响主流程
-                  }
-
+                    try {
+                        // 如果回调显式返回 false，或 V8 执行异常返回 null，则不刷新
+                        if (res === false || res === null) return;
+                        if (!self.ShouldRefreshTableAfterClick(field)) return;
+                        self.DispatchTableRefresh({ _PageIndex: 1 });
+                    } catch (e) {
+                        // 忽略派发失败，不影响主流程
+                    }
                 }
             });
         },
@@ -314,7 +340,8 @@ export default {
             self.configForm = {
                 Button: {
                     Type: self.field.Config.Button.Type || '',
-                    PreviewCanClick: self.field.Config.Button.PreviewCanClick || false,
+                    PreviewCanClick: self.NormalizeBoolean(self.field.Config.Button.PreviewCanClick, false),
+                    RefreshTableAfterClick: self.NormalizeBoolean(self.field.Config.Button.RefreshTableAfterClick, false),
                     Icon: self.field.Config.Button.Icon || ''
                 }
             };
@@ -327,7 +354,8 @@ export default {
                 self.field.Config.Button = {};
             }
             self.field.Config.Button.Type = self.configForm.Button.Type;
-            self.field.Config.Button.PreviewCanClick = self.configForm.Button.PreviewCanClick;
+            self.field.Config.Button.PreviewCanClick = self.configForm.Button.PreviewCanClick === true;
+            self.field.Config.Button.RefreshTableAfterClick = self.configForm.Button.RefreshTableAfterClick === true;
             self.field.Config.Button.Icon = self.configForm.Button.Icon;
 
             self.configDialogVisible = false;

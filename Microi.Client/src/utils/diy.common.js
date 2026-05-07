@@ -2046,7 +2046,8 @@ var DiyCommon = {
                 Loading: false,
                 Icon: "",
                 Size: "small",
-                PreviewCanClick: true
+                PreviewCanClick: true,
+                RefreshTableAfterClick: false
             },
             Autocomplete: {},
             Unique: {
