@@ -1,3 +1,8 @@
+---
+name: ui-design
+description: Microi UI design system guidance. Use when designing PC Vue, Element Plus, uni-app H5, dashboards, forms, cards, gradients, responsive layout, and visual polish.
+---
+
 # Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
 
 你正在为 Microi 吾码平台创建界面。所有页面、组件、弹窗必须遵循本规范，打造统一的赛博、炫技、科技感视觉体验。

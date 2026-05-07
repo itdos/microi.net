@@ -1,3 +1,8 @@
+---
+name: v8-debugging
+description: Microi V8 debugging and logging guidance. Use when troubleshooting API engines, V8 events, console.log, DataAppend.DebugLog, sys_log, exception handling, and remote execution.
+---
+
 # Microi V8 调试与日志
 
 你正在为 Microi 吾码平台编写 V8 引擎代码，需要在开发/测试/生产环境进行排错。本指南提供调试模式、异常捕获、系统日志、调试输出的标准做法。

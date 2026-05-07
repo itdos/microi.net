@@ -349,17 +349,27 @@ namespace Microi.net
                     return new DosResult<object>(0, null, $"未找到接口引擎：{apiEngineKey}");
                 }
 
-                var id = (string)getResult.Data.Id;
-                var existingApiAddress = (string)getResult.Data.ApiAddress ?? "";
-                var existingApiName = (string)getResult.Data.ApiName ?? "";
+                var existingEngine = JObject.FromObject(getResult.Data);
+                var id = existingEngine.Value<string>("Id");
+                var existingApiAddress = existingEngine.Value<string>("ApiAddress") ?? "";
+                var apiAddress = string.IsNullOrWhiteSpace(existingApiAddress)
+                    ? $"/apiengine/{apiEngineKey}"
+                    : existingApiAddress;
+                var existingApiName = existingEngine.Value<string>("ApiName") ?? "";
+                var existingAllowAnonymous = existingEngine.Value<int?>("AllowAnonymous") ?? 0;
+                var existingIsEnable = existingEngine.Value<int?>("IsEnable") ?? 1;
+                var existingStopHttp = existingEngine.Value<int?>("StopHttp") ?? 0;
 
                 var updateParam = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["Id"] = id,
                     ["ApiEngineKey"] = apiEngineKey,
-                    ["ApiAddress"] = existingApiAddress,
+                    ["ApiAddress"] = apiAddress,
                     ["ApiName"] = existingApiName,
+                    ["AllowAnonymous"] = existingAllowAnonymous,
+                    ["IsEnable"] = existingIsEnable,
+                    ["StopHttp"] = existingStopHttp,
                     ["ApiV8Code"] = apiV8Code ?? "",
                     ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     ["_InvokeType"] = "Client"
@@ -371,6 +381,10 @@ namespace Microi.net
                     var cache = MicroiEngine.CacheTenant.Cache(osClient);
                     await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiEngineKey.ToLower()}");
                     await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{id.ToLower()}");
+                    if (!string.IsNullOrWhiteSpace(existingApiAddress))
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{existingApiAddress.ToLower()}");
+                    if (!string.IsNullOrWhiteSpace(apiAddress) && apiAddress != existingApiAddress)
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiAddress.ToLower()}");
 
                     return new DosResult<object>(1, new
                     {
@@ -2964,14 +2978,18 @@ namespace Microi.net
                     });
                     if (qr.Code != 1 || qr.Data == null) { fail++; log.Add("✗ not found: " + key); continue; }
                     var row = qr.Data;
+                    var currentApiAddress = row.ApiAddress == null ? "" : (string)row.ApiAddress;
+                    var apiAddress = string.IsNullOrWhiteSpace(currentApiAddress) ? $"/apiengine/{key}" : currentApiAddress;
                     var upt = new
                     {
                         OsClient = osClient,
                         Id = (string)row.Id,
                         ApiEngineKey = (string)row.ApiEngineKey,
                         ApiName = (string)row.ApiName,
-                        ApiAddress = (string)row.ApiAddress,
-                        AllowAnonymous = allowAnonymous
+                        ApiAddress = apiAddress,
+                        AllowAnonymous = allowAnonymous,
+                        IsEnable = 1,
+                        StopHttp = 0
                     };
                     var ur = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", upt);
                     var lk = (key ?? "").ToLower();
@@ -2979,7 +2997,9 @@ namespace Microi.net
                     await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{((string)row.Id ?? "").ToLower()}");
                     if (row.ApiAddress != null)
                         await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{((string)row.ApiAddress).ToLower()}");
-                    if (ur.Code == 1) { ok++; log.Add($"✓ {key} AllowAnonymous={allowAnonymous}"); }
+                    if (!string.IsNullOrWhiteSpace(apiAddress))
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiAddress.ToLower()}");
+                    if (ur.Code == 1) { ok++; log.Add($"✓ {key} AllowAnonymous={allowAnonymous}, IsEnable=1, StopHttp=0, ApiAddress={apiAddress}"); }
                     else { fail++; log.Add($"⚠ {key} fail: {ur.Msg}"); }
                 }
                 return new DosResult<object>(1, new { Ok = ok, Fail = fail, Log = log });
