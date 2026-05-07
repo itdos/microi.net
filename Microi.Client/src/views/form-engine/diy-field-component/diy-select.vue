@@ -147,7 +147,7 @@ export default {
         TableInEdit: { type: Boolean, default: false },
         TableId: { type: String, default: "" },
         DiyFieldList: { type: Array, default: () => [] },
-        DiyConfig: {
+        SysMenuModel: {
             type: Object,
             default() {
                 return {};
@@ -788,7 +788,7 @@ export default {
                 if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
                     apiUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Update);
                 }
-                if (self.DiyConfig && self.DiyConfig.AddBtnType == "InTable" && self.DiyConfig.SaveType == "提交一起保存") {
+                if (self.SysMenuModel && self.SysMenuModel.AddBtnType == "InTable" && self.SysMenuModel.SaveType == "提交一起保存") {
                     if (!self.FormDiyTableModel._DataStatus) {
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
                             self.FormDiyTableModel["_DataStatus"] = "Add";
