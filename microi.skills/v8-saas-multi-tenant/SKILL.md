@@ -1,3 +1,8 @@
+---
+name: v8-saas-multi-tenant
+description: Microi V8 SaaS multi-tenant guidance. Use when handling OsClient, OsClientType, OsClientNetwork, tenant configuration, V8.OsClientModel, isolation, and tenant-aware code.
+---
+
 # Microi V8 SaaS 多租户引擎
 
 你正在为 Microi 吾码平台编写多租户（SaaS）相关代码。SaaS 引擎为每个租户配置独立的数据库、Redis、MQ、存储、第三方密钥等，**所有 V8 代码都在租户上下文中运行**。

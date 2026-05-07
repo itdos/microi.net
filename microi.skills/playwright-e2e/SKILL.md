@@ -1,6 +1,6 @@
 ---
 name: playwright-e2e
-description: 在 Microi 吾码低代码平台的 PC Vue、uni-app H5、官网和租户自建前端中编写 Playwright 自动化测试，覆盖 UI 端到端、接口引擎断言、登录态注入、冒烟验收和 CI 报告。
+description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。Use when testing PC Vue, uni-app H5, websites, page engines, mobile malls, ApiEngine/FormEngine contracts, login flows, write-flow closure, network guards, screenshots, and reports.
 ---
 
 # Microi 吾码 Playwright E2E 自动化测试
@@ -145,8 +145,13 @@ export const microiEnv = {
   loginEngine: process.env.PW_LOGIN_ENGINE || 'member_login'
 };
 
+export function withOsClient(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}OsClient=${encodeURIComponent(microiEnv.osClient)}`;
+}
+
 export async function callEngine(request, apiEngineKey, data = {}, token = '') {
-  const res = await request.post(`${microiEnv.apiBase}/apiengine/${apiEngineKey}`, {
+  const res = await request.post(withOsClient(`${microiEnv.apiBase}/apiengine/${apiEngineKey}`), {
     headers: {
       'Content-Type': 'application/json',
       OsClient: microiEnv.osClient,
@@ -265,6 +270,13 @@ tests/e2e/
 3. 写操作必须做“前置清理 → 执行动作 → 后端查询确认 → 用例清理”。
 4. UI 点击不能只断言 toast；必须用 `page.waitForResponse()` 捕捉对应接口，并验证响应体。
 5. 任何 FormEngine HTTP 路由必须使用 `/api/formengine/{action}-{table}`，不要生成 `/formengine/{table}/{action}`。
+6. ApiEngine 动态路由必须显式携带 OsClient：推荐 `/apiengine/{ApiEngineKey}?OsClient={osClient}`，Header 里的 `OsClient` 只能作为补充，不能作为唯一租户来源。
+7. 页面级测试必须把 `请求失败`、`网络错误`、`null`、`待开发`、`开发中` 当成失败信号；这些文案如果出现在页面或 toast 中，说明功能未交付或接口契约错误。
+8. 新增、保存、结算、转赠、确认、上传等按钮不能只弹“成功/待开发”toast；必须调用真实业务接口，并通过后端查询验证状态变化。
+9. 源码守卫可作为兜底：递归扫描 `src/**/*.vue`、`src/**/*.js`，禁止残留 `待开发|开发中` 占位文案。
+10. 新建或更新 ApiEngine 后必须用 HTTP 路径复测一次；只用 `microi_run_engine` 通过不够，因为 HTTP 调用还受 `IsEnable`、`StopHttp`、`AllowAnonymous` 和动态路由缓存影响。
+11. 每个移动端项目都要有“接口清单驱动”的契约测试：静态扫描或维护清单覆盖所有 `callEngine('xxx')`，逐个 HTTP 调用并断言不是 404、不是空响应、不是字符串 `null`，且必须是标准 DosResult。
+12. 写业务闭环时必须准备可重复测试数据并清理：例如抢购要“创建测试挂单 → 调用抢购 → 验证订单 → 删除测试订单/挂单/提货卡”，购物车要“加入购物车 → 结算 → 验证订单/购物车状态 → 删除测试订单”。
 
 移动商城/会员 H5 额外规则：
 
@@ -272,6 +284,12 @@ tests/e2e/
 - 移动端会员数据查询不要直连平台 FormEngine；使用租户 ApiEngine 或安全查询代理。
 - 商品详情“加入购物车”必须登录；登录后必须写服务端购物车，再进入购物车页验证同一商品可见。
 - 购物车、订单、资产、团队、提货、地址、收款方式等会员数据都必须按会员 Id 做后端范围过滤。
+- 库存转让区不要写成“转赠区”，更不要写 `1:1.5 转赠`；业务含义是“提货卡转让”，平台服务费 1.2%，用户收益 1.5%。页面、接口、测试命名都要用“库存转让/提货卡转让”。
+- 库存转让区必须覆盖 `mall_grab_window_status`：接口必须返回标准 DosResult，`Data` 至少包含 `Status`、`StartTime`、`EndTime`、`ServerTime`、`UserProfitRate`、`PlatformServiceRate`。当前业务需要 00:00-24:00 全天开放时，测试必须断言 `Status=Open`、开始时间 `00:00:00`、结束时间 `24:00:00`。
+- `mall_grab_submit` 必须对空参数、无效挂单、已锁定挂单返回标准 DosResult，禁止返回 JS `null`；成功路径必须返回订单 Id，并验证用户收益率 1.5%、平台服务费率 1.2%。
+- “我的-新增地址”和“我的-新增收款方式”必须点击后出现真实表单，保存后后端能查到新增记录。
+- 购物车“结算”必须调用 `mall_cart_settle` 或等价业务接口，不能残留 `结算功能开发中`。
+- `mall_cart_settle` 必须覆盖真实闭环：登录、加入购物车、点击结算、等待 `/apiengine/mall_cart_settle`、断言 Code=1 和订单 Id，再查询购物车确认对应商品已移除。
 
 ## 与 MCP 的配合
 
@@ -279,7 +297,7 @@ tests/e2e/
 - `microi_get_playwright_context`：获取可测菜单 URL、接口引擎、匿名配置。
 - `microi_plan_playwright_e2e`：生成推荐的测试文件、环境变量和冒烟路径。
 - `microi_run_engine`：调试单个接口引擎，不替代浏览器 E2E。
-- `microi_set_engine_anonymous`：登录、注册、公开首页接口需要匿名访问时使用。
+- `microi_set_engine_anonymous`：登录、注册、公开首页接口需要匿名访问时使用；设置后仍要验证 HTTP `/apiengine/{key}?OsClient={osClient}` 返回标准 DosResult。
 
 ## 与 VS Code 插件的配合
 
@@ -319,6 +337,11 @@ jobs:
 |---|---|---|
 | 接口返回 `Code=1001/1002` | Token 失效或未传 | 登录 fixture 注入 Token，或检查 Header |
 | 登录接口返回 `Code=0` | 账号数据不存在或 `AllowAnonymous=0` | 准备测试账号，必要时设置匿名 |
+| `microi_run_engine` 成功但 `/apiengine/{key}` 返回“未启用” | `IsEnable=0`、`StopHttp=1` 或保存代码时丢失接口元数据 | 设置匿名/启用后清缓存，并用 HTTP 路径复测 |
+| 新增接口一开始 404 | 动态路由缓存尚未刷新 | HTTP 调用带 `apiengine: 1` Header 直达接口引擎，并刷新缓存/重启后端 |
+| `microi_set_engine_anonymous` 显示已启用但 HTTP 仍提示 `sys_apiengine` 不存在 | 历史引擎 `ApiAddress` 为空或不是 `/apiengine/{key}` | 批量补齐 `ApiAddress`、`IsEnable=1`、`StopHttp=0`，并清 key/id/address 三类缓存 |
+| 保存接口代码后 MCP 自己报 `string does not contain DosIsNullOrWhiteSpace` | 后端 C# 在动态对象路径上调用扩展方法 | 改用 `string.IsNullOrWhiteSpace`，不要在 MCP 路径新增 `DosIsNullOrWhiteSpace` 调用 |
+| MCP `run_engine` 里 `V8.Db` 为 null | MCP 执行上下文没有注入直连 Db | 维护/测试引擎优先使用 `V8.FormEngine.GetTableData/UptFormData` |
 | H5 静态资源 404 | `vite.config.js` 未配置相对路径 | uni-app H5 设置 `base: './'` |
 | 本地浏览器下载失败 | Playwright 下载 Chromium 受阻 | 使用 `PW_BROWSER_CHANNEL=msedge` |
 | 用例偶发失败 | HMR 或网络请求未稳定 | CI 使用静态构建，断言明确等待关键元素 |

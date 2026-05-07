@@ -1,3 +1,8 @@
+---
+name: v8-menu-buttons
+description: Microi menu button and tab V8 guidance. Use when configuring sys_menu MoreBtns, FormBtns, BatchSelectMoreBtns, PageTabs, PageBtns, ExportMoreBtns, visibility code, and row actions.
+---
+
 # v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
 
 > 适用于 sys_menu 表的 MoreBtns、FormBtns、BatchSelectMoreBtns、PageTabs、ExportMoreBtns、PageBtns 字段。

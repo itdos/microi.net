@@ -1,3 +1,8 @@
+---
+name: v8-mq-mqtt
+description: Microi V8 message queue and MQTT guidance. Use when using V8.MQ.SendMsg, RabbitMQ queues, MQTT event handling, topics, payloads, client IDs, and async integrations.
+---
+
 # Microi V8 消息队列与 MQTT
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 RabbitMQ 消息队列或 MQTT 物联网协议。
