@@ -1886,6 +1886,53 @@ var DiyCommon = {
             Divider: {
                 Icon: ""
             },
+            CollapseGroup: {
+                DefaultCollapsed: false,
+                ScopeMode: "UntilNextGroup",
+                FieldCount: 10,
+                Description: "",
+                Icon: "fas fa-layer-group",
+                Theme: "default",
+                ShowFieldCount: true
+            },
+            Alert: {
+                Title: "",
+                Content: "",
+                Type: "info",
+                Effect: "light",
+                ShowIcon: true
+            },
+            StaticText: {
+                Title: "",
+                Content: "",
+                Align: "left",
+                Theme: "default"
+            },
+            Html: {
+                Content: "",
+                UseFieldValue: false,
+                MinHeight: "",
+                Padding: ""
+            },
+            Slider: {
+                Min: 0,
+                Max: 100,
+                Step: 1,
+                Range: false,
+                ShowInput: false,
+                ShowStops: false
+            },
+            TagInput: {
+                Placeholder: "请输入或选择标签",
+                Options: [],
+                MaxCount: 0
+            },
+            Transfer: {
+                LeftTitle: "可选项",
+                RightTitle: "已选项",
+                Filterable: true,
+                Options: []
+            },
             DataSource: "",
             DataSourceSqlRemote: false,
             DataSourceSqlRemoteLoading: false,
@@ -2219,6 +2266,35 @@ var DiyCommon = {
                 return value;
             }
         },
+        "TagInput": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            }
+        },
+        "Transfer": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            }
+        },
+        "Slider": {
+            valueType: "dynamic",
+            defaultValue: 0,
+            process: function(field, formData, ctx) {
+                var config = field.Config && field.Config.Slider ? field.Config.Slider : {};
+                if (config.Range === true) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, true);
+                }
+                var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) ? null : formData[field.Name];
+                if (DiyCommon.IsNull(rawValue)) {
+                    return Number(config.Min || 0);
+                }
+                return Number(rawValue);
+            }
+        },
         
         // ==================== 单选下拉类组件 ====================
         "Select": {
@@ -2506,6 +2582,27 @@ var DiyCommon = {
             defaultValue: null,
             process: function(field, formData, ctx) {
                 return null; // 按钮不需要值
+            }
+        },
+        "CollapseGroup": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 折叠分组不需要值
+            }
+        },
+        "Alert": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 提示说明不需要值
+            }
+        },
+        "StaticText": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 静态文本不需要值
             }
         },
         
@@ -2866,9 +2963,16 @@ var DiyCommon = {
         var field = typeof fieldOrComponent === "object" ? fieldOrComponent : null;
 
         // 常规需要数组类型的组件
-        var arrayComponents = ["Checkbox", "MultipleSelect"];
+        var arrayComponents = ["Checkbox", "MultipleSelect", "TagInput", "Transfer"];
         if (arrayComponents.indexOf(component) > -1) {
             return "array";
+        }
+
+        if (component === "Slider") {
+            if (field && field.Config && field.Config.Slider && field.Config.Slider.Range === true) {
+                return "array";
+            }
+            return null;
         }
 
         // ImgUpload 和 FileUpload：只有在配置了 Multiple 时才期望数组

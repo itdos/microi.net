@@ -60,7 +60,12 @@
                                 <template #item="{ element: field }">
                                     <el-col
                                         v-show="field._isShow"
-                                        :class="'field-drag-handle design-mode-field ' + (CurrentDiyFieldModel.Id == field.Id ? field._activeClass + ' selected-field' : field._class)"
+                                        :class="[
+                                            'field-drag-handle',
+                                            'design-mode-field',
+                                            CurrentDiyFieldModel.Id == field.Id ? field._activeClass + ' selected-field' : field._class,
+                                            field._collapseClass
+                                        ]"
                                         :key="'el_col_fieldid_' + field.Id"
                                         :span="field._span"
                                         :xs="24"
@@ -149,6 +154,7 @@
                                                 @CallbackParentFormSubmit="CallbackParentFormSubmit"
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
+                                                @CallbackGroupCollapseChange="handleGroupCollapseChange"
                                             />
                                         </el-form-item>
                                     </div>
@@ -161,7 +167,7 @@
                                 <el-col
                                     v-for="field in DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                     v-show="field._isShow"
-                                    :class="CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class"
+                                    :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass]"
                                     :key="'el_col_fieldid_' + field.Id"
                                     :span="field._span"
                                     :xs="24"
@@ -219,6 +225,7 @@
                                                 @CallbackParentFormSubmit="CallbackParentFormSubmit"
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
                                                 @CallbackShowTableChildHideField="ShowTableChildHideField"
+                                                @CallbackGroupCollapseChange="handleGroupCollapseChange"
                                             />
                                         </el-form-item>
                                     </div>
@@ -1078,6 +1085,8 @@ export default {
                             }
                         });
 
+                        self.RefreshDiyFieldRuntimeState();
+
                         self.LoadDiyFieldList = true;
                         self.$emit("CallbackGetDiyField", self.DiyFieldList);
                         //注意：2020-11-02发现，当初为什么这里要0.3秒后执行？
@@ -1324,11 +1333,13 @@ export default {
         // },
         FieldSet(fieldName, attrName, value) {
             var self = this;
+            var needRefreshRuntime = false;
             // 先查找出Field对象
             self.DiyFieldList.forEach((element) => {
                 //2022-07-25：像JoinTable.TableId 这种赋值， attrName需要传入 'Config.JoinTable.TableId'
                 if (element.Name == fieldName) {
                     if (attrName.indexOf("Config.") > -1) {
+                        needRefreshRuntime = true;
                         var oldConfig = element.Config;
                         var attrArray = attrName.split(".");
                         if (attrArray.length == 2) {
@@ -1348,6 +1359,7 @@ export default {
                             || attrName == 'Display'
                             || attrName == 'AppDisplay'
                         ){
+                            needRefreshRuntime = true;
                             element['Visible'] = value;
                             element['AppVisible'] = value;
                             element['Display'] = value;
@@ -1356,6 +1368,9 @@ export default {
                     }
                 }
             });
+            if (needRefreshRuntime && typeof self.RefreshDiyFieldRuntimeState === 'function') {
+                self.RefreshDiyFieldRuntimeState();
+            }
         },
         NumberTextChange(currentValue, oldValue, field) {
             var self = this;
