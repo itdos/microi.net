@@ -4,7 +4,7 @@
 }
 /* 禁用状态文字颜色优化 - 使用 CSS 变量以兼容深色模式 */
 .itdos-diy-form {
-    
+
     /* Element Plus Input 禁用状态 */
     :deep(.el-input.is-disabled .el-input__inner),
     :deep(.el-input.is-disabled .el-input__wrapper) {
@@ -12,14 +12,14 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Textarea 禁用状态 */
     :deep(.el-textarea.is-disabled .el-textarea__inner) {
         color: var(--el-text-color-regular) !important;
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-secondary) !important;
     }
-    
+
     /* Element Plus Select 禁用状态 */
     :deep(.el-select.is-disabled .el-input__inner),
     :deep(.el-select.is-disabled .el-input__wrapper) {
@@ -27,7 +27,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus DatePicker 禁用状态 */
     :deep(.el-date-editor.is-disabled .el-input__inner),
     :deep(.el-date-editor.is-disabled .el-input__wrapper) {
@@ -35,7 +35,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus InputNumber 禁用状态 */
     :deep(.el-input-number.is-disabled .el-input__inner),
     :deep(.el-input-number.is-disabled .el-input__wrapper) {
@@ -43,7 +43,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Cascader 禁用状态 */
     :deep(.el-cascader.is-disabled .el-input__inner),
     :deep(.el-cascader.is-disabled .el-input__wrapper) {
@@ -51,7 +51,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus TimePicker 禁用状态 */
     :deep(.el-time-picker.is-disabled .el-input__inner),
     :deep(.el-time-picker.is-disabled .el-input__wrapper) {
@@ -59,7 +59,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus AutoComplete 禁用状态 */
     :deep(.el-autocomplete.is-disabled .el-input__inner),
     :deep(.el-autocomplete.is-disabled .el-input__wrapper) {
@@ -67,7 +67,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus 通用禁用状态 */
     :deep(.el-form-item.is-disabled),
     :deep(.is-disabled) {
@@ -172,6 +172,9 @@
 
     .collapse-group-header {
         margin-top: 8px;
+        //zhy改用表单下边框和下方折叠框宽度对齐，设置外边距避免边框重合
+        border-bottom: 1px solid var(--collapse-group-border);
+        margin-bottom: 5px;
 
         .container-form-item {
             margin-bottom: 0;
@@ -188,7 +191,8 @@
     }
 
     .collapse-group-item {
-        background: var(--collapse-group-bg);
+      //去掉折叠区域背景，主要是为了和页面背景衔接
+        // background: var(--collapse-group-bg);
         border-color: var(--collapse-group-border);
         border-style: solid;
         border-width: 0;
