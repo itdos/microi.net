@@ -181,6 +181,7 @@ export default {
                     || field.Component == "JoinForm"
                     || field.Component == "TableChild"
                     || field.Component == "CollapseGroup"
+                    || field.Component == "Tabs"
                     || field.Component == "Alert"
                     || field.Component == "StaticText"
                     || field.Component == "Html"
@@ -227,6 +228,9 @@ export default {
         GetFieldIsShow(field) {
             var self = this;
             if (field && field._collapseHidden === true) {
+                return false;
+            }
+            if (field && field._fieldTabsHidden === true) {
                 return false;
             }
             // 默认不显示审计字段，需手动在表单属性中开启

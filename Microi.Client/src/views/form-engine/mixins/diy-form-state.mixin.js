@@ -188,6 +188,7 @@ export default {
             Object.keys(grouped).forEach((key) => {
                 if (tabKey && key !== tabKey) return;
                 self.ApplyCollapseGroupState(grouped[key], key);
+                self.ApplyFieldTabsState(grouped[key], key);
             });
         },
         GetCollapseStateKey(field, tabKey, index) {
@@ -287,7 +288,7 @@ export default {
             for (var childIndex = groupIndex + 1; childIndex < fields.length; childIndex++) {
                 var childField = fields[childIndex];
                 if (!childField) continue;
-                if (childField.Component === "CollapseGroup") {
+                if (childField.Component === "CollapseGroup" || childField.Component === "Tabs") {
                     break;
                 }
 
@@ -367,6 +368,204 @@ export default {
                 });
             });
         },
+        GetFieldTabsStateKey(field, tabKey, index) {
+            return field.Id || field.Name || (tabKey + "_tabs_" + index);
+        },
+        GetFieldTabsConfig(field) {
+            return (field && field.Config && field.Config.FieldTabs) ? field.Config.FieldTabs : {};
+        },
+        NormalizeFieldTabsPanes(config) {
+            var defaultPanes = [
+                { Key: "tab1", Title: "基础信息", Icon: "fas fa-id-card", FieldCount: 4, Disabled: false },
+                { Key: "tab2", Title: "扩展信息", Icon: "fas fa-layer-group", FieldCount: 4, Disabled: false }
+            ];
+            var source = config && Array.isArray(config.Tabs) && config.Tabs.length > 0 ? config.Tabs : defaultPanes;
+            var usedKeys = {};
+            return source.map((pane, index) => {
+                var rawKey = pane && pane.Key ? String(pane.Key).trim() : "";
+                var key = rawKey || ("tab" + (index + 1));
+                if (usedKeys[key]) {
+                    key = key + "_" + (index + 1);
+                }
+                usedKeys[key] = true;
+                var fieldCount = parseInt(pane && pane.FieldCount, 10);
+                if (!fieldCount || fieldCount < 1) fieldCount = 1;
+                return {
+                    Key: key,
+                    Title: (pane && (pane.Title || pane.Name || pane.Label)) || ("页签" + (index + 1)),
+                    Icon: (pane && pane.Icon) || "",
+                    FieldCount: fieldCount,
+                    Disabled: pane && (pane.Disabled === true || pane.Disabled === 1 || pane.Disabled === "1" || pane.Disabled === "true")
+                };
+            });
+        },
+        ResolveFieldTabsActiveKey(config, panes, stateKey) {
+            var self = this;
+            if (!Array.isArray(panes) || panes.length === 0) return "";
+            var configuredKey = self.FieldTabsState && Object.prototype.hasOwnProperty.call(self.FieldTabsState, stateKey)
+                ? self.FieldTabsState[stateKey]
+                : (config.DefaultActiveKey || "");
+            var activePane = panes.find((pane) => pane.Key === configuredKey && pane.Disabled !== true);
+            if (activePane) return activePane.Key;
+            var firstEnabled = panes.find((pane) => pane.Disabled !== true);
+            return (firstEnabled || panes[0]).Key;
+        },
+        AppendFieldRuntimeClass(field, className) {
+            var self = this;
+            if (!field || !className) return;
+            var current = field._collapseClass || "";
+            self.SetFieldRuntimeValue(field, "_collapseClass", (current + " " + className).trim());
+        },
+        ApplyFieldTabsState(fields, tabKey) {
+            var self = this;
+            if (!Array.isArray(fields) || fields.length === 0) {
+                return fields;
+            }
+
+            fields.forEach((field) => {
+                if (!field || typeof field !== "object") return;
+                self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
+                self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneTitle", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneIndex", -1);
+                self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", 0);
+                self.SetFieldRuntimeValue(field, "_fieldTabsPanes", []);
+            });
+
+            fields.forEach((field, index) => {
+                if (!field || field.Component !== "Tabs") return;
+                self.ApplyFieldTabsVisualState(fields, index, tabKey);
+            });
+
+            return fields;
+        },
+        ApplyFieldTabsVisualState(fields, tabsIndex, tabKey) {
+            var self = this;
+            var field = fields[tabsIndex];
+            if (!field || field.Component !== "Tabs") return;
+
+            var tabsConfig = self.GetFieldTabsConfig(field);
+            var panes = self.NormalizeFieldTabsPanes(tabsConfig);
+            var stateKey = self.GetFieldTabsStateKey(field, tabKey, tabsIndex);
+            var activeKey = self.ResolveFieldTabsActiveKey(tabsConfig, panes, stateKey);
+            var captureRest = tabsConfig.CaptureRest !== false;
+            var theme = tabsConfig.Theme || "default";
+
+            var stopIndex = fields.length;
+            for (var scanIndex = tabsIndex + 1; scanIndex < fields.length; scanIndex++) {
+                var scanField = fields[scanIndex];
+                if (scanField && scanField.Component === "Tabs") {
+                    stopIndex = scanIndex;
+                    break;
+                }
+            }
+
+            var availableFields = fields.slice(tabsIndex + 1, stopIndex);
+            var cursor = 0;
+            var runtimePanes = [];
+            var totalChildCount = 0;
+
+            panes.forEach((pane, paneIndex) => {
+                var remaining = Math.max(availableFields.length - cursor, 0);
+                var paneFieldCount = pane.FieldCount;
+                if (captureRest && paneIndex === panes.length - 1) {
+                    paneFieldCount = remaining;
+                }
+                paneFieldCount = Math.max(0, Math.min(paneFieldCount, remaining));
+                var paneFields = availableFields.slice(cursor, cursor + paneFieldCount);
+                cursor += paneFieldCount;
+
+                var visibleCount = paneFields.filter((childField) => childField && childField._baseIsShow !== false).length;
+                totalChildCount += visibleCount;
+                runtimePanes.push({
+                    ...pane,
+                    _fieldCount: visibleCount
+                });
+
+                var visiblePaneFields = [];
+                paneFields.forEach((childField, childIndex) => {
+                    if (!childField) return;
+                    var visibleBeforeTabs = childField._isShow !== false;
+                    var isActivePane = pane.Key === activeKey;
+                    var shouldShow = visibleBeforeTabs && (isActivePane || self.LoadMode === "Design");
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsHidden", !isActivePane && self.LoadMode !== "Design");
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsStateKey", stateKey);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsActiveKey", activeKey);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneKey", pane.Key);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneTitle", pane.Title);
+                    self.SetFieldRuntimeValue(childField, "_fieldTabsPaneIndex", paneIndex);
+                    self.SetFieldRuntimeValue(childField, "_isShow", shouldShow);
+                    self.AppendFieldRuntimeClass(
+                        childField,
+                        "field-tabs-item field-tabs-theme-" + theme +
+                        " field-tabs-pane-" + paneIndex +
+                        " field-tabs-child-" + childIndex +
+                        (isActivePane ? " field-tabs-active-pane" : " field-tabs-inactive-pane")
+                    );
+                    if (shouldShow) {
+                        visiblePaneFields.push(childField);
+                    }
+                });
+
+                self.ApplyFieldTabsRowClasses(visiblePaneFields);
+            });
+
+            self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
+            self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", stateKey);
+            self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", activeKey);
+            self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", totalChildCount);
+            self.SetFieldRuntimeValue(field, "_fieldTabsPanes", runtimePanes);
+            self.AppendFieldRuntimeClass(field, "field-tabs-header field-tabs-theme-" + theme);
+        },
+        ApplyFieldTabsRowClasses(visibleChildFields) {
+            var self = this;
+            if (!Array.isArray(visibleChildFields) || visibleChildFields.length === 0) return;
+
+            var rows = [];
+            var currentRow = [];
+            var currentSpan = 0;
+            var pushCurrentRow = function () {
+                if (currentRow.length > 0) {
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentSpan = 0;
+                }
+            };
+
+            visibleChildFields.forEach((childField) => {
+                var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                if (!span || span < 1) span = 24;
+                if (span > 24) span = 24;
+
+                if (currentRow.length > 0 && currentSpan + span > 24) {
+                    pushCurrentRow();
+                }
+                currentRow.push(childField);
+                currentSpan += span;
+                if (currentSpan >= 24) {
+                    pushCurrentRow();
+                }
+            });
+            pushCurrentRow();
+
+            self.AppendFieldRuntimeClass(visibleChildFields[0], "field-tabs-visible-first");
+            self.AppendFieldRuntimeClass(visibleChildFields[visibleChildFields.length - 1], "field-tabs-visible-last");
+
+            rows.forEach((row, rowIndex) => {
+                row.forEach((childField, colIndex) => {
+                    self.AppendFieldRuntimeClass(
+                        childField,
+                        "field-tabs-row field-tabs-row-" + rowIndex +
+                        (rowIndex === 0 ? " field-tabs-row-first" : "") +
+                        (rowIndex === rows.length - 1 ? " field-tabs-row-last" : "") +
+                        (colIndex === 0 ? " field-tabs-row-start" : "") +
+                        (colIndex === row.length - 1 ? " field-tabs-row-end" : "")
+                    );
+                });
+            });
+        },
         handleGroupCollapseChange(field, collapsed) {
             var self = this;
             if (!field) return;
@@ -378,6 +577,20 @@ export default {
             }
             self.CollapseGroupState = Object.assign({}, self.CollapseGroupState, {
                 [stateKey]: collapsed
+            });
+            self.RefreshDiyFieldRuntimeState();
+        },
+        handleFieldTabsChange(field, activeKey) {
+            var self = this;
+            if (!field) return;
+            var stateKey = field._fieldTabsStateKey || field.Id || field.Name;
+            if (!stateKey) return;
+            if (self.FieldTabsState && self.FieldTabsState[stateKey] === activeKey) {
+                self.RefreshDiyFieldRuntimeState();
+                return;
+            }
+            self.FieldTabsState = Object.assign({}, self.FieldTabsState, {
+                [stateKey]: activeKey
             });
             self.RefreshDiyFieldRuntimeState();
         }
@@ -394,6 +607,7 @@ export default {
             PageType: "", //可以是Report
             FormTabs: [],
             CollapseGroupState: {},
+            FieldTabsState: {},
             // 性能优化：跟踪已渲染的标签页，实现懒加载
             // Set 结构存储已渲染的 tab id/name，首次只渲染第一个 tab
             renderedTabs: new Set(),

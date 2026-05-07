@@ -34,7 +34,7 @@ export default {
         shouldShowLabel(field) {
             var self = this;
             // 不显示 label 的组件类型
-            var noLabelComponents = ['Divider', 'CollapseGroup', 'Alert', 'StaticText', 'Html', 'HTML', 'DevComponent'];
+            var noLabelComponents = ['Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html', 'HTML', 'DevComponent'];
             // 如果是子表，并且 Label 为空，也不显示
             if (field.Component === 'TableChild' && !field.Label) {
                 return false;
