@@ -513,7 +513,6 @@ var DiyCommon = {
         "MobileListFields",
         "SearchFieldIds",
         "SortFieldIds",
-        "DiyConfig",
         "StatisticsFields",
         "MoreBtns",
         "ExportMoreBtns",
@@ -3547,11 +3546,7 @@ var DiyCommon = {
 
         DiyCommon.SysMenuNeedConvertField.forEach((convertField) => {
             if (DiyCommon.IsNull(data[convertField])) {
-                if (convertField == "DiyConfig") {
-                    data[convertField] = {};
-                } else {
-                    data[convertField] = [];
-                }
+                data[convertField] = [];
             } else if (typeof data[convertField] == "string") {
                 if (convertField == "StatisticsFields") {
                     var tempResult = [];
@@ -3592,8 +3587,6 @@ var DiyCommon = {
                             });
                         }
                     }
-                } else if (convertField == "DiyConfig" && data[convertField] == "[]") {
-                    data[convertField] = {};
                 } else {
                     try {
                         data[convertField] = JSON.parse(data[convertField]);

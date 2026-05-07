@@ -47,7 +47,7 @@ export default {
         //是否是多Tabs
         IsPageTabs() {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)) {
+            if (!self.DiyCommon.IsNull(self.SysMenuModel) && !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)) {
                 if (self.SysMenuModel.PageTabs.length > 1 || (self.SysMenuModel.PageTabs.length == 1 && self.SysMenuModel.PageTabs[0].Id != "none" && self.SysMenuModel.PageTabs[0].Name != "")) {
                     return true;
                 }
@@ -235,8 +235,8 @@ export default {
             self.BtnExportLoading = true;
             var url = self.DiyCommon.GetApiBase() + "/api/FormEngine/ExportDiyTableRow";
             var paramType = "json";
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
-                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ExportApi);
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.ExportApi)) {
+                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.ExportApi);
                 paramType = "json";
             }
 

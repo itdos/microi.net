@@ -27,7 +27,7 @@
                                 <el-dropdown-item v-if="FormMode == 'View' && ShowUpdateBtn" @click="GotoEdit()">
                                     <el-icon><Edit /></el-icon>编辑
                                 </el-dropdown-item>
-                                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                                <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                                     <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                                         <el-dropdown-item
                                             :key="'mobile_btn_' + btnIndex"
@@ -70,7 +70,7 @@
                         >
                             {{ $t('Msg.Cancel')}}
                         </el-button>
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                                 <el-button
                                     :key="'more_btn_formbtns_page_' + btnIndex"
@@ -187,7 +187,7 @@
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                             </div>
                             <!--表单更多按钮 FormBtns-->
-                            <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                            <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                                 <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'fab_formbtn_' + btnIndex">
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                         <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -282,7 +282,7 @@
                     >
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                    <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
@@ -438,7 +438,7 @@
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'dialog_fab_btn_' + btnIndex">
                                 <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                     <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -497,8 +497,8 @@
                     >
                         <dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />
                         {{
-                            (FormMode == "Add" || FormMode == "Insert") && !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.SaveBtnText)
-                                ? SysMenuModel.DiyConfig.SaveBtnText
+                            (FormMode == "Add" || FormMode == "Insert") && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.SaveBtnText)
+                                ? SysMenuModel.SaveBtnText
                                 : $t("Msg.Save")
                         }}
                         <template #dropdown
@@ -548,7 +548,7 @@
                     >
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                    <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
@@ -704,7 +704,7 @@
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'drawer_fab_btn_' + btnIndex">
                                 <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                     <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>

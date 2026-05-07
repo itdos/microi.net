@@ -132,7 +132,7 @@ export default {
             type: String,
             default: "" //View
         },
-        DiyConfig: {
+        SysMenuModel: {
             type: Object,
             default() {
                 return {};
@@ -212,7 +212,7 @@ export default {
                       var tableId = null;
 
                       // 优先从当前组件自身的已知字段取
-                      if (self.DiyConfig && self.DiyConfig.SysMenuId) sysMenuId = self.DiyConfig.SysMenuId;
+                      if (self.SysMenuModel && self.SysMenuModel.SysMenuId) sysMenuId = self.SysMenuModel.SysMenuId;
                       if (!sysMenuId && self.FormDiyTableModel && self.FormDiyTableModel.SysMenuId) sysMenuId = self.FormDiyTableModel.SysMenuId;
                       if (!sysMenuId && self.DiyTableModel && self.DiyTableModel.SysMenuId) sysMenuId = self.DiyTableModel.SysMenuId;
                       if (!tableId && self.TableId) tableId = self.TableId;
