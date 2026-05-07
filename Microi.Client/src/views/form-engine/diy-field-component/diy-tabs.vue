@@ -32,6 +32,13 @@
                 </template>
             </el-tab-pane>
         </el-tabs>
+        <div v-if="LoadMode === 'Design'" class="diy-field-tabs__designbar" @click.stop>
+            <el-tag size="small" effect="plain">{{ scopeModeText }}</el-tag>
+            <el-tag v-if="totalFieldCountText" size="small" effect="plain">{{ totalFieldCountText }}</el-tag>
+            <el-button size="small" type="primary" plain :icon="Setting" @click.stop="openConfig">
+                字段归属
+            </el-button>
+        </div>
     </div>
 
     <el-dialog
@@ -49,6 +56,20 @@
             <el-divider content-position="left">基础设置</el-divider>
             <el-row :gutter="12">
                 <el-col :span="8" :xs="24">
+                    <el-form-item label="分组方式">
+                        <el-select v-model="configForm.ScopeMode" style="width: 100%">
+                            <el-option label="按页签字段数" value="FieldCount" />
+                            <el-option label="手动选择字段" value="Manual" />
+                        </el-select>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="8" :xs="24">
+                    <el-form-item label="总作用字段数">
+                        <el-input-number v-model="configForm.TotalFieldCount" :min="0" :max="200" :step="1" />
+                        <div class="form-item-tip">0 表示直到下一个页签分组</div>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="8" :xs="24">
                     <el-form-item label="默认页签">
                         <el-select v-model="configForm.DefaultActiveKey" style="width: 100%">
                             <el-option
@@ -60,6 +81,9 @@
                         </el-select>
                     </el-form-item>
                 </el-col>
+            </el-row>
+
+            <el-row :gutter="12">
                 <el-col :span="8" :xs="24">
                     <el-form-item label="页签样式">
                         <el-select v-model="configForm.Type" style="width: 100%">
@@ -79,9 +103,6 @@
                         </el-select>
                     </el-form-item>
                 </el-col>
-            </el-row>
-
-            <el-row :gutter="12">
                 <el-col :span="8" :xs="24">
                     <el-form-item label="拉伸铺满">
                         <el-switch v-model="configForm.Stretch" active-color="#ff6c04" inactive-color="#ccc" />
@@ -134,12 +155,34 @@
                                 </el-input>
                             </el-form-item>
                         </el-col>
-                        <el-col :span="5" :xs="24">
+                        <el-col v-if="configForm.ScopeMode === 'FieldCount'" :span="5" :xs="24">
                             <el-form-item label="字段数">
                                 <el-input-number v-model="pane.FieldCount" :min="1" :max="100" :step="1" />
                             </el-form-item>
                         </el-col>
                     </el-row>
+                    <el-form-item v-if="configForm.ScopeMode === 'Manual'" label="手动字段">
+                        <el-select
+                            v-model="pane.FieldKeys"
+                            multiple
+                            filterable
+                            collapse-tags
+                            collapse-tags-tooltip
+                            clearable
+                            style="width: 100%"
+                            placeholder="从总作用字段范围内选择字段"
+                        >
+                            <el-option
+                                v-for="item in manualFieldOptions"
+                                :key="'manual_field_' + item.Key"
+                                :label="item.Label"
+                                :value="item.Key"
+                            >
+                                <span style="float: left">{{ item.Label }}</span>
+                                <span style="float: right; color: #8492a6; font-size: 12px">{{ item.Name }}</span>
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
                     <el-form-item label="禁用页签">
                         <el-switch v-model="pane.Disabled" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
@@ -156,7 +199,7 @@
 
 <script setup>
 import { computed, getCurrentInstance, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Delete, Plus } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowUp, Delete, Plus, Setting } from "@element-plus/icons-vue";
 
 defineOptions({
     name: "diy-tabs",
@@ -175,6 +218,10 @@ const props = defineProps({
     LoadMode: {
         type: String,
         default: ""
+    },
+    ParentFieldList: {
+        type: Array,
+        default: () => []
     }
 });
 
@@ -210,6 +257,8 @@ const normalizePanes = (tabs) => {
             Title: (pane && (pane.Title || pane.Name || pane.Label)) || ("页签" + (index + 1)),
             Icon: (pane && pane.Icon) || "",
             FieldCount: fieldCount,
+            FieldKeys: Array.isArray(pane && pane.FieldKeys) ? pane.FieldKeys.map((item) => String(item)) : [],
+            FieldNames: Array.isArray(pane && pane.FieldNames) ? pane.FieldNames.map((item) => String(item)) : [],
             Disabled: normalizeBoolean(pane && pane.Disabled, false),
             _fieldCount: pane && pane._fieldCount !== undefined ? pane._fieldCount : undefined
         };
@@ -239,6 +288,14 @@ const tabPosition = computed(() => {
 });
 const stretch = computed(() => normalizeBoolean(config.value.Stretch, false));
 const showFieldCount = computed(() => config.value.ShowFieldCount !== false);
+const scopeModeText = computed(() => {
+    return (config.value.ScopeMode || "FieldCount") === "Manual" ? "手动选择字段" : "按字段数分配";
+});
+const totalFieldCountText = computed(() => {
+    var total = parseInt(config.value.TotalFieldCount, 10);
+    if (!total || total < 1) return "直到下一个页签分组";
+    return "总字段数 " + total;
+});
 
 const getDefaultActiveKey = () => {
     var paneList = panes.value;
@@ -280,6 +337,8 @@ const handleTabChange = (key) => {
 
 const configDialogVisible = ref(false);
 const configForm = ref({
+    ScopeMode: "FieldCount",
+    TotalFieldCount: 0,
     DefaultActiveKey: "tab1",
     Type: "card",
     Position: "top",
@@ -291,10 +350,47 @@ const configForm = ref({
     Tabs: defaultPanes()
 });
 
+const getFieldKey = (fieldModel) => {
+    if (!fieldModel) return "";
+    return String(fieldModel.Id || fieldModel.Name || "");
+};
+
+const manualFieldOptions = computed(() => {
+    var fields = Array.isArray(props.ParentFieldList) ? props.ParentFieldList.slice() : [];
+    var currentKey = getFieldKey(props.field);
+    var currentTab = props.field && props.field.Tab ? props.field.Tab : "";
+    var sameTabFields = fields
+        .filter((item) => item && (item.Tab || "") === currentTab)
+        .sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+    var startIndex = sameTabFields.findIndex((item) => getFieldKey(item) === currentKey);
+    if (startIndex < 0) return [];
+
+    var total = parseInt(configForm.value.TotalFieldCount, 10);
+    if (!total || total < 0) total = 0;
+
+    var result = [];
+    for (var index = startIndex + 1; index < sameTabFields.length; index++) {
+        var item = sameTabFields[index];
+        if (!item) continue;
+        if (item.Component === "Tabs") break;
+        var key = getFieldKey(item);
+        if (!key) continue;
+        result.push({
+            Key: key,
+            Name: item.Name || "",
+            Label: item.Label || item.Name || key
+        });
+        if (total > 0 && result.length >= total) break;
+    }
+    return result;
+});
+
 const openConfig = () => {
     var cfg = config.value;
     var tabList = normalizePanes(cfg.Tabs);
     configForm.value = {
+        ScopeMode: cfg.ScopeMode || "FieldCount",
+        TotalFieldCount: Number(cfg.TotalFieldCount || 0),
         DefaultActiveKey: cfg.DefaultActiveKey || props.field._fieldTabsActiveKey || tabList[0].Key,
         Type: cfg.Type === "default" ? "" : (cfg.Type || "card"),
         Position: cfg.Position || "top",
@@ -315,6 +411,8 @@ const addPane = () => {
         Title: "页签" + nextIndex,
         Icon: "",
         FieldCount: 4,
+        FieldKeys: [],
+        FieldNames: [],
         Disabled: false
     });
 };
@@ -341,6 +439,8 @@ const saveConfig = () => {
         active = tabList[0].Key;
     }
     props.field.Config.FieldTabs = {
+        ScopeMode: configForm.value.ScopeMode || "FieldCount",
+        TotalFieldCount: Number(configForm.value.TotalFieldCount || 0),
         DefaultActiveKey: active,
         Type: configForm.value.Type || "",
         Position: configForm.value.Position || "top",
@@ -419,6 +519,7 @@ defineExpose({
     }
 
     :deep(.el-tabs__header) {
+        display: block !important;
         margin-bottom: 0;
     }
 
@@ -433,6 +534,15 @@ defineExpose({
     &--success { --field-tabs-color: var(--el-color-success); }
     &--warning { --field-tabs-color: var(--el-color-warning); }
     &--danger { --field-tabs-color: var(--el-color-danger); }
+
+    &__designbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 7px 0 8px;
+        border-top: 1px dashed var(--field-tabs-border);
+    }
 }
 
 .tabs-config-list {
