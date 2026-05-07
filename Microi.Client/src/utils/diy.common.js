@@ -1895,6 +1895,8 @@ var DiyCommon = {
                 ShowFieldCount: true
             },
             FieldTabs: {
+                ScopeMode: "FieldCount",
+                TotalFieldCount: 0,
                 DefaultActiveKey: "tab1",
                 Type: "card",
                 Position: "top",

@@ -133,9 +133,6 @@ onFieldAdd(evt) {
             // 从设计器拖入时，由 diy-design.vue 处理添加逻辑
             // 这里只是一个占位符，确保事件能正确触发
             self.$emit('CallbackFieldAdd', evt);
-            if (evt && evt.pullMode === 'clone' && evt.item && evt.item.parentNode) {
-                evt.item.parentNode.removeChild(evt.item);
-            }
         },
 onFieldDragEnd(evt) {
             var self = this;
