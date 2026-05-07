@@ -213,16 +213,19 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
-        public async Task<IActionResult> GetPlaywrightContext(string osClient, string keyword, [FromBody] JObject param = null)
+        public async Task<IActionResult> GetPlaywrightContext(string osClient, string keyword, int? pageSize, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             keyword = keyword ?? param?["Keyword"].Val<string>();
+            var resolvedPageSize = pageSize ?? 5000;
+            var pageSizeToken = param?["PageSize"];
+            if (pageSizeToken != null && int.TryParse(pageSizeToken.ToString(), out var bodyPageSize)) resolvedPageSize = bodyPageSize;
             osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var apiBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}".TrimEnd('/');
-            var result = await V8McpLogic.GetPlaywrightContext(osClient, keyword, apiBaseUrl);
+            var result = await V8McpLogic.GetPlaywrightContext(osClient, keyword, apiBaseUrl, resolvedPageSize);
             return Ok(result);
         }
 
@@ -572,7 +575,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var arr = (param["ApiEngineKeys"] as JArray);
             var list = arr?.ToObject<List<string>>() ?? new List<string>();
             var allow = param["AllowAnonymous"]?.Val<int>() ?? 1;
