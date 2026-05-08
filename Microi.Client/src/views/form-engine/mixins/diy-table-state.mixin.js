@@ -513,7 +513,7 @@ export default {
             TableRowListActiveTab: "", //TableRowList
             FormMode: "View",
             NeedDiyTemplateFieldLst: ["DevComponent", "TableChild", "Map", "MapArea", "FontAwesome", "ImgUpload"], //'Switch',
-            FixedNotShowField: ["Divider", "CollapseGroup", "Alert", "StaticText", "Html", "HTML"], //, 'ImgUpload', 'FileUpload'
+            FixedNotShowField: ["Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "HTML"], //, 'ImgUpload', 'FileUpload'
             FieldFormDefaultValues: {},
             StatisticsFields: null,
             BtnLoading: false,
@@ -566,7 +566,6 @@ export default {
             //     "NotShowFields",
             //     "SearchFieldIds",
             //     "SortFieldIds",
-            //     "DiyConfig",
             //     "StatisticsFields",
             //     'MoreBtns',
             // ],
@@ -683,8 +682,8 @@ export default {
         // 注意：滚动位置由路由的 scrollBehavior 自动处理（使用 savedPosition）
         if (self.diyStore.IsPhoneView) {
             // zhy当移动端时，默认刷新列表以确保从新增/编辑页面返回时能看到新数据（片区管理板块），主要改动就是新增了！mobileKeep的情况。
-            // 如果你希望保留原先不刷新的行为，可在菜单配置中设置：SysMenuModel.DiyConfig.MobileKeepState = true
-            var mobileKeep = !!(self.SysMenuModel && self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.MobileKeepState === true);
+            // 如果你希望保留原先不刷新的行为，可在菜单配置中设置：SysMenuModel.MobileKeepState = true
+            var mobileKeep = !!(self.SysMenuModel && self.SysMenuModel.MobileKeepState === true);
             if (mobileKeep) {
                 // console.log('%c[DiyTableRowlist] 移动端模式，配置要求保持页面状态不刷新', 'color: blue; font-size: 14px');
                 // 仍需重新添加滚动监听
