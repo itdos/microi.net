@@ -4,7 +4,7 @@
 }
 /* 禁用状态文字颜色优化 - 使用 CSS 变量以兼容深色模式 */
 .itdos-diy-form {
-    
+
     /* Element Plus Input 禁用状态 */
     :deep(.el-input.is-disabled .el-input__inner),
     :deep(.el-input.is-disabled .el-input__wrapper) {
@@ -12,14 +12,14 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Textarea 禁用状态 */
     :deep(.el-textarea.is-disabled .el-textarea__inner) {
         color: var(--el-text-color-regular) !important;
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-secondary) !important;
     }
-    
+
     /* Element Plus Select 禁用状态 */
     :deep(.el-select.is-disabled .el-input__inner),
     :deep(.el-select.is-disabled .el-input__wrapper) {
@@ -27,7 +27,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus DatePicker 禁用状态 */
     :deep(.el-date-editor.is-disabled .el-input__inner),
     :deep(.el-date-editor.is-disabled .el-input__wrapper) {
@@ -35,7 +35,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus InputNumber 禁用状态 */
     :deep(.el-input-number.is-disabled .el-input__inner),
     :deep(.el-input-number.is-disabled .el-input__wrapper) {
@@ -43,7 +43,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Cascader 禁用状态 */
     :deep(.el-cascader.is-disabled .el-input__inner),
     :deep(.el-cascader.is-disabled .el-input__wrapper) {
@@ -51,7 +51,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus TimePicker 禁用状态 */
     :deep(.el-time-picker.is-disabled .el-input__inner),
     :deep(.el-time-picker.is-disabled .el-input__wrapper) {
@@ -59,7 +59,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus AutoComplete 禁用状态 */
     :deep(.el-autocomplete.is-disabled .el-input__inner),
     :deep(.el-autocomplete.is-disabled .el-input__wrapper) {
@@ -67,7 +67,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus 通用禁用状态 */
     :deep(.el-form-item.is-disabled),
     :deep(.is-disabled) {
@@ -127,6 +127,7 @@
     .field_TagInput,
     .field_Transfer,
     .field_CollapseGroup,
+    .field_Tabs,
     .field_Alert,
     .field_StaticText,
     .field_Html,
@@ -171,6 +172,9 @@
 
     .collapse-group-header {
         margin-top: 8px;
+        //zhy改用表单下边框和下方折叠框宽度对齐，设置外边距避免边框重合
+        border-bottom: 1px solid var(--collapse-group-border);
+        margin-bottom: 5px;
 
         .container-form-item {
             margin-bottom: 0;
@@ -187,7 +191,8 @@
     }
 
     .collapse-group-item {
-        background: var(--collapse-group-bg);
+      //去掉折叠区域背景，主要是为了和页面背景衔接
+        // background: var(--collapse-group-bg);
         border-color: var(--collapse-group-border);
         border-style: solid;
         border-width: 0;
@@ -261,6 +266,131 @@
         }
 
         .collapse-group-visible-last {
+            border-bottom-width: 1px;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+    }
+
+    .field-tabs-theme-default {
+        --field-tabs-color: var(--el-color-primary);
+        --field-tabs-bg: color-mix(in srgb, var(--el-color-primary) 4%, var(--el-bg-color) 96%);
+        --field-tabs-border: color-mix(in srgb, var(--el-color-primary) 18%, var(--el-border-color-light) 82%);
+    }
+
+    .field-tabs-theme-success {
+        --field-tabs-color: var(--el-color-success);
+        --field-tabs-bg: color-mix(in srgb, var(--el-color-success) 5%, var(--el-bg-color) 95%);
+        --field-tabs-border: color-mix(in srgb, var(--el-color-success) 24%, var(--el-border-color-light) 76%);
+    }
+
+    .field-tabs-theme-warning {
+        --field-tabs-color: var(--el-color-warning);
+        --field-tabs-bg: color-mix(in srgb, var(--el-color-warning) 5%, var(--el-bg-color) 95%);
+        --field-tabs-border: color-mix(in srgb, var(--el-color-warning) 26%, var(--el-border-color-light) 74%);
+    }
+
+    .field-tabs-theme-danger {
+        --field-tabs-color: var(--el-color-danger);
+        --field-tabs-bg: color-mix(in srgb, var(--el-color-danger) 5%, var(--el-bg-color) 95%);
+        --field-tabs-border: color-mix(in srgb, var(--el-color-danger) 24%, var(--el-border-color-light) 76%);
+    }
+
+    .field-tabs-header {
+        margin-top: 8px;
+
+        .container-form-item {
+            margin-bottom: 0;
+        }
+
+        .diy-field-tabs {
+            border-bottom-color: transparent;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+    }
+
+    .field-tabs-item {
+        background: var(--field-tabs-bg);
+        border-color: var(--field-tabs-border);
+        border-style: solid;
+        border-width: 0;
+        transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+
+        .container-form-item {
+            padding: 8px 8px 2px;
+            border-radius: 4px;
+        }
+
+        .el-form-item {
+            margin-bottom: 12px;
+        }
+
+        &:hover {
+            background: color-mix(in srgb, var(--field-tabs-color) 7%, var(--el-bg-color) 93%);
+        }
+    }
+
+    .design-mode-field.field-tabs-inactive-pane {
+        opacity: 0.68;
+    }
+
+    .field-tabs-row-first {
+        border-top: 1px solid var(--field-tabs-border);
+        padding-top: 8px;
+    }
+
+    .field-tabs-row-last {
+        border-bottom: 1px solid var(--field-tabs-border);
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+
+    .field-tabs-row-start {
+        border-left-width: 1px;
+    }
+
+    .field-tabs-row-end {
+        border-right-width: 1px;
+    }
+
+    .field-tabs-row-last.field-tabs-row-start {
+        border-bottom-left-radius: 8px;
+    }
+
+    .field-tabs-row-last.field-tabs-row-end {
+        border-bottom-right-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+        .field-tabs-item {
+            border-left-width: 1px;
+            border-right-width: 1px;
+
+            .container-form-item {
+                padding-left: 6px;
+                padding-right: 6px;
+            }
+        }
+
+        .field-tabs-row-first,
+        .field-tabs-row-last {
+            border-top-width: 0;
+            border-bottom-width: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0;
+            border-radius: 0;
+        }
+
+        .field-tabs-visible-first {
+            border-top-width: 1px;
+            padding-top: 8px;
+        }
+
+        .field-tabs-visible-last {
             border-bottom-width: 1px;
             border-bottom-left-radius: 8px;
             border-bottom-right-radius: 8px;

@@ -73,6 +73,8 @@ beforeUnmount() {
         self.FormTabs = [];
         self.FormRules = {};
         self.ModifiedFields = [];
+        self.CollapseGroupState = {};
+        self.FieldTabsState = {};
 
         // ========== 5. 清理表模型 ==========
         if (self.DiyTableModel) {

@@ -408,8 +408,8 @@ export default {
             type: String,
             default: ''
         },
-        // DiyConfig 配置
-        DiyConfig: {
+        // SysMenuModel 配置
+        SysMenuModel: {
             type: Object,
             default: () => ({})
         }
@@ -492,15 +492,15 @@ export default {
             return item[labelField] || JSON.stringify(item);
         };
 
-        // 获取列配置 - 从 field.Config.JsonTable 或 DiyConfig.JsonTable 读取
+        // 获取列配置 - 从 field.Config.JsonTable 或 SysMenuModel.JsonTable 读取
         const columnConfig = computed(() => {
             // 优先从字段配置获取
             if (props.field?.Config?.JsonTable?.Columns && props.field.Config.JsonTable.Columns.length > 0) {
                 return props.field.Config.JsonTable.Columns;
             }
-            // 其次从 DiyConfig 获取
-            if (props.DiyConfig?.JsonTable?.Columns && props.DiyConfig.JsonTable.Columns.length > 0) {
-                return props.DiyConfig.JsonTable.Columns;
+            // 其次从 SysMenuModel 获取
+            if (props.SysMenuModel?.JsonTable?.Columns && props.SysMenuModel.JsonTable.Columns.length > 0) {
+                return props.SysMenuModel.JsonTable.Columns;
             }
             // 默认返回空数组
             return [];

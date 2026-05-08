@@ -64,6 +64,7 @@ const DiyFileUpload = defineAsyncComponent(() => import("@/views/form-engine/diy
 const DiyImgUpload = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-imgupload.vue"));
 const DiyDivider = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-divider.vue"));
 const DiyCollapseGroup = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-collapse-group.vue"));
+const DiyTabs = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-tabs.vue"));
 const DiyAlert = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-alert.vue"));
 const DiyStaticText = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-statictext.vue"));
 const DiyHtml = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-html.vue"));
@@ -171,6 +172,7 @@ function RegMicroiComponents(app) {
     app.component("DiyImgUpload", DiyImgUpload);
     app.component('DiyDivider', DiyDivider);
     app.component('DiyCollapseGroup', DiyCollapseGroup);
+    app.component('DiyTabs', DiyTabs);
     app.component('DiyAlert', DiyAlert);
     app.component('DiyStaticText', DiyStaticText);
     app.component('DiyHtml', DiyHtml);
@@ -248,6 +250,7 @@ export {
     DiyDateTime,
     DiyTextarea,
     DiyCollapseGroup,
+    DiyTabs,
     DiyAlert,
     DiyStaticText,
     DiyCustomDialog,
