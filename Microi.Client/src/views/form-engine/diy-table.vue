@@ -1989,7 +1989,6 @@ export default {
             if (isOpenWorkFlowForm) {
                 isOpenPage = false;
             }
-            debugger;
             if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {

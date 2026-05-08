@@ -233,6 +233,9 @@ export default {
             if (field && field._fieldTabsHidden === true) {
                 return false;
             }
+            if (typeof self.CanShowHiddenFields === "function" && self.CanShowHiddenFields()) {
+                return true;
+            }
             // 默认不显示审计字段，需手动在表单属性中开启
             if (self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
                 return false;

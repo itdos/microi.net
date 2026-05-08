@@ -1,4 +1,21 @@
 export default {
+    watch: {
+        ShowHideField() {
+            this.ScheduleRefreshDiyFieldRuntimeState();
+        },
+        ShowFields: {
+            deep: true,
+            handler() {
+                this.ScheduleRefreshDiyFieldRuntimeState();
+            }
+        },
+        HideFields: {
+            deep: true,
+            handler() {
+                this.ScheduleRefreshDiyFieldRuntimeState();
+            }
+        }
+    },
     computed: {
         // ==================== 性能优化：预计算根元素 class ====================
         rootClass() {
@@ -88,7 +105,7 @@ export default {
                 }
 
                 // 判断字段是否应该显示（在 ShowFields/HideFields 中）
-                var shouldShow = self.ShowHideField === true ||
+                var shouldShow = self.CanShowHiddenFields() ||
                     ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
                      self.HideFields.indexOf(field.Name) === -1);
 
@@ -129,6 +146,21 @@ export default {
         },
     },
     methods: {
+        CanShowHiddenFields() {
+            var self = this;
+            var currentUser = self.GetCurrentUser || {};
+            var isAdmin = currentUser._IsAdmin === true || currentUser._IsAdmin === 1 || currentUser._IsAdmin === "1" || currentUser._IsAdmin === "true";
+            return self.ShowHideField === true && isAdmin;
+        },
+        ScheduleRefreshDiyFieldRuntimeState() {
+            var self = this;
+            if (typeof self.RefreshDiyFieldRuntimeState !== "function") {
+                return;
+            }
+            self.$nextTick(function () {
+                self.RefreshDiyFieldRuntimeState();
+            });
+        },
         SetFieldRuntimeValue(field, key, value) {
             if (field && field[key] !== value) {
                 field[key] = value;
@@ -137,6 +169,10 @@ export default {
         GetBaseFieldIsShow(field) {
             var self = this;
             if (!field) return false;
+
+            if (self.CanShowHiddenFields()) {
+                return true;
+            }
 
             if ((self.DiyCommon.DefaultFieldNames || []).indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
                 return false;
