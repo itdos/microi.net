@@ -146,6 +146,14 @@
     "Sort": 1010
   },
   {
+    "Control": "Tabs",
+    "Name": "页签分组",
+    "Type": "Advanced",
+    "FieldType": "varchar(50)",
+    "Icon": "fas fa-folder-open",
+    "Sort": 1015
+  },
+  {
     "Control": "Alert",
     "Name": "提示说明",
     "Type": "Advanced",

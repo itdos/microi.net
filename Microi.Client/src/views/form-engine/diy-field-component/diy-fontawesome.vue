@@ -59,7 +59,7 @@ export default {
             type: String,
             default: "" //View
         },
-        DiyConfig: {
+        SysMenuModel: {
             type: Object,
             default() {
                 return {};

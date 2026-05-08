@@ -513,7 +513,6 @@ var DiyCommon = {
         "MobileListFields",
         "SearchFieldIds",
         "SortFieldIds",
-        "DiyConfig",
         "StatisticsFields",
         "MoreBtns",
         "ExportMoreBtns",
@@ -1895,6 +1894,20 @@ var DiyCommon = {
                 Theme: "default",
                 ShowFieldCount: true
             },
+            FieldTabs: {
+                DefaultActiveKey: "tab1",
+                Type: "card",
+                Position: "top",
+                Stretch: false,
+                ShowFieldCount: true,
+                CaptureRest: true,
+                Description: "",
+                Theme: "default",
+                Tabs: [
+                    { Key: "tab1", Title: "基础信息", Icon: "fas fa-id-card", FieldCount: 4, Disabled: false },
+                    { Key: "tab2", Title: "扩展信息", Icon: "fas fa-layer-group", FieldCount: 4, Disabled: false }
+                ]
+            },
             Alert: {
                 Title: "",
                 Content: "",
@@ -2589,6 +2602,13 @@ var DiyCommon = {
             defaultValue: null,
             process: function(field, formData, ctx) {
                 return null; // 折叠分组不需要值
+            }
+        },
+        "Tabs": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 页签分组不需要值
             }
         },
         "Alert": {
@@ -3526,11 +3546,7 @@ var DiyCommon = {
 
         DiyCommon.SysMenuNeedConvertField.forEach((convertField) => {
             if (DiyCommon.IsNull(data[convertField])) {
-                if (convertField == "DiyConfig") {
-                    data[convertField] = {};
-                } else {
-                    data[convertField] = [];
-                }
+                data[convertField] = [];
             } else if (typeof data[convertField] == "string") {
                 if (convertField == "StatisticsFields") {
                     var tempResult = [];
@@ -3571,8 +3587,6 @@ var DiyCommon = {
                             });
                         }
                     }
-                } else if (convertField == "DiyConfig" && data[convertField] == "[]") {
-                    data[convertField] = {};
                 } else {
                     try {
                         data[convertField] = JSON.parse(data[convertField]);

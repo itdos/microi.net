@@ -610,10 +610,8 @@ export default {
                 paramType = "json";
             }
             // url = '/api/diytable/getDiyTableRowTree';
-            if (self.SysMenuModel
-                && (self.SysMenuModel.SelectApi || (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi))
-            ) {
-                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.SelectApi || self.SysMenuModel.DiyConfig.SelectApi);
+            if (self.SysMenuModel && self.SysMenuModel.SelectApi) {
+                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.SelectApi);
             }
             //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
             if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
