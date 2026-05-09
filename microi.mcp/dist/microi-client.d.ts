@@ -102,6 +102,7 @@ export interface PlaywrightContextData {
         PublicEngineCount?: number;
         ProtectedEngineCount?: number;
         ModuleCount?: number;
+        PageSize?: number;
     };
     Warnings?: string[];
 }
@@ -155,7 +156,7 @@ export declare class MicroiClient {
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
     }>>;
-    getPlaywrightContext(keyword?: string): Promise<ApiResponse<PlaywrightContextData>>;
+    getPlaywrightContext(keyword?: string, pageSize?: number): Promise<ApiResponse<PlaywrightContextData>>;
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;

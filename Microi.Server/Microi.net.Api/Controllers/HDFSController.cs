@@ -26,6 +26,143 @@ namespace Microi.net.Api
             }
             param._InvokeType = InvokeType.Client.ToString();
         }
+
+        private string ResolveOsClient(DiyUploadParam param)
+        {
+            var osClient = param.OsClient;
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Query["OsClient"].ToString();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Headers["OsClient"].ToString();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Headers["osclient"].ToString();
+            try
+            {
+                if (osClient.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    osClient = Request.Form["OsClient"].ToString();
+                }
+            }
+            catch (InvalidOperationException) { }
+            return osClient;
+        }
+
+        private string ResolveRequestToken()
+        {
+            var token = Request.Headers["Token"].ToString();
+            if (token.DosIsNullOrWhiteSpace()) token = Request.Headers["Authorization"].ToString();
+            try
+            {
+                if (token.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    token = Request.Form["Token"].ToString();
+                }
+                if (token.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    token = Request.Form["authorization"].ToString();
+                }
+            }
+            catch (InvalidOperationException) { }
+            return token.DosTrim().DosReplace("Bearer ", "");
+        }
+
+        private string ResolveFilePathName(DiyUploadParam param)
+        {
+            var filePathName = param.FilePathName;
+            if (filePathName.DosIsNullOrWhiteSpace()) filePathName = Request.Query["FilePathName"].ToString();
+            try
+            {
+                if (filePathName.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    filePathName = Request.Form["FilePathName"].ToString();
+                }
+            }
+            catch (InvalidOperationException) { }
+            return filePathName;
+        }
+
+        private async Task<JObject?> GetMallMemberFromToken(string osClient)
+        {
+            var token = ResolveRequestToken();
+            if (osClient.DosIsNullOrWhiteSpace() || token.DosIsNullOrWhiteSpace()) return null;
+
+            var cacheKey = $"Microi:{osClient}:MallMemberToken:{token}";
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var cached = await cache.GetAsync(cacheKey);
+            if (cached == null) return null;
+
+            try
+            {
+                return JObject.Parse(cached.ToString());
+            }
+            catch
+            {
+                try
+                {
+                    return await cache.GetAsync<JObject>(cacheKey);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        private static bool IsMallPayProofUploadPath(string path)
+        {
+            if (path.DosIsNullOrWhiteSpace()) return false;
+            var normalized = path.Trim().Trim('/').Replace("\\", "/").ToLower();
+            return normalized == "mall/pay-proof" || normalized.StartsWith("mall/pay-proof/");
+        }
+
+        private static bool IsMallPayProofFilePath(string osClient, string filePathName)
+        {
+            if (filePathName.DosIsNullOrWhiteSpace()) return false;
+            var normalized = filePathName.Trim().Replace("\\", "/").ToLower();
+            var client = osClient.Trim('/').ToLower();
+            return normalized.Contains("/mall/pay-proof/")
+                   || (!client.DosIsNullOrWhiteSpace() && normalized.Contains($"/{client}/mall/pay-proof/"));
+        }
+
+        private void LoadFormFiles(DiyUploadParam param)
+        {
+            param.Files = new Dictionary<string, Stream>();
+            if (HttpContext.Request.HasFormContentType)
+            {
+                foreach (var file in HttpContext.Request.Form.Files)
+                {
+                    if (file != null)
+                        param.Files.Add(file.FileName, file.OpenReadStream());
+                }
+            }
+        }
+
+        private async Task LoadJsonBody(DiyUploadParam param)
+        {
+            if (Request.HasFormContentType || Request.ContentType?.Contains("application/json") != true)
+            {
+                return;
+            }
+
+            Request.EnableBuffering();
+            Request.Body.Position = 0;
+            using var reader = new StreamReader(Request.Body, leaveOpen: true);
+            var body = await reader.ReadToEndAsync();
+            Request.Body.Position = 0;
+            if (body.DosIsNullOrWhiteSpace()) return;
+
+            JObject json;
+            try
+            {
+                json = JObject.Parse(body);
+            }
+            catch
+            {
+                return;
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = json["OsClient"]?.Val<string>();
+            if (param.FilePathName.DosIsNullOrWhiteSpace()) param.FilePathName = json["FilePathName"]?.Val<string>();
+            if (param.Path.DosIsNullOrWhiteSpace()) param.Path = json["Path"]?.Val<string>();
+            if (param.Limit == null && json["Limit"] != null) param.Limit = json["Limit"]?.Val<bool>();
+            if (param.Preview == null && json["Preview"] != null) param.Preview = json["Preview"]?.Val<bool>();
+        }
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。
         /// Multiple：是否多文件
@@ -62,9 +199,74 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [AllowAnonymous]
         public async Task<JsonResult> UniappUpload(DiyUploadParam param)
         {
-            return await Upload(param);
+            var currentToken = await DiyToken.GetCurrentToken();
+            if (currentToken?.CurrentUser != null)
+            {
+                return await Upload(param);
+            }
+
+            var osClient = ResolveOsClient(param);
+            var mallMember = await GetMallMemberFromToken(osClient);
+            if (mallMember == null)
+            {
+                return Json(new DosResult(1001, null, "登录身份已过期！"));
+            }
+            if (!IsMallPayProofUploadPath(param.Path))
+            {
+                return Json(new DosResult(0, null, "商城移动端仅允许上传支付凭证文件！"));
+            }
+
+            param.OsClient = osClient;
+            param._CurrentUser = mallMember;
+            param._InvokeType = InvokeType.Client.ToString();
+            param.Limit = true;
+            param.Preview ??= true;
+            LoadFormFiles(param);
+
+            var result = await MicroiEngine.HDFS.Upload(param);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 商城移动端获取支付凭证私有文件临时访问地址。
+        /// </summary>
+        [HttpGet, HttpPost]
+        [AllowAnonymous]
+        public async Task<JsonResult> MallFileUrl(DiyUploadParam param)
+        {
+            await LoadJsonBody(param);
+            param.FilePathName = ResolveFilePathName(param);
+
+            var currentToken = await DiyToken.GetCurrentToken();
+            if (currentToken?.CurrentUser != null)
+            {
+                param._CurrentUser = currentToken.CurrentUser;
+                param.OsClient = currentToken.OsClient;
+                param._InvokeType = InvokeType.Client.ToString();
+                var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
+                return Json(platformResult);
+            }
+
+            var osClient = ResolveOsClient(param);
+            var mallMember = await GetMallMemberFromToken(osClient);
+            if (mallMember == null)
+            {
+                return Json(new DosResult(1001, null, "登录身份已过期！"));
+            }
+            if (!IsMallPayProofFilePath(osClient, param.FilePathName))
+            {
+                return Json(new DosResult(0, null, "商城移动端仅允许访问支付凭证文件！"));
+            }
+
+            param.OsClient = osClient;
+            param._CurrentUser = mallMember;
+            param._InvokeType = InvokeType.Client.ToString();
+            param.Limit = true;
+            var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
+            return Json(result);
         }
 
         /// <summary>

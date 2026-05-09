@@ -285,10 +285,11 @@ export class MicroiClient {
             OsClient: this.config.osClient,
         });
     }
-    async getPlaywrightContext(keyword) {
+    async getPlaywrightContext(keyword, pageSize) {
         return this.post(API.GET_PLAYWRIGHT_CONTEXT, {
             OsClient: this.config.osClient,
             ...(keyword ? { Keyword: keyword } : {}),
+            ...(pageSize ? { PageSize: pageSize } : {}),
         });
     }
     async getEngineList(keyword) {
