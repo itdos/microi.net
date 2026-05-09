@@ -1,3 +1,8 @@
+---
+name: v8-http-integration
+description: Microi V8 HTTP integration guidance. Use when calling third-party APIs with V8.Http.Get/Post/GetResponse/PostResponse, headers, JSON/form payloads, timeout, files, and response parsing.
+---
+
 # Microi V8 HTTP 外部接口集成
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要调用外部 HTTP API（微信、支付宝、短信、ERP 等第三方系统）。

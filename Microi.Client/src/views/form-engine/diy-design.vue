@@ -1033,10 +1033,6 @@ export default {
                     itemHTML: evt.item.outerHTML,
                     itemDataset: evt.item.dataset
                 });
-                // 移除拖拽添加的临时元素
-                if (evt.item && evt.item.parentNode) {
-                    evt.item.parentNode.removeChild(evt.item);
-                }
                 return;
             }
             

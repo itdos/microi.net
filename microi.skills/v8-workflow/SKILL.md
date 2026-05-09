@@ -1,3 +1,8 @@
+---
+name: v8-workflow
+description: Microi V8 workflow event guidance. Use when writing approval flow conditions, node V8 code, wf_flowdesign/wf_node/wf_line logic, V8.WF variables, and workflow routing.
+---
+
 # Microi V8 工作流事件开发
 
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。
