@@ -1,7 +1,7 @@
 <template>
     <div class="diy-collapse-group" :class="'diy-collapse-group--' + theme" @click="toggleCollapse">
         <div class="diy-collapse-group__header">
-           <el-icon class="diy-collapse-group__arrow">
+            <el-icon class="diy-collapse-group__arrow">
                 <ArrowRight v-if="isCollapsed" />
                 <ArrowDown v-else />
             </el-icon>
@@ -207,17 +207,18 @@ defineExpose({
     cursor: pointer;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-   &:hover {
+
+    &:hover {
         border-color: var(--group-color);
         box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
-   }
+    }
 
     &__header {
         min-height: 42px;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 9px 12px;、//zhy去掉内边距保持头部两边原宽度
+        padding: 9px 12px;
     }
 
     &__arrow,
