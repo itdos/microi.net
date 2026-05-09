@@ -1,3 +1,8 @@
+---
+name: v8-api-config
+description: Microi V8 API engine configuration guidance. Use when setting ApiEngineKey, ApiAddress, StopHttp, AllowAnonymous, ResponseFile, locks, logging, timeout, and HTTP exposure.
+---
+
 # Microi V8 接口引擎配置
 
 你正在配置 Microi 吾码平台的接口引擎（API 引擎）。除了 JS 代码本身，每个接口还有一系列**安全/性能配置项**，写代码时必须了解这些选项以决定是否需要调整。

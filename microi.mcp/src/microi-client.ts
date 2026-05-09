@@ -126,6 +126,7 @@ export interface PlaywrightContextData {
     PublicEngineCount?: number;
     ProtectedEngineCount?: number;
     ModuleCount?: number;
+    PageSize?: number;
   };
   Warnings?: string[];
 }
@@ -421,10 +422,11 @@ export class MicroiClient {
     });
   }
 
-  async getPlaywrightContext(keyword?: string): Promise<ApiResponse<PlaywrightContextData>> {
+  async getPlaywrightContext(keyword?: string, pageSize?: number): Promise<ApiResponse<PlaywrightContextData>> {
     return this.post(API.GET_PLAYWRIGHT_CONTEXT, {
       OsClient: this.config.osClient,
       ...(keyword ? { Keyword: keyword } : {}),
+      ...(pageSize ? { PageSize: pageSize } : {}),
     });
   }
 

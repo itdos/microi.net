@@ -1895,6 +1895,8 @@ var DiyCommon = {
                 ShowFieldCount: true
             },
             FieldTabs: {
+                ScopeMode: "FieldCount",
+                TotalFieldCount: 0,
                 DefaultActiveKey: "tab1",
                 Type: "card",
                 Position: "top",
@@ -2044,7 +2046,8 @@ var DiyCommon = {
                 Loading: false,
                 Icon: "",
                 Size: "small",
-                PreviewCanClick: true
+                PreviewCanClick: true,
+                RefreshTableAfterClick: false
             },
             Autocomplete: {},
             Unique: {

@@ -608,15 +608,15 @@
         box-shadow: none;
         border: none;
 
-        .el-tabs__header {
+        > .el-tabs__header {
             display: none !important;
         }
-        .el-tabs__content {
+        > .el-tabs__content {
             padding: 0;
         }
     }
     .tab-pane-show {
-        .el-tabs__header {
+        > .el-tabs__header {
             display: block;
         }
     }

@@ -1,3 +1,8 @@
+---
+name: v8-crud-api
+description: Microi V8 CRUD API engine development. Use when writing server-side JavaScript with V8.FormEngine Add/Upt/Del/GetTableData, DosResult returns, transactions, and validation.
+---
+
 # Microi V8 CRUD API 接口引擎开发
 
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。

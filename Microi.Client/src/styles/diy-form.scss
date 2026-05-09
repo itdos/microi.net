@@ -172,9 +172,6 @@
 
     .collapse-group-header {
         margin-top: 8px;
-        //zhy改用表单下边框和下方折叠框宽度对齐，设置外边距避免边框重合
-        border-bottom: 1px solid var(--collapse-group-border);
-        margin-bottom: 5px;
 
         .container-form-item {
             margin-bottom: 0;
@@ -191,8 +188,7 @@
     }
 
     .collapse-group-item {
-      //去掉折叠区域背景，主要是为了和页面背景衔接
-        // background: var(--collapse-group-bg);
+        background: var(--collapse-group-bg);
         border-color: var(--collapse-group-border);
         border-style: solid;
         border-width: 0;
@@ -757,7 +753,9 @@
             border-radius: 8px 0 0 8px;
         }
         :deep(.el-input-group.el-input-group--prepend .el-input__wrapper) {
-            border-radius: 0px 8px 8px 0;
+             // 调整详情页输入框右侧边框弧度为0，避免和右侧搜索按钮有空隙
+            // border-radius: 0px 8px 8px 0;
+            border-radius: 0px 0px 0px 0;
         }
 
 

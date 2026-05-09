@@ -1,3 +1,8 @@
+---
+name: v8-mongodb
+description: Microi V8 MongoDB guidance. Use when using V8.MongoDb AddFormData, UptFormData, DelFormData, GetFormData, GetTableData, object filters, and document IDs.
+---
+
 # Microi V8 MongoDB 操作
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 MongoDB 存储非结构化数据（如日志、IoT 数据、大文档等）。
