@@ -27,7 +27,8 @@ export default {
                 PageObj: {},
                 PrintObj: {}
             },
-            printEngineStore: null
+            printEngineStore: null,
+            savePrintJsonHandler: null
         };
     },
     props: {
@@ -93,7 +94,15 @@ export default {
         },
         registerEventListeners() {
             //监听保存打印模板JSON事件
-            EventBus.on("savePrintJson", async (savePrintJson) => {
+            if (this.savePrintJsonHandler) {
+                return;
+            }
+            this.savePrintJsonHandler = async (savePrintJson) => {
+                var saveId = savePrintJson && savePrintJson.Id;
+                var currentId = this.pageid || (this.remoteObj && this.remoteObj.Id);
+                if (!saveId || String(saveId) !== String(currentId)) {
+                    return;
+                }
                 console.log("监听savePrintJson", savePrintJson);
                 var model = {
                     Title: savePrintJson.Title,
@@ -104,13 +113,17 @@ export default {
                 };
                 await DiyCommon.FormEngine.UptFormData({
                     FormEngineKey: "mic_print",
-                    Id: this.pageid,
+                    Id: saveId,
                     _RowModel: model
                 });
-            });
+            };
+            EventBus.on("savePrintJson", this.savePrintJsonHandler);
         },
         removeEventListeners() {
-            EventBus.off("savePrintJson");
+            if (this.savePrintJsonHandler) {
+                EventBus.off("savePrintJson", this.savePrintJsonHandler);
+                this.savePrintJsonHandler = null;
+            }
         }
     }
 };

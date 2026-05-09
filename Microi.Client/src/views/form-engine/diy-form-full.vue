@@ -623,6 +623,7 @@
                         :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
                         :CurrentTableData="DiyTableRowList"
                         :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                        :ShowHideField="ShowHideField"
                         :DataAppend="DataAppend"
                         @ParentFormSet="ParentFormSet"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
