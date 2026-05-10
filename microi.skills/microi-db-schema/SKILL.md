@@ -31,3 +31,5 @@ Use this skill to answer schema questions and write code that depends on Microiå
 - Remember fixed fields on DIY tables: `Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserName`, `IsDeleted`.
 - Query non-deleted rows by default (`IsDeleted != 1`) when using raw SQL.
 - When changing schema metadata, account for cache invalidation and physical table changes; keep edits narrowly scoped.
+- When adding or updating low-code fields, prefer MCP native tools such as `microi_add_field` / `microi_update_field` over ad-hoc V8 metadata writes. A field row with `diy_field.TableId = null` can leave the physical column present but invisible to FormEngine/table schema loading.
+- After schema changes, validate with `microi_get_db_schema` and refresh `diy_table_field_list` caches with `microi_refresh_schema_cache` when needed.
