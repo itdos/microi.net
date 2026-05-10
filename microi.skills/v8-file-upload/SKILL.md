@@ -54,6 +54,18 @@ var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 | 公有桶 | `false` | 直接拼接 `V8.SysConfig.FileServer + Path` | 头像、产品图、公开文档 |
 | 私有桶 | `true` | 必须用 `V8.Method.GetPrivateFileUrl` 获取临时 URL | 合同、身份证、敏感数据 |
 
+公开页面图片（首页 banner、商品主图、头像等）应返回公有 URL，例如 `V8.SysConfig.FileServer + Path`。不要把公有图片统一转成 `GetPrivateFileUrl` 的 `static-private` 签名地址；部分 H5/浏览器会因响应头或跨域策略触发 ORB/CORS 拦截，表现为 uni-app `<image>` 内层 `background-image: none`。
+
+后台 `ImgUpload` 字段通常保存相对路径或 JSON：接口返回给移动端前先解析出 `Path`，再按公私有场景转换 URL：
+
+```javascript
+function publicFileUrl(path) {
+  if (!path) return '';
+  if (/^https?:/i.test(path)) return path;
+  return String(V8.SysConfig.FileServer || '').replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '');
+}
+```
+
 ### 私有桶临时 URL
 
 ```javascript
@@ -119,6 +131,10 @@ var upResult = V8.Method.Upload({
 
 return upResult;
 ```
+
+> 在 V8/Jint 中避免把 `resp.RawBytes` 直接塞进 `FilesByte`；序列化时可能变成数字/浮点数组，导致 `Unexpected token when reading bytes`。更稳的是 `System.Convert.ToBase64String(resp.RawBytes)` 后使用 `FilesByteBase64`。
+
+移动端公开图片优先使用 `.jpg` / `.png` / `.webp`。如果上传 `.svg`，必须确认对象存储返回正确 `Content-Type: image/svg+xml`，否则浏览器可能拦截或不渲染。
 
 ## 通过 URL 列表批量下载并入库
 

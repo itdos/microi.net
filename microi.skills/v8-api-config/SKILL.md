@@ -121,6 +121,23 @@ LogResult = true    # 记录每次返回
 
 > ❌ 接口返回结果含敏感数据（密码、token、密钥）时不要打开 `LogResult`
 
+## 8. 保存后 HTTP 复测
+
+`microi_run_engine` 只能证明引擎代码在 MCP/内部执行上下文可运行，不能证明移动端或外部 HTTP 能调用。新建或更新接口后必须再走一次真实 HTTP 路径：
+
+```text
+POST /apiengine/{ApiEngineKey}?OsClient={OsClient}
+Headers: Content-Type=application/json, OsClient={OsClient}, apiengine=1
+```
+
+复测重点：
+
+- `IsEnable=1`、`StopHttp=0`、公开接口 `AllowAnonymous=1`。
+- `ApiAddress` 不能为空字符串；空字符串可能导致 404。
+- 响应不能是空 body、字符串 `null`、非 JSON；业务接口必须返回标准 DosResult。
+- Header `OsClient` 只能作为补充，URL query 里的 `?OsClient=` 更稳，动态路由和缓存场景不要省略。
+- 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
+
 ## 异步执行（接口内）
 
 接口默认同步返回。需要异步执行（如：耗时同步、批量操作不阻塞响应）：
@@ -146,6 +163,7 @@ return { Code: 1, Msg: '已接收，后台处理中' };
 - [ ] 审计需求接口是否开启 `LogParam`？
 - [ ] 文件响应接口是否开启 `IsResponseFile`？
 - [ ] 接口代码内是否仍校验 `V8.CurrentUser`（`IsAnonymous=true` 时尤其重要）？
+- [ ] 保存后是否通过 `/apiengine/{key}?OsClient=...` 做过 HTTP 复测？
 
 ## 常见错误
 
