@@ -154,6 +154,7 @@ export async function callEngine(request, apiEngineKey, data = {}, token = '') {
   const res = await request.post(withOsClient(`${microiEnv.apiBase}/apiengine/${apiEngineKey}`), {
     headers: {
       'Content-Type': 'application/json',
+      apiengine: '1',
       OsClient: microiEnv.osClient,
       ...(token ? { Token: token } : {})
     },
@@ -277,6 +278,8 @@ tests/e2e/
 10. 新建或更新 ApiEngine 后必须用 HTTP 路径复测一次；只用 `microi_run_engine` 通过不够，因为 HTTP 调用还受 `IsEnable`、`StopHttp`、`AllowAnonymous` 和动态路由缓存影响。
 11. 每个移动端项目都要有“接口清单驱动”的契约测试：静态扫描或维护清单覆盖所有 `callEngine('xxx')`，逐个 HTTP 调用并断言不是 404、不是空响应、不是字符串 `null`，且必须是标准 DosResult。
 12. 写业务闭环时必须准备可重复测试数据并清理：例如抢购要“创建测试挂单 → 调用抢购 → 验证订单 → 删除测试订单/挂单/提货卡”，购物车要“加入购物车 → 结算 → 验证订单/购物车状态 → 删除测试订单”。
+13. 图片断言必须检查真实渲染，而不是只检查元素可见。uni-app H5 的 `<image>` 会渲染成 `UNI-IMAGE`，真实图片在内部 `div.style.backgroundImage` 或子 `img` 上；不要把宿主元素的 CSS 渐变背景算作加载成功。
+14. 网络守卫要记录 `requestfailed`，特别是图片资源的 `net::ERR_BLOCKED_BY_ORB` / CORS / 404；首页 banner、商品主图、头像等公开图片必须实际加载。
 
 移动商城/会员 H5 额外规则：
 
@@ -290,6 +293,7 @@ tests/e2e/
 - “我的-新增地址”和“我的-新增收款方式”必须点击后出现真实表单，保存后后端能查到新增记录。
 - 购物车“结算”必须调用 `mall_cart_settle` 或等价业务接口，不能残留 `结算功能开发中`。
 - `mall_cart_settle` 必须覆盖真实闭环：登录、加入购物车、点击结算、等待 `/apiengine/mall_cart_settle`、断言 Code=1 和订单 Id，再查询购物车确认对应商品已移除。
+- 首页运营 banner 推荐从公告或配置表驱动，例如 `mall_notice.BannerImg`、`IsBanner`、`BannerSort`；E2E 要同时断言接口 `Banners[]`、图片真实加载、点击进入详情页。
 
 ## 与 MCP 的配合
 
