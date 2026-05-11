@@ -1,279 +1,68 @@
 <template>
-    <div>
-        <el-button style="margin-bottom: 10px" type="primary" @click="linkForm">SQL设计器</el-button>
-
-        <el-dialog v-model="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
-            <template #title>
-                <span class="headTitle">SQL设计器</span>
-            </template>
-
-            <el-form :model="form" :rules="rules" ref="ruleForm" label-width="100px" class="demo-ruleForm">
-                <el-form-item label="选择表单" prop="table">
-                    <el-select v-model="form.table" filterable placeholder="请选择" style="width: 100%" @change="changeTable">
-                        <el-option v-for="item in tableList" :key="item.Name" :label="item.Description" :value="item.Name"> </el-option>
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="选择字段" prop="ziduan">
-                    <el-select v-model="form.ziduan" multiple filterable placeholder="请选择" style="width: 100%">
-                        <el-option v-for="item in fieldList" :key="item.Name" :label="item.Label" :value="item.Name"> </el-option>
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="是否已删除" prop="isDelete">
-                    <el-select v-model="form.isDelete" filterable placeholder="请选择" style="width: 100%">
-                        <el-option label="未删除" value="0"></el-option>
-                        <el-option label="已删除" value="1"></el-option>
-                        <el-option label="全显示" value="2"></el-option>
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="" prop="">
-                    <el-button type="primary" @click="save">生成sql</el-button>
-                    <el-button style="margin-left: 40px" @click="reset">重置选择</el-button>
-                </el-form-item>
-                <el-form-item label="生成结果" prop="">
-                    <div class="CodeMirror-code">
-                        <codemirror ref="cmObj" v-model="SQLcode" :options="cmOptions" />
-                    </div>
-                </el-form-item>
-            </el-form>
-
-            <template #footer>
-                <el-button @click="showForm = false">取 消</el-button>
-                <el-button type="primary" @click="submit">确 定</el-button>
-            </template>
-        </el-dialog>
+    <div class="diy-sql-design-compat">
+        <el-button style="margin-bottom: 10px" type="primary" @click="show">SQL/V8代码设计器</el-button>
+        <DiyCodeDesign
+            ref="designerRef"
+            v-model:model="innerModel"
+            default-tab="sql"
+            @insert-code="insertCode"
+        />
     </div>
 </template>
 
-<script>
-import qs from "qs";
-import { DiyCommon } from "@/utils/diy.common";
-// vue-codemirror 暂不支持 Vue 3
-// import "codemirror/lib/codemirror.css";
-// import { codemirror } from "vue-codemirror";
-// require("codemirror/mode/javascript/javascript.js");
-export default {
-    name: "DiySqlDesign",
-    components: {
-        // codemirror  // 已禁用
-    },
-    props: {
-        model: {
-            type: String,
-            defalut: ""
-        }
-    },
-    watch: {
-        model: function (newVal, oldVal) {
-            if (oldVal != newVal) {
-                this.SQLcode = newVal;
-            }
-        }
-    },
-    data() {
-        return {
-            SQLcode: this.model,
-            showForm: false,
-            tableList: [],
-            fieldList: [],
-            form: {
-                table: "",
-                ziduan: "",
-                isDelete: ""
-            },
-            https: "",
-            cmOptions: {
-                // 所有参数配置见：https://codemirror.net/doc/manual.html#config
-                tabSize: 4,
-                styleActiveLine: true,
-                lineNumbers: true,
-                line: true,
-                foldGutter: true,
-                styleSelectedText: true,
-                mode: "text/x-sparksql",
-                // keyMap: "sublime",
-                matchBrackets: true,
-                showCursorWhenSelecting: true,
-                // theme: 'base16-dark',
-                extraKeys: {
-                    Ctrl: "autocomplete"
-                },
-                hintOptions: {
-                    completeSingle: false
-                },
-                lineWrapping: true // 自动换行
-            },
-            rules: {}
-        };
-    },
-    methods: {
-        reset() {
-            this.$refs["ruleForm"].resetFields();
-            this.fieldList = [];
-        },
-        linkForm() {
-            this.showForm = true;
-        },
-        getTable() {
-            let self = this;
-            this.$axios
-                .post(
-                    this.https + "/api/FormEngine/GetDiyTableList",
-                    qs.stringify({
-                        // _PageSize: 50,
-                        // _PageIndex: 1,
-                        _Keyword: ""
-                    }),
-                    {
-                        headers: {
-                            authorization: "Bearer " + DiyCommon.getToken(),
-                            "content-type": "application/x-www-form-urlencoded",
-                            did: this.newGuid()
-                        }
-                    }
-                )
-                .then(function (response) {
-                    if (response.data.Code == 1) {
-                        self.tableList = response.data.Data;
-                    }
-                })
-                .catch(function (error) {
-                    console.log(error);
-                });
-        },
-        changeTable(e) {
-            // console.log(e)
-            this.fieldList = [];
-            this.form.ziduan = "";
-            var self = this;
+<script setup>
+import { ref, watch } from "vue";
+import DiyCodeDesign from "./diy-code-design.vue";
 
-            var aa = "";
-            this.tableList.map((item) => {
-                if (item.Name == e) {
-                    aa = item.Id;
-                }
-            });
+defineOptions({
+    name: "DiySqlDesign"
+});
 
-            this.$axios
-                .post(
-                    self.https + "/api/FormEngine/GetDiyField",
-                    qs.stringify({
-                        TableId: aa
-                    }),
-                    {
-                        headers: {
-                            authorization: "Bearer " + DiyCommon.getToken(),
-                            "content-type": "application/x-www-form-urlencoded",
-                            did: self.newGuid()
-                        }
-                    }
-                )
-                .then(function (res) {
-                    if (res.data.Code == 1) {
-                        self.fieldList = res.data.Data;
-                    }
-                })
-                .catch(function (error) {
-                    console.log(error);
-                });
-        },
-        // 生成sql
-        save() {
-            // console.log(3333333,this.form)
-
-            var txt = "",
-                aa = "";
-            if (this.form.isDelete == "0") {
-                aa = "IsDeleted=0";
-            } else if (this.form.isDelete == "1") {
-                aa = "IsDeleted=1";
-            } else {
-                aa = "";
-            }
-
-            txt = "SELECT " + this.form.ziduan + " FROM " + this.form.table + (aa == "" ? "" : " WHERE " + aa);
-
-            this.SQLcode = txt;
-        },
-        // 最后确认提交
-        submit() {
-            this.$refs["ruleForm"].validate((valid) => {
-                if (valid) {
-                    // console.log(1111111,'提交')
-                    this.$emit("update:model", this.SQLcode);
-                    this.showForm = false;
-                }
-            });
-        },
-
-        newGuid() {
-            // Crockford's Base32字母表（无I、L、O、U）
-            const ENCODING = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-            // 生成安全的随机字符
-            function getRandomChar() {
-                // 优先使用crypto API
-                if (window.crypto && window.crypto.getRandomValues) {
-                    const buffer = new Uint8Array(1);
-                    window.crypto.getRandomValues(buffer);
-                    return ENCODING[buffer[0] % 32];
-                }
-
-                // 后备方案
-                const rand = Math.floor(Math.random() * 32);
-                return ENCODING[rand];
-            }
-
-            // 1. 时间戳部分（10个字符，48位毫秒时间戳）
-            let time = Date.now();
-            let timePart = "";
-
-            for (let i = 0; i < 10; i++) {
-                const mod = time % 32;
-                timePart = ENCODING[mod] + timePart;
-                time = Math.floor(time / 32);
-            }
-
-            // 2. 随机部分（16个字符）
-            let randomPart = "";
-            for (let i = 0; i < 16; i++) {
-                randomPart += getRandomChar();
-            }
-
-            return timePart + randomPart; // 26字符的ULID
-            var guid = "";
-            for (var i = 1; i <= 32; i++) {
-                var n = Math.floor(Math.random() * 16.0).toString(16);
-                guid += n;
-                if (i == 8 || i == 12 || i == 16 || i == 20) guid += "-";
-            }
-            return guid;
-        },
-        // 获取系统地址
-        getDiyApiBase() {
-            if (localStorage.getItem("Microi.ApiBase")) {
-                this.https = localStorage.getItem("Microi.ApiBase");
-            } else {
-                this.https = "https://api-china.itdos.com";
-            }
-        }
-    },
-    mounted() {
-        this.getDiyApiBase();
-        this.getTable();
+const props = defineProps({
+    model: {
+        type: [String, Number, Object, Array],
+        default: ""
     }
-};
-</script>
+});
 
-<style lang="scss" scoped>
-.headTitle {
-    color: #1f2d3d;
-    margin-right: 20px;
+const emit = defineEmits(["update:model"]);
+const designerRef = ref(null);
+const innerModel = ref(normalizeCode(props.model));
+
+watch(
+    () => props.model,
+    (value) => {
+        const nextValue = normalizeCode(value);
+        if (nextValue !== innerModel.value) innerModel.value = nextValue;
+    }
+);
+
+watch(innerModel, (value) => {
+    emit("update:model", value);
+});
+
+function normalizeCode(value) {
+    if (value == null) return "";
+    if (typeof value === "object") {
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (error) {
+            return "";
+        }
+    }
+    return String(value);
 }
-.subTitle {
-    font-size: 13px;
-    color: #91a1b7;
+
+function insertCode(code) {
+    if (!code) return;
+    innerModel.value = innerModel.value ? innerModel.value + "\n" + code : code;
 }
-.head {
-    font-size: 16px;
+
+function show() {
+    designerRef.value?.open({ tab: "sql", resetPreview: true });
 }
-</style>
+
+defineExpose({
+    show
+});
+</script>

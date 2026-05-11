@@ -41,5 +41,10 @@ export declare const API: {
     readonly GET_PAGE_ENGINE_LIST: "/api/V8Engine/GetPageEngineList";
     readonly GET_PAGE_ENGINE_DETAIL: "/api/V8Engine/GetPageEngineDetail";
     readonly SAVE_PAGE_ENGINE: "/api/V8Engine/SavePageEngine";
+    readonly LIST_BLUEPRINTS: "/api/V8Engine/ListBlueprints";
+    readonly GET_BLUEPRINT: "/api/V8Engine/GetBlueprint";
+    readonly SAVE_BLUEPRINT: "/api/V8Engine/SaveBlueprint";
+    readonly DELETE_BLUEPRINT: "/api/V8Engine/DeleteBlueprint";
+    readonly VALIDATE_BLUEPRINT: "/api/V8Engine/ValidateBlueprint";
 };
 //# sourceMappingURL=api-paths.d.ts.map

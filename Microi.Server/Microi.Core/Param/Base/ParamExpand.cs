@@ -883,6 +883,11 @@ namespace Microi.net
         /// </summary>
         public string _EncodePwd { get; set; }
         public string _EncodeNewPwd { get; set; }
+        /// <summary>
+        /// 自动化测试旁路：当请求头 X-Microi-Dev-Key 与环境变量 MICROI_DEV_TEST_KEY 匹配且 Pwd="_DEV_BYPASS_" 时，
+        /// 控制器会设置该标志为 true，登录逻辑跳过密码校验。生产环境不要设置该环境变量。
+        /// </summary>
+        public bool _DevBypassPwd { get; set; }
 
     }
 }

@@ -265,6 +265,11 @@ export declare class MicroiClient {
         Desc?: string;
         JsonStr: string;
     }): Promise<ApiResponse>;
+    listBlueprints(keyword?: string): Promise<ApiResponse>;
+    getBlueprint(blueprintId: string): Promise<ApiResponse>;
+    saveBlueprint(data: Record<string, unknown>): Promise<ApiResponse>;
+    deleteBlueprint(blueprintId: string): Promise<ApiResponse>;
+    validateBlueprint(blueprintId: string): Promise<ApiResponse>;
     destroy(): void;
 }
 //# sourceMappingURL=microi-client.d.ts.map

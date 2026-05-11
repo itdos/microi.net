@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { registerAdvancedTools } from './advanced-tools.js';
+import { registerBlueprintTools } from './blueprint-tools.js';
 function unwrapList(data) {
     if (Array.isArray(data))
         return data;
@@ -1292,6 +1293,7 @@ export function createMcpServer(client, context) {
         }
     });
     registerAdvancedTools(server, client, context);
+    registerBlueprintTools(server, client, context);
     return server;
 }
 //# sourceMappingURL=server.js.map
