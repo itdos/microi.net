@@ -584,5 +584,316 @@ namespace Microi.net.Api
         }
 
         #endregion
+
+        #region 业务架构蓝图（System Blueprint）
+
+        /// <summary>
+        /// 列出当前 OsClient 的所有业务蓝图（不含 BlueprintData）
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListBlueprints(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var keyword = param?["Keyword"].Val<string>();
+            var result = await V8McpLogic.ListBlueprints(osClient, keyword);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// 获取单个蓝图详情（含 BlueprintData JSON 全文）
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetBlueprint(string osClient, string blueprintId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            var result = await V8McpLogic.GetBlueprint(osClient, blueprintId);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// 创建或更新蓝图。规则：
+        ///   - 传 Id 命中 → Update；否则按 Name 命中 → Update；否则 Create
+        ///   - 自动写入历史快照（sys_blueprint_history）
+        ///   - 自动重建反向引用索引（sys_blueprint_relation）
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SaveBlueprint([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.SaveBlueprint(osClient, param, token);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// 删除蓝图（软删除主表 + 同步删反向索引；保留历史快照用于回溯）
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> DeleteBlueprint([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var blueprintId = param["BlueprintId"].Val<string>() ?? param["Id"].Val<string>();
+            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            var result = await V8McpLogic.DeleteBlueprint(osClient, blueprintId);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// 验证蓝图引用的所有平台资源是否存在（漂移检测）。
+        /// 返回 errors/warnings/CheckedRefs 统计，AI 据此决定是否需先修复蓝图再生成代码。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ValidateBlueprint(string osClient, string blueprintId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            var result = await V8McpLogic.ValidateBlueprint(osClient, blueprintId);
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region 状态机（State Machine）
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListStateMachines(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var keyword = param?["Keyword"].Val<string>();
+            var result = await V8McpLogic.ListStateMachines(osClient, keyword);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetStateMachine(string osClient, string id, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            id = id ?? param?["Id"].Val<string>() ?? param?["Code"].Val<string>();
+            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            var result = await V8McpLogic.GetStateMachine(osClient, id);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveStateMachine([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.SaveStateMachine(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteStateMachine([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
+            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            var result = await V8McpLogic.DeleteStateMachine(osClient, id);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> TransitionState([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.TransitionState(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetStateHistory(string osClient, string tableName, string rowId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            tableName = tableName ?? param?["TableName"].Val<string>();
+            rowId = rowId ?? param?["RowId"].Val<string>();
+            var result = await V8McpLogic.GetStateHistory(osClient, tableName, rowId);
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region 自动化流（Flow Engine）
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListFlows(string osClient, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.ListFlows(osClient, param?["Keyword"].Val<string>(), param?["TriggerType"].Val<string>());
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetFlow(string osClient, string id, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            id = id ?? param?["Id"].Val<string>() ?? param?["Code"].Val<string>();
+            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            var result = await V8McpLogic.GetFlow(osClient, id);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveFlow([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.SaveFlow(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteFlow([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
+            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            var result = await V8McpLogic.DeleteFlow(osClient, id);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RunFlow([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
+            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            var input = param["Input"] as JObject ?? new JObject();
+            var result = await V8McpLogic.RunFlow(osClient, id, input, token);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetFlowRuns(string osClient, string flowId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowId = flowId ?? param?["FlowId"].Val<string>() ?? param?["Code"].Val<string>();
+            var pageSize = param?["PageSize"].Val<int>() ?? 50;
+            var result = await V8McpLogic.GetFlowRuns(osClient, flowId, pageSize);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetFlowRunDetail(string osClient, string runId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            runId = runId ?? param?["RunId"].Val<string>();
+            if (runId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "RunId 不能为空"));
+            var result = await V8McpLogic.GetFlowRunDetail(osClient, runId);
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region 流程挖掘（Process Mining）
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> AnalyzeWorkflow(string osClient, string flowDesignId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
+            var fromDate = param?["FromDate"].Val<string>();
+            var toDate = param?["ToDate"].Val<string>();
+            var result = await V8McpLogic.AnalyzeWorkflow(osClient, flowDesignId, fromDate, toDate);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetHotPaths(string osClient, string flowDesignId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
+            var topN = param?["TopN"].Val<int>() ?? 20;
+            var result = await V8McpLogic.GetHotPaths(osClient, flowDesignId, topN);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetSlaViolations(string osClient, string flowDesignId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
+            var slaMinutes = param?["SlaMinutes"].Val<int>() ?? 60;
+            var topN = param?["TopN"].Val<int>() ?? 100;
+            var result = await V8McpLogic.GetSlaViolations(osClient, flowDesignId, slaMinutes, topN);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetBottlenecks(string osClient, string flowDesignId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
+            var topN = param?["TopN"].Val<int>() ?? 5;
+            var result = await V8McpLogic.GetBottlenecks(osClient, flowDesignId, topN);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetWorkflowOverview(string osClient, string flowDesignId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
+            var result = await V8McpLogic.GetWorkflowOverview(osClient, flowDesignId);
+            return Ok(result);
+        }
+
+        #endregion
     }
 }
