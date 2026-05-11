@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo } from './microi-client.js';
 import { registerAdvancedTools } from './advanced-tools.js';
+import { registerBlueprintTools } from './blueprint-tools.js';
 
 /** MCP Server 上下文（用于区分不同租户） */
 export interface McpServerContext {
@@ -1476,6 +1477,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   registerAdvancedTools(server, client, context);
+  registerBlueprintTools(server, client, context);
 
   return server;
 }

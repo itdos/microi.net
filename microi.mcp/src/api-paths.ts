@@ -56,4 +56,11 @@ export const API = {
   GET_PAGE_ENGINE_LIST: '/api/V8Engine/GetPageEngineList',
   GET_PAGE_ENGINE_DETAIL: '/api/V8Engine/GetPageEngineDetail',
   SAVE_PAGE_ENGINE: '/api/V8Engine/SavePageEngine',
+
+  // 业务架构蓝图（System Blueprint）
+  LIST_BLUEPRINTS: '/api/V8Engine/ListBlueprints',
+  GET_BLUEPRINT: '/api/V8Engine/GetBlueprint',
+  SAVE_BLUEPRINT: '/api/V8Engine/SaveBlueprint',
+  DELETE_BLUEPRINT: '/api/V8Engine/DeleteBlueprint',
+  VALIDATE_BLUEPRINT: '/api/V8Engine/ValidateBlueprint',
 } as const;

@@ -63,6 +63,51 @@ namespace Microi.net.Api
             try
             {
                 var enableCaptcha = DynamicHelper.GetDynamicBoolValue(sysConfigResult.Data, "EnableCaptcha");
+                // ===== 自动化测试旁路：仅当环境变量 MICROI_DEV_TEST_KEY 显式设置且请求头 X-Microi-Dev-Key 匹配时，跳过验证码 =====
+                // 用途：CI/E2E 自动化登录。生产环境不要设置该变量。
+                var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
+                var isDevTest = !string.IsNullOrWhiteSpace(devKey)
+                    && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal);
+                if (isDevTest)
+                {
+                    enableCaptcha = false;
+                    // 在该模式下，密码字段允许为占位值（如 "_DEV_BYPASS_"），后续 Login() 会跳过密码校验
+                    if (string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
+                    {
+                        param._DevBypassPwd = true;
+                    }
+                }
+                // ===== 本地开发旁路（配置驱动）=====
+                // 当 appsettings.{Env}.json 中 DevLoginBypass.Enabled=true 且
+                // （OnlyLoopback=false 或 请求来自 127.0.0.1/::1）时，跳过验证码。
+                // 生产环境务必保持 DevLoginBypass.Enabled=false 或不配置。
+                else
+                {
+                    var cfg = HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
+                        as Microsoft.Extensions.Configuration.IConfiguration;
+                    if (cfg != null && cfg.GetValue<bool>("DevLoginBypass:Enabled"))
+                    {
+                        var onlyLoopback = cfg.GetValue<bool>("DevLoginBypass:OnlyLoopback", true);
+                        var remoteIp = HttpContext.Connection.RemoteIpAddress;
+                        var isLoopback = remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
+                        if (!onlyLoopback || isLoopback)
+                        {
+                            if (cfg.GetValue<bool>("DevLoginBypass:SkipCaptcha", true))
+                            {
+                                enableCaptcha = false;
+                            }
+                            // 自动填充缺省账号密码（仅当请求未带）
+                            if (param.Account.DosIsNullOrWhiteSpace())
+                            {
+                                param.Account = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
+                            }
+                            if (param.Pwd.DosIsNullOrWhiteSpace())
+                            {
+                                param.Pwd = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
+                            }
+                        }
+                    }
+                }
                 if (enableCaptcha)
                 {
                     if (param._CaptchaId.DosIsNullOrWhiteSpace())
