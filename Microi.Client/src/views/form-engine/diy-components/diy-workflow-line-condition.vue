@@ -54,15 +54,15 @@
                 <div class="wf-route__head">
                     <div class="wf-route__main">
                         <span class="wf-route__badge">{{ routeIndex + 1 }}</span>
-                        <span class="wf-route__name">{{ route.lineName || route.toNodeName || "未命名路线" }}</span>
-                        <span class="wf-route__target">到 {{ route.toNodeName || route.toNodeId || "下一节点" }}</span>
+                        <span class="wf-route__name">{{ getRouteTitle(route) }}</span>
+                        <span class="wf-route__target">{{ route.conditionName ? "条件 " + route.conditionName : "未命名条件" }}</span>
                     </div>
                     <el-checkbox v-model="route.isDefault" @change="setDefaultRoute(route)">默认路线</el-checkbox>
                 </div>
 
                 <div class="wf-route__line">
-                    <el-input v-model="route.lineName" placeholder="条件名称" @input="markDirty" />
-                    <el-input v-model="route.lineValue" placeholder="条件值 LineValue" @input="markDirty">
+                    <el-input v-model="route.conditionName" placeholder="条件名称" @input="markDirty" />
+                    <el-input v-model="route.lineValue" placeholder="可选；留空时使用 NextNodeId" @input="markDirty">
                         <template #prepend>LineValue</template>
                     </el-input>
                 </div>
@@ -203,7 +203,7 @@ const operatorOptions = [
 ];
 
 const currentNodeId = computed(() => props.FormDiyTableModel.Id || props.TableRowId || "");
-const currentNodeName = computed(() => props.FormDiyTableModel.NodeName || "");
+const currentNodeName = computed(() => getNodeName(currentNodeId.value) || props.FormDiyTableModel.NodeName || "");
 const flowDesignId = computed(() => props.FormDiyTableModel.FlowDesignId || props.ParentV8?.FlowDesignModel?.Id || props.DataAppend.FlowDesignId || "");
 const businessTableId = computed(() => props.FormDiyTableModel.TableId || props.ParentV8?.FlowDesignModel?.TableId || props.DataAppend.TableId || "");
 const targetFieldName = computed(() => props.field?.Config?.WorkflowCondition?.TargetField || props.DataAppend.TargetField || "LineValueV8");
@@ -284,6 +284,22 @@ function onRuleFieldChange(rule) {
     markDirty();
 }
 
+function getNodeName(nodeId) {
+    if (!nodeId) return "";
+    const node = nodeOptions.value.find((item) => item.Id === nodeId) || {};
+    return node.NodeName || node.Name || "";
+}
+
+function buildRouteTitle(fromNodeId, toNodeId, fromNodeName, toNodeName) {
+    const fromName = getNodeName(fromNodeId) || fromNodeName || (fromNodeId === currentNodeId.value ? currentNodeName.value : "") || fromNodeId || "当前节点";
+    const toName = getNodeName(toNodeId) || toNodeName || toNodeId || "下一节点";
+    return `${fromName} 到 ${toName}`;
+}
+
+function getRouteTitle(route) {
+    return buildRouteTitle(route.fromNodeId, route.toNodeId, route.fromNodeName, route.toNodeName);
+}
+
 async function loadDesignerData() {
     if (!currentNodeId.value) {
         routes.value = [];
@@ -343,14 +359,20 @@ async function loadNodesAndLines() {
 }
 
 function toRoute(line, index) {
+    const fromNode = nodeOptions.value.find((node) => node.Id === line.FromNodeId) || {};
     const toNode = nodeOptions.value.find((node) => node.Id === line.ToNodeId) || {};
+    const fromNodeName = fromNode.NodeName || line.FromNodeName || "";
+    const toNodeName = toNode.NodeName || line.ToNodeName || "";
+    const routeTitle = buildRouteTitle(line.FromNodeId, line.ToNodeId, fromNodeName, toNodeName);
+    const conditionName = line.LineName && line.LineName !== routeTitle ? line.LineName : "";
     return {
         lineId: line.Id,
-        lineName: line.LineName || "",
-        lineValue: line.LineValue || String(index + 1),
+        conditionName,
+        lineValue: line.LineValue || "",
         fromNodeId: line.FromNodeId,
+        fromNodeName,
         toNodeId: line.ToNodeId,
-        toNodeName: toNode.NodeName || line.ToNodeName || "",
+        toNodeName,
         match: "all",
         isDefault: false,
         rules: [newRule()]
@@ -365,8 +387,10 @@ function initRoutesFromVisualConfig() {
     routes.value.forEach((route) => {
         const savedRoute = config.routes.find((item) => item.lineId === route.lineId || (item.lineValue && item.lineValue === route.lineValue));
         if (!savedRoute) return;
-        route.lineName = savedRoute.lineName || route.lineName;
-        route.lineValue = savedRoute.lineValue || route.lineValue;
+        route.conditionName = savedRoute.conditionName || savedRoute.lineName || route.conditionName;
+        route.lineValue = savedRoute.lineValue == null ? route.lineValue : savedRoute.lineValue;
+        route.fromNodeName = getNodeName(route.fromNodeId) || savedRoute.fromNodeName || route.fromNodeName;
+        route.toNodeName = getNodeName(route.toNodeId) || savedRoute.toNodeName || route.toNodeName;
         route.match = savedRoute.match === "any" ? "any" : "all";
         route.isDefault = !!savedRoute.isDefault;
         route.rules = Array.isArray(savedRoute.rules) && savedRoute.rules.length > 0
@@ -436,11 +460,14 @@ function buildConfig() {
         nodeName: currentNodeName.value,
         routes: routes.value.map((route) => ({
             lineId: route.lineId,
-            lineName: route.lineName || "",
+            conditionName: route.conditionName || "",
+            lineName: route.conditionName || "",
             lineValue: String(route.lineValue || ""),
             fromNodeId: route.fromNodeId,
+            fromNodeName: getNodeName(route.fromNodeId) || route.fromNodeName || "",
             toNodeId: route.toNodeId,
-            toNodeName: route.toNodeName || "",
+            toNodeName: getNodeName(route.toNodeId) || route.toNodeName || "",
+            routeTitle: getRouteTitle(route),
             match: route.match === "any" ? "any" : "all",
             isDefault: !!route.isDefault,
             rules: (route.rules || [])
@@ -457,7 +484,82 @@ function buildConfig() {
 
 function buildV8Code(config) {
     const json = JSON.stringify(config, null, 2);
-    return `${CODE_BEGIN}\n${MARKER_BEGIN}\n${json}\n${MARKER_END}\n(function () {\n  var config = ${json};\n\n  function getValue(row, field) {\n    if (!row || !field) return null;\n    if (row[field] !== undefined) return row[field];\n    var parts = String(field).split('.');\n    var current = row;\n    for (var i = 0; i < parts.length; i++) {\n      if (current == null) return null;\n      current = current[parts[i]];\n    }\n    return current;\n  }\n\n  function isEmpty(value) {\n    if (value === null || value === undefined) return true;\n    if (typeof value === 'string' && value.replace(/(^\\s*)|(\\s*$)/g, '') === '') return true;\n    if (Object.prototype.toString.call(value) === '[object Array]' && value.length === 0) return true;\n    return false;\n  }\n\n  function toNumber(value) {\n    if (value === null || value === undefined || value === '') return null;\n    var numberValue = Number(value);\n    return isNaN(numberValue) ? null : numberValue;\n  }\n\n  function compare(left, operatorValue, right) {\n    if (operatorValue === 'empty') return isEmpty(left);\n    if (operatorValue === 'notEmpty') return !isEmpty(left);\n\n    var leftText = left === null || left === undefined ? '' : String(left);\n    var rightText = right === null || right === undefined ? '' : String(right);\n    var leftNumber = toNumber(left);\n    var rightNumber = toNumber(right);\n\n    if (operatorValue === 'eq') return leftText == rightText;\n    if (operatorValue === 'ne') return leftText != rightText;\n    if (operatorValue === 'contains') return leftText.indexOf(rightText) > -1;\n    if (operatorValue === 'notContains') return leftText.indexOf(rightText) === -1;\n    if (operatorValue === 'startsWith') return leftText.indexOf(rightText) === 0;\n    if (operatorValue === 'endsWith') return rightText === '' || leftText.lastIndexOf(rightText) === leftText.length - rightText.length;\n\n    if (leftNumber !== null && rightNumber !== null) {\n      if (operatorValue === 'gt') return leftNumber > rightNumber;\n      if (operatorValue === 'gte') return leftNumber >= rightNumber;\n      if (operatorValue === 'lt') return leftNumber < rightNumber;\n      if (operatorValue === 'lte') return leftNumber <= rightNumber;\n    }\n\n    if (operatorValue === 'gt') return leftText > rightText;\n    if (operatorValue === 'gte') return leftText >= rightText;\n    if (operatorValue === 'lt') return leftText < rightText;\n    if (operatorValue === 'lte') return leftText <= rightText;\n    return false;\n  }\n\n  function routeMatch(route, form) {\n    var rules = route.rules || [];\n    if (rules.length === 0) return false;\n    var anyMode = route.match === 'any';\n    var matchedCount = 0;\n    for (var i = 0; i < rules.length; i++) {\n      var rule = rules[i];\n      var matched = compare(getValue(form, rule.field), rule.operator || 'eq', rule.value);\n      if (anyMode && matched) return true;\n      if (!anyMode && !matched) return false;\n      if (matched) matchedCount++;\n    }\n    return anyMode ? matchedCount > 0 : true;\n  }\n\n  var defaultRoute = null;\n  var form = V8.Form || {};\n  var routes = config.routes || [];\n  for (var i = 0; i < routes.length; i++) {\n    var route = routes[i];\n    if (route.isDefault) {\n      defaultRoute = route;\n      continue;\n    }\n    if (routeMatch(route, form)) {\n      V8.LineValue = String(route.lineValue);\n      return;\n    }\n  }\n  if (defaultRoute) {\n    V8.LineValue = String(defaultRoute.lineValue);\n  }\n})();\n${CODE_END}`;
+    const normalRoutes = (config.routes || []).filter((route) => !route.isDefault && buildRouteExpression(route));
+    const defaultRoute = (config.routes || []).find((route) => route.isDefault);
+    const codeLines = [CODE_BEGIN, MARKER_BEGIN, json, MARKER_END];
+
+    normalRoutes.forEach((route, index) => {
+        const keyword = index === 0 ? "if" : "else if";
+        codeLines.push(`${keyword} (${buildRouteExpression(route)}) {`);
+        codeLines.push(buildRouteAssignment(route));
+        codeLines.push("}");
+    });
+
+    if (defaultRoute) {
+        codeLines.push(normalRoutes.length > 0 ? "else {" : "if (true) {");
+        codeLines.push(buildRouteAssignment(defaultRoute));
+        codeLines.push("}");
+    }
+
+    codeLines.push(CODE_END);
+    return codeLines.join("\n");
+}
+
+function buildRouteExpression(route) {
+    const rules = (route.rules || []).filter((rule) => rule.field);
+    if (rules.length === 0) return "";
+    const joiner = route.match === "any" ? " || " : " && ";
+    return rules.map((rule) => `(${buildRuleExpression(rule)})`).join(joiner);
+}
+
+function buildRouteAssignment(route) {
+    if (route.lineValue) {
+        return `  V8.LineValue = ${formatLineValue(route.lineValue)};`;
+    }
+    return `  V8.NextNodeId = ${toJsString(route.toNodeId || "")};`;
+}
+
+function buildRuleExpression(rule) {
+    const fieldValue = `V8.Form[${toJsString(rule.field)}]`;
+    const value = rule.value == null ? "" : String(rule.value);
+    const valueString = toJsString(value);
+    const textValue = `String(${fieldValue} == null ? "" : ${fieldValue})`;
+
+    if (rule.operator === "empty") return `${fieldValue} == null || ${textValue}.replace(/(^\\s*)|(\\s*$)/g, "") === ""`;
+    if (rule.operator === "notEmpty") return `${fieldValue} != null && ${textValue}.replace(/(^\\s*)|(\\s*$)/g, "") !== ""`;
+    if (rule.operator === "contains") return `${textValue}.indexOf(${valueString}) > -1`;
+    if (rule.operator === "notContains") return `${textValue}.indexOf(${valueString}) === -1`;
+    if (rule.operator === "startsWith") return `${textValue}.indexOf(${valueString}) === 0`;
+    if (rule.operator === "endsWith") return `${valueString} === "" || ${textValue}.lastIndexOf(${valueString}) === ${textValue}.length - ${valueString}.length`;
+
+    const compareValue = isNumericValue(value) && ["gt", "gte", "lt", "lte"].indexOf(rule.operator) > -1
+        ? Number(value)
+        : valueString;
+    const leftValue = isNumericValue(value) && ["gt", "gte", "lt", "lte"].indexOf(rule.operator) > -1
+        ? `Number(${fieldValue})`
+        : textValue;
+
+    const operatorMap = {
+        eq: "==",
+        ne: "!=",
+        gt: ">",
+        gte: ">=",
+        lt: "<",
+        lte: "<="
+    };
+    return `${leftValue} ${operatorMap[rule.operator] || "=="} ${compareValue}`;
+}
+
+function isNumericValue(value) {
+    return value !== "" && !Number.isNaN(Number(value));
+}
+
+function formatLineValue(value) {
+    return isNumericValue(String(value)) ? String(value) : toJsString(value);
+}
+
+function toJsString(value) {
+    return JSON.stringify(value == null ? "" : String(value));
 }
 
 function mergeVisualCode(oldCode, visualCode) {
@@ -489,12 +591,6 @@ function mergeVisualCode(oldCode, visualCode) {
 function applyConfig() {
     if (isReadonly()) return;
 
-    const invalidRoute = routes.value.find((route) => !route.lineValue);
-    if (invalidRoute) {
-        DiyCommon.Tips("请为每条路线设置条件值 LineValue。", false);
-        return;
-    }
-
     const config = buildConfig();
     const code = mergeVisualCode(getCurrentLineValueV8(), buildV8Code(config));
     const target = targetFieldName.value;
@@ -516,7 +612,7 @@ function applyConfig() {
 
 function updateParentLine(route) {
     const patch = {
-        LineName: route.lineName || "",
+        LineName: getRouteTitle(route),
         LineValue: String(route.lineValue || "")
     };
     if (typeof props.ParentV8?.SetWorkflowLine === "function") {

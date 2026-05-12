@@ -72,6 +72,7 @@ namespace Microi.net
         public List<JObject> TableData { get; set; } = new List<JObject>();
         public dynamic OldForm { get; set; }
         public string LineValue { get; set; }
+        public string NextNodeId { get; set; }
         public string V8Code { get; set; }
         public DbSession Db { get; set; }
         public Dictionary<string, DbSession> Dbs { get; set; } = new Dictionary<string, DbSession>();

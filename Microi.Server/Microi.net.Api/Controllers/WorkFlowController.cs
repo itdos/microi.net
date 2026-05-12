@@ -193,6 +193,13 @@ namespace Microi.net.Api.Controllers
                 // 兼容：若不传 _FormSubmitAction，按是否有 Id 判定
                 formAction = string.IsNullOrEmpty(formPayload["Id"]?.ToString()) ? "Add" : "Edit";
             }
+            if (isStart
+                && !string.Equals(formAction, "Add", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(formAction, "Insert", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrEmpty(formPayload["_NoLineForAdd"]?.ToString()))
+            {
+                formPayload["_NoLineForAdd"] = true;
+            }
 
             // 注入身份信息到表单 payload
             formPayload["_CurrentUser"] = JTokenEx.FromObject(currentUser);
