@@ -1,4 +1,6 @@
 import { z } from 'zod';
+const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
+const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
 const jsonRecordSchema = z.record(z.unknown());
 function textResult(text, isError = false) {
     return { content: [{ type: 'text', text }], isError };
@@ -547,9 +549,242 @@ function buildPlan(manifest) {
     permissions.forEach((item) => plan.push(`set_permission ${getString(item, 'roleId', 'RoleId') || 'admin'}`));
     pages.forEach((item) => plan.push(`save_page ${getString(item, 'title', 'Title')}`));
     printTemplates.forEach((item) => plan.push(`save_print_template ${getString(item, 'title', 'Title')}`));
-    workflows.forEach((item) => plan.push(`save_workflow ${getString(asRecord(item.FlowDesign ?? item.flowDesign ?? item), 'FlowName', 'flowName', 'name')}`));
+    workflows.forEach((item, workflowIndex) => {
+        const check = validateWorkflowPackage(item);
+        errors.push(...check.errors.map((error) => `workflows[${workflowIndex}]: ${error}`));
+        warnings.push(...check.warnings.map((warning) => `workflows[${workflowIndex}]: ${warning}`));
+        plan.push(`save_workflow ${getString(asRecord(item.FlowDesign ?? item.flowDesign ?? item), 'FlowName', 'flowName', 'name')}`);
+    });
     jobs.forEach((item) => plan.push(`save_job ${getString(item, 'jobName', 'JobName')}`));
     return { plan, errors, warnings };
+}
+function getWorkflowParts(workflow) {
+    return {
+        flow: asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow),
+        nodes: getArray(workflow, 'Nodes', 'nodes'),
+        lines: getArray(workflow, 'Lines', 'lines'),
+    };
+}
+function getNodeId(node) {
+    return getString(node, 'Id', 'id', 'NodeId', 'nodeId');
+}
+function getNodeName(node) {
+    return getString(node, 'NodeName', 'nodeName', 'Name', 'name');
+}
+function getNodeType(node) {
+    return getString(node, 'NodeType', 'nodeType', 'Type', 'type');
+}
+function isStartNode(node) {
+    const value = `${getNodeType(node)} ${getNodeName(node)}`.toLowerCase();
+    return value.includes('start') || value.includes('begin') || value.includes('开始') || value.includes('发起');
+}
+function isEndNode(node) {
+    const value = `${getNodeType(node)} ${getNodeName(node)}`.toLowerCase();
+    return value.includes('end') || value.includes('finish') || value.includes('结束') || value.includes('完成');
+}
+function validateWorkflowPackage(workflow) {
+    const errors = [];
+    const warnings = [];
+    const { flow, nodes, lines } = getWorkflowParts(workflow);
+    const flowName = getString(flow, 'FlowName', 'flowName', 'Name', 'name');
+    const flowTableId = getString(flow, 'TableId', 'tableId');
+    const flowTableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
+    const nodeById = new Map();
+    const outgoing = new Map();
+    const incoming = new Map();
+    if (!flowName)
+        errors.push('FlowDesign.FlowName 不能为空');
+    if (!nodes.length)
+        errors.push('Nodes 至少需要包含开始、审批/业务、结束节点');
+    if (!lines.length)
+        errors.push('Lines 至少需要连接开始到下一节点');
+    if (!flowTableId && !flowTableRef)
+        warnings.push('FlowDesign.TableId 为空；普通审批流建议绑定业务 diy_table');
+    nodes.forEach((node, index) => {
+        const id = getNodeId(node);
+        const name = getNodeName(node);
+        if (!id)
+            errors.push(`Nodes[${index}].Id/NodeId 不能为空`);
+        if (!name)
+            errors.push(`Nodes[${index}].NodeName 不能为空`);
+        if (id) {
+            if (nodeById.has(id))
+                errors.push(`节点 Id 重复：${id}`);
+            nodeById.set(id, node);
+        }
+    });
+    lines.forEach((line, index) => {
+        const id = getString(line, 'Id', 'id', 'LineId', 'lineId') || `(index ${index})`;
+        const fromNodeId = getString(line, 'FromNodeId', 'fromNodeId');
+        const toNodeId = getString(line, 'ToNodeId', 'toNodeId');
+        if (!fromNodeId)
+            errors.push(`Lines[${index}].FromNodeId 不能为空`);
+        if (!toNodeId)
+            errors.push(`Lines[${index}].ToNodeId 不能为空`);
+        if (fromNodeId && !nodeById.has(fromNodeId))
+            errors.push(`连线 ${id} 的 FromNodeId 不存在：${fromNodeId}`);
+        if (toNodeId && !nodeById.has(toNodeId))
+            errors.push(`连线 ${id} 的 ToNodeId 不存在：${toNodeId}`);
+        if (fromNodeId === toNodeId && fromNodeId)
+            warnings.push(`连线 ${id} 指向自身，请确认是否为有意循环`);
+        if (fromNodeId)
+            outgoing.set(fromNodeId, [...(outgoing.get(fromNodeId) || []), line]);
+        if (toNodeId)
+            incoming.set(toNodeId, [...(incoming.get(toNodeId) || []), line]);
+    });
+    const startNodes = nodes.filter(isStartNode);
+    const endNodes = nodes.filter(isEndNode);
+    if (startNodes.length !== 1)
+        errors.push(`需要且仅需要 1 个开始节点，当前 ${startNodes.length} 个`);
+    if (endNodes.length < 1)
+        errors.push('至少需要 1 个结束节点');
+    nodes.forEach((node) => {
+        const id = getNodeId(node);
+        const name = getNodeName(node) || id;
+        if (!id)
+            return;
+        const outLines = outgoing.get(id) || [];
+        const inLines = incoming.get(id) || [];
+        if (!isStartNode(node) && inLines.length === 0)
+            warnings.push(`节点 ${name} 没有入线`);
+        if (!isEndNode(node) && outLines.length === 0)
+            warnings.push(`节点 ${name} 没有出线`);
+        if (outLines.length > 1) {
+            const conditionCode = getString(node, 'LineValueV8', 'lineValueV8', 'V8Code', 'v8Code');
+            if (!conditionCode)
+                warnings.push(`节点 ${name} 有 ${outLines.length} 条出线，建议配置 LineValueV8，并优先用 V8.NextNodeId 指定下一节点`);
+        }
+    });
+    return {
+        ok: errors.length === 0,
+        errors,
+        warnings,
+        summary: {
+            flowName,
+            tableId: flowTableId,
+            table: flowTableRef,
+            nodeCount: nodes.length,
+            lineCount: lines.length,
+            startNodes: startNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
+            endNodes: endNodes.map((node) => ({ id: getNodeId(node), name: getNodeName(node) })),
+        },
+    };
+}
+function extractWorkflowVisualConfig(code) {
+    const beginIndex = code.indexOf(WF_MARKER_BEGIN);
+    if (beginIndex < 0)
+        return null;
+    const jsonStart = beginIndex + WF_MARKER_BEGIN.length;
+    const endIndex = code.indexOf(WF_MARKER_END, jsonStart);
+    if (endIndex < 0)
+        return null;
+    try {
+        return asRecord(JSON.parse(code.slice(jsonStart, endIndex).trim()));
+    }
+    catch {
+        return null;
+    }
+}
+function isEmptyValue(value) {
+    return value === null || value === undefined || String(value).trim() === '';
+}
+function compareWorkflowRule(rule, formData) {
+    const field = getString(rule, 'field', 'Field');
+    const operator = getString(rule, 'operator', 'Operator') || 'eq';
+    const expected = getValue(rule, 'value', 'Value');
+    const actual = field ? formData[field] : undefined;
+    const actualText = actual == null ? '' : String(actual);
+    const expectedText = expected == null ? '' : String(expected);
+    if (operator === 'empty')
+        return isEmptyValue(actual);
+    if (operator === 'notEmpty')
+        return !isEmptyValue(actual);
+    if (operator === 'contains')
+        return actualText.includes(expectedText);
+    if (operator === 'notContains')
+        return !actualText.includes(expectedText);
+    if (operator === 'startsWith')
+        return actualText.startsWith(expectedText);
+    if (operator === 'endsWith')
+        return expectedText === '' || actualText.endsWith(expectedText);
+    if (['gt', 'gte', 'lt', 'lte'].includes(operator)) {
+        const left = Number(actual);
+        const right = Number(expected);
+        if (Number.isNaN(left) || Number.isNaN(right))
+            return false;
+        if (operator === 'gt')
+            return left > right;
+        if (operator === 'gte')
+            return left >= right;
+        if (operator === 'lt')
+            return left < right;
+        return left <= right;
+    }
+    if (operator === 'ne')
+        return actualText !== expectedText;
+    return actualText === expectedText;
+}
+function testWorkflowVisualCondition(input) {
+    const workflow = asRecord(input.workflow);
+    const formData = asRecord(input.formData);
+    let code = getString(input, 'lineValueV8Code', 'LineValueV8', 'code');
+    if (!code && Object.keys(workflow).length > 0) {
+        const { nodes } = getWorkflowParts(workflow);
+        const nodeId = getString(input, 'nodeId', 'NodeId');
+        const node = (nodeId ? nodes.find((item) => getNodeId(item) === nodeId) : nodes.find(isStartNode) || nodes[0]) || {};
+        code = getString(node, 'LineValueV8', 'lineValueV8', 'V8Code', 'v8Code');
+    }
+    const config = extractWorkflowVisualConfig(code);
+    const routes = getArray(config || {}, 'routes', 'Routes');
+    if (!config || routes.length === 0) {
+        return { ok: false, selectedRoute: null, warnings: ['未找到图形条件标记，MCP 不执行任意手写 V8；请用图形条件生成 LineValueV8 后再测试。'] };
+    }
+    const defaultRoute = routes.find((route) => !!getValue(route, 'isDefault', 'IsDefault')) || null;
+    for (const route of routes) {
+        if (route === defaultRoute)
+            continue;
+        const rules = getArray(route, 'rules', 'Rules').filter((rule) => getString(rule, 'field', 'Field'));
+        if (rules.length === 0)
+            continue;
+        const match = getString(route, 'match', 'Match') === 'any'
+            ? rules.some((rule) => compareWorkflowRule(rule, formData))
+            : rules.every((rule) => compareWorkflowRule(rule, formData));
+        if (match) {
+            return { ok: true, selectedRoute: route, assignment: buildWorkflowAssignment(route), source: 'matched' };
+        }
+    }
+    return { ok: !!defaultRoute, selectedRoute: defaultRoute, assignment: defaultRoute ? buildWorkflowAssignment(defaultRoute) : null, source: defaultRoute ? 'default' : 'none' };
+}
+function buildWorkflowAssignment(route) {
+    const lineValue = getString(route, 'lineValue', 'LineValue');
+    const toNodeId = getString(route, 'toNodeId', 'ToNodeId');
+    return lineValue ? { LineValue: lineValue } : { NextNodeId: toNodeId };
+}
+function workflowPayload(workflow, tableIdByName) {
+    const { flow, nodes, lines } = getWorkflowParts(workflow);
+    const nextFlow = { ...flow };
+    const tableRef = getString(flow, 'table', 'tableName', 'TableName', 'diyTableName', 'DiyTableName');
+    if (!getString(nextFlow, 'TableId', 'tableId') && tableRef) {
+        const resolvedTableId = tableIdByName.get(tableRef.toLowerCase());
+        if (resolvedTableId)
+            nextFlow.TableId = resolvedTableId;
+    }
+    const nodeNameById = new Map();
+    const nextNodes = nodes.map((node, index) => {
+        const id = getNodeId(node) || `wf_node_${index + 1}_${randomId().slice(0, 8)}`;
+        const nextNode = { ...node, Id: id };
+        const name = getNodeName(nextNode);
+        if (name)
+            nodeNameById.set(id, name);
+        return nextNode;
+    });
+    const nextLines = lines.map((line, index) => {
+        const fromNodeId = getString(line, 'FromNodeId', 'fromNodeId');
+        const toNodeId = getString(line, 'ToNodeId', 'toNodeId');
+        const lineName = getString(line, 'LineName', 'lineName') || `${nodeNameById.get(fromNodeId) || fromNodeId || '当前节点'} 到 ${nodeNameById.get(toNodeId) || toNodeId || '下一节点'}`;
+        return { ...line, Id: getString(line, 'Id', 'id', 'LineId', 'lineId') || `wf_line_${index + 1}_${randomId().slice(0, 8)}`, LineName: lineName };
+    });
+    return { FlowDesign: nextFlow, Nodes: nextNodes, Lines: nextLines };
 }
 async function audit(client, action, target, payload) {
     try {
@@ -706,7 +941,18 @@ function manifestGuide(osClient) {
             dataSources: [],
             pages: [],
             printTemplates: [],
-            workflows: [],
+            workflows: [{
+                    FlowDesign: { FlowName: 'Order approval', TableId: '<Biz_Order table id or tableName-resolved id>', IsEnable: 1 },
+                    Nodes: [
+                        { Id: 'start', NodeName: '发起人', NodeType: 'Start', AllowSelectUsers: 0, PositionLeft: 80, PositionTop: 160, LineValueV8: '' },
+                        { Id: 'manager', NodeName: '部门经理审批', NodeType: 'Approve', Roles: 'Manager', AllowSelectUsers: 1, PositionLeft: 320, PositionTop: 160 },
+                        { Id: 'end', NodeName: '结束', NodeType: 'End', PositionLeft: 560, PositionTop: 160 },
+                    ],
+                    Lines: [
+                        { Id: 'line_start_manager', FromNodeId: 'start', ToNodeId: 'manager', LineName: '发起人 到 部门经理审批', LineValue: '' },
+                        { Id: 'line_manager_end', FromNodeId: 'manager', ToNodeId: 'end', LineName: '部门经理审批 到 结束', LineValue: '' },
+                    ],
+                }],
             jobs: [],
         },
         naturalFieldKeys: {
@@ -725,7 +971,10 @@ function manifestGuide(osClient) {
         rules: [
             'Use table and field names in manifests; do not ask the user for diy_field ids.',
             'Put business logic in API engines and call them from menu button V8Code.',
+            'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
+            'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
             'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
+            'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
             'Use dryRun=true until the user explicitly asks to write.',
         ],
     };
@@ -756,6 +1005,16 @@ export function registerAdvancedTools(server, client, context) {
         const plan = buildPlan(manifest);
         return textResult(JSON.stringify({ ok: plan.errors.length === 0, dryRun: true, ...plan }, null, 2), plan.errors.length > 0);
     });
+    server.tool('microi_check_workflow_package', 'Validate a wf_flowdesign + wf_node + wf_line workflow package locally before saving. Checks topology, node ids, line endpoints, start/end nodes and multi-route condition setup.', { workflow: jsonRecordSchema.describe('Workflow package with FlowDesign, Nodes and Lines') }, async ({ workflow }) => {
+        const check = validateWorkflowPackage(workflow);
+        return textResult(JSON.stringify(check, null, 2), !check.ok);
+    });
+    server.tool('microi_test_workflow_condition', 'Test a workflow LineValueV8 generated by the visual condition designer against sample formData. For safety this only evaluates Microi visual-condition marker JSON, not arbitrary hand-written V8.', {
+        workflow: jsonRecordSchema.optional().describe('Optional workflow package; when provided the tool reads the selected node LineValueV8'),
+        nodeId: z.string().optional().describe('Node Id whose LineValueV8 should be tested. If omitted, uses the start node or first node.'),
+        lineValueV8Code: z.string().optional().describe('Direct LineValueV8 JavaScript code containing MICROI_WF_LINE_CONDITION_JSON marker'),
+        formData: jsonRecordSchema.optional().describe('Sample business form data used for rule evaluation'),
+    }, async (input) => textResult(JSON.stringify(testWorkflowVisualCondition(input), null, 2)));
     server.tool('microi_validate_system', `Validate that a generated low-code system exists on Microi server after generation. OsClient: ${osClient}`, { manifest: jsonRecordSchema.describe('The same manifest used by microi_generate_system') }, async ({ manifest }) => {
         try {
             const result = await client.validateLowCodeSystem(manifest);
@@ -830,6 +1089,7 @@ export function registerAdvancedTools(server, client, context) {
                         Unique: getNumber(field, 'unique', 'Unique'),
                         DefaultValue: getString(field, 'defaultValue', 'DefaultValue'),
                         Placeholder: getString(field, 'placeholder', 'Placeholder'),
+                        FormWidth: getNumber(field, 'formWidth', 'FormWidth'),
                         Data: generatedConfig?.data ?? getString(field, 'data', 'Data'),
                         Config: generatedConfig ? JSON.stringify(generatedConfig.config) : stringifyConfig(field.config ?? field.Config),
                         Description: getString(field, 'description', 'Description'),
@@ -926,10 +1186,11 @@ export function registerAdvancedTools(server, client, context) {
                     return textResult(JSON.stringify({ ok: false, failedAt: 'savePrintTemplate', template: payload, response, results }, null, 2), true);
             }
             for (const workflow of getArray(manifest, 'workflows', 'Workflows')) {
-                const response = await client.saveWorkflowPackage(workflow);
-                results.push({ step: 'saveWorkflowPackage', workflow: getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow), 'FlowName', 'flowName'), response });
+                const payload = workflowPayload(workflow, tableIdByName);
+                const response = await client.saveWorkflowPackage(payload);
+                results.push({ step: 'saveWorkflowPackage', workflow: getString(asRecord(payload.FlowDesign ?? payload.flowDesign ?? payload), 'FlowName', 'flowName'), response });
                 if (response.Code !== 1)
-                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage', workflow, response, results }, null, 2), true);
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'saveWorkflowPackage', workflow: payload, response, results }, null, 2), true);
             }
             for (const job of getArray(manifest, 'jobs', 'Jobs')) {
                 const payload = jobPayload(job);
@@ -1002,6 +1263,9 @@ export function registerAdvancedTools(server, client, context) {
     });
     server.tool('microi_save_workflow_package', `Create or update wf_flowdesign + wf_node + wf_line as one workflow package. OsClient ${osClient}.`, { workflow: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ workflow, confirmExecution }) => {
         const name = getString(asRecord(workflow.FlowDesign ?? workflow.flowDesign ?? workflow), 'FlowName', 'flowName', 'name');
+        const check = validateWorkflowPackage(workflow);
+        if (!check.ok)
+            return textResult(JSON.stringify(check, null, 2), true);
         if (confirmExecution !== name && confirmExecution !== 'EXECUTE')
             return textResult(`写入已拦截：请传 confirmExecution="${name}" 或 "EXECUTE"。`, true);
         await audit(client, 'microi_save_workflow_package', name, workflow);

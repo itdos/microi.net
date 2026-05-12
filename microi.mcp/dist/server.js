@@ -292,6 +292,8 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
+- **microi_save_engine_code** — 只覆盖 ApiV8Code，不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
+- **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
@@ -729,7 +731,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Overwrites existing code.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Overwrites ApiV8Code only and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
     }, async ({ apiEngineKey, code }) => {
@@ -865,7 +867,7 @@ export function createMcpServer(client, context) {
         unique: z.number().optional().describe('Unique constraint (1=unique, 0=allow duplicates). Default: 0'),
         defaultValue: z.string().optional().describe('Default value for the field'),
         placeholder: z.string().optional().describe('Placeholder text shown in form input'),
-        formWidth: z.string().optional().describe('Field width in form (e.g. "100%", "50%"). Default: "100%"'),
+        formWidth: z.number().nullable().optional().describe('Field width in form grid columns (1-24). Default: null/omitted for normal fields. Use 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.'),
         data: z.string().optional().describe('Options data source for Select/MultipleSelect/Radio/Checkbox components. REQUIRED for these four components. Format: "key1|label1,key2|label2" (KeyValue, recommended — e.g. "1|启用,0|禁用", "male|男,female|女") — backend stores key, displays label. Or simple "v1,v2,v3" (same value for both). Backend auto-builds the Config JSON. For SQL/ApiEngine/DataSource sources, use the config parameter instead.'),
         config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm: \'{"JoinForm":{"TableId":"xxx","TableName":"xxx","JoinFieldName":"yyy"}}\''),
         description: z.string().optional().describe('Field description / help text'),
@@ -1018,7 +1020,7 @@ export function createMcpServer(client, context) {
         notEmpty: z.number().optional(),
         unique: z.number().optional(),
         sort: z.number().optional(),
-        formWidth: z.number().optional(),
+        formWidth: z.number().nullable().optional(),
         tableWidth: z.number().optional(),
         placeholder: z.string().optional(),
         defaultValue: z.string().optional(),

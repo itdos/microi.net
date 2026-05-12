@@ -195,7 +195,7 @@ export declare class MicroiClient {
         Unique?: number;
         DefaultValue?: string;
         Placeholder?: string;
-        FormWidth?: string;
+        FormWidth?: number | null;
         Data?: string;
         Config?: string;
         Description?: string;

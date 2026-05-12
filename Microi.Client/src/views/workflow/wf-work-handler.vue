@@ -1048,6 +1048,9 @@ export default {
                 try {
                     var formPayload = Object.assign({}, formApiParam || {});
                     formPayload._FormSubmitAction = param.FormMode || "Edit";
+                    if (formPayload._FormSubmitAction != "Add" && formPayload._FormSubmitAction != "Insert") {
+                        formPayload._NoLineForAdd = true;
+                    }
                     var workflowFormData = self.GetWorkflowFormDataForSubmit(formPayload, param.FormData);
 
                     if (!(await self.PrepareNextNodeConfirmUsersBeforeSubmit(workflowFormData))) {

@@ -518,7 +518,7 @@ export class MicroiClient {
     NameConfirm?: number; Readonly?: number;
     NotEmpty?: number; Unique?: number;
     DefaultValue?: string; Placeholder?: string;
-    FormWidth?: string; Data?: string; Config?: string;
+    FormWidth?: number | null; Data?: string; Config?: string;
     Description?: string; Encrypt?: number; InTableEdit?: number;
   }): Promise<ApiResponse> {
     return this.post(API.ADD_FIELD, {

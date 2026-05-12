@@ -352,24 +352,12 @@ namespace Microi.net
                 var existingEngine = JObject.FromObject(getResult.Data);
                 var id = existingEngine.Value<string>("Id");
                 var existingApiAddress = existingEngine.Value<string>("ApiAddress") ?? "";
-                var apiAddress = string.IsNullOrWhiteSpace(existingApiAddress)
-                    ? $"/apiengine/{apiEngineKey}"
-                    : existingApiAddress;
-                var existingApiName = existingEngine.Value<string>("ApiName") ?? "";
-                var existingAllowAnonymous = existingEngine.Value<int?>("AllowAnonymous") ?? 0;
-                var existingIsEnable = existingEngine.Value<int?>("IsEnable") ?? 1;
-                var existingStopHttp = existingEngine.Value<int?>("StopHttp") ?? 0;
 
                 var updateParam = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["Id"] = id,
                     ["ApiEngineKey"] = apiEngineKey,
-                    ["ApiAddress"] = apiAddress,
-                    ["ApiName"] = existingApiName,
-                    ["AllowAnonymous"] = existingAllowAnonymous,
-                    ["IsEnable"] = existingIsEnable,
-                    ["StopHttp"] = existingStopHttp,
                     ["ApiV8Code"] = apiV8Code ?? "",
                     ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     ["_InvokeType"] = "Client"
@@ -383,8 +371,6 @@ namespace Microi.net
                     await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{id.ToLower()}");
                     if (!string.IsNullOrWhiteSpace(existingApiAddress))
                         await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{existingApiAddress.ToLower()}");
-                    if (!string.IsNullOrWhiteSpace(apiAddress) && apiAddress != existingApiAddress)
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiAddress.ToLower()}");
 
                     return new DosResult<object>(1, new
                     {
@@ -1436,6 +1422,17 @@ namespace Microi.net
                 || c.Equals("Checkbox", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static int? GetDefaultFormWidth(string component)
+        {
+            if (string.IsNullOrWhiteSpace(component)) return null;
+            var fullWidthComponents = new[] {
+                "Textarea", "CodeEditor", "RichText", "ImgUpload", "FileUpload",
+                "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html",
+                "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"
+            };
+            return fullWidthComponents.Any(item => item.Equals(component.Trim(), StringComparison.OrdinalIgnoreCase)) ? (int?)24 : null;
+        }
+
         /// <summary>
         /// 将 AI 传入的简洁 data 字符串解析为前端约定的 Data + Config JSON
         /// 支持格式：
@@ -1543,7 +1540,7 @@ namespace Microi.net
             string type, string component, int visible, int appVisible,
             string tab, int tableWidth, int sort, int nameConfirm, int readonlyVal,
             int notEmpty = 0, int unique = 0, string defaultValue = null, string placeholder = null,
-            int formWidth = 24, string data = null, string config = null, string description = null,
+            int? formWidth = null, string data = null, string config = null, string description = null,
             int encrypt = 0, int inTableEdit = 0)
         {
             try
@@ -1611,7 +1608,7 @@ namespace Microi.net
                     Unique = unique,
                     DefaultValue = defaultValue ?? "",
                     Placeholder = placeholder ?? "",
-                    FormWidth = formWidth > 0 ? formWidth : 24,
+                    FormWidth = formWidth.HasValue && formWidth.Value > 0 ? formWidth.Value : GetDefaultFormWidth(componentName),
                     Data = effectiveData,
                     Config = effectiveConfig,
                     Description = description ?? "",
@@ -2839,7 +2836,7 @@ namespace Microi.net
                     Unique = patch["Unique"]?.Val<int>(),
                     Encrypt = patch["Encrypt"]?.Val<int>(),
                     Sort = patch["Sort"]?.Val<int>(),
-                    FormWidth = patch["FormWidth"]?.Val<int>(),
+                    FormWidth = patch["FormWidth"]?.Val<int?>(),
                     TableWidth = patch["TableWidth"]?.Val<int>(),
                     Placeholder = patch["Placeholder"].Val<string>(),
                     DefaultValue = patch["DefaultValue"].Val<string>(),
