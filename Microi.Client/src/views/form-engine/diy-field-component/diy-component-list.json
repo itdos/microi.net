@@ -100,7 +100,7 @@
     "Control": "Slider",
     "Name": "滑块",
     "Type": "Base",
-    "FieldType": "decimal(18, 2)",
+    "FieldType": "int",
     "Icon": "fas fa-sliders-h",
     "Sort": 115
   },

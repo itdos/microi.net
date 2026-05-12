@@ -1230,9 +1230,15 @@ var DiyCommon = {
         if (DiyCommon.IsNull(b)) {
             b = true;
         }
+        var messageType = "success";
+        if (b === false) {
+            messageType = "error";
+        } else if (typeof b === "string" && ["success", "warning", "info", "error"].indexOf(b) > -1) {
+            messageType = b;
+        }
 
         if (DiyCommon.IsNull(t)) {
-            if (b) {
+            if (messageType === "success") {
                 t = 3000;
             } else {
                 t = 10000;
@@ -1271,7 +1277,8 @@ var DiyCommon = {
         var nParam = {
             title: getI18nMsg("Tips"),
             message: c,
-            type: b === false ? "error" : "success",
+            type: messageType,
+            customClass: "microi-tips-" + messageType,
             position: position,
             // duration: t ,
             offset: 40,
@@ -1284,7 +1291,7 @@ var DiyCommon = {
         }
         const notification = ElNotification(nParam);
 
-        if (b === false) {
+        if (messageType === "error") {
             try {
                 var obj = $("#audioError")[0];
                 obj.currentTime = 0;

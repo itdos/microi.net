@@ -265,7 +265,7 @@ namespace Microi.net.Api
                 param["Readonly"]?.Val<int>() ?? 0,
                 param["NotEmpty"]?.Val<int>() ?? 0, param["Unique"]?.Val<int>() ?? 0,
                 param["DefaultValue"].Val<string>(), param["Placeholder"].Val<string>(),
-                param["FormWidth"]?.Val<int>() ?? 24, param["Data"].Val<string>(),
+                param["FormWidth"]?.Val<int?>(), param["Data"].Val<string>(),
                 param["Config"].Val<string>(), param["Description"].Val<string>(),
                 param["Encrypt"]?.Val<int>() ?? 0, param["InTableEdit"]?.Val<int>() ?? 0);
             return Ok(result);

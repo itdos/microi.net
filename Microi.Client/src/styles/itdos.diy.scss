@@ -328,6 +328,12 @@
         word-break: break-all;
         word-wrap: break-word;
     }
+    .el-notification.microi-tips-error,
+    .el-notification--error {
+        background: linear-gradient(135deg, #f56c6c 0%, #c45656 100%) !important;
+        border-color: #f56c6c !important;
+        box-shadow: 0 2px 18px rgba(245, 108, 108, 0.35) !important;
+    }
     // 目前已知的是：diy弹出的层都是2000开始依次+1,
     // neditor一定要设置3000，甚至是3万，因为element的弹出层，会从2000开始一直持续增长，增长到2000多的时候，neditor如果设置2000，那么编辑器里面的图片上传弹出来就会在elemment的2000多之下。
     // 而neditor设置的是3000，目的是为了编辑器右键能弹出层来
@@ -886,7 +892,21 @@ p {
     .el-table .cell {
         // color: #0F0F0F;
         color: var(--el-text-color-regular, #606266);
+    }
+    .el-table th .cell {
+        white-space: nowrap !important;
+    }
+    .el-table tr .cell {
         white-space: nowrap;
+    }
+    .el-table tr .cell.el-tooltip {
+        white-space: nowrap;
+    }
+    .el-table.table-cell-wrap tr .cell,
+    .el-table.table-cell-wrap tr .cell.el-tooltip {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
     //   .el-table .cell:last-child{
     //     color: #606266;

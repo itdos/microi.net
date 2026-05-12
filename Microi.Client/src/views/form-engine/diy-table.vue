@@ -422,7 +422,10 @@
                     :show-summary="StatisticsFields != null"
                     :summary-method="StatisticsFieldsMethod"
                     @sort-change="DiyTableRowSortChange"
-                    :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
+                    :class="[
+                        'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name,
+                        SysMenuModel && (SysMenuModel.TableCellWrap === true || SysMenuModel.TableCellWrap === 1 || SysMenuModel.TableCellWrap === '1' || SysMenuModel.TableCellWrap === 'true') ? 'table-cell-wrap' : ''
+                    ]"
                     @row-dblclick="TableRowDblClick"
                     @selection-change="TableRowSelectionChange"
                     :height="GetDiyTableMaxHeight()"
