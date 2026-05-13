@@ -518,7 +518,7 @@ export class MicroiClient {
     NameConfirm?: number; Readonly?: number;
     NotEmpty?: number; Unique?: number;
     DefaultValue?: string; Placeholder?: string;
-    FormWidth?: string; Data?: string; Config?: string;
+    FormWidth?: number | null; Data?: string; Config?: string;
     Description?: string; Encrypt?: number; InTableEdit?: number;
   }): Promise<ApiResponse> {
     return this.post(API.ADD_FIELD, {
@@ -711,6 +711,43 @@ export class MicroiClient {
     return this.post(API.SAVE_PAGE_ENGINE, {
       OsClient: this.config.osClient,
       ...data,
+    });
+  }
+
+  // ---------- 业务架构蓝图（System Blueprint） ----------
+
+  async listBlueprints(keyword?: string): Promise<ApiResponse> {
+    return this.post(API.LIST_BLUEPRINTS, {
+      OsClient: this.config.osClient,
+      ...(keyword ? { Keyword: keyword } : {}),
+    });
+  }
+
+  async getBlueprint(blueprintId: string): Promise<ApiResponse> {
+    return this.post(API.GET_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+    });
+  }
+
+  async saveBlueprint(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async deleteBlueprint(blueprintId: string): Promise<ApiResponse> {
+    return this.post(API.DELETE_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+    });
+  }
+
+  async validateBlueprint(blueprintId: string): Promise<ApiResponse> {
+    return this.post(API.VALIDATE_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
     });
   }
 

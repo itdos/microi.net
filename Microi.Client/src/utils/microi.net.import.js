@@ -86,6 +86,7 @@ const PrintEngineView = defineAsyncComponent(() => import("@/views/print-engine/
 
 // ==================== DIY组件（diy-components）====================
 const DiyLoadNonDiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-components/DiyLoadNonDiyTable.vue"));
+const DiyWorkflowLineCondition = defineAsyncComponent(() => import("@/views/form-engine/diy-components/diy-workflow-line-condition.vue"));
 
 // ==================== 富文本编辑器（延迟加载，体积较大）====================
 // wangeditor CSS 单独导入（可考虑在需要时才导入）
@@ -195,6 +196,7 @@ function RegMicroiComponents(app) {
 
     // DIY组件
     app.component("DiyLoadNonDiyTable", DiyLoadNonDiyTable);
+    app.component("DiyWorkflowLineCondition", DiyWorkflowLineCondition);
 
     // 富文本编辑器
     app.component("Editor", Editor);

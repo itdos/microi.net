@@ -13,10 +13,27 @@
         <component
             v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
             :is="field.Config.DevComponentName"
+            :model-value="modelValue"
             :TableRowId="TableRowId"
+            :TableId="TableId"
+            :TableName="TableName"
             :DataAppend="GetDataAppend(field)"
-            @FormSet="FormSet"
+            :field="field"
+            :FormDiyTableModel="FormDiyTableModel"
+            :FormData="FormData"
+            :FormMode="FormMode"
+            :LoadMode="LoadMode"
+            :ReadonlyFields="ReadonlyFields"
+            :FieldReadonly="FieldReadonly"
+            :ApiReplace="ApiReplace"
+            :ParentV8="ParentV8"
+            :ParentFieldList="ParentFieldList"
+            :CodeEditorMini="CodeEditorMini"
             :pageLifetimes="pageLifetimes"
+            @update:modelValue="UpdateModelValue"
+            @CallbackFormValueChange="CallbackFormValueChange"
+            @ParentFormSet="ParentFormSet"
+            @FormSet="FormSet"
         />
     </el-form-item>
 
@@ -67,13 +84,53 @@ const props = defineProps({
         type: String,
         default: ""
     },
+    LoadMode: {
+        type: String,
+        default: ""
+    },
     TableRowId: {
+        type: String,
+        default: ""
+    },
+    TableId: {
+        type: String,
+        default: ""
+    },
+    TableName: {
         type: String,
         default: ""
     },
     FormDiyTableModel: {
         type: Object,
         default: () => ({})
+    },
+    FormData: {
+        type: Object,
+        default: () => ({})
+    },
+    ReadonlyFields: {
+        type: Array,
+        default: () => []
+    },
+    FieldReadonly: {
+        type: Boolean,
+        default: false
+    },
+    ApiReplace: {
+        type: Object,
+        default: () => ({})
+    },
+    ParentV8: {
+        type: Object,
+        default: () => ({})
+    },
+    ParentFieldList: {
+        type: Array,
+        default: () => []
+    },
+    CodeEditorMini: {
+        type: Boolean,
+        default: false
     },
     DevComponents: {
         type: Object,
@@ -85,7 +142,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(["update:modelValue", "FormSet"]);
+const emit = defineEmits(["update:modelValue", "FormSet", "ParentFormSet", "CallbackFormValueChange"]);
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
@@ -115,8 +172,24 @@ const GetDataAppend = (field) => {
     return field.DataAppend;
 };
 
-const FormSet = (data) => {
-    emit("FormSet", data);
+const UpdateModelValue = (value) => {
+    emit("update:modelValue", value);
+};
+
+const CallbackFormValueChange = (field, value) => {
+    emit("CallbackFormValueChange", field || props.field, value);
+};
+
+const ParentFormSet = (...args) => {
+    emit("ParentFormSet", ...args);
+};
+
+const FormSet = (...args) => {
+    if (args.length >= 2) {
+        emit("ParentFormSet", ...args);
+    } else {
+        emit("FormSet", ...args);
+    }
 };
 
 // 打开配置弹窗
