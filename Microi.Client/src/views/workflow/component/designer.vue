@@ -72,6 +72,7 @@
                                     :ColSpan="24"
                                     :LabelPosition="'top'"
                                     :CodeEditorMini="true"
+                                    :ParentV8="GetWorkflowDesignerV8()"
                                     @CallbackForm="CallbackForm_Node"
                                     @CallbackFormValueChange="CallbackFormValueChange_Node"
                                 ></DiyForm>
@@ -431,6 +432,34 @@ export default {
             self.DiyCommon.ForRowModelHandler(_rowModel, [field]);
             self.FlowDesignModel[field.Name] = _rowModel[field.Name];
         },
+        GetWorkflowDesignerV8() {
+            var self = this;
+            return {
+                FlowDesignModel: self.FlowDesignModel,
+                WF_Node_List: self.WF_Node_List,
+                WF_Line_List: self.WF_Line_List,
+                CurrentNodeOrLine: self.CurrentNodeOrLine,
+                SetWorkflowLine: self.SetWorkflowLineFromConditionDesigner
+            };
+        },
+        SetWorkflowLineFromConditionDesigner(lineId, patch) {
+            var self = this;
+            if (!lineId || !patch) return;
+            var lineModel = _.find(self.WF_Line_List, function (item) {
+                return item.Id == lineId;
+            });
+            if (!lineModel) return;
+            var oldLineName = lineModel.LineName;
+            Object.keys(patch).forEach(function (key) {
+                lineModel[key] = patch[key];
+            });
+            if (patch.LineName !== undefined && oldLineName !== patch.LineName) {
+                self.setLineLabel(lineModel.FromNodeId, lineModel.ToNodeId, patch.LineName);
+            }
+            if (self.CurrentNodeOrLine.Type == "Line" && self.CurrentNodeOrLine.LineId == lineId) {
+                self.DefaultValues_Line = { ...lineModel };
+            }
+        },
         SwaitchRightConfig() {},
         LoadRightWfNode(nodeModel) {
             var self = this;
@@ -612,6 +641,7 @@ export default {
                 source: from,
                 target: to
             })[0];
+            if (!conn) return;
             if (!label || label === "") {
                 conn.removeClass("flowLabel");
                 conn.addClass("emptyFlowLabel");

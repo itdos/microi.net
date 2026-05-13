@@ -389,7 +389,7 @@ V8.FormEngine.GetFormData('this_table', { Id: V8.Form.Id }, V8.DbTrans);
 ### 工作流V8事件
 ```js
 // 条件判断V8（决定流程走向）
-if (V8.Form.Money <= 100) { V8.LineValue = 1; } else { V8.LineValue = 2; }
+if (V8.Form.Money <= 100) { V8.NextNodeId = 'node_id_1'; } else { V8.LineValue = 2; }
 // 节点V8中可用
 V8.WF.ApprovalType    // Agree/Disagree/Recall/Auto
 V8.WF.ApprovalIdea    // 审批意见
@@ -486,6 +486,9 @@ console.log('调试信息')                                  // 控制台输出�
 - 先调用 `microi_get_db_schema` 了解已有表、菜单、字段，避免重复建模。
 - 再调用 `microi_get_manifest_schema` 获取完整 Manifest 协议和示例。
 - 将需求整理为 Manifest，模块配置优先写字段名：`listFields`、`searchFields`、`sortFields`、`hiddenFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`。MCP 会自动解析为 `diy_field.Id`、`SelectFields`、`SearchFieldIds` 等 `sys_menu` 所需格式。
+- 生成或新增字段时，普通字段默认不要设置 `diy_field.FormWidth`（保持 null/省略）；只有 `CodeEditor`、`Textarea`、`RichText`、上传、子表、地图/布局/自定义等需要独占整行的控件才设置为 `24`。
+- 生成审批流时，Manifest 的 workflows 需包含 FlowDesign、Nodes、Lines；连线标题默认使用 `{起点节点} 到 {终点节点}`，多路线节点优先生成设置 `V8.NextNodeId` 的 `LineValueV8`。
+- 保存工作流前调用 `microi_check_workflow_package` 检查拓扑，必要时用 `microi_test_workflow_condition` 带样例表单数据测试图形条件路线。
 - 调用 `microi_plan_system` 做本地结构检查，再调用 `microi_generate_system` 且保持 `dryRun:true`。
 - 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 

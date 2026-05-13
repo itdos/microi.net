@@ -21,6 +21,18 @@
                     </el-dropdown-menu>
                 </template>
             </el-dropdown>
+            <el-dropdown trigger="click" @command="HandleMoreCommand">
+                <el-button>
+                    更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item command="ClearAllFieldFormWidth">
+                            清除所有字段表单占宽配置
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
             <el-select v-if="DiyFieldList && DiyFieldList.length > 0"
                 v-model="CurrentDiyFieldModel"
                 @change="SelectFieldChange"
@@ -1242,6 +1254,27 @@ export default {
                 return 24;
             }
         },
+        HandleMoreCommand(command) {
+            if (command === "ClearAllFieldFormWidth") {
+                this.ClearAllFieldFormWidth();
+            }
+        },
+        ClearAllFieldFormWidth() {
+            var self = this;
+            if (!self.DiyFieldList || self.DiyFieldList.length === 0) {
+                self.DiyCommon.Tips("当前表单没有字段可清除。", false);
+                return;
+            }
+            self.DiyCommon.OsConfirm("确定清除所有字段的表单占宽配置？清除后会使用表单列数自动计算宽度。", function () {
+                self.DiyFieldList.forEach(function (field) {
+                    field.FormWidth = null;
+                });
+                if (self.CurrentDiyFieldModel && !self.DiyCommon.IsNull(self.CurrentDiyFieldModel.Id)) {
+                    self.CurrentDiyFieldModel.FormWidth = null;
+                }
+                self.SaveAllDiyField();
+            });
+        },
         /**
          * 预览当前正在设计的表单（3 选 1：抽屉 / 弹窗 / 新页面）
          * 复用 diy-table 的同款 DiyFormDialog（即 diy-form-full.vue），保证预览与运行时表现完全一致。
@@ -1518,8 +1551,11 @@ export default {
             }
             
             // param.OsClient = self.OsClient
-            var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"];
-            if (width100.indexOf(param.Component) > -1) {
+            var fullWidthComponents = ["Textarea", "CodeEditor", "RichText", "ImgUpload", "FileUpload", "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "Map", "MapArea", "DataTable", "TableChild", "Address", "Transfer", "DevComponent"];
+            if (self.DiyCommon.IsNull(param.FormWidth)) {
+                param.FormWidth = null;
+            }
+            if (self.DiyCommon.IsNull(param.FormWidth) && fullWidthComponents.indexOf(param.Component) > -1) {
                 param.FormWidth = 24;
             }
             // param.Sort = 100;

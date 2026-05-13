@@ -509,6 +509,37 @@ export class MicroiClient {
             ...data,
         });
     }
+    // ---------- 业务架构蓝图（System Blueprint） ----------
+    async listBlueprints(keyword) {
+        return this.post(API.LIST_BLUEPRINTS, {
+            OsClient: this.config.osClient,
+            ...(keyword ? { Keyword: keyword } : {}),
+        });
+    }
+    async getBlueprint(blueprintId) {
+        return this.post(API.GET_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+        });
+    }
+    async saveBlueprint(data) {
+        return this.post(API.SAVE_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async deleteBlueprint(blueprintId) {
+        return this.post(API.DELETE_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+        });
+    }
+    async validateBlueprint(blueprintId) {
+        return this.post(API.VALIDATE_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+        });
+    }
     destroy() {
         if (this.refreshTimer) {
             clearInterval(this.refreshTimer);

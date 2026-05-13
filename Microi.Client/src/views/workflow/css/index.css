@@ -8,10 +8,15 @@
     overflow-y: auto;
 }
 .itdos-wf-design-config {
+    /* width: clamp(380px, 32vw, 560px);
+    min-width: 380px;
+    max-width: 560px; */
     width: 300px;
     min-width: 300px;
     flex-shrink: 0;
     border-left: 1px solid #dce3e8;
+    box-sizing: border-box;
+    overflow-x: hidden;
     /* background-color: #FBFBFB */
 }
 

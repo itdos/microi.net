@@ -41,6 +41,9 @@
                         <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                             <el-icon><Document /></el-icon> V8文档
                         </button>
+                        <button class="toolbar-btn" @click.prevent="openCodeDesigner" title="SQL/V8代码设计器">
+                            <el-icon><Operation /></el-icon> 设计器
+                        </button>
                         <button class="toolbar-btn" @click.prevent="increaseFontSize" title="放大">
                             <el-icon><ZoomIn /></el-icon>
                         </button>
@@ -118,6 +121,9 @@
                 </button>
                 <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                     <el-icon><Document /></el-icon> V8文档
+                </button>
+                <button class="toolbar-btn" @click.prevent="openCodeDesigner" title="SQL/V8代码设计器">
+                    <el-icon><Operation /></el-icon> 设计器
                 </button>
                 <button class="toolbar-btn" @click.prevent="increaseFontSize" title="放大">
                     <el-icon><ZoomIn /></el-icon>
@@ -236,6 +242,15 @@
             </template>
         </el-dialog>
     </div>
+
+    <DiyCodeDesign
+        ref="codeDesignerRef"
+        :model-value="ModelValue"
+        :fields="fields"
+        :v8-code-type="v8CodeType"
+        @insert-code="insertCodeAtCursor"
+        @replace-code="applyCodeToEditor"
+    />
 </template>
 
 <script setup>
@@ -303,6 +318,7 @@ const initMonaco = async () => {
 };
 import { getToken } from '@/utils/auth.js';
 import AiChatPanel from './AiChatPanel.vue';
+import DiyCodeDesign from '../diy-components/diy-code-design.vue';
 import { 
     MagicStick, 
     DArrowLeft, 
@@ -317,7 +333,8 @@ import {
     ChatDotSquare,
     Edit,
     RefreshLeft,
-    RefreshRight
+    RefreshRight,
+    Operation
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
@@ -364,6 +381,10 @@ const props = defineProps({
     },
     field: {
         type: Object,
+    },
+    fields: {
+        type: Array,
+        default: () => []
     },
     FormMode: {
         type: String,
@@ -519,6 +540,7 @@ let isSelfUpdating = false;
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
 const isFolded = ref(false);
+const codeDesignerRef = ref(null);
 
 const EditorOption = reactive({
     theme: 'vs-dark',
@@ -671,6 +693,14 @@ const openV8Docs = () => {
         ? "https://microi.net/doc/v8-engine/v8-server.html" 
         : "https://microi.net/doc/v8-engine/v8-client.html";
     window.open(docUrl, "_blank", "noopener,noreferrer");
+};
+
+const openCodeDesigner = () => {
+    const language = props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript';
+    codeDesignerRef.value?.open({
+        tab: language === 'sql' ? 'sql' : 'v8',
+        resetPreview: true
+    });
 };
 
 const Init = async () => {
@@ -1472,20 +1502,29 @@ const cancelAiGeneration = () => {
 
 // 应用代码到编辑器
 const applyCodeToEditor = (code) => {
-    if (monacoEditor && code) {
-        monacoEditor.setValue(code);
-        isSelfUpdating = true;
-        ModelValue.value = code;
-        emits('update:modelValue', code);
-        emits('ModelChange', code);
-        emits('CallbackFormValueChange', props.field, code);
+    if (code === null || code === undefined) return;
+    const nextCode = String(code);
+    if (monacoEditor) {
+        monacoEditor.setValue(nextCode);
+    }
+    isSelfUpdating = true;
+    ModelValue.value = nextCode;
+    emits('update:modelValue', nextCode);
+    emits('ModelChange', nextCode);
+    emits('CallbackFormValueChange', props.field, nextCode);
+    if (monacoEditor) {
         DiyCommon.Tips('代码已应用到编辑器', true);
     }
 };
 
 // 插入代码到光标位置
 const insertCodeAtCursor = (code) => {
-    if (monacoEditor && code) {
+    if (!code) return;
+    if (!monacoEditor) {
+        applyCodeToEditor(ModelValue.value ? ModelValue.value + '\n' + code : code);
+        return;
+    }
+    if (monacoEditor) {
         const selection = monacoEditor.getSelection();
         const id = { major: 1, minor: 1 };
         const op = { identifier: id, range: selection, text: code, forceMoveMarkers: true };

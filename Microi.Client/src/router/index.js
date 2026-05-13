@@ -203,6 +203,101 @@ export const asyncRoutes = [
             }
         ]
     },
+    // 业务架构蓝图（Business Blueprint）
+    {
+        path: "/blueprint/list",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/blueprint/list",
+                name: "blueprint_list",
+                meta: { title: "业务架构蓝图", keepAlive: false },
+                component: () => import("@/views/blueprint/BlueprintList.vue")
+            }
+        ]
+    },
+    {
+        path: "/blueprint/designer/:id",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/blueprint/designer/:id",
+                name: "blueprint_designer",
+                meta: { title: "蓝图设计器", keepAlive: false },
+                component: () => import("@/views/blueprint/BlueprintDesigner.vue")
+            }
+        ]
+    },
+    // 状态机（State Machine）
+    {
+        path: "/state-machine/list",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/state-machine/list",
+                name: "state_machine_list",
+                meta: { title: "状态机", keepAlive: false },
+                component: () => import("@/views/state-machine/StateMachineList.vue")
+            }
+        ]
+    },
+    {
+        path: "/state-machine/designer/:id",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/state-machine/designer/:id",
+                name: "state_machine_designer",
+                meta: { title: "状态机设计器", keepAlive: false },
+                component: () => import("@/views/state-machine/StateMachineDesigner.vue")
+            }
+        ]
+    },
+    // 自动化流程引擎（Flow Engine）
+    {
+        path: "/flow-engine/list",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/flow-engine/list",
+                name: "flow_engine_list",
+                meta: { title: "自动化流程", keepAlive: false },
+                component: () => import("@/views/flow-engine/FlowList.vue")
+            }
+        ]
+    },
+    {
+        path: "/flow-engine/designer/:id",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/flow-engine/designer/:id",
+                name: "flow_engine_designer",
+                meta: { title: "流程设计器", keepAlive: false },
+                component: () => import("@/views/flow-engine/FlowDesigner.vue")
+            }
+        ]
+    },
+    // 过程挖掘（Process Mining）
+    {
+        path: "/process-mining",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/process-mining",
+                name: "process_mining",
+                meta: { title: "过程挖掘", keepAlive: false },
+                component: () => import("@/views/process-mining/ProcessMiningView.vue")
+            }
+        ]
+    },
     // GoView 大屏设计器
     {
         path: "/mic/data-dashboard/design/:Id",

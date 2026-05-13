@@ -106,7 +106,12 @@ export default {
                     v8Result.Form = formData;
                 }
 
-                var formMode = self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit";
+                var oldFormHasId = oldFormData && !self.DiyCommon.IsNull(oldFormData.Id);
+                var initialWorkflowMode = self.OpenDiyFormWorkFlowType.FormMode || self.FormMode;
+                var formMode = self.StartWorkSubmited == false
+                    && (initialWorkflowMode == "Add" || initialWorkflowMode == "Insert" || !oldFormHasId)
+                    ? "Add"
+                    : "Edit";
 
                 // 第2步：通过 _AlternateSubmit 钩子，把"表单保存 + StartWork"合并为单事务后端调用
                 var formParam = {

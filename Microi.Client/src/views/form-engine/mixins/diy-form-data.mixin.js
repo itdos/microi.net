@@ -99,16 +99,18 @@ export default {
                         var refArray = Array.isArray(self.$refs["ref_" + field.Name]) ? self.$refs["ref_" + field.Name] : (refComponent2 ? [refComponent2] : []);
                         for (var item of refArray) {
                             var list = [];
-                            item.DiyTableRowList.forEach((ite) => {
-                                if (ite._DataStatus == "Edit") {
-                                    list.push(ite);
-                                }
-                            });
-                            result.push({
-                                FieldName: field.Name,
-                                TableId: field.Config.TableChildTableId,
-                                Rows: list
-                            });
+                            if(item.DiyTableRowList){
+                                item.DiyTableRowList.forEach((ite) => {
+                                    if (ite._DataStatus == "Edit") {
+                                        list.push(ite);
+                                    }
+                                });
+                                result.push({
+                                    FieldName: field.Name,
+                                    TableId: field.Config.TableChildTableId,
+                                    Rows: list
+                                });
+                            }
                         }
                     }
                 }

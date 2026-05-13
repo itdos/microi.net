@@ -100,18 +100,18 @@ var history = V8.Db.FromSql(
 
 ## 条件判断 V8 事件（后端 WFNodeLine）
 
-根据业务规则决定流程走向，`V8.LineValue` 对应流程图中条件线的条件值。
+根据业务规则决定流程走向。优先推荐设置 `V8.NextNodeId` 直接指定下一节点；如仍使用条件线的条件值，也可以设置 `V8.LineValue`。
 
 ```javascript
 // V8.EventName === 'WFNodeLine'
 // V8.Form 是当前表单数据
 
 if (V8.Form.Money <= 100) {
-  V8.LineValue = 1;    // 走条件值为 1 的线（如：直接通过）
+  V8.NextNodeId = 'node_id_1';    // 直接走指定下一节点（推荐）
 } else if (V8.Form.Money <= 10000) {
-  V8.LineValue = 2;    // 走条件值为 2 的线（如：部门经理审批）
+  V8.LineValue = 2;             // 也可走条件值为 2 的线（兼容旧配置）
 } else {
-  V8.LineValue = 3;    // 走条件值为 3 的线（如：总经理审批）
+  V8.NextNodeId = 'node_id_3';
 }
 ```
 
@@ -222,7 +222,7 @@ V8.WF.StartWork({
 
 ```javascript
 // 发起流程
-V8.OpenFormWF(V8.Form, 'Edit', {
+V8.OpenFormWF(V8.Form, 'Add', {
   WorkType: 'StartWork',
   FlowDesignId: 'flow-design-id'
 });
@@ -233,6 +233,51 @@ V8.OpenFormWF(V8.Form, 'View', {
   FlowDesignId: 'flow-design-id'
 });
 ```
+
+## MCP 创建/检查/测试工作流
+
+从自然语言需求创建审批流时，优先整理成完整 Manifest 的 `workflows` 配置，再走 MCP 干跑和验收流程。
+
+```json
+{
+  "workflows": [
+    {
+      "FlowDesign": { "FlowName": "请假审批", "table": "diy_leave", "IsEnable": 1 },
+      "Nodes": [
+        { "Id": "start", "NodeName": "发起人", "NodeType": "Start", "LineValueV8": "" },
+        { "Id": "leader", "NodeName": "部门负责人审批", "NodeType": "Approve", "Roles": "dept-leader" },
+        { "Id": "end", "NodeName": "结束", "NodeType": "End" }
+      ],
+      "Lines": [
+        { "Id": "line_start_leader", "FromNodeId": "start", "ToNodeId": "leader", "LineName": "发起人 到 部门负责人审批", "LineValue": "" },
+        { "Id": "line_leader_end", "FromNodeId": "leader", "ToNodeId": "end", "LineName": "部门负责人审批 到 结束", "LineValue": "" }
+      ]
+    }
+  ]
+}
+```
+
+MCP 操作顺序：
+
+1. `microi_get_db_schema`：确认业务表、已有流程、角色、字段。
+2. `microi_get_manifest_schema`：按 Manifest 协议生成 tables/modules/workflows。
+3. `microi_plan_system`：本地干跑，必须修复 workflow 拓扑错误。
+4. `microi_check_workflow_package`：单独检查某个 workflow package。
+5. `microi_test_workflow_condition`：对图形条件生成的 `LineValueV8` 传入样例 `formData`，验证会选中哪条路线。
+6. `microi_generate_system` 或 `microi_save_workflow_package`：用户明确确认后再写入。
+
+工作流建模规则：
+
+- 必须有且仅有 1 个开始节点，至少 1 个结束节点。
+- 所有 `wf_line.FromNodeId/ToNodeId` 必须指向存在的节点。
+- 线路标题 `LineName` 默认使用 `{起点节点名称} 到 {终点节点名称}`，不要把业务条件名写成线路标题。
+- 条件名称只作为图形配置/注释标记里的业务说明；修改条件名称不应改变线路标题。
+- 多出线节点必须配置条件判断 V8，优先设置 `V8.NextNodeId`，只有兼容旧条件值时才设置 `V8.LineValue`。
+- 图形条件生成的 V8 会带 `MICROI_WF_LINE_CONDITION_JSON` 标记，MCP 测试工具只解析该标记，不执行任意手写 V8。
+
+## 发起流程与表单保存
+
+新建业务数据并发起流程时，应先保存表单，再启动流程，或使用平台的合并接口 `StartWorkWithForm` 在同一事务里完成。首次发起建议以 `Add` 模式打开流程表单；如果前端提前生成了 `Id` 但业务表还没有该行，后端会使用 `_NoLineForAdd` 兜底，避免 `UptFormData` 报“数据显示不存在”。
 
 ## 流程相关表
 
@@ -247,7 +292,8 @@ V8.OpenFormWF(V8.Form, 'View', {
 
 ## 注意事项
 
-- 条件判断 V8 事件中 `V8.LineValue` 的值必须与流程设计器中条件线的**条件值**对应
+- 条件判断 V8 事件可以设置 `V8.NextNodeId` 直接指定下一节点；未设置时才按 `V8.LineValue` 匹配条件线的**条件值**
+- 配置图形化条件时，节点/路线标识来自流程拓扑，条件名称只是规则名称，不要用条件名称覆盖 `wf_line.LineName`
 - 节点开始后端事件返回 `{ Code: 0, Msg: '...' }` 或 `V8.Result = { Code: 0 }` 可阻止流程提交
 - 流程事件在事务中执行，任何节点返回失败都会回滚
 - `V8.WF.ApprovalType === 'Auto'` 表示自动节点（发起、业务节点、自动结束），无需人工审批
