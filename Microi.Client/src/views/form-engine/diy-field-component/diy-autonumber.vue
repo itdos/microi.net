@@ -31,7 +31,7 @@
             
             <el-form-item label="关联列">
                 <el-select v-model="configForm.AutoNumberFields" multiple clearable filterable placeholder="选择关联字段" style="width: 100%">
-                    <el-option v-for="item in DiyFieldList" :key="item.Name" :label="item.Label || item.Name" :value="item.Name" />
+                    <el-option v-for="item in AutoNumberFieldOptions" :key="item.Id" :label="GetAutoNumberFieldLabel(item)" :value="item.Id" />
                 </el-select>
                 <div class="form-item-tip">按关联字段分组生成独立编号序列</div>
             </el-form-item>
@@ -163,7 +163,14 @@ export default {
 
     components: {},
 
-    computed: {},
+    computed: {
+        AutoNumberFieldOptions() {
+            var self = this;
+            return (self.DiyFieldList || []).filter(function (fieldItem) {
+                return fieldItem && fieldItem.Id && fieldItem.Id !== self.field.Id;
+            });
+        }
+    },
 
     mounted() {
         var self = this;
@@ -381,6 +388,51 @@ export default {
                 );
             }
         },
+        GetAutoNumberFieldLabel(fieldItem) {
+            if (!fieldItem) {
+                return "";
+            }
+            var label = fieldItem.Label || fieldItem.Name || "";
+            if (fieldItem.Name && label !== fieldItem.Name) {
+                label += "（" + fieldItem.Name + "）";
+            }
+            return label;
+        },
+        NormalizeAutoNumberFields(autoNumberFields) {
+            var self = this;
+            var fieldValues = [];
+            if (Array.isArray(autoNumberFields)) {
+                fieldValues = autoNumberFields;
+            } else if (typeof autoNumberFields === "string") {
+                if (self.DiyCommon.IsNull(autoNumberFields)) {
+                    return [];
+                }
+                try {
+                    var parsedFields = JSON.parse(autoNumberFields);
+                    fieldValues = Array.isArray(parsedFields) ? parsedFields : [autoNumberFields];
+                } catch (error) {
+                    fieldValues = autoNumberFields.split(",");
+                }
+            } else if (!self.DiyCommon.IsNull(autoNumberFields)) {
+                fieldValues = [autoNumberFields];
+            }
+
+            var fieldIdList = [];
+            fieldValues.forEach(function (fieldValue) {
+                if (self.DiyCommon.IsNull(fieldValue)) {
+                    return;
+                }
+                var fieldValueText = fieldValue.toString();
+                var fieldItem = (self.DiyFieldList || []).find(function (optionItem) {
+                    return optionItem && (optionItem.Id === fieldValueText || optionItem.Name === fieldValueText);
+                });
+                var fieldId = fieldItem ? fieldItem.Id : fieldValueText;
+                if (fieldId && fieldId !== self.field.Id && fieldIdList.indexOf(fieldId) === -1) {
+                    fieldIdList.push(fieldId);
+                }
+            });
+            return fieldIdList;
+        },
         // ==================== 配置弹窗相关方法 ====================
         openConfig() {
             var self = this;
@@ -394,7 +446,7 @@ export default {
             self.configForm = {
                 AutoNumberFixed: self.field.Config.AutoNumberFixed || '',
                 AutoNumberLength: self.field.Config.AutoNumberLength || 4,
-                AutoNumberFields: self.field.Config.AutoNumberFields || [],
+                AutoNumberFields: self.NormalizeAutoNumberFields(self.field.Config.AutoNumberFields),
                 DataRule: self.field.Config.AutoNumber.DataRule || '',
                 CreateRule: self.field.Config.AutoNumber.CreateRule || ''
             };
@@ -402,10 +454,12 @@ export default {
         },
         saveConfig() {
             var self = this;
+            var autoNumberFields = self.NormalizeAutoNumberFields(self.configForm.AutoNumberFields);
             // 保存配置到 field.Config
             self.field.Config.AutoNumberFixed = self.configForm.AutoNumberFixed;
             self.field.Config.AutoNumberLength = self.configForm.AutoNumberLength;
-            self.field.Config.AutoNumberFields = self.configForm.AutoNumberFields;
+            self.field.Config.AutoNumberFields = autoNumberFields;
+            self.configForm.AutoNumberFields = autoNumberFields;
             
             // 保存 AutoNumber 相关配置
             if (!self.field.Config.AutoNumber) {
