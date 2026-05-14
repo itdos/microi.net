@@ -220,11 +220,12 @@ export default {
                 }
             }
             self.FormMode = self.$route.query.FormMode;
-            self.SysMenuId = self.$route.query.SysMenuId;
+            self.SysMenuId = self.$route.query.SysMenuId || self.$route.query.Id || (self.$route.meta ? (self.$route.meta.Id || self.$route.meta.SysMenuId) : "");
             if (!self.TableId || !self.FormMode) {
                 self.DiyCommon.Tips("缺少参数！格式：/FormMode/TableId/TableRowId", false);
                 return;
             }
+            await self.EnsureSysMenuModel();
             // Page 模式下 DiyForm 组件通过 props 自动初始化，无需手动调用 Init()
             // 手动调用会导致与 CallbackReloadFormPage 形成死循环
         }

@@ -54,6 +54,138 @@ namespace Microi.net
             return int.TryParse(text, out var value) ? value : fallback;
         }
 
+        private static string BuildApiEngineCacheKey(string osClient, string key)
+        {
+            return $"Microi:{osClient}:FormData:sys_apiengine:{key.DosToLower()}";
+        }
+
+        private static async Task<DosResult<object>> RefreshApiEngineRouteCache(string osClient, string apiEngineKey = null, string id = null)
+        {
+            try
+            {
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<object>(0, null, "OsClient 不能为空");
+                }
+
+                DosResult<dynamic> getResult;
+                if (!id.DosIsNullOrWhiteSpace())
+                {
+                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                    {
+                        OsClient = osClient,
+                        Id = id
+                    });
+                }
+                else if (!apiEngineKey.DosIsNullOrWhiteSpace())
+                {
+                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>()
+                        {
+                            new List<object>() { "ApiEngineKey", "=", apiEngineKey },
+                        }
+                    });
+                }
+                else
+                {
+                    return new DosResult<object>(0, null, "ApiEngineKey 和 Id 不能同时为空");
+                }
+
+                if (getResult.Code != 1 || getResult.Data == null)
+                {
+                    return new DosResult<object>(getResult.Code, getResult.Data, getResult.Msg.DosIsNullOrWhiteSpace() ? "刷新接口引擎缓存失败：未找到最新数据" : getResult.Msg);
+                }
+
+                var row = JObject.FromObject(getResult.Data);
+                var latestId = SafeJString(row, "Id");
+                var latestKey = SafeJString(row, "ApiEngineKey", apiEngineKey ?? "");
+                var latestAddress = SafeJString(row, "ApiAddress");
+                var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                var tasks = new List<Task>();
+
+                if (!latestKey.DosIsNullOrWhiteSpace())
+                {
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestKey), getResult.Data));
+                }
+                if (!latestId.DosIsNullOrWhiteSpace())
+                {
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestId), getResult.Data));
+                }
+                if (!latestAddress.DosIsNullOrWhiteSpace())
+                {
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestAddress), getResult.Data));
+                }
+
+                if (tasks.Any())
+                {
+                    await Task.WhenAll(tasks);
+                }
+
+                return new DosResult<object>(1, getResult.Data);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "刷新接口引擎缓存失败：" + ex.Message);
+            }
+        }
+
+        private static async Task<DosResult<object>> RefreshDiyTableModelCache(string osClient, string tableName = null, string id = null)
+        {
+            try
+            {
+                DosResult<dynamic> getResult;
+                if (!id.DosIsNullOrWhiteSpace())
+                {
+                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Diy_Table", new { OsClient = osClient, Id = id });
+                }
+                else if (!tableName.DosIsNullOrWhiteSpace())
+                {
+                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Diy_Table", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>() { new List<object>() { "Name", "=", tableName } }
+                    });
+                }
+                else
+                {
+                    return new DosResult<object>(0, null, "TableName 和 Id 不能同时为空");
+                }
+
+                if (getResult.Code != 1 || getResult.Data == null)
+                {
+                    return new DosResult<object>(getResult.Code, getResult.Data, getResult.Msg.DosIsNullOrWhiteSpace() ? "刷新表单引擎缓存失败：未找到最新数据" : getResult.Msg);
+                }
+
+                var row = JObject.FromObject(getResult.Data);
+                var latestId = SafeJString(row, "Id");
+                var latestName = SafeJString(row, "Name", tableName ?? "");
+                var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                var tasks = new List<Task>();
+                foreach (var prefix in new[] { "Diy_Table", "diy_table" })
+                {
+                    if (!latestId.DosIsNullOrWhiteSpace())
+                    {
+                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestId.DosToLower()}", getResult.Data));
+                    }
+                    if (!latestName.DosIsNullOrWhiteSpace())
+                    {
+                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestName.DosToLower()}", getResult.Data));
+                    }
+                }
+                if (tasks.Any())
+                {
+                    await Task.WhenAll(tasks);
+                }
+                return new DosResult<object>(1, getResult.Data);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "刷新表单引擎缓存失败：" + ex.Message);
+            }
+        }
+
         #region 权限校验
 
         /// <summary>
@@ -351,7 +483,6 @@ namespace Microi.net
 
                 var existingEngine = JObject.FromObject(getResult.Data);
                 var id = existingEngine.Value<string>("Id");
-                var existingApiAddress = existingEngine.Value<string>("ApiAddress") ?? "";
 
                 var updateParam = new JObject
                 {
@@ -366,11 +497,11 @@ namespace Microi.net
 
                 if (updateResult.Code == 1)
                 {
-                    var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiEngineKey.ToLower()}");
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{id.ToLower()}");
-                    if (!string.IsNullOrWhiteSpace(existingApiAddress))
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{existingApiAddress.ToLower()}");
+                    var cacheResult = await RefreshApiEngineRouteCache(osClient, apiEngineKey, id);
+                    if (cacheResult.Code != 1)
+                    {
+                        return new DosResult<object>(0, null, cacheResult.Msg);
+                    }
 
                     return new DosResult<object>(1, new
                     {
@@ -443,6 +574,12 @@ namespace Microi.net
 
                 if (addResult.Code == 1)
                 {
+                    var cacheResult = await RefreshApiEngineRouteCache(osClient, apiEngineKey);
+                    if (cacheResult.Code != 1)
+                    {
+                        return new DosResult<object>(0, null, cacheResult.Msg);
+                    }
+
                     return new DosResult<object>(1, new
                     {
                         Message = $"接口引擎 [{apiEngineKey}] 创建成功",
@@ -891,9 +1028,11 @@ namespace Microi.net
 
                 if (updateResult.Code == 1)
                 {
-                    var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:Diy_Table:{formEngineKey.ToLower()}");
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:Diy_Table:{id.ToLower()}");
+                    var cacheResult = await RefreshDiyTableModelCache(osClient, formEngineKey, id);
+                    if (cacheResult.Code != 1)
+                    {
+                        return new DosResult<object>(0, null, cacheResult.Msg);
+                    }
 
                     return new DosResult<object>(1, new
                     {
@@ -2964,7 +3103,6 @@ namespace Microi.net
             {
                 if (apiEngineKeys == null || apiEngineKeys.Count == 0)
                     return new DosResult<object>(0, null, "apiEngineKeys 不能为空");
-                var cache = MicroiEngine.CacheTenant.Cache(osClient);
                 var ok = 0; var fail = 0; var log = new List<string>();
                 foreach (var key in apiEngineKeys)
                 {
@@ -2989,14 +3127,18 @@ namespace Microi.net
                         StopHttp = 0
                     };
                     var ur = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", upt);
-                    var lk = (key ?? "").ToLower();
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{lk}");
-                    await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{((string)row.Id ?? "").ToLower()}");
-                    if (row.ApiAddress != null)
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{((string)row.ApiAddress).ToLower()}");
-                    if (!string.IsNullOrWhiteSpace(apiAddress))
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{apiAddress.ToLower()}");
-                    if (ur.Code == 1) { ok++; log.Add($"✓ {key} AllowAnonymous={allowAnonymous}, IsEnable=1, StopHttp=0, ApiAddress={apiAddress}"); }
+                    if (ur.Code == 1)
+                    {
+                        var cacheResult = await RefreshApiEngineRouteCache(osClient, key, (string)row.Id);
+                        if (cacheResult.Code == 1)
+                        {
+                            ok++; log.Add($"✓ {key} AllowAnonymous={allowAnonymous}, IsEnable=1, StopHttp=0, ApiAddress={apiAddress}");
+                        }
+                        else
+                        {
+                            fail++; log.Add($"⚠ {key} cache refresh fail: {cacheResult.Msg}");
+                        }
+                    }
                     else { fail++; log.Add($"⚠ {key} fail: {ur.Msg}"); }
                 }
                 return new DosResult<object>(1, new { Ok = ok, Fail = fail, Log = log });
