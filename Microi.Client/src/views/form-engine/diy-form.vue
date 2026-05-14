@@ -164,8 +164,8 @@
                                 </template>
                             </draggable>
 
-                            <!-- 普通模式：使用原生 el-row 以获得最佳性能 -->
-                            <el-row v-else :gutter="10" @click="handleFieldClick">
+                            <!-- 普通模式：使用原生 el-row 以获得最佳性能。 如果这里设置:gutter="10"会导致折叠组件标题和内容对不齐 -->
+                            <el-row v-else :gutter="0" @click="handleFieldClick">
                                 <el-col
                                     v-for="field in DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                     v-show="field._isShow"
