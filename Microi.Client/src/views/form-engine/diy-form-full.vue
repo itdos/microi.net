@@ -777,6 +777,7 @@
 import { defineAsyncComponent, computed } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
+import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
 import {
     diyFormFullCleanupMixin,
     diyFormFullMobileMixin,
@@ -935,7 +936,8 @@ export default {
             var isOpenWorkFlowForm = param.IsOpenWorkFlowForm;
             var wfParam = param.WFParam;
 
-            self.$nextTick(function () {
+            self.$nextTick(async function () {
+                await self.EnsureSysMenuModel();
                 self.OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
         },
@@ -1208,6 +1210,7 @@ export default {
             var self = this;
             var V8 = v8 ? v8 : {};
             V8.Result = null;
+            var v8CodeShowResult;
             if (row && v8) {
                 row._V8 = v8;
             }
@@ -1223,7 +1226,7 @@ export default {
                     V8.EventName = "​V8BtnLimit";
                     self.SetV8DefaultValue(V8);
                     self.DiyCommon.InitV8Code(V8, self.$router);
-                    eval(btn.V8CodeShow);
+                    v8CodeShowResult = runV8ButtonVisibilityCode(btn.V8CodeShow, { V8, row, btn, self, v8, _ });
                 } else {
                     //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
                 }
@@ -1231,8 +1234,9 @@ export default {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
             } finally {
             }
-            if (V8.Result === false) {
-                return false;
+            var v8Visible = resolveV8ButtonVisibility(V8, v8CodeShowResult);
+            if (v8Visible !== null) {
+                return v8Visible;
             }
 
             if (self.GetCurrentUser._IsAdmin === true) {
@@ -1371,27 +1375,31 @@ export default {
         },
 
         // ========== 全新页面模式：表单数据回调（兼容diy-form-page.vue的逻辑） ==========
+        async EnsureSysMenuModel() {
+            var self = this;
+            if (self.DiyCommon.IsNull(self.SysMenuId)) {
+                return;
+            }
+            if (!self.DiyCommon.IsNull(self.SysMenuModel) && self.SysMenuModel.Id == self.SysMenuId) {
+                return;
+            }
+            var result = await self.DiyCommon.PostAsync("/api/FormEngine/GetFormData-sysmenu", {
+                FormEngineKey: "Sys_Menu",
+                Id: self.SysMenuId
+            });
+            if (self.DiyCommon.Result(result)) {
+                self.DiyCommon.ForConvertSysMenu(result.Data);
+                self.SysMenuModel = result.Data;
+            }
+        },
         CallbackSetFormData(formData) {
             var self = this;
             self.CurrentRowModel = formData;
             self.CallbackSetFormDataFinish = true;
 
-            if (self.SysMenuId) {
-                self.DiyCommon.Post(
-                    "/api/FormEngine/GetFormData-sysmenu",
-                    {
-                        FormEngineKey: "Sys_Menu",
-                        Id: self.SysMenuId
-                    },
-                    async function (result) {
-                        if (self.DiyCommon.Result(result)) {
-                            self.DiyCommon.ForConvertSysMenu(result.Data);
-                            self.SysMenuModel = result.Data;
-                            await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, self.CurrentRowModel, {});
-                        }
-                    }
-                );
-            }
+            self.EnsureSysMenuModel().then(async function () {
+                await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, self.CurrentRowModel, {});
+            });
         },
 
         // ========== 页面模式专用：异步版本的HandlerBtns ==========
@@ -1412,6 +1420,7 @@ export default {
             var self = this;
             var V8 = v8 || {};
             V8.Result = null;
+            var v8CodeShowResult;
             if (row && v8) {
                 row._V8 = v8;
             }
@@ -1427,13 +1436,14 @@ export default {
                     V8.EventName = "​V8BtnLimit";
                     self.SetV8DefaultValue(V8);
                     await self.DiyCommon.InitV8Code(V8, self.$router);
-                    await eval("(async () => {\n " + btn.V8CodeShow + " \n})()");
+                    v8CodeShowResult = await runV8ButtonVisibilityCodeAsync(btn.V8CodeShow, { V8, row, btn, self, v8, _ });
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
             }
-            if (V8.Result === false) {
-                return false;
+            var v8Visible = resolveV8ButtonVisibility(V8, v8CodeShowResult);
+            if (v8Visible !== null) {
+                return v8Visible;
             }
             if (self.GetCurrentUser._IsAdmin === true) {
                 return true;
