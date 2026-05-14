@@ -62,6 +62,7 @@
 import { defineAsyncComponent, computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
+import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode } from "@/utils/v8-button-visibility";
 
 export default {
     name: "diy-form-dialog",
@@ -609,6 +610,7 @@ export default {
             //如果V8配置了不显示
             var V8 = v8 ? v8 : {};
             V8.Result = null;
+            var v8CodeShowResult;
             if (row && v8) {
                 row._V8 = v8;
             }
@@ -624,8 +626,7 @@ export default {
                     V8.EventName = "​V8BtnLimit";
                     self.SetV8DefaultValue(V8);
                     self.DiyCommon.InitV8Code(V8, self.$router);
-                    eval(btn.V8CodeShow);
-                    // await eval("(async () => {\n " + btn.V8CodeShow + " \n})()")
+                    v8CodeShowResult = runV8ButtonVisibilityCode(btn.V8CodeShow, { V8, row, btn, self, v8, _ });
                 } else {
                     //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
                 }
@@ -633,9 +634,9 @@ export default {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
             }
             var result = false;
-            if (V8.Result === false) {
-                
-                return false;
+            var v8Visible = resolveV8ButtonVisibility(V8, v8CodeShowResult);
+            if (v8Visible !== null) {
+                return v8Visible;
             }
             //------------------------------------------------------
 

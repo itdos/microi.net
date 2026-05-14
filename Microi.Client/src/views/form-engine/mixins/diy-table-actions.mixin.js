@@ -1,4 +1,5 @@
 import _u from "underscore";
+import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode } from "@/utils/v8-button-visibility";
 
 export default {
     methods: {
@@ -169,10 +170,11 @@ IsPermission(type) {
 
             var hasV8Code = !self.DiyCommon.IsNull(btn.V8CodeShow);
             var btnStartTime = performance.now();
+            var v8CodeShowResult;
 
             try {
                 if (hasV8Code) {
-                    eval("//" + btn.Name + "(按钮显示条件)\n" + btn.V8CodeShow);
+                    v8CodeShowResult = runV8ButtonVisibilityCode(btn.V8CodeShow, { V8, row, btn, self, v8, _: _u });
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
@@ -204,8 +206,9 @@ IsPermission(type) {
                 }
             }
 
-            if (V8.Result === false) {
-                return false;
+            var v8Visible = resolveV8ButtonVisibility(V8, v8CodeShowResult);
+            if (v8Visible !== null) {
+                return v8Visible;
             }
 
             if (self.GetCurrentUser._IsAdmin === true) {

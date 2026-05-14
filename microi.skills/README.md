@@ -34,6 +34,7 @@
 | **v8-frontend-events** | 前端字段/按钮/列表事件（FieldValueChange 等） | `v8-frontend-events/SKILL.md` |
 | **v8-template-engine** | 表格/表单 V8 模板（HTML 渲染、徽章、图片列） | `v8-template-engine/SKILL.md` |
 | **v8-menu-buttons** | 菜单按钮 / Tab / 批量操作 JSON | `v8-menu-buttons/SKILL.md` |
+| **microi-client-frontend** | `Microi.Client` 前台源码架构、表单引擎、动态按钮和工作流修改指南 | `microi-client-frontend/SKILL.md` |
 
 ### 引擎模块
 
