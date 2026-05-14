@@ -45,13 +45,20 @@
 				<view v-if="searchKeyword" class="search-clear" @tap="clearSearch">✕</view>
 			</view>
 		</view>
-		 <!-- 自定义多选下拉：通讯录人员类型筛选 -->
+		 <!-- zhy自定义多选下拉：通讯录人员类型筛选 -->
 		  <view class="filter-section" v-if="isLoggedIn && activeTab === 'contacts'">
-			<view class="filter-button" @tap="showTypeDropdown = !showTypeDropdown">
-			  <text class="filter-bt">人员类型：</text>
-			  <text class="filter-label">{{selectedTypes.length?selectedTypesString : ' 请选择 '}}</text>
-			  <text class="chev-top" v-if="showTypeDropdown">▲</text>
-			  <text class="chev-top" v-else>▼</text>
+			<view class="filter-button">
+			  <view class="filter-lef" @tap="showTypeDropdown = !showTypeDropdown">
+			  	<text class="filter-bt">人员角色：</text>
+			  	<view class="filter-label">
+			  		<text class="">{{selectedTypes.length?selectedTypesString : ' 请选择 '}}</text>
+			  	</view>
+			  	<text class="chev-top" v-if="showTypeDropdown">▲</text>
+			  	<text class="chev-top" v-else>▼</text>
+			  </view>
+			  <view class="filter-rig" @tap="handDelet">
+			  	<text class="filter-delet">清除</text>
+			  </view>
 			</view>
 			<!-- 遮罩层：覆盖页面，点击关闭下拉 -->
 			<view v-if="showTypeDropdown" class="dropdown-mask" @tap="showTypeDropdown = false"></view>
@@ -273,24 +280,34 @@
 		},
 
 		methods: {
-			// 多选类型筛选方法
+			// zhy多选人员角色筛选方法
 			    toggleTypeSelection(typeId,typeLabel) {
-			      const idx = this.selectedTypes.indexOf(typeId)
+			      const idx = this.selectedTypes.indexOf(typeId);
 			      if (idx === -1) {
-					  this.selectedTypes.push(typeId)
-					  this.selectedTypesLabelArry.push(typeLabel)
+					  this.selectedTypes.push(typeId);
+					  this.selectedTypesLabelArry.push(typeLabel);
 				  }
 			      else {
-					  this.selectedTypes.splice(idx, 1)
-					   this.selectedTypesLabelArry.splice(idx, 1)
+					  this.selectedTypes.splice(idx, 1);
+					   this.selectedTypesLabelArry.splice(idx, 1);
 				  }
-				  this.selectedTypesString = this.selectedTypesLabelArry.join(',')
+				  this.selectedTypesString = this.selectedTypesLabelArry.join(',');
 			      // 关闭下拉（保留为可按需调整，这里不自动关闭以便多选）
 			    },
 			    //选中数据打勾
 			    isTypeSelected(typeId) {
-			      return this.selectedTypes.indexOf(typeId) !== -1
+			      return this.selectedTypes.indexOf(typeId) !== -1;
 			    },
+				//清空筛选
+				handDelet(){
+					this.selectedTypes = [];
+					this.selectedTypesLabelArry = [];
+					this.selectedTypesString = '';
+					this.searchKeyword = '';
+					this.contactPageIndex = 1;
+					this.contactHasMore = true;
+					this.loadContacts(false);
+				},
 			
 			checkLoginAndLoad() {
 				const token = getToken()
@@ -755,14 +772,36 @@
 	  padding: 12rpx 18rpx;
 	  height: 56rpx;
 	}
+	.filter-lef{
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
 	.filter-label {
+	  max-width: 250rpx;
 	  color: #4c4c4c;
 	  font-size: 26rpx;
+	  overflow: hidden;
+	  text-overflow: ellipsis;
+	  white-space: nowrap;
 	}
 	.chev-top {
 	  color: #000;
 	  font-size: 22rpx;
 	  margin-left: 12rpx;
+	}
+	.filter-rig{
+		margin-left: 22rpx;
+		padding: 4px 13px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1rpx solid #5a5a5a ;
+		border-radius: 20px;
+		background: #fff;
+		color: #565656;
+		font-size: 24rpx;
+		
 	}
 
 	.type-dropdown {
