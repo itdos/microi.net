@@ -1,0 +1,183 @@
+---
+name: microi-client-frontend
+description: Microi.Client source architecture guide. Use when modifying Microi.Client Vue frontend code, especially form-engine, diy-table, diy-form-full, workflow panels, sys_menu buttons, frontend V8 events, or routing/page/dialog/drawer behavior.
+---
+
+# Microi.Client 前台源码架构说明
+
+> 适用于修改 `Microi.Client/` 前台源码。新 AI 对话在动 `Microi.Client/src/views/form-engine` 前，应先阅读本 Skill，避免把分散在 SFC、mixins、utils、路由和低代码配置里的逻辑误判成不存在。
+
+---
+
+## 1. 技术栈和源码入口
+
+- Vue 3 + Options API + mixins，构建工具是 Vite。
+- UI 主要使用 Element Plus、FontAwesome、项目内 `dynamic-icon`。
+- 状态入口：`src/pinia`，常用 `useDiyStore()` 读取 `GetCurrentUser`、`OsClient`、终端类型等。
+- 低代码主入口集中在 `src/views/form-engine/`，不要只看一个 `.vue` 文件就下结论。
+
+常见入口：
+
+| 场景 | 关键文件 |
+|------|----------|
+| 列表页 | `diy-table.vue` + `mixins/diy-table-*.mixin.js` |
+| 表单容器 | `diy-form-full.vue` + `mixins/diy-form-full-*.mixin.js` |
+| 表单字段渲染 | `diy-form.vue` + `mixins/diy-form-*.mixin.js` |
+| 字段组件 | `diy-field-component/*.vue` |
+| 工作流右侧面板 | `form-right-panel.vue`、`workflow/wf-work-handler.vue` |
+| 表单设计器 | `diy-design.vue`、`diy-components/*` |
+| 通用 V8/低代码工具 | `src/utils/diy.common.js`、`src/utils/v8-*.js` |
+
+---
+
+## 2. 表单引擎三层结构
+
+### `diy-table.vue`
+
+列表页/模块页容器，负责：
+
+- 读取 `sys_menu` 得到 `SysMenuModel`。
+- 读取 `diy_table` / `diy_field` 得到表结构和字段列表。
+- 渲染搜索、表格、卡片、行按钮、批量按钮、页面按钮、PageTabs。
+- 打开表单：通过 `refDiyTable_DiyFormDialog.Init({...})` 调用 `diy-form-full.vue`。
+- 权限：`SysMenuId`、`GetCurrentUser._RoleLimits`、`Permission` 控制增删改查和动态按钮。
+
+### `diy-form-full.vue`
+
+表单外壳，不直接渲染字段。它负责：
+
+- Page/Dialog/Drawer 三种打开方式。
+- 顶部保存、编辑、关闭、删除、`sys_menu.FormBtns` 动态按钮。
+- 移动端 FAB 菜单。
+- 右侧数据日志、评论、工作流面板。
+- 调用内部 `DiyForm` 并接收 `CallbackSetFormData`、`CallbackSetDiyTableModel`。
+- 自身根据 `SysMenuId` 拉取 `sys_menu`，再执行 `HandlerBtns/HandlerBtnsAsync` 计算 `FormBtns` 显隐。
+
+注意：`diy-form-full.vue` 的方法大量来自 mixins：
+
+| mixin | 职责 |
+|-------|------|
+| `diy-form-full-state.mixin.js` | data/computed、路由 Page 模式、mounted/activated/deactivated |
+| `diy-form-full-dialog.mixin.js` | OpenDetail、Dialog/Drawer/Page 初始化、关闭和重载 |
+| `diy-form-full-data.mixin.js` | 保存、删除、刷新表单/子表等数据操作 |
+| `diy-form-full-workflow.mixin.js` | StartWork/SendWork 与表单提交整合 |
+| `diy-form-full-mobile.mixin.js` | 移动端 FAB、手势返回、位置保存 |
+| `diy-form-full-permission.mixin.js` | 权限判断 |
+| `diy-form-full-cleanup.mixin.js` | 清理 watcher、全局事件、引用 |
+
+### `diy-form.vue`
+
+真正的字段表单，负责：
+
+- 根据 `diy_field` 分组/Tab/布局渲染字段组件。
+- 执行字段前端 V8、表单前端 V8、模板 V8。
+- 维护 `FormDiyTableModel`、`OldForm`、`DiyFieldList`。
+- 对外 emit `CallbackSetFormData` 和 `CallbackSetDiyTableModel` 给 `diy-form-full.vue`。
+
+---
+
+## 3. 动态按钮系统
+
+按钮配置来自 `sys_menu`：
+
+| 字段 | 渲染位置 |
+|------|----------|
+| `MoreBtns` | 列表行按钮/更多按钮 |
+| `FormBtns` | 表单右上角、移动端 FAB |
+| `BatchSelectMoreBtns` | 列表多选后批量按钮 |
+| `PageBtns` | 列表页顶部按钮 |
+| `PageTabs` | 列表页 Tab |
+| `ExportMoreBtns` | 导出下拉扩展 |
+
+按钮显隐链路：
+
+1. `DiyCommon.ForConvertSysMenu()` 把 JSON 字符串转成数组并补默认值。
+2. `HandlerBtns()` / `HandlerBtnsAsync()` 遍历按钮。
+3. `LimitMoreBtn()` / `LimitMoreBtnAsync()` 构建前端 V8 上下文。
+4. 执行 `btn.V8CodeShow`，支持两种写法：
+
+```js
+return V8.Form.Status == '待审核';
+```
+
+```js
+V8.Result = V8.Form.Status == '待审核';
+```
+
+5. 点击时 `RunMoreBtn()` 执行 `btn.V8Code`。
+
+修改按钮逻辑时必须同时检查：
+
+- `diy-form-full.vue`：表单 `FormBtns`。
+- `mixins/diy-table-actions.mixin.js`：列表按钮、PageBtns、BatchSelectMoreBtns、PageTabs 等。
+- `left-right/RightView.vue`、`left-right/RightForm.vue`：旧版左右布局兼容。
+- `src/utils/v8-button-visibility.js`：统一的 `V8CodeShow` 执行与布尔结果解析。
+
+---
+
+## 4. 工作流与表单提交
+
+工作流相关文件：
+
+| 文件 | 说明 |
+|------|------|
+| `form-right-panel.vue` | 右侧 Tab 容器，展示日志/评论/工作流 |
+| `workflow/wf-work-handler.vue` | StartWork/SendWork UI 与提交参数构建 |
+| `mixins/diy-form-full-workflow.mixin.js` | 把工作流提交接到 `diy-form-full` 的保存链路 |
+| `diy-components/diy-workflow-line-condition.vue` | 条件路线图形配置与 V8 marker 生成 |
+
+关键规则：
+
+- 首次发起流程时，前端可能已经生成 `Id`，但业务表还没有行；必须走 `Add` 或传 `_NoLineForAdd=true`。
+- `StartWorkWithForm` 用于“保存表单 + 发起流程”原子化提交。
+- 工作流路线标题是拓扑关系 `{起点节点} 到 {终点节点}`，条件名称不能覆盖 `wf_line.LineName`。
+- 条件 V8 推荐设置 `V8.NextNodeId`，兼容 `V8.LineValue`。
+
+---
+
+## 5. 路由与打开方式
+
+`diy-form-full.vue` 支持三类形态：
+
+| 打开方式 | 特征 |
+|----------|------|
+| Dialog | `ShowFieldForm=true`，内部 `DiyForm` 使用 `ref="fieldForm"` |
+| Drawer | `ShowFieldFormDrawer=true`，`onDrawerOpened()` 中调用 `fieldForm.Init()` |
+| Page | 路由 `/diy/form-page/:TableId/:TableRowId?`，`IsPageMode=true`，内部 `fieldFormPage` 通过 props 自动初始化 |
+
+Page 模式要特别注意：
+
+- `SysMenuId` 可能来自 query `SysMenuId`、query `Id`、或 route meta。
+- `CallbackSetFormData` 到达后才能可靠评估 `FormBtns`，因为此时才有当前表单数据。
+- keep-alive 会触发 `activated/deactivated`，不要只在 `mounted` 里写一次性逻辑。
+
+---
+
+## 6. 修改前必查清单
+
+修改 `Microi.Client` 前，至少搜索：
+
+```text
+目标方法名 | 目标字段名 | V8CodeShow | SysMenuModel | CallbackSetFormData | HandlerBtns | RunMoreBtn
+```
+
+并确认：
+
+- 方法是否在 mixin 中，而不是当前 SFC。
+- PC/移动端是否有两套模板。
+- Page/Dialog/Drawer 是否都需要同样修复。
+- 旧版 `left-right` 是否仍需兼容。
+- 是否同时影响列表页按钮和表单按钮。
+- 是否需要更新 `microi.skills/v8-menu-buttons/SKILL.md` 或前端 V8 typings。
+
+---
+
+## 7. 验证建议
+
+- 修改 Vue/JS 后先跑 VS Code Problems 或 `get_errors`。
+- 影响核心前端时跑 `Microi.Client` 的 `npm run build`。
+- 如果改了工作流、表单保存、按钮 V8，建议用实际 `sys_menu` 配置测试：
+  - `FormBtns` 是否出现在表单右上角/FAB。
+  - `V8CodeShow: return false;` 是否隐藏。
+  - `V8CodeShow: return true;` 是否显示。
+  - `V8CodeShow: V8.Result = false;` 是否仍兼容。
