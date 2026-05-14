@@ -1262,7 +1262,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_set_engine_anonymous',
-    `Batch set sys_apiengine.AllowAnonymous for one or more API engines (OsClient "${osClient}"). Use 1 for login/register/public endpoints that need to be callable without a token; use 0 to require login. The backend also keeps the engine HTTP-callable (IsEnable=1, StopHttp=0) and clears the corresponding sys_apiengine cache entries.`,
+    `Batch set sys_apiengine.AllowAnonymous for one or more API engines (OsClient "${osClient}"). Use 1 for login/register/public endpoints that need to be callable without a token; use 0 to require login. The backend also keeps the engine HTTP-callable (IsEnable=1, StopHttp=0) and refreshes the corresponding sys_apiengine dynamic route cache entries from the latest DB row.`,
     {
       apiEngineKeys: z.array(z.string()).describe('Array of ApiEngineKey strings'),
       allowAnonymous: z.number().optional().describe('1 = allow anonymous (default), 0 = require login'),

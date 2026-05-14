@@ -95,12 +95,11 @@ V8.ConfirmTips('确认审核通过？', function() {
 ### V8BtnLimit — 按钮显隐（V8CodeShow）
 
 ```javascript
-// 必须给 V8.Result 赋 boolean
-if (V8.Form.Status === '待审核' && V8.CurrentUser.RoleName.indexOf('审批员') !== -1) {
-  V8.Result = true;
-} else {
-  V8.Result = false;
-}
+// 推荐：直接 return boolean
+return V8.Form.Status === '待审核' && V8.CurrentUser.RoleName.indexOf('审批员') !== -1;
+
+// 兼容旧写法：V8.Result = true/false
+// V8.Result = V8.Form.Status === '待审核';
 ```
 
 ## 列表事件

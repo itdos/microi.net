@@ -16,7 +16,7 @@ description: Microi menu button and tab V8 guidance. Use when configuring sys_me
 | 字段 | 渲染位置 | 必填项 |
 |------|---------|--------|
 | `MoreBtns` | 列表每行尾的"…更多"操作 | `Id, Name, V8Code`，建议 `ShowRow:true` |
-| `FormBtns` | 编辑/查看表单底部 | `Id, Name, V8Code` |
+| `FormBtns` | 表单右上角 / 移动端 FAB | `Id, Name, V8Code` |
 | `BatchSelectMoreBtns` | 列表勾选多行后顶部出现 | `Id, Name, V8Code`，按钮里用 `V8.TableRowSelected` 取选中行 |
 | `PageTabs` | 列表页顶部页签切换 | `Id, Name, V8Code`，`V8Code` 通常调用 `V8.SearchSet({...})` |
 | `ExportMoreBtns` | 列表"导出"下拉的扩展 | `Id, Name, V8Code` |
@@ -35,13 +35,23 @@ description: Microi menu button and tab V8 guidance. Use when configuring sys_me
   "BtnStyle": "primary",      // primary | success | warning | danger | (空)
   "IsVisible": true,          // 是否参与渲染（false 则完全隐藏）
   "ShowRow": true,            // MoreBtns 必填：true 显示在行内，false 收进"更多"
-  "V8CodeShow": "...",        // 显隐表达式 JS：赋值 V8.Result=true/false
+  "V8CodeShow": "...",        // 显隐表达式 JS：return true/false 或赋值 V8.Result=true/false
   "V8Code": "...",            // 点击执行的 JS（前端 V8 上下文）
   "Url": ""                   // 可选：直接跳转 URL（不与 V8Code 同用）
 }
 ```
 
-### V8CodeShow（显隐控制）—— 必须给 `V8.Result` 赋布尔值
+### V8CodeShow（显隐控制）—— 支持 `return` 和 `V8.Result`
+
+推荐写法：直接返回布尔值。
+
+```js
+// 仅当状态为"待指派"且无负责人时显示
+return V8.Form.Status == '待指派' && !V8.Form.AssigneeId;
+```
+
+兼容旧写法：给 `V8.Result` 赋布尔值。
+
 ```js
 // 仅当状态为"待指派"且无负责人时显示
 if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
@@ -158,7 +168,7 @@ V8.SearchSet({ Status: '' });
 `V8CodeShow` 控制此 Tab 在哪种端显示：
 ```js
 // 只在 App 端显示
-V8.Result = (V8.ClientType != 'PC');
+return V8.ClientType != 'PC';
 ```
 
 ---
@@ -201,8 +211,8 @@ V8.Result = (V8.ClientType != 'PC');
 ❌ 把所有业务逻辑塞进 `V8Code`，不创建接口引擎
 ✅ 前端 `V8Code` 只负责弹窗/确认/刷新；业务逻辑写在接口引擎
 
-❌ `V8CodeShow` 不赋值 `V8.Result` 就 return
-✅ 永远显式 `V8.Result = true/false;`
+❌ `V8CodeShow` 中返回非布尔值，导致按钮显隐继续走默认权限判断
+✅ 显式 `return true/false;`，或兼容写法 `V8.Result = true/false;`
 
 ❌ `MoreBtns` 不写 `ShowRow:true`，按钮看不见
 ✅ 行内必须 `ShowRow:true`
