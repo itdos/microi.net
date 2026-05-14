@@ -448,11 +448,12 @@ export default {
             self.CallbackSetFormDataFinish = false;
             self.CallbackSetDiyTableModelFinish = false;
 
-            self.$nextTick(function () {
+            self.$nextTick(async function () {
                 // 重新从路由参数读取
                 self.TableId = self.$route.params.TableId;
                 self.FormMode = self.$route.query.FormMode;
-                self.SysMenuId = self.$route.query.SysMenuId;
+                self.SysMenuId = self.$route.query.SysMenuId || self.$route.query.Id || (self.$route.meta ? (self.$route.meta.Id || self.$route.meta.SysMenuId) : "");
+                await self.EnsureSysMenuModel();
 
                 var newTableRowId = self.$route.params.TableRowId;
                 if (newTableRowId) {
