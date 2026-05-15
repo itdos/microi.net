@@ -587,6 +587,8 @@ export default {
             _isDestroyed: false, // 组件销毁标志
             _paginationVersion: 0, // 分页版本号，用于取消旧请求的异步操作
             _currentAbortController: null, // 用于取消正在进行的HTTP请求
+            _openFormDialogToken: 0, // 打开表单弹窗的异步 token，切菜单/重复点击时取消旧初始化
+            _openFormDialogTimer: null,
             // ========== 移动端无限滚动相关 ==========
             mobileLoadingMore: false, // 移动端加载更多数据中
             mobileScrollHandler: null, // 滚动事件处理函数引用

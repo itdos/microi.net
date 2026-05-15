@@ -14,6 +14,8 @@
     "analyze:deps": "./analyze-deps.sh",
     "analyze:build": "node analyze-build.js",
     "preview": "vite preview",
+    "test:form-freeze": "playwright test tests/form-engine-freeze-trace.spec.mjs --headed --reporter=list",
+    "test:form-freeze:auto": "node scripts/run-form-engine-freeze-trace.mjs",
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
     "format": "prettier --write \"**/*.{js,vue,json,md}\""
   },

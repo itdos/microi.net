@@ -1,9 +1,17 @@
 
+import { formTrace } from "@/utils/form-engine-trace.js";
+
 export default {
     methods: {
         // ========== 打开详情（核心方法，以diy-table.vue为准） ==========
         OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
+            formTrace("diy-form-full:open-detail", {
+                tableId: self.TableId,
+                tableName: self.TableName,
+                formMode: formMode,
+                rowId: tableRowModel && tableRowModel.Id
+            });
 
             self.BtnLoading = true;
             self.FormMode = formMode;
@@ -112,22 +120,88 @@ export default {
             }
             self.GetCommentList();
         },
-        // ========== 抽屉打开动画完成后初始化表单 ==========
-        onDrawerOpened() {
+        _beginFieldFormOpen() {
             var self = this;
-            var formMode = self._pendingDrawerContext?.formMode;
-            var isOpenWorkFlowForm = self._pendingDrawerContext?.isOpenWorkFlowForm;
-            var wfParam = self._pendingDrawerContext?.wfParam;
+            self._clearFieldFormInitTimer();
+            self._fieldFormOpenToken = (self._fieldFormOpenToken || 0) + 1;
+            formTrace("diy-form-full:begin-open", {
+                tableId: self.TableId,
+                tableName: self.TableName,
+                token: self._fieldFormOpenToken
+            });
+            return self._fieldFormOpenToken;
+        },
+        _cancelFieldFormOpen() {
+            var self = this;
+            self._clearFieldFormInitTimer();
+            self._fieldFormOpenToken = (self._fieldFormOpenToken || 0) + 1;
+            self._pendingDrawerContext = null;
+            self.BtnLoading = false;
+        },
+        _clearFieldFormInitTimer() {
+            var self = this;
+            if (self._fieldFormInitTimer) {
+                try { clearTimeout(self._fieldFormInitTimer); } catch (e) {}
+                self._fieldFormInitTimer = null;
+            }
+        },
+        _getFieldFormRef() {
+            var self = this;
+            var fieldForm = self.$refs && self.$refs.fieldForm;
+            if (Array.isArray(fieldForm)) {
+                fieldForm = fieldForm[0];
+            }
+            return fieldForm;
+        },
+        _initFieldFormWhenReady(options) {
+            var self = this;
+            options = options || {};
+            var token = options.token || self._fieldFormOpenToken;
+            var formMode = options.formMode;
+            var isOpenWorkFlowForm = options.isOpenWorkFlowForm;
+            var wfParam = options.wfParam;
+            var dialogId = options.dialogId;
+            var source = options.source || 'Form';
 
+            self._clearFieldFormInitTimer();
             self.CloseFormNeedConfirm = false;
+            formTrace("diy-form-full:init-when-ready-start", {
+                tableId: self.TableId,
+                tableName: self.TableName,
+                token: token,
+                formMode: formMode,
+                source: source
+            });
 
             var retryCount = 0;
-            var maxRetries = 20;
+            var maxRetries = 60;
             var retryInterval = 50;
 
             var tryInitFieldForm = function() {
-                if (self.$refs.fieldForm) {
-                    self.$refs.fieldForm.Init(true, function (callbackValue) {
+                if (self._isDestroyed || token !== self._fieldFormOpenToken) {
+                    self._fieldFormInitTimer = null;
+                    return;
+                }
+                if ((dialogId === 'ShowFieldForm' && !self.ShowFieldForm) || (dialogId === 'ShowFieldFormDrawer' && !self.ShowFieldFormDrawer)) {
+                    self._fieldFormInitTimer = null;
+                    self.BtnLoading = false;
+                    return;
+                }
+
+                var fieldForm = self._getFieldFormRef();
+                if (fieldForm && typeof fieldForm.Init === 'function') {
+                    self._clearFieldFormInitTimer();
+                    formTrace("diy-form-full:field-form-init", {
+                        tableId: self.TableId,
+                        tableName: self.TableName,
+                        token: token,
+                        retryCount: retryCount,
+                        source: source
+                    });
+                    fieldForm.Init(true, function (callbackValue) {
+                        if (self._isDestroyed || token !== self._fieldFormOpenToken) {
+                            return;
+                        }
                         if (callbackValue && callbackValue.CurrentRowModel) {
                             self.CurrentRowModel = callbackValue.CurrentRowModel;
                             var V8 = callbackValue.V8;
@@ -135,30 +209,49 @@ export default {
                         }
                         self.BtnLoading = false;
                     });
-                    // 工作流面板初始化
                     if (isOpenWorkFlowForm == true) {
                         if (self.DiyCommon.IsNull(wfParam)) { wfParam = { WorkType: "ViewWork" }; }
                         wfParam.FormMode = formMode;
                         self.InitWorkFlow(wfParam);
                     }
+                    return;
+                }
+
+                retryCount++;
+                if (retryCount < maxRetries) {
+                    self._fieldFormInitTimer = setTimeout(tryInitFieldForm, retryInterval);
                 } else {
-                    retryCount++;
-                    if (retryCount < maxRetries) {
-                        setTimeout(tryInitFieldForm, retryInterval);
-                    } else {
-                        self.BtnLoading = false;
-                        console.error('[DiyFormFull] Drawer fieldForm ref 在 ' + (maxRetries * retryInterval) + 'ms 后仍不存在');
-                    }
+                    self._fieldFormInitTimer = null;
+                    self.BtnLoading = false;
+                    console.error('[DiyFormFull] ' + source + ' fieldForm ref 在 ' + (maxRetries * retryInterval) + 'ms 后仍不存在');
                 }
             };
 
-            tryInitFieldForm();
+            self.$nextTick(tryInitFieldForm);
+        },
+        // ========== 抽屉打开动画完成后初始化表单 ==========
+        onDrawerOpened() {
+            var self = this;
+            var formMode = self._pendingDrawerContext?.formMode;
+            var isOpenWorkFlowForm = self._pendingDrawerContext?.isOpenWorkFlowForm;
+            var wfParam = self._pendingDrawerContext?.wfParam;
+            var token = self._pendingDrawerContext?.token || self._fieldFormOpenToken;
+
+            self._initFieldFormWhenReady({
+                token: token,
+                formMode: formMode,
+                isOpenWorkFlowForm: isOpenWorkFlowForm,
+                wfParam: wfParam,
+                dialogId: 'ShowFieldFormDrawer',
+                source: 'Drawer'
+            });
 
             self._pendingDrawerContext = null;
         },
         // ========== 抽屉关闭动画完成后的清理 ==========
         onDrawerClosed() {
             var self = this;
+            self._cancelFieldFormOpen();
             self.showMobileFabMenu = false;
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
@@ -172,6 +265,7 @@ export default {
         // ========== 弹窗关闭动画完成后的清理 ==========
         onDialogClosed() {
             var self = this;
+            self._cancelFieldFormOpen();
             self.showMobileFabMenu = false;
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
@@ -329,6 +423,7 @@ export default {
         },
         async CloseFieldFormHandler(dialogId, actionType, tableRowId, isPopstate) {
             var self = this;
+            self._cancelFieldFormOpen();
             // 移动端关闭Drawer时：如果是通过代码关闭（非popstate触发），需要回退pushState推入的历史记录
                         // if (dialogId === 'ShowFieldFormDrawer' && self._drawerPopstateHandler) {
                         //     // 先移除监听，避免history.back()触发的popstate再次执行关闭

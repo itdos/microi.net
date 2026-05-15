@@ -159,11 +159,14 @@ export default {
             CallbackSetDiyTableModelFinish: false,
             _isReloadingForm: false, // 防止 ReloadForm 死循环
             _isMounted: false, // 防止 mounted 重复执行
+            _isDestroyed: false, // 组件销毁标记，用于取消异步初始化
             _isDirectPageMode: false, // 标识是否为直接通过路由访问的页面模式（非嵌套的子表弹窗）
             _isDeactivated: false, // keep-alive 停用标记，防止缓存实例响应路由变化导致重复请求
 
             // ========== 抽屉打开上下文 ==========
             _pendingDrawerContext: null,
+            _fieldFormOpenToken: 0,
+            _fieldFormInitTimer: null,
 
             // ========== 移动端历史管理（按实例） ==========
             // 抽屉组件相关数据

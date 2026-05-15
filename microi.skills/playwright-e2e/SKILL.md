@@ -64,6 +64,71 @@ PW_TEST_PASSWORD=123456
 PW_HOME_PATH=/#/pages/index/index
 ```
 
+## 表单引擎卡死/递归更新全自动化诊断
+
+当用户反馈“新增抽屉卡死”“设计页卡死”“点击控件无响应”“Maximum recursive updates exceeded”等表单引擎问题时，优先做可复现的 Playwright 诊断，而不是只靠猜测改代码。
+
+Microi.Client 已提供专用入口：
+
+```powershell
+Push-Location Microi.Client
+npm run test:form-freeze:auto
+Pop-Location
+```
+
+该入口会执行 `scripts/run-form-engine-freeze-trace.mjs`，完整流程如下：
+
+1. 自动配置 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 中指定 profile 的 `ASPNETCORE_ENVIRONMENT` 和 `DOTNET_ENVIRONMENT`。
+2. 自动配置 `Microi.Server/Microi.net.Api/appsettings.{Env}.json` 的 `DevLoginBypass`，用于本地测试账号、跳过验证码、只允许 loopback。
+3. 本地后端未启动时，自动执行 `dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api`。
+4. 启动 Playwright，打开指定前端页面，开启 `MicroiFormTrace`，采集 `window.__MICROI_FORM_TRACE__`、console、pageerror、当前 URL 和 Playwright trace。
+5. 页面卡住或断言失败时，先看最后一批 `[MicroiFormTrace #n]`，定位是停在 `runtime:*`、`diy-select:*`、`inform-v8-*`、`field-v8-*` 还是业务 console。
+
+常用环境变量：
+
+```powershell
+$env:FRONTEND='http://localhost:1988'
+$env:BACKEND='https://localhost:7266'
+$env:PW_BACKEND_ENV='iTdos'
+$env:PW_ASPNETCORE_ENVIRONMENT='iTdos'
+$env:PW_DOTNET_ENVIRONMENT='iTdos'
+$env:PW_APPSETTINGS_ENV='iTdos'
+$env:MICROI_OSCLIENT='iTdos'
+$env:PW_TEST_ACCOUNT='admin'
+$env:PW_TEST_PASSWORD='microi#2026'
+$env:MICROI_FREEZE_PATH='/#/diy/diy-design/<TableId>?PageType='
+npm run test:form-freeze:auto
+```
+
+可选开关：
+
+- `PW_START_BACKEND=0`：不自动启动后端，只跑测试。
+- `PW_CONFIG_BACKEND=0`：不修改 `launchSettings.json`。
+- `PW_CONFIG_DEV_LOGIN=0`：不修改 `DevLoginBypass`。
+- `PW_APPSETTINGS_PATH=Microi.Server/Microi.net.Api/appsettings.iTdos.json`：明确指定配置文件。
+- `PW_BACKEND_PROFILE=Microi.net.Api`：指定 launch profile。
+- `PW_DEV_LOGIN_BYPASS=1`、`PW_DEV_SKIP_CAPTCHA=1`、`PW_DEV_ONLY_LOOPBACK=1`：控制本地登录旁路。
+- `PW_DEV_LOGIN_ACCOUNT`、`PW_DEV_LOGIN_PASSWORD`：只配置后端旁路账号密码；`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD` 同时作为 Playwright 登录账号密码。
+- `PW_HEADED=0`：无头运行。
+
+诊断代码要遵守这些规则：
+
+- 登录优先用真实后端 `/api/SysUser/Login`，token 可能在响应头 `Authorization`，不要只从 `Data.Token` 取。
+- 如果 direct-token 被前端守卫踢回登录页，必须保留 UI 登录兜底，模拟真实用户输入账号密码点击登录。
+- trace 只在 URL、localStorage 或 `window.__MICROI_FORM_TRACE_ENABLED__` 开启时输出，避免生产默认刷屏。
+- 卡死类问题要捕获 `pageerror`；Vue 的 `Maximum recursive updates exceeded` 通常直接暴露根因组件。
+- 不要把 token 打印到最终报告里；console 附件中如包含 token，只用于本地诊断，不要转述完整值。
+- 修复后必须重跑同一个诊断用例，确认最后 trace 不再无限重复，并且页面在 10-15 秒后仍可响应。
+
+表单引擎冻结高频根因：
+
+- 在 computed/render/watch 路径里写回同一个响应式依赖，例如 `field.Data` watcher 里再次写 `field.Data`。
+- 程序性同步 `el-select` 值时触发 `change`，又执行 V8/FormSet，形成循环。
+- 折叠分组、字段 Tabs 等运行态字段属性反复写入 `_isShow`、`_collapseClass`、`_fieldTabsPanes`。
+- 前端 InFormV8 或字段 V8 中持续 `FormSet` 同一字段，且没有值相等保护。
+
+当前 Microi.Client 的表单冻结诊断文件是 `tests/form-engine-freeze-trace.spec.mjs`。新增类似测试时，可以复制它的结构：`addInitScript` 注入 `ApiBase/OsClient/Trace`，登录后跳转目标 hash，等待设计/表单 DOM，延迟观察响应性，最后 attach trace 和 console。
+
 ## 安装
 
 ```bash

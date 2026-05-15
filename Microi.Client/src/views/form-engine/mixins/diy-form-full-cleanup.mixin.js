@@ -2,6 +2,8 @@ export default {
 beforeUnmount() {
         var self = this;
         self._isDestroyed = true;
+        try { self._cancelFieldFormOpen && self._cancelFieldFormOpen(); } catch (e) {}
+        try { self.ShowFieldForm = false; self.ShowFieldFormDrawer = false; } catch (e) {}
 
         // 1. 解除全局 popstate 监听（即使关闭逻辑没走到 onDialogClosed/onDrawerClosed 也兜底清理）
         try { self._cleanupDialogPopstate && self._cleanupDialogPopstate(); } catch (e) {}
@@ -15,8 +17,11 @@ beforeUnmount() {
             if (window.__microi_drawer_stack && window.__microi_drawer_stack.length === 0) {
                 window.__microi_drawer_stack = null;
             }
-            if (typeof window.__microi_protected_count === 'number') window.__microi_protected_count = 0;
-            if (typeof window.__microi_ignore_pop === 'boolean') window.__microi_ignore_pop = false;
+            if ((!window.__microi_dialog_stack || window.__microi_dialog_stack.length === 0)
+                && (!window.__microi_drawer_stack || window.__microi_drawer_stack.length === 0)) {
+                if (typeof window.__microi_protected_count === 'number') window.__microi_protected_count = 0;
+                if (typeof window.__microi_ignore_pop === 'boolean') window.__microi_ignore_pop = false;
+            }
         } catch (e) {}
 
         // 3. 清理大对象/数组引用（这些都是响应式的，断开能让 GC 立即回收）

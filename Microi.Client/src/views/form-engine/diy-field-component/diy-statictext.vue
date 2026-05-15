@@ -71,9 +71,7 @@ const configForm = ref({
 });
 
 const staticTextConfig = computed(() => {
-    if (!props.field.Config) props.field.Config = {};
-    if (!props.field.Config.StaticText) props.field.Config.StaticText = {};
-    return props.field.Config.StaticText;
+    return props.field && props.field.Config && props.field.Config.StaticText ? props.field.Config.StaticText : {};
 });
 
 const title = computed(() => staticTextConfig.value.Title || props.field.Label || "");
@@ -93,6 +91,7 @@ const openConfig = () => {
 };
 
 const saveConfig = () => {
+    if (!props.field.Config) props.field.Config = {};
     props.field.Config.StaticText = {
         ...staticTextConfig.value,
         ...configForm.value

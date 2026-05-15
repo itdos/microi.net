@@ -937,7 +937,9 @@ export default {
             var wfParam = param.WFParam;
 
             self.$nextTick(async function () {
+                if (self._isDestroyed) { return; }
                 await self.EnsureSysMenuModel();
+                if (self._isDestroyed) { return; }
                 self.OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
         },
@@ -1013,6 +1015,7 @@ export default {
             }
 
             if (dialogType == "Dialog") {
+                var dialogOpenToken = self._beginFieldFormOpen();
                 self.ShowFieldForm = true;
                  // 移动端：推入历史记录，拦截返回键关闭弹窗而非路由回退
                                 // if (self.diyStore.IsPhoneView && window.history && window.history.pushState) {
@@ -1072,38 +1075,13 @@ export default {
                         }
                     }
                 }
-                self.$nextTick(function () {
-                    self.$nextTick(function () {
-                        self.CloseFormNeedConfirm = false;
-                        // 添加重试机制，确保ref存在
-                        let retryCount = 0;
-                        const maxRetries = 20;
-                        const tryInit = () => {
-                            if (self.$refs.fieldForm) {
-                                self.$refs.fieldForm.Init(true, function (callbackValue) {
-                                    if (callbackValue && callbackValue.CurrentRowModel) {
-                                        self.CurrentRowModel = callbackValue.CurrentRowModel;
-                                        var V8 = callbackValue.V8;
-                                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
-                                    }
-                                    self.BtnLoading = false;
-                                });
-                                // 工作流面板初始化
-                                if (isOpenWorkFlowForm == true) {
-                                    if (self.DiyCommon.IsNull(wfParam)) { wfParam = { WorkType: "ViewWork" }; }
-                                    wfParam.FormMode = formMode;
-                                    self.InitWorkFlow(wfParam);
-                                }
-                            } else if (retryCount < maxRetries) {
-                                retryCount++;
-                                setTimeout(tryInit, 50);
-                            } else {
-                                console.error('[DiyFormFull] Dialog fieldForm ref未找到，已重试', maxRetries, '次');
-                                self.BtnLoading = false;
-                            }
-                        };
-                        tryInit();
-                    });
+                self._initFieldFormWhenReady({
+                    token: dialogOpenToken,
+                    formMode: formMode,
+                    isOpenWorkFlowForm: isOpenWorkFlowForm,
+                    wfParam: wfParam,
+                    dialogId: 'ShowFieldForm',
+                    source: 'Dialog'
                 });
             } else {
                 // Drawer模式
@@ -1113,10 +1091,12 @@ export default {
                 // 导致 fieldForm.Init() 永远不会执行，表单不会用新参数刷新。
                 // 此时直接走 onDrawerOpened 的初始化逻辑即可（diy-form.vue 内部对 TableRowId/FormMode props 变化已有响应式处理）。
                 var _drawerAlreadyOpen = self.ShowFieldFormDrawer === true;
+                var drawerOpenToken = self._beginFieldFormOpen();
                 self._pendingDrawerContext = {
                     formMode: formMode,
                     isOpenWorkFlowForm: isOpenWorkFlowForm,
-                    wfParam: wfParam
+                    wfParam: wfParam,
+                    token: drawerOpenToken
                 };
                 if (_drawerAlreadyOpen) {
                     // 抽屉已打开 → 直接调用初始化逻辑（等价于 V8.ReloadForm）

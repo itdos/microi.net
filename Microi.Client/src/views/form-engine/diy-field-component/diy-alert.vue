@@ -80,9 +80,7 @@ const configForm = ref({
 });
 
 const alertConfig = computed(() => {
-    if (!props.field.Config) props.field.Config = {};
-    if (!props.field.Config.Alert) props.field.Config.Alert = {};
-    return props.field.Config.Alert;
+    return props.field && props.field.Config && props.field.Config.Alert ? props.field.Config.Alert : {};
 });
 
 const title = computed(() => alertConfig.value.Title || props.field.Label || "提示说明");
@@ -113,6 +111,7 @@ const openConfig = () => {
 };
 
 const saveConfig = () => {
+    if (!props.field.Config) props.field.Config = {};
     props.field.Config.Alert = {
         ...alertConfig.value,
         ...configForm.value

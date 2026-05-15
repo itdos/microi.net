@@ -2018,9 +2018,25 @@ export default {
                 } else {
                     // 已迁移至 diy-form-full.vue，通过 refDiyTable_DiyFormDialog 统一打开
                     var dialogType = self.CurrentDiyTableModel.FormOpenType || "Drawer";
+                    var openFormDialogToken = (self._openFormDialogToken || 0) + 1;
+                    self._openFormDialogToken = openFormDialogToken;
+                    if (self._openFormDialogTimer) {
+                        try { clearTimeout(self._openFormDialogTimer); } catch (e) {}
+                        self._openFormDialogTimer = null;
+                    }
                     // 延迟渲染：首次调用时才渲染组件
                     const initFormDialog = () => {
-                        self.$refs.refDiyTable_DiyFormDialog.Init({
+                        if (self._isDestroyed || openFormDialogToken !== self._openFormDialogToken) {
+                            return false;
+                        }
+                        var formDialog = self.$refs.refDiyTable_DiyFormDialog;
+                        if (Array.isArray(formDialog)) {
+                            formDialog = formDialog[0];
+                        }
+                        if (!formDialog || typeof formDialog.Init !== 'function') {
+                            return false;
+                        }
+                        formDialog.Init({
                             TableId: self.TableId,
                             TableName: self.CurrentDiyTableModel.Name,
                             SysMenuId: self.SysMenuId,
@@ -2040,25 +2056,31 @@ export default {
                             WFParam: wfParam
                         });
                         self.BtnLoading = false;
+                        self._openFormDialogTimer = null;
+                        return true;
                     };
 
                     if (!self._shouldRenderDiyFormDialog) {
                         self._shouldRenderDiyFormDialog = true;
                     }
-                    if (self.$refs.refDiyTable_DiyFormDialog) {
-                        initFormDialog();
+                    if (initFormDialog()) {
+                        return;
                     } else {
                         var retryCount = 0;
-                        var maxRetries = 40;
+                        var maxRetries = 100;
                         var tryInitFormDialog = function() {
-                            if (self.$refs.refDiyTable_DiyFormDialog) {
-                                initFormDialog();
+                            if (self._isDestroyed || openFormDialogToken !== self._openFormDialogToken) {
+                                return;
+                            }
+                            if (initFormDialog()) {
+                                return;
                             } else if (retryCount < maxRetries) {
                                 retryCount++;
-                                setTimeout(tryInitFormDialog, 50);
+                                self._openFormDialogTimer = setTimeout(tryInitFormDialog, 50);
                             } else {
                                 console.error('[OpenFormDialog] refDiyTable_DiyFormDialog 始终未挂载，已重试' + maxRetries + '次');
                                 self.BtnLoading = false;
+                                self._openFormDialogTimer = null;
                             }
                         };
                         self.$nextTick(tryInitFormDialog);

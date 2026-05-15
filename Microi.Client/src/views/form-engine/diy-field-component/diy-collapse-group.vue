@@ -185,7 +185,7 @@ const saveConfig = () => {
         ...groupConfig.value,
         ...configForm.value
     };
-    emit("CallbackGroupCollapseChange", props.field, isCollapsed.value);
+    emit("CallbackGroupCollapseChange", props.field, isCollapsed.value, { force: true });
     configDialogVisible.value = false;
     DiyCommon.Tips("配置已保存", true);
 };
