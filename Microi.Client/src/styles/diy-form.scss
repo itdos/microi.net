@@ -4,7 +4,7 @@
 }
 /* 禁用状态文字颜色优化 - 使用 CSS 变量以兼容深色模式 */
 .itdos-diy-form {
-    
+
     /* Element Plus Input 禁用状态 */
     :deep(.el-input.is-disabled .el-input__inner),
     :deep(.el-input.is-disabled .el-input__wrapper) {
@@ -12,14 +12,14 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Textarea 禁用状态 */
     :deep(.el-textarea.is-disabled .el-textarea__inner) {
         color: var(--el-text-color-regular) !important;
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-secondary) !important;
     }
-    
+
     /* Element Plus Select 禁用状态 */
     :deep(.el-select.is-disabled .el-input__inner),
     :deep(.el-select.is-disabled .el-input__wrapper) {
@@ -27,7 +27,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus DatePicker 禁用状态 */
     :deep(.el-date-editor.is-disabled .el-input__inner),
     :deep(.el-date-editor.is-disabled .el-input__wrapper) {
@@ -35,7 +35,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus InputNumber 禁用状态 */
     :deep(.el-input-number.is-disabled .el-input__inner),
     :deep(.el-input-number.is-disabled .el-input__wrapper) {
@@ -43,7 +43,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus Cascader 禁用状态 */
     :deep(.el-cascader.is-disabled .el-input__inner),
     :deep(.el-cascader.is-disabled .el-input__wrapper) {
@@ -51,7 +51,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus TimePicker 禁用状态 */
     :deep(.el-time-picker.is-disabled .el-input__inner),
     :deep(.el-time-picker.is-disabled .el-input__wrapper) {
@@ -59,7 +59,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus AutoComplete 禁用状态 */
     :deep(.el-autocomplete.is-disabled .el-input__inner),
     :deep(.el-autocomplete.is-disabled .el-input__wrapper) {
@@ -67,7 +67,7 @@
         opacity: 1 !important;
         -webkit-text-fill-color: var(--el-text-color-regular) !important;
     }
-    
+
     /* Element Plus 通用禁用状态 */
     :deep(.el-form-item.is-disabled),
     :deep(.is-disabled) {
@@ -755,7 +755,9 @@
             border-radius: 8px 0 0 8px;
         }
         :deep(.el-input-group.el-input-group--prepend .el-input__wrapper) {
-            border-radius: 0px 8px 8px 0;
+             // 调整详情页输入框右侧边框弧度为0，避免和右侧搜索按钮有空隙
+            // border-radius: 0px 8px 8px 0;
+            border-radius: 0px 0px 0px 0;
         }
 
 

@@ -38,7 +38,7 @@
             </template>
             <!--DIY子表-->
             <el-card :class="'box-card box-card-table-row-list' + ((diyStore.IsPhoneView || TableDisplayMode == 'Card') ? ' mobile-box-card' : '')">
-                
+
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
                 <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && ShowAddByRoute" class="mobile-header">
@@ -1992,6 +1992,7 @@ export default {
             if (isOpenWorkFlowForm) {
                 isOpenPage = false;
             }
+
             if (isOpenPage) {
                 var url = `/diy/form-page/${self.TableId}`;
                 if (!self.DiyCommon.IsNull(tableRowModel)) {

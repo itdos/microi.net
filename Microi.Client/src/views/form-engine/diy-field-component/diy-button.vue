@@ -272,6 +272,7 @@ export default {
          */
         ComponentButtonClick(field) {
             var self = this;
+            console.log(field,8888888888)
             // 触发V8代码执行
             self.$emit("CallbackRunV8Code", {
                 field: field,
