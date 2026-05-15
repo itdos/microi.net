@@ -334,6 +334,11 @@ export const usePermissionStore = defineStore("permission", {
             this.routes = constantRoutes.concat(routes);
         },
 
+        resetRoutes() {
+            this.addRoutes = [];
+            this.routes = constantRoutes;
+        },
+
         generateRoutes(roles) {
             return new Promise((resolve, reject) => {
                 // 从服务器端查询自定义功能模块
