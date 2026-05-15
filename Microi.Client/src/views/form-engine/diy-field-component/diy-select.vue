@@ -50,7 +50,7 @@
             因为field.Name是固定不变的，
             已解决-->
         <el-option
-            v-for="(fieldData, index2) in field.Data"
+            v-for="(fieldData, index2) in SelectOptionList"
             :key="'slt_opt_' + field.Name + '_' + index2"
             :label="GetOptionLabel(fieldData)"
             :value="GetOptionValue(fieldData)"
@@ -91,6 +91,7 @@ import _ from "underscore";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
+import { formTrace } from "@/utils/form-engine-trace.js";
 
 export default {
     name: "diy-select",
@@ -106,6 +107,8 @@ export default {
             LastModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
             FieldAllData: [],
             NeedResetDataSourse: true,
+            _selectDestroyed: false,
+            _suppressSelectChange: false,
             _ArrowDownIcon: markRaw(ArrowDown),
             // 配置弹窗相关
             configDialogVisible: false,
@@ -171,6 +174,14 @@ export default {
         "field.Data": function (newVal, oldVal) {
             var self = this;
             var dataList = Array.isArray(newVal) ? newVal : [];
+            formTrace("diy-select:field-data-watch", {
+                field: self.field && self.field.Name,
+                component: self.field && self.field.Component,
+                dataLength: dataList.length,
+                oldLength: Array.isArray(oldVal) ? oldVal.length : 0,
+                needReset: self.NeedResetDataSourse,
+                modelType: Array.isArray(self.ModelValue) ? "array" : typeof self.ModelValue
+            });
             // if (newVal.length > 0 && self.FieldAllData.length == 0) {//2023-10-27注释
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
             // 首次数据加载时（FieldAllData为空），即使NeedResetDataSourse=false也要匹配
@@ -182,15 +193,15 @@ export default {
                 if (self._isPlainDataSource() ||
                     (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") ||
                     self._isObjectDataSource()) {
+                    self._suppressSelectChange = true;
                     self.ModelValue = self._resolveSelectModelValue(self.ModelValue);
+                    self.$nextTick(function () {
+                        self._suppressSelectChange = false;
+                    });
                 }
 
                 if (self._isObjectDataSource()) {
                     var mergedData = self._mergeSelectedOptions(dataList);
-                    if (mergedData.length !== dataList.length) {
-                        self.NeedResetDataSourse = false;
-                        self.field.Data = mergedData;
-                    }
                     self.FieldAllData = [...mergedData];
                 }
             }
@@ -198,10 +209,38 @@ export default {
         }
     },
 
-    computed: {},
+    computed: {
+        SelectOptionList() {
+            var self = this;
+            var data = self.field && Array.isArray(self.field.Data) ? self.field.Data : [];
+            return self._mergeSelectedOptions(data);
+        }
+    },
+
+    beforeUnmount() {
+        var self = this;
+        formTrace("diy-select:before-unmount", {
+            field: self.field && self.field.Name,
+            component: self.field && self.field.Component
+        });
+        self._selectDestroyed = true;
+        if (self.field) {
+            self.field._SelectRemoteRequestId = (self.field._SelectRemoteRequestId || 0) + 1;
+            if (self.field.Config) {
+                self.field.Config.DataSourceSqlRemoteLoading = false;
+            }
+        }
+    },
 
     mounted() {
         var self = this;
+        formTrace("diy-select:mounted", {
+            field: self.field && self.field.Name,
+            component: self.field && self.field.Component,
+            dataSource: self.field && self.field.Config && self.field.Config.DataSource,
+            remote: self.field && self.field.Config && self.field.Config.DataSourceSqlRemote,
+            dataLength: self.field && Array.isArray(self.field.Data) ? self.field.Data.length : 0
+        });
         // 标准化KeyValue数据源的数据格式（将旧的小写key/value转换为大驼峰Key/Value）
         if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue" && self.field.Data && Array.isArray(self.field.Data)) {
             self.field.Data = self.field.Data.map(item => {
@@ -242,7 +281,8 @@ export default {
                     ? self.ModelValue.filter(function (item) { return !self.DiyCommon.IsNull(item); }).length
                     : (self.DiyCommon.IsNull(self.ModelValue) ? 0 : 1);
                 if (self.field.Config.DataSourceSqlRemote &&
-                    (!self.field.Data || self.field.Data.length === 0 || (selectedCount > 0 && self.field.Data.length <= selectedCount))) {
+                    selectedCount > 0 &&
+                    (!self.field.Data || self.field.Data.length === 0 || self.field.Data.length <= selectedCount)) {
                     self.SelectRemoteMethod("", self.field);
                 }
             }
@@ -350,13 +390,19 @@ export default {
         },
         _setModelValueFromExternal(value) {
             var self = this;
+            if (self._selectDestroyed) return;
+            formTrace("diy-select:model-external", {
+                field: self.field && self.field.Name,
+                component: self.field && self.field.Component,
+                valueType: Array.isArray(value) ? "array" : typeof value
+            });
             var nextValue = self._resolveSelectModelValue(value);
-            var oldValue = self.ModelValue;
+            self._suppressSelectChange = true;
             self.ModelValue = nextValue;
             self._ensureSelectOption(nextValue);
-            if (!self._isMultipleSelect() && oldValue === nextValue) {
-                self._forceReSelectModelValue();
-            }
+            self.$nextTick(function () {
+                self._suppressSelectChange = false;
+            });
         },
         _resolveSelectModelValue(value) {
             var self = this;
@@ -523,19 +569,39 @@ export default {
             });
             return result;
         },
-        // 强制刷新 el-select 选中状态（处理同字符串赋值不触发反应性的场景）
-        _forceReSelectModelValue() {
+        _isSameOptionList(oldList, newList) {
             var self = this;
-            var keep = self.ModelValue;
-            if (self.DiyCommon.IsNull(keep)) return;
-            self.$nextTick(function () {
-                // 先清空再赋值，才能让基本类型相同值也触发变更
-                var isMulti = self.field && self.field.Component === "MultipleSelect";
-                self.ModelValue = isMulti ? [] : "";
-                self.$nextTick(function () {
-                    self.ModelValue = keep;
-                });
-            });
+            var oldData = Array.isArray(oldList) ? oldList : [];
+            var newData = Array.isArray(newList) ? newList : [];
+            if (oldData.length !== newData.length) return false;
+            for (var index = 0; index < oldData.length; index++) {
+                var oldIdentity = self._getOptionIdentity(oldData[index]);
+                var newIdentity = self._getOptionIdentity(newData[index]);
+                if (!self.DiyCommon.IsNull(oldIdentity) || !self.DiyCommon.IsNull(newIdentity)) {
+                    if (oldIdentity != newIdentity) return false;
+                    if (oldData[index] && typeof oldData[index] === "object" && newData[index] && typeof newData[index] === "object") {
+                        try {
+                            if (JSON.stringify(oldData[index]) !== JSON.stringify(newData[index])) return false;
+                        } catch (e) {}
+                    }
+                    continue;
+                }
+                if (oldData[index] !== newData[index]) return false;
+            }
+            return true;
+        },
+        _setFieldDataSafely(field, nextData) {
+            var self = this;
+            if (self._selectDestroyed || !field) return;
+            var normalizedData = Array.isArray(nextData) ? nextData : [];
+            var currentData = Array.isArray(field.Data) ? field.Data : [];
+            if (self._isSameOptionList(currentData, normalizedData)) {
+                self.FieldAllData = normalizedData.slice();
+                return;
+            }
+            self.NeedResetDataSourse = false;
+            self.FieldAllData = normalizedData.slice();
+            field.Data = normalizedData;
         },
         // 修复：普通数据源(Data) 单选时，把任意形态的值（字符串/数字/对象/数组）规整为字符串。
         // 解决 bug：旧记录可能将值保存成 {Name:"选项1"} / ["选项1"] / 数字 等，导致 el-select 无法匹配 el-option 的 :value（字符串）而显示为空。
@@ -626,14 +692,17 @@ export default {
             if (!self.field || !self.field.Config) return;
             var ds = self.field.Config.DataSource;
             if (ds !== 'Sql' && ds !== 'DataSource' && ds !== 'ApiEngine') return;
-            if (!self.field.Data) self.field.Data = [];
+            var sourceData = Array.isArray(self.FieldAllData) && self.FieldAllData.length > 0
+                ? self.FieldAllData
+                : (Array.isArray(self.field.Data) ? self.field.Data : []);
+            var nextData = sourceData.slice();
             var values = Array.isArray(value) ? value : [value];
             values.forEach(function (item) {
                 if (self.DiyCommon.IsNull(item)) return;
                 var option = self._buildFallbackOption(item);
                 if (!option) return;
                 var optionIdentity = self._getOptionIdentity(option);
-                var exists = self.field.Data.some(function (dataItem) {
+                var exists = nextData.some(function (dataItem) {
                     var dataIdentity = self._getOptionIdentity(dataItem);
                     if (!self.DiyCommon.IsNull(optionIdentity)) {
                         return dataIdentity == optionIdentity;
@@ -641,9 +710,10 @@ export default {
                     return dataItem === option;
                 });
                 if (!exists) {
-                    self.field.Data.push(option);
+                    nextData.push(option);
                 }
             });
+            self.FieldAllData = nextData;
         },
         // 修复：标准化选择框的值，根据单选/多选返回正确类型
         normalizeSelectValue(value) {
@@ -699,12 +769,25 @@ export default {
         },
         VisibleChange(visible, field) {
             var self = this;
-            if (!visible) {
-                if (field.Config.DataSourceSqlRemote) {
+            formTrace("diy-select:visible-change", {
+                field: field && field.Name,
+                component: field && field.Component,
+                visible: visible,
+                remote: field && field.Config && field.Config.DataSourceSqlRemote,
+                dataLength: field && Array.isArray(field.Data) ? field.Data.length : 0
+            });
+            if (field.Config.DataSourceSqlRemote) {
+                if (visible) {
+                    if (!Array.isArray(field.Data) || field.Data.length === 0) {
+                        self.SelectRemoteMethod("", field);
+                    }
+                } else if (field._SelectRemoteHasUserQuery === true) {
                     self.SelectRemoteMethod("", field);
-                } else {
-                    self.FilterMethod("", field);
                 }
+                return;
+            }
+            if (!visible) {
+                self.FilterMethod("", field);
             }
         },
         GetFieldValue(field, form) {
@@ -781,6 +864,20 @@ export default {
         },
         async SelectChange(item, field) {
             var self = this;
+            if (self._suppressSelectChange || self._selectDestroyed) {
+                formTrace("diy-select:change-suppressed", {
+                    field: field && field.Name,
+                    component: field && field.Component,
+                    suppress: self._suppressSelectChange,
+                    destroyed: self._selectDestroyed
+                });
+                return;
+            }
+            formTrace("diy-select:change-start", {
+                field: field && field.Name,
+                component: field && field.Component,
+                itemType: Array.isArray(item) ? "array" : typeof item
+            });
             // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
             var saveItem = item;
             if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
@@ -855,6 +952,10 @@ export default {
             }
 
             self.$emit("CallbackFormValueChange", self.field, saveItem);
+            formTrace("diy-select:change-end", {
+                field: field && field.Name,
+                component: field && field.Component
+            });
         },
         GetSelectValueKey(field) {
             var self = this;
@@ -901,8 +1002,28 @@ export default {
         },
         SelectRemoteMethod(query, field) {
             var self = this;
+            if (self._selectDestroyed || !field || !field.Config) return;
+            query = query == null ? "" : String(query);
+            formTrace("diy-select:remote-start", {
+                field: field && field.Name,
+                component: field && field.Component,
+                query: query,
+                loading: field.Config.DataSourceSqlRemoteLoading,
+                loadedQuery: field._SelectRemoteLoadedQuery,
+                dataLength: Array.isArray(field.Data) ? field.Data.length : 0
+            });
             if (field.Config.DataSourceSqlRemote == true)
             {
+                if (query) {
+                    field._SelectRemoteHasUserQuery = true;
+                }
+                if (field.Config.DataSourceSqlRemoteLoading === true && field._SelectRemoteLastQuery === query) {
+                    return;
+                }
+                if (field._SelectRemoteLoadedQuery === query && Array.isArray(field.Data) && field.Data.length > 0) {
+                    return;
+                }
+                field._SelectRemoteLastQuery = query;
                 field._SelectRemoteRequestId = (field._SelectRemoteRequestId || 0) + 1;
                 var requestId = field._SelectRemoteRequestId;
                 field.Config.DataSourceSqlRemoteLoading = true;
@@ -934,13 +1055,19 @@ export default {
                 // 安全兜底：无论请求成功/失败/异常/空结果，都必须重置 loading 为 false，
                 // 并把 field.Data 规整为数组，避免 el-select 在 remote 模式下卡在"加载中"
                 var finishLoading = function (data) {
+                    if (self._selectDestroyed) return;
                     if (requestId !== field._SelectRemoteRequestId) return;
                     try {
                         var nextData = Array.isArray(data) ? data : (Array.isArray(field.Data) ? field.Data : []);
                         var mergedData = self._mergeSelectedOptions(nextData);
-                        self.NeedResetDataSourse = false;
-                        field.Data = mergedData;
-                        self.FieldAllData = [...mergedData];
+                        self._setFieldDataSafely(field, mergedData);
+                        field._SelectRemoteLoadedQuery = query;
+                        formTrace("diy-select:remote-finish", {
+                            field: field && field.Name,
+                            component: field && field.Component,
+                            query: query,
+                            dataLength: mergedData.length
+                        });
                     } finally {
                         field.Config.DataSourceSqlRemoteLoading = false;
                     }

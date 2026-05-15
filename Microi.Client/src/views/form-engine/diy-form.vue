@@ -273,6 +273,7 @@ import { useDiyStore } from "@/pinia";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
 import { initV8Print } from "@/utils/v8-print.js";
+import { formTrace } from "@/utils/form-engine-trace.js";
 
 // Mixins
 import {
@@ -481,6 +482,13 @@ export default {
          */
                 Init(param, callback) {
             var self = this;
+            formTrace("diy-form:init-start", {
+                tableId: self.TableId,
+                tableName: self.TableName,
+                formMode: self.FormMode,
+                loadMode: self.LoadMode,
+                tableRowId: self.TableRowId
+            });
             self.GetDiyTableRowModelFinish = false;
             self.IsFirstLoadForm = true;
             self.DiyImgUploadRealPath = [];
@@ -874,6 +882,13 @@ export default {
         },
         GetAllData(param, callback) {
             var self = this;
+            formTrace("diy-form:get-all-data-start", {
+                tableId: self.TableId,
+                tableName: self.TableName,
+                formMode: self.FormMode,
+                loadMode: self.LoadMode,
+                tableRowId: self.TableRowId
+            });
             self.GetDiyTableRowModelFinish = false;
             var apiGetDiyTableModel = self.DiyApi.GetDiyTableModel;
             if (!self.DiyCommon.IsNull(self.ApiReplace.GetDiyTableModel)) {
@@ -938,6 +953,12 @@ export default {
 
             self.DiyCommon.PostAll(param, async function (results) {
                 loadingObj.close();
+                formTrace("diy-form:postall-return", {
+                    tableId: self.TableId,
+                    tableName: self.TableName,
+                    result0: results && results[0] && results[0].Code,
+                    result1: results && results[1] && results[1].Code
+                });
                 if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
                     // GetDiyTableModel
                     var result1 = results[0];
@@ -947,6 +968,11 @@ export default {
                     self.DiyCommon.Base64DecodeDiyTable(result1.Data);
 
                     self.DiyTableModel = result1.Data;
+                    formTrace("diy-form:table-model-ready", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                        tableId: self.DiyTableModel && self.DiyTableModel.Id,
+                        tabs: self.DiyTableModel && self.DiyTableModel.Tabs ? self.DiyTableModel.Tabs.length : 0
+                    });
 
                     if (self.FixedTabs.length > 0) {
                         self.FormTabs = self.FixedTabs;
@@ -977,6 +1003,12 @@ export default {
                     }
 
                     var resultGetDiyField = results[1];
+                    formTrace("diy-form:fields-ready", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                        fieldCount: resultGetDiyField && resultGetDiyField.Data ? resultGetDiyField.Data.length : 0,
+                        collapseCount: resultGetDiyField && resultGetDiyField.Data ? resultGetDiyField.Data.filter((field) => field && field.Component === "CollapseGroup").length : 0,
+                        tabsCount: resultGetDiyField && resultGetDiyField.Data ? resultGetDiyField.Data.filter((field) => field && field.Component === "Tabs").length : 0
+                    });
                     var formData = {};
 
                     //2021-09-06修改：要先获取了DiyTableModel实体后才能再去获取 DiyTableRowModel,因为有可能配置了查询接口替换
@@ -1043,8 +1075,15 @@ export default {
                         formData[key] = self.FormData[key];
                     }
 
+                    formTrace("diy-form:get-all-data-after-before", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name
+                    });
                     await self.GetAllDataAfter(resultGetDiyField, formData, function (callbackObj) {
                         self.$emit("CallbackSetFormData", callbackObj.CurrentRowModel);
+                    });
+                    formTrace("diy-form:get-all-data-after-end", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                        formKeys: formData ? Object.keys(formData).length : 0
                     });
 
                     // // if (self.FormMode != 'Add' && !self.DiyCommon.IsNull(self.TableRowId)) {//!self.DiyCommon.IsNull(self.TableRowId)
@@ -1093,6 +1132,10 @@ export default {
                         });
 
                         self.RefreshDiyFieldRuntimeState();
+                        formTrace("diy-form:runtime-refresh-after-fields", {
+                            table: self.DiyTableModel && self.DiyTableModel.Name,
+                            loadMode: self.LoadMode
+                        });
 
                         self.LoadDiyFieldList = true;
                         self.$emit("CallbackGetDiyField", self.DiyFieldList);
@@ -1117,6 +1160,10 @@ export default {
                             });
                             // 判断需要执行的V8
                             if (!self.DiyCommon.IsNull(self.DiyTableModel.InFormV8)) {
+                                formTrace("diy-form:inform-v8-before", {
+                                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                                    codeLength: self.DiyTableModel.InFormV8 ? self.DiyTableModel.InFormV8.length : 0
+                                });
                                 // 优化：创建独立的 V8 实例，避免污染基础对象
                                 var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                                 V8.V8From = "DiyForm";
@@ -1130,7 +1177,14 @@ export default {
                                 try {
                                     // 执行用户的 InFormV8 代码
                                     await eval("(async () => {\n " + self.DiyTableModel.InFormV8 + " \n})();");
+                                    formTrace("diy-form:inform-v8-end", {
+                                        table: self.DiyTableModel && self.DiyTableModel.Name
+                                    });
                                 } catch (error) {
+                                    formTrace("diy-form:inform-v8-error", {
+                                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                                        message: error && error.message
+                                    });
                                     self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.DiyTableModel.Name}-InFormV8]：` + error.message, false);
                                 }
                                 // 注意：不清理 window.V8，让用户的异步函数能持续访问
@@ -1290,6 +1344,13 @@ export default {
             }
 
             if (!self.DiyCommon.IsNull(v8Code) && !self.IsFirstLoadForm) {
+                formTrace("diy-form:field-v8-before", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    field: field && field.Name,
+                    component: field && field.Component,
+                    v8codeKey: v8codeKey,
+                    codeLength: v8Code ? v8Code.length : 0
+                });
                 var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                 V8.ThisValue = self.DiyCommon.IsNull(thisValue) ? "" : thisValue; // 这个是Select控制选择后的回调对象
                 V8.EventName = "FieldValueChange";
@@ -1305,7 +1366,16 @@ export default {
                     } else {
                         callback && callback(V8.Result);
                     }
+                    formTrace("diy-form:field-v8-end", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                        field: field && field.Name
+                    });
                 } catch (error) {
+                    formTrace("diy-form:field-v8-error", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name,
+                        field: field && field.Name,
+                        message: error && error.message
+                    });
                     self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                     callback && callback(null);
                 } finally {
@@ -1393,6 +1463,12 @@ export default {
         },
         FormSet(fieldName, value, field) {
             var self = this;
+            formTrace("diy-form:form-set", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                field: fieldName,
+                component: field && field.Component,
+                valueType: Array.isArray(value) ? "array" : typeof value
+            });
             self.FormDiyTableModel[fieldName] = value;
             try {
                 // self.$refs['ref_' + fieldName].trigger('change');

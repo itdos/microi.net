@@ -79,15 +79,14 @@ export default {
     },
     computed: {
         sliderConfig() {
-            if (!this.field.Config) this.field.Config = {};
-            if (!this.field.Config.Slider) this.field.Config.Slider = {};
+            var config = this.field && this.field.Config && this.field.Config.Slider ? this.field.Config.Slider : {};
             return {
-                Min: Number(this.field.Config.Slider.Min ?? 0),
-                Max: Number(this.field.Config.Slider.Max ?? 100),
-                Step: Number(this.field.Config.Slider.Step ?? 1),
-                Range: this.field.Config.Slider.Range === true,
-                ShowInput: this.field.Config.Slider.ShowInput === true,
-                ShowStops: this.field.Config.Slider.ShowStops === true
+                Min: Number(config.Min ?? 0),
+                Max: Number(config.Max ?? 100),
+                Step: Number(config.Step ?? 1),
+                Range: config.Range === true,
+                ShowInput: config.ShowInput === true,
+                ShowStops: config.ShowStops === true
             };
         }
     },
@@ -138,6 +137,7 @@ export default {
             this.configDialogVisible = true;
         },
         saveConfig() {
+            if (!this.field.Config) this.field.Config = {};
             this.field.Config.Slider = { ...this.configForm };
             this.configDialogVisible = false;
             this.DiyCommon.Tips("配置已保存", true);

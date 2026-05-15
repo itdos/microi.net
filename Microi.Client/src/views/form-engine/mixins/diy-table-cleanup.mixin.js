@@ -46,6 +46,11 @@ beforeUnmount() {
             clearTimeout(self._debounceTimer);
             self._debounceTimer = null;
         }
+        if (self._openFormDialogTimer) {
+            try { clearTimeout(self._openFormDialogTimer); } catch (e) {}
+            self._openFormDialogTimer = null;
+        }
+        self._openFormDialogToken = (self._openFormDialogToken || 0) + 1;
 
         // ========== 2. 关闭所有弹窗和抽屉 ==========
         self.ShowImport = false;

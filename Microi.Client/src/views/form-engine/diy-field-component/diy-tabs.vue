@@ -291,12 +291,19 @@ const getDefaultActiveKey = () => {
     return (firstEnabled || paneList[0]).Key;
 };
 
+const getRuntimeActiveKey = () => {
+    return props.field && props.field._fieldTabsActiveKey ? String(props.field._fieldTabsActiveKey) : "";
+};
+
 const activeKey = ref("");
 
 watch(
     () => props.field && props.field._fieldTabsActiveKey,
     () => {
-        activeKey.value = getDefaultActiveKey();
+        var nextKey = getDefaultActiveKey();
+        if (activeKey.value !== nextKey) {
+            activeKey.value = nextKey;
+        }
     },
     { immediate: true }
 );
@@ -304,9 +311,12 @@ watch(
 watch(
     panes,
     () => {
-        activeKey.value = getDefaultActiveKey();
+        var nextKey = getDefaultActiveKey();
+        if (activeKey.value !== nextKey) {
+            activeKey.value = nextKey;
+        }
     },
-    { deep: true }
+    { deep: true, flush: "post" }
 );
 
 const getPaneCount = (pane) => {
@@ -315,8 +325,13 @@ const getPaneCount = (pane) => {
 };
 
 const handleTabChange = (key) => {
-    activeKey.value = String(key || "");
-    emit("CallbackFieldTabsChange", props.field, activeKey.value);
+    var nextKey = String(key || "");
+    if (!nextKey) return;
+    activeKey.value = nextKey;
+    if (nextKey === getRuntimeActiveKey()) {
+        return;
+    }
+    emit("CallbackFieldTabsChange", props.field, nextKey);
 };
 
 const configDialogVisible = ref(false);
@@ -435,7 +450,7 @@ const saveConfig = () => {
     };
     configForm.value.DefaultActiveKey = active;
     activeKey.value = active;
-    emit("CallbackFieldTabsChange", props.field, active);
+    emit("CallbackFieldTabsChange", props.field, active, { force: true });
     configDialogVisible.value = false;
     DiyCommon.Tips("配置已保存", true);
 };

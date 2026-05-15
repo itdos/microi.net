@@ -68,13 +68,12 @@ export default {
     },
     computed: {
         transferConfig() {
-            if (!this.field.Config) this.field.Config = {};
-            if (!this.field.Config.Transfer) this.field.Config.Transfer = {};
+            var config = this.field && this.field.Config && this.field.Config.Transfer ? this.field.Config.Transfer : {};
             return {
-                LeftTitle: this.field.Config.Transfer.LeftTitle || "可选项",
-                RightTitle: this.field.Config.Transfer.RightTitle || "已选项",
-                Filterable: this.field.Config.Transfer.Filterable !== false,
-                Options: Array.isArray(this.field.Config.Transfer.Options) ? this.field.Config.Transfer.Options : []
+                LeftTitle: config.LeftTitle || "可选项",
+                RightTitle: config.RightTitle || "已选项",
+                Filterable: config.Filterable !== false,
+                Options: Array.isArray(config.Options) ? config.Options : []
             };
         },
         transferData() {
@@ -142,6 +141,7 @@ export default {
             this.configDialogVisible = true;
         },
         saveConfig() {
+            if (!this.field.Config) this.field.Config = {};
             var options = this.configForm.OptionsText.split("\n").map((line) => {
                 var value = line.trim();
                 if (!value) return null;
