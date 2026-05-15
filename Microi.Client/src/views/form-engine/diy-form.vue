@@ -196,7 +196,7 @@
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
-                                           <!-- {{GetFieldComponent(field)}}{{FormDiyTableModel[field.Name]}}{{field.Name}} -->
+                                           <!-- {{field.Component}} -->
                                             <component
                                                 :is="GetFieldComponent(field)"
                                                 :ref="'ref_' + field.Name"
@@ -1108,7 +1108,7 @@ export default {
                             self.FieldActiveTab = self.GetShowTabs()[0].Id || self.GetShowTabs()[0].Name;
                         }
                     });
-                    console.log('准备传入表数据 - GetAllData:', self.DiyTableModel );
+                    // console.log('准备传入表数据 - GetAllData:', self.DiyTableModel );
 
                     self.$emit("CallbackSetDiyTableModel", self.DiyTableModel);
 

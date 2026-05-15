@@ -246,6 +246,7 @@ IsPermission(type) {
             return false;
         },
         async RunMoreBtn(btn, row, v8) {
+          // console.log("RunMoreBtn",btn, row, v8);
             var self = this;
             self.BtnV8Loading = true;
             var V8 = v8 ? v8 : await self.DiyCommon.InitV8Code({}, self.$router);;
