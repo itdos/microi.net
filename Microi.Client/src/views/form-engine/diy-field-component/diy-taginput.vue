@@ -69,9 +69,7 @@ export default {
     },
     computed: {
         tagConfig() {
-            if (!this.field.Config) this.field.Config = {};
-            if (!this.field.Config.TagInput) this.field.Config.TagInput = {};
-            return this.field.Config.TagInput;
+            return this.field && this.field.Config && this.field.Config.TagInput ? this.field.Config.TagInput : {};
         },
         optionList() {
             var list = Array.isArray(this.tagConfig.Options) ? this.tagConfig.Options : [];
@@ -137,6 +135,7 @@ export default {
             this.configDialogVisible = true;
         },
         saveConfig() {
+            if (!this.field.Config) this.field.Config = {};
             this.field.Config.TagInput = {
                 Placeholder: this.configForm.Placeholder,
                 Options: this.configForm.OptionsText.split("\n").map((item) => item.trim()).filter((item) => item),

@@ -1,3 +1,5 @@
+import { formTrace, isAdvancedFieldLayoutRuntimeEnabled } from "@/utils/form-engine-trace.js";
+
 export default {
     watch: {
         ShowHideField() {
@@ -157,13 +159,50 @@ export default {
             if (typeof self.RefreshDiyFieldRuntimeState !== "function") {
                 return;
             }
+            if (self._runtimeRefreshScheduled) {
+                formTrace("runtime:schedule-skip", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    loadMode: self.LoadMode
+                });
+                return;
+            }
+            self._runtimeRefreshScheduled = true;
+            formTrace("runtime:schedule", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                loadMode: self.LoadMode
+            });
             self.$nextTick(function () {
+                self._runtimeRefreshScheduled = false;
+                if (self._isDestroyed) {
+                    formTrace("runtime:schedule-cancel-destroyed", {
+                        table: self.DiyTableModel && self.DiyTableModel.Name
+                    });
+                    return;
+                }
                 self.RefreshDiyFieldRuntimeState();
             });
         },
+        IsSameFieldRuntimeValue(key, oldValue, newValue) {
+            if (oldValue === newValue) return true;
+            if (key === "_fieldTabsPanes" && Array.isArray(oldValue) && Array.isArray(newValue)) {
+                if (oldValue.length !== newValue.length) return false;
+                try {
+                    return JSON.stringify(oldValue) === JSON.stringify(newValue);
+                } catch (e) {
+                    return false;
+                }
+            }
+            return false;
+        },
         SetFieldRuntimeValue(field, key, value) {
-            if (field && field[key] !== value) {
+            if (field && !this.IsSameFieldRuntimeValue(key, field[key], value)) {
                 field[key] = value;
+            }
+        },
+        SetFieldRuntimeValueOnce(field, key, value) {
+            if (!field) return;
+            if (field[key] === undefined || field[key] === null || field[key] === "") {
+                this.SetFieldRuntimeValue(field, key, value);
             }
         },
         GetBaseFieldIsShow(field) {
@@ -210,22 +249,103 @@ export default {
             self.SetFieldRuntimeValue(field, '_class', fieldClass);
             self.SetFieldRuntimeValue(field, '_activeClass', fieldClass + ' active-field');
         },
+        ShouldUseAdvancedFieldLayoutRuntime() {
+            var enabled = isAdvancedFieldLayoutRuntimeEnabled();
+            if (!enabled && !this._advancedFieldLayoutRuntimeDisabledLogged) {
+                this._advancedFieldLayoutRuntimeDisabledLogged = true;
+                formTrace("runtime:advanced-layout-disabled", {
+                    table: this.DiyTableModel && this.DiyTableModel.Name,
+                    tableId: this.DiyTableModel && this.DiyTableModel.Id,
+                    loadMode: this.LoadMode
+                });
+            }
+            if (enabled) {
+                formTrace("runtime:advanced-layout-enabled", {
+                    table: this.DiyTableModel && this.DiyTableModel.Name,
+                    loadMode: this.LoadMode
+                });
+            }
+            return enabled;
+        },
+        ResetAdvancedFieldLayoutRuntime(fields) {
+            var self = this;
+            if (!Array.isArray(fields)) return;
+            formTrace("runtime:reset-advanced-layout", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                loadMode: self.LoadMode,
+                fieldCount: fields.length,
+                collapseCount: fields.filter((field) => field && field.Component === "CollapseGroup").length,
+                tabsCount: fields.filter((field) => field && field.Component === "Tabs").length
+            });
+            fields.forEach((field) => {
+                if (!field || typeof field !== "object") return;
+                self.SetFieldRuntimeValue(field, "_collapseHidden", false);
+                self.SetFieldRuntimeValue(field, "_collapsedByFieldId", "");
+                self.SetFieldRuntimeValue(field, "_collapseChildCount", 0);
+                self.SetFieldRuntimeValue(field, "_collapseCollapsed", false);
+                self.SetFieldRuntimeValue(field, "_collapseGroupTheme", "");
+                self.SetFieldRuntimeValue(field, "_collapseGroupIndex", -1);
+                self.SetFieldRuntimeValue(field, "_collapseGroupChildIndex", -1);
+                self.SetFieldRuntimeValue(field, "_collapseStateKey", "");
+                self.SetFieldRuntimeValue(field, "_collapseClass", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
+                self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneKey", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneTitle", "");
+                self.SetFieldRuntimeValue(field, "_fieldTabsPaneIndex", -1);
+                self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", 0);
+                self.SetFieldRuntimeValue(field, "_fieldTabsPanes", []);
+                self.SetFieldRuntimeValue(field, "_isShow", field._baseIsShow !== false);
+            });
+        },
         RefreshDiyFieldRuntimeState(tabKey) {
             var self = this;
+            if (self._runtimeRefreshing) {
+                formTrace("runtime:refresh-skip-reentry", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    tabKey: tabKey
+                });
+                return;
+            }
             if (!Array.isArray(self.DiyFieldList) || self.DiyFieldList.length === 0) {
+                formTrace("runtime:refresh-skip-empty", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    tabKey: tabKey
+                });
                 return;
             }
 
-            self.DiyFieldList.forEach((field) => {
-                self.ApplyBaseFieldRuntimeState(field);
-            });
+            self._runtimeRefreshing = true;
+            try {
+                formTrace("runtime:refresh-start", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    tableId: self.DiyTableModel && self.DiyTableModel.Id,
+                    loadMode: self.LoadMode,
+                    tabKey: tabKey,
+                    fieldCount: self.DiyFieldList.length
+                });
+                self.DiyFieldList.forEach((field) => {
+                    self.ApplyBaseFieldRuntimeState(field);
+                });
 
-            var grouped = self.DiyFieldListGrouped || {};
-            Object.keys(grouped).forEach((key) => {
-                if (tabKey && key !== tabKey) return;
-                self.ApplyCollapseGroupState(grouped[key], key);
-                self.ApplyFieldTabsState(grouped[key], key);
-            });
+                var grouped = self.DiyFieldListGrouped || {};
+                Object.keys(grouped).forEach((key) => {
+                    if (tabKey && key !== tabKey) return;
+                    if (self.ShouldUseAdvancedFieldLayoutRuntime()) {
+                        self.ApplyCollapseGroupState(grouped[key], key);
+                        self.ApplyFieldTabsState(grouped[key], key);
+                    } else {
+                        self.ResetAdvancedFieldLayoutRuntime(grouped[key]);
+                    }
+                });
+                formTrace("runtime:refresh-end", {
+                    table: self.DiyTableModel && self.DiyTableModel.Name,
+                    tabKey: tabKey
+                });
+            } finally {
+                self._runtimeRefreshing = false;
+            }
         },
         GetCollapseStateKey(field, tabKey, index) {
             return field.Id || field.Name || (tabKey + "_" + index);
@@ -238,6 +358,11 @@ export default {
             if (!Array.isArray(fields) || fields.length === 0) {
                 return fields;
             }
+            formTrace("runtime:collapse-start", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                tabKey: tabKey,
+                fieldCount: fields.length
+            });
 
             var metaMap = new Map();
             fields.forEach((field) => {
@@ -273,6 +398,11 @@ export default {
                 Object.keys(meta).forEach((key) => {
                     self.SetFieldRuntimeValue(field, key, meta[key]);
                 });
+            });
+
+            formTrace("runtime:collapse-end", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                tabKey: tabKey
             });
 
             return fields;
@@ -459,22 +589,34 @@ export default {
             if (!Array.isArray(fields) || fields.length === 0) {
                 return fields;
             }
+            formTrace("runtime:tabs-start", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                tabKey: tabKey,
+                fieldCount: fields.length
+            });
 
             fields.forEach((field) => {
                 if (!field || typeof field !== "object") return;
                 self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
-                self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", "");
-                self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", "");
                 self.SetFieldRuntimeValue(field, "_fieldTabsPaneKey", "");
                 self.SetFieldRuntimeValue(field, "_fieldTabsPaneTitle", "");
                 self.SetFieldRuntimeValue(field, "_fieldTabsPaneIndex", -1);
-                self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", 0);
-                self.SetFieldRuntimeValue(field, "_fieldTabsPanes", []);
+                if (field.Component !== "Tabs") {
+                    self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", "");
+                    self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", "");
+                    self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", 0);
+                    self.SetFieldRuntimeValue(field, "_fieldTabsPanes", []);
+                }
             });
 
             fields.forEach((field, index) => {
                 if (!field || field.Component !== "Tabs") return;
                 self.ApplyFieldTabsVisualState(fields, index, tabKey);
+            });
+
+            formTrace("runtime:tabs-end", {
+                table: self.DiyTableModel && self.DiyTableModel.Name,
+                tabKey: tabKey
             });
 
             return fields;
@@ -576,9 +718,9 @@ export default {
 
             self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
             self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", stateKey);
-            self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", activeKey);
+            self.SetFieldRuntimeValueOnce(field, "_fieldTabsActiveKey", activeKey);
             self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", totalChildCount);
-            self.SetFieldRuntimeValue(field, "_fieldTabsPanes", runtimePanes);
+            self.SetFieldRuntimeValueOnce(field, "_fieldTabsPanes", runtimePanes);
             self.AppendFieldRuntimeClass(field, "field-tabs-header field-tabs-theme-" + theme);
         },
         ApplyFieldTabsRowClasses(visibleChildFields) {
@@ -628,13 +770,15 @@ export default {
                 });
             });
         },
-        handleGroupCollapseChange(field, collapsed) {
+        handleGroupCollapseChange(field, collapsed, options) {
             var self = this;
+            if (!self.ShouldUseAdvancedFieldLayoutRuntime()) {
+                return;
+            }
             if (!field) return;
             var stateKey = field._collapseStateKey || field.Id || field.Name;
             if (!stateKey) return;
-            if (self.CollapseGroupState && self.CollapseGroupState[stateKey] === collapsed) {
-                self.RefreshDiyFieldRuntimeState();
+            if (self.CollapseGroupState && self.CollapseGroupState[stateKey] === collapsed && !(options && options.force === true)) {
                 return;
             }
             self.CollapseGroupState = Object.assign({}, self.CollapseGroupState, {
@@ -642,13 +786,15 @@ export default {
             });
             self.RefreshDiyFieldRuntimeState();
         },
-        handleFieldTabsChange(field, activeKey) {
+        handleFieldTabsChange(field, activeKey, options) {
             var self = this;
+            if (!self.ShouldUseAdvancedFieldLayoutRuntime()) {
+                return;
+            }
             if (!field) return;
             var stateKey = field._fieldTabsStateKey || field.Id || field.Name;
             if (!stateKey) return;
-            if (self.FieldTabsState && self.FieldTabsState[stateKey] === activeKey) {
-                self.RefreshDiyFieldRuntimeState();
+            if (self.FieldTabsState && self.FieldTabsState[stateKey] === activeKey && !(options && options.force === true)) {
                 return;
             }
             self.FieldTabsState = Object.assign({}, self.FieldTabsState, {
@@ -743,6 +889,9 @@ export default {
             _isDestroyed: false,
             // 用于存储需要清理的 watcher 取消函数
             _unwatchCallbacks: [],
+            _runtimeRefreshScheduled: false,
+            _runtimeRefreshing: false,
+            _advancedFieldLayoutRuntimeDisabledLogged: false,
             // 字段操作工具栏状态
             fieldToolbarVisible: false,
             fieldToolbarPosition: { top: 0, left: 0 },

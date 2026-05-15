@@ -211,6 +211,8 @@
     .collapse-group-row-first {
         border-top: 1px solid var(--collapse-group-border);
         padding-top: 8px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
     }
 
     .collapse-group-row-last {
