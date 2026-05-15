@@ -5,6 +5,7 @@ import router, { resetRouter } from "@/router";
 import { DiyApi, DiyCommon } from "@/utils/microi.net.import";
 import { useTagsViewStore } from "./tagsView";
 import { usePermissionStore } from "./permission";
+import { useDiyStore } from "./diy";
 
 export const useUserStore = defineStore("user", {
     state: () => ({
@@ -63,6 +64,14 @@ export const useUserStore = defineStore("user", {
                 DiyCommon.removeToken();
                 resetRouter();
 
+                const permissionStore = usePermissionStore();
+                permissionStore.resetRoutes();
+
+                const diyStore = useDiyStore();
+                diyStore.setCurrentUser({});
+                diyStore.removeToken();
+                diyStore.setTokenExpires("");
+
                 // reset visited views and cached views
                 const tagsViewStore = useTagsViewStore();
                 tagsViewStore.delAllViews();
@@ -79,6 +88,14 @@ export const useUserStore = defineStore("user", {
                 removeToken();
                 DiyCommon.removeToken();
                 resetRouter();
+
+                const permissionStore = usePermissionStore();
+                permissionStore.resetRoutes();
+
+                const diyStore = useDiyStore();
+                diyStore.setCurrentUser({});
+                diyStore.removeToken();
+                diyStore.setTokenExpires("");
                 resolve();
             });
         },

@@ -89,6 +89,21 @@ export const constantRoutes = [
         ]
     }
 ];
+
+function collectRouteNames(routes, names = new Set()) {
+    routes.forEach((routeItem) => {
+        if (routeItem && routeItem.name) {
+            names.add(routeItem.name);
+        }
+        if (routeItem && Array.isArray(routeItem.children)) {
+            collectRouteNames(routeItem.children, names);
+        }
+    });
+    return names;
+}
+
+const constantRouteNames = collectRouteNames(constantRoutes);
+
 export const asyncRoutes = [
     {
         path: "/diy/diy-design/:Id",
@@ -443,16 +458,12 @@ function addPluginRoutes() {
     console.log("插件路由已加载:", pluginRoutes.length, "个路由");
 }
 export function resetRouter() {
-    // Vue Router 4: 移除所有动态添加的路由
+    // Vue Router 4: 只移除动态添加的路由，保留 /mobile/* 等常量子路由
     const routeNames = router.getRoutes().map((route) => route.name);
     routeNames.forEach((name) => {
-        if (name) {
+        if (name && !constantRouteNames.has(name)) {
             router.removeRoute(name);
         }
-    });
-    // 重新添加基础路由
-    constantRoutes.forEach((route) => {
-        router.addRoute(route);
     });
     //清除asyncRoutes by itdos.com
     for (let index = 0; index < asyncRoutes.length; index++) {
