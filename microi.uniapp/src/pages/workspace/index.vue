@@ -88,7 +88,8 @@
               </view>
               <text class="grid-name">{{ child.meta && child.meta.title || child.name || '' }}</text>
               <view class="has-sub-badge" v-if="child.children && getVisibleChildren(child.children).length > 0">
-                <text>⟩</text>
+			    <!-- 隐藏掉箭头 -->
+                <!-- <text>⟩</text> -->
               </view>
             </view>
           </view>
