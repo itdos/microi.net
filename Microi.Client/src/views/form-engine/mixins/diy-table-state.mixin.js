@@ -300,10 +300,7 @@ export default {
         ShowSelectLabel: function () {
             var self = this;
             return (scope, field) => {
-                let labelName = self.GetColValue(scope, field);
-                let obj = field.Data?.find((item) => item[field.Config.SelectSaveField] == labelName);
-                if (obj) labelName = obj[field.Config.SelectLabel];
-                return labelName;
+                return self.GetColValue(scope, field);
             };
         },
         GetSearchFieldList: function () {

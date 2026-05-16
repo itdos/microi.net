@@ -168,20 +168,62 @@ export default {
             innerActiveTab: this.modelValue || "WorkFlow"
         };
     },
-    watch: {
-        modelValue(v) {
-            this.innerActiveTab = v;
+    computed: {
+        availableTabs() {
+            var tabs = [];
+            if (this.openDiyFormWorkFlow) tabs.push("WorkFlow");
+            if (this.enableDataLog) tabs.push("DataLog");
+            if (this.enableDataComment) tabs.push("DataComment");
+            return tabs;
         }
     },
+    watch: {
+        modelValue(tabName) {
+            this.SetActiveTab(tabName, true);
+        },
+        openDiyFormWorkFlow() {
+            this.EnsureActiveTab();
+        },
+        enableDataLog() {
+            this.EnsureActiveTab();
+        },
+        enableDataComment() {
+            this.EnsureActiveTab();
+        }
+    },
+    mounted() {
+        this.EnsureActiveTab();
+    },
     methods: {
-        OnTabChange(v) {
-            this.$emit("update:modelValue", v);
-            // 切换 Tab 时懒加载：若列表为空且未在加载中，请求父组件重新获取。
-            if (v === "DataLog" && !this.dataLogListLoading && (!this.dataLogList || this.dataLogList.length === 0)) {
+        GetFirstAvailableTab() {
+            return this.availableTabs.length > 0 ? this.availableTabs[0] : "";
+        },
+        GetAvailableTab(tabName) {
+            if (tabName && this.availableTabs.indexOf(tabName) > -1) return tabName;
+            return this.GetFirstAvailableTab();
+        },
+        EnsureActiveTab() {
+            this.SetActiveTab(this.innerActiveTab || this.modelValue, true);
+        },
+        SetActiveTab(tabName, shouldEmit) {
+            var nextTab = this.GetAvailableTab(tabName);
+            if (this.innerActiveTab !== nextTab) {
+                this.innerActiveTab = nextTab;
+            }
+            if (shouldEmit !== false && this.modelValue !== nextTab) {
+                this.$emit("update:modelValue", nextTab);
+            }
+            this.RefreshActiveTabData(nextTab);
+        },
+        RefreshActiveTabData(tabName) {
+            if (tabName === "DataLog" && !this.dataLogListLoading && (!this.dataLogList || this.dataLogList.length === 0)) {
                 this.$emit("refresh-data-log");
-            } else if (v === "DataComment" && !this.dataCommentListLoading && (!this.dataCommentList || this.dataCommentList.length === 0)) {
+            } else if (tabName === "DataComment" && !this.dataCommentListLoading && (!this.dataCommentList || this.dataCommentList.length === 0)) {
                 this.$emit("refresh-data-comment");
             }
+        },
+        OnTabChange(tabName) {
+            this.SetActiveTab(tabName, true);
         },
         OnRefreshDataLog() {
             this.$emit("refresh-data-log");
