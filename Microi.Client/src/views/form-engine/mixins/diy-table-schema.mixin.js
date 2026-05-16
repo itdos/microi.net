@@ -278,13 +278,276 @@ export default {
             }
             return "column-" + field.Name;
         },
+        _GetTableFieldKey(field) {
+            return this.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+        },
+        _GetTableFieldRawValue(scope, field) {
+            var row = scope && scope.row ? scope.row : {};
+            return row[this._GetTableFieldKey(field)];
+        },
+        _EnsureTableFieldConfig(field) {
+            var self = this;
+            if (self.DiyCommon.IsNull(field.Config)) {
+                field.Config = {};
+            }
+            if (typeof field.Config === "string") {
+                try {
+                    field.Config = JSON.parse(field.Config);
+                } catch (error) {
+                    field.Config = {};
+                }
+            }
+            return field.Config || {};
+        },
+        _IsBlankDisplayValue(value) {
+            return value === undefined || value === null || value === "";
+        },
+        _ParseMaybeJsonForDisplay(value) {
+            if (typeof value !== "string") return value;
+            var trimmed = value.trim();
+            if (!trimmed) return value;
+            var firstChar = trimmed.charAt(0);
+            var lastChar = trimmed.charAt(trimmed.length - 1);
+            if ((firstChar === "[" && lastChar === "]") || (firstChar === "{" && lastChar === "}") || (firstChar === '"' && lastChar === '"')) {
+                try {
+                    return JSON.parse(trimmed);
+                } catch (error) {}
+            }
+            return value;
+        },
+        _DisplayValueToString(value) {
+            var self = this;
+            if (self._IsBlankDisplayValue(value)) return "";
+            if (Array.isArray(value)) {
+                return value.map(function (item) {
+                    return self._DisplayValueToString(item);
+                }).filter(function (item) {
+                    return !self._IsBlankDisplayValue(item);
+                }).join(",");
+            }
+            if (typeof value === "object") {
+                var fallback = self._GetObjectDisplayValue(value, {}, ["Label", "label", "Name", "name", "Text", "text", "Value", "value", "Key", "key", "Id", "id"]);
+                if (!self._IsBlankDisplayValue(fallback)) return String(fallback);
+                try {
+                    return JSON.stringify(value);
+                } catch (error) {
+                    return "";
+                }
+            }
+            return String(value);
+        },
+        _GetUniqueDisplayKeys(keys) {
+            var result = [];
+            keys.forEach(function (key) {
+                if (key && result.indexOf(key) === -1) {
+                    result.push(key);
+                }
+            });
+            return result;
+        },
+        _GetObjectDisplayValue(item, field, keys) {
+            var self = this;
+            if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+            var cfg = field && field.Config ? field.Config : {};
+            var keyList = self._GetUniqueDisplayKeys(keys || [cfg.SelectLabel, cfg.SelectSaveField, "Value", "value", "Label", "label", "Name", "name", "Text", "text", "Key", "key", "Id", "id"]);
+            for (var keyIndex = 0; keyIndex < keyList.length; keyIndex++) {
+                var key = keyList[keyIndex];
+                if (!self._IsBlankDisplayValue(item[key])) {
+                    return item[key];
+                }
+            }
+            return null;
+        },
+        _GetOptionValueCandidates(item, field) {
+            var self = this;
+            if (self._IsBlankDisplayValue(item)) return [];
+            if (typeof item !== "object" || Array.isArray(item)) return [item];
+            var cfg = field && field.Config ? field.Config : {};
+            var keys = self._GetUniqueDisplayKeys([cfg.SelectSaveField, "Key", "key", "Value", "value", "Id", "id", cfg.SelectLabel, "Name", "name", "Label", "label", "Text", "text"]);
+            var result = [];
+            keys.forEach(function (key) {
+                if (!self._IsBlankDisplayValue(item[key]) && result.indexOf(item[key]) === -1) {
+                    result.push(item[key]);
+                }
+            });
+            return result;
+        },
+        _GetOptionLabelForDisplay(item, field) {
+            var self = this;
+            if (self._IsBlankDisplayValue(item)) return "";
+            if (typeof item !== "object" || Array.isArray(item)) return item;
+            var cfg = field && field.Config ? field.Config : {};
+            var label = self._GetObjectDisplayValue(item, field, [cfg.SelectLabel, "Value", "value", "Label", "label", "Name", "name", "Text", "text", cfg.SelectSaveField, "Key", "key", "Id", "id"]);
+            return self._IsBlankDisplayValue(label) ? "" : label;
+        },
+        _DisplayValueEquals(leftValue, rightValue) {
+            if (this._IsBlankDisplayValue(leftValue) || this._IsBlankDisplayValue(rightValue)) return false;
+            return leftValue == rightValue || String(leftValue) === String(rightValue);
+        },
+        _FindOptionForDisplay(value, field) {
+            var self = this;
+            var options = Array.isArray(field.Data) ? field.Data : [];
+            if (options.length === 0) return null;
+            var valueCandidates = self._GetOptionValueCandidates(value, field);
+            for (var optionIndex = 0; optionIndex < options.length; optionIndex++) {
+                var option = options[optionIndex];
+                var optionCandidates = self._GetOptionValueCandidates(option, field);
+                for (var valueIndex = 0; valueIndex < valueCandidates.length; valueIndex++) {
+                    for (var candidateIndex = 0; candidateIndex < optionCandidates.length; candidateIndex++) {
+                        if (self._DisplayValueEquals(valueCandidates[valueIndex], optionCandidates[candidateIndex])) {
+                            return option;
+                        }
+                    }
+                }
+            }
+            return null;
+        },
+        _NormalizeMultiDisplayValue(value, field) {
+            var self = this;
+            var parsedValue = self._ParseMaybeJsonForDisplay(value);
+            if (Array.isArray(parsedValue)) return parsedValue;
+            if ((field.Component === "MultipleSelect" || field.Component === "Checkbox" || field.Component === "Transfer") && typeof parsedValue === "string" && parsedValue.indexOf(",") > -1) {
+                return parsedValue.split(",").map(function (item) {
+                    return item.trim();
+                }).filter(function (item) {
+                    return !self._IsBlankDisplayValue(item);
+                });
+            }
+            return self._IsBlankDisplayValue(parsedValue) ? [] : [parsedValue];
+        },
+        _IsOptionDisplayField(field) {
+            return ["Select", "MultipleSelect", "Radio", "Checkbox", "Autocomplete"].indexOf(field.Component) > -1;
+        },
+        _IsTreeOptionDisplayField(field) {
+            return ["Cascader", "SelectTree"].indexOf(field.Component) > -1;
+        },
+        _FormatOptionDisplayValue(value, field, isArrayItem) {
+            var self = this;
+            var cfg = field.Config || {};
+            var parsedValue = self._ParseMaybeJsonForDisplay(value);
+            if (self._IsBlankDisplayValue(parsedValue)) return "";
+            if (!isArrayItem && (Array.isArray(parsedValue) || field.Component === "MultipleSelect" || field.Component === "Checkbox")) {
+                return self._NormalizeMultiDisplayValue(parsedValue, field).map(function (item) {
+                    return self._FormatOptionDisplayValue(item, field, true);
+                }).filter(function (item) {
+                    return !self._IsBlankDisplayValue(item);
+                }).join(",");
+            }
+            if (typeof parsedValue === "object") {
+                var objectLabel = self._GetObjectDisplayValue(parsedValue, field, [cfg.SelectLabel, "Value", "value", "Label", "label", "Name", "name", "Text", "text"]);
+                if (!self._IsBlankDisplayValue(objectLabel)) return self._DisplayValueToString(objectLabel);
+                var matchedByObject = self._FindOptionForDisplay(parsedValue, field);
+                if (matchedByObject) return self._DisplayValueToString(self._GetOptionLabelForDisplay(matchedByObject, field));
+                return self._DisplayValueToString(self._GetObjectDisplayValue(parsedValue, field, [cfg.SelectSaveField, "Key", "key", "Value", "value", "Id", "id", "Name", "name"]) || parsedValue);
+            }
+            var matchedOption = self._FindOptionForDisplay(parsedValue, field);
+            if (matchedOption) return self._DisplayValueToString(self._GetOptionLabelForDisplay(matchedOption, field));
+            return self._DisplayValueToString(parsedValue);
+        },
+        _GetTreeChildrenForDisplay(node, field) {
+            var cfg = field.Config || {};
+            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (cfg.SelectTree || {});
+            var keys = this._GetUniqueDisplayKeys([treeCfg.Children, "_Child", "children", "Children"]);
+            for (var keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+                if (Array.isArray(node[keys[keyIndex]])) return node[keys[keyIndex]];
+            }
+            return [];
+        },
+        _FindTreeOptionForDisplay(value, field) {
+            var self = this;
+            var treeData = Array.isArray(field.Data) ? field.Data : [];
+            var valueCandidates = self._GetOptionValueCandidates(value, field);
+            var visit = function (nodes) {
+                for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+                    var node = nodes[nodeIndex];
+                    var nodeCandidates = self._GetOptionValueCandidates(node, field);
+                    for (var valueIndex = 0; valueIndex < valueCandidates.length; valueIndex++) {
+                        for (var candidateIndex = 0; candidateIndex < nodeCandidates.length; candidateIndex++) {
+                            if (self._DisplayValueEquals(valueCandidates[valueIndex], nodeCandidates[candidateIndex])) {
+                                return node;
+                            }
+                        }
+                    }
+                    var matchedChild = visit(self._GetTreeChildrenForDisplay(node, field));
+                    if (matchedChild) return matchedChild;
+                }
+                return null;
+            };
+            return visit(treeData);
+        },
+        _FormatSingleTreeDisplayValue(value, field) {
+            var self = this;
+            if (self._IsBlankDisplayValue(value)) return "";
+            if (typeof value === "object" && !Array.isArray(value)) {
+                var directLabel = self._GetOptionLabelForDisplay(value, field);
+                if (!self._IsBlankDisplayValue(directLabel)) return self._DisplayValueToString(directLabel);
+            }
+            var matchedNode = self._FindTreeOptionForDisplay(value, field);
+            if (matchedNode) return self._DisplayValueToString(self._GetOptionLabelForDisplay(matchedNode, field));
+            return self._DisplayValueToString(value);
+        },
+        _FormatTreePathDisplayValue(pathValue, field) {
+            var self = this;
+            if (Array.isArray(pathValue)) {
+                return pathValue.map(function (item) {
+                    return self._FormatSingleTreeDisplayValue(item, field);
+                }).filter(function (item) {
+                    return !self._IsBlankDisplayValue(item);
+                }).join("/");
+            }
+            return self._FormatSingleTreeDisplayValue(pathValue, field);
+        },
+        _FormatTreeOptionDisplayValue(value, field) {
+            var self = this;
+            var cfg = field.Config || {};
+            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (cfg.SelectTree || {});
+            var parsedValue = self._ParseMaybeJsonForDisplay(value);
+            if (self._IsBlankDisplayValue(parsedValue)) return "";
+            if (Array.isArray(parsedValue)) {
+                if (parsedValue.length === 0) return "";
+                var hasNestedPath = parsedValue.some(function (item) { return Array.isArray(item); });
+                if (hasNestedPath) {
+                    return parsedValue.map(function (pathValue) {
+                        return self._FormatTreePathDisplayValue(pathValue, field);
+                    }).filter(function (item) {
+                        return !self._IsBlankDisplayValue(item);
+                    }).join(",");
+                }
+                if (field.Component === "Cascader" && treeCfg.EmitPath !== false) {
+                    return self._FormatTreePathDisplayValue(parsedValue, field);
+                }
+                return parsedValue.map(function (item) {
+                    return self._FormatSingleTreeDisplayValue(item, field);
+                }).filter(function (item) {
+                    return !self._IsBlankDisplayValue(item);
+                }).join(",");
+            }
+            return self._FormatSingleTreeDisplayValue(parsedValue, field);
+        },
+        _FormatTransferDisplayValue(value, field) {
+            var self = this;
+            var cfg = field.Config || {};
+            var transferConfig = cfg.Transfer || {};
+            var options = Array.isArray(transferConfig.Options) ? transferConfig.Options : [];
+            var values = self._NormalizeMultiDisplayValue(value, { Component: "Transfer" });
+            return values.map(function (item) {
+                var matchedOption = options.find(function (option, optionIndex) {
+                    var optionKey = typeof option === "string" ? option : (option.Key || option.key || option.Value || option.value || String(optionIndex));
+                    return self._DisplayValueEquals(item, optionKey);
+                });
+                if (!matchedOption) return self._DisplayValueToString(item);
+                if (typeof matchedOption === "string") return matchedOption;
+                return self._DisplayValueToString(matchedOption.Label || matchedOption.label || matchedOption.Value || matchedOption.value || matchedOption.Name || matchedOption.name || item);
+            }).filter(function (item) {
+                return !self._IsBlankDisplayValue(item);
+            }).join(",");
+        },
         GetColValue(scope, field) {
             var self = this;
             var fuheWZ = "";
             var result = "";
-            var displayValue = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
-                ? ""
-                : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
+            var rawValue = self._GetTableFieldRawValue(scope, field);
+            var displayValue = self.DiyCommon.IsNull(rawValue) ? "" : rawValue;
             //如果是地址控件
             if (field.Component == "Address" && displayValue) {
                 try {
@@ -306,56 +569,38 @@ export default {
                 } catch (error) {}
             }
 
-            if (!self.DiyCommon.IsNull(field.Config)) {
-                if (typeof field.Config === "string") {
-                    field.Config = JSON.parse(field.Config);
-                }
-                if (!self.DiyCommon.IsNull(field.Config.TextApend)) {
-                    fuheWZ = " " + field.Config.TextApend;
-                }
+            var cfg = self._EnsureTableFieldConfig(field);
+            if (!self.DiyCommon.IsNull(cfg.TextApend)) {
+                fuheWZ = " " + cfg.TextApend;
+            }
 
-                if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
-                    try {
-                        //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
-                        var tObj = JSON.parse(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]);
-                        if (Array.isArray(tObj)) {
-                            //if (field.Component == 'MultipleSelect')
-                            tObj.forEach((element, index) => {
-                                result += self.DiyCommon.IsNull(element[field.Config.SelectLabel]) ? "" : element[field.Config.SelectLabel];
-                                if (index !== tObj.length - 1) {
-                                    result += ",";
-                                }
-                            });
-                            return result + fuheWZ;
-                        }
-                        //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
-                        else if (typeof tObj == "number") {
-                            result = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
-                                ? ""
-                                : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
-                            return result + fuheWZ;
-                        } else {
-                            result = self.DiyCommon.IsNull(tObj[field.Config.SelectLabel]) ? "" : tObj[field.Config.SelectLabel];
-                            return result + fuheWZ;
-                        }
-                    } catch (error) {
-                        // console.log('Error：GetColValue(scope, field)')
-                        // console.log(error)
-                    }
-                }
+            var formattedValue = null;
+            if (field.Component === "Transfer") {
+                formattedValue = self._FormatTransferDisplayValue(displayValue, field);
+            } else if (self._IsTreeOptionDisplayField(field)) {
+                formattedValue = self._FormatTreeOptionDisplayValue(displayValue, field);
+            } else if (self._IsOptionDisplayField(field) || !self.DiyCommon.IsNull(cfg.SelectLabel) || !self.DiyCommon.IsNull(cfg.SelectSaveField)) {
+                formattedValue = self._FormatOptionDisplayValue(displayValue, field);
+            }
+            if (formattedValue !== null) {
+                result = self._DisplayValueToString(formattedValue);
+                if (result == "[]") return "";
+                return self._IsBlankDisplayValue(result) ? "" : result + fuheWZ;
             }
 
             //如果是富文本，需要去掉html标签
             if (field.Component == "RichText") {
                 displayValue = self.DiyCommon.RemoveHtml(displayValue);
             }else if (field.Component == "ImgUpload" || field.Component == 'FileUpload') {//如果是图片或文件控件
-                if(displayValue.startsWith("{")){
-                    var tempObj = JSON.parse(displayValue);
-                    displayValue = tempObj.Name;
+                if(typeof displayValue === "string" && displayValue.startsWith("{")){
+                    try {
+                        var tempObj = JSON.parse(displayValue);
+                        displayValue = tempObj.Name;
+                    } catch (error) {}
                 }
             }
 
-            result = displayValue; //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
+            result = self._DisplayValueToString(displayValue); //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
             // return result + fuheWZ;
             result = result + fuheWZ;
             if (result == "[]") {

@@ -111,3 +111,4 @@ microi-pay-platform-simple
 AI进销存V3
 dev.log
 .tmp-build
+*.csproj.lscache
