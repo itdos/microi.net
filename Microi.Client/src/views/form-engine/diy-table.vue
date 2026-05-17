@@ -1488,6 +1488,7 @@ export default {
         EnableMultipleSelect: { type: Boolean, default: false },
         // {FieldName1:value , FieldName2:value}
         FormDefaultValues: { type: Object, default: () => ({}) },
+        DataAppend: { type: Object, default: () => ({}) },
         ParentFormLoadFinish: { type: Boolean, default: null },
         /**
          * 加载模式：可能是Design（表单设计）
@@ -1783,6 +1784,7 @@ export default {
             V8.TableId = self.TableId;
             V8.TableName = self.CurrentDiyTableModel.Name;
             V8.TableModel = self.CurrentDiyTableModel;
+            V8.DataAppend = self.DataAppend;
             V8.HideFormBtn = self.CallbackHideFormBtn;
             V8.TableRowSelected = self.TableMultipleSelection;
             V8.SelectedData = self.TableMultipleSelection;

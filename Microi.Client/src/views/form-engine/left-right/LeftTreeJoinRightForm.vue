@@ -13,6 +13,7 @@
                         ref="ref_RightDiyTable"
                         :PropsWhere="whereList"
                         :ParentV8="clickData"
+                        :DataAppend="rightTableDataAppend"
                         v-if="(RightViewType === '表格' || RightViewType === '表单/表格') && ShowRightView"
                     ></DiyTableRowlist>
                 </el-card>
@@ -59,6 +60,7 @@ export default {
             RightViewType: "",
             WhereType: "",
             ShowRightView: true,
+            rightTableDataAppend: {},
             LastClickNode : {},
         };
     },
@@ -148,6 +150,7 @@ export default {
                     Origin: "BomProject",
                     IsAllCategory: true
                 };
+                self.rightTableDataAppend = {};
                 if (self.RightViewType === "表格" || self.RightViewType === "表单/表格") {
                     self.whereList = [];
                 }
@@ -208,6 +211,12 @@ export default {
                     Origin: "BomProject",
                     Id: data.Id,
                     ...data // 传递完整的分类数据，以便右侧新增时可以关联
+                };
+                this.rightTableDataAppend = {
+                    ParentField: this.LeftTreeData.ZibiaoGLZD,
+                    ParentData: data,
+                    ParentValue: data[this.LeftTreeData.FubiaoGLZD],
+                    LeftTreeData: this.LeftTreeData
                 };
 
                 this.whereList = [
