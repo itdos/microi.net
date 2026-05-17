@@ -214,7 +214,7 @@ defineExpose({
     }
 
     &__header {
-        min-height: 42px;
+        min-height: 24px;
         display: flex;
         align-items: center;
         gap: 8px;

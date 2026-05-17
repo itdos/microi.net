@@ -419,7 +419,7 @@ export default {
             return ["Select", "MultipleSelect", "Radio", "Checkbox", "Autocomplete"].indexOf(field.Component) > -1;
         },
         _IsTreeOptionDisplayField(field) {
-            return ["Cascader", "SelectTree"].indexOf(field.Component) > -1;
+            return ["Cascader", "SelectTree", "Department"].indexOf(field.Component) > -1;
         },
         _FormatOptionDisplayValue(value, field, isArrayItem) {
             var self = this;
@@ -446,7 +446,7 @@ export default {
         },
         _GetTreeChildrenForDisplay(node, field) {
             var cfg = field.Config || {};
-            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (cfg.SelectTree || {});
+            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (field.Component === "Department" ? (cfg.Department || {}) : (cfg.SelectTree || {}));
             var keys = this._GetUniqueDisplayKeys([treeCfg.Children, "_Child", "children", "Children"]);
             for (var keyIndex = 0; keyIndex < keys.length; keyIndex++) {
                 if (Array.isArray(node[keys[keyIndex]])) return node[keys[keyIndex]];
@@ -489,6 +489,9 @@ export default {
         _FormatTreePathDisplayValue(pathValue, field) {
             var self = this;
             if (Array.isArray(pathValue)) {
+                if (field.Component === "Department") {
+                    return self._FormatSingleTreeDisplayValue(pathValue[pathValue.length - 1], field);
+                }
                 return pathValue.map(function (item) {
                     return self._FormatSingleTreeDisplayValue(item, field);
                 }).filter(function (item) {
@@ -500,7 +503,7 @@ export default {
         _FormatTreeOptionDisplayValue(value, field) {
             var self = this;
             var cfg = field.Config || {};
-            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (cfg.SelectTree || {});
+            var treeCfg = field.Component === "Cascader" ? (cfg.Cascader || {}) : (field.Component === "Department" ? (cfg.Department || {}) : (cfg.SelectTree || {}));
             var parsedValue = self._ParseMaybeJsonForDisplay(value);
             if (self._IsBlankDisplayValue(parsedValue)) return "";
             if (Array.isArray(parsedValue)) {
@@ -513,7 +516,7 @@ export default {
                         return !self._IsBlankDisplayValue(item);
                     }).join(",");
                 }
-                if (field.Component === "Cascader" && treeCfg.EmitPath !== false) {
+                if ((field.Component === "Cascader" || field.Component === "Department") && treeCfg.EmitPath !== false) {
                     return self._FormatTreePathDisplayValue(parsedValue, field);
                 }
                 return parsedValue.map(function (item) {

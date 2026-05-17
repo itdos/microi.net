@@ -219,6 +219,20 @@
   .reset-search:active {
     opacity: 0.5;
   }
+  .open-table-row-radio {
+    height: 18px;
+    margin-right: 0;
+
+    :deep(.el-radio__label) {
+      display: none;
+      padding-left: 0;
+    }
+  }
+  .card-radio-wrapper {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+  }
   // @media screen and (max-width: 768px) {
   //   :deep(.el-picker__popper.el-date-range-picker) {
   //     width: 90vw !important;

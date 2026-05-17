@@ -308,7 +308,7 @@
                             <fa-icon :icon="item.Icon || 'fas fa-chart-bar'" />
                         </div>
                         <div class="table-report-body">
-                            <div class="table-report-value">{{ item.Value }}</div>
+                            <div class="table-report-value" :title="String(item.Value ?? '')">{{ FormatTableReportValue(item.Value) }}</div>
                             <div class="table-report-label" :title="item.Label">{{ item.Label }}</div>
                         </div>
                     </div>
@@ -439,7 +439,18 @@
                     row-key="Id"
                     :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
                 >
-                    <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
+                    <el-table-column v-if="IsOpenTableSingleSelect()" label="#" width="45" align="center">
+                        <template #default="scope">
+                            <el-radio
+                                class="open-table-row-radio"
+                                :model-value="TableSelectedRow && TableSelectedRow.Id"
+                                :label="scope.row.Id"
+                                @change="selectOpenTableSingleRow(scope.row)"
+                                @click.stop
+                            />
+                        </template>
+                    </el-table-column>
+                    <el-table-column v-else-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
                     <el-table-column
                         type="index"
                         :label="$t('Msg.SerialNo')"
@@ -591,20 +602,7 @@
                                         {{ ShowSelectLabel(scope, field) }}
                                     </template>
                                     <template v-else-if="field.Component == 'Department'">
-                                        <DiyDepartment
-                                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                                            :field="field"
-                                            :FormDiyTableModel="scope.row"
-                                            :FormMode="TableChildFormMode"
-                                            :FieldReadonly="true"
-                                            :LoadType="'Table'"
-                                            :TableId="TableId"
-                                            @CallbackRunV8Code="
-                                                ({ field, thisValue }) => {
-                                                    return RunV8Code({ field: field, thisValue: thisValue, row: scope.row });
-                                                }
-                                            "
-                                        />
+                                        <span>{{ GetColValue(scope, field) }}</span>
                                     </template>
                                     <template v-else-if="field.Component == 'Rate'">
                                         <el-rate v-model="scope.row[field.Name]" :disabled="true" />
@@ -795,7 +793,7 @@
                         >
                             <el-card
                                 class="box-card card-data-animate no-padding card-redesign"
-                                :class="{ 'card-selected': TableEnableBatch && isCardSelected(item) }"
+                                :class="{ 'card-selected': IsCardSelectActive(item) }"
                                 @click="CardItemClick(item)"
                             >
                                 <div
@@ -938,7 +936,17 @@
                                 <!-- ====== 操作按钮区域 ====== -->
                                 <div class="card-actions" @click.stop>
                                     <!--Fix by Anderson for 小赵：移动端也需要选中功能以便V8按钮操作，下面不能增加【&&!diyStore.IsPhoneView】-->
-                                    <div v-if="TableEnableBatch"
+                                    <div v-if="IsOpenTableSingleSelect()"
+                                        class="card-radio-wrapper"
+                                        @click.stop="selectOpenTableSingleRow(item)"
+                                        style="flex:1;justify-content:left;">
+                                        <el-radio
+                                            class="open-table-row-radio"
+                                            :model-value="TableSelectedRow && TableSelectedRow.Id"
+                                            :label="item.Id"
+                                        />
+                                    </div>
+                                    <div v-else-if="TableEnableBatch"
                                         class="card-checkbox-wrapper"
                                         @click.stop="toggleCardSelection(item)"
                                         style="flex:1;justify-content:left;">
