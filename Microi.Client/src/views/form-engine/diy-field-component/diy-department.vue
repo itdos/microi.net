@@ -3,7 +3,7 @@
     <el-cascader
         v-if="field.Component == 'Department' && !isMobile"
         clearable
-        :value="ModelValue"
+        v-model="ModelValue"
         :options="field.Data"
         :props="GetDepartmentProps(field)"
         :disabled="GetFieldReadOnly(field)"
@@ -148,25 +148,32 @@ export default {
     watch: {
         modelValue: function (newVal, oldVal) {
             var self = this;
-            if (typeof newVal == "string" && newVal != oldVal) {
+            if (newVal != oldVal) {
                 self.$nextTick(function () {
-                    var parsed = JSON.parse(newVal);
-                    self.ModelValue = parsed;
-                    if (self.isMobile) {
-                        self.TreeInnerValue = self.cascaderValueToTreeValue(parsed);
-                    }
+                    self.ApplyIncomingValue(newVal);
                 });
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
-            if (typeof newVal == "string" && newVal != oldVal) {
+            if (newVal != oldVal) {
                 self.$nextTick(function () {
-                    var parsed = JSON.parse(newVal);
-                    self.ModelValue = parsed;
-                    if (self.isMobile) {
-                        self.TreeInnerValue = self.cascaderValueToTreeValue(parsed);
-                    }
+                    self.ApplyIncomingValue(newVal);
+                });
+            }
+        },
+        "field.Data": function () {
+            var self = this;
+            self.$nextTick(function () {
+                self.ApplyIncomingValue(self.GetFieldValue(self.field, self.FormDiyTableModel));
+            });
+        },
+        FormDiyTableModel: {
+            deep: false,
+            handler() {
+                var self = this;
+                self.$nextTick(function () {
+                    self.ApplyIncomingValue(self.GetFieldValue(self.field, self.FormDiyTableModel));
                 });
             }
         }
@@ -190,18 +197,121 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue) && self.field.Config.Department.EmitPath !== false) {
-                try {
-                    modelValue = JSON.parse(modelValue);
-                } catch (e) {
-                    console.error("Failed to parse modelValue as JSON:", e);
-                    modelValue = ""; // 或者其他默认值
-                }
-            }
-            self.ModelValue = modelValue;            // 移动端同步 TreeInnerValue
+            self.ApplyIncomingValue(modelValue);
+            self.LastModelValue = self.ModelValue;
+        },
+        ApplyIncomingValue(value) {
+            var self = this;
+            var normalizedValue = self.NormalizeDepartmentValue(value);
+            self.ModelValue = normalizedValue;
             if (self.isMobile) {
-                self.TreeInnerValue = self.cascaderValueToTreeValue(modelValue);
-            }            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+                self.TreeInnerValue = self.cascaderValueToTreeValue(normalizedValue);
+            }
+        },
+        ParseDepartmentValue(value) {
+            var self = this;
+            if (typeof value !== "string") return value;
+            if (self.DiyCommon.IsNull(value)) return value;
+            var text = value.trim();
+            if (text.indexOf("[") !== 0 && text.indexOf("{") !== 0) return value;
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return value;
+            }
+        },
+        GetDepartmentNodeValue(value) {
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                return value.Id || value.id || value.Value || value.value || value.Key || value.key || "";
+            }
+            return value;
+        },
+        GetDepartmentLeafValue(value) {
+            var self = this;
+            if (Array.isArray(value)) {
+                if (value.length === 0) return "";
+                return self.GetDepartmentLeafValue(value[value.length - 1]);
+            }
+            return self.GetDepartmentNodeValue(value);
+        },
+        NormalizeSingleDepartmentPath(value) {
+            var self = this;
+            if (Array.isArray(value)) {
+                if (value.length === 0) return [];
+                if (Array.isArray(value[0])) {
+                    return self.NormalizeSingleDepartmentPath(value[0]);
+                }
+                if (value.length === 1) {
+                    var singleLeaf = self.GetDepartmentLeafValue(value[0]);
+                    return self.buildPathToNode(singleLeaf) || [singleLeaf];
+                }
+                return value.map(function (item) {
+                    return self.GetDepartmentNodeValue(item);
+                }).filter(function (item) {
+                    return !self.DiyCommon.IsNull(item);
+                });
+            }
+            var leaf = self.GetDepartmentLeafValue(value);
+            if (self.DiyCommon.IsNull(leaf)) return [];
+            return self.buildPathToNode(leaf) || [leaf];
+        },
+        NormalizeDepartmentPathValue(value, isMultiple) {
+            var self = this;
+            if (isMultiple) {
+                if (Array.isArray(value) && value.length > 0 && Array.isArray(value[0])) {
+                    return value.map(function (item) {
+                        return self.NormalizeSingleDepartmentPath(item);
+                    }).filter(function (item) {
+                        return Array.isArray(item) && item.length > 0;
+                    });
+                }
+                if (Array.isArray(value)) {
+                    return value.map(function (item) {
+                        return self.NormalizeSingleDepartmentPath(item);
+                    }).filter(function (item) {
+                        return Array.isArray(item) && item.length > 0;
+                    });
+                }
+                var singlePath = self.NormalizeSingleDepartmentPath(value);
+                return singlePath.length > 0 ? [singlePath] : [];
+            }
+            return self.NormalizeSingleDepartmentPath(value);
+        },
+        NormalizeDepartmentLeafValue(value, isMultiple) {
+            var self = this;
+            if (isMultiple) {
+                if (Array.isArray(value) && value.length > 0 && Array.isArray(value[0])) {
+                    return value.map(function (item) {
+                        return self.GetDepartmentLeafValue(item);
+                    }).filter(function (item) {
+                        return !self.DiyCommon.IsNull(item);
+                    });
+                }
+                if (Array.isArray(value)) {
+                    return value.map(function (item) {
+                        return self.GetDepartmentLeafValue(item);
+                    }).filter(function (item) {
+                        return !self.DiyCommon.IsNull(item);
+                    });
+                }
+                var singleLeaf = self.GetDepartmentLeafValue(value);
+                return self.DiyCommon.IsNull(singleLeaf) ? [] : [singleLeaf];
+            }
+            if (Array.isArray(value) && value.length > 0 && Array.isArray(value[0])) {
+                return self.GetDepartmentLeafValue(value[0]);
+            }
+            return self.GetDepartmentLeafValue(value);
+        },
+        NormalizeDepartmentValue(value) {
+            var self = this;
+            var isMultiple = self.field.Config.Department.Multiple === true;
+            var isEmitPath = self.field.Config.Department.EmitPath !== false;
+            var parsedValue = self.ParseDepartmentValue(value);
+            if (self.DiyCommon.IsNull(parsedValue) || (Array.isArray(parsedValue) && parsedValue.length === 0)) {
+                if (isMultiple) return [];
+                return isEmitPath ? [] : null;
+            }
+            return isEmitPath ? self.NormalizeDepartmentPathValue(parsedValue, isMultiple) : self.NormalizeDepartmentLeafValue(parsedValue, isMultiple);
         },
         DeptChange(value, field) {
             var self = this;
@@ -358,6 +468,9 @@ export default {
         ModelChangeMethods(item) {
             var self = this;
             self.ModelValue = item;
+            if (self.isMobile) {
+                self.TreeInnerValue = self.cascaderValueToTreeValue(item);
+            }
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
         },
