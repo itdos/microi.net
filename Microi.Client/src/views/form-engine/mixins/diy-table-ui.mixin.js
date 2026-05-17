@@ -832,10 +832,44 @@ LoadFabPosition() {
         // 卡片点击：先执行原有行点击逻辑，再打开详情
         CardItemClick(item) {
             var self = this;
+            if (self.PropsTableType === 'OpenTable') {
+                if (self.IsOpenTableSingleSelect()) {
+                    self.selectOpenTableSingleRow(item);
+                } else if (self.TableEnableBatch) {
+                    self.toggleCardSelection(item);
+                }
+                return;
+            }
             self.DiyTableRowClick(item);
             if (self.IsPermission('NoDetail')) {
                 self.OpenDetail(item, 'View');
             }
+        },
+        FormatTableReportValue(value) {
+            if (value === null || value === undefined || value === '') return '';
+            if (typeof value === 'string') {
+                var trimmed = value.trim();
+                if (trimmed === '') return '';
+                var numericString = trimmed.replace(/,/g, '');
+                if (!/^[-+]?\d+(\.\d+)?$/.test(numericString)) {
+                    return value;
+                }
+                value = Number(numericString);
+            }
+            if (typeof value !== 'number' || isNaN(value)) return value;
+            var absValue = Math.abs(value);
+            var formatNumber = function (num, maximumFractionDigits) {
+                return Number(num.toFixed(maximumFractionDigits)).toLocaleString('zh-CN', {
+                    maximumFractionDigits: maximumFractionDigits
+                });
+            };
+            if (absValue >= 100000000) {
+                return formatNumber(value / 100000000, 2) + '亿';
+            }
+            if (absValue >= 10000) {
+                return formatNumber(value / 10000, 2) + '万';
+            }
+            return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
         },
         // ========== 卡片模式辅助方法 END ==========
 
