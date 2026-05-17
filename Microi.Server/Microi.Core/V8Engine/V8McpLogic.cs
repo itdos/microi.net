@@ -2632,7 +2632,7 @@ namespace Microi.net
                     var nodeName = node["NodeName"].Val<string>() ?? node["Name"].Val<string>();
                     if (nodeName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "节点 NodeName 不能为空");
                     var nodeData = BuildDataFromParam(osClient, node,
-                        new[] { "NodeName", "NodeType", "Roles", "Users", "Depts", "Description", "Remark", "StartV8", "StartV8Server", "EndV8", "EndV8Server", "LineValueV8", "Timeout", "AllowSelectUsers", "AllowRecall", "AllowAddUsers", "SameDeptApprove", "BackNodes", "PositionLeft", "PositionTop", "Icon", "DisplayFields", "HideFields", "EditFields", "FieldsConfig", "CopyUsers" },
+                        new[] { "NodeName", "NodeType", "Roles", "BindJobs", "Users", "Depts", "Description", "Remark", "StartV8", "StartV8Server", "EndV8", "EndV8Server", "LineValueV8", "Timeout", "AllowSelectUsers", "AllowRecall", "AllowAddUsers", "SameDeptApprove", "BackNodes", "PositionLeft", "PositionTop", "Icon", "DisplayFields", "HideFields", "EditFields", "FieldsConfig", "CopyUsers" },
                         node["NodeId"].Val<string>() ?? node["Id"].Val<string>());
                     nodeData["NodeName"] = nodeName;
                     nodeData["FlowDesignId"] = flowId;

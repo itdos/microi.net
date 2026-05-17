@@ -118,11 +118,11 @@ export default {
                 }
                 this.WhereType = res.Data.GuanlianPPLJ;
                 this.whereList = [
-                    {
-                        Name: res.Data.ZibiaoGLZD,
-                        Value: "XXXXXXXXXX",
-                        Type: this.WhereType
-                    }
+                    // {
+                    //     Name: res.Data.ZibiaoGLZD,
+                    //     Value: "XXXXXXXXXX",
+                    //     Type: this.WhereType
+                    // }
                 ];
                 this.RightViewType = res.Data.YoubianZSZJ;
                 this.LeftTreeData = {
@@ -133,6 +133,26 @@ export default {
         },
         async LeftViewClick(data) {
             var self = this;
+            if (data && data._IsAllCategory === true) {
+                if (self.LastClickNode && self.LastClickNode._IsAllCategory === true) {
+                    return;
+                }
+                self.LastClickNode = data;
+                self.ShowRightClick(true);
+                if (self.$refs.ref_RightDiyTable) {
+                    self.$refs.ref_RightDiyTable.DiyTableRowList = [];
+                    self.$refs.ref_RightDiyTable.TableMultipleSelection = [];
+                    self.$refs.ref_RightDiyTable.TableSelectedRow = {};
+                }
+                self.clickData = {
+                    Origin: "BomProject",
+                    IsAllCategory: true
+                };
+                if (self.RightViewType === "表格" || self.RightViewType === "表单/表格") {
+                    self.whereList = [];
+                }
+                return;
+            }
             if(self.LastClickNode.Id == data.Id){
                 return;
             }

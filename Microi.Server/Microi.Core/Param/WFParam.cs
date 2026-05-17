@@ -441,6 +441,10 @@ namespace Microi.net
         /// </summary>
         public string Roles { get; set; }
         /// <summary>
+        /// 绑定岗位
+        /// </summary>
+        public string BindJobs { get; set; }
+        /// <summary>
         /// null
         /// </summary>
         public string Depts { get; set; }

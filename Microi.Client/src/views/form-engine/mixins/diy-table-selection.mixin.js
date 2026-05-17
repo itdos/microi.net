@@ -6,28 +6,57 @@ export default {
         },
         DiyTableCurrentChange(currentRow) {
             var self = this;
+            var oldSelection = self.TableMultipleSelection ? self.TableMultipleSelection.flat() : [];
             // 🔥 性能优化：避免对整行做 spread (200条数据时 currentRow 可能含数十字段)
             // 仅保存引用即可；行已 markRaw 不会触发深度代理
             self.TableSelectedRowLast = self.TableSelectedRow || {};
             self.TableSelectedRow = currentRow || {};
+            if (self.IsOpenTableSingleSelect()) {
+                self.TableMultipleSelection = currentRow && currentRow.Id ? [currentRow] : [];
+                self.EmitOpenTableSelectionChange(oldSelection, 'Y');
+            }
+        },
+        IsOpenTableSingleSelect() {
+            return this.PropsTableType === 'OpenTable' && this.EnableMultipleSelect !== true;
+        },
+        IsCardSelectActive(model) {
+            if (this.IsOpenTableSingleSelect()) {
+                return !!(model && this.TableSelectedRow && this.TableSelectedRow.Id === model.Id);
+            }
+            return this.TableEnableBatch && this.isCardSelected(model);
+        },
+        selectOpenTableSingleRow(row) {
+            var self = this;
+            if (!row) return;
+            var tableRef = self.$refs["diy-table-" + self.TableId];
+            if (tableRef && tableRef.setCurrentRow) {
+                tableRef.setCurrentRow(row);
+            }
+            self.DiyTableCurrentChange(row);
+        },
+        EmitOpenTableSelectionChange(oldSelection, type) {
+            var self = this;
+            if (self.PropsTableType && self.PropsTableType === "OpenTable") {
+                self.$emit("getOpenAnyTableParam", {
+                    OldTableMultipleSelection: oldSelection || [],
+                    TableMultipleSelection: self.TableMultipleSelection,
+                    TableSelectedRow: self.TableSelectedRow,
+                    ShowDiyFieldList: self.ShowDiyFieldList,
+                    PageIndex: self.DiyTableRowPageIndex,
+                    Type: type || "Y"
+                });
+            }
         },
         TableRowSelectionChange(val) {
             var self = this;
             var OldTableMultipleSelection = self.TableMultipleSelection.flat();
             self.TableMultipleSelection = val;
-            if (self.PropsTableType && self.PropsTableType === "OpenTable") {
-                self.$emit("getOpenAnyTableParam", {
-                    OldTableMultipleSelection: OldTableMultipleSelection,
-                    TableMultipleSelection: self.TableMultipleSelection,
-                    ShowDiyFieldList: self.ShowDiyFieldList,
-                    PageIndex: self.DiyTableRowPageIndex,
-                    Type: "Y"
-                });
-            }
+            self.EmitOpenTableSelectionChange(OldTableMultipleSelection, "Y");
         },
         // 卡片模式批量选择
         toggleCardSelection(model) {
             const self = this;
+            const oldSelection = self.TableMultipleSelection.flat();
             const index = self.cardSelection.findIndex(item => item.Id === model.Id);
             if (index > -1) {
                 self.cardSelection.splice(index, 1);
@@ -36,6 +65,7 @@ export default {
             }
             // 同步到 TableMultipleSelection
             self.TableMultipleSelection = [...self.cardSelection];
+            self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },
         isCardSelected(model) {
             const self = this;
@@ -43,6 +73,7 @@ export default {
         },
         toggleCardSelectAll(checked) {
             const self = this;
+            const oldSelection = self.TableMultipleSelection.flat();
             if (checked) {
                 self.cardSelection = [...self.DiyTableRowList];
             } else {
@@ -50,6 +81,7 @@ export default {
             }
             // 同步到 TableMultipleSelection
             self.TableMultipleSelection = [...self.cardSelection];
+            self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },
         toggleSelection(rows, type) {
             var self = this;
@@ -88,6 +120,10 @@ export default {
             self.DiyTableRowPageIndex = val;
             // 翻页时清空卡片选择
             self.cardSelection = [];
+            self.TableSelectedRow = {};
+            if (self.IsOpenTableSingleSelect()) {
+                self.TableMultipleSelection = [];
+            }
             self.GetDiyTableRow();
             self.$nextTick(function () {
                 $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
@@ -105,6 +141,10 @@ export default {
             self.DiyTableRowPageIndex = 1;
             // 切换页大小时清空卡片选择
             self.cardSelection = [];
+            self.TableSelectedRow = {};
+            if (self.IsOpenTableSingleSelect()) {
+                self.TableMultipleSelection = [];
+            }
             self.GetDiyTableRow({ _PageIndex: 1 });
             self.$nextTick(function () {
                 $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);

@@ -122,11 +122,12 @@ export default {
         },
         RunOpenAnyTableSubmitEvent() {
             var self = this;
+            var tableRef = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)];
             //传入已选择的数据
             var selectData =
                 self.OpenAnyTableParam.ShowLeftSelectionList || false
                     ? self.OpenAnyTableParam.TableIndexDataList
-                    : self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+                    : (self.OpenAnyTableParam.MultipleSelect === false ? tableRef.TableSelectedRow : tableRef.TableMultipleSelection);
             self.OpenAnyTableParam.SubmitEvent(selectData, function () {
                 self.ShowAnyTable = false;
             });

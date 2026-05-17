@@ -68,19 +68,40 @@
         <div class="tree-container" style="margin-top: 10px">
             <!-- 搜索区域 -->
             <div style="margin-top: 15px">
-                <el-input placeholder="请输入内容" v-model="TreeData.SearchFormData.inputText" class="input-with-select" v-if="LeftTreeData.ShumoHSS === 1" @change="TreeSearch('inputText')">
+                <el-input
+                    placeholder="请输入内容"
+                    v-model="TreeData.SearchFormData.inputText"
+                    class="input-with-select"
+                    v-if="LeftTreeData.ShumoHSS === 1"
+                    clearable
+                    @change="TreeSearch('inputText')"
+                    @clear="ClearTreeSearch"
+                    @keyup.enter="TreeSearch('enter')"
+                >
                     <template #prepend>
                         <el-select v-model="TreeData.SearchFormData.selectText" placeholder="请选择" v-if="LeftTreeData.ShuxiaLSS === 1" style="width: 110px" @change="TreeSearch('selectText')">
                             <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
                         </el-select>
                     </template>
-                    <template #append><el-button :icon="Search" v-if="LeftTreeData.ShusouSAN === 1" @click="TreeSearch('button')"></el-button></template>
+                    <template #append>
+                        <div class="tree-search-buttons">
+                            <el-button :icon="Search" v-if="LeftTreeData.ShusouSAN === 1" @click="TreeSearch('button')"></el-button>
+                            <el-button :icon="Close" v-if="HasTreeSearchValue" @click="ClearTreeSearch"></el-button>
+                        </div>
+                    </template>
                 </el-input>
             </div>
 
             <!-- 树形控件 -->
             <div class="custom-tree-wrapper">
                 <div class="custom-tree-scroll">
+                    <div
+                        class="tree-all-node"
+                        :class="{ 'is-active': CurrentCategoryId === '__all' }"
+                        @click="handleAllCategoryClick"
+                    >
+                        <span>全部</span>
+                    </div>
                     <el-tree
                         :data="TreeData.categories"
                         :props="TreeData.defaultProps"
@@ -93,7 +114,7 @@
                         :load="lazy ? loadNode : null"
                         @node-click="handleCategoryClick"
                         :lazy="lazy"
-                        :key="'tree-' + lazy"
+                        :key="'tree-' + lazy + '-' + TreeData.treeRenderKey"
                         ref="categoryTree"
                     >
                         <!-- 自定义树节点 -->
@@ -156,7 +177,11 @@ export default {
             }
         }
     },
-    computed: {},
+    computed: {
+        HasTreeSearchValue() {
+            return !this.DiyCommon.IsNull(this.TreeData.SearchFormData.inputText) || !this.DiyCommon.IsNull(this.TreeData.SearchFormData.selectText);
+        }
+    },
     data() {
         return {
             lazy: false,
@@ -172,12 +197,14 @@ export default {
                     isLeaf: "_HasChild"
                 },
                 ExpandedKeys: [],
-                CheckedKeys: []
+                CheckedKeys: [],
+                treeRenderKey: 0
             },
             OpenAnyTableParam: {},
             ShowAnyTable: false,
             BtnLoading: false,
-            options: []
+            options: [],
+            CurrentCategoryId: "__all"
         };
     },
     async created() {
@@ -200,7 +227,24 @@ export default {
         // 节点过滤方法
         filterNode(value, data) {
             if (!value) return true;
-            return data[this.TreeData.defaultProps.label].indexOf(value) !== -1;
+            var label = data[this.TreeData.defaultProps.label] || data.Name || "";
+            return String(label).indexOf(value) !== -1;
+        },
+        ApplyTreeData(data) {
+            this.TreeData.categories = this.NormalizeTreeData(Array.isArray(data) ? data : []);
+            this.TreeData.treeRenderKey++;
+        },
+        NormalizeTreeData(data) {
+            var self = this;
+            if (!Array.isArray(data)) return [];
+            data.forEach(function (item) {
+                if (!item) return;
+                item._HasChild = item._HasChild ? true : false;
+                if (Array.isArray(item._Child) && item._Child.length > 0) {
+                    self.NormalizeTreeData(item._Child);
+                }
+            });
+            return data;
         },
 
         // 获取树形数据
@@ -215,7 +259,7 @@ export default {
                 try {
                     await eval("(async () => {\n " + self.LeftTreeData.ChushiHDM + " \n})()");
                     var result = V8.Result;
-                    self.TreeData.categories = result.Data;
+                    self.ApplyTreeData(result && result.Data ? result.Data : []);
                 } catch (error) {
                     self.DiyCommon.Tips("执行初始化V8引擎代码出现错误：" + error.message, false);
                 } finally {
@@ -231,14 +275,11 @@ export default {
                             ModuleEngineKey: ShuxingGLCD[ShuxingGLCD.length - 1]
                         },
                         function (res) {
-                            for (var item of res.Data) {
-                                item._HasChild = item._HasChild ? true : false;
-                            }
                             resolve(res);
                         }
                     );
                 });
-                self.TreeData.categories = res.Data;
+                self.ApplyTreeData(res.Data);
             }
         },
 
@@ -268,6 +309,10 @@ export default {
         // 树搜索方法
         async TreeSearch(origin) {
             var self = this;
+            if (!self.HasTreeSearchValue) {
+                await self.ClearTreeSearch();
+                return;
+            }
             if (self.LeftTreeData.ChufaSJ) {
                 var V8 = {
                     Origin: origin,
@@ -278,13 +323,34 @@ export default {
                 try {
                     await eval("(async () => {\n " + self.LeftTreeData.ChufaSJ + " \n})()");
                     var result = await V8.Result;
+                    if (result && Array.isArray(result.Data)) {
+                        self.ApplyTreeData(result.Data);
+                    }
                 } catch (error) {
                     self.DiyCommon.Tips("执行搜索触发V8引擎代码出现错误：" + error.message, false);
                 } finally {
                     
                     
                 }
+            } else if (self.$refs.categoryTree && self.$refs.categoryTree.filter) {
+                self.$refs.categoryTree.filter(self.TreeData.SearchFormData.inputText || "");
             }
+        },
+        async ClearTreeSearch() {
+            var self = this;
+            self.TreeData.SearchFormData.inputText = "";
+            self.TreeData.SearchFormData.selectText = "";
+            await self.treeData();
+            self.$nextTick(function () {
+                if (self.$refs.categoryTree) {
+                    if (self.$refs.categoryTree.filter) {
+                        self.$refs.categoryTree.filter("");
+                    }
+                    if (self.CurrentCategoryId === "__all" && self.$refs.categoryTree.setCurrentKey) {
+                        self.$refs.categoryTree.setCurrentKey(null);
+                    }
+                }
+            });
         },
 
         // 设置V8默认值
@@ -297,7 +363,15 @@ export default {
         },
         // 处理分类节点点击事件
         handleCategoryClick(data) {
+            this.CurrentCategoryId = data && data.Id ? data.Id : "";
             this.$emit("LeftViewClick", data);
+        },
+        handleAllCategoryClick() {
+            this.CurrentCategoryId = "__all";
+            if (this.$refs.categoryTree && this.$refs.categoryTree.setCurrentKey) {
+                this.$refs.categoryTree.setCurrentKey(null);
+            }
+            this.$emit("LeftViewClick", { _IsAllCategory: true, Id: "", Name: "全部" });
         },
         ShowRightClick(item) {
             this.$emit("ShowRightClick", item);
@@ -346,7 +420,8 @@ export default {
         // 执行表格提交事件
         RunOpenAnyTableSubmitEvent() {
             var self = this;
-            var selectData = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+            var tableRef = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)];
+            var selectData = self.OpenAnyTableParam.MultipleSelect === false ? tableRef.TableSelectedRow : tableRef.TableMultipleSelection;
             self.OpenAnyTableParam.SubmitEvent(selectData, function () {
                 self.ShowAnyTable = false;
             });
@@ -513,6 +588,29 @@ export default {
     min-width: 0; /* 修复flex容器中的最小宽度问题 */
     /* 新增修复代码 */
     position: relative;
+}
+.tree-all-node {
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 8px 0 24px;
+    font-size: 13px;
+    color: var(--el-text-color-primary);
+    cursor: pointer;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.tree-all-node:hover,
+.tree-all-node.is-active {
+    background: var(--el-fill-color-light);
+    color: var(--el-color-primary);
+}
+.tree-search-buttons {
+    display: inline-flex;
+    align-items: center;
+}
+.tree-search-buttons .el-button + .el-button {
+    margin-left: 0;
 }
 /* 树节点容器 - 关键修改 */
 .el-tree {
