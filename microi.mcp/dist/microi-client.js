@@ -329,6 +329,12 @@ export class MicroiClient {
         }
         return this.post(API.CREATE_ENGINE, payload);
     }
+    async uploadFileBase64(data) {
+        return this.post(API.UPLOAD_FILE_BASE64, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
     async getEventCode(formEngineKey, eventType) {
         return this.post(API.GET_EVENT_CODE, {
             OsClient: this.config.osClient,

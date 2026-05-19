@@ -120,6 +120,26 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        public async Task<IActionResult> UploadFileBase64([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var result = await V8McpLogic.UploadFileBase64(
+                osClient,
+                param["FileName"].Val<string>(),
+                param["FileByteBase64"].Val<string>(),
+                param["Path"].Val<string>(),
+                param["Limit"]?.Val<bool>(),
+                param["Preview"]?.Val<bool>(),
+                param["TargetTable"].Val<string>(),
+                param["TargetId"].Val<string>(),
+                param["TargetField"].Val<string>(),
+                token);
+            return Ok(result);
+        }
+
+        [HttpPost]
         public async Task<IActionResult> CheckVersions([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();

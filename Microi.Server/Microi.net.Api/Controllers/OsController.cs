@@ -67,6 +67,27 @@ namespace Microi.net.Api
             //return Content(inputString);
             //return File(stream, "image/png");
         }
+
+        /// <summary>
+        /// 生成二维码 PNG 图片，供前端 image 组件直接使用。
+        /// </summary>
+        /// <param name="qrCodeContent"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        [AllowAnonymous]
+        public ActionResult CreateQRCodeImage(string qrCodeContent)
+        {
+            if (qrCodeContent.DosIsNullOrWhiteSpace())
+            {
+                qrCodeContent = "测试内容";
+            }
+
+            var stream = Dos.Common.ImageHelper.CreateQRCode(qrCodeContent);
+            using var binReader = new BinaryReader(stream);
+            var bytes = binReader.ReadBytes(Convert.ToInt32(stream.Length));
+            return File(bytes, "image/png");
+        }
+
         /// <summary>
         /// 
         /// </summary>

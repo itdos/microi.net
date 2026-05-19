@@ -13,6 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -54,22 +55,73 @@ namespace Microi.net
             return int.TryParse(text, out var value) ? value : fallback;
         }
 
+        private static string SafeString(object value, string fallback = "")
+        {
+            if (value == null) return fallback;
+            try
+            {
+                var text = Convert.ToString(value);
+                return string.IsNullOrWhiteSpace(text) ? fallback : text;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private static bool IsBlank(object value)
+        {
+            return string.IsNullOrWhiteSpace(SafeString(value));
+        }
+
+        private static string NormalizeBase64Payload(string value)
+        {
+            var text = SafeString(value).Trim();
+            var commaIndex = text.IndexOf(',');
+            if (commaIndex >= 0 && text.Substring(0, commaIndex).Contains("base64", StringComparison.OrdinalIgnoreCase))
+            {
+                return text.Substring(commaIndex + 1).Trim();
+            }
+            return text;
+        }
+
+        private static string ExtractUploadPath(object data)
+        {
+            if (data == null) return "";
+            try
+            {
+                var token = data as JToken ?? JToken.FromObject(data);
+                if (token is JArray arr && arr.Count > 0) token = arr[0];
+                if (token is JObject obj)
+                {
+                    foreach (var key in new[] { "Path", "FilePathName", "FilePath", "FullPath", "Url", "FileUrl" })
+                    {
+                        var value = obj[key]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value;
+                    }
+                }
+                if (token.Type == JTokenType.String) return token.ToString();
+            }
+            catch { }
+            return "";
+        }
+
         private static string BuildApiEngineCacheKey(string osClient, string key)
         {
-            return $"Microi:{osClient}:FormData:sys_apiengine:{key.DosToLower()}";
+            return $"Microi:{osClient}:FormData:sys_apiengine:{SafeString(key).ToLowerInvariant()}";
         }
 
         private static async Task<DosResult<object>> RefreshApiEngineRouteCache(string osClient, string apiEngineKey = null, string id = null)
         {
             try
             {
-                if (osClient.DosIsNullOrWhiteSpace())
+                if (IsBlank(osClient))
                 {
                     return new DosResult<object>(0, null, "OsClient 不能为空");
                 }
 
                 DosResult<dynamic> getResult;
-                if (!id.DosIsNullOrWhiteSpace())
+                if (!IsBlank(id))
                 {
                     getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                     {
@@ -77,7 +129,7 @@ namespace Microi.net
                         Id = id
                     });
                 }
-                else if (!apiEngineKey.DosIsNullOrWhiteSpace())
+                else if (!IsBlank(apiEngineKey))
                 {
                     getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                     {
@@ -95,7 +147,7 @@ namespace Microi.net
 
                 if (getResult.Code != 1 || getResult.Data == null)
                 {
-                    return new DosResult<object>(getResult.Code, getResult.Data, getResult.Msg.DosIsNullOrWhiteSpace() ? "刷新接口引擎缓存失败：未找到最新数据" : getResult.Msg);
+                    return new DosResult<object>(getResult.Code, getResult.Data, IsBlank(getResult.Msg) ? "刷新接口引擎缓存失败：未找到最新数据" : SafeString(getResult.Msg));
                 }
 
                 var row = JObject.FromObject(getResult.Data);
@@ -105,15 +157,15 @@ namespace Microi.net
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
                 var tasks = new List<Task>();
 
-                if (!latestKey.DosIsNullOrWhiteSpace())
+                if (!IsBlank(latestKey))
                 {
                     tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestKey), getResult.Data));
                 }
-                if (!latestId.DosIsNullOrWhiteSpace())
+                if (!IsBlank(latestId))
                 {
                     tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestId), getResult.Data));
                 }
-                if (!latestAddress.DosIsNullOrWhiteSpace())
+                if (!IsBlank(latestAddress))
                 {
                     tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestAddress), getResult.Data));
                 }
@@ -136,11 +188,11 @@ namespace Microi.net
             try
             {
                 DosResult<dynamic> getResult;
-                if (!id.DosIsNullOrWhiteSpace())
+                if (!IsBlank(id))
                 {
                     getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Diy_Table", new { OsClient = osClient, Id = id });
                 }
-                else if (!tableName.DosIsNullOrWhiteSpace())
+                else if (!IsBlank(tableName))
                 {
                     getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Diy_Table", new
                     {
@@ -155,7 +207,7 @@ namespace Microi.net
 
                 if (getResult.Code != 1 || getResult.Data == null)
                 {
-                    return new DosResult<object>(getResult.Code, getResult.Data, getResult.Msg.DosIsNullOrWhiteSpace() ? "刷新表单引擎缓存失败：未找到最新数据" : getResult.Msg);
+                    return new DosResult<object>(getResult.Code, getResult.Data, IsBlank(getResult.Msg) ? "刷新表单引擎缓存失败：未找到最新数据" : SafeString(getResult.Msg));
                 }
 
                 var row = JObject.FromObject(getResult.Data);
@@ -165,13 +217,13 @@ namespace Microi.net
                 var tasks = new List<Task>();
                 foreach (var prefix in new[] { "Diy_Table", "diy_table" })
                 {
-                    if (!latestId.DosIsNullOrWhiteSpace())
+                    if (!IsBlank(latestId))
                     {
-                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestId.DosToLower()}", getResult.Data));
+                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestId.ToLowerInvariant()}", getResult.Data));
                     }
-                    if (!latestName.DosIsNullOrWhiteSpace())
+                    if (!IsBlank(latestName))
                     {
-                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestName.DosToLower()}", getResult.Data));
+                        tasks.Add(cache.SetAsync($"Microi:{osClient}:FormData:{prefix}:{latestName.ToLowerInvariant()}", getResult.Data));
                     }
                 }
                 if (tasks.Any())
@@ -2844,6 +2896,86 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return new DosResult<object>(1, new { Warning = "审计日志写入失败：" + ex.Message }, "审计日志写入失败但业务操作不回滚");
+            }
+        }
+
+        /// <summary>
+        /// MCP 上传 base64 文件到平台文件存储，并可同步写入指定表字段。
+        /// </summary>
+        public static async Task<DosResult<object>> UploadFileBase64(string osClient, string fileName, string fileByteBase64, string path, bool? limit, bool? preview, string targetTable, string targetId, string targetField, dynamic currentToken)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                if (IsBlank(fileByteBase64)) return new DosResult<object>(0, null, "FileByteBase64 不能为空");
+
+                var normalizedBase64 = NormalizeBase64Payload(fileByteBase64);
+                byte[] bytes;
+                try
+                {
+                    bytes = Convert.FromBase64String(normalizedBase64);
+                }
+                catch
+                {
+                    return new DosResult<object>(0, null, "FileByteBase64 不是有效的 base64 文件内容");
+                }
+
+                if (bytes.Length == 0) return new DosResult<object>(0, null, "文件内容为空");
+                if (IsBlank(fileName)) fileName = $"mcp-{DateTime.Now:yyyyMMddHHmmssfff}.png";
+                if (IsBlank(path)) path = "mcp/assets";
+
+                using var fileStream = new MemoryStream(bytes);
+                var currentUser = currentToken?.CurrentUser;
+                var uploadParam = new DiyUploadParam
+                {
+                    OsClient = osClient,
+                    Path = path.Trim().Trim('/'),
+                    Limit = limit ?? false,
+                    Preview = preview ?? true,
+                    Multiple = false,
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _CurrentUser = currentUser,
+                    Files = new Dictionary<string, Stream> { [fileName] = fileStream }
+                };
+
+                var uploadResult = await MicroiEngine.HDFS.Upload(uploadParam);
+                if (uploadResult.Code != 1)
+                {
+                    return new DosResult<object>(uploadResult.Code, uploadResult.Data, "MCP 上传文件失败：" + uploadResult.Msg);
+                }
+
+                var filePathName = ExtractUploadPath(uploadResult.Data);
+                object updateInfo = null;
+                if (!IsBlank(targetTable) && !IsBlank(targetId) && !IsBlank(targetField))
+                {
+                    if (IsBlank(filePathName)) return new DosResult<object>(0, uploadResult.Data, "文件已上传，但未能从上传结果解析文件路径，无法写入表字段");
+
+                    var updateParam = new JObject
+                    {
+                        ["OsClient"] = osClient,
+                        ["Id"] = targetId,
+                        [targetField] = filePathName,
+                        ["_InvokeType"] = InvokeType.Client.ToString()
+                    };
+                    var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(targetTable, updateParam);
+                    if (updateResult.Code != 1)
+                    {
+                        return new DosResult<object>(updateResult.Code, new { Upload = uploadResult.Data, FilePathName = filePathName }, "文件已上传，但写入数据库字段失败：" + updateResult.Msg);
+                    }
+                    updateInfo = updateResult.Data;
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    FileName = fileName,
+                    FilePathName = filePathName,
+                    Upload = uploadResult.Data,
+                    Updated = updateInfo
+                }, "MCP 文件上传完成");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "MCP 上传文件失败：" + ex.Message);
             }
         }
 

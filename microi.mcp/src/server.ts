@@ -883,6 +883,44 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 上传平台文件
+  // ========================
+  server.tool(
+    'microi_upload_file_base64',
+    `Upload a base64 file to Microi platform HDFS for OsClient "${osClient}". Use this for app images, posters, banners and other assets instead of third-party image URLs. Optionally writes the uploaded platform file path back to a low-code table field.`,
+    {
+      fileByteBase64: z.string().describe('File content as base64. Data URLs such as data:image/png;base64,... are accepted.'),
+      fileName: z.string().optional().describe('File name, e.g. mall-banner.png'),
+      path: z.string().optional().describe('Platform storage path, e.g. mall/banner or mcp/assets'),
+      limit: z.boolean().optional().describe('Whether to upload to a private path. Default false.'),
+      preview: z.boolean().optional().describe('Whether to let the platform generate preview/compressed output. Default true.'),
+      targetTable: z.string().optional().describe('Optional table name to update after upload.'),
+      targetId: z.string().optional().describe('Optional row Id to update after upload.'),
+      targetField: z.string().optional().describe('Optional field name that stores the uploaded file path.'),
+    },
+    async ({ fileByteBase64, fileName, path, limit, preview, targetTable, targetId, targetField }) => {
+      try {
+        const result = await client.uploadFileBase64({
+          FileName: fileName,
+          FileByteBase64: fileByteBase64,
+          Path: path,
+          Limit: limit,
+          Preview: preview,
+          TargetTable: targetTable,
+          TargetId: targetId,
+          TargetField: targetField,
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: `✅ File uploaded successfully.\n\n${JSON.stringify(result.Data, null, 2)}` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 获取 V8 事件代码
   // ========================
   server.tool(
