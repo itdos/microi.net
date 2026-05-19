@@ -472,6 +472,22 @@ export class MicroiClient {
     return this.post(API.CREATE_ENGINE, payload);
   }
 
+  async uploadFileBase64(data: {
+    FileName?: string;
+    FileByteBase64: string;
+    Path?: string;
+    Limit?: boolean;
+    Preview?: boolean;
+    TargetTable?: string;
+    TargetId?: string;
+    TargetField?: string;
+  }): Promise<ApiResponse> {
+    return this.post(API.UPLOAD_FILE_BASE64, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
   async getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>> {
     return this.post(API.GET_EVENT_CODE, {
       OsClient: this.config.osClient,

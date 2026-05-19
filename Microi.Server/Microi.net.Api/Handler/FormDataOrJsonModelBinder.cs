@@ -383,6 +383,10 @@ namespace Microi.net.Api
                 var model = JsonConvert.DeserializeObject(json, modelType, _jsonSettings);
                 if (model != null)
                 {
+                    // 补偿恢复：若 error handler 将某个嵌套复杂对象静默置 null，
+                    // 但 JSON 中该属性值不为 null，则对该属性单独重新反序列化
+                    RecoverNullComplexProperties(model, modelType, json);
+
                     bindingContext.Result = ModelBindingResult.Success(model);
                     return true;
                 }
@@ -393,6 +397,50 @@ namespace Microi.net.Api
                 Console.WriteLine($"Microi：【⚠️Warn】FormDataOrJsonModelBinder JSON反序列化失败 [{modelType.Name}]: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 对主反序列化后仍为 null 但 JSON 中存在非 null 值的复杂类型属性进行二次补偿反序列化。
+        /// 当 Newtonsoft.Json 的 Error handler 静默处理了某个属性内部的错误时，
+        /// 可能将整个嵌套对象置为 null（如 bool 属性接收 int 值时触发），此方法用于恢复。
+        /// </summary>
+        private static void RecoverNullComplexProperties(object model, Type modelType, string json)
+        {
+            try
+            {
+                JObject jObj = null;
+
+                var properties = modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(p => p.CanRead && p.CanWrite && !IsSimpleType(p.PropertyType));
+
+                foreach (var prop in properties)
+                {
+                    // 属性已有值，跳过
+                    if (prop.GetValue(model) != null)
+                        continue;
+
+                    // 延迟解析 JObject（只在有需要时才解析，避免不必要开销）
+                    jObj ??= JObject.Parse(json);
+
+                    // JSON 中不存在该属性或值为 null，跳过
+                    var token = jObj.GetValue(prop.Name, StringComparison.OrdinalIgnoreCase);
+                    if (token == null || token.Type == JTokenType.Null)
+                        continue;
+
+                    // 对该属性单独重新反序列化
+                    try
+                    {
+                        var value = token.ToObject(prop.PropertyType, JsonSerializer.Create(_jsonSettings));
+                        if (value != null)
+                        {
+                            prop.SetValue(model, value);
+                            Console.WriteLine($"Microi：【ℹ️Info】FormDataOrJsonModelBinder 补偿恢复属性 [{modelType.Name}.{prop.Name}]");
+                        }
+                    }
+                    catch { /* 单属性恢复失败时忽略 */ }
+                }
+            }
+            catch { /* 整体恢复流程异常时忽略，不影响主流程 */ }
         }
 
         #endregion

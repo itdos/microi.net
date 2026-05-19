@@ -168,6 +168,16 @@ export declare class MicroiClient {
         Code?: string;
         ApiAddress?: string;
     }): Promise<ApiResponse>;
+    uploadFileBase64(data: {
+        FileName?: string;
+        FileByteBase64: string;
+        Path?: string;
+        Limit?: boolean;
+        Preview?: boolean;
+        TargetTable?: string;
+        TargetId?: string;
+        TargetField?: string;
+    }): Promise<ApiResponse>;
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse>;
     getEventList(keyword?: string): Promise<ApiResponse<V8Event[] | ListEnvelope<V8Event>>>;
