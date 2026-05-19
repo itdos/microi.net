@@ -20,6 +20,7 @@ export const API = {
   UPDATE_ENGINE_CODE: '/api/V8Engine/UpdateApiEngineCode',
   CREATE_ENGINE: '/api/V8Engine/CreateApiEngine',
   EXECUTE_ENGINE: '/api/V8Engine/ExecuteApiEngine',
+  UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
 
   // V8 事件
   GET_EVENT_LIST: '/api/V8Engine/GetV8EventList',
