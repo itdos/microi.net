@@ -315,7 +315,7 @@ export class MicroiClient {
         return this.post(API.UPDATE_ENGINE_CODE, {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
-            ApiV8Code: code,
+            ApiV8CodeBase64: Buffer.from(code, 'utf8').toString('base64'),
         });
     }
     async createEngine(data) {
@@ -324,6 +324,12 @@ export class MicroiClient {
             OsClient: this.config.osClient,
             ...data,
         };
+        const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
+        if (code) {
+            payload.ApiV8CodeBase64 = Buffer.from(code, 'utf8').toString('base64');
+            delete payload.Code;
+            delete payload.ApiV8Code;
+        }
         if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
             payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
         }

@@ -386,9 +386,10 @@ export default {
             });
             if (res.Code === 2) {
                 self.DiyCommon.Tips("此业务数据已删除", false);
-                await self.DiyCommon.ApiEngine.Run("deleteFlow", {
-                    Id: self.CurrentTableRowId
-                });
+                //2026-05-220 Anderson：不能直接删除流程数据，太暴力
+                // await self.DiyCommon.ApiEngine.Run("deleteFlow", {
+                //     Id: self.CurrentTableRowId
+                // });
                 self.GetWFWork();
                 return;
             }
