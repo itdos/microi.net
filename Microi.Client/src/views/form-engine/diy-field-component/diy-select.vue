@@ -91,7 +91,6 @@ import _ from "underscore";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
-import { formTrace } from "@/utils/form-engine-trace.js";
 
 export default {
     name: "diy-select",
@@ -107,8 +106,6 @@ export default {
             LastModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
             FieldAllData: [],
             NeedResetDataSourse: true,
-            _selectDestroyed: false,
-            _suppressSelectChange: false,
             _ArrowDownIcon: markRaw(ArrowDown),
             // 配置弹窗相关
             configDialogVisible: false,
@@ -150,7 +147,7 @@ export default {
         TableInEdit: { type: Boolean, default: false },
         TableId: { type: String, default: "" },
         DiyFieldList: { type: Array, default: () => [] },
-        SysMenuModel: {
+        DiyConfig: {
             type: Object,
             default() {
                 return {};
@@ -162,47 +159,165 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self._setModelValueFromExternal(newVal);
+                // 先标准化值
+                const normalizedVal = self.normalizeSelectValue(newVal);
+                if (self._isEmptySelectValue(normalizedVal)) {
+                    self.ModelValue = self._getEmptyModelValue();
+                    return;
+                }
+
+                // 普通数据源 Data，值就是字符串
+                if (self._isPlainDataSource()) {
+                    var resolved = self._resolveDataSourceValue(normalizedVal);
+                    // 优先从 field.Data 中取同引用，避免同值不触发重选
+                    if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
+                        var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
+                        if (hit !== undefined) resolved = hit;
+                    }
+                    var changed = self.ModelValue !== resolved;
+                    self.ModelValue = resolved;
+                    if (!changed) self._forceReSelectModelValue();
+                    return;
+                }
+                if (self._isMultipleSelectSaveFieldObjectDataSource()) {
+                    self.ModelValue = self._normalizeMultipleSaveFieldValue(normalizedVal);
+                    self._ensureSelectOption(self.ModelValue);
+                    return;
+                }
+                // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
+                if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
+                        self.ModelValue = normalizedVal;
+                        return;
+                    }
+                    if (self.field.Data && self.field.Data.length > 0) {
+                        var found = self.field.Data.find(item => item.Key == normalizedVal);
+                        if (found) {
+                            self.ModelValue = found;
+                            return;
+                        }
+                    }
+                    self.ModelValue = normalizedVal;
+                    return;
+                }
+                // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
+                self.ModelValue = self._resolveTextFormatValue(normalizedVal);
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self._setModelValueFromExternal(newVal);
+                // 先标准化值
+                const normalizedVal = self.normalizeSelectValue(newVal);
+                if (self._isEmptySelectValue(normalizedVal)) {
+                    self.ModelValue = self._getEmptyModelValue();
+                    return;
+                }
+
+                // 普通数据源 Data，值就是字符串
+                if (self._isPlainDataSource()) {
+                    var resolved = self._resolveDataSourceValue(normalizedVal);
+                    if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
+                        var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
+                        if (hit !== undefined) resolved = hit;
+                    }
+                    var changed = self.ModelValue !== resolved;
+                    self.ModelValue = resolved;
+                    if (!changed) self._forceReSelectModelValue();
+                    return;
+                }
+                if (self._isMultipleSelectSaveFieldObjectDataSource()) {
+                    self.ModelValue = self._normalizeMultipleSaveFieldValue(normalizedVal);
+                    self._ensureSelectOption(self.ModelValue);
+                    return;
+                }
+                // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
+                if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
+                        // 已经是对象，直接使用
+                        self.ModelValue = normalizedVal;
+                        return;
+                    }
+                    // newVal 是 Key 字符串，需要从 Data 中找到对应对象
+                    if (self.field.Data && self.field.Data.length > 0) {
+                        var found = self.field.Data.find(item => item.Key == normalizedVal);
+                        if (found) {
+                            self.ModelValue = found;
+                            return;
+                        }
+                    }
+                    // 找不到对应对象，暂存 key，等 Data 加载后再匹配
+                    self.ModelValue = normalizedVal;
+                    return;
+                }
+                // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
+                self.ModelValue = self._resolveTextFormatValue(normalizedVal);
             }
         },
         "field.Data": function (newVal, oldVal) {
             var self = this;
-            var dataList = Array.isArray(newVal) ? newVal : [];
-            formTrace("diy-select:field-data-watch", {
-                field: self.field && self.field.Name,
-                component: self.field && self.field.Component,
-                dataLength: dataList.length,
-                oldLength: Array.isArray(oldVal) ? oldVal.length : 0,
-                needReset: self.NeedResetDataSourse,
-                modelType: Array.isArray(self.ModelValue) ? "array" : typeof self.ModelValue
-            });
             // if (newVal.length > 0 && self.FieldAllData.length == 0) {//2023-10-27注释
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
             // 首次数据加载时（FieldAllData为空），即使NeedResetDataSourse=false也要匹配
             // 解决远程搜索SQL数据源在表内编辑时初始不显示值的问题
+            var dataList = Array.isArray(newVal) ? newVal : [];
             var isFirstLoad = self.FieldAllData.length === 0 && dataList.length > 0;
             if (self.NeedResetDataSourse || isFirstLoad) {
                 self.FieldAllData = [...dataList];
-
-                if (self._isPlainDataSource() ||
-                    (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") ||
-                    self._isObjectDataSource()) {
-                    self._suppressSelectChange = true;
-                    self.ModelValue = self._resolveSelectModelValue(self.ModelValue);
-                    self.$nextTick(function () {
-                        self._suppressSelectChange = false;
-                    });
+                if (self._isEmptySelectValue(self.ModelValue)) {
+                    self.ModelValue = self._getEmptyModelValue();
+                    self.NeedResetDataSourse = true;
+                    return;
                 }
 
-                if (self._isObjectDataSource()) {
-                    var mergedData = self._mergeSelectedOptions(dataList);
-                    self.FieldAllData = [...mergedData];
+                // 只有在需要重置数据源时才同步 ModelValue
+                // 如果是普通数据源Data或KeyValue，处理方式不同
+                if (self._isPlainDataSource()) {
+                    // 普通数据源：ModelValue 可能是字符串、数字、对象（历史遗留），统一规整
+                    var normalizedCurrent = self._resolveDataSourceValue(self.ModelValue);
+                    var delData = self.field.Data.find((item) => {
+                        // 用宽松比较以兼容数字/字符串（普通数据源选项均为字符串）
+                        return item == normalizedCurrent || String(item) === String(normalizedCurrent);
+                    });
+                    if (delData !== undefined) {
+                        var sameRef = self.ModelValue === delData;
+                        self.ModelValue = delData;
+                        if (sameRef) self._forceReSelectModelValue();
+                    } else if (normalizedCurrent !== self.ModelValue) {
+                        // 没匹配到但当前值已规整过，更新本地 ModelValue
+                        self.ModelValue = normalizedCurrent;
+                    }
+                } else if (self.field.Config.DataSource === "KeyValue") {
+                    var delData = self.field.Data.find((item) => {
+                        return item.Key == self.ModelValue || (typeof self.ModelValue === 'object' && item.Key == self.ModelValue.Key);
+                    });
+                    if (delData) self.ModelValue = delData;
+                } else {
+                    // 其他数据源（Sql/DataSource/ApiEngine），item是对象
+                    var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+                    if (saveField) {
+                        if (self._isMultipleSelectSaveFieldObjectDataSource()) {
+                            self.ModelValue = self._normalizeMultipleSaveFieldValue(self.ModelValue);
+                            self._ensureSelectOption(self.ModelValue);
+                            self.FieldAllData = [...self.field.Data];
+                            self.NeedResetDataSourse = true;
+                            return;
+                        }
+                        // ModelValue 可能已被 mounted() 转换为对象，需要提取原始值进行比较
+                        var compareVal = (typeof self.ModelValue === 'object' && self.ModelValue !== null && !Array.isArray(self.ModelValue))
+                            ? self.ModelValue[saveField] : self.ModelValue;
+                        var delData = self.field.Data.find((item) => {
+                            return item[saveField] == compareVal;
+                        });
+                        if (delData) {
+                            self.ModelValue = delData;
+                        } else if (!self.DiyCommon.IsNull(compareVal) && typeof self.ModelValue === 'object' && self.ModelValue !== null) {
+                            // 当前值不在数据源结果中（远程搜索有LIMIT时常见），
+                            // 将当前值对象插入field.Data，确保el-select能显示
+                            self.field.Data.push(self.ModelValue);
+                            self.FieldAllData = [...self.field.Data];
+                        }
+                    }
                 }
             }
             self.NeedResetDataSourse = true;
@@ -213,34 +328,14 @@ export default {
         SelectOptionList() {
             var self = this;
             var data = self.field && Array.isArray(self.field.Data) ? self.field.Data : [];
-            return self._mergeSelectedOptions(data);
-        }
-    },
-
-    beforeUnmount() {
-        var self = this;
-        formTrace("diy-select:before-unmount", {
-            field: self.field && self.field.Name,
-            component: self.field && self.field.Component
-        });
-        self._selectDestroyed = true;
-        if (self.field) {
-            self.field._SelectRemoteRequestId = (self.field._SelectRemoteRequestId || 0) + 1;
-            if (self.field.Config) {
-                self.field.Config.DataSourceSqlRemoteLoading = false;
-            }
+            return data.filter(function (item) {
+                return !self._isEmptyOptionItem(item);
+            });
         }
     },
 
     mounted() {
         var self = this;
-        formTrace("diy-select:mounted", {
-            field: self.field && self.field.Name,
-            component: self.field && self.field.Component,
-            dataSource: self.field && self.field.Config && self.field.Config.DataSource,
-            remote: self.field && self.field.Config && self.field.Config.DataSourceSqlRemote,
-            dataLength: self.field && Array.isArray(self.field.Data) ? self.field.Data.length : 0
-        });
         // 标准化KeyValue数据源的数据格式（将旧的小写key/value转换为大驼峰Key/Value）
         if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue" && self.field.Data && Array.isArray(self.field.Data)) {
             self.field.Data = self.field.Data.map(item => {
@@ -254,8 +349,86 @@ export default {
             });
         }
 
-        var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-        self._setModelValueFromExternal(modelValue);
+        var modelValue = self.normalizeSelectValue(self.GetFieldValue(self.field, self.FormDiyTableModel));
+        // 普通数据源 Data 时，值就是字符串，不需要转换
+        if (self._isPlainDataSource()) {
+            // 普通数据源：兼容历史遗留数据（对象/数组/数字），统一规整为字符串
+            // 并尽量从 field.Data 中找到完全相等的引用，确保 el-select 能匹配上
+            self.ModelValue = self._resolveDataSourceValue(modelValue);
+            if (!self.DiyCommon.IsNull(self.ModelValue) && self.field.Data && self.field.Data.length > 0) {
+                var matchedItem = self.field.Data.find(function (item) {
+                    return item == self.ModelValue || String(item) === String(self.ModelValue);
+                });
+                if (matchedItem !== undefined) {
+                    self.ModelValue = matchedItem;
+                }
+            }
+        } else if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+            // KeyValue 数据源，存储的是对象或Key字符串
+            if (typeof modelValue === 'object' && modelValue !== null) {
+                // 如果已经是对象，标准化为大驼峰
+                self.ModelValue = {
+                    Key: modelValue.Key || modelValue.key || '',
+                    Value: modelValue.Value || modelValue.value || ''
+                };
+            } else {
+                // 如果是Key字符串，从Data中找到对应的对象
+                self.ModelValue = self._isEmptySelectValue(modelValue) ? "" : modelValue;
+                if (!self._isEmptySelectValue(modelValue) && self.field.Data && self.field.Data.length > 0) {
+                    var found = self.field.Data.find(item => (item.Key || item.key) == modelValue);
+                    if (found) {
+                        self.ModelValue = {
+                            Key: found.Key || found.key || '',
+                            Value: found.Value || found.value || ''
+                        };
+                    }
+                }
+            }
+        } else if (typeof modelValue == "string") {
+            if (modelValue.startsWith("{") || modelValue.startsWith("[")) {
+                try {
+                    modelValue = JSON.parse(modelValue);
+                } catch (error) {}
+            } else if (self.field && self.field.Config && self.field.Config.SelectSaveFormat == "Text" &&
+                (!self.DiyCommon.IsNull(self.field.Config.SelectLabel) || !self.DiyCommon.IsNull(self.field.Config.SelectSaveField))) {
+                var newModelValue = {};
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectSaveField)) {
+                    newModelValue[self.field.Config.SelectSaveField] = modelValue;
+                }
+                if (!self.DiyCommon.IsNull(self.field.Config.SelectLabel)) {
+                    newModelValue[self.field.Config.SelectLabel] = modelValue;
+                }
+                modelValue = newModelValue;
+            }
+            self.ModelValue = modelValue;
+        } else {
+            self.ModelValue = modelValue;
+        }
+
+        self.ModelValue = self.normalizeSelectValue(self.ModelValue);
+
+        // 对于 SQL/DataSource/ApiEngine 数据源，如果 field.Data 已经加载，
+        // 需要从 field.Data 中查找匹配的完整选项对象，否则 el-select 的 value-key 无法匹配
+        if (self.field && self.field.Config &&
+            (self.field.Config.DataSource === "Sql" ||
+             self.field.Config.DataSource === "DataSource" ||
+             self.field.Config.DataSource === "ApiEngine") &&
+            self.field.Data && self.field.Data.length > 0 &&
+            !self.DiyCommon.IsNull(self.ModelValue)) {
+            var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+            if (saveField) {
+                if (self._isMultipleSelectSaveFieldObjectDataSource()) {
+                    self.ModelValue = self._normalizeMultipleSaveFieldValue(self.ModelValue);
+                } else {
+                    var compareVal = (typeof self.ModelValue === 'object' && self.ModelValue !== null && !Array.isArray(self.ModelValue))
+                        ? self.ModelValue[saveField] : self.ModelValue;
+                    var found = self.field.Data.find(function(item) { return item[saveField] == compareVal; });
+                    if (found) {
+                        self.ModelValue = found;
+                    }
+                }
+            }
+        }
 
         // 确保当前值的选项存在于field.Data中（表内编辑时，数据源可能因LIMIT不包含当前值）
         self._ensureSelectOption(self.ModelValue);
@@ -277,12 +450,8 @@ export default {
                 }
                 // 远程搜索模式下，主动加载一次数据，确保表内编辑时能立即显示当前值
                 // SetFieldsData批量API不传_Keyword，含$Keyword$的SQL可能返回空
-                var selectedCount = Array.isArray(self.ModelValue)
-                    ? self.ModelValue.filter(function (item) { return !self.DiyCommon.IsNull(item); }).length
-                    : (self.DiyCommon.IsNull(self.ModelValue) ? 0 : 1);
                 if (self.field.Config.DataSourceSqlRemote &&
-                    selectedCount > 0 &&
-                    (!self.field.Data || self.field.Data.length === 0 || self.field.Data.length <= selectedCount)) {
+                    (!self.field.Data || self.field.Data.length === 0)) {
                     self.SelectRemoteMethod("", self.field);
                 }
             }
@@ -347,8 +516,8 @@ export default {
                 if (fieldData == null) return "";
                 return typeof fieldData === "object" ? "" : (typeof fieldData === "string" ? fieldData : String(fieldData));
             }
-            // 多选配置了存储字段时，v-model 直接保存字段值数组，避免对象数组与远程 LIMIT 数据无法匹配
-            if (self._isMultipleSelect() && !self.DiyCommon.IsNull(cfg.SelectSaveField)) {
+            // 多选 + 对象数据源 + 保存字段：v-model 保存字段值数组，option value 必须是保存字段值
+            if (self._isMultipleSelectSaveFieldObjectDataSource()) {
                 return self._getOptionFieldValue(fieldData, cfg.SelectSaveField);
             }
             // Sql / DataSource / ApiEngine：value 是整个对象
@@ -375,139 +544,15 @@ export default {
         _isMultipleSelect() {
             return this.field && this.field.Component === "MultipleSelect";
         },
-        _parseMaybeJson(value) {
-            if (typeof value !== "string") return value;
-            var trimmed = value.trim();
-            if (!trimmed) return value;
-            var first = trimmed.charAt(0);
-            var last = trimmed.charAt(trimmed.length - 1);
-            if ((first === "[" && last === "]") || (first === "{" && last === "}") || (first === '"' && last === '"')) {
-                try {
-                    return JSON.parse(trimmed);
-                } catch (e) {}
-            }
-            return value;
-        },
-        _setModelValueFromExternal(value) {
-            var self = this;
-            if (self._selectDestroyed) return;
-            formTrace("diy-select:model-external", {
-                field: self.field && self.field.Name,
-                component: self.field && self.field.Component,
-                valueType: Array.isArray(value) ? "array" : typeof value
-            });
-            var nextValue = self._resolveSelectModelValue(value);
-            self._suppressSelectChange = true;
-            self.ModelValue = nextValue;
-            self._ensureSelectOption(nextValue);
-            self.$nextTick(function () {
-                self._suppressSelectChange = false;
-            });
-        },
-        _resolveSelectModelValue(value) {
-            var self = this;
-            var parsedValue = self._parseMaybeJson(value);
-            var normalizedVal = self.normalizeSelectValue(parsedValue);
-
-            if (self._isPlainDataSource()) {
-                return self._resolvePlainDataSourceModelValue(normalizedVal);
-            }
-            if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-                return self._resolveKeyValueModelValue(normalizedVal);
-            }
-            if (self._isObjectDataSource()) {
-                return self._resolveObjectDataSourceModelValue(normalizedVal);
-            }
-            return normalizedVal;
-        },
-        _resolvePlainDataSourceModelValue(value) {
-            var self = this;
-            if (self._isMultipleSelect()) {
-                var arr = Array.isArray(value) ? value : self.normalizeSelectValue(value);
-                return arr.map(function (item) {
-                    return self._resolveDataSourceValue(item);
-                }).filter(function (item) {
-                    return !self.DiyCommon.IsNull(item);
-                });
-            }
-            var resolved = self._resolveDataSourceValue(value);
-            if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
-                var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
-                if (hit !== undefined) resolved = hit;
-            }
-            return resolved;
-        },
-        _resolveKeyValueModelValue(value) {
-            var self = this;
-            if (self._isMultipleSelect()) {
-                var arr = Array.isArray(value) ? value : self.normalizeSelectValue(value);
-                return arr.map(function (item) {
-                    return self._resolveKeyValueItem(item);
-                }).filter(function (item) {
-                    return !self.DiyCommon.IsNull(item) && !(typeof item === "object" && self.DiyCommon.IsNull(item.Key));
-                });
-            }
-            return self._resolveKeyValueItem(value);
-        },
-        _resolveKeyValueItem(item) {
-            var self = this;
-            var parsedItem = self._parseMaybeJson(item);
-            if (parsedItem && typeof parsedItem === "object" && !Array.isArray(parsedItem)) {
-                return {
-                    Key: parsedItem.Key !== undefined ? parsedItem.Key : (parsedItem.key !== undefined ? parsedItem.key : ""),
-                    Value: parsedItem.Value !== undefined ? parsedItem.Value : (parsedItem.value !== undefined ? parsedItem.value : "")
-                };
-            }
-            if (!self.DiyCommon.IsNull(parsedItem) && self.field.Data && self.field.Data.length > 0) {
-                var found = self.field.Data.find(function (dataItem) {
-                    return (dataItem.Key !== undefined ? dataItem.Key : dataItem.key) == parsedItem;
-                });
-                if (found) {
-                    return {
-                        Key: found.Key !== undefined ? found.Key : (found.key !== undefined ? found.key : ""),
-                        Value: found.Value !== undefined ? found.Value : (found.value !== undefined ? found.value : "")
-                    };
-                }
-            }
-            if (self.DiyCommon.IsNull(parsedItem)) return self._isMultipleSelect() ? null : "";
-            return { Key: parsedItem, Value: parsedItem };
-        },
-        _resolveObjectDataSourceModelValue(value) {
-            var self = this;
-            var cfg = (self.field && self.field.Config) || {};
-            var parsedValue = self._parseMaybeJson(value);
-
-            if (self._isMultipleSelect()) {
-                var arr = Array.isArray(parsedValue) ? parsedValue : self.normalizeSelectValue(parsedValue);
-                if (!self.DiyCommon.IsNull(cfg.SelectSaveField)) {
-                    return arr.map(function (item) {
-                        return self._getOptionFieldValue(item, cfg.SelectSaveField);
-                    }).filter(function (item) {
-                        return !self.DiyCommon.IsNull(item);
-                    });
-                }
-                return arr.map(function (item) {
-                    if (item && typeof item === "object" && !Array.isArray(item)) return item;
-                    return self._buildFallbackOption(item);
-                }).filter(function (item) { return !!item; });
-            }
-
-            if (Array.isArray(parsedValue)) {
-                parsedValue = parsedValue.length > 0 ? parsedValue[0] : "";
-            }
-            if (parsedValue && typeof parsedValue === "object") {
-                self._ensureSelectOption(parsedValue);
-                return parsedValue;
-            }
-            return self._resolveTextFormatValue(parsedValue);
-        },
-        _getOptionIdentityField() {
+        _isMultipleSelectSaveFieldObjectDataSource() {
             var cfg = (this.field && this.field.Config) || {};
-            return cfg.SelectSaveField || cfg.SelectLabel || "Id";
+            return this._isMultipleSelect()
+                && this._isObjectDataSource()
+                && !this.DiyCommon.IsNull(cfg.SelectSaveField);
         },
         _getOptionFieldValue(item, fieldName) {
             var self = this;
-            if (self.DiyCommon.IsNull(item)) return item;
+            if (self._isEmptySelectValue(item)) return "";
             if (item && typeof item === "object" && !Array.isArray(item)) {
                 if (!self.DiyCommon.IsNull(fieldName) && !self.DiyCommon.IsNull(item[fieldName])) return item[fieldName];
                 var cfg = (self.field && self.field.Config) || {};
@@ -516,92 +561,76 @@ export default {
                     var key = keys[i];
                     if (key && !self.DiyCommon.IsNull(item[key])) return item[key];
                 }
-                return null;
+                return "";
             }
             return item;
         },
-        _buildFallbackOption(value) {
+        _normalizeMultipleSaveFieldValue(value) {
             var self = this;
-            if (self.DiyCommon.IsNull(value)) return null;
-            if (value && typeof value === "object" && !Array.isArray(value)) return value;
             var cfg = (self.field && self.field.Config) || {};
-            var result = {};
-            if (!self.DiyCommon.IsNull(cfg.SelectSaveField)) {
-                result[cfg.SelectSaveField] = value;
-            }
-            if (!self.DiyCommon.IsNull(cfg.SelectLabel)) {
-                result[cfg.SelectLabel] = value;
-            }
-            if (self.DiyCommon.IsNull(cfg.SelectSaveField) && self.DiyCommon.IsNull(cfg.SelectLabel)) {
-                result.Value = value;
-            }
-            return result;
-        },
-        _getOptionIdentity(item) {
-            var self = this;
-            if (self.DiyCommon.IsNull(item)) return null;
-            if (item && typeof item === "object" && !Array.isArray(item)) {
-                var identityField = self._getOptionIdentityField();
-                if (!self.DiyCommon.IsNull(identityField) && !self.DiyCommon.IsNull(item[identityField])) {
-                    return item[identityField];
-                }
-                return self._getOptionFieldValue(item, identityField);
-            }
-            return item;
-        },
-        _mergeSelectedOptions(data) {
-            var self = this;
-            if (!self._isObjectDataSource()) return Array.isArray(data) ? data : [];
-            var result = Array.isArray(data) ? data.slice() : [];
-            var selectedValues = Array.isArray(self.ModelValue) ? self.ModelValue : [self.ModelValue];
-            selectedValues.forEach(function (selectedValue) {
-                if (self.DiyCommon.IsNull(selectedValue)) return;
-                var option = self._buildFallbackOption(selectedValue);
-                if (!option) return;
-                var optionIdentity = self._getOptionIdentity(option);
-                var exists = result.some(function (item) {
-                    var itemIdentity = self._getOptionIdentity(item);
-                    return !self.DiyCommon.IsNull(optionIdentity) && itemIdentity == optionIdentity;
-                });
-                if (!exists) {
-                    result.push(option);
-                }
+            var arr = Array.isArray(value) ? value : self.normalizeSelectValue(value);
+            if (!Array.isArray(arr)) arr = self._isEmptySelectValue(arr) ? [] : [arr];
+            return arr.map(function (item) {
+                return self._getOptionFieldValue(item, cfg.SelectSaveField);
+            }).filter(function (item) {
+                return !self._isEmptySelectValue(item);
             });
-            return result;
         },
-        _isSameOptionList(oldList, newList) {
+        _getEmptyModelValue() {
+            return this.field && this.field.Component === "MultipleSelect" ? [] : "";
+        },
+        _isEmptySelectValue(value) {
             var self = this;
-            var oldData = Array.isArray(oldList) ? oldList : [];
-            var newData = Array.isArray(newList) ? newList : [];
-            if (oldData.length !== newData.length) return false;
-            for (var index = 0; index < oldData.length; index++) {
-                var oldIdentity = self._getOptionIdentity(oldData[index]);
-                var newIdentity = self._getOptionIdentity(newData[index]);
-                if (!self.DiyCommon.IsNull(oldIdentity) || !self.DiyCommon.IsNull(newIdentity)) {
-                    if (oldIdentity != newIdentity) return false;
-                    if (oldData[index] && typeof oldData[index] === "object" && newData[index] && typeof newData[index] === "object") {
-                        try {
-                            if (JSON.stringify(oldData[index]) !== JSON.stringify(newData[index])) return false;
-                        } catch (e) {}
-                    }
-                    continue;
+            if (value === null || value === undefined || value === "" || value === "undefined" || value === "null") return true;
+            if (Array.isArray(value)) {
+                return value.length === 0 || value.every(function (item) { return self._isEmptySelectValue(item); });
+            }
+            if (typeof value === "object") {
+                var cfg = (self.field && self.field.Config) || {};
+                if (cfg.DataSource === "KeyValue") {
+                    var key = value.Key !== undefined ? value.Key : value.key;
+                    return self.DiyCommon.IsNull(key);
                 }
-                if (oldData[index] !== newData[index]) return false;
+                if (cfg.DataSource === "Sql" || cfg.DataSource === "DataSource" || cfg.DataSource === "ApiEngine") {
+                    var saveField = cfg.SelectSaveField || cfg.SelectLabel;
+                    if (!self.DiyCommon.IsNull(saveField) && self.DiyCommon.IsNull(value[saveField])) return true;
+                }
+                var keys = Object.keys(value);
+                if (keys.length === 0) return true;
+                return keys.every(function (key) { return self.DiyCommon.IsNull(value[key]); });
             }
-            return true;
+            return false;
         },
-        _setFieldDataSafely(field, nextData) {
+        _isEmptyOptionItem(item) {
             var self = this;
-            if (self._selectDestroyed || !field) return;
-            var normalizedData = Array.isArray(nextData) ? nextData : [];
-            var currentData = Array.isArray(field.Data) ? field.Data : [];
-            if (self._isSameOptionList(currentData, normalizedData)) {
-                self.FieldAllData = normalizedData.slice();
-                return;
+            var cfg = (self.field && self.field.Config) || {};
+            if (self._isEmptySelectValue(item)) return true;
+            if (cfg.DataSource === "KeyValue" && item && typeof item === "object") {
+                var key = item.Key !== undefined ? item.Key : item.key;
+                return self.DiyCommon.IsNull(key);
             }
-            self.NeedResetDataSourse = false;
-            self.FieldAllData = normalizedData.slice();
-            field.Data = normalizedData;
+            if (self._isPlainDataSource()) {
+                return typeof item === "object" || self.DiyCommon.IsNull(item);
+            }
+            if ((cfg.DataSource === "Sql" || cfg.DataSource === "DataSource" || cfg.DataSource === "ApiEngine") && item && typeof item === "object") {
+                var saveField = cfg.SelectSaveField || cfg.SelectLabel;
+                return !self.DiyCommon.IsNull(saveField) && self.DiyCommon.IsNull(item[saveField]);
+            }
+            return false;
+        },
+        // 强制刷新 el-select 选中状态（处理同字符串赋值不触发反应性的场景）
+        _forceReSelectModelValue() {
+            var self = this;
+            var keep = self.ModelValue;
+            if (self.DiyCommon.IsNull(keep)) return;
+            self.$nextTick(function () {
+                // 先清空再赋值，才能让基本类型相同值也触发变更
+                var isMulti = self.field && self.field.Component === "MultipleSelect";
+                self.ModelValue = isMulti ? [] : "";
+                self.$nextTick(function () {
+                    self.ModelValue = keep;
+                });
+            });
         },
         // 修复：普通数据源(Data) 单选时，把任意形态的值（字符串/数字/对象/数组）规整为字符串。
         // 解决 bug：旧记录可能将值保存成 {Name:"选项1"} / ["选项1"] / 数字 等，导致 el-select 无法匹配 el-option 的 :value（字符串）而显示为空。
@@ -651,6 +680,7 @@ export default {
         // 修复：SQL/DataSource/ApiEngine数据源 + 存储形式"字段"时，将字符串值转换为el-select需要的对象
         _resolveTextFormatValue(val) {
             var self = this;
+            if (self._isEmptySelectValue(val)) return "";
             // 如果已经是对象，确保它存在于field.Data中
             if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
                 self._ensureSelectOption(val);
@@ -687,45 +717,36 @@ export default {
             return val;
         },
         // 确保当前值对应的选项存在于field.Data中（数据源有LIMIT时，已加载数据可能不包含当前值）
-        _ensureSelectOption(value) {
+        _ensureSelectOption(valObj) {
             var self = this;
             if (!self.field || !self.field.Config) return;
             var ds = self.field.Config.DataSource;
             if (ds !== 'Sql' && ds !== 'DataSource' && ds !== 'ApiEngine') return;
-            var sourceData = Array.isArray(self.FieldAllData) && self.FieldAllData.length > 0
-                ? self.FieldAllData
-                : (Array.isArray(self.field.Data) ? self.field.Data : []);
-            var nextData = sourceData.slice();
-            var values = Array.isArray(value) ? value : [value];
-            values.forEach(function (item) {
-                if (self.DiyCommon.IsNull(item)) return;
-                var option = self._buildFallbackOption(item);
-                if (!option) return;
-                var optionIdentity = self._getOptionIdentity(option);
-                var exists = nextData.some(function (dataItem) {
-                    var dataIdentity = self._getOptionIdentity(dataItem);
-                    if (!self.DiyCommon.IsNull(optionIdentity)) {
-                        return dataIdentity == optionIdentity;
-                    }
-                    return dataItem === option;
-                });
+            var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
+            if (!saveField) return;
+            if (!self.field.Data) self.field.Data = [];
+            var labelField = self.field.Config.SelectLabel || saveField;
+            var values = Array.isArray(valObj) ? valObj : [valObj];
+            values.forEach(function(item) {
+                if (self._isEmptySelectValue(item)) return;
+                var option = item;
+                if (!(option && typeof option === 'object' && !Array.isArray(option))) {
+                    option = {};
+                    option[saveField] = item;
+                    option[labelField] = item;
+                }
+                if (self.DiyCommon.IsNull(option[saveField])) return;
+                var exists = self.field.Data.some(function(dataItem) { return dataItem && dataItem[saveField] == option[saveField]; });
                 if (!exists) {
-                    nextData.push(option);
+                    self.field.Data.push(option);
                 }
             });
-            self.FieldAllData = nextData;
         },
         // 修复：标准化选择框的值，根据单选/多选返回正确类型
         normalizeSelectValue(value) {
             const isMultiple = this.field?.Component === 'MultipleSelect';
 
-            // null 或 undefined
-            if (value === null || value === undefined) {
-                return isMultiple ? [] : '';
-            }
-
-            // 空字符串
-            if (value === '') {
+            if (this._isEmptySelectValue(value)) {
                 return isMultiple ? [] : '';
             }
 
@@ -733,7 +754,7 @@ export default {
             if (isMultiple) {
                 // 已经是数组
                 if (Array.isArray(value)) {
-                    return value;
+                    return value.filter(item => !this._isEmptySelectValue(item));
                 }
                 // 字符串尝试 JSON 解析
                 if (typeof value === 'string') {
@@ -756,7 +777,8 @@ export default {
             // 单选模式
             // 数组取第一个元素
             if (Array.isArray(value)) {
-                return value.length > 0 ? value[0] : '';
+                var firstValue = value.find(item => !this._isEmptySelectValue(item));
+                return firstValue === undefined ? '' : firstValue;
             }
             // 直接返回
             return value;
@@ -764,30 +786,17 @@ export default {
         Init() {
             var self = this;
             const fieldValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self._setModelValueFromExternal(fieldValue);
-            self.LastModelValue = self.ModelValue;
+            self.ModelValue = self.normalizeSelectValue(fieldValue);
+            self.LastModelValue = self.normalizeSelectValue(fieldValue);
         },
         VisibleChange(visible, field) {
             var self = this;
-            formTrace("diy-select:visible-change", {
-                field: field && field.Name,
-                component: field && field.Component,
-                visible: visible,
-                remote: field && field.Config && field.Config.DataSourceSqlRemote,
-                dataLength: field && Array.isArray(field.Data) ? field.Data.length : 0
-            });
-            if (field.Config.DataSourceSqlRemote) {
-                if (visible) {
-                    if (!Array.isArray(field.Data) || field.Data.length === 0) {
-                        self.SelectRemoteMethod("", field);
-                    }
-                } else if (field._SelectRemoteHasUserQuery === true) {
-                    self.SelectRemoteMethod("", field);
-                }
-                return;
-            }
             if (!visible) {
-                self.FilterMethod("", field);
+                if (field.Config.DataSourceSqlRemote) {
+                    self.SelectRemoteMethod("", field);
+                } else {
+                    self.FilterMethod("", field);
+                }
             }
         },
         GetFieldValue(field, form) {
@@ -839,7 +848,7 @@ export default {
                     result = field.Code;
                 }
             }
-            return result;
+            return result || "请选择";
         },
         SelectField(field) {
             var self = this;
@@ -864,30 +873,14 @@ export default {
         },
         async SelectChange(item, field) {
             var self = this;
-            if (self._suppressSelectChange || self._selectDestroyed) {
-                formTrace("diy-select:change-suppressed", {
-                    field: field && field.Name,
-                    component: field && field.Component,
-                    suppress: self._suppressSelectChange,
-                    destroyed: self._selectDestroyed
-                });
-                return;
-            }
-            formTrace("diy-select:change-start", {
-                field: field && field.Name,
-                component: field && field.Component,
-                itemType: Array.isArray(item) ? "array" : typeof item
-            });
             // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
             var saveItem = item;
             if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
-                var normalizedItem = Array.isArray(item)
-                    ? item.map(function (keyValueItem) { return self._resolveKeyValueItem(keyValueItem); })
-                    : {
-                        Key: item.Key || item.key || '',
-                        Value: item.Value || item.value || ''
-                    };
-                saveItem = normalizedItem;
+                // 将旧数据的小写key/value转换为大驼峰Key/Value
+                var normalizedItem = {
+                    Key: item.Key || item.key || '',
+                    Value: item.Value || item.value || ''
+                };
                 // ModelValue 和 FormDiyTableModel 都保存标准化后的对象
                 self.ModelValue = normalizedItem;
                 var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
@@ -933,7 +926,7 @@ export default {
                 if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
                     apiUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Update);
                 }
-                if (self.SysMenuModel && self.SysMenuModel.AddBtnType == "InTable" && self.SysMenuModel.SaveType == "提交一起保存") {
+                if (self.DiyConfig && self.DiyConfig.AddBtnType == "InTable" && self.DiyConfig.SaveType == "提交一起保存") {
                     if (!self.FormDiyTableModel._DataStatus) {
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
                             self.FormDiyTableModel["_DataStatus"] = "Add";
@@ -952,10 +945,6 @@ export default {
             }
 
             self.$emit("CallbackFormValueChange", self.field, saveItem);
-            formTrace("diy-select:change-end", {
-                field: field && field.Name,
-                component: field && field.Component
-            });
         },
         GetSelectValueKey(field) {
             var self = this;
@@ -986,12 +975,12 @@ export default {
                 self.NeedResetDataSourse = false;
                 field.Data = _.filter([...self.FieldAllData], function (item) {
                     if (field.Config.DataSource == "Data") {
-                        return String(item).indexOf(query) > -1;
+                        return item.indexOf(query) > -1;
                     }
                     if (field.Config.DataSource == "KeyValue") {
-                        return (item.Value && String(item.Value).indexOf(query) > -1) || (item.Key && String(item.Key).indexOf(query) > -1);
+                        return (item.Value && item.Value.indexOf(query) > -1) || (item.Key && item.Key.indexOf(query) > -1);
                     }
-                    return String(self.GetOptionLabel(item)).indexOf(query) > -1;
+                    return item[field.Config.SelectLabel].indexOf(query) > -1;
                 });
             } else {
                 self.NeedResetDataSourse = false;
@@ -1002,30 +991,8 @@ export default {
         },
         SelectRemoteMethod(query, field) {
             var self = this;
-            if (self._selectDestroyed || !field || !field.Config) return;
-            query = query == null ? "" : String(query);
-            formTrace("diy-select:remote-start", {
-                field: field && field.Name,
-                component: field && field.Component,
-                query: query,
-                loading: field.Config.DataSourceSqlRemoteLoading,
-                loadedQuery: field._SelectRemoteLoadedQuery,
-                dataLength: Array.isArray(field.Data) ? field.Data.length : 0
-            });
             if (field.Config.DataSourceSqlRemote == true)
             {
-                if (query) {
-                    field._SelectRemoteHasUserQuery = true;
-                }
-                if (field.Config.DataSourceSqlRemoteLoading === true && field._SelectRemoteLastQuery === query) {
-                    return;
-                }
-                if (field._SelectRemoteLoadedQuery === query && Array.isArray(field.Data) && field.Data.length > 0) {
-                    return;
-                }
-                field._SelectRemoteLastQuery = query;
-                field._SelectRemoteRequestId = (field._SelectRemoteRequestId || 0) + 1;
-                var requestId = field._SelectRemoteRequestId;
                 field.Config.DataSourceSqlRemoteLoading = true;
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
@@ -1055,22 +1022,9 @@ export default {
                 // 安全兜底：无论请求成功/失败/异常/空结果，都必须重置 loading 为 false，
                 // 并把 field.Data 规整为数组，避免 el-select 在 remote 模式下卡在"加载中"
                 var finishLoading = function (data) {
-                    if (self._selectDestroyed) return;
-                    if (requestId !== field._SelectRemoteRequestId) return;
-                    try {
-                        var nextData = Array.isArray(data) ? data : (Array.isArray(field.Data) ? field.Data : []);
-                        var mergedData = self._mergeSelectedOptions(nextData);
-                        self._setFieldDataSafely(field, mergedData);
-                        field._SelectRemoteLoadedQuery = query;
-                        formTrace("diy-select:remote-finish", {
-                            field: field && field.Name,
-                            component: field && field.Component,
-                            query: query,
-                            dataLength: mergedData.length
-                        });
-                    } finally {
-                        field.Config.DataSourceSqlRemoteLoading = false;
-                    }
+                    self.NeedResetDataSourse = false;
+                    field.Data = Array.isArray(data) ? data : [];
+                    field.Config.DataSourceSqlRemoteLoading = false;
                 };
                 try {
                     self.DiyCommon.Post(
@@ -1080,15 +1034,16 @@ export default {
                             if (result && result.Code == 1) {
                                 finishLoading(result.Data);
                             } else {
-                                finishLoading(field.Data);
+                                // 接口返回失败：保留原数据但必须关闭 loading
+                                field.Config.DataSourceSqlRemoteLoading = false;
                             }
                         },
                         function (error) {
-                            finishLoading(field.Data);
+                            field.Config.DataSourceSqlRemoteLoading = false;
                         }
                     );
                 } catch (e) {
-                    finishLoading(field.Data);
+                    field.Config.DataSourceSqlRemoteLoading = false;
                 }
             }
         },

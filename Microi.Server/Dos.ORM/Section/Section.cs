@@ -80,6 +80,15 @@ namespace Dos.ORM
             this.dbSession = dbSession;
         }
 
+        public Section SetCommandTimeout(int seconds)
+        {
+            if (cmd != null && seconds > 0)
+            {
+                cmd.CommandTimeout = seconds;
+            }
+            return this;
+        }
+
         #region 执行
 
         /// <summary>

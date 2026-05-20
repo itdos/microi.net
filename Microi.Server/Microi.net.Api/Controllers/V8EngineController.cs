@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using Dos.Common;
+using System;
+using System.Text;
 
 namespace Microi.net.Api
 {
@@ -27,6 +29,12 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class V8EngineController : Controller
     {
+        private static string DecodeCodeBase64(string codeBase64)
+        {
+            if (codeBase64.DosIsNullOrWhiteSpace()) return "";
+            return Encoding.UTF8.GetString(Convert.FromBase64String(codeBase64));
+        }
+
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
         {
@@ -86,15 +94,27 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateApiEngineCode([FromBody] JObject param)
+        public async Task<IActionResult> UpdateApiEngineCode([FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            var apiEngineKey = param["ApiEngineKey"].Val<string>();
+            if (param == null) return Ok(new DosResult(0, null, "请求参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param.Value<string>("OsClient"), token);
+            var apiEngineKey = param.Value<string>("ApiEngineKey");
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
-            var code = param["ApiV8Code"].Val<string>() ?? param["Code"].Val<string>();
+            var codeBase64 = param.Value<string>("ApiV8CodeBase64") ?? param.Value<string>("CodeBase64");
+            string code;
+            try
+            {
+                code = DecodeCodeBase64(codeBase64);
+                if (code.DosIsNullOrWhiteSpace()) code = param.Value<string>("ApiV8Code");
+                if (code.DosIsNullOrWhiteSpace()) code = param.Value<string>("Code");
+            }
+            catch
+            {
+                return Ok(new DosResult(0, null, "ApiV8CodeBase64 不是有效的 UTF-8 Base64 字符串"));
+            }
             var result = await V8McpLogic.UpdateApiEngineCode(osClient, apiEngineKey, code);
             return Ok(result);
         }
@@ -110,7 +130,17 @@ namespace Microi.net.Api
             if (apiName.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiName 不能为空"));
             if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
-            var code = param["ApiV8Code"].Val<string>() ?? param["Code"].Val<string>();
+            string code;
+            try
+            {
+                code = DecodeCodeBase64(param.Value<string>("ApiV8CodeBase64") ?? param.Value<string>("CodeBase64"));
+                if (code.DosIsNullOrWhiteSpace()) code = param["ApiV8Code"].Val<string>();
+                if (code.DosIsNullOrWhiteSpace()) code = param["Code"].Val<string>();
+            }
+            catch
+            {
+                return Ok(new DosResult(0, null, "ApiV8CodeBase64 不是有效的 UTF-8 Base64 字符串"));
+            }
             var result = await V8McpLogic.CreateApiEngine(
                 osClient, apiName, apiEngineKey,
                 param["ApiAddress"].Val<string>(), param["ApiRemark"].Val<string>(),
@@ -157,8 +187,18 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            string v8Code;
+            try
+            {
+                v8Code = DecodeCodeBase64(param.Value<string>("V8CodeBase64") ?? param.Value<string>("CodeBase64"));
+                if (v8Code.DosIsNullOrWhiteSpace()) v8Code = param["V8Code"].Val<string>();
+            }
+            catch
+            {
+                return Ok(new DosResult(0, null, "V8CodeBase64 不是有效的 UTF-8 Base64 字符串"));
+            }
             var result = await V8McpLogic.ExecuteApiEngine(
-                osClient, param["ApiEngineKey"].Val<string>(), param["V8Code"].Val<string>(),
+                osClient, param["ApiEngineKey"].Val<string>(), v8Code,
                 param["Param"] as JObject ?? new JObject(), token, HttpContext);
             return Ok(result);
         }
