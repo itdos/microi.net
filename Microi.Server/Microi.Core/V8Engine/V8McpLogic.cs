@@ -85,6 +85,80 @@ namespace Microi.net
             return text;
         }
 
+        private static readonly UTF8Encoding StrictUtf8Encoding = new UTF8Encoding(false, true);
+
+        private static bool LooksLikeV8Source(string value)
+        {
+            var text = SafeString(value);
+            if (text.DosIsNullOrWhiteSpace()) return false;
+            var trimmed = text.TrimStart('\uFEFF', ' ', '\r', '\n', '\t');
+            return trimmed.StartsWith("var ")
+                || trimmed.StartsWith("let ")
+                || trimmed.StartsWith("const ")
+                || trimmed.StartsWith("function")
+                || trimmed.StartsWith("return")
+                || trimmed.StartsWith("//")
+                || trimmed.StartsWith("/*")
+                || text.Contains("V8.")
+                || text.Contains("return ")
+                || text.Contains("=>")
+                || text.Contains("console.")
+                || text.Contains(";")
+                || text.Contains("{")
+                || text.Contains("\n");
+        }
+
+        private static string DecodeLegacyApiV8Code(string value)
+        {
+            var raw = SafeString(value);
+            if (raw.DosIsNullOrWhiteSpace()) return "";
+            var text = raw.Trim();
+            if (!DiyCommon.IsBase64String(text)) return raw;
+            try
+            {
+                var decoded = StrictUtf8Encoding.GetString(Convert.FromBase64String(text));
+                return LooksLikeV8Source(decoded) ? decoded : raw;
+            }
+            catch
+            {
+                return raw;
+            }
+        }
+
+        private static string[] SplitConsoleOutput(string value)
+        {
+            var text = SafeString(value);
+            if (text.DosIsNullOrWhiteSpace()) return Array.Empty<string>();
+            return text.Replace("\r\n", "\n").Split('\n').Where(line => !line.DosIsNullOrWhiteSpace()).ToArray();
+        }
+
+        private static int ExtractResultCode(object result, int fallback = 1)
+        {
+            if (result == null) return fallback;
+            try
+            {
+                if (result is DosResult dosResult) return dosResult.Code ?? fallback;
+                var token = result as JToken ?? JToken.FromObject(result);
+                var codeText = token["Code"]?.ToString();
+                if (int.TryParse(codeText, out var code)) return code;
+            }
+            catch { }
+            return fallback;
+        }
+
+        private static string ExtractResultMsg(object result)
+        {
+            if (result == null) return "";
+            try
+            {
+                if (result is DosResult dosResult) return SafeString(dosResult.Msg);
+                var token = result as JToken ?? JToken.FromObject(result);
+                return SafeString(token["Msg"]?.ToString());
+            }
+            catch { }
+            return "";
+        }
+
         private static string ExtractUploadPath(object data)
         {
             if (data == null) return "";
@@ -106,9 +180,14 @@ namespace Microi.net
             return "";
         }
 
+        private static string NormalizeApiEngineCacheKeyPart(string value)
+        {
+            return SafeString(value).Trim().ToLowerInvariant();
+        }
+
         private static string BuildApiEngineCacheKey(string osClient, string key)
         {
-            return $"Microi:{osClient}:FormData:sys_apiengine:{SafeString(key).ToLowerInvariant()}";
+            return $"Microi:{osClient}:FormData:sys_apiengine:{NormalizeApiEngineCacheKeyPart(key)}";
         }
 
         private static async Task<DosResult<object>> RefreshApiEngineRouteCache(string osClient, string apiEngineKey = null, string id = null)
@@ -151,9 +230,9 @@ namespace Microi.net
                 }
 
                 var row = JObject.FromObject(getResult.Data);
-                var latestId = SafeJString(row, "Id");
-                var latestKey = SafeJString(row, "ApiEngineKey", apiEngineKey ?? "");
-                var latestAddress = SafeJString(row, "ApiAddress");
+                var latestId = NormalizeApiEngineCacheKeyPart(SafeJString(row, "Id"));
+                var latestKey = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiEngineKey", apiEngineKey ?? ""));
+                var latestAddress = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiAddress"));
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
                 var tasks = new List<Task>();
 
@@ -314,7 +393,7 @@ namespace Microi.net
                     {
                         var apiV8Code = (string)item.ApiV8Code ?? "";
                         var updateTime = item.UpdateTime?.ToString() ?? "";
-                        apiV8Code = V8Base64.Base64ToString(apiV8Code);
+                        apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                         list.Add(new
                         {
@@ -372,7 +451,7 @@ namespace Microi.net
                 {
                     var item = result.Data;
                     var apiV8Code = (string)item.ApiV8Code ?? "";
-                    apiV8Code = V8Base64.Base64ToString(apiV8Code);
+                    apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                     return new DosResult<object>(1, new
                     {
@@ -421,7 +500,7 @@ namespace Microi.net
                 if (result.Code == 1 && result.Data != null)
                 {
                     var apiV8Code = (string)result.Data.ApiV8Code ?? "";
-                    apiV8Code = V8Base64.Base64ToString(apiV8Code);
+                    apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                     return new DosResult<object>(1, new
                     {
@@ -474,7 +553,7 @@ namespace Microi.net
                     foreach (var item in result.Data)
                     {
                         var apiV8Code = (string)item.ApiV8Code ?? "";
-                        apiV8Code = V8Base64.Base64ToString(apiV8Code);
+                        apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                         list.Add(new
                         {
@@ -518,51 +597,58 @@ namespace Microi.net
         {
             try
             {
-                var getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null)
                 {
-                    OsClient = osClient,
-                    _Where = new List<object>()
-                    {
-                        new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        
-                    }
-                });
+                    return new DosResult<object>(0, null, $"未找到租户数据库连接：{osClient}");
+                }
 
-                if (getResult.Code != 1 || getResult.Data == null)
+                var getSection = client.Db.FromSql("SELECT Id FROM sys_apiengine WHERE ApiEngineKey=?key AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
+                    .AddInParameter("?key", apiEngineKey);
+                getSection.SetCommandTimeout(10);
+                var id = getSection.ToScalar<string>();
+
+                if (id.DosIsNullOrWhiteSpace())
                 {
                     return new DosResult<object>(0, null, $"未找到接口引擎：{apiEngineKey}");
                 }
 
-                var existingEngine = JObject.FromObject(getResult.Data);
-                var id = existingEngine.Value<string>("Id");
+                var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                var plainCode = apiV8Code ?? "";
+                var updateSection = client.Db.FromSql("UPDATE sys_apiengine SET ApiV8Code=?code, UpdateTime=?now WHERE Id=?id")
+                    .AddInParameter("?code", plainCode)
+                    .AddInParameter("?now", now)
+                    .AddInParameter("?id", id);
+                updateSection.SetCommandTimeout(10);
+                var affected = updateSection.ExecuteNonQuery();
 
-                var updateParam = new JObject
+                if (affected <= 0)
                 {
-                    ["OsClient"] = osClient,
-                    ["Id"] = id,
-                    ["ApiEngineKey"] = apiEngineKey,
-                    ["ApiV8Code"] = apiV8Code ?? "",
-                    ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    ["_InvokeType"] = "Client"
-                };
-                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", updateParam);
-
-                if (updateResult.Code == 1)
-                {
-                    var cacheResult = await RefreshApiEngineRouteCache(osClient, apiEngineKey, id);
-                    if (cacheResult.Code != 1)
-                    {
-                        return new DosResult<object>(0, null, cacheResult.Msg);
-                    }
-
-                    return new DosResult<object>(1, new
-                    {
-                        Message = $"接口引擎 [{apiEngineKey}] 代码已同步到数据库",
-                        UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                    });
+                    return new DosResult<object>(0, null, $"接口引擎 [{apiEngineKey}] 代码未更新");
                 }
 
-                return new DosResult<object>(updateResult.Code, updateResult.Data, updateResult.Msg);
+                var cacheRefreshStatus = "OK";
+                var cacheTask = Task.Run(() => RefreshApiEngineRouteCache(osClient, apiEngineKey, id));
+                var completedTask = await Task.WhenAny(cacheTask, Task.Delay(3000));
+                if (completedTask == cacheTask)
+                {
+                    var cacheResult = await cacheTask;
+                    if (cacheResult.Code != 1)
+                    {
+                        cacheRefreshStatus = cacheResult.Msg;
+                    }
+                }
+                else
+                {
+                    cacheRefreshStatus = "刷新接口缓存超时，代码已保存到数据库；接口路由缓存将在重启或后续刷新后生效";
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    Message = $"接口引擎 [{apiEngineKey}] 代码已同步到数据库",
+                    UpdateTime = now,
+                    CacheRefresh = cacheRefreshStatus
+                });
             }
             catch (Exception ex)
             {
@@ -694,7 +780,7 @@ namespace Microi.net
                                 var localTime = DateTime.Parse(item.LocalUpdateTime);
                                 if (dbTime > localTime)
                                 {
-                                    var dbCode = V8Base64.Base64ToString((string)result.Data.ApiV8Code ?? "");
+                                    var dbCode = DecodeLegacyApiV8Code((string)result.Data.ApiV8Code ?? "");
                                     conflicts.Add(new
                                     {
                                         ApiEngineKey = item.ApiEngineKey,
@@ -732,109 +818,64 @@ namespace Microi.net
             string osClient, string apiEngineKey, string v8Code,
             JObject paramData, dynamic currentToken, HttpContext httpContext)
         {
-            if (v8Code.DosIsNullOrWhiteSpace() && apiEngineKey.DosIsNullOrWhiteSpace())
+            if (apiEngineKey.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<object>(0, null, "V8Code 和 ApiEngineKey 不能同时为空");
+                return new DosResult<object>(0, null, "ApiEngineKey 不能为空。MCP 执行接口引擎必须走真实接口引擎上下文。");
             }
 
             try
             {
-                // 如果没传代码，从数据库获取
-                if (v8Code.DosIsNullOrWhiteSpace() && !apiEngineKey.DosIsNullOrWhiteSpace())
+                var executeParam = paramData != null ? (JObject)paramData.DeepClone() : new JObject();
+                executeParam["OsClient"] = osClient;
+                executeParam["ApiEngineKey"] = apiEngineKey;
+                executeParam["_InvokeType"] = "Server";
+                if (!v8Code.DosIsNullOrWhiteSpace())
                 {
-                    var getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
-                    {
-                        OsClient = osClient,
-                        _SelectFields = new[] { "ApiV8Code" },
-                        _Where = new List<object>()
-                        {
-                            new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                            
-                        }
-                    });
-
-                    if (getResult.Code != 1 || getResult.Data == null)
-                    {
-                        return new DosResult<object>(0, null, $"未找到接口引擎：{apiEngineKey}");
-                    }
-
-                    v8Code = V8Base64.Base64ToString((string)getResult.Data.ApiV8Code ?? "");
+                    executeParam["_McpDebugExecute"] = true;
+                    executeParam["_McpDebugV8Code"] = v8Code;
                 }
-
-                // 获取 OsClient 模型
-                var osClientResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_osclients", new
+                try
                 {
-                    OsClient = osClient,
-                    _Where = new List<object>()
+                    if (currentToken?.CurrentUser != null)
                     {
-                        new List<object>() { "OsClient", "=", osClient }
+                        executeParam["_CurrentUser"] = JToken.FromObject(currentToken.CurrentUser);
                     }
-                });
+                }
+                catch { }
 
-                // 获取 SysConfig
-                var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_config", new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>()
-                    {
-                        new List<object>() { "OsClient", "=", osClient }
-                    }
-                });
-
-                // 捕获 Console 输出
                 var consoleOutput = new StringBuilder();
                 var originalOut = Console.Out;
                 var stringWriter = new System.IO.StringWriter(consoleOutput);
-
-                var v8EngineParam = new V8EngineParam()
-                {
-                    HttpContext = httpContext,
-                    OsClient = osClient,
-                    OsClientModel = osClientResult?.Data,
-                    SysConfig = sysConfigResult?.Data,
-                    EventName = apiEngineKey ?? "DebugExecute",
-                    ApiEngineKey = apiEngineKey ?? "",
-                    InvokeType = "Server",
-                    Param = paramData,
-                    CurrentUser = currentToken.CurrentUser,
-                    CurrentSysUser = currentToken.CurrentUser,
-                    V8Code = v8Code,
-                    Action = new Dictionary<string, object>()
-                };
+                var stopwatch = Stopwatch.StartNew();
 
                 Console.SetOut(stringWriter);
                 try
                 {
-                    var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                    var apiResult = await MicroiEngine.ApiEngine.RunAsync(executeParam);
+                    stopwatch.Stop();
                     Console.SetOut(originalOut);
 
-                    if (v8RunResult.Code == 1)
+                    var resultCode = ExtractResultCode(apiResult, 1);
+                    var resultMsg = ExtractResultMsg(apiResult);
+                    return new DosResult<object>(resultCode, new
                     {
-                        var resultParam = v8RunResult.Data;
-                        return new DosResult<object>(1, new
-                        {
-                            Result = resultParam?.Result,
-                            ConsoleOutput = consoleOutput.ToString(),
-                            ExecuteTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                        });
-                    }
-                    else
-                    {
-                        return new DosResult<object>(0, new
-                        {
-                            ConsoleOutput = consoleOutput.ToString(),
-                            ExecuteTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                        }, v8RunResult.Msg ?? "执行失败");
-                    }
+                        Result = apiResult,
+                        Data = apiResult,
+                        ConsoleOutput = SplitConsoleOutput(consoleOutput.ToString()),
+                        ExecutionTime = stopwatch.ElapsedMilliseconds,
+                        ExecuteTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    }, resultMsg);
                 }
                 catch (Exception runEx)
                 {
+                    stopwatch.Stop();
                     Console.SetOut(originalOut);
                     return new DosResult<object>(0, new
                     {
-                        ConsoleOutput = consoleOutput.ToString(),
+                        ConsoleOutput = SplitConsoleOutput(consoleOutput.ToString()),
                         Error = runEx.Message,
                         StackTrace = runEx.StackTrace,
+                        ExecutionTime = stopwatch.ElapsedMilliseconds,
                         ExecuteTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                     }, "V8引擎执行异常：" + runEx.Message);
                 }

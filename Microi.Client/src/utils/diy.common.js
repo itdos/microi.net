@@ -2326,6 +2326,9 @@ var DiyCommon = {
             process: function(field, formData, ctx) {
                 var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
                     ? "" : formData[field.Name];
+                if (DiyCommon.IsNull(rawValue)) {
+                    return "";
+                }
                 
                 // 普通数据源 Data：值就是字符串数组中的某一项（如 "齐套"），永远不要包装成对象
                 // 修复 bug：用户可能在 Data 源上误配置了 SelectLabel/SelectSaveField，
@@ -2382,6 +2385,31 @@ var DiyCommon = {
                 
                 // 有 SelectLabel 或 SelectSaveField 配置：数据是对象或需要转换为对象
                 if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                    var saveFieldForRawValue = field.Config.SelectSaveField || field.Config.SelectLabel;
+                    var rawFirstValue = null;
+                    if (Array.isArray(rawValue)) {
+                        rawFirstValue = rawValue.find(function(item) { return !DiyCommon.IsNull(item); });
+                    } else if (typeof rawValue === 'string') {
+                        var rawTrimmed = rawValue.trim();
+                        if (rawTrimmed.startsWith("[") && rawTrimmed.endsWith("]")) {
+                            try {
+                                var rawArray = JSON.parse(rawTrimmed);
+                                if (Array.isArray(rawArray)) {
+                                    rawFirstValue = rawArray.find(function(item) { return !DiyCommon.IsNull(item); });
+                                }
+                            } catch (e) { }
+                        }
+                    }
+                    if (!DiyCommon.IsNull(rawFirstValue)) {
+                        if (field.Data && field.Data.length > 0) {
+                            var rawFound = field.Data.find(function(item) {
+                                return item && item[saveFieldForRawValue] == rawFirstValue;
+                            });
+                            if (rawFound) return rawFound;
+                        }
+                        return rawFirstValue;
+                    }
+
                     var jsonValue = DiyCommon.GetFieldJsonValue(field, formData, false);
                     
                     // 如果GetFieldJsonValue返回的是字符串（解析失败），尝试从field.Data中查找完整对象
@@ -2409,10 +2437,6 @@ var DiyCommon = {
                 return value;
             },
             getDefaultValue: function(field) {
-                if (field.Config && field.Config.DataSource === "KeyValue") return "";
-                if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    return {};
-                }
                 return "";
             }
         },
