@@ -181,7 +181,7 @@
         }
         .el-dialog__header {
             padding-top: 10px;
-            padding-bottom: 0px;
+            padding-bottom: 10px;//如果这里设置0px会导致移动端显示标题时底部没空隙
         }
         .el-card__body{
             padding: 0;
