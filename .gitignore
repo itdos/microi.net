@@ -50,7 +50,8 @@ package-lock.json
 
 # 忽略开发配置文件
 appsettings.*.json
-
+# 本地环境标识文件（每位开发者自行创建，不提交 git）
+.microi-local
 
 nuget-push-all.sh
 
@@ -112,3 +113,4 @@ AI进销存V3
 dev.log
 .tmp-build
 *.csproj.lscache
+switch-env.ps1

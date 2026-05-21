@@ -1,6 +1,6 @@
 ---
 name: playwright-e2e
-description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。Use when testing PC Vue, uni-app H5, websites, page engines, mobile malls, ApiEngine/FormEngine contracts, login flows, write-flow closure, network guards, screenshots, and reports.
+description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。Use when testing PC Vue, uni-app H5, websites, page engines, mobile malls, ApiEngine/FormEngine contracts, login flows, write-flow closure, network guards, screenshots, reports, and Playwright Test for VSCode integration.
 ---
 
 # Microi 吾码 Playwright E2E 自动化测试
@@ -63,6 +63,28 @@ PW_TEST_ACCOUNT=admin
 PW_TEST_PASSWORD=123456
 PW_HOME_PATH=/#/pages/index/index
 ```
+
+## 服务自启动纪律（必做）
+
+执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
+
+默认本地后端：
+
+```powershell
+dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api
+```
+
+默认 PC 前端：
+
+```powershell
+Push-Location Microi.Client
+npm run dev -- --host 0.0.0.0 --port 1988
+Pop-Location
+```
+
+默认乐闪购 H5 前端仍按项目自身命令启动，例如 `npm run dev:h5 -- --host 0.0.0.0 --port 5192` 或测试配置里的 `PW_WEB_SERVER_COMMAND`。如果目标测试同时依赖 PC 管理端和移动 H5，需要分别启动对应前端；不要用一个前端服务替代另一个业务入口。
+
+执行顺序：先检查端口/健康接口是否可达；不可达则用后台终端启动；等待服务输出监听地址；再重试接口同步、页面打开、Playwright 截图和断言。只有启动命令失败、缺少依赖、数据库连接失败、端口冲突无法自动换端口且无替代配置时，才算真正阻塞，并且要报告具体失败命令和错误。
 
 ## 表单引擎卡死/递归更新全自动化诊断
 
@@ -471,11 +493,27 @@ tests/e2e/
 
 ## 与 VS Code 插件的配合
 
-VS Code 插件应提供三类能力：
+### Microi VS Code 插件
+
+Microi VS Code 插件应提供三类能力：
 
 - 初始化：创建 `playwright.config.js`、`tests/e2e/helpers/microi.js`、示例 `smoke.spec.js`、`.env.e2e.example`，并补齐 `package.json` 脚本。
 - 运行：在当前前端项目目录执行 `npm run test:e2e`，并提供打开报告入口。
 - 上下文：从后端 `GetPlaywrightContext` 拉取当前租户可测路由和接口引擎，写入 `tests/e2e/.microi-playwright-context.json`，供 AI 生成用例时参考。
+
+### Playwright Test for VSCode（官方插件）
+
+官方插件 `Playwright Test for VSCode` 与 Microi Playwright 规范不冲突。它只是同一套 `@playwright/test` 的 VS Code 测试视图/调试入口，读取项目里的 `playwright.config.js`、`testDir`、`projects`、`webServer`、`use` 配置；CLI 的 `npx playwright test` 与插件按钮运行的是同一批 spec。
+
+推荐共用方式：
+
+1. 项目内保留 `playwright.config.js` 作为唯一配置源，不为插件单独复制一份配置。
+2. `webServer.reuseExistingServer: true`，这样插件运行时如果 H5 静态服务已启动就复用，否则按配置启动。
+3. 本地 H5 先执行 `npm run build:h5:local`；插件再运行 `tests/e2e/*.spec.js` 时会服务 `dist/build/h5`。
+4. Windows 本机推荐 `PW_BROWSER_CHANNEL=msedge` 或在配置中默认 `channel: 'msedge'`，避免每台机器重复下载 Chromium。
+5. 需要自定义 `PW_API_BASE/PW_API_ENV/PW_PORT/PW_OS_CLIENT` 时，优先写入 `playwright.config.js` 的默认值或 VS Code 插件环境变量设置；CI 和一次性运行再用终端环境变量覆盖。
+6. 插件适合单个用例调试、断点、Trace 查看；最终交付仍要跑 CLI 全量命令并查看 `tests/e2e/report`。
+7. 插件截图/trace 与 CLI 使用同一目录；视觉回归仍必须 `view_image` 人眼复核关键 fullPage 截图。
 
 ## CI 建议
 

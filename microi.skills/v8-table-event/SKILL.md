@@ -7,6 +7,27 @@ description: Microi V8 table event development. Use when writing InFormV8, Submi
 
 你正在开发 Microi 吾码平台的 V8 表单事件。事件绑定在表单引擎的表上，在数据操作的不同阶段自动触发。
 
+## 本地优先与版本头（必做）
+
+AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<项目>/表单引擎/.../<EventType>.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。若插件显示“本地和远端不一致”，先读取本地与远端并合并有效差异，不能直接覆盖。
+
+每一次修改、上传、推送 `InFormV8.js`、`SubmitFormV8.js`、`SubmitBeforeServerV8.js`、`SubmitAfterServerV8.js`、`OutFormV8.js`、`DataFilterV8.js` 等事件文件，都必须维护顶部版本区域。版本号从 `v1.0.0` 开始；每次上传/推送/修改递增 1；补丁位和次版本位最大为 9 并向前进位（`v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`）。代码头只写完整功能说明，不写修改历史、时间戳或 ChangeLog。
+
+```javascript
+/*
+ * V8 Event
+ * TableKey: your_table_key
+ * EventType: SubmitBeforeServerV8
+ * Version: v1.0.0
+ * Function:
+ * - 完整说明该事件的触发时机、校验/加工逻辑、读写字段和阻止提交条件。
+ */
+```
+
+同步流程：`读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认版本头一致 -> 执行触发该事件的最小表单操作验证`。修改记录不得写进事件代码头；如果将来事件存储表增加 `Version`/`ChangeHistory` 字段，工具也必须按接口引擎同样规则兼容写入：最新说明拼接到最前面，并保留原有全部历史文字。
+
+生成 V8 事件代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；提交前校验、提交后联动、字段显隐、数据脱敏、跨表写入、复杂条件判断等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
+
 ## 事件类型
 
 | 事件 | 运行端 | V8.EventName | 触发时机 | 用途 |
