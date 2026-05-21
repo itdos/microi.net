@@ -876,7 +876,8 @@
         justify-content: flex-end;
     }
 }
-.diy-child-table{
+.diy-child-table,
+.el-dialog{
     .mobile-header {
         position: relative;
         .back-icon{
@@ -908,7 +909,8 @@
         padding-top: calc(10px + var(--status-bar-height, 0px)) !important; // 头部高度 + 安全区域
     }
 }
-.diy-child-table{
+.diy-child-table,
+.el-dialog{
     .table-rowlist-tabs{
     @media screen and (max-width: 768px) {
             padding-top: 0px !important; // 子表不需要额外间距

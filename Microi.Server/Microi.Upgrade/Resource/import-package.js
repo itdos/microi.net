@@ -1206,9 +1206,12 @@ try {
 
                     }
 
-                    //清除缓存
+                    //清除旧Id、旧Key的缓存（Id已被替换，旧缓存失效）
                     V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.Id.toLowerCase()}`);
                     V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.ApiEngineKey.toLowerCase()}`);
+                    if (checkByKeyResult.Data.ApiAddress) {
+                        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.ApiAddress.toLowerCase()}`);
+                    }
                     existingId = apiEngine.Id;
                 }
             }
@@ -1224,6 +1227,16 @@ try {
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
+                    // 同步缓存（更新最新数据）
+                    if (apiEngine.ApiEngineKey) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiEngineKey.toLowerCase()}`, modelCopy);
+                    }
+                    if (apiEngine.Id) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.Id.toLowerCase()}`, modelCopy);
+                    }
+                    if (apiEngine.ApiAddress) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiAddress.toLowerCase()}`, modelCopy);
+                    }
                 } else {
                     debugLog['apiengine_upt_error_' + existingId] = uptResult.Msg;
                 }
@@ -1232,6 +1245,16 @@ try {
                 var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
+                    // 同步缓存（写入新数据）
+                    if (apiEngine.ApiEngineKey) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiEngineKey.toLowerCase()}`, modelCopy);
+                    }
+                    if (apiEngine.Id) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.Id.toLowerCase()}`, modelCopy);
+                    }
+                    if (apiEngine.ApiAddress) {
+                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiAddress.toLowerCase()}`, modelCopy);
+                    }
                 } else {
                     debugLog['apiengine_add_error_' + (apiEngine.Id || apiEngine.ApiEngineKey)] = addResult.Msg;
                 }

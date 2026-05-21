@@ -14,7 +14,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "5.1.9.9";
+        public static string Version = "5.5.5.0";
         
         /// <summary>
         /// 从嵌入资源读取文件内容
