@@ -131,6 +131,21 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 如果接口返回了不可用图片，优先修数据源、上传平台文件或修接口引擎，不要用第三方 fallback 把测试“跑绿”。
 - 对分享海报二维码，优先断言平台接口，如 `/api/Os/CreateQRCodeImage`，或平台接口引擎返回的 HDFS 图片路径。
 
+## 乐闪购移动端回归纪律
+
+处理乐闪购 `ai-helper/数字经济商城/mci.lsg.uniapp` 的交易、资产、登录、购物车、抢购、约单、充值、分享或图片相关问题时，不能只改代码后让用户手工发现问题。完成实现后必须至少执行：
+
+```powershell
+Set-Location 'd:\Work\microi.net.all\ai-helper\数字经济商城\mci.lsg.uniapp'
+$env:PW_API_BASE='https://localhost:7266'
+$env:PW_API_ENV='development'
+$env:PW_PORT='5192'
+npm run build:h5:local
+npx playwright test --reporter=list
+```
+
+当前业务口径要在测试里同步表达：普通商品只能提货卡支付，兑换金商品只能兑换金支付；积分充值只允许系统档位并生成唯一尾数金额；图片和二维码必须来自平台接口/HDFS；我的页绿色积分和兑换金提货入口按当前口径隐藏；约单同意后两张卡进入已约单，普通抢购必须被拒绝。
+
 表单引擎冻结高频根因：
 
 - 在 computed/render/watch 路径里写回同一个响应式依赖，例如 `field.Data` watcher 里再次写 `field.Data`。
@@ -139,6 +154,75 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 前端 InFormV8 或字段 V8 中持续 `FormSet` 同一字段，且没有值相等保护。
 
 当前 Microi.Client 的表单冻结诊断文件是 `tests/form-engine-freeze-trace.spec.mjs`。新增类似测试时，可以复制它的结构：`addInitScript` 注入 `ApiBase/OsClient/Trace`，登录后跳转目标 hash，等待设计/表单 DOM，延迟观察响应性，最后 attach trace 和 console。
+
+## 文字对比度与可读性自动化检查（必做）
+
+凡涉及前端样式、卡片、芯片、按钮、价格区间筛选条、退出登录、徽章、覆盖文字（金色/渐变背景上的小字）、列表副标题、空状态等，**测试与人眼复核都必须执行对比度检查**。历史教训：「1000 以下」筛选条、「退出登录」幽灵按钮、`#7A6A58` 浅灰副标题在 `#F8F3EA` 米色底色下肉眼几乎不可见，但接口/DOM 断言全部通过。
+
+### 自动化对比度审计
+
+对每个核心页面，遍历可见文本节点，计算前景色与最近不透明背景色的 WCAG 对比度，<4.5:1 直接失败：
+
+```js
+const lowContrast = await page.evaluate(() => {
+  const ratio = (fg, bg) => {
+    const lum = (c) => {
+      const v = c.map(x => x/255).map(x => x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4));
+      return 0.2126*v[0] + 0.7152*v[1] + 0.0722*v[2];
+    };
+    const parse = (s) => (s.match(/\d+(\.\d+)?/g) || []).slice(0,3).map(Number);
+    const lf = lum(parse(fg)); const lb = lum(parse(bg));
+    return (Math.max(lf,lb)+0.05)/(Math.min(lf,lb)+0.05);
+  };
+  const findBg = (el) => {
+    let cur = el;
+    while (cur) {
+      const c = getComputedStyle(cur).backgroundColor;
+      if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+      cur = cur.parentElement;
+    }
+    return 'rgb(255,255,255)';
+  };
+  const issues = [];
+  document.querySelectorAll('*').forEach(el => {
+    const t = (el.innerText || '').trim();
+    if (!t || el.children.length) return;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.5) return;
+    const fz = parseFloat(cs.fontSize);
+    if (fz < 9) return;
+    const r = ratio(cs.color, findBg(el));
+    if (r < 4.5) issues.push({ text: t.slice(0,40), color: cs.color, bg: findBg(el), ratio: +r.toFixed(2), fontSize: fz });
+  });
+  return issues;
+});
+expect(lowContrast, '低对比度文字: ' + JSON.stringify(lowContrast.slice(0,5))).toEqual([]);
+```
+
+### 必须人眼复核（view_image）的页面
+
+完成功能后强制 `fullPage` 截图并 `view_image` 人眼审阅以下页面，截图存入 `tests/e2e/screenshots/`：
+
+| 页面 | 路径 | 重点检查 |
+|------|------|---------|
+| 首页 | `/#/pages/index/index` | 横幅、公告、商品卡价格 |
+| 分类 | `/#/pages/category/category` | tab、商品标题副信息 |
+| 商品详情 | `/#/pages/product/detail?id=...` | 价格、规格、按钮 |
+| 购物车 | `/#/pages/cart/cart` | 数量、合计、结算按钮 |
+| 库存转让区 | `/#/pages/zone/transfer` | **价格区间芯片（顶部）**、卡号、持有人、转让价 |
+| 抢购详情 | `/#/pages/zone/grab-detail?id=...` | **真实卖家昵称**、规则文字、底部按钮 |
+| 订单列表/详情 | `/#/pages/order/buy-list` 等 | 状态徽章、金额、提交按钮 |
+| 我的 | `/#/pages/mine/mine` | **退出登录按钮**、菜单标签、积分数字 |
+
+判定标准：任意小号文字 < 12px 在彩色/渐变背景上，或纯文字按钮在与页面同色调底色上无明显边框/填充——一律视为缺陷，必须修复后再发版。
+
+### 设计禁忌（直接判失败）
+
+1. `mci-btn-ghost` 在米色 / 浅金 / 暖红等近似底色上当独立操作按钮使用——必须改成 `mci-btn-primary` 或显式覆盖背景填充。
+2. `color: #7A6A58 / #8C7B68 / #999` 等中性灰直接放在 `#F8F3EA` 等暖色底，且字号 ≤ 22rpx。
+3. 渐变红/金背景上写 `opacity: .85` 的小字。
+4. 金色 `#D8A23A` 文本放在白色或浅金底（必须改深红 `#8E0613` 或加深底）。
+5. 价格区间、状态、筛选这类**导航/筛选元素出现在列表中部作为标题**——必须移到顶部 sticky 工具栏，并与正文形成色彩区隔。
 
 ## 安装
 
@@ -314,6 +398,12 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
 5. 接口引擎断言必须检查 `HTTP ok`、`Code`、`Msg` 和关键 `Data` 字段。
 6. 涉及写库的用例必须使用专用测试账号和可重复数据，避免污染生产数据。
 7. 截图只用于关键节点和失败场景；不要让截图成为唯一断言。
+8. **每条业务主线 spec 必须有"图片回归检查"步骤**：在涉及商品列表、商品详情、提货卡、海报、头像、Banner 的页面，必须 `await page.screenshot({ path: 'tests/e2e/screenshots/<spec>.png', fullPage: true })`，并在测试报告生成后用 `view_image` 工具肉眼复核截图，确认：
+   - 没有出现纯渐变/首字母占位/空白图位（这通常意味着 `sanitizeAssetUrl` 等前缀工具被遗漏，或图片字段拿到了相对路径）
+   - 商品/卡片图都真实显示
+   - 价格、卖家、卡号等文案不出错位
+   - 同步参见 [uniapp-mall-assets](../uniapp-mall-assets/SKILL.md) 中的 FileServer 前缀规范。
+9. 用 `page.on('response', r => { if (r.url().includes('/file/') && !r.ok()) failedAssets.push(r.url()); })` 监听全部资源请求，断言 `failedAssets.length === 0`，能在断言前就抓到 404 图片。
 
 ## 最少冒烟集
 
