@@ -1,7 +1,8 @@
 <template>
     <el-input
-        v-if="field.Component == 'Text' || field.Component == 'Guid'"
+        v-if="field.Component == 'Text' || field.Component == 'Guid' || field.Component == 'Password'"
         v-model="ModelValue"
+        :type="field.Component == 'Password' || field.Config.TextShowPassword ? 'password' : 'text'"
         :clearable="TableInEdit ? false : true"
         :disabled="GetFieldReadOnly(field)"
         :placeholder="GetFieldPlaceholder(field)"
@@ -65,7 +66,7 @@
         <el-form label-width="100px" label-position="top" size="small" :inline="true">
             <el-divider content-position="left">显示设置</el-divider>
             
-            <el-form-item label="密码输入">
+            <el-form-item label="显示密码按钮">
                 <el-switch v-model="configForm.TextShowPassword" active-color="#ff6c04" inactive-color="#ccc" />
             </el-form-item>
 

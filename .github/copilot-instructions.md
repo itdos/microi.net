@@ -521,5 +521,6 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
+- `microi.skills/uniapp-mall-assets/SKILL.md` — 商城 uni-app/Vue 前端图片资源强制 sanitizeAssetUrl 规范
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）
