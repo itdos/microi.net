@@ -81,6 +81,8 @@ var url = V8.Method.GetPrivateFileUrl({
 
 接口引擎需要在配置中开启【**响应文件**】选项，然后返回特殊结构：
 
+平台后端会统一处理响应文件：图片和 PDF 自动 `inline` 在浏览器中打开，其它类型默认下载；PDF、PNG、JPEG、GIF、WebP、AVIF、BMP、TIFF、ICO、SVG 等常见可预览类型会自动校验文件头。V8 代码不要手写复杂的文件头判断，只需要保证 `ContentType` 与真实文件内容一致。
+
 ```javascript
 // 模板：导出 Excel
 var excelResult = V8.Office.ExportExcel({...});
@@ -103,6 +105,17 @@ return {
     FileByteBase64: System.Convert.ToBase64String(resp.RawBytes)
   }
 };
+
+// 模板：返回 PDF（浏览器直接预览；后端自动校验 %PDF- 文件头）
+var pdfResp = V8.Http.GetResponse({ Url: 'https://example.com/report.pdf' });
+return {
+  Code: 1,
+  Data: {
+    FileName: 'report.pdf',
+    ContentType: 'application/pdf',
+    FileByteBase64: System.Convert.ToBase64String(pdfResp.RawBytes)
+  }
+};
 ```
 
 常用 ContentType：
@@ -110,6 +123,8 @@ return {
 - `application/pdf`
 - `image/png` / `image/jpeg`
 - `application/octet-stream`（通用二进制）
+
+注意：如果远程系统返回的是错误页、登录页、业务容器格式（例如文件头不是 `%PDF-` 的伪 PDF），不要在 V8 里伪装成 PDF。后端会返回 JSON 错误，包含 `ExpectedFirstAscii`、`ActualFirstAscii`、`ActualFirstHex`、`Length`，按这些信息排查上游下载接口。
 
 ## 下载远程文件并存到 HDFS
 
