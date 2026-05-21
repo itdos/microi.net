@@ -195,7 +195,11 @@ V8.Result = {
 >* 当开启允许匿名调用时，则无需传入token，但注意在V8引擎中访问**V8.CurrentUser**为{}
 
 ### 响应文件
->测试访问接口引擎地址会直接下载图片：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
+接口引擎开启【响应文件】后，只需要返回 `FileName`、`ContentType`、`FileByteBase64` 三个字段。平台会自动处理响应头：图片和 PDF 在浏览器中直接打开，Excel、压缩包等其它类型保持下载。
+
+平台会校验常见图片和 PDF 的文件头，避免把非 PDF 内容伪装成 `application/pdf` 导致浏览器无法预览。比如 PDF 必须以 `%PDF-` 开头；如果远程系统返回的是业务容器格式、错误页、登录页等内容，接口会返回 JSON 错误，方便排查。
+
+测试访问接口引擎地址：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
 ```javascript
 var downResult = V8.Http.GetResponse({
   Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
@@ -210,6 +214,95 @@ return {
   }
 };
 ```
+
+返回 PDF 的写法相同，V8 代码不需要手动解析文件头：
+
+```javascript
+var downResult = V8.Http.GetResponse({
+  Url : 'https://example.com/report.pdf'
+});
+return {
+  Code : 1,
+  Data : {
+    FileName : '报告.pdf',
+    ContentType : 'application/pdf',
+    FileByteBase64 : System.Convert.ToBase64String(downResult.RawBytes)
+  }
+};
+```
+
+如果返回 `Code: 1` 但 `ContentType` 与真实文件内容不匹配，后端会自动返回类似下面的 JSON 错误：
+
+```json
+{
+  "Code": 0,
+  "Msg": "响应文件内容与ContentType不匹配，浏览器无法正常预览或下载。",
+  "Data": {
+    "ContentType": "application/pdf",
+    "ExpectedFirstAscii": "%PDF-",
+    "ActualFirstAscii": "KD_C_PLM........",
+    "ActualFirstHex": "4B 44 5F 43 5F 50 4C 4D 00 00 08 00 00 1E 01 00",
+    "Length": 73216
+  }
+}
+```
+
+::: details ContentType 常用值清单
+> `ContentType` 必须与真实文件字节一致。平台会自动校验 PDF、PNG、JPEG、GIF、WebP、AVIF、BMP、TIFF、ICO、SVG 等常见可预览类型。
+
+| 文件类型 | ContentType | 常见后缀 |
+| --- | --- | --- |
+| PDF | `application/pdf` | `.pdf` |
+| PNG 图片 | `image/png` | `.png` |
+| JPEG 图片 | `image/jpeg` | `.jpg` `.jpeg` |
+| GIF 图片 | `image/gif` | `.gif` |
+| WebP 图片 | `image/webp` | `.webp` |
+| AVIF 图片 | `image/avif` | `.avif` |
+| SVG 图片 | `image/svg+xml` | `.svg` |
+| BMP 图片 | `image/bmp` | `.bmp` |
+| TIFF 图片 | `image/tiff` | `.tif` `.tiff` |
+| ICO 图标 | `image/x-icon` | `.ico` |
+| 普通文本 | `text/plain; charset=utf-8` | `.txt` `.log` |
+| HTML | `text/html; charset=utf-8` | `.html` `.htm` |
+| CSS | `text/css; charset=utf-8` | `.css` |
+| JavaScript | `text/javascript; charset=utf-8` | `.js` |
+| JSON | `application/json; charset=utf-8` | `.json` |
+| XML | `application/xml; charset=utf-8` | `.xml` |
+| CSV | `text/csv; charset=utf-8` | `.csv` |
+| Markdown | `text/markdown; charset=utf-8` | `.md` |
+| RTF | `application/rtf` | `.rtf` |
+| Word 旧版 | `application/msword` | `.doc` |
+| Word OpenXML | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `.docx` |
+| Excel 旧版 | `application/vnd.ms-excel` | `.xls` |
+| Excel OpenXML | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `.xlsx` |
+| PowerPoint 旧版 | `application/vnd.ms-powerpoint` | `.ppt` |
+| PowerPoint OpenXML | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | `.pptx` |
+| OpenDocument 文档 | `application/vnd.oasis.opendocument.text` | `.odt` |
+| OpenDocument 表格 | `application/vnd.oasis.opendocument.spreadsheet` | `.ods` |
+| OpenDocument 演示 | `application/vnd.oasis.opendocument.presentation` | `.odp` |
+| ZIP | `application/zip` | `.zip` |
+| 7z | `application/x-7z-compressed` | `.7z` |
+| RAR | `application/vnd.rar` | `.rar` |
+| TAR | `application/x-tar` | `.tar` |
+| GZip | `application/gzip` | `.gz` |
+| BZip2 | `application/x-bzip2` | `.bz2` |
+| WebM 视频 | `video/webm` | `.webm` |
+| MP4 视频 | `video/mp4` | `.mp4` |
+| MPEG 视频 | `video/mpeg` | `.mpeg` `.mpg` |
+| OGG 视频 | `video/ogg` | `.ogv` |
+| AVI 视频 | `video/x-msvideo` | `.avi` |
+| MOV 视频 | `video/quicktime` | `.mov` |
+| MP3 音频 | `audio/mpeg` | `.mp3` |
+| WAV 音频 | `audio/wav` | `.wav` |
+| OGG 音频 | `audio/ogg` | `.ogg` |
+| AAC 音频 | `audio/aac` | `.aac` |
+| FLAC 音频 | `audio/flac` | `.flac` |
+| WOFF 字体 | `font/woff` | `.woff` |
+| WOFF2 字体 | `font/woff2` | `.woff2` |
+| TTF 字体 | `font/ttf` | `.ttf` |
+| OTF 字体 | `font/otf` | `.otf` |
+| 二进制流 | `application/octet-stream` | 任意未知文件 |
+:::
 ## 接口测试
 >接口引擎表单提供了接口运行测试的功能（由表单引擎驱动）
 

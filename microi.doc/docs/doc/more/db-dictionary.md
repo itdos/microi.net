@@ -532,7 +532,7 @@
 | `IsEnable` | 启用 | `bit` | `Switch` | 启用 |
 | `ResponseFile` | 响应文件 | `int` | `Switch` | 响应文件 |
 | `AllowAnonymous` | 允许匿名调用 | `bit` | `Switch` | 允许匿名调用 |
-| `TestParam` | 参数 | `mediumtext` | `Textarea` | 请输入标准的JSON格式参数，如：{ "Id" : "xxxx" }，不支持单引号：{ 'Id' : 'xxxx; } |
+| `TestParam` | 参数 | `mediumtext` | `Textarea` | 请输入标准的JSON格式参数，如：&#123; "Id" : "xxxx" &#125;，不支持单引号：&#123; 'Id' : 'xxxx' &#125; |
 
 ### `sys_datasource` - 数据源引擎
 
@@ -698,7 +698,7 @@
 | `ClientSecrets` | Token密钥 | `varchar(50)` | `Text` | 废弃字段 |
 | `MQVitrualHost` | VitrualHost | `varchar(50)` | `Text` | VitrualHost |
 | `DbReadConn` | 数据库连接字符串（读） | `varchar(500)` | `Text` | 为空则取DbConn |
-| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 需要在主库中配置所有saas库可能用到的前端访问域名，支持通配符，修改此配置后需要重启api的docker容器。示例值：http://localhost:2009;https://os.itdos.com;https://*.microi.net |
+| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 需要在主库中配置所有saas库可能用到的前端访问域名，支持通配符，修改此配置后需要重启api的docker容器。示例值：`http://localhost:2009;https://os.itdos.com;https://*.microi.net` |
 | `SessionAuthTimeout` | Token过期时间（PC） | `varchar(50)` | `Text` | 单位：分钟，默认20分钟 |
 | `MQUserName` | 用户名 | `varchar(50)` | `Text` | 用户名 |
 | `DomainName` | 域名 | `mediumtext` | `Text` | 多个域名使用英文分号分割，移动端建议使用m-开头。 |
