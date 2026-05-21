@@ -115,7 +115,10 @@ namespace Microi.net.Api
             {
                 return Ok(new DosResult(0, null, "ApiV8CodeBase64 不是有效的 UTF-8 Base64 字符串"));
             }
-            var result = await V8McpLogic.UpdateApiEngineCode(osClient, apiEngineKey, code);
+            var result = await V8McpLogic.UpdateApiEngineCode(
+                osClient, apiEngineKey, code,
+                param.Value<string>("Version"),
+                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"));
             return Ok(result);
         }
 
@@ -145,7 +148,9 @@ namespace Microi.net.Api
                 osClient, apiName, apiEngineKey,
                 param["ApiAddress"].Val<string>(), param["ApiRemark"].Val<string>(),
                 param["Lock"].Val<int>(), param["AllowAnonymous"].Val<int>(),
-                param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code);
+                param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code,
+                param.Value<string>("Version"),
+                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"));
             return Ok(result);
         }
 

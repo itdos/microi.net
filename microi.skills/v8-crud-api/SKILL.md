@@ -7,6 +7,30 @@ description: Microi V8 CRUD API engine development. Use when writing server-side
 
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。
 
+## 本地优先与版本头（必做）
+
+AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目>/接口引擎/.../*.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。插件提示“本地和远端不一致”时，必须先读取本地与远端代码并合并有效差异，不能盲目用任一侧覆盖另一侧。
+
+每一次修改、上传、推送接口引擎代码，都必须维护文件顶部版本区域。版本号从 `v1.0.0` 开始；每次上传/推送/修改递增 1；补丁位和次版本位最大为 9 并向前进位（`v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`）。代码头只写完整功能说明，不写修改历史、时间戳或 ChangeLog。推荐格式：
+
+```javascript
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: your_api_engine_key
+ * Version: v1.0.0
+ * Function:
+ * - 完整说明该接口引擎负责的业务功能、输入参数、关键返回字段和重要副作用。
+ */
+```
+
+同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key}?OsClient=... 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。
+
+如果保存或回读时出现 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听等服务不可达问题，不能提前中止。必须自动执行 `dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api` 启动后端，等待 `https://localhost:7266` 可达后重试同步；涉及 PC 页面联调或 Playwright 时，还要自动启动 `Microi.Client`：`npm run dev -- --host 0.0.0.0 --port 1988`。只有启动失败、依赖缺失、数据库连接失败或端口冲突无法处理时才报告阻塞。
+
+版本与历史同步规则：通过 MCP 或 VS Code 插件保存接口引擎时，必须同步写入 `sys_apiengine.Version`；修改记录只写入 `sys_apiengine.ChangeHistory`，不得写进代码头。`ChangeHistory` 是“修改历史说明”，每次更新都必须把最新说明拼接到最前面，并保留原有全部历史文字，禁止覆盖、清空或只保留最新一条。旧数据库可能没有 `Version`、`ChangeHistory` 字段，工具必须检测字段或失败回退，保证旧库仍可只更新 `ApiV8Code` 与 `UpdateTime`。
+
+生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
+
 ## 核心规则
 
 - 接口引擎文件是纯 JavaScript（Jint 引擎，非 Node.js）

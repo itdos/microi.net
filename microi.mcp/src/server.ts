@@ -319,7 +319,7 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
-- **microi_save_engine_code** — 只覆盖 ApiV8Code，不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
+- **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
@@ -832,14 +832,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_engine_code',
-    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Overwrites ApiV8Code only and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`,
+    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine'),
       code: z.string().describe('The complete JavaScript source code to save'),
+      functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
+      changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
     },
-    async ({ apiEngineKey, code }) => {
+    async ({ apiEngineKey, code, functionDescription, changeSummary }) => {
       try {
-        const result = await client.saveEngineCode(apiEngineKey, code);
+        const result = await client.saveEngineCode(apiEngineKey, code, { functionDescription, changeSummary });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
@@ -861,15 +863,19 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       apiName: z.string().describe('Display name of the engine'),
       category: z.string().optional().describe('Category to organize engines'),
       code: z.string().optional().describe('Initial JavaScript code for the engine'),
+      functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
+      changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
       apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
     },
-    async ({ apiEngineKey, apiName, category, code, apiAddress }) => {
+    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress }) => {
       try {
         const result = await client.createEngine({
           ApiEngineKey: apiEngineKey,
           ApiName: apiName,
           Category: category,
           Code: code,
+          functionDescription,
+          changeSummary,
           ApiAddress: apiAddress,
         });
         if (result.Code !== 1) {
@@ -961,15 +967,17 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_event_code',
-    `Save (update) V8 event code on Microi server (OsClient: ${osClient}). Overwrites existing event code.`,
+    `Save (update) V8 event code on Microi server (OsClient: ${osClient}). Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code.`,
     {
       formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
       eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
       code: z.string().describe('The complete JavaScript source code to save'),
+      functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
+      changeSummary: z.string().optional().describe('One-line change summary for audit/future compatible storage.'),
     },
-    async ({ formEngineKey, eventType, code }) => {
+    async ({ formEngineKey, eventType, code, functionDescription, changeSummary }) => {
       try {
-        const result = await client.saveEventCode(formEngineKey, eventType, code);
+        const result = await client.saveEventCode(formEngineKey, eventType, code, { functionDescription, changeSummary });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }

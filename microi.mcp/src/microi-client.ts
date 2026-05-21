@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { API } from './api-paths.js';
+import { prepareV8VersionedCode } from './v8-version.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const NO_LOGIN_CODE = 1001;
@@ -69,6 +70,8 @@ export interface ApiEngine {
   Code?: string;
   ApiRemark?: string;
   Description?: string;
+  Version?: string;
+  ChangeHistory?: string;
   UpdateTime?: string;
 }
 
@@ -81,6 +84,7 @@ export interface V8Event {
   V8Code?: string;
   Code?: string;
   TableName?: string;
+  Version?: string;
   UpdateTime?: string;
 }
 
@@ -452,26 +456,54 @@ export class MicroiClient {
     });
   }
 
-  async saveEngineCode(apiEngineKey: string, code: string): Promise<ApiResponse> {
+  async saveEngineCode(apiEngineKey: string, code: string, options?: { functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    let remote: ApiEngine | undefined;
+    try {
+      const remoteResult = await this.getEngineCode(apiEngineKey);
+      remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+    } catch {
+      remote = undefined;
+    }
+    const prepared = prepareV8VersionedCode({
+      kind: 'ApiEngine',
+      key: apiEngineKey,
+      currentCode: code,
+      remoteCode: remote?.ApiV8Code || remote?.Code,
+      remoteVersion: remote?.Version,
+      functionDescription: options?.functionDescription,
+      changeSummary: options?.changeSummary || `保存接口引擎 ${apiEngineKey}`,
+    });
     return this.post(API.UPDATE_ENGINE_CODE, {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
-      ApiV8CodeBase64: Buffer.from(code, 'utf8').toString('base64'),
+      ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
+      Version: prepared.version,
+      ChangeHistory: prepared.changeHistory,
     });
   }
 
-  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string; ApiAddress?: string }): Promise<ApiResponse> {
+  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string; ApiAddress?: string; functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
     // 默认 ApiAddress 为 /apiengine/{key}，否则平台路由匹配会 404
     const payload: any = {
       OsClient: this.config.osClient,
       ...data,
     };
     const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
-    if (code) {
-      payload.ApiV8CodeBase64 = Buffer.from(code, 'utf8').toString('base64');
-      delete payload.Code;
-      delete payload.ApiV8Code;
-    }
+    const prepared = prepareV8VersionedCode({
+      kind: 'ApiEngine',
+      key: data.ApiEngineKey,
+      currentCode: code,
+      functionDescription: payload.functionDescription,
+      changeSummary: payload.changeSummary || `创建接口引擎 ${data.ApiEngineKey}`,
+      initial: true,
+    });
+    payload.ApiV8CodeBase64 = Buffer.from(prepared.code, 'utf8').toString('base64');
+    payload.Version = prepared.version;
+    payload.ChangeHistory = prepared.changeHistory;
+    delete payload.Code;
+    delete payload.ApiV8Code;
+    delete payload.functionDescription;
+    delete payload.changeSummary;
     if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
       payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
     }
@@ -502,12 +534,31 @@ export class MicroiClient {
     });
   }
 
-  async saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse> {
+  async saveEventCode(formEngineKey: string, eventType: string, code: string, options?: { functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    let remote: V8Event | undefined;
+    try {
+      const remoteResult = await this.getEventCode(formEngineKey, eventType);
+      remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+    } catch {
+      remote = undefined;
+    }
+    const prepared = prepareV8VersionedCode({
+      kind: 'V8Event',
+      key: formEngineKey,
+      eventType,
+      currentCode: code,
+      remoteCode: remote?.V8Code || remote?.Code,
+      remoteVersion: remote?.Version,
+      functionDescription: options?.functionDescription,
+      changeSummary: options?.changeSummary || `保存 V8 事件 ${formEngineKey}/${eventType}`,
+    });
     return this.post(API.UPDATE_EVENT_CODE, {
       OsClient: this.config.osClient,
       FormEngineKey: formEngineKey,
       EventType: eventType,
-      V8Code: code,
+      V8Code: prepared.code,
+      Version: prepared.version,
+      ChangeHistory: prepared.changeHistory,
     });
   }
 

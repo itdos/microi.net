@@ -11,18 +11,11 @@
     "Microi.net.Api": {
       "commandName": "Project",
       "launchBrowser": true,
-      "applicationUrl": "https://0.0.0.0:7266",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "iTdos",
-        "DOTNET_ENVIRONMENT": "iTdos"
-      }
+      "applicationUrl": "https://0.0.0.0:7266"
     },
     "IIS Express": {
       "commandName": "IISExpress",
-      "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+      "launchBrowser": true
     }
   }
 }
