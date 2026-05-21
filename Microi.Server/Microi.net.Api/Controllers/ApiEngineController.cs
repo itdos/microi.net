@@ -95,6 +95,154 @@ namespace Microi.net.Api
             }
         }
 
+        private static ContentResult ResponseFileError(string msg, object? data = null)
+        {
+            return new ContentResult()
+            {
+                Content = JsonHelper.Serialize(new { Code = 0, Msg = msg, Data = data }),
+                ContentType = "application/json; charset=utf-8"
+            };
+        }
+
+        private static bool StartsWithBytes(byte[] bytes, params byte[] prefix)
+        {
+            if (bytes.Length < prefix.Length)
+            {
+                return false;
+            }
+            for (var i = 0; i < prefix.Length; i++)
+            {
+                if (bytes[i] != prefix[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static string BytesToHexPrefix(byte[] bytes, int maxLength = 16)
+        {
+            var length = Math.Min(bytes.Length, maxLength);
+            var result = new string[length];
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = bytes[i].ToString("X2");
+            }
+            return string.Join(" ", result);
+        }
+
+        private static string BytesToAsciiPrefix(byte[] bytes, int maxLength = 16)
+        {
+            var length = Math.Min(bytes.Length, maxLength);
+            var result = new char[length];
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = bytes[i] >= 32 && bytes[i] <= 126 ? (char)bytes[i] : '.';
+            }
+            return new string(result);
+        }
+
+        private static bool IsWebp(byte[] bytes)
+        {
+            return bytes.Length >= 12
+                && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46
+                && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
+        }
+
+        private static bool IsAvif(byte[] bytes)
+        {
+            return bytes.Length >= 12
+                && bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70
+                && bytes[8] == 0x61 && bytes[9] == 0x76 && bytes[10] == 0x69
+                && (bytes[11] == 0x66 || bytes[11] == 0x73);
+        }
+
+        private static bool IsSvg(byte[] bytes)
+        {
+            var text = BytesToAsciiPrefix(bytes, Math.Min(bytes.Length, 256)).TrimStart('.', ' ', '\t', '\r', '\n');
+            return text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static ContentResult? ValidateResponseFileBytes(string contentType, byte[] fileBytes)
+        {
+            if (fileBytes.Length == 0)
+            {
+                return ResponseFileError("FileByteBase64不能为空文件！");
+            }
+
+            var normalizedContentType = (contentType ?? "").Split(';')[0].Trim().ToLowerInvariant();
+            string? expectedFirstAscii = null;
+            var isValid = true;
+
+            switch (normalizedContentType)
+            {
+                case "application/pdf":
+                    expectedFirstAscii = "%PDF-";
+                    isValid = StartsWithBytes(fileBytes, 0x25, 0x50, 0x44, 0x46, 0x2D);
+                    break;
+                case "image/png":
+                    expectedFirstAscii = "PNG";
+                    isValid = StartsWithBytes(fileBytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
+                    break;
+                case "image/jpeg":
+                case "image/jpg":
+                    expectedFirstAscii = "JPEG";
+                    isValid = StartsWithBytes(fileBytes, 0xFF, 0xD8, 0xFF);
+                    break;
+                case "image/gif":
+                    expectedFirstAscii = "GIF8";
+                    isValid = StartsWithBytes(fileBytes, 0x47, 0x49, 0x46, 0x38);
+                    break;
+                case "image/webp":
+                    expectedFirstAscii = "RIFF....WEBP";
+                    isValid = IsWebp(fileBytes);
+                    break;
+                case "image/avif":
+                    expectedFirstAscii = "....ftypavif/avis";
+                    isValid = IsAvif(fileBytes);
+                    break;
+                case "image/bmp":
+                    expectedFirstAscii = "BM";
+                    isValid = StartsWithBytes(fileBytes, 0x42, 0x4D);
+                    break;
+                case "image/tiff":
+                    expectedFirstAscii = "II* or MM*";
+                    isValid = StartsWithBytes(fileBytes, 0x49, 0x49, 0x2A, 0x00)
+                        || StartsWithBytes(fileBytes, 0x4D, 0x4D, 0x00, 0x2A);
+                    break;
+                case "image/x-icon":
+                case "image/vnd.microsoft.icon":
+                    expectedFirstAscii = "ICO";
+                    isValid = StartsWithBytes(fileBytes, 0x00, 0x00, 0x01, 0x00);
+                    break;
+                case "image/svg+xml":
+                    expectedFirstAscii = "<svg or <?xml";
+                    isValid = IsSvg(fileBytes);
+                    break;
+            }
+
+            if (!isValid)
+            {
+                return ResponseFileError("响应文件内容与ContentType不匹配，浏览器无法正常预览或下载。", new
+                {
+                    ContentType = contentType,
+                    ExpectedFirstAscii = expectedFirstAscii,
+                    ActualFirstAscii = BytesToAsciiPrefix(fileBytes),
+                    ActualFirstHex = BytesToHexPrefix(fileBytes),
+                    Length = fileBytes.Length
+                });
+            }
+            return null;
+        }
+
+        private static bool ShouldOpenResponseFileInline(string contentType)
+        {
+            var normalizedContentType = (contentType ?? "").Split(';')[0].Trim();
+            return normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedContentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         ///
         /// </summary>
@@ -394,10 +542,21 @@ namespace Microi.net.Api
                     ContentType = "application/json; charset=utf-8"
                 };
             }
-            var fileBytes = Convert.FromBase64String(fileByteBase64);
-            // 图片和PDF在浏览器中直接打开（inline），其他类型触发下载（attachment）
-            var isInline = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
+            byte[] fileBytes;
+            try
+            {
+                fileBytes = Convert.FromBase64String(fileByteBase64);
+            }
+            catch
+            {
+                return ResponseFileError("FileByteBase64不是合法的Base64字符串！");
+            }
+            var validateResult = ValidateResponseFileBytes(contentType, fileBytes);
+            if (validateResult != null)
+            {
+                return validateResult;
+            }
+            var isInline = ShouldOpenResponseFileInline(contentType);
             if (isInline)
             {
                 Response.Headers["Content-Disposition"] = $"inline; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
