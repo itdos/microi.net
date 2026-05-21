@@ -16,6 +16,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microsoft.AspNetCore.Http;
@@ -66,6 +67,61 @@ namespace Microi.net
             catch
             {
                 return fallback;
+            }
+        }
+
+        private static string NormalizeV8SemanticVersion(string value)
+        {
+            var text = SafeString(value).Trim();
+            var match = Regex.Match(text, @"^v(\d+)\.(\d+)\.(\d+)$", RegexOptions.IgnoreCase);
+            if (!match.Success) return "";
+            return $"v{int.Parse(match.Groups[1].Value)}.{int.Parse(match.Groups[2].Value)}.{int.Parse(match.Groups[3].Value)}";
+        }
+
+        private static string ExtractV8SemanticVersion(string code)
+        {
+            var text = SafeString(code);
+            if (text.DosIsNullOrWhiteSpace()) return "";
+            var match = Regex.Match(text, @"^\s*\*?\s*Version\s*:\s*(v\d+\.\d+\.\d+)\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+            return match.Success ? NormalizeV8SemanticVersion(match.Groups[1].Value) : "";
+        }
+
+        private static string ResolveV8SemanticVersion(string version, string code, string fallback = "")
+        {
+            var normalized = NormalizeV8SemanticVersion(version);
+            if (!normalized.DosIsNullOrWhiteSpace()) return normalized;
+            normalized = ExtractV8SemanticVersion(code);
+            if (!normalized.DosIsNullOrWhiteSpace()) return normalized;
+            return fallback;
+        }
+
+        private static string BuildV8ChangeHistoryEntry(string version, string changeHistory)
+        {
+            var summary = SafeString(changeHistory).Trim();
+            if (summary.DosIsNullOrWhiteSpace()) return "";
+            var prefix = "";
+            if (!version.DosIsNullOrWhiteSpace() && !Regex.IsMatch(summary, @"^v\d+\.\d+\.\d+\b", RegexOptions.IgnoreCase))
+            {
+                prefix = version + " ";
+            }
+            return $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {prefix}{summary}{Environment.NewLine}";
+        }
+
+        private static bool SysApiEngineHasColumn(string osClient, string columnName)
+        {
+            try
+            {
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null) return false;
+                var section = client.Db.FromSql("SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?table AND COLUMN_NAME = ?column")
+                    .AddInParameter("?table", "sys_apiengine")
+                    .AddInParameter("?column", columnName);
+                section.SetCommandTimeout(10);
+                return section.ToScalar<int>() > 0;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -376,10 +432,15 @@ namespace Microi.net
         {
             try
             {
+                var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
+                var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" };
+                if (hasVersionColumn) selectFields.Add("Version");
+                if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" },
+                    _SelectFields = selectFields.ToArray(),
                     _Where = new List<object>()
                     {
                         
@@ -405,6 +466,8 @@ namespace Microi.net
                             IsEnable = item.IsEnable,
                             ApiRemark = (string)item.ApiRemark ?? "",
                             ApiV8Code = apiV8Code,
+                            Version = hasVersionColumn ? SafeString(item.Version) : "",
+                            ChangeHistory = hasChangeHistoryColumn ? SafeString(item.ChangeHistory) : "",
                             UpdateTime = updateTime
                         });
                     }
@@ -437,6 +500,8 @@ namespace Microi.net
         {
             try
             {
+                var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
+                var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -463,6 +528,8 @@ namespace Microi.net
                         IsEnable = item.IsEnable,
                         ApiRemark = (string)item.ApiRemark ?? "",
                         ApiV8Code = apiV8Code,
+                        Version = hasVersionColumn ? SafeString(item.Version) : "",
+                        ChangeHistory = hasChangeHistoryColumn ? SafeString(item.ChangeHistory) : "",
                         UpdateTime = FormatDbDateTime(item.UpdateTime)
                     });
                 }
@@ -486,10 +553,15 @@ namespace Microi.net
         {
             try
             {
+                var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
+                var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var selectFields = new List<string> { "ApiEngineKey", "ApiV8Code", "UpdateTime" };
+                if (hasVersionColumn) selectFields.Add("Version");
+                if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] { "ApiEngineKey", "ApiV8Code", "UpdateTime" },
+                    _SelectFields = selectFields.ToArray(),
                     _Where = new List<object>()
                     {
                         new List<object>() { "ApiEngineKey", "=", apiEngineKey },
@@ -506,6 +578,8 @@ namespace Microi.net
                     {
                         ApiEngineKey = apiEngineKey,
                         ApiV8Code = apiV8Code,
+                        Version = hasVersionColumn ? SafeString(result.Data.Version) : "",
+                        ChangeHistory = hasChangeHistoryColumn ? SafeString(result.Data.ChangeHistory) : "",
                         UpdateTime = FormatDbDateTime(result.Data.UpdateTime)
                     });
                 }
@@ -593,7 +667,7 @@ namespace Microi.net
         /// <summary>
         /// 更新接口引擎代码（本地 → 数据库）
         /// </summary>
-        public static async Task<DosResult<object>> UpdateApiEngineCode(string osClient, string apiEngineKey, string apiV8Code)
+        public static async Task<DosResult<object>> UpdateApiEngineCode(string osClient, string apiEngineKey, string apiV8Code, string version = null, string changeHistory = null)
         {
             try
             {
@@ -615,10 +689,20 @@ namespace Microi.net
 
                 var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 var plainCode = apiV8Code ?? "";
-                var updateSection = client.Db.FromSql("UPDATE sys_apiengine SET ApiV8Code=?code, UpdateTime=?now WHERE Id=?id")
+                var resolvedVersion = ResolveV8SemanticVersion(version, plainCode);
+                var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
+                var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
+                var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var setParts = new List<string> { "ApiV8Code=?code", "UpdateTime=?now" };
+                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace()) setParts.Add("`Version`=?version");
+                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) setParts.Add("`ChangeHistory`=CONCAT(?history, IFNULL(`ChangeHistory`,''))");
+
+                var updateSection = client.Db.FromSql($"UPDATE sys_apiengine SET {string.Join(", ", setParts)} WHERE Id=?id")
                     .AddInParameter("?code", plainCode)
-                    .AddInParameter("?now", now)
-                    .AddInParameter("?id", id);
+                    .AddInParameter("?now", now);
+                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace()) updateSection.AddInParameter("?version", resolvedVersion);
+                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) updateSection.AddInParameter("?history", changeHistoryEntry);
+                updateSection.AddInParameter("?id", id);
                 updateSection.SetCommandTimeout(10);
                 var affected = updateSection.ExecuteNonQuery();
 
@@ -647,6 +731,7 @@ namespace Microi.net
                 {
                     Message = $"接口引擎 [{apiEngineKey}] 代码已同步到数据库",
                     UpdateTime = now,
+                    Version = resolvedVersion,
                     CacheRefresh = cacheRefreshStatus
                 });
             }
@@ -666,7 +751,8 @@ namespace Microi.net
         public static async Task<DosResult<object>> CreateApiEngine(
             string osClient, string apiName, string apiEngineKey,
             string apiAddress, string apiRemark, int lockVal, int allowAnonymous,
-            int isEnable, string category, string apiV8Code = null)
+            int isEnable, string category, string apiV8Code = null,
+            string version = null, string changeHistory = null)
         {
             try
             {
@@ -685,7 +771,11 @@ namespace Microi.net
                     return new DosResult<object>(0, null, $"ApiEngineKey [{apiEngineKey}] 已存在");
                 }
 
-                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new JObject
+                var resolvedVersion = ResolveV8SemanticVersion(version, apiV8Code, "v1.0.0");
+                var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
+                var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
+                var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var addParam = new JObject
                 {
                     ["OsClient"] = osClient,
                     ["ApiName"] = apiName,
@@ -708,7 +798,11 @@ namespace Microi.net
                     ["IsDeleted"] = 0,
                     ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     ["_InvokeType"] = "Client"
-                });
+                };
+                if (hasVersionColumn) addParam["Version"] = resolvedVersion;
+                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) addParam["ChangeHistory"] = changeHistoryEntry;
+
+                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", addParam);
 
                 if (addResult.Code == 1)
                 {
@@ -722,6 +816,7 @@ namespace Microi.net
                     {
                         Message = $"接口引擎 [{apiEngineKey}] 创建成功",
                         ApiEngineKey = apiEngineKey,
+                        Version = resolvedVersion,
                         Category = category ?? "未分类"
                     });
                 }

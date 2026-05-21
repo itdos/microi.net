@@ -1,0 +1,25 @@
+iTdos
+
+# Microi 本地环境配置模板
+# -----------------------------------------------
+# 使用方法：
+#   复制本文件为 .microi-local（注意：.microi-local 已加入 .gitignore，不会提交 git）
+#   将上方的环境名替换为你需要连接的环境，保存后重启服务即生效
+#
+# 优先级说明（高 → 低）：
+#   1. IDE 强制设置（VS Code launch.json [环境名] 配置 / VS/Rider launchSettings.json 具名 Profile）
+#   2. 本文件 .microi-local
+#   3. 系统/用户级环境变量（Windows 系统属性）
+# -----------------------------------------------
+# 可用环境（对应 appsettings.{env}.json）：
+#
+#   iTdos              — iTdos 生产环境
+#   renyiPro           — 任亿生产环境
+#   renyiDev           — 任亿开发环境
+#   chongshi           — 崇石环境
+#   qiqiang            — 启强环境
+#   xjy                — XJY 环境
+#   itdos-zhongfu-dev  — 中服开发环境
+#   itdos-zhongfu-product — 中服生产环境
+# -----------------------------------------------
+

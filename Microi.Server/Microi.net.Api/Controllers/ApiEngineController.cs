@@ -394,7 +394,16 @@ namespace Microi.net.Api
                     ContentType = "application/json; charset=utf-8"
                 };
             }
-            return File(Convert.FromBase64String(fileByteBase64), contentType, fileName);
+            var fileBytes = Convert.FromBase64String(fileByteBase64);
+            // 图片和PDF在浏览器中直接打开（inline），其他类型触发下载（attachment）
+            var isInline = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
+            if (isInline)
+            {
+                Response.Headers["Content-Disposition"] = $"inline; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
+                return File(fileBytes, contentType);
+            }
+            return File(fileBytes, contentType, fileName);
         }
 
         [HttpPost, HttpGet, HttpDelete, HttpPut, HttpPatch]

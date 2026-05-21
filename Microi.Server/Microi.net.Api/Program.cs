@@ -38,6 +38,30 @@ Environment.SetEnvironmentVariable("DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HT
 
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】HTTP/2非加密支持已启用");
 
+// 🔧 本地环境快速切换：读取 .microi-local 文件（已加入 .gitignore，每位开发者本地独立配置）
+// 优先级：IDE 环境变量（launch.json env / launchSettings.json）> .microi-local > 系统环境变量
+// 切换方式：编辑 Microi.Server/Microi.net.Api/.microi-local，写入环境名（如 iTdos / renyiPro）
+//           或执行 PowerShell：.\switch-env.ps1 renyiPro
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")))
+{
+    // 依次查找：cwd（dotnet run / F5 调试 cwd）→ bin/Debug/net10.0 上三级（项目根）
+    var localEnvFile = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), ".microi-local"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".microi-local")
+    }.FirstOrDefault(File.Exists);
+    if (localEnvFile != null)
+    {
+        var localEnv = File.ReadAllText(localEnvFile).Trim();
+        if (!string.IsNullOrEmpty(localEnv))
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", localEnv);
+            Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", localEnv);
+            Console.WriteLine($"Microi：【🔧本地环境】已从 .microi-local 加载：{localEnv}");
+        }
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine(
     $"Microi：【诊断】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】EnvironmentName={builder.Environment.EnvironmentName}，" +
