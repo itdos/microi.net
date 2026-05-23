@@ -38,9 +38,9 @@
                         <button class="toolbar-btn" @click.prevent="showShortcuts" title="快捷键">
                             <el-icon><InfoFilled /></el-icon> 快捷键
                         </button>
-                        <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
+                        <!-- <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                             <el-icon><Document /></el-icon> V8文档
-                        </button>
+                        </button> -->
                         <button class="toolbar-btn" @click.prevent="openCodeDesigner" title="SQL/V8代码设计器">
                             <el-icon><Operation /></el-icon> 设计器
                         </button>
@@ -119,9 +119,9 @@
                 <button class="toolbar-btn" @click.prevent="showShortcuts" title="快捷键">
                     <el-icon><InfoFilled /></el-icon> 快捷键
                 </button>
-                <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
+                <!-- <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                     <el-icon><Document /></el-icon> V8文档
-                </button>
+                </button> -->
                 <button class="toolbar-btn" @click.prevent="openCodeDesigner" title="SQL/V8代码设计器">
                     <el-icon><Operation /></el-icon> 设计器
                 </button>

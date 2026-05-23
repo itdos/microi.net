@@ -222,3 +222,46 @@ return V8.ClientType != 'PC';
 
 ❌ `BatchSelectMoreBtns` 用 `V8.Form` 取数据
 ✅ 必须用 `V8.TableRowSelected`
+
+---
+
+## 11. ⚠️ `V8.CurrentUser` 拿不到的历史陷阱（必看）
+
+### 现象
+`diy-form-full.vue`（弹窗 / 详情 / 全屏表单）的 `FormBtns` / `PageBtns` / `PageTabs` / `BatchSelectMoreBtns` / `ExportMoreBtns` 中：
+- 编写 `V8.CurrentUser._IsAdmin` 总是 `undefined`
+- `V8CodeShow` 里靠用户角色判断的隐藏逻辑全部失效
+- 但 `diy-table.vue` 的 `MoreBtns` 同样代码却**正常**
+
+### 根因（2026-05 已修）
+`diy.common.js` 中有一个**进程级单例缓存** `DiyCommon._V8BaseInstance`：
+```js
+// 旧 BUG 写法
+DiyCommon._V8BaseInstance = {
+  CurrentUser : store.state.DiyStore.GetCurrentUser,   // ← Pinia getter 不在 $state 里，永远 undefined
+  CurrentToken: DiyCommon.getToken(),                  // ← 只算了一次，登录态变化后过期
+  SysConfig   : store.state.DiyStore.SysConfig,
+  ...
+}
+```
+- `store.state.DiyStore` 是 Pinia 的 `$state` 兼容层，**只有 state 字段**，**不包含 getter**。`GetCurrentUser` 是 getter → 取到 `undefined`。
+- `_V8BaseInstance` 是模块级单例，第一次构建后所有 `InitV8Code` 都会 `Object.assign(V8, _V8BaseInstance)`。
+- `diy-form-full.vue` 调用顺序是：`SetV8DefaultValue` → `InitV8Code` → `Object.assign` 把 V8.CurrentUser 改回 undefined。
+- `diy-table.vue` 调用顺序是：`InitV8Code` → `SetV8DefaultValue`，新鲜值后写胜出，所以没问题。
+
+### 正确做法
+1. **不要把会话级 / 用户级状态写进进程级单例缓存**（CurrentUser / Token / SysConfig）。
+2. 在 `InitV8Code` / `InitV8CodeSync` 的 `Object.assign` 之后，调用 `DiyCommon._RefreshV8DynamicContext(V8)`，始终从 `useDiyStore()` 实例（而不是 `$state`）取最新值：
+   ```js
+   var diyStore = getDiyStore();
+   V8.CurrentUser = diyStore.GetCurrentUser;   // Pinia getter，必须经 store 实例
+   V8.SysConfig   = diyStore.SysConfig;
+   V8.CurrentToken= DiyCommon.getToken();
+   ```
+3. 任何按钮组件（包括将来新增的 `PageBtns`、自定义 Tab 等）都**不需要**再单独 set `CurrentUser`，统一由 `_RefreshV8DynamicContext` 保证。
+
+### AI 编写按钮时的检查清单
+- [ ] `V8CodeShow` 中读 `V8.CurrentUser.RoleName` / `V8.CurrentUser._IsAdmin` 之前，**不**做 `if (!V8.CurrentUser)` 容错回写——容错会反过来掩盖框架问题。
+- [ ] 不要在 `V8Code` 里 `Object.assign(V8, {...})`，避免再次覆盖动态字段。
+- [ ] 涉及租户切换（SaaS）的按钮，禁止把 `V8.OsClient` 缓存在 `setTimeout` 闭包里，应每次重新读 `V8.OsClient` 或 `DiyCommon.GetOsClient()`。
+
