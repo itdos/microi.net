@@ -7,7 +7,6 @@ import { createPinia } from 'pinia'
 import { setupNaive } from './src/plugins/naive'
 import { setupCustomComponents } from './src/plugins/customComponents'
 import { setupDirectives } from './src/plugins/directives'
-import { setHtmlTheme } from '@goview/utils'
 import 'iconify-icon'
 import { addCollection } from 'iconify-icon'
 // 标尺样式
@@ -29,9 +28,6 @@ export function setupGoView(app) {
 
   // 注册指令（vue3-lazyload）
   setupDirectives(app)
-
-  // 设置暗色主题
-  setHtmlTheme()
 
   // 注册图标集（按需加载独立包，避免引入 409MB 的 @iconify/json）
   try {

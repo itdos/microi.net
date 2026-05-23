@@ -108,13 +108,24 @@ export function hslToHex(hslString: string): string {
  * @returns
  */
 export const setHtmlTheme = (themeName?: string) => {
+  const designStore = useDesignStore()
+  const targetThemeName = themeName || designStore.themeName
+  const roots = window.document.querySelectorAll('.go-view-editor-wrapper, .go-view-preview-wrapper')
+  roots.forEach(root => root.setAttribute('data-theme', targetThemeName))
+}
+
+export const getGoViewThemeName = () => {
+  const designStore = useDesignStore()
+  return designStore.themeName
+}
+
+export const removeHtmlTheme = (themeName?: string) => {
   const e = window.document.documentElement
   if (themeName) {
-    e.setAttribute('data-theme', themeName)
+    if (e.getAttribute('data-theme') === themeName) e.removeAttribute('data-theme')
     return
   }
-  const designStore = useDesignStore()
-  e.setAttribute('data-theme', designStore.themeName)
+  e.removeAttribute('data-theme')
 }
 
 /**

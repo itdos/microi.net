@@ -13,6 +13,9 @@
       show-trigger="bar"
       @collapse="collapsedHandle"
       @expand="expandHandle"
+      @keydown="stopEditableKeyEvent"
+      @keyup="stopEditableKeyEvent"
+      @keypress="stopEditableKeyEvent"
     >
       <content-box class="go-content-configurations go-boderbox" :show-top="false" :depth="2">
         <!-- 页面配置 -->
@@ -95,6 +98,10 @@ const collapsedHandle = () => {
 const expandHandle = () => {
   collapsed.value = false
   setItem(ChartLayoutStoreEnum.DETAILS, false)
+}
+
+const stopEditableKeyEvent = (event: KeyboardEvent) => {
+  event.stopPropagation()
 }
 
 const selectTarget = computed(() => {
