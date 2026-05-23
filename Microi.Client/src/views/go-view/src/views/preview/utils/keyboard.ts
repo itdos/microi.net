@@ -1,3 +1,5 @@
+import { isEditableEventTarget } from '@goview/utils'
+
 // 处理键盘记录
 export const keyRecordHandle = () => {
   // 默认赋值
@@ -7,6 +9,7 @@ export const keyRecordHandle = () => {
   }
 
   document.onkeydown = (e: KeyboardEvent) => {
+    if (isEditableEventTarget(e.target)) return
     const { keyCode } = e
     if (keyCode == 32 && e.target == document.body) e.preventDefault()
 
@@ -27,6 +30,7 @@ export const keyRecordHandle = () => {
   }
 
   document.onkeyup = (e: KeyboardEvent) => {
+    if (isEditableEventTarget(e.target)) return
     const { keyCode } = e
     if (keyCode == 32 && e.target == document.body) e.preventDefault()
 
