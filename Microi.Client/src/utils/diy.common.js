@@ -4082,6 +4082,26 @@ var DiyCommon = {
     },
     _V8BaseInstance : null,
     _globalV8CodeExecuted: false, // 全局V8代码只执行一次的标记
+    /**
+     * 2026-05 修复：把每次 InitV8Code / InitV8CodeSync 都需要刷新的动态上下文统一处理。
+     * 历史 bug：_V8BaseInstance 是进程级单例缓存，会用第一次构建时的 CurrentUser（很可能是 undefined）
+     * 通过 Object.assign 覆盖 V8.CurrentUser，导致 diy-form-full 的 FormBtns / PageBtns / PageTabs /
+     * BatchSelectMoreBtns / ExportMoreBtns 的 V8Code 与 V8CodeShow 拿不到登录用户。
+     * 这里始终从最新的 Pinia store 读取，确保 V8 拿到的是当前登录态。
+     */
+    _RefreshV8DynamicContext(V8) {
+        try {
+            var diyStore = getDiyStore();
+            // CurrentUser 来自 Pinia getter，必须通过 useDiyStore() 触发，$state 取不到 getter
+            V8.CurrentUser = diyStore.GetCurrentUser;
+            V8.SysConfig = diyStore.SysConfig;
+            V8.OsClient = DiyCommon.GetOsClient();
+            V8.CurrentToken = DiyCommon.getToken ? DiyCommon.getToken() : getToken();
+        } catch (e) {
+            // 极早期调用（store 未就绪）时容错
+            V8.CurrentUser = V8.CurrentUser || {};
+        }
+    },
     async InitV8Code(V8, router) {
         if(DiyCommon._V8BaseInstance == null){
             V8 = DiyCommon.InitV8CodeSync(V8, router, false);
@@ -4107,6 +4127,10 @@ var DiyCommon = {
             V8.NewServerGuid = await DiyCommon.NewServerGuid;
         }
         Object.assign(V8, DiyCommon._V8BaseInstance);
+        // 2026-05 修复：_V8BaseInstance 是进程级单例缓存，但 CurrentUser / CurrentToken / SysConfig
+        // 会随登录态、Token 刷新、租户切换发生变化，必须每次从 store 读取最新值，
+        // 否则会覆盖 SetV8DefaultValue 刚写入的最新 CurrentUser（典型场景：FormBtns / PageBtns 按钮 V8 中 V8.CurrentUser 为空）。
+        DiyCommon._RefreshV8DynamicContext(V8);
         return V8;
     },
     InitV8CodeSync(V8, router, execGlobalV8Code = true) {
@@ -4143,7 +4167,8 @@ var DiyCommon = {
                 GetAsync : DiyCommon.GetAsync,
                 Tips : DiyCommon.Tips,
                 ConfirmTips : DiyCommon.OsConfirm,
-                CurrentUser : store.state.DiyStore.GetCurrentUser,
+                // 注意：CurrentUser / CurrentToken / SysConfig 不放在静态缓存里，
+                // 由 _RefreshV8DynamicContext 在每次 InitV8Code / InitV8CodeSync 调用时刷新（见下方 Object.assign 后的逻辑）。
 
                 IsNull : DiyCommon.IsNull,
 
@@ -4165,11 +4190,9 @@ var DiyCommon = {
                     StartWork : DiyCommon.StartWork
                 },
                 WorkFlow : V8.WF,
-                CurrentToken : DiyCommon.getToken(),
+                // CurrentToken / SysConfig 同 CurrentUser 一样需要每次刷新，不进静态缓存
                 SendSystemMessage : DiyCommon.SendSystemMessage,
-                Base64 : Base64,
-                
-                SysConfig : store.state.DiyStore.SysConfig
+                Base64 : Base64
             };
             // 注册 V8.Method（含 ScanCode 扫码功能）
             initV8ScanCode(DiyCommon._V8BaseInstance);
@@ -4177,6 +4200,8 @@ var DiyCommon = {
             initV8Print(DiyCommon._V8BaseInstance);
         }
         Object.assign(V8, DiyCommon._V8BaseInstance);
+        // 2026-05 修复：用最新 store 值刷新动态上下文（CurrentUser / CurrentToken / SysConfig）
+        DiyCommon._RefreshV8DynamicContext(V8);
         // 确保每个 V8 实例的 Method.ScanCode 闭包引用正确的 V8 对象
         initV8ScanCode(V8);
         // 确保每个 V8 实例的 Print 引用正确的 V8 对象

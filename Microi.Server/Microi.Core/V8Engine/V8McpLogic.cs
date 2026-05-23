@@ -1006,7 +1006,7 @@ namespace Microi.net
             "SubmitBeforeServerV8" => "后端表单提交前",
             "SubmitAfterServerV8" => "后端表单提交后",
             "SubmitFormV8" => "前端表单提交",
-            "ServerDataV8" => "服务器端数据",
+            "ServerDataV8" => "后端数据",
             "InFormV8" => "进入表单",
             "OutFormV8" => "离开表单",
             "DataFilterV8" => "数据过滤/脱敏",
@@ -1062,19 +1062,16 @@ namespace Microi.net
                                 try { code = (string)((IDictionary<string, object>)item)[field] ?? ""; } catch { }
                             }
 
-                            if (!code.DosIsNullOrWhiteSpace())
+                            list.Add(new
                             {
-                                list.Add(new
-                                {
-                                    Id = (string)item.Id,
-                                    FormEngineKey = tableName,
-                                    Description = tableDescription,
-                                    EventType = field,
-                                    EventName = GetEventDisplayName(field),
-                                    V8Code = code,
-                                    UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                                });
-                            }
+                                Id = (string)item.Id,
+                                FormEngineKey = tableName,
+                                Description = tableDescription,
+                                EventType = field,
+                                EventName = GetEventDisplayName(field),
+                                V8Code = code,
+                                UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                            });
                         }
                     }
 
@@ -2229,12 +2226,13 @@ namespace Microi.net
         /// <summary>
         /// 解析 OsClient（如果为空则从 token 或配置中获取）
         /// </summary>
-        public static string ResolveOsClient(string osClient, dynamic currentToken)
+        public static string ResolveOsClient(string osClient, object currentToken)
         {
-            string tokenOsClient = null;
+            string tokenOsClient;
             try
             {
-                tokenOsClient = currentToken?.OsClient;
+                dynamic token = currentToken;
+                tokenOsClient = token?.OsClient;
             }
             catch
             {
@@ -2255,7 +2253,7 @@ namespace Microi.net
             {
                 osClient = ConfigHelper.GetAppSettings("OsClient");
             }
-            return osClient;
+            return osClient ?? "";
         }
 
         #endregion
@@ -3258,12 +3256,133 @@ namespace Microi.net
                 if (p.Id.DosIsNullOrWhiteSpace() && (p.Name.DosIsNullOrWhiteSpace() || (p.TableId.DosIsNullOrWhiteSpace() && p.TableName.DosIsNullOrWhiteSpace())))
                     return new DosResult<object>(0, null, "需要提供 Id 或 (TableId/TableName + Name) 来定位字段");
 
+                var v8FieldNames = new[] { "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm" };
+                var hasV8 = v8FieldNames.Any(k => patch[k] != null);
+
+                async Task<string> ResolveFieldIdAsync()
+                {
+                    if (!p.Id.DosIsNullOrWhiteSpace()) return p.Id;
+
+                    var tableId = p.TableId;
+                    if (tableId.DosIsNullOrWhiteSpace() && !p.TableName.DosIsNullOrWhiteSpace())
+                    {
+                        var tableLookup = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
+                        {
+                            OsClient = osClient,
+                            _SelectFields = new[] { "Id", "Name" },
+                            _Where = new List<object>
+                            {
+                                new List<object> { "Name", "=", p.TableName }
+                            }
+                        });
+                        if (tableLookup.Code == 1 && tableLookup.Data != null) tableId = (string)tableLookup.Data.Id;
+                    }
+
+                    var lookup = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                    {
+                        OsClient = osClient,
+                        _SelectFields = new[] { "Id", "TableId", "Name" },
+                        _Where = new List<object>
+                        {
+                            new List<object> { "TableId", "=", tableId },
+                            new List<object> { "Name", "=", p.Name }
+                        }
+                    });
+                    return lookup.Code == 1 && lookup.Data != null ? (string)lookup.Data.Id : "";
+                }
+
+                var onlyV8Patch = hasV8 && patch.Properties().All(prop =>
+                    prop.Name == "OsClient" || prop.Name == "Id" || prop.Name == "TableId" ||
+                    prop.Name == "TableName" || prop.Name == "Name" || prop.Name == "_InvokeType" ||
+                    v8FieldNames.Contains(prop.Name));
+
+                if (onlyV8Patch)
+                {
+                    var fieldId = await ResolveFieldIdAsync();
+                    if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "未找到字段，无法更新字段 V8 代码");
+                    var directPatch = new JObject { ["OsClient"] = osClient, ["Id"] = fieldId };
+                    foreach (var k in v8FieldNames)
+                    {
+                        if (patch[k] != null) directPatch[k] = patch[k];
+                    }
+                    var directResult = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", directPatch);
+                    if (directResult.Code != 1) return new DosResult<object>(0, null, "更新字段 V8 代码失败：" + directResult.Msg);
+                    return new DosResult<object>(1, new { UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }, "");
+                }
+
                 var r = await MicroiEngine.FormEngine.UptDiyField(p);
+                if (r.Code != 1) return new DosResult<object>(r.Code, r.Data, r.Msg);
+
+                // 单独写入 4 个 V8 字段（不影响物理列，直接写 diy_field 表）
+                // 任一字段在 patch 中存在（哪怕空串，表示要清空）就回写
+                var v8Patch = new JObject { ["OsClient"] = osClient };
+                foreach (var k in v8FieldNames)
+                {
+                    if (patch[k] != null) v8Patch[k] = patch[k];
+                }
+                if (hasV8)
+                {
+                    var fieldId = await ResolveFieldIdAsync();
+                    if (!fieldId.DosIsNullOrWhiteSpace())
+                    {
+                        v8Patch["Id"] = fieldId;
+                        var v8r = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", v8Patch);
+                        if (v8r.Code != 1) return new DosResult<object>(0, null, "更新字段 V8 代码失败：" + v8r.Msg);
+                    }
+                }
+
                 return new DosResult<object>(r.Code, r.Data, r.Msg);
             }
             catch (Exception ex)
             {
                 return new DosResult<object>(0, null, "UpdateField 失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 获取指定表的所有字段（含 V8 代码字段，供 VSCode 插件字段 V8 事件目录使用）
+        /// 至少返回：Id / TableId / Name / Label / V8Code / KeyupV8Code / V8TmpEngineTable / V8TmpEngineForm / UpdateTime
+        /// </summary>
+        public static async Task<DosResult<object>> GetFieldList(string osClient, string tableId, string tableName = null)
+        {
+            try
+            {
+                if (tableId.DosIsNullOrWhiteSpace() && tableName.DosIsNullOrWhiteSpace())
+                    return new DosResult<object>(0, null, "需要提供 TableId 或 TableName");
+
+                var where = new List<object>();
+                if (!tableId.DosIsNullOrWhiteSpace())
+                {
+                    where.Add(new List<object> { "TableId", "=", tableId });
+                }
+                else
+                {
+                    // 按 TableName 反查 TableId
+                    var tr = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object> { new List<object> { "Name", "=", tableName } }
+                    });
+                    if (tr.Code != 1 || tr.Data == null) return new DosResult<object>(0, null, "未找到表：" + tableName);
+                    where.Add(new List<object> { "TableId", "=", (string)tr.Data.Id });
+                }
+
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort",
+                        "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm", "UpdateTime" },
+                    _Where = where,
+                    _OrderBy = "Sort",
+                    _OrderByType = "ASC",
+                    _PageSize = 5000
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
+                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取字段列表失败：" + ex.Message);
             }
         }
         #endregion
