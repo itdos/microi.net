@@ -247,6 +247,8 @@ return {
 }
 ```
 
+例如金蝶 PLM 电子仓返回的 `KD_C_PLM` 是业务封装流，不是真实 PDF；即使文件最终可由金蝶客户端处理，也不能用 `application/pdf` 返回给浏览器。需要先取得或转换成以 `%PDF-` 开头的真实 PDF 字节，再按上面的结构返回。
+
 ::: details ContentType 常用值清单
 > `ContentType` 必须与真实文件字节一致。平台会自动校验 PDF、PNG、JPEG、GIF、WebP、AVIF、BMP、TIFF、ICO、SVG 等常见可预览类型。
 

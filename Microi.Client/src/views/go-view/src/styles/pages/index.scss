@@ -8,8 +8,7 @@
   opacity: 0 !important;
 }
 
-[data-theme='dark'] {
-  body {
-    background-color: #18181c;
-  }
+.go-view-editor-wrapper[data-theme='dark'],
+.go-view-preview-wrapper[data-theme='dark'] {
+  background-color: #18181c;
 }

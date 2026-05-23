@@ -1,5 +1,5 @@
 <template>
-  <div class="go-view-preview-wrapper" :style="wrapperStyle" v-loading="loading">
+  <div class="go-view-preview-wrapper" :data-theme="goViewTheme" :style="wrapperStyle" v-loading="loading">
     <n-config-provider :theme="darkTheme" :theme-overrides="overridesTheme">
       <n-message-provider>
         <n-dialog-provider>
@@ -24,6 +24,7 @@ import { DiyCommon } from '@/utils/diy.common'
 import { setupGoView } from './setup.js'
 import GoViewMessageInject from './GoViewMessageInject.vue'
 import { useDiyStore } from '@/pinia'
+import { useDesignStore as useGoViewDesignStore } from '@goview/store/modules/designStore/designStore'
 
 export default defineComponent({
   name: 'GoViewPreview',
@@ -37,13 +38,15 @@ export default defineComponent({
   },
   setup() {
     const diyStore = useDiyStore()
+    const goViewDesignStore = useGoViewDesignStore()
     const wrapperStyle = computed(() => {
       const navbarHeight = diyStore.ShowClassicTop !== 0 ? 50 : 0
       const tabsHeight = 33
       const offset = navbarHeight + tabsHeight
       return { height: `calc(100vh - ${offset}px)` }
     })
-    return { wrapperStyle }
+    const goViewTheme = computed(() => goViewDesignStore.themeName)
+    return { wrapperStyle, goViewTheme }
   },
   data() {
     return {

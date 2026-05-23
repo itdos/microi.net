@@ -164,6 +164,50 @@ namespace Microi.net.Api
                 || text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static int IndexOfBytes(byte[] bytes, params byte[] marker)
+        {
+            if (bytes.Length < marker.Length)
+            {
+                return -1;
+            }
+            for (var i = 0; i <= bytes.Length - marker.Length; i++)
+            {
+                var matched = true;
+                for (var j = 0; j < marker.Length; j++)
+                {
+                    if (bytes[i + j] != marker[j])
+                    {
+                        matched = false;
+                        break;
+                    }
+                }
+                if (matched)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private static byte[] NormalizeResponseFileBytes(string contentType, byte[] fileBytes)
+        {
+            var normalizedContentType = contentType.Split(';')[0].Trim().ToLowerInvariant();
+            if (normalizedContentType != "application/pdf" || StartsWithBytes(fileBytes, 0x25, 0x50, 0x44, 0x46, 0x2D))
+            {
+                return fileBytes;
+            }
+
+            var pdfOffset = IndexOfBytes(fileBytes, 0x25, 0x50, 0x44, 0x46, 0x2D);
+            if (pdfOffset <= 0)
+            {
+                return fileBytes;
+            }
+
+            var pdfBytes = new byte[fileBytes.Length - pdfOffset];
+            Buffer.BlockCopy(fileBytes, pdfOffset, pdfBytes, 0, pdfBytes.Length);
+            return pdfBytes;
+        }
+
         private static ContentResult? ValidateResponseFileBytes(string contentType, byte[] fileBytes)
         {
             if (fileBytes.Length == 0)
@@ -171,7 +215,7 @@ namespace Microi.net.Api
                 return ResponseFileError("FileByteBase64不能为空文件！");
             }
 
-            var normalizedContentType = (contentType ?? "").Split(';')[0].Trim().ToLowerInvariant();
+            var normalizedContentType = contentType.Split(';')[0].Trim().ToLowerInvariant();
             string? expectedFirstAscii = null;
             var isValid = true;
 
@@ -224,13 +268,19 @@ namespace Microi.net.Api
 
             if (!isValid)
             {
-                return ResponseFileError("响应文件内容与ContentType不匹配，浏览器无法正常预览或下载。", new
+                var errorMsg = "响应文件内容与ContentType不匹配，浏览器无法正常预览或下载。";
+                if (normalizedContentType == "application/pdf"
+                    && StartsWithBytes(fileBytes, 0x4B, 0x44, 0x5F, 0x43, 0x5F, 0x50, 0x4C, 0x4D))
+                {
+                    errorMsg = "金蝶PLM电子仓返回的是KD_C_PLM封装流，不是真实PDF字节；请返回以%PDF-开头的PDF文件或先完成金蝶预览文件转换。";
+                }
+                return ResponseFileError(errorMsg, new
                 {
                     ContentType = contentType,
                     ExpectedFirstAscii = expectedFirstAscii,
                     ActualFirstAscii = BytesToAsciiPrefix(fileBytes),
                     ActualFirstHex = BytesToHexPrefix(fileBytes),
-                    Length = fileBytes.Length
+                    fileBytes.Length
                 });
             }
             return null;
@@ -238,7 +288,7 @@ namespace Microi.net.Api
 
         private static bool ShouldOpenResponseFileInline(string contentType)
         {
-            var normalizedContentType = (contentType ?? "").Split(';')[0].Trim();
+            var normalizedContentType = contentType.Split(';')[0].Trim();
             return normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalizedContentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
         }
@@ -525,11 +575,19 @@ namespace Microi.net.Api
             {
                 return new ContentResult() { Content = resultObj.ToString(), ContentType = "application/json; charset=utf-8" };
             }
-            JObject resultDataObj = JObject.FromObject(result.Data);
+            var resultDataObj = resultObj["Data"] as JObject;
+            if (resultDataObj == null)
+            {
+                return new ContentResult() { Content = resultObj.ToString(), ContentType = "application/json; charset=utf-8" };
+            }
             //返回文件：Data是一个对象：{ FileName: '(包含后缀格式)', ContentType: '(如：application/vnd.ms-excel)', FileByteBase64: '(byte[])' }
             var fileName = resultDataObj["FileName"].Val<string>();
             var contentType = resultDataObj["ContentType"].Val<string>();
             var fileByteBase64 = resultDataObj["FileByteBase64"].Val<string>();
+            if (fileName.DosIsNullOrWhiteSpace() && contentType.DosIsNullOrWhiteSpace() && fileByteBase64.DosIsNullOrWhiteSpace())
+            {
+                return new ContentResult() { Content = resultObj.ToString(), ContentType = "application/json; charset=utf-8" };
+            }
             if (fileName.DosIsNullOrWhiteSpace() || contentType.DosIsNullOrWhiteSpace() || fileByteBase64.DosIsNullOrWhiteSpace())
             {
                 return new ContentResult()
@@ -551,6 +609,7 @@ namespace Microi.net.Api
             {
                 return ResponseFileError("FileByteBase64不是合法的Base64字符串！");
             }
+            fileBytes = NormalizeResponseFileBytes(contentType, fileBytes);
             var validateResult = ValidateResponseFileBytes(contentType, fileBytes);
             if (validateResult != null)
             {
