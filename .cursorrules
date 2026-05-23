@@ -360,7 +360,7 @@ if (eventName == 'MessageReceived') {
 |----------|--------|---------|------|
 | `InFormV8.js` | 前端 | 表单打开时 | 初始化字段显隐、默认值 |
 | `SubmitFormV8.js` | 前端 | 表单提交时 | 前端校验（Postman不触发） |
-| `SubmitBeforeServerV8.js` | 后端 | 数据写入DB前（事务中） | 服务端校验、数据加工 |
+| `SubmitBeforeServerV8.js` | 后端 | 数据写入DB前（事务中） | 后端校验、数据加工 |
 | `SubmitAfterServerV8.js` | 后端 | 数据写入DB后（仍在事务中） | 触发通知、同步其它表 |
 | `OutFormV8.js` | 前端 | 表单关闭后 | 刷新列表、跳转 |
 | `DataFilterV8.js` | 后端 | 获取数据后每行执行 | 数据脱敏、字段加工 |
