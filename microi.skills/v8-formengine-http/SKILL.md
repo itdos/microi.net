@@ -61,6 +61,8 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 | `OsClient`     | 必填 | 租户标识；亦可放 querystring `?OsClient=xxx` 或 body |
 | `Token`        | 鉴权接口必填 | 登录返回的 Token |
 
+注意：上表是 FormEngine 路由约定。ApiEngine HTTP 复测和移动端 `callEngine` 推荐使用 `/apiengine/{key}--OsClient--{osClient}--`，同时带 Header `OsClient`；不要优先用 `?OsClient=`，部分动态路由会把 querystring 参与 `ApiAddress` 匹配。
+
 ## Body 结构（POST JSON）
 
 ```jsonc

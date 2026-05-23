@@ -23,7 +23,7 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
  */
 ```
 
-同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key}?OsClient=... 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。
+同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key}--OsClient--{osClient}-- 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。
 
 如果保存或回读时出现 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听等服务不可达问题，不能提前中止。必须自动执行 `dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api` 启动后端，等待 `https://localhost:7266` 可达后重试同步；涉及 PC 页面联调或 Playwright 时，还要自动启动 `Microi.Client`：`npm run dev -- --host 0.0.0.0 --port 1988`。只有启动失败、依赖缺失、数据库连接失败或端口冲突无法处理时才报告阻塞。
 
