@@ -497,7 +497,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 26 个）：
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 27 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -523,4 +523,5 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/uniapp-mall-assets/SKILL.md` — 商城前端：图片 / 资源路径规范
+- `microi.skills/v8-explorer-tree/SKILL.md` — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 - `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）

@@ -31,7 +31,7 @@ namespace Microi.net.Api
     {
         private static string DecodeCodeBase64(string codeBase64)
         {
-            if (codeBase64.DosIsNullOrWhiteSpace()) return "";
+            if (string.IsNullOrWhiteSpace(codeBase64)) return "";
             return Encoding.UTF8.GetString(Convert.FromBase64String(codeBase64));
         }
 
@@ -49,7 +49,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.GetApiEngineList(osClient);
             return Ok(result);
@@ -62,8 +62,8 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             apiEngineKey = apiEngineKey ?? param?["ApiEngineKey"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(apiEngineKey)) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             var result = await V8McpLogic.GetApiEngine(osClient, apiEngineKey);
             return Ok(result);
         }
@@ -75,8 +75,8 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             apiEngineKey = apiEngineKey ?? param?["ApiEngineKey"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(apiEngineKey)) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             var result = await V8McpLogic.GetApiEngineCode(osClient, apiEngineKey);
             return Ok(result);
         }
@@ -88,7 +88,7 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             lastSyncTime = lastSyncTime ?? param?["LastSyncTime"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             var result = await V8McpLogic.GetUpdatedApiEngines(osClient, lastSyncTime);
             return Ok(result);
         }
@@ -99,17 +99,17 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             if (param == null) return Ok(new DosResult(0, null, "请求参数不能为空"));
-            var osClient = V8McpLogic.ResolveOsClient(param.Value<string>("OsClient"), token);
+            var osClient = V8McpLogic.ResolveOsClient(param.Value<string>("OsClient"), (object)token);
             var apiEngineKey = param.Value<string>("ApiEngineKey");
-            if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            if (string.IsNullOrWhiteSpace(apiEngineKey)) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
             var codeBase64 = param.Value<string>("ApiV8CodeBase64") ?? param.Value<string>("CodeBase64");
             string code;
             try
             {
                 code = DecodeCodeBase64(codeBase64);
-                if (code.DosIsNullOrWhiteSpace()) code = param.Value<string>("ApiV8Code");
-                if (code.DosIsNullOrWhiteSpace()) code = param.Value<string>("Code");
+                if (string.IsNullOrWhiteSpace(code)) code = param.Value<string>("ApiV8Code");
+                if (string.IsNullOrWhiteSpace(code)) code = param.Value<string>("Code");
             }
             catch
             {
@@ -127,18 +127,18 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var apiName = param["ApiName"].Val<string>();
             var apiEngineKey = param["ApiEngineKey"].Val<string>();
-            if (apiName.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiName 不能为空"));
-            if (apiEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            if (string.IsNullOrWhiteSpace(apiName)) return Ok(new DosResult(0, null, "ApiName 不能为空"));
+            if (string.IsNullOrWhiteSpace(apiEngineKey)) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
             string code;
             try
             {
                 code = DecodeCodeBase64(param.Value<string>("ApiV8CodeBase64") ?? param.Value<string>("CodeBase64"));
-                if (code.DosIsNullOrWhiteSpace()) code = param["ApiV8Code"].Val<string>();
-                if (code.DosIsNullOrWhiteSpace()) code = param["Code"].Val<string>();
+                if (string.IsNullOrWhiteSpace(code)) code = param["ApiV8Code"].Val<string>();
+                if (string.IsNullOrWhiteSpace(code)) code = param["Code"].Val<string>();
             }
             catch
             {
@@ -159,7 +159,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.UploadFileBase64(
                 osClient,
                 param["FileName"].Val<string>(),
@@ -179,7 +179,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var items = param["Items"]?.ToObject<List<V8McpLogic.VersionCheckItem>>();
             if (items == null || items.Count == 0) return Ok(new DosResult(0, null, "Items 不能为空"));
             var result = await V8McpLogic.CheckVersions(osClient, items);
@@ -191,12 +191,12 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             string v8Code;
             try
             {
                 v8Code = DecodeCodeBase64(param.Value<string>("V8CodeBase64") ?? param.Value<string>("CodeBase64"));
-                if (v8Code.DosIsNullOrWhiteSpace()) v8Code = param["V8Code"].Val<string>();
+                if (string.IsNullOrWhiteSpace(v8Code)) v8Code = param["V8Code"].Val<string>();
             }
             catch
             {
@@ -214,8 +214,8 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.GetV8EventList(osClient);
             return Ok(result);
         }
@@ -226,12 +226,12 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var formEngineKey = param?["FormEngineKey"].Val<string>();
-            if (formEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
+            if (string.IsNullOrWhiteSpace(formEngineKey)) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
             var eventType = param?["EventType"].Val<string>();
-            if (eventType.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "EventType 不能为空"));
+            if (string.IsNullOrWhiteSpace(eventType)) return Ok(new DosResult(0, null, "EventType 不能为空"));
             var result = await V8McpLogic.GetV8EventCode(osClient, formEngineKey, eventType);
             return Ok(result);
         }
@@ -241,9 +241,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var formEngineKey = param["FormEngineKey"].Val<string>();
-            if (formEngineKey.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
+            if (string.IsNullOrWhiteSpace(formEngineKey)) return Ok(new DosResult(0, null, "FormEngineKey 不能为空"));
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 V8Code
             var code = param["V8Code"].Val<string>() ?? param["Code"].Val<string>();
             var result = await V8McpLogic.UpdateV8EventCode(
@@ -256,9 +256,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var v8Code = param["V8Code"].Val<string>();
-            if (v8Code.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "V8Code 不能为空"));
+            if (string.IsNullOrWhiteSpace(v8Code)) return Ok(new DosResult(0, null, "V8Code 不能为空"));
             var result = await V8McpLogic.ExecuteV8Event(
                 osClient, param["EventType"].Val<string>(), v8Code,
                 param["Form"] as JObject ?? new JObject(), token, HttpContext);
@@ -271,8 +271,8 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.GetDbSchema(osClient);
             return Ok(result);
         }
@@ -287,7 +287,7 @@ namespace Microi.net.Api
             var resolvedPageSize = pageSize ?? 5000;
             var pageSizeToken = param?["PageSize"];
             if (pageSizeToken != null && int.TryParse(pageSizeToken.ToString(), out var bodyPageSize)) resolvedPageSize = bodyPageSize;
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var apiBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}".TrimEnd('/');
             var result = await V8McpLogic.GetPlaywrightContext(osClient, keyword, apiBaseUrl, resolvedPageSize);
@@ -299,9 +299,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var name = param["Name"].Val<string>();
-            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
+            if (string.IsNullOrWhiteSpace(name)) return Ok(new DosResult(0, null, "Name 不能为空"));
             var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>(),
                 param["Tabs"].Val<string>(), param["IsTree"]?.Val<int>() ?? 0,
                 param["Column"]?.Val<int>() ?? 1, param["FormOpenType"].Val<string>(),
@@ -314,13 +314,13 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var tableId = param["TableId"].Val<string>();
             var name = param["Name"].Val<string>();
             var label = param["Label"].Val<string>();
-            if (tableId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "TableId 不能为空"));
-            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
-            if (label.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Label 不能为空"));
+            if (string.IsNullOrWhiteSpace(tableId)) return Ok(new DosResult(0, null, "TableId 不能为空"));
+            if (string.IsNullOrWhiteSpace(name)) return Ok(new DosResult(0, null, "Name 不能为空"));
+            if (string.IsNullOrWhiteSpace(label)) return Ok(new DosResult(0, null, "Label 不能为空"));
             var result = await V8McpLogic.AddField(
                 osClient, tableId, name, label,
                 param["Type"].Val<string>(), param["Component"].Val<string>(),
@@ -341,9 +341,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var name = param["Name"].Val<string>();
-            if (name.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Name 不能为空"));
+            if (string.IsNullOrWhiteSpace(name)) return Ok(new DosResult(0, null, "Name 不能为空"));
             var result = await V8McpLogic.CreateModule(
                 osClient, name,
                 param["DiyTableId"].Val<string>(),
@@ -384,7 +384,7 @@ namespace Microi.net.Api
                         Message = "调试会话已创建，请通过 SignalR 连接 /diy-websocket 进行调试"
                     }));
                 case "status":
-                    if (sessionId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "SessionId 不能为空"));
+                    if (string.IsNullOrWhiteSpace(sessionId)) return Ok(new DosResult(0, null, "SessionId 不能为空"));
                     return Ok(new DosResult(1, new
                     {
                         SessionId = sessionId,
@@ -401,10 +401,10 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var roleId = param["RoleId"].Val<string>();
             var menuIds = param["MenuIds"]?.ToObject<List<string>>();
-            if (roleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "RoleId 不能为空"));
+            if (string.IsNullOrWhiteSpace(roleId)) return Ok(new DosResult(0, null, "RoleId 不能为空"));
             if (menuIds == null || menuIds.Count == 0) return Ok(new DosResult(0, null, "MenuIds 不能为空"));
             var result = await V8McpLogic.SetRolePermission(osClient, roleId, menuIds);
             return Ok(result);
@@ -416,7 +416,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             var result = await V8McpLogic.ListRoles(osClient, param?["Keyword"].Val<string>());
             return Ok(result);
         }
@@ -426,7 +426,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.SaveRole(osClient, param);
             return Ok(result);
         }
@@ -437,7 +437,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             var result = await V8McpLogic.ListModules(osClient, param?["Keyword"].Val<string>());
             return Ok(result);
         }
@@ -449,8 +449,8 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             moduleId = moduleId ?? param?["ModuleId"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (moduleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(moduleId)) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
             var result = await V8McpLogic.GetModule(osClient, moduleId);
             return Ok(result);
         }
@@ -460,9 +460,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var moduleId = param["ModuleId"].Val<string>() ?? param["Id"].Val<string>();
-            if (moduleId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
+            if (string.IsNullOrWhiteSpace(moduleId)) return Ok(new DosResult(0, null, "ModuleId 不能为空"));
             var result = await V8McpLogic.UpdateModule(osClient, moduleId, param);
             return Ok(result);
         }
@@ -473,7 +473,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             var result = await V8McpLogic.ListDataSources(osClient, param?["Keyword"].Val<string>());
             return Ok(result);
         }
@@ -483,7 +483,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.SaveDataSource(osClient, param);
             return Ok(result);
         }
@@ -494,7 +494,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             var result = await V8McpLogic.ListPrintTemplates(osClient, param?["Keyword"].Val<string>());
             return Ok(result);
         }
@@ -504,7 +504,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.SavePrintTemplate(osClient, param);
             return Ok(result);
         }
@@ -514,7 +514,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.SaveWorkflowPackage(osClient, param);
             return Ok(result);
         }
@@ -524,7 +524,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.SaveJob(osClient, param);
             return Ok(result);
         }
@@ -534,7 +534,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.ValidateLowCodeSystem(osClient, param["Manifest"] as JObject ?? param);
             return Ok(result);
         }
@@ -544,7 +544,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var result = await V8McpLogic.WriteMcpAuditLog(osClient,
                 param["Action"].Val<string>(), param["Target"].Val<string>(), param["Content"].Val<string>(), token);
             return Ok(result);
@@ -558,8 +558,8 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var keyword = param?["Keyword"].Val<string>();
             var result = await V8McpLogic.GetPageEngineList(osClient, keyword);
             return Ok(result);
@@ -571,10 +571,10 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var pageId = param?["PageId"].Val<string>();
-            if (pageId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "PageId 不能为空"));
+            if (string.IsNullOrWhiteSpace(pageId)) return Ok(new DosResult(0, null, "PageId 不能为空"));
             var result = await V8McpLogic.GetPageEngineDetail(osClient, pageId);
             return Ok(result);
         }
@@ -584,11 +584,11 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var title = param["Title"].Val<string>();
-            if (title.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Title 不能为空"));
+            if (string.IsNullOrWhiteSpace(title)) return Ok(new DosResult(0, null, "Title 不能为空"));
             var jsonStr = param["JsonStr"].Val<string>();
-            if (jsonStr.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "JsonStr 不能为空"));
+            if (string.IsNullOrWhiteSpace(jsonStr)) return Ok(new DosResult(0, null, "JsonStr 不能为空"));
             var result = await V8McpLogic.SavePageEngine(
                 osClient, param["PageId"].Val<string>(), title,
                 param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr);
@@ -604,9 +604,23 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.UpdateField(osClient, param);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetFieldList(string? osClient, string? tableId, string? tableName = null, [FromBody] JObject? param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            tableId = tableId ?? param?["TableId"].Val<string>();
+            tableName = tableName ?? param?["TableName"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.GetFieldList(osClient, tableId, tableName);
             return Ok(result);
         }
 
@@ -615,8 +629,8 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
-            if (osClient.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.UpdateTable(osClient, param);
             return Ok(result);
         }
@@ -626,7 +640,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var arr = (param["Tables"] as JArray) ?? (param["TableNames"] as JArray);
             var list = arr?.ToObject<List<string>>() ?? new List<string>();
@@ -639,7 +653,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var arr = (param["ApiEngineKeys"] as JArray);
             var list = arr?.ToObject<List<string>>() ?? new List<string>();
@@ -661,7 +675,7 @@ namespace Microi.net.Api
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var keyword = param?["Keyword"].Val<string>();
             var result = await V8McpLogic.ListBlueprints(osClient, keyword);
@@ -678,8 +692,8 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
             var result = await V8McpLogic.GetBlueprint(osClient, blueprintId);
             return Ok(result);
         }
@@ -695,7 +709,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.SaveBlueprint(osClient, param, token);
             return Ok(result);
@@ -709,9 +723,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var blueprintId = param["BlueprintId"].Val<string>() ?? param["Id"].Val<string>();
-            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
             var result = await V8McpLogic.DeleteBlueprint(osClient, blueprintId);
             return Ok(result);
         }
@@ -727,8 +741,8 @@ namespace Microi.net.Api
             if (!ok) return Ok(new DosResult(0, null, msg));
             osClient = osClient ?? param?["OsClient"].Val<string>();
             blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
-            osClient = V8McpLogic.ResolveOsClient(osClient, token);
-            if (blueprintId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
             var result = await V8McpLogic.ValidateBlueprint(osClient, blueprintId);
             return Ok(result);
         }
@@ -742,7 +756,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var keyword = param?["Keyword"].Val<string>();
             var result = await V8McpLogic.ListStateMachines(osClient, keyword);
@@ -754,9 +768,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             id = id ?? param?["Id"].Val<string>() ?? param?["Code"].Val<string>();
-            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            if (string.IsNullOrWhiteSpace(id)) return Ok(new DosResult(0, null, "Id 不能为空"));
             var result = await V8McpLogic.GetStateMachine(osClient, id);
             return Ok(result);
         }
@@ -766,7 +780,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.SaveStateMachine(osClient, param, token);
             return Ok(result);
@@ -777,9 +791,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
-            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            if (string.IsNullOrWhiteSpace(id)) return Ok(new DosResult(0, null, "Id 不能为空"));
             var result = await V8McpLogic.DeleteStateMachine(osClient, id);
             return Ok(result);
         }
@@ -789,7 +803,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.TransitionState(osClient, param, token);
             return Ok(result);
@@ -800,7 +814,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             tableName = tableName ?? param?["TableName"].Val<string>();
             rowId = rowId ?? param?["RowId"].Val<string>();
             var result = await V8McpLogic.GetStateHistory(osClient, tableName, rowId);
@@ -816,7 +830,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.ListFlows(osClient, param?["Keyword"].Val<string>(), param?["TriggerType"].Val<string>());
             return Ok(result);
@@ -827,9 +841,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             id = id ?? param?["Id"].Val<string>() ?? param?["Code"].Val<string>();
-            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            if (string.IsNullOrWhiteSpace(id)) return Ok(new DosResult(0, null, "Id 不能为空"));
             var result = await V8McpLogic.GetFlow(osClient, id);
             return Ok(result);
         }
@@ -839,7 +853,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
             var result = await V8McpLogic.SaveFlow(osClient, param, token);
             return Ok(result);
@@ -850,9 +864,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
-            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            if (string.IsNullOrWhiteSpace(id)) return Ok(new DosResult(0, null, "Id 不能为空"));
             var result = await V8McpLogic.DeleteFlow(osClient, id);
             return Ok(result);
         }
@@ -862,9 +876,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var id = param["Id"].Val<string>() ?? param["Code"].Val<string>();
-            if (id.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "Id 不能为空"));
+            if (string.IsNullOrWhiteSpace(id)) return Ok(new DosResult(0, null, "Id 不能为空"));
             var input = param["Input"] as JObject ?? new JObject();
             var result = await V8McpLogic.RunFlow(osClient, id, input, token);
             return Ok(result);
@@ -875,7 +889,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowId = flowId ?? param?["FlowId"].Val<string>() ?? param?["Code"].Val<string>();
             var pageSize = param?["PageSize"].Val<int>() ?? 50;
             var result = await V8McpLogic.GetFlowRuns(osClient, flowId, pageSize);
@@ -887,9 +901,9 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             runId = runId ?? param?["RunId"].Val<string>();
-            if (runId.DosIsNullOrWhiteSpace()) return Ok(new DosResult(0, null, "RunId 不能为空"));
+            if (string.IsNullOrWhiteSpace(runId)) return Ok(new DosResult(0, null, "RunId 不能为空"));
             var result = await V8McpLogic.GetFlowRunDetail(osClient, runId);
             return Ok(result);
         }
@@ -903,7 +917,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
             var fromDate = param?["FromDate"].Val<string>();
             var toDate = param?["ToDate"].Val<string>();
@@ -916,7 +930,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
             var topN = param?["TopN"].Val<int>() ?? 20;
             var result = await V8McpLogic.GetHotPaths(osClient, flowDesignId, topN);
@@ -928,7 +942,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
             var slaMinutes = param?["SlaMinutes"].Val<int>() ?? 60;
             var topN = param?["TopN"].Val<int>() ?? 100;
@@ -941,7 +955,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
             var topN = param?["TopN"].Val<int>() ?? 5;
             var result = await V8McpLogic.GetBottlenecks(osClient, flowDesignId, topN);
@@ -953,7 +967,7 @@ namespace Microi.net.Api
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), token);
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
             flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>();
             var result = await V8McpLogic.GetWorkflowOverview(osClient, flowDesignId);
             return Ok(result);

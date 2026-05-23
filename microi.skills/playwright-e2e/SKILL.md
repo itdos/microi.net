@@ -5,7 +5,13 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 # Microi 吾码 Playwright E2E 自动化测试
 
-`E2E` 是 `End-to-End`，中文通常叫“端到端测试”。它强调从用户入口开始，穿过前端页面、接口引擎、表单引擎、权限、缓存、数据库等真实链路，验证一条业务路径是否真的可交付。
+> **2026-05 更新（重要）**：Microi.VSCode 插件生成的所有 E2E 产物现已统一隔离到 `<projectRoot>/.microi-e2e/` 目录，**不再**写入 `tests/e2e/`、根目录 `playwright.config.js` 或 `.env.e2e.example`。
+> - `playwright.config.js` 位于 `.microi-e2e/playwright.config.js`，`testDir` 为 `./` （即 `.microi-e2e/specs/`）
+> - 报告路径 `.microi-e2e/report/`，截图 `.microi-e2e/screenshots/`
+> - 上下文 `.microi-e2e/.microi-playwright-context.json`
+> - 本文档下方仍有大量 `tests/e2e/...` 写法，均为历史风格示意，**实际生成路径以 `.microi-e2e/` 为准**。手写测试（如 `tests/blueprint-e2e.spec.mjs`）不受影响。
+
+`E2E` 是 `End-to-End`，中文通常叫"端到端测试"。它强调从用户入口开始，穿过前端页面、接口引擎、表单引擎、权限、缓存、数据库等真实链路，验证一条业务路径是否真的可交付。
 
 ## 是否需要 `-e2e` 后缀
 
