@@ -254,6 +254,7 @@ app.UseRouting();
 //-------注意以下两者的顺序-------
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapDynamicControllerRoute<DynamicRoute>("apiengine/{*path}");
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

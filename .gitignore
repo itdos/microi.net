@@ -114,3 +114,4 @@ dev.log
 .tmp-build
 *.csproj.lscache
 switch-env.ps1
+.tmp
