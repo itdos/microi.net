@@ -78,47 +78,99 @@ namespace Microi.net.Api
             return filePathName;
         }
 
-        private async Task<JObject?> GetMallMemberFromToken(string osClient)
+        private string ResolveUploadPath(DiyUploadParam param)
+        {
+            var path = param.Path;
+            if (path.DosIsNullOrWhiteSpace()) path = Request.Query["Path"].ToString();
+            try
+            {
+                if (path.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    path = Request.Form["Path"].ToString();
+                }
+            }
+            catch (InvalidOperationException) { }
+            return path;
+        }
+
+        private async Task<JObject?> GetClientUserFromToken(string osClient)
         {
             var token = ResolveRequestToken();
             if (osClient.DosIsNullOrWhiteSpace() || token.DosIsNullOrWhiteSpace()) return null;
 
-            var cacheKey = $"Microi:{osClient}:MallMemberToken:{token}";
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            var cached = await cache.GetAsync(cacheKey);
-            if (cached == null) return null;
+            var cacheKeys = new[]
+            {
+                $"Microi:{osClient}:ClientUserToken:{token}",
+                $"Microi:{osClient}:MobileMemberToken:{token}",
+                $"Microi:{osClient}:MallMemberToken:{token}"
+            };
 
-            try
+            foreach (var cacheKey in cacheKeys)
             {
-                return JObject.Parse(cached.ToString());
-            }
-            catch
-            {
+                var cached = await cache.GetAsync(cacheKey);
+                if (cached == null) continue;
+
                 try
                 {
-                    return await cache.GetAsync<JObject>(cacheKey);
+                    return JObject.Parse(cached.ToString());
                 }
                 catch
                 {
-                    return null;
+                    try
+                    {
+                        return await cache.GetAsync<JObject>(cacheKey);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
                 }
             }
+
+            return null;
         }
 
-        private static bool IsMallPayProofUploadPath(string path)
+        private static bool HasUnsafePathSegment(string value)
         {
-            if (path.DosIsNullOrWhiteSpace()) return false;
-            var normalized = path.Trim().Trim('/').Replace("\\", "/").ToLower();
-            return normalized == "mall/pay-proof" || normalized.StartsWith("mall/pay-proof/");
+            if (value.DosIsNullOrWhiteSpace()) return true;
+            var normalized = value.Trim().Replace("\\", "/");
+            var isAbsoluteWebUrl = false;
+            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                normalized = uri.AbsolutePath.TrimStart('/');
+                isAbsoluteWebUrl = true;
+            }
+            if (normalized.Contains("..") || normalized.Contains(":") || normalized.Contains("//")) return true;
+            if ((!isAbsoluteWebUrl && normalized.StartsWith("/")) || normalized.StartsWith("~")) return true;
+            return false;
         }
 
-        private static bool IsMallPayProofFilePath(string osClient, string filePathName)
+        private static string NormalizeTenantFilePath(string filePathName)
         {
-            if (filePathName.DosIsNullOrWhiteSpace()) return false;
-            var normalized = filePathName.Trim().Replace("\\", "/").ToLower();
+            var normalized = filePathName.Trim().Replace("\\", "/");
+            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                normalized = uri.AbsolutePath;
+            }
+            return normalized.Trim().Trim('/').ToLower();
+        }
+
+        private static bool IsSafeClientUploadPath(string path)
+        {
+            if (HasUnsafePathSegment(path)) return false;
+            var normalized = path.Trim().Trim('/').Replace("\\", "/");
+            if (normalized.DosIsNullOrWhiteSpace()) return false;
+            return normalized.Split('/').All(item => !item.DosIsNullOrWhiteSpace());
+        }
+
+        private static bool IsTenantFilePath(string osClient, string filePathName)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || filePathName.DosIsNullOrWhiteSpace()) return false;
+            var normalized = NormalizeTenantFilePath(filePathName);
+            if (normalized.DosIsNullOrWhiteSpace() || normalized.Contains("..") || normalized.Contains(":") || normalized.Contains("//") || normalized.StartsWith("~")) return false;
             var client = osClient.Trim('/').ToLower();
-            return normalized.Contains("/mall/pay-proof/")
-                   || (!client.DosIsNullOrWhiteSpace() && normalized.Contains($"/{client}/mall/pay-proof/"));
+            return normalized == client || normalized.StartsWith(client + "/");
         }
 
         private void LoadFormFiles(DiyUploadParam param)
@@ -209,20 +261,22 @@ namespace Microi.net.Api
             }
 
             var osClient = ResolveOsClient(param);
-            var mallMember = await GetMallMemberFromToken(osClient);
-            if (mallMember == null)
+            var clientUser = await GetClientUserFromToken(osClient);
+            if (clientUser == null)
             {
                 return Json(new DosResult(1001, null, "登录身份已过期！"));
             }
-            if (!IsMallPayProofUploadPath(param.Path))
+
+            param.Path = ResolveUploadPath(param);
+            if (!IsSafeClientUploadPath(param.Path))
             {
-                return Json(new DosResult(0, null, "商城移动端仅允许上传支付凭证文件！"));
+                return Json(new DosResult(0, null, "移动端文件上传路径不合法！"));
             }
 
             param.OsClient = osClient;
-            param._CurrentUser = mallMember;
+            param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
-            param.Limit = true;
+            param.Limit ??= true;
             param.Preview ??= true;
             LoadFormFiles(param);
 
@@ -231,7 +285,7 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 商城移动端获取支付凭证私有文件临时访问地址。
+        /// 移动端获取私有文件临时访问地址。保留旧 action 名用于兼容已发布客户端。
         /// </summary>
         [HttpGet, HttpPost]
         [AllowAnonymous]
@@ -251,18 +305,18 @@ namespace Microi.net.Api
             }
 
             var osClient = ResolveOsClient(param);
-            var mallMember = await GetMallMemberFromToken(osClient);
-            if (mallMember == null)
+            var clientUser = await GetClientUserFromToken(osClient);
+            if (clientUser == null)
             {
                 return Json(new DosResult(1001, null, "登录身份已过期！"));
             }
-            if (!IsMallPayProofFilePath(osClient, param.FilePathName))
+            if (!IsTenantFilePath(osClient, param.FilePathName))
             {
-                return Json(new DosResult(0, null, "商城移动端仅允许访问支付凭证文件！"));
+                return Json(new DosResult(0, null, "移动端仅允许访问当前租户文件！"));
             }
 
             param.OsClient = osClient;
-            param._CurrentUser = mallMember;
+            param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit = true;
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
@@ -304,10 +358,37 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
+        [AllowAnonymous]
         public async Task<JsonResult> GetPrivateFileUrl(DiyUploadParam param)
         {
-            await DefaultParam(param);
-            //var result = await DiyCommon.GetPrivateFileUrl(param);
+            await LoadJsonBody(param);
+            param.FilePathName = ResolveFilePathName(param);
+
+            var currentToken = await DiyToken.GetCurrentToken();
+            if (currentToken?.CurrentUser != null)
+            {
+                param._CurrentUser = currentToken.CurrentUser;
+                param.OsClient = currentToken.OsClient;
+                param._InvokeType = InvokeType.Client.ToString();
+                var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
+                return Json(platformResult);
+            }
+
+            var osClient = ResolveOsClient(param);
+            var clientUser = await GetClientUserFromToken(osClient);
+            if (clientUser == null)
+            {
+                return Json(new DosResult(1001, null, "登录身份已过期！"));
+            }
+            if (!IsTenantFilePath(osClient, param.FilePathName))
+            {
+                return Json(new DosResult(0, null, "移动端仅允许访问当前租户文件！"));
+            }
+
+            param.OsClient = osClient;
+            param._CurrentUser = clientUser;
+            param._InvokeType = InvokeType.Client.ToString();
+            param.Limit = true;
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
