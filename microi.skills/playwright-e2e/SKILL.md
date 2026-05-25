@@ -433,7 +433,7 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
    - 没有出现纯渐变/首字母占位/空白图位（这通常意味着 `sanitizeAssetUrl` 等前缀工具被遗漏，或图片字段拿到了相对路径）
    - 商品/卡片图都真实显示
    - 价格、卖家、卡号等文案不出错位
-   - 同步参见 [uniapp-mall-assets](../uniapp-mall-assets/SKILL.md) 中的 FileServer 前缀规范。
+  - 同步参见 [microi-uniapp-frontend](../microi-uniapp-frontend/SKILL.md) 中的 FileServer 前缀规范。
 9. 用 `page.on('response', r => { if (r.url().includes('/file/') && !r.ok()) failedAssets.push(r.url()); })` 监听全部资源请求，断言 `failedAssets.length === 0`，能在断言前就抓到 404 图片。
 
 ## 最少冒烟集
