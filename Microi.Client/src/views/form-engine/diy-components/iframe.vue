@@ -20,7 +20,7 @@
 
 <script>
 export default {
-    name: "iframe",
+    name: "MicroiIframe",
     data() {
         return {
             Url: ""
@@ -30,34 +30,13 @@ export default {
     components: {},
 
     computed: {},
-    async created() {
-        var self = this;
-        var url = self.$route.params.Url;
-        var menuId = self.$route && self.$route.meta && self.$route.meta.Id;
-        if (!self.DiyCommon.IsNull(url)) {
-            url = url.replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$@", "#");
-            // url = url.replace(/＆/,'&');
-        } else {
-            url = decodeURIComponent((new RegExp("[?|&|%3F]" + "src" + "=" + "([^&;]+?)(&|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
+    created() {
+        this.LoadIframeUrl();
+    },
+    watch: {
+        "$route.fullPath"() {
+            this.LoadIframeUrl();
         }
-        if (self.DiyCommon.IsNull(url) && self.$route.fullPath.startsWith("/iframe/")) {
-            url = decodeURIComponent(self.$route.fullPath.replace("/iframe/", ""));
-        }
-        if (url) {
-            //如果url是guid，就表示是接口引擎
-            if (self.isValidGUID(url)) {
-                var apiEngineResult = await self.DiyCommon.ApiEngine.Run(url, {
-                    MenuId: menuId
-                });
-                if (apiEngineResult.Code == 1) {
-                    url = apiEngineResult.Data;
-                } else {
-                    self.DiyCommon.Tips(apiEngineResult.Msg, false);
-                }
-            }
-            url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
-        }
-        self.Url = url;
     },
     mounted() {
         function iFrameHeight() {
@@ -70,6 +49,61 @@ export default {
     },
 
     methods: {
+        _safeDecode(value) {
+            if (this.DiyCommon.IsNull(value)) return "";
+            try {
+                return decodeURIComponent(String(value).replace(/\+/g, "%20"));
+            } catch (error) {
+                return String(value);
+            }
+        },
+        _extractIframeUrl() {
+            var self = this;
+            var url = self.$route && self.$route.params ? self.$route.params.Url : "";
+            if (Array.isArray(url)) {
+                url = url.join("/");
+            }
+            if (!self.DiyCommon.IsNull(url)) {
+                url = self._safeDecode(url);
+            } else if (self.$route && self.$route.query && !self.DiyCommon.IsNull(self.$route.query.src)) {
+                url = Array.isArray(self.$route.query.src) ? self.$route.query.src[0] : self.$route.query.src;
+                url = self._safeDecode(url);
+            } else if (self.$route && self.$route.fullPath && self.$route.fullPath.startsWith("/iframe/")) {
+                url = self.$route.fullPath.replace("/iframe/", "");
+                var queryIndex = url.indexOf("?");
+                if (queryIndex > -1) {
+                    url = url.substring(0, queryIndex);
+                }
+                url = self._safeDecode(url);
+            } else {
+                var regUrl = (new RegExp("[?|&|%3F]" + "src" + "=" + "([^&;]+?)(&|;|$)").exec(location.href) || [, ""])[1];
+                url = self._safeDecode(regUrl);
+            }
+            if (!self.DiyCommon.IsNull(url)) {
+                url = url.replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$@", "#");
+            }
+            return url || "";
+        },
+        async LoadIframeUrl() {
+            var self = this;
+            var url = self._extractIframeUrl();
+            var menuId = self.$route && self.$route.meta && self.$route.meta.Id;
+            if (url) {
+                //如果url是guid，就表示是接口引擎
+                if (self.isValidGUID(url)) {
+                    var apiEngineResult = await self.DiyCommon.ApiEngine.Run(url, {
+                        MenuId: menuId
+                    });
+                    if (apiEngineResult.Code == 1) {
+                        url = apiEngineResult.Data;
+                    } else {
+                        self.DiyCommon.Tips(apiEngineResult.Msg, false);
+                    }
+                }
+                url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
+            }
+            self.Url = url;
+        },
         isValidGUID(guid) {
             // GUID 正则表达式模式
             // 支持以下格式：
@@ -79,8 +113,9 @@ export default {
             // 4. 带有括号: (XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX)
             const guidPattern =
                 /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32}|\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}|\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\))$/;
+            const ulidPattern = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
 
-            return guidPattern.test(guid);
+            return guidPattern.test(guid) || ulidPattern.test(guid);
         }
     }
 };

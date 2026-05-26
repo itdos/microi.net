@@ -106,6 +106,7 @@ export default {
             LastModelValue: this.field?.Component === 'MultipleSelect' ? [] : '',
             FieldAllData: [],
             NeedResetDataSourse: true,
+            _selectDestroyed: false,
             _ArrowDownIcon: markRaw(ArrowDown),
             // 配置弹窗相关
             configDialogVisible: false,
@@ -334,6 +335,17 @@ export default {
         }
     },
 
+    beforeUnmount() {
+        var self = this;
+        self._selectDestroyed = true;
+        if (self.field) {
+            self.field._SelectRemoteRequestId = (self.field._SelectRemoteRequestId || 0) + 1;
+            if (self.field.Config) {
+                self.field.Config.DataSourceSqlRemoteLoading = false;
+            }
+        }
+    },
+
     mounted() {
         var self = this;
         // 标准化KeyValue数据源的数据格式（将旧的小写key/value转换为大驼峰Key/Value）
@@ -450,8 +462,12 @@ export default {
                 }
                 // 远程搜索模式下，主动加载一次数据，确保表内编辑时能立即显示当前值
                 // SetFieldsData批量API不传_Keyword，含$Keyword$的SQL可能返回空
+                var selectedCount = Array.isArray(self.ModelValue)
+                    ? self.ModelValue.filter(function (item) { return !self._isEmptySelectValue(item); }).length
+                    : (self._isEmptySelectValue(self.ModelValue) ? 0 : 1);
                 if (self.field.Config.DataSourceSqlRemote &&
-                    (!self.field.Data || self.field.Data.length === 0)) {
+                    selectedCount > 0 &&
+                    (!self.field.Data || self.field.Data.length === 0 || self.field.Data.length <= selectedCount)) {
                     self.SelectRemoteMethod("", self.field);
                 }
             }
@@ -564,6 +580,16 @@ export default {
                 return "";
             }
             return item;
+        },
+        _isSameOptionList(oldList, newList) {
+            oldList = Array.isArray(oldList) ? oldList : [];
+            newList = Array.isArray(newList) ? newList : [];
+            if (oldList.length !== newList.length) return false;
+            try {
+                return JSON.stringify(oldList) === JSON.stringify(newList);
+            } catch (error) {
+                return oldList === newList;
+            }
         },
         _normalizeMultipleSaveFieldValue(value) {
             var self = this;
@@ -791,12 +817,14 @@ export default {
         },
         VisibleChange(visible, field) {
             var self = this;
-            if (!visible) {
-                if (field.Config.DataSourceSqlRemote) {
+            if (field.Config.DataSourceSqlRemote) {
+                if (visible && (!Array.isArray(field.Data) || field.Data.length === 0)) {
                     self.SelectRemoteMethod("", field);
-                } else {
-                    self.FilterMethod("", field);
                 }
+                return;
+            }
+            if (!visible) {
+                self.FilterMethod("", field);
             }
         },
         GetFieldValue(field, form) {
@@ -991,8 +1019,19 @@ export default {
         },
         SelectRemoteMethod(query, field) {
             var self = this;
+            if (self._selectDestroyed || !field || !field.Config) return;
+            query = query == null ? "" : String(query);
             if (field.Config.DataSourceSqlRemote == true)
             {
+                if (field.Config.DataSourceSqlRemoteLoading === true && field._SelectRemoteLastQuery === query) {
+                    return;
+                }
+                if (field._SelectRemoteLoadedQuery === query) {
+                    return;
+                }
+                field._SelectRemoteLastQuery = query;
+                field._SelectRemoteRequestId = (field._SelectRemoteRequestId || 0) + 1;
+                var requestId = field._SelectRemoteRequestId;
                 field.Config.DataSourceSqlRemoteLoading = true;
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
@@ -1021,10 +1060,21 @@ export default {
                 }
                 // 安全兜底：无论请求成功/失败/异常/空结果，都必须重置 loading 为 false，
                 // 并把 field.Data 规整为数组，避免 el-select 在 remote 模式下卡在"加载中"
-                var finishLoading = function (data) {
-                    self.NeedResetDataSourse = false;
-                    field.Data = Array.isArray(data) ? data : [];
-                    field.Config.DataSourceSqlRemoteLoading = false;
+                var finishLoading = function (data, markLoaded) {
+                    if (self._selectDestroyed) return;
+                    if (requestId !== field._SelectRemoteRequestId) return;
+                    try {
+                        self.NeedResetDataSourse = false;
+                        var nextData = Array.isArray(data) ? data : [];
+                        if (!self._isSameOptionList(field.Data, nextData)) {
+                            field.Data = nextData;
+                        }
+                        if (markLoaded !== false) {
+                            field._SelectRemoteLoadedQuery = query;
+                        }
+                    } finally {
+                        field.Config.DataSourceSqlRemoteLoading = false;
+                    }
                 };
                 try {
                     self.DiyCommon.Post(
@@ -1035,15 +1085,15 @@ export default {
                                 finishLoading(result.Data);
                             } else {
                                 // 接口返回失败：保留原数据但必须关闭 loading
-                                field.Config.DataSourceSqlRemoteLoading = false;
+                                finishLoading(field.Data, false);
                             }
                         },
                         function (error) {
-                            field.Config.DataSourceSqlRemoteLoading = false;
+                            finishLoading(field.Data, false);
                         }
                     );
                 } catch (e) {
-                    field.Config.DataSourceSqlRemoteLoading = false;
+                    finishLoading(field.Data, false);
                 }
             }
         },
