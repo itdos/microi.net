@@ -49,6 +49,8 @@ export interface ApiEngine {
     Code?: string;
     ApiRemark?: string;
     Description?: string;
+    Version?: string;
+    ChangeHistory?: string;
     UpdateTime?: string;
 }
 export interface V8Event {
@@ -60,6 +62,7 @@ export interface V8Event {
     V8Code?: string;
     Code?: string;
     TableName?: string;
+    Version?: string;
     UpdateTime?: string;
 }
 export interface PlaywrightEngineInfo {
@@ -160,13 +163,18 @@ export declare class MicroiClient {
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;
-    saveEngineCode(apiEngineKey: string, code: string): Promise<ApiResponse>;
+    saveEngineCode(apiEngineKey: string, code: string, options?: {
+        functionDescription?: string;
+        changeSummary?: string;
+    }): Promise<ApiResponse>;
     createEngine(data: {
         ApiEngineKey: string;
         ApiName: string;
         Category?: string;
         Code?: string;
         ApiAddress?: string;
+        functionDescription?: string;
+        changeSummary?: string;
     }): Promise<ApiResponse>;
     uploadFileBase64(data: {
         FileName?: string;
@@ -179,7 +187,10 @@ export declare class MicroiClient {
         TargetField?: string;
     }): Promise<ApiResponse>;
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
-    saveEventCode(formEngineKey: string, eventType: string, code: string): Promise<ApiResponse>;
+    saveEventCode(formEngineKey: string, eventType: string, code: string, options?: {
+        functionDescription?: string;
+        changeSummary?: string;
+    }): Promise<ApiResponse>;
     getEventList(keyword?: string): Promise<ApiResponse<V8Event[] | ListEnvelope<V8Event>>>;
     createTable(name: string, description?: string, options?: {
         Tabs?: string;

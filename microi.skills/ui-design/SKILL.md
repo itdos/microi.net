@@ -141,10 +141,6 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 - 移动端首页、商城、分享海报、资产页必须优先保证阅读清楚。浅色背景上的正文、占位文字、标签、金额、按钮文字不得使用低透明度浅灰或低对比金色。
 - 关键正文与背景对比度建议不低于 4.5:1；大标题、海报大字、促销卡标题不低于 3:1。金色渐变按钮默认使用深红/深棕文字，不使用白字。
 - 在渐变、图片、红金背景上放文字时，文字必须是实色且有足够字重；不要依赖 `opacity: .6` 这类弱化文字承载业务信息。
-- 统计卡片、资产金额、余额、销量、人数、次数等数字必须考虑极端大值。移动端紧凑区域内优先使用业务可读的单位缩写（如 `万`、`百万`、`千万`、`亿`，或系统语言/行业约定单位），同时保留合理精度，避免 `99999999.99` 这类长数字撑破布局。
-- 数字容器必须有稳定宽度约束：使用 `min-width: 0`、`white-space: nowrap`、合适的 `font-size`/`font-weight`，必要时拆行显示标签和数值。不得靠缩小到难以阅读的字号解决溢出。
-- 涉及金额或统计汇总时，前端展示应优先来自当前业务明细或可信汇总接口；若页面同时显示数量和金额，自动化用例必须校验二者来源一致，防止列表数据与卡片汇总脱节。
-- 完成统计类 UI 后，Playwright 截图用例必须注入大数值夹具（至少覆盖万、百万/千万、亿级）并检查关键数字没有横向溢出、遮挡或低对比度。
 - 完成移动端风格改造后，必须配合 Playwright 截图和关键文字对比度检查复核首页第一屏、列表页、登录页、分享海报。
 
 ---
@@ -1143,34 +1139,36 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 
 ---
 
-## 移动端低代码项目落地踩坑（平台通用）
+## 🚨 移动端低代码项目落地踩坑（必�?- 2026.5�?
 
-实战中频繁出现的 7 类问题，应作为 Microi 移动端项目的通用规范处理：
+实战中频繁出现的 7 类问题，团队复盘后总结为强制规范：
 
 ### 1. 路由前缀不要硬编码租户名
-- 错误：`manifest.json` 中写死 `"router": { "base": "/some-tenant/" }`。
-- 正确：通常使用 `"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量、请求头或环境变量完成。
-- 平台对外路由应保持 `/`、`/api/...`、`/apiengine/...`，不要把租户名拼进 API 路径。
+- �?`manifest.json` �?`"router": { "base": "/lsg/" }`
+- �?`"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量 + 请求头完�?
+- 任何形如 `https://api.itdos.com/{tenant}/...` �?URL 都是错误的，平台对外只暴�?`/`、`/api/...`、`/apiengine/...`
 
-### 2. tabBar 使用平台支持的静态图标
-- uni-app / 微信小程序的 tabBar `iconPath` / `selectedIconPath` 应使用静态 PNG 文件路径。
-- 不要用 emoji 字符、字体图标、SVG 或远程 URL 作为 tabBar 图标。
-- 推荐尺寸 60x60 到 81x81 px，未选中和选中状态使用同一视觉体系。
+### 2. tabBar 必须�?PNG 图标
+- uniapp / 微信小程序的 tabBar `iconPath` / `selectedIconPath` **只接受静�?PNG 文件路径**
+- 不允许：emoji 字符、字体图标、SVG（部分平台不支持）、远�?URL
+- 推荐尺寸�?0×60 ~ 81×81 px，未选中�?`#9898B0`，选中�?= 品牌主色
+- 可用 PowerShell + System.Drawing 一次性生�?5×2 = 10 个图标，保证统一风格
 
-### 3. font-size 禁止通配子元素
-SCSS scoped 中 `.module text { font-size: 40rpx }` 会同时影响图标、标签、副标题等子节点，导致布局失控。
-- 错误：`.entry text { font-size: 40rpx; }`
-- 正确：`.entry .entry-icon { font-size: 40rpx; } .entry .entry-label { font-size: 22rpx; }`
-- 同一容器内同时含图标与文字时，必须给图标和文字各自的 class。
+### 3. font-size 严禁通配 `.parent text { ... }`
+SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 子标�?`<text class="fz-22">`，导致标签字体被强行放大�?
+- �?`.qo text { font-size: 40rpx; }`
+- �?`.qo .qo-emoji { font-size: 40rpx; } .qo .qo-label { font-size: 22rpx; }`
+- 凡同一容器内同时含图标与文字，**必须**给图标和文字各自的具�?class
 
-### 4. 会员中心和详情入口优先使用网格单元
-- 资产汇总、快捷入口、服务入口优先使用 4 到 5 列网格，适合手机端扫读和点击。
-- 单元格建议结构：`80rpx` 左右的圆角图标背景 + `22rpx` 左右标签，间距 16 到 24rpx。
-- 横排“图标 + 文字 + 箭头”列表只适合设置类、低频深层菜单。
+### 4. 我的�?/ 详情页菜单优先用网格单元格而非纵向列表
+参�?"乐闪�?�?环球捕手"�?云集" 等线上商城：
+- 5 列资产汇总条 �?4-5 列彩色图标网�?�?多行 4 列服务网�?
+- 单元�?cell 结构：`80rpx 圆角图标背景�?+ 22rpx 标签`，间�?16~24rpx
+- 不要�?"图标 �?文字 �?�?箭头" 的横排长列表（除非是设置类深层菜单）
 
-### 5. 可点击元素必须有反馈
+### 5. 必备微动效（每个可点击元素都要有反馈�?
 ```scss
-.cell, .entry-item, .data-card, .module-card {
+.cell, .entry-item, .product-card, .zone-card {
   transition: transform .2s ease, box-shadow .2s ease;
 }
 .cell:active, .entry-item:active { transform: scale(0.94); }
@@ -1182,62 +1180,64 @@ SCSS scoped 中 `.module text { font-size: 40rpx }` 会同时影响图标、标�
 .animate-fadein { animation: fadein-up .45s ease both; }
 ```
 
-### 6. 品牌名和 Logo 必须集中替换
-- `manifest.json`: `name`、`h5.title`。
-- `pages.json`: 每个页面 `navigationBarTitleText`、`globalStyle.navigationBarTitleText`。
-- 页面顶栏、首页 hero、登录页 logo 区、注册页标题等用户可见位置必须使用当前系统品牌。
-- 控制台日志可保留技术代号，但用户可见文案不能泄漏旧项目名或模板名。
+### 6. 品牌�?/ Logo 在所有标题位置统一替换
+- `manifest.json`: `name`、`h5.title`
+- `pages.json`: 每个页面 `navigationBarTitleText`、`globalStyle.navigationBarTitleText`
+- 各页面顶�?brand 文本（首�?hero、登录页 logo 区、注册页标题�?
+- 控制�?`console.log('[lsg-mall]')` 等技术代号可保留，但用户可见文案必须统一为产品名（如 `乐闪购`�?
 
-### 7. 接口路径必须包含 ApiAddress
-平台动态路由 `/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` 在缓存中查找，`ApiAddress` 为空会导致 HTTP 404。
-- MCP `microi_create_engine` 会自动设置 `ApiAddress = '/apiengine/{apiEngineKey}'`。
-- 手工 SQL 或直接 INSERT 创建的接口必须补全 `ApiAddress` 字段，并写入对应缓存。
-- 修复脚本可用 V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })`，再刷新 key、Id、ApiAddress 三类缓存。
+### 7. 接口路径必须自动包含 ApiAddress（MCP 创建接口的硬规则�?
+平台动态路�?`/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` �?Redis 中查找�?*ApiAddress 为空 = 全部 404�?*
+- MCP `microi_create_engine` 已自�?`ApiAddress = '/apiengine/{apiEngineKey}'`
+- 手工 SQL / 直接 INSERT 创建的接口请补全 `ApiAddress` 字段，并写入缓存�?
+  `Microi:{osClient}:FormData:sys_apiengine:{apiAddress.toLowerCase()}` �?整行模型对象
+- 修复脚本可用一次�?V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })` �?`V8.Cache.Set` 三个键（key、Id、ApiAddress �?lowercase�?
 
-## 外键字段必须使用 Id+Name 双控件设计
 
-错误做法：只建一个 `XxxId` 字段并设 Select 下拉，数据库存 Id，列表里也显示 Id，用户无法识别。
+## 🔗 外键字段必须使用 Id+Name 双控件设计（强制规范�?
 
-正确做法：`XxxId`（隐藏 Text）和 `XxxName`（显示 Select+SQL 数据源）成对出现。Name 控件变化时，V8 事件自动把选项 Id 写入 Id 控件。
+> **错误做法**：只建一�?`XxxId` 字段并设�?Select 下拉，存的是 Id，列表中显示的也�?Id —�?用户根本看不懂�?
+>
+> **正确做法**：`XxxId`（隐�?Text�? `XxxName`（显�?Select+SQL 数据源）成对出现。Name 控件的值变�?V8 事件自动�?Id 控件赋值�?
 
-### 字段对结构
+### 字段对结�?
 
-| 字段 | Component | Visible | 用途 |
+| 字段 | Component | Visible | 用�?|
 |------|-----------|---------|------|
-| `XxxId` | Text | 0（隐藏） | 实际外键 Id，用于数据库索引和关联查询 |
-| `XxxName` | Select | 1 | 用户在表单和列表里看到的关联记录名称 |
+| `XxxId` | Text | **0**（隐藏） | 实际外键 Id（数据库索引 / 关联查询用） |
+| `XxxName` | Select | 1 | 用户在表�?列表里看到的关联记录名称 |
 
 ### XxxName 字段 Config（Sql 数据源）
 
 ```jsonc
 {
   "DataSource": "Sql",
-  "Sql": "select Id, Name from <JoinTable> where Name like '%$Keyword$%' limit 0,20",
-  "SelectLabel": "Name",
-  "SelectSaveField": "Name",
+  "Sql": "select Id, Name from <关联�? where Name like '%$Keyword$%' limit 0,20",
+  "SelectLabel": "Name",          // 下拉显示字段
+  "SelectSaveField": "Name",      // 保存�?XxxName 的字段（注意保存的是 Name 而非 Id�?
   "SelectSaveFormat": "Text",
   "EnableSearch": true,
-  "DataSourceSqlRemote": true,
+  "DataSourceSqlRemote": true,    // 必须 true：每次输入关键字向后端查�?
   "V8Code": "if (V8.ThisValue && typeof V8.ThisValue === 'object') { V8.Form.XxxId = V8.ThisValue.Id || ''; } else if (!V8.ThisValue) { V8.Form.XxxId = ''; }"
 }
 ```
 
-关键点：
-1. `SelectSaveField` 使用 Name 而不是 Id，确保 `XxxName` 存的是可读名称。
-2. `DataSourceSqlRemote: true` 表示远程搜索，避免一次性把整张表拉到前端。
-3. `V8Code` 通过 `V8.ThisValue` 拿到完整选项对象，把 `Id` 同步给 `V8.Form.XxxId`。
-4. SQL 中 `$Keyword$` 是占位符，会被平台替换为用户输入的关键字。
-5. 若关联表名称字段不是 `Name`，应按实际字段替换，例如 `CustomerName`、`Title`、`FullName`、`Receiver`。
+**关键�?*�?
+1. `SelectSaveField` �?**Name 而非 Id** —�?`XxxName` 存的是名称，列表直接显示就有意义
+2. `DataSourceSqlRemote: true` —�?远程搜索，避免一次性把整张表拉到前�?
+3. `V8Code` 中通过 `V8.ThisValue` 拿到完整选项对象（包�?Id �?Name），赋值给 `V8.Form.XxxId` 即可同步外键 Id
+4. SQL �?`$Keyword$` 是占位符，会被替换为用户输入的关键字
+5. 若关联表"name 字段"叫别的（�?`mall_member.NickName`、`mall_shop.ShopName`、`mall_product.Title`、`mall_address.Receiver`、`mall_pickup_apply.ApplyNo`），需�?SQL �?Config 中相应替�?
 
 ### 命名规范
 
-| 关联场景 | baseName | 字段名 | joinTable.joinNameField |
+| 关联场景 | baseName | 字段�?| joinTable.joinNameField |
 |---------|---------|--------|------------------------|
-| 分类 | Category | CategoryId / CategoryName | base_category.Name |
-| 客户 | Customer | CustomerId / CustomerName | crm_customer.Name |
-| 用户 | Owner / Buyer / Seller / Applicant | XxxId / XxxName | Sys_User.Name |
-| 商品 | Product | ProductId / ProductName | erp_product.Name |
-| 地址 | Address | AddressId / AddressName | base_address.Receiver |
+| 商品分类 | Category | CategoryId / CategoryName | mall_category.Name |
+| 会员（直推上�?/ 买家 / 卖家 / 持有�?/ 发起�?/ 目标人） | Parent / Buyer / Seller / Owner / Initiator / Target | XxxId / XxxName | mall_member.NickName |
+| 店铺 | Shop / ShopOwner | ShopId / ShopName | mall_shop.ShopName |
+| 商品 | Product / AnchorProduct | ProductId / ProductName | mall_product.Title |
+| 收货地址 | Address | AddressId / AddressName | mall_address.Receiver |
 
 ### MCP 工具支持
 
@@ -1247,46 +1247,46 @@ SCSS scoped 中 `.module text { font-size: 40rpx }` 会同时影响图标、标�
   "tableId": "01XXX...",
   "baseName": "Category",
   "label": "分类",
-  "joinTableName": "base_category",
-  "joinIdField": "Id",
-  "joinNameField": "Name",
+  "joinTableName": "mall_category",
+  "joinIdField": "Id",      // 默认 "Id"
+  "joinNameField": "Name",  // 默认 "Name"
   "tab": "",
   "sort": 100
 }
 ```
 
-#### 修复存量字段：`microi_fix_join_field` 或 `_mcp_fix_join_field`
-- 自动隐藏 `XxxId`（Visible=0/AppVisible=0）。
-- 自动创建或更新 `XxxName` 的 Select、SQL、V8Code 配置。
-- 自动回填：遍历目标表所有非空 `XxxId` 行，通过 Id 查询关联表名称并更新 `XxxName`。
-- 幂等：重复调用不会重复创建字段，只会刷新 Config。
+#### 修复存量字段：`microi_fix_join_field`（或直接调用 `_mcp_fix_join_field` 接口引擎�?
+- 自动隐藏 `XxxId`（Visible=0/AppVisible=0�?
+- 自动创建/更新 `XxxName` �?Select+SQL+V8Code 三件�?
+- 自动回填：遍历目标表所有非�?`XxxId` 行，�?Id 查询关联表的 Name，UPDATE �?`XxxName`
+- 幂等：重复调用不会重复创建字段，只会刷新 Config
 
 调用示例（dryRun 先看计划）：
 ```jsonc
 microi_run_engine "_mcp_fix_join_field" {
-  "tableName": "biz_order",
-  "baseName": "Customer",
-  "label": "客户",
-  "joinTableName": "crm_customer",
-  "joinNameField": "Name",
+  "tableName": "mall_buy_order",
+  "baseName": "Buyer",
+  "label": "买家",
+  "joinTableName": "mall_member",
+  "joinNameField": "NickName",
   "dryRun": true
 }
 ```
 
 ### 何时跳过 Name 字段
 
-只在以下场景保留单 `XxxId` 字段：
-- 关联表没有任何可读名称字段。
-- 多态关联，同一字段可能指向多张不同表，例如 `RelOrderId`。
-- 高频写入日志表外键，且管理后台不需要列表展示。
+只在以下场景下保留单 `XxxId` 字段（不�?Name 对）�?
+- 关联表完全没有可�?名称字段"（如�?Id 表）
+- 多态关联（同一字段可能指向多张不同表，�?`RelOrderId`�?
+- 高频写入的日志表外键，且管理后台不需要列表展�?
 
-其他业务表外键默认都应使用 Id+Name 对。
+其他所有业务表的外�?**必须** �?Id+Name 对�?
 
 ---
 
 ## 表单布局规范（Column）
 
-平台默认设计标准：`diy_table` 建议使用双列布局 (`Column = 2`)，更紧凑现代，符合主流后台 SaaS 视觉密度。
+> 平台默认设计标准：所有 `diy_table` **应使用双列布局** (`Column = 2`)，更紧凑现代，符合主流后台 SaaS 视觉密度。
 
 ### 创建表时
 
@@ -1294,11 +1294,11 @@ microi_run_engine "_mcp_fix_join_field" {
 microi_create_table {
   "name": "Crm_Customer",
   "description": "客户",
-  "column": 2
+  "column": 2     // ✅ 默认就是 2，无需显式传，但推荐写明
 }
 ```
 
-### 修复存量表
+### 修复存量表（一次性把所有 `Column=null` 改成 2）
 
 ```jsonc
 microi_update_table {
@@ -1309,42 +1309,43 @@ microi_update_table {
 
 ### 何时使用 Column=1（单列）
 
-- 工作流审批表单，字段少且需要专注。
-- 移动端优先表单，手机宽度不够双列。
-- 含大量富文本、长文本字段的内容编辑表。
+- 工作流审批表单（字段少且需要专注）
+- 移动端优先表单（手机宽度不够双列）
+- 含大量富文本/长文本字段的内容编辑表
 
 ### 何时使用 Column=3（三列）
 
-- 字段不少于 18 个的基础档案类大表，如员工、SKU、设备清单。
-- 面向 1920px 以上桌面分辨率的内部管理后台。
+- 字段≥18 的"基础档案"类大表（员工、商品 SKU、设备清单）
+- 桌面分辨率≥1920px 的内部管理后台
 
-修改 `Column` 后会自动清缓存；前端硬刷新即可看到效果。
+> 修改 `Column` 后会自动清缓存（`microi_update_table` 后端走 `UptFormData('diy_table')` + 主动 `RefreshSchemaCache`），前端硬刷新（Ctrl+Shift+R）即可看到效果。
 
 ---
 
-## 缓存刷新（解决“我改了字段但页面不变”问题）
+## 缓存刷新（解决"我改了字段但页面不变"问题）
 
 平台对 `diy_field` 的字段列表有 Redis 缓存，键格式 `Microi:{OsClient}:FormData:diy_table_field_list:{TableId|TableName}`。
 
-何时缓存会失效：
-- 通过 `microi_add_field` / `microi_update_field` / `microi_update_table` 走原生 API，通常自动清理。
-- 通过低代码后台界面操作，表单事件通常自动清理。
-- 直接 `V8.FormEngine.UptFormData('diy_field', ...)` 不会可靠触发清缓存，需要手动刷新。
+**何时缓存会失效**：
+- ✅ 通过 `microi_add_field` / `microi_update_field` / `microi_update_table` 走原生 API → 自动清
+- ✅ 通过低代码后台界面操作（diy_table 表单事件触发）→ 自动清
+- ❌ 直接 `V8.FormEngine.UptFormData('diy_field', ...)` → **不会触发清缓存**（这是历史 bug）
 
-手动清理示例：
+**何时手动清**：
 ```jsonc
-microi_refresh_schema_cache { "tables": ["crm_customer", "base_category"] }
+microi_refresh_schema_cache { "tables": ["mall_address", "mall_member"] }
 ```
+该工具会清除每张表的 6 个 key 变种（`diy_table` / `Diy_Table` / `diy_table_field_list` × `id|name`）。
 
 ---
 
 ## 接口引擎匿名访问
 
-登录、注册、首页公共数据等接口如果需要未登录调用，必须设置 `AllowAnonymous=1`，否则前端可能拿到 `null` 或鉴权失败：
+登录、注册、首页公共数据等接口必须 `AllowAnonymous=1`，否则未登录用户调用会拿到 `null`：
 
 ```jsonc
 microi_set_engine_anonymous {
-  "apiEngineKeys": ["member_login", "member_register", "home_data"],
+  "apiEngineKeys": ["mall_member_login", "mall_member_register", "mall_home_data"],
   "allowAnonymous": 1
 }
 ```

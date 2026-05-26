@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { API } from './api-paths.js';
+import { prepareV8VersionedCode } from './v8-version.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const NO_LOGIN_CODE = 1001;
 const DEFAULT_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
@@ -311,11 +312,30 @@ export class MicroiClient {
             Param: params || {},
         });
     }
-    async saveEngineCode(apiEngineKey, code) {
+    async saveEngineCode(apiEngineKey, code, options) {
+        let remote;
+        try {
+            const remoteResult = await this.getEngineCode(apiEngineKey);
+            remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+        }
+        catch {
+            remote = undefined;
+        }
+        const prepared = prepareV8VersionedCode({
+            kind: 'ApiEngine',
+            key: apiEngineKey,
+            currentCode: code,
+            remoteCode: remote?.ApiV8Code || remote?.Code,
+            remoteVersion: remote?.Version,
+            functionDescription: options?.functionDescription,
+            changeSummary: options?.changeSummary || `保存接口引擎 ${apiEngineKey}`,
+        });
         return this.post(API.UPDATE_ENGINE_CODE, {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
-            ApiV8CodeBase64: Buffer.from(code, 'utf8').toString('base64'),
+            ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
+            Version: prepared.version,
+            ChangeHistory: prepared.changeHistory,
         });
     }
     async createEngine(data) {
@@ -325,11 +345,21 @@ export class MicroiClient {
             ...data,
         };
         const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
-        if (code) {
-            payload.ApiV8CodeBase64 = Buffer.from(code, 'utf8').toString('base64');
-            delete payload.Code;
-            delete payload.ApiV8Code;
-        }
+        const prepared = prepareV8VersionedCode({
+            kind: 'ApiEngine',
+            key: data.ApiEngineKey,
+            currentCode: code,
+            functionDescription: payload.functionDescription,
+            changeSummary: payload.changeSummary || `创建接口引擎 ${data.ApiEngineKey}`,
+            initial: true,
+        });
+        payload.ApiV8CodeBase64 = Buffer.from(prepared.code, 'utf8').toString('base64');
+        payload.Version = prepared.version;
+        payload.ChangeHistory = prepared.changeHistory;
+        delete payload.Code;
+        delete payload.ApiV8Code;
+        delete payload.functionDescription;
+        delete payload.changeSummary;
         if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
             payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
         }
@@ -348,12 +378,32 @@ export class MicroiClient {
             EventType: eventType,
         });
     }
-    async saveEventCode(formEngineKey, eventType, code) {
+    async saveEventCode(formEngineKey, eventType, code, options) {
+        let remote;
+        try {
+            const remoteResult = await this.getEventCode(formEngineKey, eventType);
+            remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+        }
+        catch {
+            remote = undefined;
+        }
+        const prepared = prepareV8VersionedCode({
+            kind: 'V8Event',
+            key: formEngineKey,
+            eventType,
+            currentCode: code,
+            remoteCode: remote?.V8Code || remote?.Code,
+            remoteVersion: remote?.Version,
+            functionDescription: options?.functionDescription,
+            changeSummary: options?.changeSummary || `保存 V8 事件 ${formEngineKey}/${eventType}`,
+        });
         return this.post(API.UPDATE_EVENT_CODE, {
             OsClient: this.config.osClient,
             FormEngineKey: formEngineKey,
             EventType: eventType,
-            V8Code: code,
+            V8Code: prepared.code,
+            Version: prepared.version,
+            ChangeHistory: prepared.changeHistory,
         });
     }
     async getEventList(keyword) {

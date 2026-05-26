@@ -179,7 +179,10 @@ function buildPlaywrightPlanText(args) {
         `PW_OS_CLIENT=${args.osClient}`,
         `PW_LOGIN_ENGINE=${loginEngine}`,
         `PW_SMOKE_ENGINE=${smokeEngine}`,
+        'PW_TEST_ACCOUNT=<dedicated-test-account>',
+        'PW_TEST_PASSWORD=<dedicated-test-password>',
         `PW_HOME_PATH=${homePath}`,
+        'PW_SCREENSHOT_DIR=tests/e2e/screenshots',
         `PW_CONTEXT_PAGE_SIZE=${args.pageSize || args.context?.Summary?.PageSize || 5000}`,
         '```',
         '',
@@ -190,23 +193,31 @@ function buildPlaywrightPlanText(args) {
         `- ${testDir}/specs/auth.spec.js`,
         `- ${testDir}/specs/api-contract.spec.js`,
         `- ${testDir}/specs/network.spec.js`,
+        `- ${testDir}/specs/visual-and-assets.spec.js`,
         `- ${testDir}/specs/business-flow.spec.js`,
         '',
         '## Required quality gates',
         `1. Open ${homePath} and assert body plus one stable app element.`,
         `2. Call /apiengine/${smokeEngine} with Playwright request and assert DosResult shape.`,
-        `3. Call /apiengine/${loginEngine} with a dedicated test account and assert Token.`,
+        `3. Call /apiengine/${loginEngine} with PW_TEST_ACCOUNT/PW_TEST_PASSWORD and assert Token without printing secrets.`,
         `4. Inject Token into storage, open ${route}, and assert the page is visible.`,
         '5. Intercept all API responses and fail on HTTP 404/5xx, empty body, string `null`, invalid JSON, or unexpected `Code=0`.',
-        '6. Cover at least one real write flow with repeatable seed data and assert the state change by querying the backend.',
-        '7. Verify unauthenticated protected actions redirect to login or return Code=1001/1002.',
+        '6. Save fullPage screenshots for every core page and review them; do not rely on failure-only screenshots.',
+        '7. Verify uploaded images, avatars, banners, private files, QR codes, and product/card pictures really render, not only that URLs are non-empty.',
+        '8. Run contrast/overflow checks: no unreadable text, no horizontal scrollbar, no missing mobile tabBar/fixed footer.',
+        '9. Cover at least one real write flow with repeatable seed data and assert the state change by querying the backend.',
+        '10. Verify unauthenticated protected actions redirect to login or return Code=1001/1002.',
+        '11. Treat visible `开发中`, `待开发`, `请求失败`, `网络错误`, and `null` as delivery failures.',
         '',
         '## Microi rules',
         '- Always send `OsClient` in API headers.',
         '- Use a dedicated test account and repeatable seed data for write scenarios.',
         '- Prefer API login plus storage injection over clicking the login form in every test.',
         '- Use MCP `microi_get_playwright_context` before adding business-flow specs.',
+        '- If backend/frontend services are not reachable, auto-start them before declaring the test blocked.',
+        '- Prefer MCP/platform tools for metadata fixes; only create tenant ApiEngines for tenant business logic.',
         '- For mobile member apps, do not call platform FormEngine directly with a mall member token; use tenant ApiEngines or a safe query proxy.',
+        '- Keep generic platform lessons in `microi.skills/microi-system-delivery/SKILL.md`; project-specific rules belong in the project blueprint/config.',
     ].join('\n');
 }
 /** 常用编程类型→平台允许的列类型映射（防止 AI 传入无效类型）
@@ -292,7 +303,7 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
-- **microi_save_engine_code** — 只覆盖 ApiV8Code，不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
+- **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
@@ -731,12 +742,14 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Overwrites ApiV8Code only and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
-    }, async ({ apiEngineKey, code }) => {
+        functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
+        changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+    }, async ({ apiEngineKey, code, functionDescription, changeSummary }) => {
         try {
-            const result = await client.saveEngineCode(apiEngineKey, code);
+            const result = await client.saveEngineCode(apiEngineKey, code, { functionDescription, changeSummary });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
@@ -754,14 +767,18 @@ export function createMcpServer(client, context) {
         apiName: z.string().describe('Display name of the engine'),
         category: z.string().optional().describe('Category to organize engines'),
         code: z.string().optional().describe('Initial JavaScript code for the engine'),
+        functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
+        changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
-    }, async ({ apiEngineKey, apiName, category, code, apiAddress }) => {
+    }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress }) => {
         try {
             const result = await client.createEngine({
                 ApiEngineKey: apiEngineKey,
                 ApiName: apiName,
                 Category: category,
                 Code: code,
+                functionDescription,
+                changeSummary,
                 ApiAddress: apiAddress,
             });
             if (result.Code !== 1) {
@@ -838,13 +855,15 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存 V8 事件代码
     // ========================
-    server.tool('microi_save_event_code', `Save (update) V8 event code on Microi server (OsClient: ${osClient}). Overwrites existing event code.`, {
+    server.tool('microi_save_event_code', `Save (update) V8 event code on Microi server (OsClient: ${osClient}). Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code.`, {
         formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
         eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
         code: z.string().describe('The complete JavaScript source code to save'),
-    }, async ({ formEngineKey, eventType, code }) => {
+        functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
+        changeSummary: z.string().optional().describe('One-line change summary for audit/future compatible storage.'),
+    }, async ({ formEngineKey, eventType, code, functionDescription, changeSummary }) => {
         try {
-            const result = await client.saveEventCode(formEngineKey, eventType, code);
+            const result = await client.saveEventCode(formEngineKey, eventType, code, { functionDescription, changeSummary });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }

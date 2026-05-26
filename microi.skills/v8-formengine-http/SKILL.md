@@ -67,11 +67,11 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 
 ```jsonc
 {
-  "OsClient": "demo",
-  "FormEngineKey": "crm_customer",   // 形式一必填；形式二可选（已在 URL 中）
-  "_Where": [["Status","=","Active"], ["AND","Name","Like","Microi"]],
-  "_SelectFields": ["Id","Name","Phone","Status"],
-  "_OrderBy": "CreateTime",
+  "OsClient": "lsg",
+  "FormEngineKey": "mall_product",   // 形式一必填；形式二可选（已在 URL 中）
+  "_Where": [["Status","=","OnSale"], ["AND","Stock",">",0]],
+  "_SelectFields": ["Id","Title","CurrentPrice","MainImg"],
+  "_OrderBy": "SoldCount",
   "_OrderByType": "DESC",
   "_PageIndex": 1,
   "_PageSize": 20
@@ -80,8 +80,8 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 
 写操作（Add/Upt）将业务字段平铺到 body：
 ```jsonc
-{ "OsClient":"demo", "FormEngineKey":"crm_customer",
-  "Id":"01ABC...", "Name":"示例客户", "Phone":"13800000000" }
+{ "OsClient":"lsg", "FormEngineKey":"mall_shopping_cart",
+  "Id":"01ABC...", "Quantity": 2, "Selected": 1 }
 ```
 
 ## 响应 DosResult 标准格式
@@ -100,8 +100,8 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 
 ```javascript
 const BASE = 'https://api.itdos.com';
-const OS_CLIENT = 'demo';
-function getToken(){ return uni.getStorageSync('microi_token') || ''; }
+const OS_CLIENT = 'lsg';
+function getToken(){ return uni.getStorageSync('mall_token') || ''; }
 
 function formEngineRequest(action, table, body = {}) {
   return new Promise((resolve, reject) => {
@@ -142,9 +142,9 @@ export const formEngineDel    = (t, d) => formEngineRequest('delformdata',  t, d
 
 | 客户端 HTTP 路由                             | V8 内等价写法 |
 | --- | --- |
-| POST `/api/formengine/gettabledata-crm_customer` | `V8.FormEngine.GetTableData('crm_customer', {...})` |
-| POST `/api/formengine/getformdata-crm_customer`   | `V8.FormEngine.GetFormData('crm_customer', {...})` |
-| POST `/api/formengine/uptformdata-biz_order` | `V8.FormEngine.UptFormData('biz_order', {...})` |
+| POST `/api/formengine/gettabledata-mall_product` | `V8.FormEngine.GetTableData('mall_product', {...})` |
+| POST `/api/formengine/getformdata-mall_member`   | `V8.FormEngine.GetFormData('mall_member', {...})` |
+| POST `/api/formengine/uptformdata-mall_shopping_cart` | `V8.FormEngine.UptFormData('mall_shopping_cart', {...})` |
 
 > 客户端 HTTP 调用**会**触发 `SubmitBeforeServerV8`、`SubmitAfterServerV8`、`DataFilterV8` 等服务端事件；
 > 而 V8 引擎内调用 `V8.FormEngine.*` 默认**不**触发，除非显式传 `_InvokeType:'Client'`。
