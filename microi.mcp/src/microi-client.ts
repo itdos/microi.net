@@ -607,6 +607,14 @@ export class MicroiClient {
     });
   }
 
+  async getFieldList(tableName?: string, tableId?: string): Promise<ApiResponse> {
+    return this.post(API.GET_FIELD_LIST, {
+      OsClient: this.config.osClient,
+      TableName: tableName,
+      TableId: tableId,
+    });
+  }
+
   async updateTable(patch: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.UPDATE_TABLE, {
       OsClient: this.config.osClient,

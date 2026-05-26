@@ -302,6 +302,7 @@ BOUNDARY RULES:
 - **microi_validate_system** — 对生成结果做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流是否存在
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
+- **microi_get_field_list / microi_update_field / microi_refresh_schema_cache** — 修改已有 diy_field 字段属性、KeyValue 数据源、Config 后必须回读并刷新缓存，避免后台字段选项与前端/接口枚举不一致
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
@@ -1058,6 +1059,23 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 修改字段（走原生 API，自动清缓存）
     // ========================
+    server.tool('microi_get_field_list', `List diy_field rows for a table on OsClient "${osClient}". Use before changing existing field Data/Config so the update targets the real FieldId and can be verified after writing.`, {
+        tableName: z.string().optional().describe('TableName, e.g. mall_product'),
+        tableId: z.string().optional().describe('TableId alternative locator'),
+    }, async ({ tableName, tableId }) => {
+        try {
+            if (!tableName && !tableId) {
+                return { content: [{ type: 'text', text: 'Error: tableName or tableId is required.' }], isError: true };
+            }
+            const result = await client.getFieldList(tableName, tableId);
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
     server.tool('microi_update_field', `Update a single diy_field for OsClient "${osClient}". Calls FormEngine.UptDiyField on the backend, which automatically clears the diy_table_field_list Redis cache so the frontend immediately sees the change. Locate the field by either Id or (TableId/TableName + Name). Only fields included in the patch are updated.`, {
         id: z.string().optional().describe('FieldId (preferred). If absent, must provide TableId/TableName + Name.'),
         tableId: z.string().optional().describe('TableId (alternative locator). Use with name.'),

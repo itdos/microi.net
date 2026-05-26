@@ -30,6 +30,7 @@ export const API = {
   // 低代码系统设计
   CREATE_TABLE: '/api/V8Engine/CreateTable',
   ADD_FIELD: '/api/V8Engine/AddField',
+  GET_FIELD_LIST: '/api/V8Engine/GetFieldList',
   UPDATE_FIELD: '/api/V8Engine/UpdateField',
   UPDATE_TABLE: '/api/V8Engine/UpdateTable',
   REFRESH_SCHEMA_CACHE: '/api/V8Engine/RefreshSchemaCache',

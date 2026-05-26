@@ -58,6 +58,15 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。Use
 - 值变更事件：选择名称时同步写入隐藏 Id，或选择 Id 时同步名称，保持列表和详情可读。
 - 下拉远程搜索无数据时必须结束 loading，显示空状态，不能一直“加载中”。
 
+### 3.1 业务枚举字段一致性
+
+业务枚举或专区、等级、状态、类型字段不能只改前端映射，也不能只改接口引擎逻辑。低代码后台的 `diy_field.Data` / `diy_field.Config` 是 PC 管理端录入数据的事实源之一，必须同步维护。
+
+- 改枚举前先用 MCP 读取目标 `diy_field`，确认 `Component`、`DataSource`、`SelectSaveField` 和现有选项。
+- KeyValue 组件必须让后台选项、接口引擎判断值、前端展示/筛选值保持同一套 Key。后台存了旧 Key 时，移动端会查不到或显示不出来。
+- 修改字段属性优先使用 `microi_get_field_list` / `microi_update_field` / `microi_refresh_schema_cache`，MCP 缺能力时先补 MCP 或平台通用 API。
+- 完成后必须回读 `diy_field.Data` / `diy_field.Config`，并用 Playwright 或接口测试覆盖后台录入值在前端列表、详情、筛选中的显示。
+
 ### 4. 示例数据与资源导入
 
 - 每个核心表至少准备 5-10 条可重复测试数据，且能清理重建。
