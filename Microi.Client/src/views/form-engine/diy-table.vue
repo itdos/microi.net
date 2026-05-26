@@ -545,6 +545,8 @@
                                                 v-if="!DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
                                                 :src="getFirstImageUrl(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
                                                 :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                                                :preview-teleported="true"
+                                                :z-index="50000"
                                                 style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
                                                 fit="cover"
                                                 lazy

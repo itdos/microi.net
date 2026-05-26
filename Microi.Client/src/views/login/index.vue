@@ -505,6 +505,17 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     },
 
     methods: {
+        normalizeIframeRouteUrl(url) {
+            if (!url) return url;
+            var rawUrl = String(url).trim();
+            if (rawUrl.startsWith("/iframe/")) {
+                rawUrl = rawUrl.replace("/iframe/", "");
+            }
+            try {
+                rawUrl = decodeURIComponent(rawUrl);
+            } catch (error) { }
+            return "/iframe/" + encodeURIComponent(rawUrl);
+        },
         // RSA加密密码
         encryptPassword(password) {
             var self = this;
@@ -896,7 +907,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                     url = self.SysConfig.DefaultIndexUrl;
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
-                        url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
+                        url = self.normalizeIframeRouteUrl(url);
                     } else if (url.startsWith("http") && !self.diyStore.IsPhoneView) {
                         window.location.href = url;
                         return;

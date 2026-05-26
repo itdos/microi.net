@@ -22,6 +22,18 @@ export const constantRoutes = [
         component: () => import("@/views/login/index.vue"),
         hidden: true
     },
+    {
+        path: "/iframe/:Url(.*)",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "iframe_page",
+                component: () => import("@/views/form-engine/diy-components/iframe.vue")
+            }
+        ]
+    },
     // WebOS 桌面路由（全屏，无经典传统 Layout 包裹，仅在 webos 模块存在时注册）
     ...(hasWebOS ? [{
         path: "/os",
