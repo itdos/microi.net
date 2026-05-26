@@ -88,7 +88,7 @@ npm run dev -- --host 0.0.0.0 --port 1988
 Pop-Location
 ```
 
-默认 uni-app H5 前端按项目自身命令启动，例如 `npm run dev:h5 -- --host 0.0.0.0 --port 5180` 或测试配置里的 `PW_WEB_SERVER_COMMAND`。如果目标测试同时依赖 PC 管理端和移动 H5，需要分别启动对应前端；不要用一个前端服务替代另一个业务入口。
+默认乐闪购 H5 前端仍按项目自身命令启动，例如 `npm run dev:h5 -- --host 0.0.0.0 --port 5192` 或测试配置里的 `PW_WEB_SERVER_COMMAND`。如果目标测试同时依赖 PC 管理端和移动 H5，需要分别启动对应前端；不要用一个前端服务替代另一个业务入口。
 
 执行顺序：先检查端口/健康接口是否可达；不可达则用后台终端启动；等待服务输出监听地址；再重试接口同步、页面打开、Playwright 截图和断言。只有启动命令失败、缺少依赖、数据库连接失败、端口冲突无法自动换端口且无替代配置时，才算真正阻塞，并且要报告具体失败命令和错误。
 
@@ -159,20 +159,20 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 - 如果接口返回了不可用图片，优先修数据源、上传平台文件或修接口引擎，不要用第三方 fallback 把测试“跑绿”。
 - 对分享海报二维码，优先断言平台接口，如 `/api/Os/CreateQRCodeImage`，或平台接口引擎返回的 HDFS 图片路径。
 
-## 移动端业务回归纪律
+## 乐闪购移动端回归纪律
 
-处理任意 Microi 租户的 uni-app H5、移动会员端、移动商城、客户门户、资产/订单/交易/登录/充值/分享或图片相关问题时，不能只改代码后让用户手工发现问题。完成实现后必须至少执行项目自己的构建命令、业务作用域 Playwright 用例、关键页面截图，并用 `view_image` 复核截图。
+处理乐闪购 `ai-helper/数字经济商城/mci.lsg.uniapp` 的交易、资产、登录、购物车、抢购、约单、充值、分享或图片相关问题时，不能只改代码后让用户手工发现问题。完成实现后必须至少执行：
 
 ```powershell
-Set-Location '<frontend-project>'
-$env:PW_API_BASE='<Microi API Base>'
-$env:PW_OS_CLIENT='<tenant osClient>'
-$env:PW_PORT='5180'
-npm run build:h5
+Set-Location 'd:\Work\microi.net.all\ai-helper\数字经济商城\mci.lsg.uniapp'
+$env:PW_API_BASE='https://localhost:7266'
+$env:PW_API_ENV='development'
+$env:PW_PORT='5192'
+npm run build:h5:local
 npx playwright test --reporter=list
 ```
 
-测试中的业务口径必须来自当前租户配置、接口引擎和需求文档，而不是写死某个项目规则。支付方式、资产名称、费率、窗口时间、页面入口、图片来源和会员等级等，都应通过接口返回或测试环境变量驱动；如果测试需要固定数据，必须用专用夹具创建并在用例结束后清理。
+当前业务口径要在测试里同步表达：普通商品只能提货卡支付，兑换金商品只能兑换金支付；积分充值只允许系统档位并生成唯一尾数金额；图片和二维码必须来自平台接口/HDFS；我的页绿色积分和兑换金提货入口按当前口径隐藏；约单同意后两张卡进入已约单，普通抢购必须被拒绝。
 
 表单引擎冻结高频根因：
 
@@ -237,8 +237,8 @@ expect(lowContrast, '低对比度文字: ' + JSON.stringify(lowContrast.slice(0,
 | 分类 | `/#/pages/category/category` | tab、商品标题副信息 |
 | 商品详情 | `/#/pages/product/detail?id=...` | 价格、规格、按钮 |
 | 购物车 | `/#/pages/cart/cart` | 数量、合计、结算按钮 |
-| 业务列表页 | `/#/pages/<module>/list` | 筛选条、卡片/表格字段、状态徽章、关键金额/数量 |
-| 业务详情页 | `/#/pages/<module>/detail?id=...` | 真实关联人/主体名称、规则/说明文字、底部按钮 |
+| 库存转让区 | `/#/pages/zone/transfer` | **价格区间芯片（顶部）**、卡号、持有人、转让价 |
+| 抢购详情 | `/#/pages/zone/grab-detail?id=...` | **真实卖家昵称**、规则文字、底部按钮 |
 | 订单列表/详情 | `/#/pages/order/buy-list` 等 | 状态徽章、金额、提交按钮 |
 | 我的 | `/#/pages/mine/mine` | **退出登录按钮**、菜单标签、积分数字 |
 
@@ -380,8 +380,8 @@ export async function injectStorage(page, values) {
 
 export async function injectH5Storage(page, token, member = null) {
   return injectStorage(page, {
-    [process.env.PW_TOKEN_STORAGE_KEY || 'microi_member_token']: token,
-    [process.env.PW_MEMBER_STORAGE_KEY || 'microi_member']: member || {}
+    mall_token: token,
+    mall_member: member || {}
   });
 }
 
@@ -429,11 +429,11 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
 5. 接口引擎断言必须检查 `HTTP ok`、`Code`、`Msg` 和关键 `Data` 字段。
 6. 涉及写库的用例必须使用专用测试账号和可重复数据，避免污染生产数据。
 7. 截图只用于关键节点和失败场景；不要让截图成为唯一断言。
-8. **每条业务主线 spec 必须有"图片回归检查"步骤**：在涉及商品列表、商品详情、业务资产卡片、海报、头像、Banner 的页面，必须 `await page.screenshot({ path: 'tests/e2e/screenshots/<spec>.png', fullPage: true })`，并在测试报告生成后用 `view_image` 工具肉眼复核截图，确认：
+8. **每条业务主线 spec 必须有"图片回归检查"步骤**：在涉及商品列表、商品详情、提货卡、海报、头像、Banner 的页面，必须 `await page.screenshot({ path: 'tests/e2e/screenshots/<spec>.png', fullPage: true })`，并在测试报告生成后用 `view_image` 工具肉眼复核截图，确认：
    - 没有出现纯渐变/首字母占位/空白图位（这通常意味着 `sanitizeAssetUrl` 等前缀工具被遗漏，或图片字段拿到了相对路径）
    - 商品/卡片图都真实显示
    - 价格、卖家、卡号等文案不出错位
-  - 同步参见 [microi-uniapp-frontend](../microi-uniapp-frontend/SKILL.md) 中的 FileServer 前缀规范。
+   - 同步参见 [uniapp-mall-assets](../uniapp-mall-assets/SKILL.md) 中的 FileServer 前缀规范。
 9. 用 `page.on('response', r => { if (r.url().includes('/file/') && !r.ok()) failedAssets.push(r.url()); })` 监听全部资源请求，断言 `failedAssets.length === 0`，能在断言前就抓到 404 图片。
 
 ## 最少冒烟集
@@ -470,22 +470,27 @@ tests/e2e/
 5. 任何 FormEngine HTTP 路由必须使用 `/api/formengine/{action}-{table}`，不要生成 `/formengine/{table}/{action}`。
 6. ApiEngine 动态路由必须显式携带 OsClient：推荐 `/apiengine/{ApiEngineKey}--OsClient--{osClient}--`，同时补充 Header `OsClient`。部分引擎会把 querystring 参与 `ApiAddress` 匹配，`?OsClient=` 可能误报“sys_apiengine 不存在”。
 7. 页面级测试必须把 `请求失败`、`网络错误`、`null`、`待开发`、`开发中` 当成失败信号；这些文案如果出现在页面或 toast 中，说明功能未交付或接口契约错误。
-8. 新增、保存、结算、转让、确认、上传等按钮不能只弹“成功/待开发”toast；必须调用真实业务接口，并通过后端查询验证状态变化。
+8. 新增、保存、结算、转赠、确认、上传等按钮不能只弹“成功/待开发”toast；必须调用真实业务接口，并通过后端查询验证状态变化。
 9. 源码守卫可作为兜底：递归扫描 `src/**/*.vue`、`src/**/*.js`，禁止残留 `待开发|开发中` 占位文案。
 10. 新建或更新 ApiEngine 后必须用 HTTP 路径复测一次；只用 `microi_run_engine` 通过不够，因为 HTTP 调用还受 `IsEnable`、`StopHttp`、`AllowAnonymous` 和动态路由缓存影响。
 11. 每个移动端项目都要有“接口清单驱动”的契约测试：静态扫描或维护清单覆盖所有 `callEngine('xxx')`，逐个 HTTP 调用并断言不是 404、不是空响应、不是字符串 `null`，且必须是标准 DosResult。
-12. 写业务闭环时必须准备可重复测试数据并清理：例如交易/库存类流程要“创建测试资源 → 执行动作 → 验证订单或状态 → 删除测试订单和资源”，购物车/申请类流程要“创建明细 → 提交 → 验证后端状态 → 清理测试数据”。
+12. 写业务闭环时必须准备可重复测试数据并清理：例如抢购要“创建测试挂单 → 调用抢购 → 验证订单 → 删除测试订单/挂单/提货卡”，购物车要“加入购物车 → 结算 → 验证订单/购物车状态 → 删除测试订单”。
 13. 图片断言必须检查真实渲染，而不是只检查元素可见。uni-app H5 的 `<image>` 会渲染成 `UNI-IMAGE`，真实图片在内部 `div.style.backgroundImage` 或子 `img` 上；不要把宿主元素的 CSS 渐变背景算作加载成功。
 14. 网络守卫要记录 `requestfailed`，特别是图片资源的 `net::ERR_BLOCKED_BY_ORB` / CORS / 404；首页 banner、商品主图、头像等公开图片必须实际加载。
 
-移动端会员/业务 H5 额外规则：
+移动商城/会员 H5 额外规则：
 
-- 业务会员 Token 通常来自租户接口引擎（如 `member_login`），不应默认当作平台 `Sys_User` Token。
-- 移动端会员数据查询不要绕过业务边界直连平台 FormEngine；优先使用租户 ApiEngine 或安全查询代理，并在后端按当前会员 Id 做范围过滤。
-- 商品、订单、资产、团队、地址、收款方式、审批或服务工单等会员数据，都必须验证“未登录不可见、登录后只可见自己的数据”。
-- 下单、结算、申请、转让、确认、上传等动作必须调用真实业务接口，并在后端查询状态变化；不能残留“开发中/待开发”占位。
-- 时间窗口、费率、支付方式、会员等级、状态枚举、入口名称等业务规则必须从配置或接口读取，测试断言跟随当前租户口径。
-- 首页 banner、公告图、商品图、头像、海报二维码等资源建议从平台 HDFS/API 或租户配置表驱动；E2E 要同时断言接口字段、真实图片加载和点击后路由。
+- 商城会员 Token 来自业务接口引擎（如 `mall_member_login`），不是平台 `Sys_User` Token。
+- 移动端会员数据查询不要直连平台 FormEngine；使用租户 ApiEngine 或安全查询代理。
+- 商品详情“加入购物车”必须登录；登录后必须写服务端购物车，再进入购物车页验证同一商品可见。
+- 购物车、订单、资产、团队、提货、地址、收款方式等会员数据都必须按会员 Id 做后端范围过滤。
+- 库存转让区不要写成“转赠区”，更不要写 `1:1.5 转赠`；业务含义是“提货卡转让”，平台服务费 1.2%，用户收益 1.5%。页面、接口、测试命名都要用“库存转让/提货卡转让”。
+- 库存转让区必须覆盖 `mall_grab_window_status`：接口必须返回标准 DosResult，`Data` 至少包含 `Status`、`StartTime`、`EndTime`、`ServerTime`、`UserProfitRate`、`PlatformServiceRate`。当前业务需要 00:00-24:00 全天开放时，测试必须断言 `Status=Open`、开始时间 `00:00:00`、结束时间 `24:00:00`。
+- `mall_grab_submit` 必须对空参数、无效挂单、已锁定挂单返回标准 DosResult，禁止返回 JS `null`；成功路径必须返回订单 Id，并验证用户收益率 1.5%、平台服务费率 1.2%。
+- “我的-新增地址”和“我的-新增收款方式”必须点击后出现真实表单，保存后后端能查到新增记录。
+- 购物车“结算”必须调用 `mall_cart_settle` 或等价业务接口，不能残留 `结算功能开发中`。
+- `mall_cart_settle` 必须覆盖真实闭环：登录、加入购物车、点击结算、等待 `/apiengine/mall_cart_settle`、断言 Code=1 和订单 Id，再查询购物车确认对应商品已移除。
+- 首页运营 banner 推荐从公告或配置表驱动，例如 `mall_notice.BannerImg`、`IsBanner`、`BannerSort`；E2E 要同时断言接口 `Banners[]`、图片真实加载、点击进入详情页。
 
 ## 与 MCP 的配合
 
