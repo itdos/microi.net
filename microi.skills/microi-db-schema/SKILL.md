@@ -32,5 +32,6 @@ Use this skill to answer schema questions and write code that depends on Microiå
 - Query non-deleted rows by default (`IsDeleted != 1`) when using raw SQL.
 - When changing schema metadata, account for cache invalidation and physical table changes; keep edits narrowly scoped.
 - When adding or updating low-code fields, prefer MCP native tools such as `microi_add_field` / `microi_update_field` over ad-hoc V8 metadata writes. A field row with `diy_field.TableId = null` can leave the physical column present but invisible to FormEngine/table schema loading.
+- When changing business enum fields, treat `diy_field.Data` and `diy_field.Config` as source-of-truth metadata. Verify the KeyValue keys match the values used by API engines and frontend filters, refresh schema caches, and read back the field row instead of trusting local constants.
 - Leave `diy_field.FormWidth` null/omitted for normal generated fields. Use `24` only for full-row controls such as `CodeEditor`, `Textarea`, `RichText`, upload, `TableChild`, map/layout, or custom components.
 - After schema changes, validate with `microi_get_db_schema` and refresh `diy_table_field_list` caches with `microi_refresh_schema_cache` when needed.
