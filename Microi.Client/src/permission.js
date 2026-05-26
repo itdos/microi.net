@@ -10,6 +10,18 @@ import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 const whiteList = ["/login", "/auth-redirect"]; // no redirect whitelist
 
+function normalizeIframeRouteUrl(url) {
+    if (!url) return url;
+    var rawUrl = String(url).trim();
+    if (rawUrl.startsWith("/iframe/")) {
+        rawUrl = rawUrl.replace("/iframe/", "");
+    }
+    try {
+        rawUrl = decodeURIComponent(rawUrl);
+    } catch (error) { }
+    return "/iframe/" + encodeURIComponent(rawUrl);
+}
+
 router.beforeEach(async (to, from, next) => {
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
@@ -90,7 +102,7 @@ router.beforeEach(async (to, from, next) => {
                     var url = sysConfig.DefaultIndexUrl;
                     url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
-                        url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
+                        url = normalizeIframeRouteUrl(url);
                     } else if (url.startsWith("http")) {
                         window.location.href = url;
                         return;
@@ -151,7 +163,7 @@ router.beforeEach(async (to, from, next) => {
                         url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
                         console.log("-------> SsoAutoLogin DefaultIndexUrl：" + url);
                         if (url.startsWith("/iframe/")) {
-                            url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
+                            url = normalizeIframeRouteUrl(url);
                         } else if (url.startsWith("http")) {
                             window.location.href = url;
                             return;
@@ -191,7 +203,7 @@ router.beforeEach(async (to, from, next) => {
                     console.log("iTdos permission error：", error);
                     console.log("Token was:", DiyCommon.getToken());
                     await userStore.resetToken();
-                    next(`/login?redirect=${to.fullPath}`);
+                    next({ path: "/login", query: { redirect: to.fullPath } });
                 }
             }
         }
@@ -199,7 +211,7 @@ router.beforeEach(async (to, from, next) => {
         if (whiteList.indexOf(to.path) !== -1) {
             next();
         } else {
-            next(`/login?redirect=${to.fullPath}`); //2022-03-31
+            next({ path: "/login", query: { redirect: to.fullPath } }); //2022-03-31
         }
     }
     } catch (e) {
@@ -209,7 +221,7 @@ router.beforeEach(async (to, from, next) => {
             if (to.path === "/login" || (whiteList && whiteList.indexOf(to.path) !== -1)) {
                 next();
             } else {
-                next(`/login?redirect=${to.fullPath || "/"}`);
+                next({ path: "/login", query: { redirect: to.fullPath || "/" } });
             }
         } catch (_) {
             next(false);

@@ -27,6 +27,7 @@ const pathMappings = {
     "/page-engine/page-renderer": "/page-engine/renderer",
     // form 相关映射
     "/microi.net/diy-form-page": "/diy/diy-form-page",
+    "/diy/diy-components/iframe": "/form-engine/diy-components/iframe",
     // system 相关映射
     "/itdos/system/sys-log": "/system/sys-log",
     "/itdos/system/sys-monitor": "/system/sys-monitor",
@@ -58,6 +59,22 @@ function normalizeComponentPath(componentPath) {
 function shouldIgnoreWarning(componentPath) {
     return false;
     return ignoredPaths.some((ignoredPath) => componentPath.includes(ignoredPath));
+}
+
+function normalizeIframeRouteUrl(url) {
+    if (DiyCommon.IsNull(url)) return "";
+    var rawUrl = String(url).trim();
+    if (rawUrl.startsWith("/iframe/")) {
+        rawUrl = rawUrl.replace("/iframe/", "");
+    }
+    try {
+        rawUrl = decodeURIComponent(rawUrl);
+    } catch (error) { }
+    return "/iframe/" + encodeURIComponent(rawUrl);
+}
+
+function isIframeMenu(item) {
+    return item && (item.OpenType === "Iframe" || item.OpenType === "iframe" || (item.Url && item.Url.startsWith("/iframe/")));
 }
 
 function GetComponent(item) {
@@ -140,7 +157,7 @@ function MenuBuild(result, data, isFater) {
                 item.Url = item.Url.trim();
 
                 // 跳过外部链接（http/https 开头的 URL 不应该添加为路由）
-                if (item.Url.startsWith("http://") || item.Url.startsWith("https://")) {
+                if (!isIframeMenu(item) && (item.Url.startsWith("http://") || item.Url.startsWith("https://"))) {
                     // 外部链接不需要添加为路由，直接跳过
                     return;
                 }
@@ -156,12 +173,12 @@ function MenuBuild(result, data, isFater) {
                     item.ComponentPath = item.ComponentPath.replace(/\?.*/, "");
                 }
             }
-            if (item.Url.startsWith("/iframe/")) {
-                item.ComponentPath = "/diy/diy-components/iframe";
+            if (isIframeMenu(item)) {
+                item.ComponentPath = "/form-engine/diy-components/iframe";
                 if (item.UrlApiEngineId) {
                     item.Url = "/iframe/" + item.UrlApiEngineId;
                 } else {
-                    item.Url = "/iframe/" + encodeURIComponent(item.Url.replace("/iframe/", ""));
+                    item.Url = normalizeIframeRouteUrl(item.Url);
                 }
             } else {
                 if (item.Url.indexOf("?") > -1) {
@@ -350,7 +367,7 @@ export const usePermissionStore = defineStore("permission", {
                 DiyCommon.Post(
                     DiyApi.GetSysMenuStep(),
                     {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "DiyTableId", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",
