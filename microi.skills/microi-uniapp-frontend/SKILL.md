@@ -54,10 +54,12 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 
 - `@media screen and (min-width: 768px)` 下把 `uni-app` 居中并限制到常见手机宽度，例如 `430px`。
 - `html, body` 使用克制的桌面背景，`uni-app` 内保持移动端页面本身背景。
+- 如果项目或主题给 `body.theme-light`、`body.theme-dark` 写了背景色，PC 媒体查询必须显式覆盖，避免手机壳外侧仍显示暗色或项目内装饰背景。
 - 同步约束 `uni-page`、`uni-page-wrapper`、`uni-page-body` 的宽度。
 - `uni-page-body` 给底部菜单和安全区预留 padding，避免内容或底部操作栏压住 tabBar。
 - 所有 `position: fixed` 底部操作栏按同一手机壳宽度居中。
 - 原生 `uni-tabbar` 和 `.uni-tabbar` 必须显式设置 `position: fixed`、`bottom: 0`、同宽居中和足够的 `z-index`，否则主体像手机壳但底部菜单可能丢失或铺满 PC 宽屏。
+- 页面内 `position: fixed` 的装饰背景（如 aurora、粒子、全屏渐变）在 PC 壳模式下必须收回到 `uni-app/uni-page-body` 内，不能覆盖整块桌面背景。
 
 参考样式：
 
@@ -129,6 +131,15 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 - 已选资产刷新后失效时清空选择，不能自动换成第一条。
 - 规则同时写在 UI 状态和提交前校验中。
 
+## 数字、主题、上传与消息
+
+- 资产金额、积分、余额、库存值、累计充值、收益等数字要按空间自适应格式化。金额很大时显示为 `1.23万`、`123万`、`1.2亿` 等，不能撑破卡片。
+- 主题切换必须全局生效：`html/body/page/uni-page-body` 与每个页面根节点都要能继承主题变量，不能只在“我的”一个页面生效。
+- iOS Safari 上传图片后必须验证表单其它字段不丢失；上传组件只更新文件字段，不得重置整张表单对象。
+- 消息、待办、审批、约单、审核类入口必须支持未读角标；已读后角标消失。
+- 会员头像、买家/卖家头像、审批人头像、团队成员头像都走 `resolveAvatarUrl`，列表页和详情页必须显示一致。
+- 私有图片、身份证照片、支付凭证等禁止匿名访问的文件，前端必须先换取临时 URL；不能直接把私有路径给 `<image>`。
+
 ## 验收要求
 
 每次改动 UniApp/H5 前端后，至少做以下验证：
@@ -137,3 +148,4 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 - PC 宽屏访问 H5，截图确认页面在手机壳内、底部 tabBar 可见、固定底栏没有铺满桌面。
 - 对关键图片和头像页面截图，确认显示真实图片而不是空白、首字母占位或失效图。
 - 对关键业务资产选择流程，验证首次进入不自动选中，刷新后无效选择会被清空。
+- 截图复核 PC 手机壳、底部 tabBar、主题背景、关键头像、私有图片、金额显示和未读角标。
