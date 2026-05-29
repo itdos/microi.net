@@ -50,6 +50,7 @@
 | Skill | 场景 | 文件 |
 |-------|------|------|
 | **playwright-e2e** | Playwright 端到端自动化测试、接口引擎断言、冒烟验收与 CI | `playwright-e2e/SKILL.md` |
+| **performance-testing** | 接口引擎、V8事件、FormEngine CRUD 高并发性能压力测试与报告 | `performance-testing/SKILL.md` |
 
 ---
 

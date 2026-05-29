@@ -30,6 +30,7 @@ globs: ["microi-v8-engine/**/*.js", "microi.skills/**/*.md"]
 - @microi.skills/ui-design/SKILL.md — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
 - @microi.skills/microi-db-schema/SKILL.md — Microi DB Schema
 - @microi.skills/playwright-e2e/SKILL.md — Microi 吾码 Playwright E2E 自动化测试
+- @microi.skills/performance-testing/SKILL.md — Microi 高并发性能压力测试
 - @microi.skills/business-blueprint/SKILL.md — Microi 业务架构蓝图（System Blueprint）
 - @microi.skills/microi-system-delivery/SKILL.md — Microi 全系统交付复盘与总控规范
 - @microi.skills/microi-uniapp-frontend/SKILL.md — Microi UniApp 前端通用规范
