@@ -107,17 +107,17 @@ export default {
             });
 
             //卡片更多跳转
-            EventBus.on("cartMoreLink", (linkurl, linktype) => {
+            EventBus.on("cartMoreLink", (linkurl, linktype = "router") => {
                 console.log("监听cartMoreLink", linkurl, linktype);
-                if (linktype == "router" && linkurl) {
+                if ((!linktype || linktype == "router") && linkurl) {
                     this.$router.push(linkurl);
                 }
             });
 
             //链接组件跳转
-            EventBus.on("linkWidget", (linkurl, linktype) => {
+            EventBus.on("linkWidget", (linkurl, linktype = "router") => {
                 console.log("监听linkWidget", linkurl, linktype);
-                if (linktype == "router" && linkurl) {
+                if ((!linktype || linktype == "router") && linkurl) {
                     this.$router.push(linkurl);
                 }
             });

@@ -334,7 +334,7 @@ const loginBottomContent = computed(() => {
         .replace('$CompanyName$', companyName.value);
 });
 
-const currentTheme = computed(() => diyStore.themeColor || '#409eff');
+const currentTheme = computed(() => diyStore.themeColor || diyStore.SysConfig?.ThemeColor || '#409eff');
 
 const language = computed(() => normalizeLocale(appStore.language) || 'zh-CN');
 const currentLang = computed(() => {
@@ -373,7 +373,7 @@ function changeMode(mode) {
     darkMode.value = mode;
     setThemeMode(mode);
     // 切换模式后重新写入主题色，使 MCI 渐变/阴影按当前模式重算
-    const color = diyStore.themeColor;
+    const color = currentTheme.value;
     if (color) applyThemeColor(color);
 }
 
