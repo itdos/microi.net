@@ -259,7 +259,7 @@
             ref="refDiyCustomDialog"
         ></DiyCustomDialog>
         <!--抽屉或弹窗打开完整的Form（延迟渲染，防止 Page 模式下无限嵌套）-->
-        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" ref="refDiyTable_DiyFormDialog" :ParentV8="GetV8()"></DiyFormDialog>
+        <DiyFormDialog v-if="_shouldRenderDiyFormDialog" ref="refDiyTable_DiyFormDialog" :ParentV8="GetV8()" @ParentFormSet="ParentFormSet"></DiyFormDialog>
     </div>
 </template>
 
@@ -563,18 +563,17 @@ export default {
         GetV8(field) {
             var self = this;
             var v8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
-
+            self.SetV8DefaultValue(v8);
             //2021-12-10新增，有可能用户自定义父级model，如点击A子表一行数据，更新B子表数据
             if (field && !self.DiyCommon.IsNull(field._ParentFormModel)) {
-                return Object.assign(
+                v8.Form = Object.assign(
                     {},
                     {
                         ...field._ParentFormModel
                     }
                 );
+                v8.ParentForm = self.FormDiyTableModel;
             }
-
-            self.SetV8DefaultValue(v8);
             return v8;
         },
         async OpenTableEventByInput(fieldName) {

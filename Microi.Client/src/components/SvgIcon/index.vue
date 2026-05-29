@@ -14,7 +14,7 @@ export default {
     name: "SvgIcon",
     setup() {
         const diyStore = useDiyStore();
-        const themeColor = computed(() => diyStore.themeColor);
+        const themeColor = computed(() => diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff");
         return { themeColor };
     },
     props: {

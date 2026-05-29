@@ -165,7 +165,7 @@ export default {
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
-        const themeColor = computed(() => diyStore.themeColor || "#409eff");
+        const themeColor = computed(() => diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff");
 
         return {
             diyStore,

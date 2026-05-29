@@ -3,6 +3,12 @@ import { defineStore } from "pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
 import LocalStorageManager from "@/utils/localStorage-manager.js";
 
+const DEFAULT_THEME_COLOR = "#409eff";
+const getLocalThemeColor = () => {
+    const color = LocalStorageManager.get("themeColor") || "";
+    return String(color).toLowerCase() === DEFAULT_THEME_COLOR ? "" : color;
+};
+
 export const useDiyStore = defineStore("diy", {
     state: () => ({
         IsPhoneView: false, //是否是移动端分辨率访问系统
@@ -82,7 +88,7 @@ export const useDiyStore = defineStore("diy", {
         ShowClassicLeft: 1,
         IsTabFullScreen: false,
         _beforeFullScreen: { ShowClassicTop: 1, ShowClassicLeft: 1 },
-        themeColor: LocalStorageManager.get("themeColor") || "#409eff"
+        themeColor: getLocalThemeColor()
     }),
 
     getters: {
@@ -249,8 +255,12 @@ export const useDiyStore = defineStore("diy", {
         },
 
         setThemeColor(color) {
-            this.themeColor = color;
-            LocalStorageManager.set("themeColor", color);
+            this.themeColor = color || "";
+            if (color) {
+                LocalStorageManager.set("themeColor", color);
+            } else {
+                LocalStorageManager.remove("themeColor");
+            }
         },
         
         // Token 相关 actions
@@ -304,6 +314,11 @@ export const useDiyStore = defineStore("diy", {
     persist: {
         key: "microi.net",
         storage: localStorage,
+        afterHydrate: (ctx) => {
+            if (String(ctx.store.themeColor || "").toLowerCase() === DEFAULT_THEME_COLOR) {
+                ctx.store.themeColor = "";
+            }
+        },
         paths: ["Lang", "ThemeClass", "SystemStyle", "IsPhoneView", "CurrentUser", "SysConfig", "DesktopBg", "themeColor", "ApiBase", "OsClient", "Token", "TokenExpires", "LastLoginAccount", "DemoSelfLogout", "Did"]
     }
 });

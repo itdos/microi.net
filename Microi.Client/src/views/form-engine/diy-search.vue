@@ -46,6 +46,7 @@
                           type="datetime"
                           :value-format="GetDateTimeFormat(field)"
                           :editable="false"
+                          :teleported="false"
                           placeholder="开始日期"
                           :picker-options="pickerOptions"
                           @change="(val) => DateTimeChange(val, field,1)"
@@ -57,6 +58,7 @@
                           type="datetime"
                           :value-format="GetDateTimeFormat(field)"
                           :editable="false"
+                          :teleported="false"
                           placeholder="结束日期"
                           :picker-options="pickerOptions"
                           @change="(val) => DateTimeChange(val, field,1)"
@@ -566,14 +568,13 @@ export default {
                                 self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
                             }
 
-                            // 临时解决方案：强制将下拉框变为文本框
-                            if (id.TextBox) {
-                                field.Component = "Text";
-                            }
+                            const forceTextInput = self.IsSearchTextInput(id);
+                            const searchField = forceTextInput ? { ...field, Component: "Text" } : field;
 
                             // 复选框类型搜索
                             if (
                                 type === "Checkbox" &&
+                                !forceTextInput &&
                                 Array.isArray(field.Data) &&
                                 field.Data.length > 0 &&
                                 field.Config.DataSourceSqlRemote !== true &&
@@ -586,12 +587,13 @@ export default {
                                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
                                     self.SearchCheckbox[field.Name] = [];
                                 }
-                                result.push(field);
+                                result.push(searchField);
                             }
                             // 文本类型搜索
                             else if (
                                 type === "Text" &&
-                                (!Array.isArray(field.Data) ||
+                                (forceTextInput ||
+                                    !Array.isArray(field.Data) ||
                                     field.Data.length === 0 ||
                                     field.Config.DataSourceSqlRemote === true ||
                                     id.DisplaySelect === true ||
@@ -604,7 +606,7 @@ export default {
                                 if ((field.Component === "Select" || field.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                                     self.SearchSelect[field.Name] = [];
                                 }
-                                result.push(field);
+                                result.push(searchField);
                             }
                             // 无类型限制
                             else if (self.DiyCommon.IsNull(type)) {
@@ -691,6 +693,18 @@ export default {
     },
 
     methods: {
+        IsSearchTextInput(id) {
+            if (!id || typeof id === "string") return false;
+            if (id.TextBox === true) return true;
+
+            const operator = id.Operator || id.SearchType || id.ConditionType || id.Type;
+            if (!this.DiyCommon.IsNull(operator)) {
+                const op = String(operator).toLowerCase();
+                return op === "like" || op === "contains" || op === "包含";
+            }
+
+            return id.Equal === false || id.Equal === "false" || id.Equal === 0 || id.Equal === "0";
+        },
         /**
          * 清除搜索缓存
          */

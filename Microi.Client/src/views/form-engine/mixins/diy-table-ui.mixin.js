@@ -624,13 +624,20 @@ LoadFabPosition() {
             self._colMenuVisible = true;
 
             setTimeout(() => {
-                document.addEventListener('click', self.hideColHeaderMenu, { once: true });
+                document.removeEventListener('click', self.hideColHeaderMenu, true);
+                document.addEventListener('click', self.hideColHeaderMenu, true);
             }, 0);
         },
-        hideColHeaderMenu() {
+        hideColHeaderMenu(event) {
             var self = this;
+            if (event && event.target) {
+                var menu = self.$refs.globalColMenu;
+                if (menu && menu.contains && menu.contains(event.target)) return;
+                var closest = event.target.closest ? event.target.closest('.el-popper, .el-picker__popper, .el-select__popper') : null;
+                if (closest) return;
+            }
             self._colMenuVisible = false;
-            document.removeEventListener('click', self.hideColHeaderMenu);
+            document.removeEventListener('click', self.hideColHeaderMenu, true);
         },
         _getDefaultOperator(field) {
             if (!field) return 'Like';
@@ -769,6 +776,10 @@ LoadFabPosition() {
             if (!self._colMenuField || !self._colMenuField.Config || !self._colMenuField.Config.DateTimeType) return 'YYYY-MM-DD';
             var mapping = { datetime: 'YYYY-MM-DD HH:mm:ss', date: 'YYYY-MM-DD', month: 'YYYY-MM', year: 'YYYY' };
             return mapping[self._colMenuField.Config.DateTimeType] || 'YYYY-MM-DD';
+        },
+        isColFilterTextInput() {
+            var self = this;
+            return ['Like', 'NotLike', 'StartLike', 'EndLike'].indexOf(self._colFilterOperator) > -1;
         },
         colMenuApplyFilter() {
             var self = this;

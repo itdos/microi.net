@@ -64,9 +64,11 @@
 
 <script>
 import { Brush, Sunny, Moon, Check, MagicStick } from "@element-plus/icons-vue";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 import { setThemeColor as applyThemeColor, setThemeMode, getThemeMode } from "@/utils/theme-color.js";
+
+const DEFAULT_THEME_COLOR = "#409eff";
 
 export default {
     name: "ThemeSelect",
@@ -75,12 +77,22 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const settingsStore = useSettingsStore();
-        const themeColor = computed({
+        const localThemeColor = computed({
             get: () => diyStore.themeColor,
             set: (v) => diyStore.setThemeColor(v)
         });
-        const SysConfig = computed(() => diyStore.SysConfig);
-        return { diyStore, appStore, settingsStore, themeColor, SysConfig };
+        const SysConfig = computed(() => diyStore.SysConfig || {});
+        const themeColor = computed({
+            get: () => localThemeColor.value || SysConfig.value.ThemeColor || DEFAULT_THEME_COLOR,
+            set: (v) => diyStore.setThemeColor(v)
+        });
+        watch(
+            () => SysConfig.value.ThemeColor,
+            (color) => {
+                if (!localThemeColor.value) applyThemeColor(color || DEFAULT_THEME_COLOR);
+            }
+        );
+        return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig };
     },
     data() {
         return {
@@ -106,20 +118,15 @@ export default {
     mounted() {
         // 初始化模式
         this.themeMode = getThemeMode();
-        // 初始化主题色（无则使用 SysConfig 或 MCI 默认）
-        if (!this.themeColor) {
-            const initial = (this.SysConfig && this.SysConfig.ThemeColor) || '#6C2BD9';
-            this.changeTheme(initial);
-        } else {
-            applyThemeColor(this.themeColor);
-        }
+        // 初始化主题色：本地手动选择 > SysConfig.ThemeColor > 默认色
+        applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
     },
     methods: {
         isActive(color) {
             return (this.themeColor || '').toLowerCase() === (color || '').toLowerCase();
         },
         changeTheme(color) {
-            if (!color) color = (this.SysConfig && this.SysConfig.ThemeColor) || '#6C2BD9';
+            if (!color) color = (this.SysConfig && this.SysConfig.ThemeColor) || DEFAULT_THEME_COLOR;
             applyThemeColor(color);
             this.diyStore.setThemeColor(color);
         },
