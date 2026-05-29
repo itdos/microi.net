@@ -178,6 +178,30 @@ Page 模式要特别注意：
 - 影响核心前端时跑 `Microi.Client` 的 `npm run build`。
 - 如果改了工作流、表单保存、按钮 V8，建议用实际 `sys_menu` 配置测试：
   - `FormBtns` 是否出现在表单右上角/FAB。
+
+---
+
+## 8. 运行时高频坑复盘
+
+### Pinia persisted-state 覆盖 state 默认值
+
+当主题色、语言、布局等状态同时支持“系统默认值”和“用户手动选择”时，不能只在 `state()` 中写 fallback。Pinia persisted-state hydrate 会在 store 初始化后把本地旧值覆盖回来，导致 `SysConfig.ThemeColor` 等系统默认永远不生效。
+
+通用规则：
+
+- 本地值只表示用户显式选择；系统默认值应在 computed/runtime fallback 中读取。
+- 对历史默认值（如 `#409eff`）要在 persisted-state `afterHydrate` 中归一化为空，避免旧默认被误判为用户手动选择。
+- 主题色相关组件、图标、导航、移动端个人中心都要使用同一条 fallback：用户手动值 > `SysConfig.ThemeColor` > 平台默认值。
+
+### Element Plus 弹层 teleport 导致父弹层提前关闭
+
+`el-date-picker`、`el-select` 等组件默认可能把面板 teleport 到 `body`。如果它们位于 `el-popover`、列头菜单、自定义 document-click 菜单里，选择日期/下拉项会被父级误判为外部点击，导致搜索弹窗立即关闭、筛选无法完成。
+
+通用规则：
+
+- 嵌套在父弹层内的日期/下拉控件优先设置 `:teleported="false"`。
+- 自定义 document click 关闭逻辑必须忽略 `.el-popper`、`.el-picker__popper`、`.el-select__popper` 内部点击。
+- 修改后要验证：打开更多搜索 -> 选择日期 -> 面板不提前关闭 -> 应用筛选成功。
   - `V8CodeShow: return false;` 是否隐藏。
   - `V8CodeShow: return true;` 是否显示。
   - `V8CodeShow: V8.Result = false;` 是否仍兼容。

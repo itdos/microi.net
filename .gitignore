@@ -115,3 +115,4 @@ dev.log
 *.csproj.lscache
 switch-env.ps1
 .tmp
+.microi-performance
