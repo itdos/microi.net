@@ -10,9 +10,8 @@
         :style="dynamicStyle"
         style="text-align: center"
       >
-        <div style="cursor: pointer">
+        <div style="cursor: pointer" @click="handleMoreClick(item)">
           <img
-            @click="handleMoreClick(item.linkUrl)"
             :style="iconStyle"
             :src="item.iconUrl == '' ? defaultIcon : item.iconUrl"
           />
@@ -81,11 +80,13 @@ const iconStyle = computed(() => {
 
 const defaultIcon = ''
 
-const handleMoreClick = (linkUrl) => {
+const handleMoreClick = (item) => {
+  const linkUrl = item?.linkUrl || item?.linkurl || item?.router || item?.href || ''
+  const linkType = item?.linkType || item?.linktype || props.widgetObj.widgetParams?.linktype || 'router'
   if (formData.value.JsonObj.formConfig.link) {
-    EventBus.emit('linkWidget', linkUrl, props.widgetObj.widgetParams.linktype)
-    window.parent?.postMessage({ key: 'linkWidget', value: linkUrl }, '*')
-    console.log('链接触发', linkUrl)
+    EventBus.emit('linkWidget', linkUrl, linkType)
+    window.parent?.postMessage({ key: 'linkWidget', value: linkUrl, linktype: linkType }, '*')
+    console.log('链接触发', linkUrl, linkType)
   } else {
     console.log('链接跳转已禁用')
   }

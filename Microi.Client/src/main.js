@@ -201,9 +201,9 @@ async function initApp() {
 
     // 监听主题变化并实时应用
     watch(
-        () => diyStore.themeColor,
-        (val) => {
-            if (val) applyThemeVariables(val);
+        () => [diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
+        ([localColor, sysColor]) => {
+            applyThemeVariables(localColor || sysColor || "#409eff");
         },
         { immediate: false }
     );

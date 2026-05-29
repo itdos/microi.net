@@ -1153,16 +1153,26 @@
                 <div class="global-col-menu-filter" @click.stop>
                     <div v-if="_colMenuField" class="col-filter-body">
                         <!-- 操作符选择 -->
-                        <el-select v-model="_colFilterOperator" size="small" style="width: 100%; margin-bottom: 8px;" placeholder="条件">
+                        <el-select v-model="_colFilterOperator" size="small" style="width: 100%; margin-bottom: 8px;" placeholder="条件" :teleported="false">
                             <el-option v-for="op in getColFilterOperators()" :key="op.value" :label="op.label" :value="op.value" />
                         </el-select>
                         <!-- 根据字段类型显示不同输入 -->
+                        <el-input
+                            v-if="isColFilterTextInput()"
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            clearable
+                            placeholder="输入筛选值"
+                            @keyup.enter="colMenuApplyFilter()"
+                        />
                         <!-- 日期时间 -->
                         <el-date-picker
-                            v-if="_colMenuField.Component === 'DateTime'"
+                            v-else-if="_colMenuField.Component === 'DateTime'"
                             v-model="_colFilterValue"
                             :type="getColFilterDateType()"
                             :value-format="getColFilterDateFormat()"
+                            :teleported="false"
                             size="small"
                             style="width: 100%; margin-bottom: 8px;"
                             placeholder="选择日期"
@@ -1183,6 +1193,7 @@
                             v-model="_colFilterValue"
                             size="small"
                             style="width: 100%; margin-bottom: 8px;"
+                            :teleported="false"
                             clearable
                             filterable
                             placeholder="选择"
@@ -1200,6 +1211,7 @@
                             v-model="_colFilterValue"
                             size="small"
                             style="width: 100%; margin-bottom: 8px;"
+                            :teleported="false"
                             clearable
                             placeholder="选择"
                         >
@@ -1227,6 +1239,7 @@
 
         <DiyFormDialog v-if="_shouldRenderDiyFormDialog"
             @CallbackGetDiyTableRow="GetDiyTableRow"
+            @ParentFormSet="ParentFormSet"
             :FatherFormModel="FatherFormModel"
             :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
             ref="refDiyTable_DiyFormDialog"></DiyFormDialog>

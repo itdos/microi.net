@@ -615,7 +615,7 @@ export default {
          */
         async OpenWork(model, formMode, OpenWorkType) {
             var self = this;
-
+            debugger;
             if (self.DiyCommon.IsNull(model.TableId)) {
                 self.OpenFormType = "Custom";
             } else {
@@ -639,9 +639,9 @@ export default {
             });
             if (res.Code === 2) {
                 self.DiyCommon.Tips("此业务数据已删除", false);
-                await self.DiyCommon.ApiEngine.Run("deleteFlow", {
-                    Id: self.CurrentTableRowId
-                });
+                // await self.DiyCommon.ApiEngine.Run("deleteFlow", {
+                //     Id: self.CurrentTableRowId
+                // });
                 self.GetWFWork();
                 return;
             }
@@ -775,32 +775,182 @@ export default {
         TableRowSelectionChange(val) {
             this.SelectList = val;
         },
+        EscapeHtml(text) {
+            var map = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            };
+            return String(text || "").replace(/[&<>"']/g, function (char) {
+                return map[char] || char;
+            });
+        },
+        IsWFTrue(value) {
+            return value === true || value === 1 || value === "1" || value === "true" || value === "True";
+        },
+        ParseBatchJsonObject(value) {
+            var self = this;
+            if (self.DiyCommon.IsNull(value)) {
+                return {};
+            }
+            if (typeof value === "object") {
+                return Object.assign({}, value);
+            }
+            try {
+                return JSON.parse(value) || {};
+            } catch (error) {
+                return {};
+            }
+        },
+        async GetBatchApprovalFormData(workModel) {
+            var self = this;
+            var formData = self.ParseBatchJsonObject(workModel.FormData);
+            if (!self.DiyCommon.IsNull(workModel.TableId) && !self.DiyCommon.IsNull(workModel.TableRowId)) {
+                try {
+                    var rowResult = await self.DiyCommon.FormEngine.GetFormData({
+                        FormEngineKey: workModel.TableId,
+                        Id: workModel.TableRowId
+                    });
+                    if (rowResult && rowResult.Code === 1) {
+                        formData = Object.assign({}, rowResult.Data || {});
+                    } else if (rowResult && rowResult.Code === 2) {
+                        throw new Error("业务数据已删除");
+                    }
+                } catch (error) {
+                    if (Object.keys(formData).length === 0) {
+                        throw error;
+                    }
+                }
+            }
+            if (!formData.Id && workModel.TableRowId) {
+                formData.Id = workModel.TableRowId;
+            }
+            return formData;
+        },
+        BuildBatchNoticeFields(workModel, formData, nodeModel) {
+            var self = this;
+            var noticeFields = [];
+            if (nodeModel && !self.DiyCommon.IsNull(nodeModel.FieldsConfig)) {
+                try {
+                    var fieldsConfig = JSON.parse(nodeModel.FieldsConfig);
+                    fieldsConfig.forEach(function (config) {
+                        if (config.Notice == true) {
+                            noticeFields.push({
+                                Id: config.Id,
+                                Name: config.Name,
+                                Label: config.Label,
+                                Value: formData && formData[config.Name] ? formData[config.Name] : ""
+                            });
+                        }
+                    });
+                } catch (error) {}
+            }
+            if (noticeFields.length > 0) {
+                return JSON.stringify(noticeFields);
+            }
+            if (self.DiyCommon.IsNull(workModel.NoticeFields)) {
+                return "[]";
+            }
+            return typeof workModel.NoticeFields === "string" ? workModel.NoticeFields : JSON.stringify(workModel.NoticeFields);
+        },
+        async BuildBatchApprovalPayload(workModel) {
+            var self = this;
+            var formData = await self.GetBatchApprovalFormData(workModel);
+            var formDataJson = JSON.stringify(formData || {});
+            var nodeResult = await self.DiyCommon.PostAsync("/api/WorkFlow/getWFNodeModel", {
+                NodeId: workModel.NodeId
+            });
+            if (!nodeResult || nodeResult.Code !== 1 || !nodeResult.Data) {
+                throw new Error((nodeResult && nodeResult.Msg) || "未获取到当前节点");
+            }
+            var nodeModel = nodeResult.Data;
+            var selectUsers = [];
+            if (self.IsWFTrue(nodeModel.AllowSelectUsers)) {
+                var nextUsersResult = await self.DiyCommon.PostAsync("/api/WorkFlow/getNextNodeConfirmUsers", {
+                    NodeId: workModel.NodeId,
+                    ApprovalType: "Agree",
+                    BackNodeId: "",
+                    WorkId: workModel.Id,
+                    TableRowId: workModel.TableRowId,
+                    FormData: formDataJson
+                });
+                if (!nextUsersResult || nextUsersResult.Code !== 1) {
+                    throw new Error((nextUsersResult && nextUsersResult.Msg) || "获取下一节点审批人失败");
+                }
+                var users = nextUsersResult.Data && nextUsersResult.Data.SelectUsers;
+                selectUsers = (Array.isArray(users) ? users : []).map(function (user) {
+                    return user && user.Id;
+                }).filter(function (id, index, arr) {
+                    return !!id && arr.indexOf(id) === index;
+                });
+                if (selectUsers.length === 0) {
+                    throw new Error("节点需要选择审批人，但未找到可选审批人");
+                }
+            }
+            return {
+                WorkId: workModel.Id,
+                FlowId: workModel.FlowId,
+                FormData: formDataJson,
+                ApprovalType: "Agree",
+                ApprovalIdea: "同意",
+                BackNodeId: "",
+                NoticeFields: self.BuildBatchNoticeFields(workModel, formData, nodeModel),
+                AddUsers: [],
+                SelectUsers: selectUsers,
+                ForceSelectUsers: []
+            };
+        },
         async BatchApproval() {
             var self = this;
             if (self.SelectList.length === 0) {
                 self.DiyCommon.Tips("请选择要审批的流程", false);
                 return;
             }
-            var res = "";
-            var count = 0;
-            self.DiyCommon.OsConfirm("确定要批量审批" + self.SelectList.length + "条数据吗？", async function () {
+            var approvalList = self.SelectList.slice();
+            self.DiyCommon.OsConfirm("确定要批量审批" + approvalList.length + "条数据吗？", async function () {
                 self.TableLoading = true;
-                for (var i = 0; i < self.SelectList.length; i++) {
-                    res = await self.DiyCommon.PostAsync("/api/WorkFlow/sendWork", {
-                        //批量审批
-                        WorkId: self.SelectList[i].Id,
-                        FlowId: self.SelectList[i].FlowId,
-                        FormData: {},
-                        ApprovalType: "Agree",
-                        ApprovalIdea: "同意",
-                        NoticeFields: self.SelectList[i].NoticeFields
-                    });
-                    count++;
+                var successCount = 0;
+                var failList = [];
+                for (var i = 0; i < approvalList.length; i++) {
+                    var workModel = approvalList[i];
+                    try {
+                        var payload = await self.BuildBatchApprovalPayload(workModel);
+                        var res = await self.DiyCommon.PostAsync("/api/WorkFlow/sendWork", payload);
+                        if (res && res.Code === 1) {
+                            successCount++;
+                        } else {
+                            failList.push({
+                                Title: workModel.FlowTitle || workModel.Id,
+                                Msg: (res && res.Msg) || "审批失败"
+                            });
+                        }
+                    } catch (error) {
+                        failList.push({
+                            Title: workModel.FlowTitle || workModel.Id,
+                            Msg: error && error.message ? error.message : "审批失败"
+                        });
+                    }
                 }
 
                 self.TableLoading = false;
-                self.DiyCommon.Tips("批量审批成功,共计" + count + "个", true);
-                self.GetWFWork();
+                self.SelectList = [];
+                if (successCount > 0) {
+                    self.DiyCommon.Tips("批量审批完成，成功" + successCount + "条，失败" + failList.length + "条", failList.length === 0, 10);
+                } else {
+                    self.DiyCommon.Tips("批量审批失败，未成功处理任何数据", false, 10);
+                }
+                if (failList.length > 0) {
+                    var failMsg = failList.slice(0, 5).map(function (item) {
+                        return self.EscapeHtml(item.Title) + "：" + self.EscapeHtml(item.Msg);
+                    }).join("<br>");
+                    if (failList.length > 5) {
+                        failMsg += "<br>还有" + (failList.length - 5) + "条失败未显示";
+                    }
+                    self.DiyCommon.Tips("批量审批失败明细：<br>" + failMsg, false, 15);
+                }
+                self.GetWFWork({ PageIndex: 1 });
                 self.loadWFStats();
             });
         },
