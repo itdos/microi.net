@@ -330,6 +330,7 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_get_field_list / microi_update_field / microi_refresh_schema_cache** — 修改已有 diy_field 字段属性、KeyValue 数据源、Config 后必须回读并刷新缓存，避免后台字段选项与前端/接口枚举不一致
+- **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 维护租户业务表数据（如商品、示例数据、配置项）时使用，写入后必须回读验证关键字段
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
@@ -793,6 +794,76 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 通用 FormEngine 数据读写
+  // ========================
+  server.tool(
+    'microi_get_table_data',
+    `Read rows from a low-code table through FormEngine.GetTableData for OsClient "${osClient}". Use this to verify business data after writes.`,
+    {
+      tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
+      query: z.record(z.unknown()).optional().describe('FormEngine query object: _Where, _SelectFields, _PageSize, _OrderBy, etc.'),
+    },
+    async ({ tableName, query }) => {
+      try {
+        const result = await client.getTableData(tableName, query || {});
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_add_form_data',
+    `Add one row to a low-code table through FormEngine.AddFormData for OsClient "${osClient}". Writes to DB; confirmExecution is required.`,
+    {
+      tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
+      row: z.record(z.unknown()).describe('Row object. Field names must match diy_field names.'),
+      confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
+    },
+    async ({ tableName, row, confirmExecution }) => {
+      try {
+        if (confirmExecution !== tableName && confirmExecution !== 'EXECUTE') {
+          return { content: [{ type: 'text', text: `执行已拦截：microi_add_form_data 会写入表 ${tableName}，请传 confirmExecution="${tableName}" 或 "EXECUTE"。` }], isError: true };
+        }
+        await client.writeAuditLog('microi_add_form_data', tableName, JSON.stringify({ fields: Object.keys(row || {}) }));
+        const result = await client.addFormData(tableName, row);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: `✅ Row added to ${tableName}. ${JSON.stringify(result.Data)}` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_update_form_data',
+    `Update one row in a low-code table through FormEngine.UptFormData for OsClient "${osClient}". The row must include Id. Writes to DB; confirmExecution is required.`,
+    {
+      tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
+      row: z.record(z.unknown()).describe('Patch object. Must include Id.'),
+      confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
+    },
+    async ({ tableName, row, confirmExecution }) => {
+      try {
+        if (confirmExecution !== tableName && confirmExecution !== 'EXECUTE') {
+          return { content: [{ type: 'text', text: `执行已拦截：microi_update_form_data 会更新表 ${tableName}，请传 confirmExecution="${tableName}" 或 "EXECUTE"。` }], isError: true };
+        }
+        if (!row || typeof row.Id !== 'string' || !row.Id) {
+          return { content: [{ type: 'text', text: 'Error: row.Id is required.' }], isError: true };
+        }
+        await client.writeAuditLog('microi_update_form_data', tableName, JSON.stringify({ id: row.Id, fields: Object.keys(row || {}) }));
+        const result = await client.updateFormData(tableName, row);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: `✅ Row updated in ${tableName}. ${JSON.stringify(result.Data)}` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 列出 V8 事件
   // ========================
   server.tool(
@@ -994,6 +1065,93 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
         return { content: [{ type: 'text', text: `✅ Event "${formEngineKey}/${eventType}" code saved successfully.` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 列出流程节点 V8 事件
+  // ========================
+  server.tool(
+    'microi_list_workflow_v8_events',
+    `List workflow node V8 events from WF_Node for OsClient ${osClient}. WF_Line is returned only in the workflow package snapshot; executable route condition code is WF_Node.LineValueV8.`,
+    {
+      flowDesignId: z.string().optional().describe('Optional WF_FlowDesign.Id to limit results to one workflow'),
+    },
+    async ({ flowDesignId }) => {
+      try {
+        const result = await client.getWorkflowV8EventList(flowDesignId);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 获取流程节点 V8 代码
+  // ========================
+  server.tool(
+    'microi_get_workflow_v8_code',
+    `Get workflow node V8 JavaScript code from WF_Node by nodeId and event type (OsClient: ${osClient}).`,
+    {
+      nodeId: z.string().describe('WF_Node.Id'),
+      eventType: z.string().describe('WF_Node V8 field: StartV8 | EndV8 | StartV8Server | EndV8Server | LineValueV8 | AllowAddUserV8Code'),
+      flowDesignId: z.string().optional().describe('Optional WF_FlowDesign.Id used as a safety check'),
+    },
+    async ({ nodeId, eventType, flowDesignId }) => {
+      try {
+        const result = await client.getWorkflowV8EventCode(nodeId, eventType, flowDesignId);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+
+        const event = result.Data;
+        const code = getStringField(event, 'V8Code', 'Code');
+        const lines = [
+          `## Workflow V8: ${event?.FlowName || event?.FlowDesignId || flowDesignId || ''} / ${event?.NodeName || nodeId} / ${eventType}`,
+          event?.EventName ? `- **Name**: ${event.EventName}` : '',
+          event?.FlowDesignId ? `- **FlowDesignId**: ${event.FlowDesignId}` : '',
+          event?.NodeId ? `- **NodeId**: ${event.NodeId}` : '',
+          '',
+          '```javascript',
+          code || '// No code available',
+          '```',
+        ].filter(Boolean);
+
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 保存流程节点 V8 代码
+  // ========================
+  server.tool(
+    'microi_save_workflow_v8_code',
+    `Save workflow node V8 code into WF_Node for OsClient ${osClient}. Empty code clears the field without adding a generated header.`,
+    {
+      nodeId: z.string().describe('WF_Node.Id'),
+      eventType: z.string().describe('WF_Node V8 field: StartV8 | EndV8 | StartV8Server | EndV8Server | LineValueV8 | AllowAddUserV8Code'),
+      code: z.string().describe('The complete JavaScript source code to save; pass empty string to clear'),
+      flowDesignId: z.string().optional().describe('Optional WF_FlowDesign.Id used as a safety check'),
+      functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
+      changeSummary: z.string().optional().describe('One-line change summary for audit/future compatible storage.'),
+    },
+    async ({ nodeId, eventType, code, flowDesignId, functionDescription, changeSummary }) => {
+      try {
+        const result = await client.saveWorkflowV8EventCode(nodeId, eventType, code, { flowDesignId, functionDescription, changeSummary });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: `✅ Workflow node V8 "${nodeId}/${eventType}" saved successfully.` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

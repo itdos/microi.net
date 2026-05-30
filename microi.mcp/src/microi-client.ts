@@ -88,6 +88,30 @@ export interface V8Event {
   UpdateTime?: string;
 }
 
+export interface WorkflowNodeV8Event {
+  Id: string;
+  FlowDesignId: string;
+  FlowName?: string;
+  NodeId: string;
+  NodeName?: string;
+  NodeType?: string;
+  EventType: string;
+  EventName?: string;
+  V8Code?: string;
+  Code?: string;
+  Version?: string;
+  UpdateTime?: string;
+}
+
+export interface WorkflowV8EventListData {
+  OsClient?: string;
+  Flows?: Array<Record<string, unknown>>;
+  Nodes?: Array<Record<string, unknown>>;
+  Lines?: Array<Record<string, unknown>>;
+  List?: WorkflowNodeV8Event[];
+  Total?: number;
+}
+
 export interface PlaywrightEngineInfo {
   Id: string;
   ApiName: string;
@@ -526,6 +550,30 @@ export class MicroiClient {
     });
   }
 
+  async getTableData(tableName: string, query: Record<string, unknown> = {}): Promise<ApiResponse> {
+    return this.post(API.FORM_GET_TABLE_DATA, {
+      OsClient: this.config.osClient,
+      FormEngineKey: tableName,
+      ...query,
+    });
+  }
+
+  async addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.FORM_ADD_FORM_DATA, {
+      OsClient: this.config.osClient,
+      FormEngineKey: tableName,
+      ...row,
+    });
+  }
+
+  async updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.FORM_UPT_FORM_DATA, {
+      OsClient: this.config.osClient,
+      FormEngineKey: tableName,
+      ...row,
+    });
+  }
+
   async getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>> {
     return this.post(API.GET_EVENT_CODE, {
       OsClient: this.config.osClient,
@@ -567,6 +615,58 @@ export class MicroiClient {
       OsClient: this.config.osClient,
       ...(keyword ? { _SearchKey: keyword } : {}),
     });
+  }
+
+  async getWorkflowV8EventList(flowDesignId?: string): Promise<ApiResponse<WorkflowV8EventListData>> {
+    return this.post(API.GET_WORKFLOW_V8_EVENT_LIST, {
+      OsClient: this.config.osClient,
+      ...(flowDesignId ? { FlowDesignId: flowDesignId } : {}),
+    });
+  }
+
+  async getWorkflowV8EventCode(nodeId: string, eventType: string, flowDesignId?: string): Promise<ApiResponse<WorkflowNodeV8Event>> {
+    return this.post(API.GET_WORKFLOW_V8_EVENT_CODE, {
+      OsClient: this.config.osClient,
+      ...(flowDesignId ? { FlowDesignId: flowDesignId } : {}),
+      NodeId: nodeId,
+      EventType: eventType,
+    });
+  }
+
+  async saveWorkflowV8EventCode(nodeId: string, eventType: string, code: string, options?: { flowDesignId?: string; functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    let remote: WorkflowNodeV8Event | undefined;
+    try {
+      const remoteResult = await this.getWorkflowV8EventCode(nodeId, eventType, options?.flowDesignId);
+      remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+    } catch {
+      remote = undefined;
+    }
+    const shouldClear = !code.trim();
+    const payload: Record<string, unknown> = {
+      OsClient: this.config.osClient,
+      ...(options?.flowDesignId ? { FlowDesignId: options.flowDesignId } : {}),
+      NodeId: nodeId,
+      EventType: eventType,
+    };
+    if (shouldClear) {
+      payload.V8Code = '';
+    } else {
+      const workflowKey = `${options?.flowDesignId || remote?.FlowDesignId || 'workflow'}/${nodeId}`;
+      const prepared = prepareV8VersionedCode({
+        kind: 'Workflow',
+        key: workflowKey,
+        eventType,
+        currentCode: code,
+        remoteCode: remote?.V8Code || remote?.Code,
+        remoteVersion: remote?.Version,
+        functionDescription: options?.functionDescription,
+        changeSummary: options?.changeSummary || `保存流程节点 V8 ${nodeId}/${eventType}`,
+      });
+      payload.V8CodeBase64 = Buffer.from(prepared.code, 'utf8').toString('base64');
+      payload.Version = prepared.version;
+      payload.ChangeHistory = prepared.changeHistory;
+    }
+    return this.post(API.UPDATE_WORKFLOW_V8_EVENT_CODE, payload);
   }
 
   // ---------- 低代码系统设计 API 方法 ----------

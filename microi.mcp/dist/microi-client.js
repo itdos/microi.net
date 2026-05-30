@@ -371,6 +371,27 @@ export class MicroiClient {
             ...data,
         });
     }
+    async getTableData(tableName, query = {}) {
+        return this.post(API.FORM_GET_TABLE_DATA, {
+            OsClient: this.config.osClient,
+            FormEngineKey: tableName,
+            ...query,
+        });
+    }
+    async addFormData(tableName, row) {
+        return this.post(API.FORM_ADD_FORM_DATA, {
+            OsClient: this.config.osClient,
+            FormEngineKey: tableName,
+            ...row,
+        });
+    }
+    async updateFormData(tableName, row) {
+        return this.post(API.FORM_UPT_FORM_DATA, {
+            OsClient: this.config.osClient,
+            FormEngineKey: tableName,
+            ...row,
+        });
+    }
     async getEventCode(formEngineKey, eventType) {
         return this.post(API.GET_EVENT_CODE, {
             OsClient: this.config.osClient,
@@ -411,6 +432,57 @@ export class MicroiClient {
             OsClient: this.config.osClient,
             ...(keyword ? { _SearchKey: keyword } : {}),
         });
+    }
+    async getWorkflowV8EventList(flowDesignId) {
+        return this.post(API.GET_WORKFLOW_V8_EVENT_LIST, {
+            OsClient: this.config.osClient,
+            ...(flowDesignId ? { FlowDesignId: flowDesignId } : {}),
+        });
+    }
+    async getWorkflowV8EventCode(nodeId, eventType, flowDesignId) {
+        return this.post(API.GET_WORKFLOW_V8_EVENT_CODE, {
+            OsClient: this.config.osClient,
+            ...(flowDesignId ? { FlowDesignId: flowDesignId } : {}),
+            NodeId: nodeId,
+            EventType: eventType,
+        });
+    }
+    async saveWorkflowV8EventCode(nodeId, eventType, code, options) {
+        let remote;
+        try {
+            const remoteResult = await this.getWorkflowV8EventCode(nodeId, eventType, options?.flowDesignId);
+            remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
+        }
+        catch {
+            remote = undefined;
+        }
+        const shouldClear = !code.trim();
+        const payload = {
+            OsClient: this.config.osClient,
+            ...(options?.flowDesignId ? { FlowDesignId: options.flowDesignId } : {}),
+            NodeId: nodeId,
+            EventType: eventType,
+        };
+        if (shouldClear) {
+            payload.V8Code = '';
+        }
+        else {
+            const workflowKey = `${options?.flowDesignId || remote?.FlowDesignId || 'workflow'}/${nodeId}`;
+            const prepared = prepareV8VersionedCode({
+                kind: 'Workflow',
+                key: workflowKey,
+                eventType,
+                currentCode: code,
+                remoteCode: remote?.V8Code || remote?.Code,
+                remoteVersion: remote?.Version,
+                functionDescription: options?.functionDescription,
+                changeSummary: options?.changeSummary || `保存流程节点 V8 ${nodeId}/${eventType}`,
+            });
+            payload.V8CodeBase64 = Buffer.from(prepared.code, 'utf8').toString('base64');
+            payload.Version = prepared.version;
+            payload.ChangeHistory = prepared.changeHistory;
+        }
+        return this.post(API.UPDATE_WORKFLOW_V8_EVENT_CODE, payload);
     }
     // ---------- 低代码系统设计 API 方法 ----------
     async createTable(name, description, options) {

@@ -1236,6 +1236,335 @@ namespace Microi.net
 
         #endregion
 
+        #region WorkflowNodeV8
+
+        private static readonly string[] WorkflowNodeV8Fields = new[] {
+            "StartV8",
+            "EndV8",
+            "StartV8Server",
+            "EndV8Server",
+            "LineValueV8",
+            "AllowAddUserV8Code"
+        };
+
+        private static string GetWorkflowNodeV8DisplayName(string field) => field switch
+        {
+            "StartV8" => "节点开始前端V8事件",
+            "EndV8" => "节点结束前端V8事件",
+            "StartV8Server" => "节点开始后端V8事件",
+            "EndV8Server" => "节点结束后端V8事件",
+            "LineValueV8" => "条件判断V8事件",
+            "AllowAddUserV8Code" => "允许添加审批人V8事件",
+            _ => field
+        };
+
+        private static string DecodeWorkflowNodeV8Code(object value)
+        {
+            return DecodeLegacyApiV8Code(SafeString(value));
+        }
+
+        private static JObject DecodeWorkflowNodeV8Fields(JObject row)
+        {
+            var clone = row == null ? new JObject() : (JObject)row.DeepClone();
+            foreach (var field in WorkflowNodeV8Fields)
+            {
+                if (clone[field] != null)
+                {
+                    clone[field] = DecodeWorkflowNodeV8Code(clone[field]);
+                }
+            }
+            return clone;
+        }
+
+        /// <summary>
+        /// 获取流程节点 V8 事件列表，同时返回流程设计、节点和连线快照。
+        /// WF_Line 仅作为路由/设计数据返回；运行时执行的条件 V8 位于 WF_Node.LineValueV8。
+        /// </summary>
+        public static async Task<DosResult<object>> GetWorkflowV8EventList(string osClient, string flowDesignId = null)
+        {
+            try
+            {
+                var flowWhere = new List<object>();
+                if (!IsBlank(flowDesignId))
+                {
+                    flowWhere.Add(new List<object>() { "Id", "=", flowDesignId });
+                }
+
+                var flowResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("wf_flowdesign", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "FlowName", "Category", "IsEnable", "Description", "JsonData", "StartV8", "EndV8", "LineValueV8", "Remark", "Sort", "Roles", "Preview", "TableId", "UpdateTime" },
+                    _Where = flowWhere
+                });
+
+                if (flowResult.Code != 1)
+                {
+                    return new DosResult<object>(flowResult.Code, flowResult.Data, flowResult.Msg);
+                }
+
+                var flowRows = new List<JObject>();
+                if (flowResult.Data != null)
+                {
+                    foreach (var item in flowResult.Data)
+                    {
+                        flowRows.Add(JObject.FromObject(item));
+                    }
+                }
+
+                var flowIds = flowRows
+                    .Select(row => SafeJString(row, "Id"))
+                    .Where(id => !IsBlank(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (!flowIds.Any())
+                {
+                    return new DosResult<object>(1, new
+                    {
+                        OsClient = osClient,
+                        Flows = flowRows,
+                        Nodes = new List<object>(),
+                        Lines = new List<object>(),
+                        List = new List<object>(),
+                        Total = 0
+                    });
+                }
+
+                var nodeSelectFields = new List<string> { "Id", "FlowDesignId", "NodeName", "NodeType", "Sort", "PositionLeft", "PositionTop", "Remark", "UpdateTime" };
+                nodeSelectFields.AddRange(WorkflowNodeV8Fields);
+                var nodeResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("wf_node", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = nodeSelectFields.ToArray(),
+                    _Where = new List<object>() { new List<object>() { "FlowDesignId", "In", flowIds } }
+                });
+
+                if (nodeResult.Code != 1)
+                {
+                    return new DosResult<object>(nodeResult.Code, nodeResult.Data, nodeResult.Msg);
+                }
+
+                var lineResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("wf_line", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "FlowDesignId", "LineName", "FromNodeId", "ToNodeId", "LineValue", "V8Code", "UpdateTime" },
+                    _Where = new List<object>() { new List<object>() { "FlowDesignId", "In", flowIds } }
+                });
+
+                if (lineResult.Code != 1)
+                {
+                    return new DosResult<object>(lineResult.Code, lineResult.Data, lineResult.Msg);
+                }
+
+                var flowById = flowRows.ToDictionary(row => SafeJString(row, "Id"), row => row, StringComparer.OrdinalIgnoreCase);
+                var nodeRows = new List<JObject>();
+                if (nodeResult.Data != null)
+                {
+                    foreach (var item in nodeResult.Data)
+                    {
+                        nodeRows.Add(DecodeWorkflowNodeV8Fields(JObject.FromObject(item)));
+                    }
+                }
+
+                var lineRows = new List<JObject>();
+                if (lineResult.Data != null)
+                {
+                    foreach (var item in lineResult.Data)
+                    {
+                        lineRows.Add(JObject.FromObject(item));
+                    }
+                }
+
+                var list = new List<object>();
+                foreach (var node in nodeRows)
+                {
+                    var nodeId = SafeJString(node, "Id");
+                    var currentFlowDesignId = SafeJString(node, "FlowDesignId");
+                    var flow = flowById.TryGetValue(currentFlowDesignId, out var flowRow) ? flowRow : null;
+                    var flowName = SafeJString(flow, "FlowName");
+                    var nodeName = SafeJString(node, "NodeName");
+                    var nodeUpdateTime = SafeJString(node, "UpdateTime");
+
+                    foreach (var field in WorkflowNodeV8Fields)
+                    {
+                        var code = SafeJString(node, field);
+                        list.Add(new
+                        {
+                            Id = nodeId,
+                            FlowDesignId = currentFlowDesignId,
+                            FlowName = flowName,
+                            NodeId = nodeId,
+                            NodeName = nodeName,
+                            NodeType = SafeJString(node, "NodeType"),
+                            EventType = field,
+                            EventName = GetWorkflowNodeV8DisplayName(field),
+                            V8Code = code,
+                            Code = code,
+                            Version = ExtractV8SemanticVersion(code),
+                            UpdateTime = nodeUpdateTime
+                        });
+                    }
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    OsClient = osClient,
+                    Flows = flowRows,
+                    Nodes = nodeRows,
+                    Lines = lineRows,
+                    List = list,
+                    Total = list.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取流程节点V8事件列表失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 获取单个流程节点 V8 事件代码。
+        /// </summary>
+        public static async Task<DosResult<object>> GetWorkflowV8EventCode(string osClient, string nodeId, string eventType, string flowDesignId = null)
+        {
+            if (!WorkflowNodeV8Fields.Contains(eventType))
+            {
+                return new DosResult<object>(0, null, $"无效的流程节点V8事件类型：{eventType}");
+            }
+
+            if (IsBlank(nodeId))
+            {
+                return new DosResult<object>(0, null, "NodeId 不能为空");
+            }
+
+            try
+            {
+                var nodeSelectFields = new List<string> { "Id", "FlowDesignId", "NodeName", "NodeType", "UpdateTime" };
+                nodeSelectFields.AddRange(WorkflowNodeV8Fields);
+                var nodeResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("wf_node", new
+                {
+                    OsClient = osClient,
+                    Id = nodeId,
+                    _SelectFields = nodeSelectFields.ToArray()
+                });
+
+                if (nodeResult.Code != 1 || nodeResult.Data == null)
+                {
+                    return new DosResult<object>(0, null, $"未找到流程节点：{nodeId}");
+                }
+
+                var node = DecodeWorkflowNodeV8Fields(JObject.FromObject(nodeResult.Data));
+                var currentFlowDesignId = SafeJString(node, "FlowDesignId");
+                if (!IsBlank(flowDesignId) && !string.Equals(currentFlowDesignId, flowDesignId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult<object>(0, null, $"流程节点 {nodeId} 不属于流程 {flowDesignId}");
+                }
+
+                var flowName = "";
+                if (!IsBlank(currentFlowDesignId))
+                {
+                    var flowResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("wf_flowdesign", new
+                    {
+                        OsClient = osClient,
+                        Id = currentFlowDesignId,
+                        _SelectFields = new[] { "Id", "FlowName" }
+                    });
+                    if (flowResult.Code == 1 && flowResult.Data != null)
+                    {
+                        flowName = SafeJString(JObject.FromObject(flowResult.Data), "FlowName");
+                    }
+                }
+
+                var code = SafeJString(node, eventType);
+                return new DosResult<object>(1, new
+                {
+                    Id = nodeId,
+                    FlowDesignId = currentFlowDesignId,
+                    FlowName = flowName,
+                    NodeId = nodeId,
+                    NodeName = SafeJString(node, "NodeName"),
+                    NodeType = SafeJString(node, "NodeType"),
+                    EventType = eventType,
+                    EventName = GetWorkflowNodeV8DisplayName(eventType),
+                    V8Code = code,
+                    Code = code,
+                    Version = ExtractV8SemanticVersion(code),
+                    UpdateTime = SafeJString(node, "UpdateTime")
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取流程节点V8事件代码失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 更新单个流程节点 V8 事件代码。
+        /// </summary>
+        public static async Task<DosResult<object>> UpdateWorkflowV8EventCode(string osClient, string nodeId, string eventType, string v8Code, string flowDesignId = null)
+        {
+            if (!WorkflowNodeV8Fields.Contains(eventType))
+            {
+                return new DosResult<object>(0, null, $"无效的流程节点V8事件类型：{eventType}");
+            }
+
+            if (IsBlank(nodeId))
+            {
+                return new DosResult<object>(0, null, "NodeId 不能为空");
+            }
+
+            try
+            {
+                var nodeResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("wf_node", new
+                {
+                    OsClient = osClient,
+                    Id = nodeId,
+                    _SelectFields = new[] { "Id", "FlowDesignId", "NodeName" }
+                });
+
+                if (nodeResult.Code != 1 || nodeResult.Data == null)
+                {
+                    return new DosResult<object>(0, null, $"未找到流程节点：{nodeId}");
+                }
+
+                var node = JObject.FromObject(nodeResult.Data);
+                var currentFlowDesignId = SafeJString(node, "FlowDesignId");
+                if (!IsBlank(flowDesignId) && !string.Equals(currentFlowDesignId, flowDesignId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult<object>(0, null, $"流程节点 {nodeId} 不属于流程 {flowDesignId}");
+                }
+
+                var updateParam = new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["Id"] = nodeId,
+                    ["NodeName"] = SafeJString(node, "NodeName"),
+                    [eventType] = v8Code ?? ""
+                };
+
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("wf_node", updateParam);
+                if (updateResult.Code == 1)
+                {
+                    return new DosResult<object>(1, new
+                    {
+                        Message = $"流程节点 [{nodeId}] 的 {eventType} 事件代码已同步到数据库",
+                        FlowDesignId = currentFlowDesignId,
+                        NodeId = nodeId,
+                        EventType = eventType,
+                        UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    });
+                }
+
+                return new DosResult<object>(updateResult.Code, updateResult.Data, updateResult.Msg);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "更新流程节点V8事件代码失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
         #region ExecuteV8Event
 
         /// <summary>
@@ -2818,7 +3147,7 @@ namespace Microi.net
                     var nodeName = node["NodeName"].Val<string>() ?? node["Name"].Val<string>();
                     if (nodeName.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "节点 NodeName 不能为空");
                     var nodeData = BuildDataFromParam(osClient, node,
-                        new[] { "NodeName", "NodeType", "Roles", "BindJobs", "Users", "Depts", "Description", "Remark", "StartV8", "StartV8Server", "EndV8", "EndV8Server", "LineValueV8", "Timeout", "AllowSelectUsers", "AllowRecall", "AllowAddUsers", "SameDeptApprove", "BackNodes", "PositionLeft", "PositionTop", "Icon", "DisplayFields", "HideFields", "EditFields", "FieldsConfig", "CopyUsers" },
+                        new[] { "NodeName", "NodeType", "Roles", "BindJobs", "Users", "Depts", "Description", "Remark", "StartV8", "StartV8Server", "EndV8", "EndV8Server", "LineValueV8", "AllowAddUserV8Code", "Timeout", "AllowSelectUsers", "AllowRecall", "AllowAddUsers", "SameDeptApprove", "BackNodes", "PositionLeft", "PositionTop", "Icon", "DisplayFields", "HideFields", "EditFields", "FieldsConfig", "CopyUsers" },
                         node["NodeId"].Val<string>() ?? node["Id"].Val<string>());
                     nodeData["NodeName"] = nodeName;
                     nodeData["FlowDesignId"] = flowId;

@@ -26,6 +26,9 @@ export const API = {
   GET_EVENT_LIST: '/api/V8Engine/GetV8EventList',
   GET_EVENT_CODE: '/api/V8Engine/GetV8EventCode',
   UPDATE_EVENT_CODE: '/api/V8Engine/UpdateV8EventCode',
+  GET_WORKFLOW_V8_EVENT_LIST: '/api/V8Engine/GetWorkflowV8EventList',
+  GET_WORKFLOW_V8_EVENT_CODE: '/api/V8Engine/GetWorkflowV8EventCode',
+  UPDATE_WORKFLOW_V8_EVENT_CODE: '/api/V8Engine/UpdateWorkflowV8EventCode',
 
   // 低代码系统设计
   CREATE_TABLE: '/api/V8Engine/CreateTable',
@@ -53,6 +56,11 @@ export const API = {
 
   // 原生引擎接口（用于验收/调试）
   RUN_DATA_SOURCE: '/api/DataSourceEngine/Run',
+
+  // 通用 FormEngine 数据读写（用于租户业务数据维护）
+  FORM_GET_TABLE_DATA: '/api/FormEngine/GetTableData',
+  FORM_ADD_FORM_DATA: '/api/FormEngine/AddFormData',
+  FORM_UPT_FORM_DATA: '/api/FormEngine/UptFormData',
 
   // 界面引擎（Page Engine）
   GET_PAGE_ENGINE_LIST: '/api/V8Engine/GetPageEngineList',

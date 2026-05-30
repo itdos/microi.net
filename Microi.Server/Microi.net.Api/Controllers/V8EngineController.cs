@@ -251,6 +251,63 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetWorkflowV8EventList(string? osClient, string? flowDesignId, [FromBody] JObject? param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>() ?? param?["Id"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.GetWorkflowV8EventList(osClient, flowDesignId);
+            return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetWorkflowV8EventCode(string? osClient, string? flowDesignId, string? nodeId, string? eventType, [FromBody] JObject? param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            flowDesignId = flowDesignId ?? param?["FlowDesignId"].Val<string>() ?? param?["Id"].Val<string>();
+            nodeId = nodeId ?? param?["NodeId"].Val<string>();
+            eventType = eventType ?? param?["EventType"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(nodeId)) return Ok(new DosResult(0, null, "NodeId 不能为空"));
+            if (string.IsNullOrWhiteSpace(eventType)) return Ok(new DosResult(0, null, "EventType 不能为空"));
+            var result = await V8McpLogic.GetWorkflowV8EventCode(osClient, nodeId, eventType, flowDesignId);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateWorkflowV8EventCode([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            var flowDesignId = param["FlowDesignId"].Val<string>() ?? param["Id"].Val<string>();
+            var nodeId = param["NodeId"].Val<string>();
+            var eventType = param["EventType"].Val<string>();
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(nodeId)) return Ok(new DosResult(0, null, "NodeId 不能为空"));
+            if (string.IsNullOrWhiteSpace(eventType)) return Ok(new DosResult(0, null, "EventType 不能为空"));
+            string code;
+            try
+            {
+                code = DecodeCodeBase64(param.Value<string>("V8CodeBase64") ?? param.Value<string>("CodeBase64"));
+                if (string.IsNullOrWhiteSpace(code)) code = param["V8Code"].Val<string>();
+                if (string.IsNullOrWhiteSpace(code)) code = param["Code"].Val<string>();
+            }
+            catch
+            {
+                return Ok(new DosResult(0, null, "V8CodeBase64 不是有效的 UTF-8 Base64 字符串"));
+            }
+            var result = await V8McpLogic.UpdateWorkflowV8EventCode(osClient, nodeId, eventType, code ?? "", flowDesignId);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> ExecuteV8Event([FromBody] JObject param)
         {
