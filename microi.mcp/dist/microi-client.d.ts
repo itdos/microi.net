@@ -65,6 +65,28 @@ export interface V8Event {
     Version?: string;
     UpdateTime?: string;
 }
+export interface WorkflowNodeV8Event {
+    Id: string;
+    FlowDesignId: string;
+    FlowName?: string;
+    NodeId: string;
+    NodeName?: string;
+    NodeType?: string;
+    EventType: string;
+    EventName?: string;
+    V8Code?: string;
+    Code?: string;
+    Version?: string;
+    UpdateTime?: string;
+}
+export interface WorkflowV8EventListData {
+    OsClient?: string;
+    Flows?: Array<Record<string, unknown>>;
+    Nodes?: Array<Record<string, unknown>>;
+    Lines?: Array<Record<string, unknown>>;
+    List?: WorkflowNodeV8Event[];
+    Total?: number;
+}
 export interface PlaywrightEngineInfo {
     Id: string;
     ApiName: string;
@@ -186,12 +208,22 @@ export declare class MicroiClient {
         TargetId?: string;
         TargetField?: string;
     }): Promise<ApiResponse>;
+    getTableData(tableName: string, query?: Record<string, unknown>): Promise<ApiResponse>;
+    addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
+    updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
     getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string, options?: {
         functionDescription?: string;
         changeSummary?: string;
     }): Promise<ApiResponse>;
     getEventList(keyword?: string): Promise<ApiResponse<V8Event[] | ListEnvelope<V8Event>>>;
+    getWorkflowV8EventList(flowDesignId?: string): Promise<ApiResponse<WorkflowV8EventListData>>;
+    getWorkflowV8EventCode(nodeId: string, eventType: string, flowDesignId?: string): Promise<ApiResponse<WorkflowNodeV8Event>>;
+    saveWorkflowV8EventCode(nodeId: string, eventType: string, code: string, options?: {
+        flowDesignId?: string;
+        functionDescription?: string;
+        changeSummary?: string;
+    }): Promise<ApiResponse>;
     createTable(name: string, description?: string, options?: {
         Tabs?: string;
         IsTree?: number;

@@ -17,6 +17,9 @@ export declare const API: {
     readonly GET_EVENT_LIST: "/api/V8Engine/GetV8EventList";
     readonly GET_EVENT_CODE: "/api/V8Engine/GetV8EventCode";
     readonly UPDATE_EVENT_CODE: "/api/V8Engine/UpdateV8EventCode";
+    readonly GET_WORKFLOW_V8_EVENT_LIST: "/api/V8Engine/GetWorkflowV8EventList";
+    readonly GET_WORKFLOW_V8_EVENT_CODE: "/api/V8Engine/GetWorkflowV8EventCode";
+    readonly UPDATE_WORKFLOW_V8_EVENT_CODE: "/api/V8Engine/UpdateWorkflowV8EventCode";
     readonly CREATE_TABLE: "/api/V8Engine/CreateTable";
     readonly ADD_FIELD: "/api/V8Engine/AddField";
     readonly GET_FIELD_LIST: "/api/V8Engine/GetFieldList";
@@ -40,6 +43,9 @@ export declare const API: {
     readonly VALIDATE_LOW_CODE_SYSTEM: "/api/V8Engine/ValidateLowCodeSystem";
     readonly WRITE_MCP_AUDIT_LOG: "/api/V8Engine/WriteMcpAuditLog";
     readonly RUN_DATA_SOURCE: "/api/DataSourceEngine/Run";
+    readonly FORM_GET_TABLE_DATA: "/api/FormEngine/GetTableData";
+    readonly FORM_ADD_FORM_DATA: "/api/FormEngine/AddFormData";
+    readonly FORM_UPT_FORM_DATA: "/api/FormEngine/UptFormData";
     readonly GET_PAGE_ENGINE_LIST: "/api/V8Engine/GetPageEngineList";
     readonly GET_PAGE_ENGINE_DETAIL: "/api/V8Engine/GetPageEngineDetail";
     readonly SAVE_PAGE_ENGINE: "/api/V8Engine/SavePageEngine";
