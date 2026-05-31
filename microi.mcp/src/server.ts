@@ -1159,6 +1159,65 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 查询 MongoDB 系统日志
+  // ========================
+  server.tool(
+    'microi_query_mongodb_logs',
+    `Query Microi MongoDB system logs (sys_log_<osClient>/log_yyyyMM) for OsClient ${osClient}. Use this after automated tests to inspect V8 errors, slow logs, workflow logs and platform guard logs.`,
+    {
+      keyword: z.string().optional().describe('Keyword searched in log Title and Content'),
+      type: z.string().optional().describe('Log Type, for example MCP, 表单V8慢日志, 表单V8递归保护, 工作流合并提交慢日志'),
+      level: z.number().optional().describe('Log level. Common values: 1 info, 2 warning, 3 error'),
+      searchMonth: z.string().optional().describe('Month in yyyyMM. Defaults to current month on server'),
+      pageIndex: z.number().optional().describe('Page index, default 1'),
+      pageSize: z.number().optional().describe('Page size, default 20, backend max 200'),
+    },
+    async ({ keyword, type, level, searchMonth, pageIndex, pageSize }) => {
+      try {
+        const result = await client.queryMongodbLogs({ keyword, type, level, searchMonth, pageIndex, pageSize });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 写入 MongoDB 系统日志
+  // ========================
+  server.tool(
+    'microi_write_mongodb_log',
+    `Write a Microi MongoDB system log for OsClient ${osClient}. Useful for AI automated test milestones, reproduction markers, and repair verification notes.`,
+    {
+      title: z.string().describe('Log title'),
+      content: z.string().describe('Log content'),
+      type: z.string().optional().describe('Log Type, default MCP'),
+      level: z.number().optional().describe('Log level, default 1'),
+      api: z.string().optional().describe('Related API/tool name'),
+      param: z.string().optional().describe('Input or context summary. Avoid secrets.'),
+      remark: z.string().optional().describe('Short remark or target identifier'),
+      otherInfo: z.string().optional().describe('Additional diagnostic info. Avoid secrets.'),
+      timer: z.number().optional().describe('Elapsed milliseconds, if applicable'),
+      result: z.string().optional().describe('Result summary'),
+      appId: z.string().optional().describe('AppId, default microi.mcp'),
+    },
+    async ({ title, content, type, level, api, param, remark, otherInfo, timer, result, appId }) => {
+      try {
+        const writeResult = await client.writeMongodbLog({ title, content, type, level, api, param, remark, otherInfo, timer, result, appId });
+        if (writeResult.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${writeResult.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(writeResult.Data || { ok: true }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 创建自定义表（低代码系统设计）
   // ========================
   server.tool(

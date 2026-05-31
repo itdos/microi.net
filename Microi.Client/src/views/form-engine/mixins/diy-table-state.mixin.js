@@ -494,6 +494,9 @@ export default {
             _colFilterOperator: 'Like',
             _colFilterValue: '',
             _colFilters: {}, // { fieldName: { operator, value } }
+            _batchDragSelecting: false,
+            _batchDragSelectionMode: true,
+            _batchDragSelectionVisited: null,
             _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
             // 移动端搜索弹窗状态
             showMobileSearch: false,

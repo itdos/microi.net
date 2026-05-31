@@ -62,7 +62,28 @@ V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 
 ## 次选：V8.Db.FromSql（参数化占位符）
 
-当 `_Where` 无法满足复杂查询（多表 JOIN、子查询、聚合统计）时使用 `V8.Db`。
+> **⚠️ FormEngine 优先原则：** 增删改操作（INSERT / UPDATE / DELETE）必须**优先**使用 `V8.FormEngine.AddFormData` / `UptFormData` / `UptFormDataByWhere` / `DelFormData` 等方法。**只有**多表 JOIN、复杂子查询、GROUP BY 聚合等 FormEngine 无法表达的场景才使用 `V8.Db.FromSql`。
+
+> **⚠️ Jint 多参数 interop 警告：** `V8.Db.FromSql(sql, p0, p1, p2)` 传入 **3 个及以上**位置参数时（即 SQL + 3+ 值），Jint .NET 重载解析会失败，抛出
+> `No public methods with the specified arguments were found` 错误。
+> 如果必须用原生 SQL，请改用 `AddInParameter` 链式具名参数，或改写为 `V8.FormEngine` 方法。
+
+```javascript
+// ❌ 错误：3个以上位置参数，Jint 报 interop 错误
+V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2", val1, val2, id).ExecuteNonQuery();
+
+// ✅ 优先：改用 FormEngine（避免任何参数限制）
+V8.FormEngine.UptFormData('t', { Id: id, A: val1, B: val2 });
+
+// ✅ 必须用原生SQL时：改用链式 AddInParameter（具名参数，无参数数量限制）
+V8.Db.FromSql("UPDATE t SET A=?a, B=?b WHERE Id=?id")
+     .AddInParameter("?a", val1)
+     .AddInParameter("?b", val2)
+     .AddInParameter("?id", id)
+     .ExecuteNonQuery();
+```
+
+当 `_Where` 无法满足复杂查询（多表 JOIN、子查询、聚合统计）时使用 `V8.Db`：
 
 ```javascript
 // ✅ 安全：使用 @p0, @p1 参数占位符

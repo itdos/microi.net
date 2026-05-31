@@ -338,6 +338,44 @@ V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 
 **支持的操作符：** `=`, `==`, `<>`, `!=`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `In`, `NotIn`
 
+## FormEngine 优先原则
+
+**在接口引擎中，所有增删改操作必须优先使用 `V8.FormEngine` 方法，而不是 `V8.Db.FromSql` 写 SQL DML。**
+
+| 场景 | 推荐写法 |
+|------|---------|
+| 插入一条记录 | `V8.FormEngine.AddFormData` |
+| 按 Id 更新 | `V8.FormEngine.UptFormData`（必须传 `Id`） |
+| 按条件批量更新 | `V8.FormEngine.UptFormDataByWhere` |
+| 删除 | `V8.FormEngine.DelFormData` / `DelFormDataByWhere` |
+| 查询单条 | `V8.FormEngine.GetFormData` |
+| 查询列表 | `V8.FormEngine.GetTableData`（含分页、过滤、排序） |
+
+`V8.Db.FromSql` **仅**用于以下场景：
+- 多表 JOIN、复杂子查询、GROUP BY 聚合
+- 动态建表 / ALTER TABLE（DDL）
+- 纯只读报表/统计（建议用 `V8.DbRead`）
+
+> **⚠️ Jint 多参数 interop 警告：** `V8.Db.FromSql(sql, p0, p1, p2)` 传入 **3 个及以上**位置参数时（即 SQL + 3+ 值），Jint 会因 .NET 重载解析失败抛出
+> `No public methods with the specified arguments were found` 错误。
+> 如果必须用原生 SQL，请改用具名参数（`AddInParameter`）形式，或将参数减少到 2 个以内；
+> 但最佳实践是换用 `V8.FormEngine.UptFormDataByWhere` / `UptFormData` 来避免该问题。
+
+```javascript
+// ❌ 错误：3个以上位置参数，Jint 报 interop 错误
+V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2", val1, val2, id).ExecuteNonQuery();
+
+// ✅ 正确：改用 FormEngine（优先）
+V8.FormEngine.UptFormData('t', { Id: id, A: val1, B: val2 });
+
+// ✅ 也可用 AddInParameter 链式方式（需用 FormEngine 无法表达时）
+V8.Db.FromSql("UPDATE t SET A=?a, B=?b WHERE Id=?id")
+     .AddInParameter("?a", val1)
+     .AddInParameter("?b", val2)
+     .AddInParameter("?id", id)
+     .ExecuteNonQuery();
+```
+
 ## 注意事项
 
 - `_Where` 是参数化查询，自动防 SQL 注入，**不要拼接 SQL 字符串**
