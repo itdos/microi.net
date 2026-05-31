@@ -42,6 +42,8 @@ export declare const API: {
     readonly SAVE_JOB: "/api/V8Engine/SaveJob";
     readonly VALIDATE_LOW_CODE_SYSTEM: "/api/V8Engine/ValidateLowCodeSystem";
     readonly WRITE_MCP_AUDIT_LOG: "/api/V8Engine/WriteMcpAuditLog";
+    readonly QUERY_MONGODB_LOGS: "/api/V8Engine/QueryMongodbLogs";
+    readonly WRITE_MONGODB_LOG: "/api/V8Engine/WriteMongodbLog";
     readonly RUN_DATA_SOURCE: "/api/DataSourceEngine/Run";
     readonly FORM_GET_TABLE_DATA: "/api/FormEngine/GetTableData";
     readonly FORM_ADD_FORM_DATA: "/api/FormEngine/AddFormData";

@@ -3362,6 +3362,85 @@ namespace Microi.net
             }
         }
 
+        public static async Task<DosResult<object>> QueryMongodbLogs(string osClient, JObject param)
+        {
+            try
+            {
+                var pageIndex = param?["PageIndex"].Val<int?>() ?? param?["_PageIndex"].Val<int?>() ?? 1;
+                var pageSize = param?["PageSize"].Val<int?>() ?? param?["_PageSize"].Val<int?>() ?? 20;
+                if (pageSize <= 0) pageSize = 20;
+                if (pageSize > 200) pageSize = 200;
+                var logParam = new SysLogParam
+                {
+                    OsClient = osClient,
+                    _SearchMonth = param?["SearchMonth"].Val<string>() ?? param?["_SearchMonth"].Val<string>(),
+                    _Keyword = param?["Keyword"].Val<string>() ?? param?["_Keyword"].Val<string>(),
+                    Type = param?["Type"].Val<string>(),
+                    Level = param?["Level"].Val<int?>(),
+                    _PageIndex = pageIndex,
+                    _PageSize = pageSize
+                };
+                var result = await MicroiEngine.MongoDB.GetSysLog(logParam);
+                return new DosResult<object>(result.Code, new
+                {
+                    List = result.Data,
+                    DataCount = result.DataCount,
+                    PageIndex = pageIndex,
+                    PageSize = pageSize,
+                    SearchMonth = logParam._SearchMonth.DosIsNullOrWhiteSpace() ? DateTime.Now.ToString("yyyyMM") : logParam._SearchMonth
+                }, result.Msg, result.DataCount);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "查询MongoDB日志失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> WriteMongodbLog(string osClient, JObject param, dynamic currentToken)
+        {
+            try
+            {
+                var currentUser = currentToken?.CurrentUser;
+                var userId = "";
+                var userName = "";
+                if (currentUser != null)
+                {
+                    var userObj = currentUser is JObject jObject ? jObject : JObject.FromObject(currentUser);
+                    userId = userObj["Id"].Val<string>() ?? "";
+                    userName = userObj["Name"].Val<string>() ?? userObj["Account"].Val<string>() ?? "";
+                }
+                var logParam = new SysLogParam
+                {
+                    OsClient = osClient,
+                    Type = param?["Type"].Val<string>() ?? "MCP",
+                    Title = param?["Title"].Val<string>() ?? "MCP MongoDB Log",
+                    Content = TruncateForLog(param?["Content"].Val<string>() ?? ""),
+                    Api = param?["Api"].Val<string>() ?? "microi.mcp",
+                    Param = TruncateForLog(param?["Param"].Val<string>() ?? ""),
+                    Remark = param?["Remark"].Val<string>() ?? "",
+                    OtherInfo = TruncateForLog(param?["OtherInfo"].Val<string>() ?? ""),
+                    Level = param?["Level"].Val<int?>() ?? 1,
+                    Timer = param?["Timer"].Val<int?>(),
+                    Result = param?["Result"].Val<string>() ?? "",
+                    UserId = param?["UserId"].Val<string>() ?? userId,
+                    UserName = param?["UserName"].Val<string>() ?? userName,
+                    AppId = param?["AppId"].Val<string>() ?? "microi.mcp"
+                };
+                var result = await MicroiEngine.MongoDB.AddSysLog(logParam);
+                return new DosResult<object>(result.Code, new
+                {
+                    logParam.Type,
+                    logParam.Title,
+                    logParam.Api,
+                    logParam.Level
+                }, result.Msg);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "写入MongoDB日志失败：" + ex.Message);
+            }
+        }
+
         /// <summary>
         /// MCP 上传 base64 文件到平台文件存储，并可同步写入指定表字段。
         /// </summary>

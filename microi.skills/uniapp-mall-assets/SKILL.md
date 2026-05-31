@@ -17,6 +17,25 @@ description: 数字经济商城 uni-app H5（mci.lsg.uniapp）资源/图片路�
 ✅ 必须拼到 `${FILE_SERVER}/`（OSS/CDN）。
 ✅ 私有文件需要签名 URL，由后端 `V8.Method.GetPrivateFileUrl({FilePathName})` 返回带 `Signature/Expires` 的临时 URL。
 
+## 私有图片必须经过 GetPrivateFileUrl
+
+收款码、付款凭证、身份证照片、实名材料、资金/订单相关截图等用户私有图片，不能只走 `sanitizeAssetUrl`，也不能把数据库里的私有路径直接绑定到 `<image>`。前端必须调用 `/api/HDFS/GetPrivateFileUrl?FilePathName=...`，或使用 `mci.lsg.uniapp/src/utils/api.js` 中的 `resolveFileUrl(filePathName)`。列表页加载后应把私有字段异步解析成 `XxxUrl` 字段，模板只绑定解析后的临时 URL。
+
+```js
+import { resolveFileUrl } from '@/utils/api.js';
+
+payMethods.value = await Promise.all((rows || []).map(async (row) => ({
+  ...row,
+  QrCodeUrl: row.QrCodeImg ? await resolveFileUrl(row.QrCodeImg) : ''
+})));
+```
+
+```vue
+<image v-if="item.QrCodeUrl" :src="item.QrCodeUrl" mode="aspectFill" />
+```
+
+`uni.previewImage` 也必须使用解析后的临时 URL。`resolveFileUrl` 可以在签名接口失败时再回退到 `MallFileUrl`/`sanitizeAssetUrl`，页面不要自己拼 API_BASE 或 FILE_SERVER。
+
 ## 必须经过 sanitizeAssetUrl
 
 `mci.lsg.uniapp/src/utils/api.js` 已经导出 `sanitizeAssetUrl(url)`，规则：

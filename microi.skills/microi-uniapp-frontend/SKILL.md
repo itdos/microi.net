@@ -24,7 +24,7 @@ description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or f
 - `http(s)://`、`data:`、`blob:` 原样返回。
 - `/file/...` 走 API 服务。
 - `/tenant/...`、`tenant/...` 等对象存储路径走 `V8.SysConfig.FileServer` 对应的文件服务器/CDN。
-- 私有文件使用后端签名 URL，例如 `V8.Method.GetPrivateFileUrl({ FilePathName })`，失败时再回退到公开文件服务器路径。
+- 私有文件必须先换取后端签名 URL：后端 V8 用 `V8.Method.GetPrivateFileUrl({ FilePathName })`，UniApp/H5 前端调用 `/api/HDFS/GetPrivateFileUrl?FilePathName=...` 或项目封装的 `resolveFileUrl(filePathName)`，失败时再回退到公开文件服务器路径。
 - 第三方占位图、已失效临时地址、空字符串统一清理为空，交给 UI 占位态。
 
 ## 头像必须异步统一解析
@@ -139,7 +139,7 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 - iOS Safari 上传图片后必须验证表单其它字段不丢失；上传组件只更新文件字段，不得重置整张表单对象。
 - 消息、待办、审批、约单、审核类入口必须支持未读角标；已读后角标消失。
 - 会员头像、买家/卖家头像、审批人头像、团队成员头像都走 `resolveAvatarUrl`，列表页和详情页必须显示一致。
-- 私有图片、身份证照片、支付凭证等禁止匿名访问的文件，前端必须先换取临时 URL；不能直接把私有路径给 `<image>`。
+- 私有图片、身份证照片、支付凭证、收款码等禁止匿名访问的文件，前端必须先通过 `/api/HDFS/GetPrivateFileUrl` 或 `resolveFileUrl` 换取临时 URL；不能直接把私有路径给 `<image>`、`uni.previewImage`、`background-image`。
 
 ## 验收要求
 

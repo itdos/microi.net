@@ -308,6 +308,26 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> QueryMongodbLogs(string? osClient, [FromBody] JObject? param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            var result = await V8McpLogic.QueryMongodbLogs(osClient, param ?? new JObject());
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> WriteMongodbLog([FromBody] JObject? param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            var result = await V8McpLogic.WriteMongodbLog(osClient, param ?? new JObject(), token);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> ExecuteV8Event([FromBody] JObject param)
         {

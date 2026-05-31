@@ -112,6 +112,29 @@ export interface WorkflowV8EventListData {
   Total?: number;
 }
 
+export interface MongodbLogQuery {
+  keyword?: string;
+  type?: string;
+  level?: number;
+  searchMonth?: string;
+  pageIndex?: number;
+  pageSize?: number;
+}
+
+export interface MongodbLogWrite {
+  type?: string;
+  title: string;
+  content: string;
+  level?: number;
+  api?: string;
+  param?: string;
+  remark?: string;
+  otherInfo?: string;
+  timer?: number;
+  result?: string;
+  appId?: string;
+}
+
 export interface PlaywrightEngineInfo {
   Id: string;
   ApiName: string;
@@ -866,6 +889,35 @@ export class MicroiClient {
       Action: action,
       Target: target,
       Content: content,
+    });
+  }
+
+  async queryMongodbLogs(query: MongodbLogQuery = {}): Promise<ApiResponse> {
+    return this.post(API.QUERY_MONGODB_LOGS, {
+      OsClient: this.config.osClient,
+      Keyword: query.keyword,
+      Type: query.type,
+      Level: query.level,
+      SearchMonth: query.searchMonth,
+      PageIndex: query.pageIndex || 1,
+      PageSize: query.pageSize || 20,
+    });
+  }
+
+  async writeMongodbLog(log: MongodbLogWrite): Promise<ApiResponse> {
+    return this.post(API.WRITE_MONGODB_LOG, {
+      OsClient: this.config.osClient,
+      Type: log.type || 'MCP',
+      Title: log.title,
+      Content: log.content,
+      Level: log.level || 1,
+      Api: log.api || 'microi.mcp',
+      Param: log.param || '',
+      Remark: log.remark || '',
+      OtherInfo: log.otherInfo || '',
+      Timer: log.timer,
+      Result: log.result || '',
+      AppId: log.appId || 'microi.mcp',
     });
   }
 

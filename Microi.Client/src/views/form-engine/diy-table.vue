@@ -428,6 +428,8 @@
                     ]"
                     @row-dblclick="TableRowDblClick"
                     @selection-change="TableRowSelectionChange"
+                    @mousedown.capture="BatchDragSelectionMouseDown"
+                    @cell-mouse-enter="BatchDragSelectionCellEnter"
                     :height="GetDiyTableMaxHeight()"
                     stripe
                     border
@@ -1157,8 +1159,28 @@
                             <el-option v-for="op in getColFilterOperators()" :key="op.value" :label="op.label" :value="op.value" />
                         </el-select>
                         <!-- 根据字段类型显示不同输入 -->
+                        <el-select
+                            v-if="isColFilterOptionField()"
+                            v-model="_colFilterValue"
+                            size="small"
+                            style="width: 100%; margin-bottom: 8px;"
+                            :teleported="false"
+                            multiple
+                            collapse-tags
+                            collapse-tags-tooltip
+                            clearable
+                            filterable
+                            placeholder="选择一个或多个值"
+                        >
+                            <el-option
+                                v-for="(opt, optIdx) in getColFilterOptions()"
+                                :key="'col_filter_opt_' + optIdx"
+                                :label="opt.label"
+                                :value="opt.value"
+                            />
+                        </el-select>
                         <el-input
-                            v-if="isColFilterTextInput()"
+                            v-else-if="isColFilterTextInput()"
                             v-model="_colFilterValue"
                             size="small"
                             style="width: 100%; margin-bottom: 8px;"
@@ -1187,37 +1209,6 @@
                             controls-position="right"
                             placeholder="输入数值"
                         />
-                        <!-- 下拉选择 -->
-                        <el-select
-                            v-else-if="(_colMenuField.Component === 'Select' || _colMenuField.Component === 'MultipleSelect') && Array.isArray(_colMenuField.Data) && _colMenuField.Data.length > 0"
-                            v-model="_colFilterValue"
-                            size="small"
-                            style="width: 100%; margin-bottom: 8px;"
-                            :teleported="false"
-                            clearable
-                            filterable
-                            placeholder="选择"
-                        >
-                            <el-option
-                                v-for="(opt, optIdx) in _colMenuField.Data"
-                                :key="'col_filter_opt_' + optIdx"
-                                :label="typeof opt === 'string' ? opt : (opt[_colMenuField.Config.SelectLabel || 'Name'] || opt.Name || '')"
-                                :value="typeof opt === 'string' ? opt : (opt[_colMenuField.Config.SelectSaveField || _colMenuField.Config.SelectLabel || 'Id'] || opt.Id || '')"
-                            />
-                        </el-select>
-                        <!-- 开关 -->
-                        <el-select
-                            v-else-if="_colMenuField.Component === 'Switch'"
-                            v-model="_colFilterValue"
-                            size="small"
-                            style="width: 100%; margin-bottom: 8px;"
-                            :teleported="false"
-                            clearable
-                            placeholder="选择"
-                        >
-                            <el-option label="打开" value="1" />
-                            <el-option label="关闭" value="0" />
-                        </el-select>
                         <!-- 默认文本输入 -->
                         <el-input
                             v-else
