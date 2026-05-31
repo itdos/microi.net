@@ -631,6 +631,33 @@ export class MicroiClient {
             Content: content,
         });
     }
+    async queryMongodbLogs(query = {}) {
+        return this.post(API.QUERY_MONGODB_LOGS, {
+            OsClient: this.config.osClient,
+            Keyword: query.keyword,
+            Type: query.type,
+            Level: query.level,
+            SearchMonth: query.searchMonth,
+            PageIndex: query.pageIndex || 1,
+            PageSize: query.pageSize || 20,
+        });
+    }
+    async writeMongodbLog(log) {
+        return this.post(API.WRITE_MONGODB_LOG, {
+            OsClient: this.config.osClient,
+            Type: log.type || 'MCP',
+            Title: log.title,
+            Content: log.content,
+            Level: log.level || 1,
+            Api: log.api || 'microi.mcp',
+            Param: log.param || '',
+            Remark: log.remark || '',
+            OtherInfo: log.otherInfo || '',
+            Timer: log.timer,
+            Result: log.result || '',
+            AppId: log.appId || 'microi.mcp',
+        });
+    }
     // ---------- 界面引擎 API 方法 ----------
     async getPageEngineList(keyword) {
         return this.post(API.GET_PAGE_ENGINE_LIST, {

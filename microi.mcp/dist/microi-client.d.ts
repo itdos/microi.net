@@ -87,6 +87,27 @@ export interface WorkflowV8EventListData {
     List?: WorkflowNodeV8Event[];
     Total?: number;
 }
+export interface MongodbLogQuery {
+    keyword?: string;
+    type?: string;
+    level?: number;
+    searchMonth?: string;
+    pageIndex?: number;
+    pageSize?: number;
+}
+export interface MongodbLogWrite {
+    type?: string;
+    title: string;
+    content: string;
+    level?: number;
+    api?: string;
+    param?: string;
+    remark?: string;
+    otherInfo?: string;
+    timer?: number;
+    result?: string;
+    appId?: string;
+}
 export interface PlaywrightEngineInfo {
     Id: string;
     ApiName: string;
@@ -310,6 +331,8 @@ export declare class MicroiClient {
     saveJob(data: Record<string, unknown>): Promise<ApiResponse>;
     validateLowCodeSystem(manifest: Record<string, unknown>): Promise<ApiResponse>;
     writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse>;
+    queryMongodbLogs(query?: MongodbLogQuery): Promise<ApiResponse>;
+    writeMongodbLog(log: MongodbLogWrite): Promise<ApiResponse>;
     getPageEngineList(keyword?: string): Promise<ApiResponse>;
     getPageEngineDetail(pageId: string): Promise<ApiResponse>;
     savePageEngine(data: {

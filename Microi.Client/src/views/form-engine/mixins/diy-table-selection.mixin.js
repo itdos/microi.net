@@ -53,6 +53,73 @@ export default {
             self.TableMultipleSelection = val;
             self.EmitOpenTableSelectionChange(OldTableMultipleSelection, "Y");
         },
+        HasBatchSelectMoreBtns() {
+            var buttons = this.SysMenuModel && this.SysMenuModel.BatchSelectMoreBtns;
+            if (!buttons) return false;
+            if (Array.isArray(buttons)) return buttons.length > 0;
+            if (typeof buttons === 'string') {
+                try {
+                    var parsed = JSON.parse(buttons);
+                    return Array.isArray(parsed) && parsed.length > 0;
+                } catch (e) {
+                    return buttons.length > 2;
+                }
+            }
+            return false;
+        },
+        CanBatchDragSelection() {
+            return this.TableDisplayMode === 'Table' && this.TableEnableBatch === true && this.HasBatchSelectMoreBtns();
+        },
+        IsRowSelected(row) {
+            if (!row || !row.Id) return false;
+            return (this.TableMultipleSelection || []).some(function(item) { return item && item.Id === row.Id; });
+        },
+        GetBatchDragRowByCell(cell) {
+            if (!cell) return null;
+            var rowEl = cell.closest ? cell.closest('tr') : null;
+            if (!rowEl || !rowEl.parentNode) return null;
+            var rows = Array.prototype.slice.call(rowEl.parentNode.children).filter(function(item) {
+                return item && item.nodeType === 1;
+            });
+            var index = rows.indexOf(rowEl);
+            if (index < 0) return null;
+            return (this.RenderedTableRowList || [])[index] || null;
+        },
+        SetBatchDragRowSelection(row, selected) {
+            if (!row || !row.Id) return;
+            if (!this._batchDragSelectionVisited) this._batchDragSelectionVisited = {};
+            if (this._batchDragSelectionVisited[row.Id]) return;
+            this._batchDragSelectionVisited[row.Id] = true;
+            var tableRef = this.$refs["diy-table-" + this.TableId];
+            if (tableRef && tableRef.toggleRowSelection) {
+                tableRef.toggleRowSelection(row, selected);
+            }
+        },
+        BatchDragSelectionMouseDown(event) {
+            var self = this;
+            if (!self.CanBatchDragSelection() || !event || event.button !== 0 || !event.target || !event.target.closest) return;
+            var cell = event.target.closest('td.el-table-column--selection');
+            if (!cell) return;
+            var row = self.GetBatchDragRowByCell(cell);
+            if (!row) return;
+            self._batchDragSelecting = true;
+            self._batchDragSelectionMode = !self.IsRowSelected(row);
+            self._batchDragSelectionVisited = {};
+            self.SetBatchDragRowSelection(row, self._batchDragSelectionMode);
+            if (event.preventDefault) event.preventDefault();
+            document.addEventListener('mouseup', self.BatchDragSelectionStop, true);
+            document.addEventListener('mouseleave', self.BatchDragSelectionStop, true);
+        },
+        BatchDragSelectionCellEnter(row, column) {
+            if (!this._batchDragSelecting || !column || column.type !== 'selection') return;
+            this.SetBatchDragRowSelection(row, this._batchDragSelectionMode);
+        },
+        BatchDragSelectionStop() {
+            this._batchDragSelecting = false;
+            this._batchDragSelectionVisited = null;
+            document.removeEventListener('mouseup', this.BatchDragSelectionStop, true);
+            document.removeEventListener('mouseleave', this.BatchDragSelectionStop, true);
+        },
         // 卡片模式批量选择
         toggleCardSelection(model) {
             const self = this;

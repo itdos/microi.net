@@ -48,6 +48,8 @@ export const API = {
     SAVE_JOB: '/api/V8Engine/SaveJob',
     VALIDATE_LOW_CODE_SYSTEM: '/api/V8Engine/ValidateLowCodeSystem',
     WRITE_MCP_AUDIT_LOG: '/api/V8Engine/WriteMcpAuditLog',
+    QUERY_MONGODB_LOGS: '/api/V8Engine/QueryMongodbLogs',
+    WRITE_MONGODB_LOG: '/api/V8Engine/WriteMongodbLog',
     // 原生引擎接口（用于验收/调试）
     RUN_DATA_SOURCE: '/api/DataSourceEngine/Run',
     // 通用 FormEngine 数据读写（用于租户业务数据维护）

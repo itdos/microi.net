@@ -615,11 +615,11 @@ LoadFabPosition() {
             var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
             if (self._colFilters[fieldName]) {
                 self._colFilterOperator = self._colFilters[fieldName].operator;
-                self._colFilterValue = self._colFilters[fieldName].value;
+                self._colFilterValue = self.normalizeColFilterValue(field, self._colFilters[fieldName].value, self._colFilterOperator);
             } else {
                 // 根据字段类型设置默认操作符
                 self._colFilterOperator = self._getDefaultOperator(field);
-                self._colFilterValue = '';
+                self._colFilterValue = self.isColFilterOptionField(field) ? [] : '';
             }
             self._colMenuVisible = true;
 
@@ -642,7 +642,7 @@ LoadFabPosition() {
         _getDefaultOperator(field) {
             if (!field) return 'Like';
             var comp = field.Component;
-            if (comp === 'Select' || comp === 'MultipleSelect' || comp === 'Switch' || comp === 'Radio') return '=';
+            if (this.isColFilterOptionField(field)) return 'In';
             if (comp === 'DateTime') return '>=';
             if (field.Type && (field.Type.toLowerCase().indexOf('int') > -1 || field.Type.toLowerCase().indexOf('decimal') > -1)) return '=';
             return 'Like';
@@ -749,11 +749,10 @@ LoadFabPosition() {
                     { label: '小于等于 (≤)', value: '<=' }
                 ];
             }
-            if (comp === 'Select' || comp === 'MultipleSelect' || comp === 'Switch' || comp === 'Radio') {
+            if (self.isColFilterOptionField(field)) {
                 return [
-                    { label: '等于 (=)', value: '=' },
-                    { label: '不等于 (≠)', value: '<>' },
-                    { label: '包含', value: 'Like' }
+                    { label: '包含任一 (In)', value: 'In' },
+                    { label: '不包含任一 (NotIn)', value: 'NotIn' }
                 ];
             }
             return [
@@ -779,20 +778,64 @@ LoadFabPosition() {
         },
         isColFilterTextInput() {
             var self = this;
+            if (self.isColFilterOptionField()) return false;
             return ['Like', 'NotLike', 'StartLike', 'EndLike'].indexOf(self._colFilterOperator) > -1;
+        },
+        isColFilterOptionField(field) {
+            field = field || this._colMenuField;
+            if (!field) return false;
+            if (field.Component === 'Switch') return true;
+            return ['Select', 'MultipleSelect', 'Radio', 'Checkbox'].indexOf(field.Component) > -1 && Array.isArray(field.Data) && field.Data.length > 0;
+        },
+        getColFilterOptions() {
+            var field = this._colMenuField;
+            if (!field) return [];
+            if (field.Component === 'Switch') {
+                return [
+                    { label: '打开', value: '1' },
+                    { label: '关闭', value: '0' }
+                ];
+            }
+            var config = field.Config || {};
+            var labelKey = config.SelectLabel || 'Name';
+            var valueKey = config.SelectSaveField || config.SelectLabel || 'Id';
+            var data = Array.isArray(field.Data) ? field.Data : [];
+            return data.map(function(opt) {
+                if (typeof opt === 'string') return { label: opt, value: opt };
+                return {
+                    label: opt[labelKey] || opt.Value || opt.Name || opt.Label || opt.Id || '',
+                    value: opt[valueKey] || opt.Key || opt.Id || opt.Value || opt.Name || ''
+                };
+            }).filter(function(opt) { return opt.value !== '' && opt.value !== null && opt.value !== undefined; });
+        },
+        normalizeColFilterValue(field, value, operator) {
+            if (this.isColFilterOptionField(field) || operator === 'In' || operator === 'NotIn') {
+                if (Array.isArray(value)) return value;
+                if (value === '' || value === null || value === undefined) return [];
+                return [value];
+            }
+            return value;
         },
         colMenuApplyFilter() {
             var self = this;
             if (!self._colMenuField) return;
             var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            var operator = self._colFilterOperator;
+            var value = self._colFilterValue;
+            if (self.isColFilterOptionField()) {
+                value = self.normalizeColFilterValue(self._colMenuField, value, operator).filter(function(item) {
+                    return item !== '' && item !== null && item !== undefined;
+                });
+                operator = operator === 'NotIn' ? 'NotIn' : 'In';
+            }
 
-            if (self._colFilterValue === '' || self._colFilterValue === null || self._colFilterValue === undefined) {
+            if (value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
                 // 清除该列筛选
                 delete self._colFilters[fieldName];
             } else {
                 self._colFilters[fieldName] = {
-                    operator: self._colFilterOperator,
-                    value: self._colFilterValue
+                    operator: operator,
+                    value: value
                 };
             }
             self._rebuildColFilterWhere();
@@ -804,7 +847,7 @@ LoadFabPosition() {
             if (!self._colMenuField) return;
             var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
             delete self._colFilters[fieldName];
-            self._colFilterValue = '';
+            self._colFilterValue = self.isColFilterOptionField() ? [] : '';
             self._rebuildColFilterWhere();
             self.hideColHeaderMenu();
             self.GetDiyTableRow({ _PageIndex: 1 });
