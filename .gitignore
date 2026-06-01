@@ -1,5 +1,3 @@
-ai-helper/
-new-water-source-h5/
 .DS_Store
 node_modules/
 
@@ -116,3 +114,5 @@ dev.log
 switch-env.ps1
 .tmp
 .microi-performance
+AI-Project/
+new-water-source-h5/

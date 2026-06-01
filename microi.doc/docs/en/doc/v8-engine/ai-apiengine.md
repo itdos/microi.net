@@ -311,61 +311,7 @@ No matter in online or local mode, AI should be clearly told: * * Please find th
 
 ---
 
-## 📚Let AI start learning
-::: details Expand View Code (50 lines)
-```
-当前项目是开源低代码平台-Microi吾码的官方文档MD源码：
-1、我需要你先学习Microi吾码的V8引擎文档：
-	docs/doc/v8-engine/api-engine.md、
-	docs/doc/v8-engine/v8-server.md、
-	docs/doc/v8-engine/form-engine.md、
-	docs/doc/v8-engine/where.md。
 
-2、现在帮我写一个接口引擎，用于获取【吾码】数据库的这些表数据（我后面会问你的业务逻辑，你需要根据表结构、菜单结构来写接口引擎代码）：
-	2.1、diy_table（数据库所有表及说明）表，取所有数据，只获取关键字段：Id、Name（表名）、Description（表说明）
-	2.2、diy_field（数据库所有字段及说明）表，取所有数据，只获取关键字段：
-        Id、Name（字段名）、Label（字段说明），
-        Description：（字段描述）、Type（字段类型）、Component（控件类型），
-        TableId：关联diy_table表的Id），
-        Config：字段配置信息，是个{}对象字符串，取出来的数据只需要返回以下属性，其它属性全部丢弃，太大了：
-            TableChildTableId：表示关联到哪个 sys_menu 表Id的数据，也就是子表，
-            TableChildSysMenuId：表示关联到哪个 sys_menu 表Id的数据，也就是子表所在的菜单，
-                
-    2.3、sys_menu（系统菜单表）树形表，取所有数据，只获取关键字段：
-        Id、Name（菜单名称）、ParentId（上级菜单Id），
-        DiyTableId：关联到 diy_table 表的Id，表示这个菜单是读取哪张表的数据，
-
-4、返回结果中的Data你需要组装一下数据：
-    {
-        Tables:  [{ 
-            Id: "01KEMDAT9ARD75943VSCB7B4J6", 
-            Name: "table1", 
-            Description: "表1", 
-            _Fields: [{
-                "Id": "01KEMDAVG6H7HSN6WWVRYK2NPR",
-                "Name": "CreateTime",
-                "Label": "创建时间",
-                "Description": null,
-                "Type": "datetime",
-                "Component": "DateTime"
-            }]
-        }],
-        Menus: [{ 
-            Id: "01KEMDAT9ARD75943VSCB7B4J6", 
-            Name: "菜单名称", 
-            ParentId: "ParentId", 
-            DiyTableId: "DiyTableId",
-            _Child: [{
-                Id: "01KEMDAT9ARD75943VSCB7B4J6", 
-                Name: "子菜单名称", 
-                ParentId: "上级菜单Id", 
-                DiyTableId: "DiyTableId",
-            }]
-        }]
-    }
-4、写的接口引擎代码放到【ai-helper/microi/get-db.js】文件，然后我会把上面拿到的数据全部给你放到【ai-helper/microi/db.json】
-```
-:::
 
 ## AI generated interface engine code (one-time test successful, 100 percent accurate)
 ::: details AI generated interface engine code
@@ -551,7 +497,7 @@ try {
 
 ## Give AI data
 ```
-1、数据库表结构我放在了【ai-helper/microi/db.json】
+1、数据库表结构我放在了【AI-Project/microi/db.json】
 2、请你先全面学习分析一下数据库结构设计，掌握表与表之间的关系，字段的含义等等
 3、因为接下来我需要给你描述业务逻辑，然后让你帮我写接口引擎代码。
 ```
@@ -560,7 +506,7 @@ try {
 >*`为了防止有时出现的AI没关联到上下文，博主是每次写一个新的接口都会加上此前缀`
 > * Let AI`学习`Your experience in programming, otherwise AI generated code would be possible.`不会考虑那么多`
 ```
-现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【ai-helper/microi/】下，
+现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【AI-Project/microi/】下，
 在写接口引擎代码之前，请先阅读我提供的注意事项：
 1、假如你没理解到我说的业务逻辑，或者我描述的有问题，请不要先生成接口引擎代码，而是先跟我沟通，
 	我来重新补充描述，确定没有任何疑问后再生成接口引擎代码，
@@ -1793,7 +1739,7 @@ try {
 ::: details Expand View Code (34 lines)
 ```
 【我的需求】：
-现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【ai-helper/microi/】下，
+现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【AI-Project/microi/】下，
 1、首先你要知道这几张表结构：
 	【生产主计划】：【diy_scxqdd1766715873794 (APS生产总计划)】
 		子表【生产主计划-任务栈列表】：【diy_APSgylxsczx1766717760801 (APS生产主计划-任务栈列表) 】，
@@ -1833,7 +1779,7 @@ try {
 ::: details Expand to view code (34 lines)
 ```
 【我的需求】：
-现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【ai-helper/microi/】下，
+现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【AI-Project/microi/】下，
 1、首先你要知道这几张表结构：
 	【生产主计划】：【diy_scxqdd1766715873794 (APS生产总计划)】
 		子表【生产主计划-任务栈列表】：【diy_APSgylxsczx1766717760801 (APS生产主计划-任务栈列表) 】，

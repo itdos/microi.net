@@ -1,6 +1,6 @@
 # Microi Table Catalog
 
-Full generated catalog from `ai-helper/microi/db.json`. Load this only when a task needs exact fields outside the core tables.
+Full generated catalog from `AI-Project/microi/db.json`. Load this only when a task needs exact fields outside the core tables.
 
 ## All Tables
 
