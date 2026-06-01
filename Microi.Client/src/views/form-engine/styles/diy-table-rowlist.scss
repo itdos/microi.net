@@ -1,4 +1,42 @@
 @import "@/styles/diy-table.scss";
+.diy-table-batch-drag-host {
+  position: relative;
+}
+
+.batch-drag-selection-rect {
+  position: fixed;
+  z-index: 3000;
+  pointer-events: none;
+  border: 1px dashed var(--el-color-primary, #409eff);
+  background: rgba(64, 158, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.18);
+}
+
+:deep(.table-data.is-batch-drag-enabled .el-table__body-wrapper td.diy-batch-drag-zone),
+:deep(.table-data.is-batch-drag-enabled .el-table__body-wrapper td.diy-batch-drag-zone *),
+:deep(.table-data.is-batch-drag-enabled .el-table__body-wrapper td.el-table-column--selection),
+:deep(.table-data.is-batch-drag-enabled .el-table__body-wrapper td.el-table-column--selection *) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+// 拖动批量选择进行中：全表临时禁用文本选中，避免框选时误选文字；拖动结束即恢复
+:deep(.table-data.is-batch-drag-selecting .el-table__body-wrapper),
+:deep(.table-data.is-batch-drag-selecting .el-table__body-wrapper *) {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+:deep(.table-data.is-batch-drag-selecting) {
+  cursor: crosshair;
+  user-select: none;
+}
+
+// 🔥 性能优化：纯 CSS 当前行高亮（替代 Element Plus highlight-current-row，避免点击时整表重渲染）
+:deep(.table-data .el-table__body tr.diy-current-row > td.el-table__cell) {
+  background-color: var(--el-table-current-row-bg-color, #ecf5ff) !important;
+}
+
 .search-box{
      display: flex;
      justify-content: space-between;

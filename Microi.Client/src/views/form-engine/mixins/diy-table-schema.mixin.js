@@ -793,52 +793,13 @@ export default {
                     //调整ShowHideFieldsList排序
                     // self.SortShowHideFieldsList(tempArr);
 
-                    // 🔥 性能优化：分批渲染表格列
+                    // 已取消表格列分批渲染：一次性渲染全部列，避免分批 setTimeout/requestIdleCallback 造成的卡顿
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
                         tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
                     }
-                    self.ShowDiyFieldList = [];
-
-                    // 首批只渲染前10列
-                    var initialCount = Math.min(10, tempArr.length);
-                    var initialColumns = tempArr.slice(0, initialCount);
-
-                    // 立即渲染首批列
-                    self.$nextTick(function () {
-                        self.ShowDiyFieldList = initialColumns;
-
-                        // 如果还有剩余列，延迟渲染
-                        if (tempArr.length > initialCount) {
-                            var renderRemaining = () => {
-                                if (self._isDestroyed) return;
-                                var current = self.ShowDiyFieldList.length;
-                                if (current < tempArr.length) {
-                                    // 每次添加5列
-                                    var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
-                                    self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
-
-                                    // 继续渲染
-                                    if (self.ShowDiyFieldList.length < tempArr.length) {
-                                        if (window.requestIdleCallback) {
-                                            window.requestIdleCallback(renderRemaining);
-                                        } else {
-                                            setTimeout(renderRemaining, 16);
-                                        }
-                                    }
-                                }
-                            };
-                            // 50ms后开始渲染剩余列
-                            setTimeout(() => {
-                                if (window.requestIdleCallback) {
-                                    window.requestIdleCallback(renderRemaining);
-                                } else {
-                                    renderRemaining();
-                                }
-                            }, 50);
-                        }
-                    });
+                    self.ShowDiyFieldList = tempArr;
                     return tempArr;
                 } else if (self.DiyFieldList.length > 0) {
                     //如果没有指定查询列
@@ -878,52 +839,13 @@ export default {
                     //调整ShowHideFieldsList排序
                     // self.SortShowHideFieldsList(tempArr);
 
-                    // 🔥 性能优化：分批渲染表格列（第二个分支 - 无指定查询列）
+                    // 已取消表格列分批渲染（第二个分支 - 无指定查询列）：一次性渲染全部列
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
                         tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
                     }
-                    self.ShowDiyFieldList = [];
-
-                    // 首批只渲染前10列
-                    var initialCount = Math.min(10, tempArr.length);
-                    var initialColumns = tempArr.slice(0, initialCount);
-
-                    // 立即渲染首批列
-                    self.$nextTick(function () {
-                        self.ShowDiyFieldList = initialColumns;
-
-                        // 如果还有剩余列，延迟渲染
-                        if (tempArr.length > initialCount) {
-                            var renderRemaining = () => {
-                                if (self._isDestroyed) return;
-                                var current = self.ShowDiyFieldList.length;
-                                if (current < tempArr.length) {
-                                    // 每次添加5列
-                                    var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
-                                    self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
-
-                                    // 继续渲染
-                                    if (self.ShowDiyFieldList.length < tempArr.length) {
-                                        if (window.requestIdleCallback) {
-                                            window.requestIdleCallback(renderRemaining);
-                                        } else {
-                                            setTimeout(renderRemaining, 16);
-                                        }
-                                    }
-                                }
-                            };
-                            // 50ms后开始渲染剩余列
-                            setTimeout(() => {
-                                if (window.requestIdleCallback) {
-                                    window.requestIdleCallback(renderRemaining);
-                                } else {
-                                    renderRemaining();
-                                }
-                            }, 50);
-                        }
-                    });
+                    self.ShowDiyFieldList = tempArr;
                     return tempArr;
                 } else {
                     self.ShowDiyFieldList = [];
