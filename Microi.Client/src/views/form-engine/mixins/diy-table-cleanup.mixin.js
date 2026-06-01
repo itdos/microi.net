@@ -25,6 +25,7 @@ beforeUnmount() {
         // 🔥 解绑表格懒渲染滚动监听
         try { self.UnbindLazyScroll && self.UnbindLazyScroll(); } catch (e) {}
         try { self.BatchDragSelectionStop && self.BatchDragSelectionStop(); } catch (e) {}
+        try { document.removeEventListener('click', self.BatchDragSelectionClick, true); } catch (e) {}
         // 🔥 解绑移动端无限滚动监听（避免 keep-alive 之外的卸载场景泄漏）
         try {
             if (self.mobileScrollHandler) {

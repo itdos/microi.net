@@ -412,8 +412,12 @@
                     ></DiySearch>
                 </div>
                 <!--DIY表格-->
-                <el-table
+                <div
                     v-if="TableDisplayMode == 'Table'"
+                    class="diy-table-batch-drag-host"
+                    @mousedown.capture="BatchDragSelectionMouseDown"
+                >
+                <el-table
                     :id="'diy-table-' + TableId"
                     :ref="'diy-table-' + TableId"
                     v-loading="tableLoading"
@@ -424,18 +428,16 @@
                     @sort-change="DiyTableRowSortChange"
                     :class="[
                         'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name,
-                        SysMenuModel && (SysMenuModel.TableCellWrap === true || SysMenuModel.TableCellWrap === 1 || SysMenuModel.TableCellWrap === '1' || SysMenuModel.TableCellWrap === 'true') ? 'table-cell-wrap' : ''
+                        SysMenuModel && (SysMenuModel.TableCellWrap === true || SysMenuModel.TableCellWrap === 1 || SysMenuModel.TableCellWrap === '1' || SysMenuModel.TableCellWrap === 'true') ? 'table-cell-wrap' : '',
+                        CanBatchDragSelection() ? 'is-batch-drag-enabled' : '',
+                        _batchDragSelecting ? 'is-batch-drag-selecting' : ''
                     ]"
                     @row-dblclick="TableRowDblClick"
                     @selection-change="TableRowSelectionChange"
-                    @mousedown.capture="BatchDragSelectionMouseDown"
-                    @cell-mouse-enter="BatchDragSelectionCellEnter"
                     :height="GetDiyTableMaxHeight()"
                     stripe
                     border
                     @row-click="DiyTableRowClick"
-                    highlight-current-row
-                    @current-change="DiyTableCurrentChange"
                     :lazy="CurrentDiyTableModel.TreeLazy === true || CurrentDiyTableModel.TreeLazy === 1"
                     :load="DiyTableLoad"
                     row-key="Id"
@@ -452,13 +454,14 @@
                             />
                         </template>
                     </el-table-column>
-                    <el-table-column v-else-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
+                    <el-table-column v-else-if="TableEnableBatch" type="selection" label="#" width="35" class-name="diy-batch-drag-zone"> </el-table-column>
                     <el-table-column
                         type="index"
                         :label="$t('Msg.SerialNo')"
                         width="55"
                         align="center"
                         :index="indexMethod"
+                        class-name="diy-batch-drag-zone"
                         v-if="DiyCommon.IsNull(SysMenuModel) || (!DiyCommon.IsNull(SysMenuModel) && !SysMenuModel.HiddenIndex)"
                     >
                     </el-table-column>
@@ -719,6 +722,12 @@
                         <div>{{ tableLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}</div>
                     </template>
                 </el-table>
+                <div
+                    v-if="_batchDragSelecting && _batchDragRect"
+                    class="batch-drag-selection-rect"
+                    :style="BatchDragSelectionRectStyle()"
+                ></div>
+                </div>
 
                 <el-row
                     v-if="TableDisplayMode == 'Card'"
@@ -1646,6 +1655,10 @@ export default {
         },
         async DiyTableRowClick(row, column, event) {
             var self = this;
+            // 🔥 性能优化：用纯 DOM 方式高亮当前行，替代 Element Plus 的 highlight-current-row。
+            // highlight-current-row 会在每次点击时改变表格 store 的 currentRow，导致整个表体重新渲染、
+            // 重跑所有单元格函数（isMuban/ShowSelectLabel/GetColValue 等），100~200 行时点击/双击会明显卡顿。
+            self.ApplyCurrentRowHighlight(event);
             // 🔥 性能优化：先做 fast-path 判断，避免每次点击都同步初始化 V8 引擎（耗时 50-200ms）
             var hasInFormV8 = self._IsTableChild
                 && self.TableSelectedRow.Id

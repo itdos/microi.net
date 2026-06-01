@@ -88,22 +88,9 @@ export default {
         // 不影响：服务端分页、服务端排序、服务端统计(StatisticsFields)、行Id唯一性。
         // 跳过：移动端(已有自身的双向滚动)、卡片模式、树形模式、子表/嵌入表。
         RenderedTableRowList() {
+            // 已取消滚动懒渲染：用户选择多少条数据就一次性全量渲染，避免滚动时频繁追加渲染导致卡顿。
             var self = this;
-            var list = self.DiyTableRowList;
-            if (!list || list.length === 0) return list || [];
-            // 跳过条件
-            if (self.diyStore && self.diyStore.IsPhoneView) return list;
-            if (self.TableDisplayMode !== 'Table') return list;
-            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.IsTree) return list;
-            // 子表/嵌入表通常不设height，不会出现长滚动，直接全量渲染
-            if (self._IsTableChild) return list;
-            if (self.PropsIsJoinTable === true) return list;
-            if (self.PropsTableType == 'OpenTable') return list;
-            // 数据量未达阈值，直接全量
-            if (list.length <= self._lazyRenderThreshold) return list;
-            // 已渲染足够 → 返回全量（避免后续不必要的slice）
-            if (self._lazyRenderedCount >= list.length) return list;
-            return list.slice(0, self._lazyRenderedCount);
+            return self.DiyTableRowList || [];
         },
         // 卡片模式显示的字段列表：优先使用MobileListFields（移动端显示列），否则回退到ShowDiyFieldList前4个
         CardShowDiyFieldList() {
@@ -494,9 +481,17 @@ export default {
             _colFilterOperator: 'Like',
             _colFilterValue: '',
             _colFilters: {}, // { fieldName: { operator, value } }
+            _batchDragPending: false,
             _batchDragSelecting: false,
             _batchDragSelectionMode: true,
             _batchDragSelectionVisited: null,
+            _batchDragApplied: null,
+            _batchDragStartPoint: null,
+            _batchDragStartRow: null,
+            _batchDragStartTarget: null,
+            _batchDragRect: null,
+            _batchDragSuppressClick: false,
+            _batchDragBodyUserSelect: null,
             _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
             // 移动端搜索弹窗状态
             showMobileSearch: false,
