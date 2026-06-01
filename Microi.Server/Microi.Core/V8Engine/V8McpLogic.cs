@@ -1653,7 +1653,6 @@ namespace Microi.net
 
         /// <summary>
         /// 获取数据库结构（表、字段、菜单树）
-        /// 对应 ai-helper/microi/get-db.js 的功能
         /// </summary>
         public static async Task<DosResult<object>> GetDbSchema(string osClient)
         {

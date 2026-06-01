@@ -1,6 +1,6 @@
 ---
 name: microi-db-schema
-description: Microi吾码 database schema and dictionary guidance. Use when Codex needs to inspect or explain Microi platform tables from ai-helper/microi/db.json, map diy_table/diy_field/sys_menu relationships, locate V8 event storage fields, generate safe V8 FormEngine queries against system tables, or reason about workflow, SaaS, permission, menu, API engine, datasource, and system configuration schemas.
+description: Microi吾码 database schema and dictionary guidance. Use when Codex needs to inspect or explain Microi platform tables from AI-Project/microi/db.json, map diy_table/diy_field/sys_menu relationships, locate V8 event storage fields, generate safe V8 FormEngine queries against system tables, or reason about workflow, SaaS, permission, menu, API engine, datasource, and system configuration schemas.
 ---
 
 # Microi DB Schema
@@ -13,7 +13,7 @@ Use this skill to answer schema questions and write code that depends on Microi�
 2. Read `references/core-tables.md` when the task touches `diy_table`, `diy_field`, `sys_menu`, V8 event storage, API engine, data source, SaaS, permissions, or workflow tables.
 3. Read `references/table-catalog.md` only when exact fields for non-core tables are needed.
 4. Prefer `V8.FormEngine` with `_Where` for schema-aware V8 code. Use `V8.Db.FromSql` only for joins, aggregates, or cases FormEngine cannot express, and always parameterize values.
-5. Treat `ai-helper/microi/db.json` as the source dictionary for current exported fields. It lists configurable fields; DIY tables also carry fixed system fields documented in the overview reference.
+5. Treat `AI-Project/microi/db.json` as the source dictionary for current exported fields. It lists configurable fields; DIY tables also carry fixed system fields documented in the overview reference.
 
 ## Core Model
 
