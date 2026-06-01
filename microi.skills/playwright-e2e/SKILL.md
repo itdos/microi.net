@@ -70,6 +70,100 @@ PW_TEST_PASSWORD=123456
 PW_HOME_PATH=/#/pages/index/index
 ```
 
+## 全自动登录（免验证码 / 免手填密码）——必读
+
+E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端提供 **两套开发期登录旁路**，自动化时优先用它们直接拿 Token，跳过验证码与登录页 UI。源码见 `Microi.Server/Microi.net.Api/Controllers/SysUserController.cs`（`Login` 方法开头）。
+
+### 方式 A：请求头 Dev Key 旁路（CI/E2E 首选，最稳）
+
+- 触发条件：后端进程环境变量 `MICROI_DEV_TEST_KEY` 已设置，且请求头 `X-Microi-Dev-Key` 与之**完全相等**。
+- 效果：**跳过验证码**；若密码传占位值 `_DEV_BYPASS_`，则**连密码都不校验**（`param._DevBypassPwd=true`）。
+- 适用：任何来源 IP（不限 loopback），最适合容器/CI。
+- 风险控制：生产环境**绝不要**设置 `MICROI_DEV_TEST_KEY`。
+
+启动后端时注入（PowerShell）：
+
+```powershell
+$env:MICROI_DEV_TEST_KEY = 'itdos-smoketest-2026'
+dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api
+```
+
+Playwright 登录助手（直接拿 Token，不走登录页）：
+
+```js
+// helpers/microi-login.js
+export async function devLogin(page, {
+  backend = process.env.BACKEND || 'https://localhost:7266',
+  osClient = process.env.MICROI_OSCLIENT || 'iTdos',
+  account = process.env.PW_TEST_ACCOUNT || 'admin',
+  devKey  = process.env.MICROI_DEV_KEY || 'itdos-smoketest-2026',
+  frontend = process.env.FRONTEND || 'http://localhost:1988',
+} = {}) {
+  const resp = await page.request.post(`${backend}/api/SysUser/Login`, {
+    headers: { 'X-Microi-Dev-Key': devKey, OsClient: osClient },
+    data: { Account: account, Pwd: '_DEV_BYPASS_', OsClient: osClient },
+    ignoreHTTPSErrors: true,
+  });
+  const json = await resp.json();
+  if (json.Code !== 1) throw new Error('devLogin failed: ' + JSON.stringify(json).slice(0, 300));
+  const token = json.Data?.Token || json.Token;
+  const userId = json.Data?.Id || json.Id;
+  // 把 Token 写进前端约定的 localStorage，刷新后即为已登录态
+  await page.goto(frontend, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(({ t, u, oc }) => {
+    localStorage.setItem('Token', t);
+    localStorage.setItem('CurrentUser', JSON.stringify({ Id: u, Account: 'admin' }));
+    localStorage.setItem('OsClient', oc);
+  }, { t: token, u: userId, oc: osClient });
+  return { token, userId };
+}
+```
+
+可直接参照工作区现成用例：`Microi.Client/tests/blueprint-e2e.spec.mjs`（`X-Microi-Dev-Key` + `Pwd:'_DEV_BYPASS_'`）。
+
+### 方式 B：配置驱动旁路（本地 localhost 调试用）
+
+`appsettings.{Env}.json`（如 `appsettings.iTdos.json` / `appsettings.json`）中的 `DevLoginBypass` 块：
+
+```jsonc
+"DevLoginBypass": {
+  "//": "Local development / E2E login bypass. Keep disabled in production.",
+  "Enabled": true,
+  "SkipCaptcha": true,      // 跳过图形验证码
+  "OnlyLoopback": true,     // 仅当请求来自 127.0.0.1 / ::1 时生效
+  "DefaultAccount": "admin",
+  "DefaultPassword": "microi#2026"
+}
+```
+
+- 触发条件：`Enabled=true`，且（`OnlyLoopback=false` 或请求来自本机回环地址）。
+- 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`。
+- 与方式 A 区别：**仍会校验真实密码**（这里默认 `microi#2026`），只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登。
+- 生产环境务必保持 `Enabled=false` 或删除该块。
+
+`Microi.Client/scripts/run-form-engine-freeze-trace.mjs` 会在跑诊断前自动把 `DevLoginBypass` 写入 `appsettings.{Env}.json`；可用 `PW_CONFIG_DEV_LOGIN=0` 关闭该自动改写。
+
+### 选型口诀
+
+- 容器/CI、无图形界面、要最稳 → **方式 A（Dev Key + `_DEV_BYPASS_`）**，直接 request 拿 Token。
+- 本机调试、想顺带验真实密码或走真实 UI 登录 → **方式 B（DevLoginBypass）**。
+- 两者都失败时再退回 UI 兜底：填账号密码、点登录（参见 `tests/form-engine-freeze-trace.spec.mjs` 的 `loginThroughUiIfNeeded`）。
+- Token 可能在响应体 `Data.Token`，也可能在响应头 `Authorization`，两处都要兜底取。
+- 不要把 Token 明文写进最终报告/附件。
+
+### ⚠️ 关键实测结论（Microi.Client SPA 守卫）
+
+> 实测：**仅把 Token 写进 localStorage 并不能通过前端路由守卫**——页面会反复跳回 `/login`，且动态菜单路由（如 `/order`）在登录态建立前会报 `No match found`。Dev Key 头旁路（方式 A）只对 `page.request` 直连接口有效（见 `blueprint-e2e.spec.mjs`），SPA 仍需要一次真实 UI 登录会话。
+>
+> 在浏览器内做 E2E（点页面、拖拽、截图）时最稳的登录顺序：
+> 1. 跳到 `#/login`；
+> 2. 填 `admin` / `microi#2026`；
+> 3. 验证码框随便填一个数字（`DevLoginBypass.SkipCaptcha=true` 时后端对 loopback 忽略验证码）；
+> 4. 点「登 录」，落到首页；
+> 5. 再 `location.hash = '#/<目标路由>'` 进入目标页。
+>
+> 直连接口验收（不进页面）才用方式 A 拿 Token。
+
 ## 服务自启动纪律（必做）
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
@@ -442,7 +536,7 @@ test('公开接口引擎返回标准 DosResult', async ({ request }) => {
    - 没有出现纯渐变/首字母占位/空白图位（这通常意味着 `sanitizeAssetUrl` 等前缀工具被遗漏，或图片字段拿到了相对路径）
    - 商品/卡片图都真实显示
    - 价格、卖家、卡号等文案不出错位
-   - 同步参见 [uniapp-mall-assets](../uniapp-mall-assets/SKILL.md) 中的 FileServer 前缀规范。
+  - 同步参见 [microi-uniapp-frontend](../microi-uniapp-frontend/SKILL.md) 中的资源 URL 与 FileServer 前缀规范。
 9. 用 `page.on('response', r => { if (r.url().includes('/file/') && !r.ok()) failedAssets.push(r.url()); })` 监听全部资源请求，断言 `failedAssets.length === 0`，能在断言前就抓到 404 图片。
 
 ## 最少冒烟集

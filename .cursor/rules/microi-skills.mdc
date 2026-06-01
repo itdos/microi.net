@@ -33,7 +33,6 @@ globs: ["microi-v8-engine/**/*.js", "microi.skills/**/*.md"]
 - @microi.skills/performance-testing/SKILL.md — Microi 高并发性能压力测试
 - @microi.skills/business-blueprint/SKILL.md — Microi 业务架构蓝图（System Blueprint）
 - @microi.skills/microi-system-delivery/SKILL.md — Microi 全系统交付复盘与总控规范
-- @microi.skills/microi-uniapp-frontend/SKILL.md — Microi UniApp 前端通用规范
-- @microi.skills/uniapp-mall-assets/SKILL.md — 商城前端：图片 / 资源路径规范
+- @microi.skills/microi-uniapp-frontend/SKILL.md — Microi UniApp 前端与资源路径通用规范
 - @microi.skills/v8-explorer-tree/SKILL.md — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 - @microi.skills/v8-formengine-http/SKILL.md — FormEngine HTTP 路由约定（外部系统调用）

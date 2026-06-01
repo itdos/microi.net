@@ -201,62 +201,22 @@ export default {
         },
         // 🔥 性能优化：每次表格数据刷新后调用，重置懒渲染窗口并绑定滚动监听
         ResetLazyRender() {
+            // 已取消滚动懒渲染：不再分批追加渲染，仅在 DOM 更新后将滚动位置重置到顶部。
             var self = this;
-            // 重置已渲染数量
-            self._lazyRenderedCount = self._lazyRenderInitial;
-            // 等 DOM 更新后再绑定监听 + 重置滚动
             self.$nextTick(() => {
                 if (self._isDestroyed) return;
-                self.BindLazyScroll();
-                if (self._lazyScrollWrapper) {
-                    try { self._lazyScrollWrapper.scrollTop = 0; } catch (e) {}
+                var root = document.getElementById('diy-table-' + self.TableId);
+                if (!root) return;
+                var wrapper = root.querySelector('.el-scrollbar__wrap')
+                           || root.querySelector('.el-table__body-wrapper');
+                if (wrapper) {
+                    try { wrapper.scrollTop = 0; } catch (e) {}
                 }
             });
         },
-        // 🔥 绑定 el-table 滚动容器的 scroll 事件，触底追加渲染
+        // 🔥 已取消滚动懒渲染：保留空实现，避免其它地方调用报错
         BindLazyScroll() {
-            var self = this;
-            if (!self.TableId) return;
-            // 仅在懒渲染生效场景下绑定
-            if (self.diyStore && self.diyStore.IsPhoneView) return;
-            if (self.TableDisplayMode !== 'Table') return;
-            if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.IsTree) return;
-            if (self._IsTableChild) return;
-            if (!self.DiyTableRowList || self.DiyTableRowList.length <= self._lazyRenderThreshold) return;
-
-            // Element Plus 2.x: 真实滚动容器是 .el-scrollbar__wrap，旧版本是 .el-table__body-wrapper
-            var root = document.getElementById('diy-table-' + self.TableId);
-            if (!root) return;
-            var wrapper = root.querySelector('.el-scrollbar__wrap')
-                       || root.querySelector('.el-table__body-wrapper');
-            if (!wrapper) return;
-
-            // 容器没变 → 已绑定过，直接返回
-            if (self._lazyScrollWrapper === wrapper && self._lazyScrollHandler) return;
-
-            // 解绑旧的（容器可能被 el-table 重建）
-            self.UnbindLazyScroll();
-
-            self._lazyScrollWrapper = wrapper;
-            self._lazyScrollHandler = function () {
-                // requestAnimationFrame 节流：滚动事件高频触发，每帧只处理一次
-                if (self._lazyScrollTicking) return;
-                self._lazyScrollTicking = true;
-                requestAnimationFrame(function () {
-                    self._lazyScrollTicking = false;
-                    var w = self._lazyScrollWrapper;
-                    if (!w || self._isDestroyed) return;
-                    var total = (self.DiyTableRowList || []).length;
-                    if (self._lazyRenderedCount >= total) return;
-                    if (w.scrollTop + w.clientHeight >= w.scrollHeight - self._lazyRenderBottomGap) {
-                        var next = Math.min(self._lazyRenderedCount + self._lazyRenderStep, total);
-                        if (next > self._lazyRenderedCount) {
-                            self._lazyRenderedCount = next;
-                        }
-                    }
-                });
-            };
-            wrapper.addEventListener('scroll', self._lazyScrollHandler, { passive: true });
+            return;
         },
         // 🔥 解绑滚动监听
         UnbindLazyScroll() {

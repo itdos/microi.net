@@ -42,6 +42,14 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
 
+## 代码格式与中文输出（必做）
+
+- 生成或修改接口引擎代码时必须是可读的多行格式，禁止把整段业务逻辑压成一行、禁止生成 minified 风格代码。
+- 中文业务提示、返回 `Msg`、注释、按钮文案必须直接写正常中文，禁止输出 `\u64cd\u4f5c\u6210\u529f` 这类 Unicode 转义串。
+- 保存前必须做 JS 语法检查；如果使用脚本生成代码，必须先格式化再写入本地文件/数据库。
+- 代码头只写当前功能说明；修改历史写到 `ChangeHistory`，不要塞进代码头。
+- 示例返回：`return { Code: 1, Msg: '操作成功', Data: data };`，不要写成 `return{Code:1,Msg:'\u64cd\u4f5c\u6210\u529f',Data:data};`。
+
 ## DosResult 状态码
 
 | Code | 含义 |
