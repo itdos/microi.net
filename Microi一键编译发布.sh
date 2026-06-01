@@ -891,6 +891,11 @@ docker_push_plan() {
     print_step "登录 ${DOCKER_REGISTRY}..."
     docker login --username="${DOCKER_USERNAME}" --password="${DOCKER_PASSWORD}" "${DOCKER_REGISTRY}"
 
+    # 清理闲置镜像，释放 Docker VM 磁盘空间（避免 no space left on device）
+    print_step "清理闲置 Docker 镜像..."
+    docker image prune -a -f --filter "label!=keep" 2>/dev/null || true
+    print_info "磁盘使用: $(docker system df --format '镜像: {{.ImagesSize}}' 2>/dev/null || echo '(无法获取)')"
+
     # 构建镜像（--no-cache 确保 Dockerfile 修改和最新产物都进入新镜像，避免旧缓存层污染）
     print_step "构建镜像: $local_image"
     (cd "$build_dir" && docker build --no-cache -t "$local_image" .)

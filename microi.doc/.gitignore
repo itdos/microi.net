@@ -149,5 +149,3 @@ dist/
 *.sw?
 
 .vitepress/dist
-
-ai-helper/
