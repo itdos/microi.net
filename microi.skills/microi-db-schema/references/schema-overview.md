@@ -1,6 +1,6 @@
 # Microi DB Schema Overview
 
-- Source: `AI-Project/microi/db.json`
+- Source: `ai-helper/microi/db.json`
 - Tables: 75
 - Configurable fields: 975
 

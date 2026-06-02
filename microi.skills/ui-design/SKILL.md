@@ -290,6 +290,15 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 }
 ```
 
+> ⚠️ **渐变文字低对比陷阱（已反复踩坑）**：`background-clip:text + color/-webkit-text-fill-color:transparent` 在部分 H5 webview / 安卓内核下渲染会失败，导致文字**透明不可见**。
+> 对**关键标题/品牌名/重要文案**优先使用实色高对比文字（如 `color:#8E0613`），或用 `@supports` 做降级：
+> ```scss
+> .mci-text-gradient { color: var(--mci-color-primary); -webkit-text-fill-color: var(--mci-color-primary); }
+> @supports ((-webkit-background-clip:text) or (background-clip:text)) {
+>   .mci-text-gradient { background: var(--mci-gradient-primary); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+> }
+> ```
+
 ---
 
 ## 间距与触摸目标
@@ -856,7 +865,11 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  /* ⚠️ 必须为负！装饰背景是“背景层”，要始终置于内容之下。
+     若为 0，由于它是 position:fixed 的“定位元素”，会绘制在同堆叠上下文中
+     无 z-index 的普通文字（如标题/副标题）之上。若背景含半透明渐变（如 rgba(...,0.94)），
+     会把下方文字“洗白”变成黑烟看不清——pointer-events:none 还会让 elementFromPoint 测不到它，极难排查。 */
+  z-index: -1;
   overflow: hidden;
   contain: strict;
 }
@@ -924,6 +937,13 @@ HTML 结构（无需 JS，纯静态 4 个 div）：
 ```
 
 > 性能预算：4 个 orb 各占一个合成层，移动端 60fps 稳定。GPU 显存占用约 12MB（基于 580×580 + 4×blur(60px)）。
+
+> 🩺 **「文字被背景洗白看不清」排查口诀（反复踩坑专用）**：
+> 1. 现象：某页标题/副标题/顶部标签发灰发淡，但同页按钮、卡片内文字清晰。
+> 2. 根因：全屏 `position:fixed` 的装饰背景（aurora / 渐变层）`z-index >= 0` 且含半透明色，盖在了**无 z-index 的普通文字**之上。`pointer-events:none` 让 `elementFromPoint` 测不到它，`getComputedStyle` 又显示文字颜色完全正常，极易误判。
+> 3. 验证：`document.querySelector('.装饰背景').style.display='none'` 后截图，若文字立刻清晰即可确诊。
+> 4. 修复（二选一或都做）：① 装饰背景 `z-index:-1`；② 页面根容器 `position:relative` + `.page-xxx > :not(.装饰背景){ position:relative; z-index:1; }` 把所有内容抬到背景之上。
+> 5. ⚠️ 别再只改文字颜色！颜色本来就是对的，问题在**堆叠层级**，改色无效。
 
 ### 网格背景
 
