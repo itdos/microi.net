@@ -42,14 +42,6 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
 
-## 代码格式与中文输出（必做）
-
-- 生成或修改接口引擎代码时必须是可读的多行格式，禁止把整段业务逻辑压成一行、禁止生成 minified 风格代码。
-- 中文业务提示、返回 `Msg`、注释、按钮文案必须直接写正常中文，禁止输出 `\u64cd\u4f5c\u6210\u529f` 这类 Unicode 转义串。
-- 保存前必须做 JS 语法检查；如果使用脚本生成代码，必须先格式化再写入本地文件/数据库。
-- 代码头只写当前功能说明；修改历史写到 `ChangeHistory`，不要塞进代码头。
-- 示例返回：`return { Code: 1, Msg: '操作成功', Data: data };`，不要写成 `return{Code:1,Msg:'\u64cd\u4f5c\u6210\u529f',Data:data};`。
-
 ## DosResult 状态码
 
 | Code | 含义 |
@@ -345,44 +337,6 @@ V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 ```
 
 **支持的操作符：** `=`, `==`, `<>`, `!=`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `In`, `NotIn`
-
-## FormEngine 优先原则
-
-**在接口引擎中，所有增删改操作必须优先使用 `V8.FormEngine` 方法，而不是 `V8.Db.FromSql` 写 SQL DML。**
-
-| 场景 | 推荐写法 |
-|------|---------|
-| 插入一条记录 | `V8.FormEngine.AddFormData` |
-| 按 Id 更新 | `V8.FormEngine.UptFormData`（必须传 `Id`） |
-| 按条件批量更新 | `V8.FormEngine.UptFormDataByWhere` |
-| 删除 | `V8.FormEngine.DelFormData` / `DelFormDataByWhere` |
-| 查询单条 | `V8.FormEngine.GetFormData` |
-| 查询列表 | `V8.FormEngine.GetTableData`（含分页、过滤、排序） |
-
-`V8.Db.FromSql` **仅**用于以下场景：
-- 多表 JOIN、复杂子查询、GROUP BY 聚合
-- 动态建表 / ALTER TABLE（DDL）
-- 纯只读报表/统计（建议用 `V8.DbRead`）
-
-> **⚠️ Jint 多参数 interop 警告：** `V8.Db.FromSql(sql, p0, p1, p2)` 传入 **3 个及以上**位置参数时（即 SQL + 3+ 值），Jint 会因 .NET 重载解析失败抛出
-> `No public methods with the specified arguments were found` 错误。
-> 如果必须用原生 SQL，请改用具名参数（`AddInParameter`）形式，或将参数减少到 2 个以内；
-> 但最佳实践是换用 `V8.FormEngine.UptFormDataByWhere` / `UptFormData` 来避免该问题。
-
-```javascript
-// ❌ 错误：3个以上位置参数，Jint 报 interop 错误
-V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2", val1, val2, id).ExecuteNonQuery();
-
-// ✅ 正确：改用 FormEngine（优先）
-V8.FormEngine.UptFormData('t', { Id: id, A: val1, B: val2 });
-
-// ✅ 也可用 AddInParameter 链式方式（需用 FormEngine 无法表达时）
-V8.Db.FromSql("UPDATE t SET A=?a, B=?b WHERE Id=?id")
-     .AddInParameter("?a", val1)
-     .AddInParameter("?b", val2)
-     .AddInParameter("?id", id)
-     .ExecuteNonQuery();
-```
 
 ## 注意事项
 
