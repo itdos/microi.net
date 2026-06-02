@@ -9,11 +9,9 @@ Use this skill to answer schema questions and write code that depends on Microiå
 
 ## Quick Workflow
 
-1. Read `references/schema-overview.md` first for the core mental model, table categories, fixed fields, and relationship map.
-2. Read `references/core-tables.md` when the task touches `diy_table`, `diy_field`, `sys_menu`, V8 event storage, API engine, data source, SaaS, permissions, or workflow tables.
-3. Read `references/table-catalog.md` only when exact fields for non-core tables are needed.
-4. Prefer `V8.FormEngine` with `_Where` for schema-aware V8 code. Use `V8.Db.FromSql` only for joins, aggregates, or cases FormEngine cannot express, and always parameterize values.
-5. Treat `AI-Project/microi/db.json` as the source dictionary for current exported fields. It lists configurable fields; DIY tables also carry fixed system fields documented in the overview reference.
+1. Read `references/schema.md` for the complete database structure: fixed fields, core relationships, V8 event fields, all table categories, and per-field details for every core table.
+2. Prefer `V8.FormEngine` with `_Where` for schema-aware V8 code. Use `V8.Db.FromSql` only for joins, aggregates, or cases FormEngine cannot express, and always parameterize values.
+3. Treat `AI-Project/microi/db.json` as the authoritative source for the current exported field list. It lists configurable fields; DIY tables also carry fixed system fields (`Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserName`, `IsDeleted`) not in the export.
 
 ## Core Model
 
