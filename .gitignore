@@ -85,6 +85,7 @@ unpackage/release/
 .venv/
 
 /Microi.VSCode/
+/Microi-V8-Engine/
 /microi-v8-engine/
 
 /microi.mcp/publish.sh
