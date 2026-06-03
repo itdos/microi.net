@@ -14,10 +14,12 @@ description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or f
 - 绝对地址：`https://...`
 - API 本地文件路由：`/file/...`
 - 对象存储相对路径：`/tenant/module/file.jpg` 或 `tenant/module/file.jpg`
-- 上传组件 JSON：`[{"Path":"..."}]`、`{"FilePathName":"..."}`
+- 上传组件 JSON：`[{"Path":"..."}]`、`{"Path":"..."}`、`{"FilePathName":"..."}`，也可能已经是对象/数组而不是字符串
 - 历史脏数据或第三方占位图
 
 页面模板不能直接写 `<image :src="row.Avatar">`、`<image :src="row.MainImg">`。必须在项目的 API/资源工具模块里提供统一解析函数，例如 `resolveAssetUrl`、`sanitizeAssetUrl`、`resolveFileUrl`、`resolveAvatarUrl`，并让页面只绑定已经归一化后的最终 URL。
+
+资源解析函数必须先按 `microi.skills/v8-file-upload/SKILL.md` 的 `normalizeUploadValue` 思路处理 `ImgUpload` / `FileUpload` 字段：空值、`正在上传中...`、旧字符串路径、JSON 字符串对象、JSON 字符串数组、运行时对象、运行时数组都要兼容；取出 `Path` 后再进入 FileServer/API/私有签名 URL 逻辑。
 
 推荐规则：
 
