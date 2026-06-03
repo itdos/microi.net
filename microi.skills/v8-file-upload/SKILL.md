@@ -177,25 +177,84 @@ for (var i = 0; i < urls.length; i++) {
 return { Code: 1, Data: savedPaths };
 ```
 
-## 表单字段存储格式
+## ImgUpload / FileUpload 字段值兼容规则
 
-| 控件 | 值结构 |
-|------|--------|
-| `ImgUpload`（单图） | `'/upload/xxx/abc.png'`（字符串路径） |
-| `ImgUpload`（多图） | `'[{"Path":"...","FileName":"..."}]'`（JSON 字符串） |
-| `FileUpload` | 同上 |
+`ImgUpload` 不能假设只是一种值结构。PC 表单、移动端、旧数据、单图/多图、公开/私有桶会混合出现以下格式：
 
-读取多图字段：
+| 场景 | 可能的值 |
+|------|----------|
+| 空值/占位 | `''`、`null`、`undefined`、`'[]'`、`'null'`、`'正在上传中...'` |
+| 旧单图 | `'/upload/xxx/a.png'`、`'https://cdn/a.png'` |
+| 新单图 | `{ Path, Name, Size, Id, State }` 或 JSON 字符串 `'{"Path":"..."}'` |
+| 多图 | `[{ Path, Name, Id, State }]` 或 JSON 字符串 `'[{"Path":"..."}]'` |
+| 其它兼容字段 | `Path`、`FilePathName`、`FullPath`、`Url`、`url`、`src` |
+
+任何端（PC、uni-app、H5、小程序）渲染图片前都必须先做“归一化 -> 取 Path -> 转最终 URL”，不要直接 `JSON.parse` 后只处理数组，也不要直接把字段值拼到 `FileServer`。
+
+推荐归一化：
 
 ```javascript
-var fileServer = V8.SysConfig.FileServer;
-if (V8.Form.Pictures && V8.Form.Pictures.indexOf('[') !== -1) {
-  var imgs = JSON.parse(V8.Form.Pictures);
-  imgs.forEach(function(it) {
-    console.log(fileServer + it.Path);
-  });
+function normalizeUploadValue(value) {
+  if (value == null || value === '' || value === 'undefined' || value === 'null') return [];
+  if (value === '正在上传中...' || value === '[]' || value === '[ ]') return [];
+
+  var raw = value;
+  if (typeof raw === 'string') {
+    var s = raw.trim();
+    if ((s.indexOf('{') === 0 || s.indexOf('[') === 0)) {
+      try { raw = JSON.parse(s); } catch (e) { raw = s; }
+    } else {
+      raw = s;
+    }
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.map(normalizeUploadItem).filter(function (it) { return !!it.Path; });
+  }
+
+  var one = normalizeUploadItem(raw);
+  return one.Path ? [one] : [];
+}
+
+function normalizeUploadItem(item) {
+  if (!item) return {};
+  if (typeof item === 'string') {
+    return { Path: item, Name: item.split('/').pop() || item, State: 1 };
+  }
+  if (typeof item === 'object') {
+    var path = item.Path || item.FilePathName || item.FullPath || item.Url || item.url || item.src || '';
+    return {
+      Id: item.Id || item.id || '',
+      Name: item.Name || item.FileName || item.name || (path ? String(path).split('/').pop() : ''),
+      Size: item.Size || item.size || '',
+      CreateTime: item.CreateTime || item.createTime || '',
+      State: item.State == null ? 1 : item.State,
+      Path: path
+    };
+  }
+  return {};
 }
 ```
+
+公开图片 URL 解析原则与 `Microi.Client/src/utils/diy.common.js` 的 `GetServerPath` 一致：
+
+```javascript
+function publicUploadUrl(path) {
+  if (!path) return '';
+  var s = String(path).trim();
+  if (!s || s === '正在上传中...') return '';
+  if (s.indexOf('.') === 0) return s;              // ./static/img/loading.gif 等本地静态资源
+  if (/^(https?:|data:|blob:)/i.test(s)) return s; // 已经是最终 URL
+  if (s.indexOf('{') === 0 || s.indexOf('[') === 0) {
+    var list = normalizeUploadValue(s);
+    s = list.length ? list[0].Path : '';
+  }
+  if (!s) return '';
+  return String(V8.SysConfig.FileServer || '').replace(/\/+$/, '') + '/' + s.replace(/^\/+/, '');
+}
+```
+
+私有桶（`Limit === true`）不要拼 `FileServer`，必须把归一化后的 `Path` 传给 `V8.Method.GetPrivateFileUrl({ FilePathName: path })` 或后端签名接口换临时 URL。
 
 ## 安全注意
 
