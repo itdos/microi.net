@@ -158,14 +158,16 @@ async function startBackendIfNeeded() {
     }
 
     const command = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
-    const args = ['run', '--project', apiProject, '--launch-profile', launchProfile];
+    const resolvedApiProject = resolveMaybeRelative(apiProject);
+    const backendCwd = path.dirname(resolvedApiProject);
+    const args = ['run', '--project', resolvedApiProject, '--launch-profile', launchProfile];
     const env = {
         ...process.env,
         ASPNETCORE_ENVIRONMENT: aspnetcoreEnvironment,
         DOTNET_ENVIRONMENT: dotnetEnvironment
     };
-    console.log(`[microi-e2e] starting backend ${path.relative(repoRoot, apiProject)} (${dotnetEnvironment})`);
-    const child = spawnManaged(command, args, { cwd: repoRoot, env, label: 'api' });
+    console.log(`[microi-e2e] starting backend ${path.relative(repoRoot, resolvedApiProject)} (${dotnetEnvironment})`);
+    const child = spawnManaged(command, args, { cwd: backendCwd, env, label: 'api' });
     await waitForUrl(backendUrl);
     return child;
 }

@@ -23,7 +23,7 @@
 ### 🛠️ 使用 VS Code 打开解决方案（Mac 推荐）
 
 1. 下载并安装 [VS Code](https://code.visualstudio.com/)
-2. 安装插件：**C#**、**C# Dev Kit**、**.NET Install Tool**
+2. 安装插件：**C# Dev Kit**
 3. 打开 `/Microi.Server` 目录，稍等几秒会自动出现【解决方案资源管理器】，等待自动还原 NuGet 库
 4. **必须**配置 `/Microi.net.Api/appsettings.json` 文件
 ```json
@@ -130,7 +130,19 @@ nrm use taobao
 npm install
 npm run dev
 ```
+3. 常见问题
+```js
+npm : 无法加载文件 d:\nvm4w\nodejs\npm.ps1，因为在此系统上禁止运行脚本。有关详细信息，请参阅 https:/go.microsoft.com/fwlink/?LinkID
+=135170 中的 about_Execution_Policies。
+所在位置 行:1 字符: 1
++ npm -v
++ ~~~
+    + CategoryInfo          : SecurityError: (:) []，PSSecurityException
+    + FullyQualifiedErrorId : UnauthorizedAccess
 
+//解决方案：
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 ---
 
 ### 🐳 本地编译发布到 Docker 镜像
