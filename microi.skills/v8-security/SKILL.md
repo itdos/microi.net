@@ -46,8 +46,10 @@ V8.FormEngine.GetTableData('SysUser', {
   _PageSize: 20
 });
 
-// ✅ 使用 @p0 参数占位符
-V8.Db.FromSql('SELECT * FROM SysUser WHERE Account = @p0', V8.Param.account).ToArray();
+// ✅ 必须原生 SQL 时：FromSql 只传 SQL，参数用 AddInParameter
+V8.Db.FromSql('SELECT * FROM SysUser WHERE Account = @p0')
+  .AddInParameter("@p0", V8.Param.account)
+  .ToArray();
 ```
 
 ### 禁止：字符串拼接
@@ -250,7 +252,9 @@ V8.Method.AddSysLog({
 
 ```javascript
 try {
-  var result = V8.Db.FromSql('SELECT * FROM t WHERE Id = @p0', V8.Param.id).ToArray();
+  var result = V8.Db.FromSql('SELECT * FROM t WHERE Id = @p0')
+    .AddInParameter("@p0", V8.Param.id)
+    .ToArray();
   return { Code: 1, Data: result };
 } catch (ex) {
   // 记录完整错误日志

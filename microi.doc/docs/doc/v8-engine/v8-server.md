@@ -154,6 +154,7 @@ var userName = V8.CurrentUser.Name;
 
 ## 数据库对象 V8.Db
 >* 数据库访问对象，支持Dos.ORM、SqlSugar切换
+>* `FromSql` 只传 SQL 字符串；动态值请使用 `.AddInParameter("@p0", value)` 链式绑定，不要写 `FromSql(sql, value)`。
 ```csharp
 //用例：
 var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromSql()
@@ -164,6 +165,11 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
                 .First(); 
                 //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table、select Name from table
                 .ToScalar(); 
+
+// 参数化查询
+var user = V8.Db.FromSql("select * from sys_user where Id = @p0")
+                .AddInParameter("@p0", userId)
+                .First();
 ```
 
 ## 数据库只读对象 V8.DbRead
