@@ -101,7 +101,9 @@ E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端提
 
 ```powershell
 $env:MICROI_DEV_TEST_KEY = 'itdos-smoketest-2026'
-dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api
+Push-Location Microi.Server/Microi.net.Api
+dotnet run --launch-profile Microi.net.Api
+Pop-Location
 ```
 
 Playwright 登录助手（直接拿 Token，不走登录页）：
@@ -187,8 +189,12 @@ export async function devLogin(page, {
 默认本地后端：
 
 ```powershell
-dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api
+Push-Location Microi.Server/Microi.net.Api
+dotnet run --launch-profile Microi.net.Api
+Pop-Location
 ```
+
+普通本地启动不要手动设置 `ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`；后端会读取 `Microi.Server/Microi.net.Api/.microi-local`，再加载对应的 `appsettings.{Env}.json`。如果测试脚本显式注入环境变量，则以脚本注入为准。
 
 默认 PC 前端：
 
@@ -218,7 +224,7 @@ Pop-Location
 
 1. 自动配置 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 中指定 profile 的 `ASPNETCORE_ENVIRONMENT` 和 `DOTNET_ENVIRONMENT`。
 2. 自动配置 `Microi.Server/Microi.net.Api/appsettings.{Env}.json` 的 `DevLoginBypass`，用于本地测试账号、跳过验证码、只允许 loopback。
-3. 本地后端未启动时，自动执行 `dotnet run --project Microi.Server/Microi.net.Api/Microi.net.Api.csproj --launch-profile Microi.net.Api`。
+3. 本地后端未启动时，自动进入 `Microi.Server/Microi.net.Api` 后执行 `dotnet run --launch-profile Microi.net.Api`。
 4. 启动 Playwright，打开指定前端页面，开启 `MicroiFormTrace`，采集 `window.__MICROI_FORM_TRACE__`、console、pageerror、当前 URL 和 Playwright trace。
 5. 页面卡住或断言失败时，先看最后一批 `[MicroiFormTrace #n]`，定位是停在 `runtime:*`、`diy-select:*`、`inform-v8-*`、`field-v8-*` 还是业务 console。
 

@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <!-- 发布项目：
-          dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
-    -->
-    <!-- 本地运行项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 【需替换__urls】 -->
+    <!-- 本地发布项目：dotnet clean && dotnet publish -c Release -o ./bin/Release/publish -->
+    <!-- 本地运行编译后的项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 【需替换__urls】 -->
+    <!-- 本地运行项目：dotnet run __launch-profile Microi.net.Api -->
+    <MicroiLocalRunCommand>Push-Location Microi.Server/Microi.net.Api; dotnet run --launch-profile Microi.net.Api; Pop-Location</MicroiLocalRunCommand>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

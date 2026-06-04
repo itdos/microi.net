@@ -57,6 +57,20 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | `.microi-e2e/` | Microi.VSCode 插件 E2E 产物 | 可定期清理 |
 | `.microi-performance/` | 性能测试报告 | 可定期清理 |
 
+## Microi.net.Api 本地启动约定
+
+默认本地后端项目是 `Microi.Server/Microi.net.Api/Microi.net.Api.csproj`。AI 需要启动后端、验证接口、跑 Playwright、回读接口引擎或排查前后端联调问题时，优先使用下面的 PowerShell 命令：
+
+```powershell
+Push-Location Microi.Server/Microi.net.Api
+dotnet run --launch-profile Microi.net.Api
+Pop-Location
+```
+
+必须先进入 `Microi.Server/Microi.net.Api` 再启动。`Program.cs` 会在 `WebApplication.CreateBuilder(args)` 之前读取当前目录下的 `.microi-local`，将其中的环境名写入 `ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`，随后加载 `appsettings.{环境名}.json`。如果从仓库根目录直接运行并导致配置读取异常，先改用上面的 `Push-Location` 方式。
+
+普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
+
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：

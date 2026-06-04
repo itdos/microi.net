@@ -21,7 +21,7 @@
 ## 🛠️ Open solution with VS Code (Mac recommended)
 
 1. Download and install [VS Code](https://code.visualstudio.com/)
-2. Install the plug-ins: **C Sharp**, **C# Dev Kit**, **. NET Install Tool**
+2. Install the plug-ins:**C# Dev Kit**
 3. Open`/Microi.Server`Directory, wait a few seconds and [Solution Explorer] will automatically appear, waiting for the NuGet library to be automatically restored.
 4. **Must** be configured`/Microi.net.Api/appsettings.json`File
 ```json
