@@ -48,6 +48,31 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 
 禁止在模板中临时拼接文件服务器，禁止每个页面各写一套头像解析，禁止只在能查到关联用户时才解析接口已经返回的头像字段。
 
+## 移动端富文本图文排版
+
+商品详情、公告详情、活动说明、文章正文、协议说明等富文本在移动端渲染时，图片和文字不能使用同一套留白规则。
+
+- 主图、详情长图、海报图可以 `width:100%` / `display:block` 满宽展示，不额外加左右 padding，避免图片显得缩小或边缘参差。
+- 文字内容必须有独立容器，设置 `padding: 16px 18px`（或项目设计体系中的等价间距）、`box-sizing:border-box`、稳定 `line-height`，不能让标题、段落贴着卡片或屏幕边缘。
+- 富文本生成器输出 HTML 时，推荐结构是“图片块 + 文本块”：图片块只包图片，文本块包标题、段落、规格说明、温馨提示。
+- 段落使用 `margin:0 0 6px` 或相近节奏，最后一段可以去掉底部 margin；不要靠 `<br>` 堆间距。
+- 移动端截图验收必须看文字是否贴边、是否横向溢出、是否被底部固定按钮遮挡。
+
+参考结构：
+
+```html
+<section class="mci-rich-detail" style="background:#fff;overflow:hidden;">
+  <p style="margin:0;text-align:center;">
+    <img src="..." style="display:block;width:100%;max-width:100%;height:auto;" />
+  </p>
+  <div style="padding:16px 18px 18px;box-sizing:border-box;line-height:1.7;color:#1f2937;font-size:15px;">
+    <h2 style="margin:0 0 10px;font-size:22px;line-height:1.28;">商品标题</h2>
+    <p style="margin:0 0 6px;">所属专区：精选专区</p>
+    <p style="margin:0;">商品图片与规格信息以实际维护为准。</p>
+  </div>
+</section>
+```
+
 ## H5 在 PC 浏览器必须自动模拟移动端
 
 移动端 UniApp H5 被 PC 浏览器访问时，不能按桌面宽屏铺满。必须在全局样式里用媒体查询生成手机预览壳。

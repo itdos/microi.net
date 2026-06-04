@@ -61,6 +61,15 @@ products.value = r.Data.map(p => ({ ...p, MainImg: sanitizeAssetUrl(p.MainImg) }
 4. 不要直接拼 `API_BASE + path`，让 `sanitizeAssetUrl` 处理；它能识别已带 `http://` 的绝对地址。
 5. Vue/uni-app SFC 写法用辅助函数 `resolveImg`，便于未来全局替换。
 
+## 商品详情富文本排版
+
+商品详情富文本里，图片满宽通常是合理的，但文字不能贴边。生成或清洗 `DetailHtml` 时必须把图片和文字分块：
+
+- 图片块：`img` 用 `display:block;width:100%;max-width:100%;height:auto;`，外层 `p` 的 `margin` 设为 `0`。
+- 文字块：标题、专区、分类、售价、规格说明、温馨提示等统一包进文本容器，使用 `padding:16px 18px 18px;box-sizing:border-box;line-height:1.7;`。
+- 不得在详情文案或图片文件名里暴露供价、成本价、倍率、导入批次、生成规则等后台信息。
+- 截图验收时同时看图片是否真实加载、文字是否贴边、长标题是否换行后仍在容器内。
+
 ## 与 sys_menu 表单 V8 事件配合
 
 在表单 V8 `InFormV8` 等事件里给字段补图片预览时，也要用同样规则。`<el-image>` / `<img>` / `mci-image` 都受影响。

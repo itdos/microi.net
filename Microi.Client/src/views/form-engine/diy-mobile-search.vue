@@ -410,7 +410,6 @@ export default {
                                 Array.isArray(field.Data) &&
                                 field.Data.length > 0 &&
                                 field.Config.DataSourceSqlRemote !== true &&
-                                id.DisplaySelect !== true &&
                                 ((field.Component === "Select" && field.Config.DataSource === "Data") ||
                                     (field.Component === "MultipleSelect" && field.Config.DataSource === "Data") ||
                                     field.Component === "Checkbox" ||
@@ -427,12 +426,9 @@ export default {
                                 (!Array.isArray(field.Data) ||
                                     field.Data.length === 0 ||
                                     field.Config.DataSourceSqlRemote === true ||
-                                    id.DisplaySelect === true ||
                                     field.Component === "Department" ||
                                     field.Component === "Cascader" ||
-                                    field.Component === "SelectTree" ||
-                                    (field.Component === "Select" && id.DisplaySelect === true) ||
-                                    (field.Component === "MultipleSelect" && id.DisplaySelect === true))
+                                    field.Component === "SelectTree")
                             ) {
                                 if ((field.Component === "Select" || field.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                                     self.SearchSelect[field.Name] = [];
