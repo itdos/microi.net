@@ -96,14 +96,31 @@ namespace Microi.net.Api
                             {
                                 enableCaptcha = false;
                             }
-                            // 自动填充缺省账号密码（仅当请求未带）
+                            var defaultAccount = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
+                            var defaultPassword = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
+                            var accounts = cfg.GetSection("DevLoginBypass:Accounts").GetChildren();
+                            foreach (var accountCfg in accounts)
+                            {
+                                var osClient = accountCfg.GetValue<string>("OsClient");
+                                if (!osClient.DosIsNullOrWhiteSpace()
+                                    && string.Equals(osClient, param.OsClient, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    defaultAccount = accountCfg.GetValue<string>("Account") ?? defaultAccount;
+                                    defaultPassword = accountCfg.GetValue<string>("Password")
+                                        ?? accountCfg.GetValue<string>("Pwd")
+                                        ?? defaultPassword;
+                                    break;
+                                }
+                            }
+                            // 自动填充缺省账号密码（仅当请求未带）；_DEV_BYPASS_ 会替换为配置密码，但仍走真实密码校验。
                             if (param.Account.DosIsNullOrWhiteSpace())
                             {
-                                param.Account = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
+                                param.Account = defaultAccount;
                             }
-                            if (param.Pwd.DosIsNullOrWhiteSpace())
+                            if (param.Pwd.DosIsNullOrWhiteSpace()
+                                || string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
                             {
-                                param.Pwd = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
+                                param.Pwd = defaultPassword;
                             }
                         }
                     }

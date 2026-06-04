@@ -110,7 +110,7 @@
                         <el-option
                             v-for="(fieldData, index2) in field.Data"
                             :key="getSelectOptionKey(field, fieldData, index2)"
-                            :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
+                            :label="GetSearchItemCheckLabel(fieldData, field)"
                             :value="fieldData"
                         />
                     </el-select>
@@ -568,8 +568,9 @@ export default {
                                 self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
                             }
 
-                            const forceTextInput = self.IsSearchTextInput(id);
+                            const forceTextInput = !self.IsSearchOptionControl(field) && self.IsSearchTextInput(id);
                             const searchField = forceTextInput ? { ...field, Component: "Text" } : field;
+                            const searchFieldKey = field.AsName || field.Name;
 
                             // 复选框类型搜索
                             if (
@@ -577,15 +578,10 @@ export default {
                                 !forceTextInput &&
                                 Array.isArray(field.Data) &&
                                 field.Data.length > 0 &&
-                                field.Config.DataSourceSqlRemote !== true &&
-                                id.DisplaySelect !== true &&
-                                ((field.Component === "Select" && field.Config.DataSource === "Data") ||
-                                    (field.Component === "MultipleSelect" && field.Config.DataSource === "Data") ||
-                                    field.Component === "Checkbox" ||
-                                    field.Component === "Radio")
+                                self.IsSearchCheckboxControl(field)
                             ) {
-                                if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
-                                    self.SearchCheckbox[field.Name] = [];
+                                if (self.DiyCommon.IsNull(self.SearchCheckbox[searchFieldKey])) {
+                                    self.SearchCheckbox[searchFieldKey] = [];
                                 }
                                 result.push(searchField);
                             }
@@ -593,18 +589,16 @@ export default {
                             else if (
                                 type === "Text" &&
                                 (forceTextInput ||
+                                    self.IsSearchSelectControl(field) ||
                                     !Array.isArray(field.Data) ||
                                     field.Data.length === 0 ||
                                     field.Config.DataSourceSqlRemote === true ||
-                                    id.DisplaySelect === true ||
                                     field.Component === "Department" ||
                                     field.Component === "Cascader" ||
-                                    field.Component === "SelectTree" ||
-                                    (field.Component === "Select" && id.DisplaySelect === true) ||
-                                    (field.Component === "MultipleSelect" && id.DisplaySelect === true))
+                                    field.Component === "SelectTree")
                             ) {
-                                if ((field.Component === "Select" || field.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
-                                    self.SearchSelect[field.Name] = [];
+                                if (self.IsSearchSelectControl(field) && self.DiyCommon.IsNull(self.SearchSelect[searchFieldKey])) {
+                                    self.SearchSelect[searchFieldKey] = [];
                                 }
                                 result.push(searchField);
                             }
@@ -835,85 +829,7 @@ export default {
                     const fieldModel = self.findFieldModel(key);
                     if (!fieldModel) continue;
 
-                    var tableName = self.GetTableName(fieldModel);
-
-                    const searchValue = arr.map((item) => {
-                        if (typeof item === "string") {
-                            return item;
-                        } else {
-                            return item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel];
-                        }
-                    });
-
-                    // 过滤空值
-                    const filteredValues = searchValue.filter((val) => val != null && val !== "");
-
-                    if (filteredValues.length === 0) continue;
-
-                    let searchType = "In";
-
-                    // JSON格式或多选框使用Like查询
-                    if (fieldModel.Config.SelectSaveFormat === "Json" || fieldModel.Component === "MultipleSelect") {
-                        searchType = "Like";
-                        filteredValues.forEach((item, index) => {
-                            // const tempWhere = {};
-                            // if (filteredValues.length > 1 && index === 0) {
-                            //   tempWhere.GroupStart = true;
-                            // }
-                            // tempWhere.Name = fieldModel.Name;
-                            // tempWhere.Value = item;
-                            // tempWhere.Type = searchType;
-                            // if (filteredValues.length > 1 && index <= filteredValues.length - 1 && index !== 0) {
-                            //   tempWhere.AndOr = "OR";
-                            // }
-                            // if (index === filteredValues.length - 1 && filteredValues.length > 1) {
-                            //   tempWhere.GroupEnd = true;
-                            // }
-
-                            const tempWhere = [];
-                            if (filteredValues.length > 1 && index <= filteredValues.length - 1 && index !== 0) {
-                                tempWhere.push("OR");
-                            }
-                            if (filteredValues.length > 1 && index === 0) {
-                                tempWhere.push("(");
-                            }
-                            tempWhere.push(tableName + fieldModel.Name);
-                            tempWhere.push(searchType);
-                            tempWhere.push(item);
-
-                            if (index === filteredValues.length - 1 && filteredValues.length > 1) {
-                                tempWhere.push(")");
-                            }
-                            self.SearchWhere.push(tempWhere);
-                        });
-                    } else {
-                        // self.SearchWhere.push({
-                        //   Name: fieldModel.Name,
-                        //   Value: JSON.stringify(filteredValues),
-                        //   Type: searchType,
-                        //   FormEngineKey: fieldModel.TableId
-                        // });
-
-                        //2025-10-27 In查询比OR查询性能更高  ----by anderson
-                        self.SearchWhere.push([tableName + fieldModel.Name, searchType, JSON.stringify(filteredValues)]); //, FormEngineKey: fieldModel.TableId
-                        // var tempIndex = 0;
-                        // filteredValues.forEach(item => {
-                        //   var tempWhere = [];
-                        //   if(tempIndex == 0){
-                        //     tempWhere.push('(');
-                        //   }else{
-                        //     tempWhere.push('OR');
-                        //   }
-                        //   tempWhere.push(fieldModel.Name);
-                        //   tempWhere.push('=');
-                        //   tempWhere.push(item);
-                        //   if(tempIndex == filteredValues.length - 1){
-                        //     tempWhere.push(')');
-                        //   }
-                        //   tempIndex++;
-                        //   self.SearchWhere.push(tempWhere);
-                        // })
-                    }
+                    self.AppendOptionSearchWhere(self.SearchWhere, fieldModel, arr);
                 }
             } else {
                 param.SearchCheckbox = {};
@@ -943,8 +859,7 @@ export default {
                     if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
                         const fieldModel = self.findFieldModel(key);
                         if (!fieldModel) continue;
-                        var tableName = self.GetTableName(fieldModel);
-                        param._Where.push([tableName + key, "In", JSON.stringify(self.SearchCheckbox[key])]);
+                        self.AppendOptionSearchWhere(param._Where, fieldModel, self.SearchCheckbox[key]);
                     }
                 }
                 delete param.SearchCheckbox;
@@ -1014,6 +929,76 @@ export default {
         },
 
         /**
+         * 选项类搜索工具方法
+         */
+        IsSearchSelectControl(field) {
+            return field && (field.Component === "Select" || field.Component === "MultipleSelect");
+        },
+
+        IsSearchCheckboxControl(field) {
+            return field && (field.Component === "Checkbox" || field.Component === "Radio");
+        },
+
+        IsSearchOptionControl(field) {
+            return this.IsSearchSelectControl(field) || this.IsSearchCheckboxControl(field);
+        },
+
+        IsJsonSaveFormat(field) {
+            const saveFormat = field && field.Config ? field.Config.SelectSaveFormat : "";
+            return String(saveFormat || "").toLowerCase() === "json";
+        },
+
+        IsMultiValueSearchField(field) {
+            return field && (field.Component === "MultipleSelect" || field.Component === "Checkbox" || this.IsJsonSaveFormat(field));
+        },
+
+        NormalizeSearchOptionValues(values, field) {
+            const list = Array.isArray(values) ? values : [values];
+            const result = [];
+            list.forEach((item) => {
+                const value = this.GetSearchOptionValue(item, field);
+                if (value === null || value === undefined || value === "") {
+                    return;
+                }
+                if (result.findIndex((oldValue) => String(oldValue) === String(value)) === -1) {
+                    result.push(value);
+                }
+            });
+            return result;
+        },
+
+        AppendOptionSearchWhere(whereList, fieldModel, values) {
+            const filteredValues = this.NormalizeSearchOptionValues(values, fieldModel);
+            if (filteredValues.length === 0) {
+                return;
+            }
+
+            const tableName = this.GetTableName(fieldModel);
+            const fieldName = tableName + fieldModel.Name;
+            if (!this.IsMultiValueSearchField(fieldModel)) {
+                whereList.push([fieldName, "In", filteredValues]);
+                return;
+            }
+
+            filteredValues.forEach((item, index) => {
+                const tempWhere = [];
+                if (filteredValues.length > 1 && index === 0) {
+                    tempWhere.push("(");
+                }
+                if (filteredValues.length > 1 && index > 0) {
+                    tempWhere.push("OR");
+                }
+                tempWhere.push(fieldName);
+                tempWhere.push("Like");
+                tempWhere.push(item);
+                if (filteredValues.length > 1 && index === filteredValues.length - 1) {
+                    tempWhere.push(")");
+                }
+                whereList.push(tempWhere);
+            });
+        },
+
+        /**
          * 查找字段模型
          */
         findFieldModel(key) {
@@ -1071,9 +1056,16 @@ export default {
         GetSearchItemCheckLabel(fieldData, field) {
             if (typeof fieldData === "string") {
                 return fieldData;
-            } else if (typeof fieldData === "object") {
-                if (!this.DiyCommon.IsNull(field.Config.SelectLabel)) {
-                    return fieldData[field.Config.SelectLabel];
+            } else if (typeof fieldData === "number") {
+                return String(fieldData);
+            } else if (fieldData && typeof fieldData === "object") {
+                const config = field.Config || {};
+                const labelKeys = [config.SelectLabel, "Value", "value", "Label", "label", "Name", "name", "Text", "text", config.SelectSaveField, "Key", "key", "Id", "id"];
+                for (let i = 0; i < labelKeys.length; i++) {
+                    const key = labelKeys[i];
+                    if (!this.DiyCommon.IsNull(key) && !this.DiyCommon.IsNull(fieldData[key])) {
+                        return fieldData[key];
+                    }
                 }
             }
             return fieldData;
@@ -1083,16 +1075,36 @@ export default {
          * 获取复选框选项值
          */
         GetSearchItemCheckKey(fieldData, field) {
-            if (typeof fieldData === "string") {
+            return this.GetSearchOptionValue(fieldData, field);
+        },
+
+        GetSearchOptionValue(fieldData, field) {
+            if (fieldData === null || fieldData === undefined) {
                 return fieldData;
-            } else if (typeof fieldData === "object") {
-                if (!this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    return fieldData[field.Config.SelectSaveField];
-                } else if (!this.DiyCommon.IsNull(field.Config.SelectLabel)) {
-                    return fieldData[field.Config.SelectLabel];
+            }
+            if (typeof fieldData !== "object" || Array.isArray(fieldData)) {
+                return fieldData;
+            }
+
+            const config = field.Config || {};
+            if (config.DataSource === "KeyValue") {
+                if (!this.DiyCommon.IsNull(fieldData.Key)) return fieldData.Key;
+                if (!this.DiyCommon.IsNull(fieldData.key)) return fieldData.key;
+            }
+
+            const valueKeys = [config.SelectSaveField, config.SelectLabel, "Key", "key", "Value", "value", "Id", "id", "Name", "name", "Label", "label", "Text", "text"];
+            for (let i = 0; i < valueKeys.length; i++) {
+                const key = valueKeys[i];
+                if (!this.DiyCommon.IsNull(key) && !this.DiyCommon.IsNull(fieldData[key])) {
+                    return fieldData[key];
                 }
             }
-            return fieldData;
+
+            try {
+                return JSON.stringify(fieldData);
+            } catch (e) {
+                return "";
+            }
         },
 
         /**
@@ -1183,7 +1195,14 @@ export default {
          * 获取选择器值字段
          */
         GetSelectValueKey(field) {
-            return field.Config.SelectSaveField || field.Config.SelectLabel || "";
+            const config = field.Config || {};
+            if (config.DataSource === "Data") {
+                return undefined;
+            }
+            if (config.DataSource === "KeyValue") {
+                return "Key";
+            }
+            return config.SelectSaveField || config.SelectLabel || undefined;
         },
 
         /**
@@ -1297,7 +1316,7 @@ export default {
          * 获取下拉选项的key
          */
         getSelectOptionKey(field, fieldData, index) {
-            const value = field.Config.SelectSaveField ? fieldData[field.Config.SelectSaveField] : field.Config.SelectLabel ? fieldData[field.Config.SelectLabel] : fieldData;
+            const value = this.GetSearchOptionValue(fieldData, field);
 
             return `slt_opt_key_${field.Name}_${value}_${index}`;
         },

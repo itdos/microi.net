@@ -235,7 +235,7 @@ export default {
                 .filter(({ field, id }) => {
                     if (!field || !id) return false;
                     if (id.DisplayType && id.DisplayType !== "In") return false;
-                    return field.Data && Array.isArray(field.Data) && field.Data.length > 0 && field.Config && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true;
+                    return field.Data && Array.isArray(field.Data) && field.Data.length > 0 && field.Config && field.Config.DataSourceSqlRemote !== true;
                 })
                 .map(({ field }) => {
                     if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
@@ -251,7 +251,7 @@ export default {
                 .filter(({ field, id }) => {
                     if (!field || !id) return false;
                     if (id.DisplayType && id.DisplayType !== "In") return false;
-                    return !field.Data || !Array.isArray(field.Data) || field.Data.length === 0 || (field.Config && field.Config.DataSourceSqlRemote === true) || id.DisplaySelect === true;
+                    return !field.Data || !Array.isArray(field.Data) || field.Data.length === 0 || (field.Config && field.Config.DataSourceSqlRemote === true);
                 })
                 .map(({ field }) => field);
         },
@@ -297,7 +297,7 @@ export default {
                     return [];
                 }
                 var result = [];
-                //注意：SearchFieldIds有可能是List<Guid>，也可能是List<{Id,Name,Label,AsName,TableId,TableName,TableDescription,DisplayType:'In/Out',DisplaySelect}>
+                //注意：SearchFieldIds有可能是List<Guid>，也可能是List<{Id,Name,Label,AsName,TableId,TableName,TableDescription,DisplayType:'In/Out'}>
                 self.SearchFieldIds.forEach((id) => {
                     self.DiyFieldList.forEach((field) => {
                         if (typeof id != "string" && !self.DiyCommon.IsNull(InOrOut)) {
@@ -313,7 +313,7 @@ export default {
                             }
 
                             //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
-                            if (type == "Checkbox" && Array.isArray(field.Data) && field.Data.length > 0 && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true) {
+                            if (type == "Checkbox" && Array.isArray(field.Data) && field.Data.length > 0 && field.Config.DataSourceSqlRemote !== true) {
                                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
                                     // self.SearchModel[field.Name] = [];
                                     self.SearchCheckbox[field.Name] = [];
@@ -321,7 +321,7 @@ export default {
                                 result.push(field);
                             }
                             //如果是文本框like模糊搜索
-                            else if (type == "Text" && (!Array.isArray(field.Data) || field.Data.length == 0 || field.Config.DataSourceSqlRemote === true || id.DisplaySelect === true)) {
+                            else if (type == "Text" && (!Array.isArray(field.Data) || field.Data.length == 0 || field.Config.DataSourceSqlRemote === true)) {
                                 result.push(field);
                             }
                             //如果type没有传

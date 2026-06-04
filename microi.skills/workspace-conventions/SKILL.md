@@ -71,6 +71,26 @@ Pop-Location
 
 普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
 
+## DevLoginBypass 多租户约定
+
+当本地 E2E/API 自动化需要对多个租户免验证码登录时，在当前生效的 `appsettings.{Environment}.json` 中配置 `DevLoginBypass:Accounts`：
+
+```json
+"DevLoginBypass": {
+  "Enabled": true,
+  "SkipCaptcha": true,
+  "OnlyLoopback": true,
+  "DefaultAccount": "admin",
+  "DefaultPassword": "<default-password>",
+  "Accounts": [
+    { "OsClient": "<tenant-a>", "Account": "<account>", "Password": "<password>" },
+    { "OsClient": "<tenant-b>", "Account": "<account>", "Password": "<password>" }
+  ]
+}
+```
+
+本地旁路配置必须保留 `OnlyLoopback=true`。自动化脚本可传 `Pwd="_DEV_BYPASS_"`，API 应按请求的 `OsClient` 替换为配置密码后继续走真实密码校验。不要把具体项目租户名或密码写进 skill；真实值只放环境配置文件。
+
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：
