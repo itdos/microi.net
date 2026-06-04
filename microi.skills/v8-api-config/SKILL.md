@@ -51,8 +51,10 @@ return { Code: 1, Msg: '验证码已发送' };
 ```javascript
 // 例：核心扣款接口（StopHttp=true）
 // 只能从 order_pay、refund 等接口通过 V8.ApiEngine.Run 调用
-V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1',
-  V8.Param.amount, V8.Param.accountId).ExecuteNonQuery();
+V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1')
+  .AddInParameter("@p0", V8.Param.amount)
+  .AddInParameter("@p1", V8.Param.accountId)
+  .ExecuteNonQuery();
 return { Code: 1 };
 ```
 
@@ -66,7 +68,9 @@ return { Code: 1 };
 // 配置：LockKey = month_settlement，LockTimeout = 600
 // 该接口同一时刻全集群只会有一个实例运行
 var month = DateNow('yyyy-MM');
-V8.Db.FromSql('INSERT INTO MonthSettle SELECT ... WHERE Month = @p0', month).ExecuteNonQuery();
+V8.Db.FromSql('INSERT INTO MonthSettle SELECT ... WHERE Month = @p0')
+  .AddInParameter("@p0", month)
+  .ExecuteNonQuery();
 return { Code: 1 };
 ```
 

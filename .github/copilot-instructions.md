@@ -149,17 +149,24 @@ _Where: [['CreateTime', '>', DateFormat(new Date(), 'yyyy-MM-dd HH:mm:ss')]]
 
 ## V8.Db / V8.DbRead — 数据库操作
 
-`V8.Db` 为主库（读写），`V8.DbRead` 为从库（只读），均使用参数化 SQL（`@p0, @p1` 占位符）。
+`V8.Db` 为主库（读写），`V8.DbRead` 为从库（只读）。`FromSql` 只传 SQL 字符串；动态值必须用 `.AddInParameter('@p0', value)` 链式绑定。普通单表查询优先使用 `V8.FormEngine.GetTableData + _Where`。
 
 ```js
 // 查询列表
-var list = V8.Db.FromSql('SELECT * FROM Sys_User WHERE Status = @p0', 1).ToArray();
+var list = V8.Db.FromSql('SELECT * FROM Sys_User WHERE Status = @p0')
+  .AddInParameter('@p0', 1)
+  .ToArray();
 
 // 查询单条
-var user = V8.Db.FromSql('SELECT * FROM Sys_User WHERE Id = @p0', userId).First();
+var user = V8.Db.FromSql('SELECT * FROM Sys_User WHERE Id = @p0')
+  .AddInParameter('@p0', userId)
+  .First();
 
 // 执行非查询
-var affected = V8.Db.FromSql('UPDATE Sys_User SET Status = @p0 WHERE Id = @p1', 0, userId).ExecuteNonQuery();
+var affected = V8.Db.FromSql('UPDATE Sys_User SET Status = @p0 WHERE Id = @p1')
+  .AddInParameter('@p0', 0)
+  .AddInParameter('@p1', userId)
+  .ExecuteNonQuery();
 
 // 执行标量
 var count = V8.Db.FromSql('SELECT COUNT(*) FROM Sys_User').ToScalar();
@@ -172,7 +179,9 @@ var result = V8.FormEngine.GetFormData('table', { Id: V8.Form.Id }, V8.DbTrans);
 var dataList = V8.Dbs.OracleDB1.FromSql('SELECT * FROM table').ToArray();
 // 扩展库独立事务
 var exTrans = V8.Dbs.EmptyEx.BeginTransaction();
-exTrans.FromSql("DELETE FROM table WHERE Id = @p0", id).ExecuteNonQuery();
+exTrans.FromSql("DELETE FROM table WHERE Id = @p0")
+  .AddInParameter('@p0', id)
+  .ExecuteNonQuery();
 exTrans.Commit();
 exTrans.Close();
 ```

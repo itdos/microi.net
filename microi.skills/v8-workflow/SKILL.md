@@ -44,21 +44,22 @@ description: Microi V8 workflow event guidance. Use when writing approval flow c
 ```javascript
 // 我的待办
 var todo = V8.Db.FromSql(
-  'SELECT * FROM wf_work WHERE TodoUserId = @p0 AND Status = @p1 ORDER BY CreateTime DESC',
-  V8.CurrentUser.Id, 'Pending'
-).ToArray();
+  'SELECT * FROM wf_work WHERE TodoUserId = @p0 AND Status = @p1 ORDER BY CreateTime DESC'
+).AddInParameter("@p0", V8.CurrentUser.Id)
+ .AddInParameter("@p1", 'Pending')
+ .ToArray();
 
 // 我发起的
 var mine = V8.Db.FromSql(
-  'SELECT * FROM wf_flow WHERE CreateUserId = @p0 ORDER BY CreateTime DESC',
-  V8.CurrentUser.Id
-).ToArray();
+  'SELECT * FROM wf_flow WHERE CreateUserId = @p0 ORDER BY CreateTime DESC'
+).AddInParameter("@p0", V8.CurrentUser.Id)
+ .ToArray();
 
 // 流程历史
 var history = V8.Db.FromSql(
-  'SELECT * FROM wf_history WHERE FlowId = @p0 ORDER BY CreateTime ASC',
-  V8.Param.flowId
-).ToArray();
+  'SELECT * FROM wf_history WHERE FlowId = @p0 ORDER BY CreateTime ASC'
+).AddInParameter("@p0", V8.Param.flowId)
+ .ToArray();
 ```
 
 ## 流程 V8 事件执行顺序

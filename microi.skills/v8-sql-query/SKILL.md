@@ -60,58 +60,54 @@ var newWhere = V8.Method.ParseWhere(V8.Param._Where);
 V8.FormEngine.GetTableData('Table', { _Where: newWhere });
 ```
 
-## 次选：V8.Db.FromSql（参数化占位符）
+## 次选：V8.Db.FromSql（仅 SQL 字符串 + AddInParameter）
 
 > **⚠️ FormEngine 优先原则：** 增删改操作（INSERT / UPDATE / DELETE）必须**优先**使用 `V8.FormEngine.AddFormData` / `UptFormData` / `UptFormDataByWhere` / `DelFormData` 等方法。**只有**多表 JOIN、复杂子查询、GROUP BY 聚合等 FormEngine 无法表达的场景才使用 `V8.Db.FromSql`。
 
-> **⚠️ Jint 多参数 interop 警告：** `V8.Db.FromSql(sql, p0, p1, p2)` 传入 **3 个及以上**位置参数时（即 SQL + 3+ 值），Jint .NET 重载解析会失败，抛出
-> `No public methods with the specified arguments were found` 错误。
-> 如果必须用原生 SQL，请改用 `AddInParameter` 链式具名参数，或改写为 `V8.FormEngine` 方法。
+> **⚠️ FromSql 调用规则：** `V8.Db.FromSql` 在 V8 中只传 SQL 字符串，不要把动态值作为第二个或后续参数传给 `FromSql`。动态值必须用链式 `.AddInParameter('@p0', value)` 绑定；否则会生成平台不支持的调用签名。
 
 ```javascript
-// ❌ 错误：3个以上位置参数，Jint 报 interop 错误
-V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2", val1, val2, id).ExecuteNonQuery();
+// ❌ 错误形态：不要把动态值作为 FromSql 的第二个参数传入
 
-// ✅ 优先：改用 FormEngine（避免任何参数限制）
+// ✅ 优先：改用 FormEngine（单表增删改查都优先这样写）
 V8.FormEngine.UptFormData('t', { Id: id, A: val1, B: val2 });
 
-// ✅ 必须用原生SQL时：改用链式 AddInParameter（具名参数，无参数数量限制）
-V8.Db.FromSql("UPDATE t SET A=?a, B=?b WHERE Id=?id")
-     .AddInParameter("?a", val1)
-     .AddInParameter("?b", val2)
-     .AddInParameter("?id", id)
+// ✅ 必须用原生 SQL 时：FromSql 只传 SQL，参数用 AddInParameter
+V8.Db.FromSql("UPDATE t SET A=@p0, B=@p1 WHERE Id=@p2")
+     .AddInParameter("@p0", val1)
+     .AddInParameter("@p1", val2)
+     .AddInParameter("@p2", id)
      .ExecuteNonQuery();
 ```
 
 当 `_Where` 无法满足复杂查询（多表 JOIN、子查询、聚合统计）时使用 `V8.Db`：
 
 ```javascript
-// ✅ 安全：使用 @p0, @p1 参数占位符
+// ✅ 安全：使用 @p0, @p1 占位符，并用 AddInParameter 绑定
 var list = V8.Db.FromSql(
-  'SELECT a.Id, a.Name, b.OrderCount FROM Customer a LEFT JOIN (SELECT CustomerId, COUNT(*) OrderCount FROM OrderHeader GROUP BY CustomerId) b ON a.Id = b.CustomerId WHERE a.Status = @p0',
-  1
-).ToArray();
+  'SELECT a.Id, a.Name, b.OrderCount FROM Customer a LEFT JOIN (SELECT CustomerId, COUNT(*) OrderCount FROM OrderHeader GROUP BY CustomerId) b ON a.Id = b.CustomerId WHERE a.Status = @p0'
+).AddInParameter("@p0", 1).ToArray();
 
 // ✅ 安全：多个参数
 var row = V8.Db.FromSql(
-  'SELECT * FROM SysUser WHERE Account = @p0 AND DeptId = @p1',
-  V8.Param.account,
-  V8.Param.deptId
-).First();
+  'SELECT * FROM SysUser WHERE Account = @p0 AND DeptId = @p1'
+).AddInParameter("@p0", V8.Param.account)
+ .AddInParameter("@p1", V8.Param.deptId)
+ .First();
 
 // 统计
 var count = V8.Db.FromSql(
-  'SELECT COUNT(*) FROM OrderHeader WHERE Status = @p0 AND CreateTime >= @p1',
-  1,
-  V8.Param.startDate
-).ToScalar();
+  'SELECT COUNT(*) FROM OrderHeader WHERE Status = @p0 AND CreateTime >= @p1'
+).AddInParameter("@p0", 1)
+ .AddInParameter("@p1", V8.Param.startDate)
+ .ToScalar();
 
 // 非查询（UPDATE / INSERT / DELETE）
 V8.Db.FromSql(
-  'UPDATE SysUser SET LastLoginTime = @p0 WHERE Id = @p1',
-  DateNow('yyyy-MM-dd HH:mm:ss'),
-  V8.CurrentUser.Id
-).ExecuteNonQuery();
+  'UPDATE SysUser SET LastLoginTime = @p0 WHERE Id = @p1'
+).AddInParameter("@p0", DateNow('yyyy-MM-dd HH:mm:ss'))
+ .AddInParameter("@p1", V8.CurrentUser.Id)
+ .ExecuteNonQuery();
 ```
 
 ### V8.Db 方法速查
@@ -136,7 +132,9 @@ V8.DbRead.FromSql(...)  // 从库（只读，适合报表和大量查询）
 ### 跨应用查询（扩展数据库）
 
 ```javascript
-var list = V8.Dbs.OracleDB1.FromSql('SELECT * FROM Table WHERE Id = @p0', id).ToArray();
+var list = V8.Dbs.OracleDB1.FromSql('SELECT * FROM Table WHERE Id = @p0')
+  .AddInParameter("@p0", id)
+  .ToArray();
 ```
 
 ## 数据库事务
@@ -148,8 +146,14 @@ var list = V8.Dbs.OracleDB1.FromSql('SELECT * FROM Table WHERE Id = @p0', id).To
 // 返回 Code=1 → 自动提交事务
 // 返回 Code≠1 → 自动回滚事务
 // 手动调用 V8.DbTrans.Commit() 或 V8.DbTrans.Rollback() 均无效
-V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1', 100, fromId).ExecuteNonQuery();
-V8.Db.FromSql('UPDATE Account SET Balance = Balance + @p0 WHERE Id = @p1', 100, toId).ExecuteNonQuery();
+V8.Db.FromSql('UPDATE Account SET Balance = Balance - @p0 WHERE Id = @p1')
+  .AddInParameter("@p0", 100)
+  .AddInParameter("@p1", fromId)
+  .ExecuteNonQuery();
+V8.Db.FromSql('UPDATE Account SET Balance = Balance + @p0 WHERE Id = @p1')
+  .AddInParameter("@p0", 100)
+  .AddInParameter("@p1", toId)
+  .ExecuteNonQuery();
 
 // V8.DbTrans 可传给 FormEngine 和 ApiEngine.Run 共享事务
 V8.FormEngine.UptFormData('Table1', { Id: 'x', Status: 1 }, V8.DbTrans);
@@ -162,8 +166,14 @@ V8.ApiEngine.Run('other-engine', { Id: 'x' }, V8.DbTrans);
 // 扩展数据库需要手动管理事务
 var exTrans = V8.Dbs.OracleDB1.BeginTransaction();
 try {
-  exTrans.FromSql('UPDATE t1 SET a = @p0 WHERE Id = @p1', 1, id1).ExecuteNonQuery();
-  exTrans.FromSql('UPDATE t2 SET b = @p0 WHERE Id = @p1', 2, id2).ExecuteNonQuery();
+  exTrans.FromSql('UPDATE t1 SET a = @p0 WHERE Id = @p1')
+    .AddInParameter("@p0", 1)
+    .AddInParameter("@p1", id1)
+    .ExecuteNonQuery();
+  exTrans.FromSql('UPDATE t2 SET b = @p0 WHERE Id = @p1')
+    .AddInParameter("@p0", 2)
+    .AddInParameter("@p1", id2)
+    .ExecuteNonQuery();
   exTrans.Commit();
 } catch (ex) {
   exTrans.Rollback();
@@ -182,11 +192,11 @@ V8.Db.FromSql(sql).ToArray();  // SQL 注入漏洞！
 // ❌ 禁止：动态拼接表名
 var sql = "SELECT * FROM " + V8.Param.tableName + " WHERE Id = @p0";
 
-// ✅ 正确做法：始终使用参数化
-var list = V8.Db.FromSql(
-  'SELECT * FROM SysUser WHERE Account = @p0',
-  V8.Param.account
-).ToArray();
+// ✅ 正确做法：单表查询优先使用 FormEngine + _Where
+var result = V8.FormEngine.GetTableData('SysUser', {
+  _Where: [['Account', '=', V8.Param.account]],
+  _PageSize: 20
+});
 ```
 
 ## 常见查询模式
@@ -235,13 +245,15 @@ var list = V8.Db.FromSql(`
   INNER JOIN Customer c ON o.CustomerId = c.Id
   WHERE o.Status = @p0 AND o.CreateTime >= @p1
   ORDER BY o.CreateTime DESC
-`, 1, V8.Param.startDate).ToArray();
+`).AddInParameter("@p0", 1)
+  .AddInParameter("@p1", V8.Param.startDate)
+  .ToArray();
 ```
 
 ## 注意事项
 
-- `V8.Db.FromSql` 的参数占位符从 `@p0` 开始递增
-- `V8.FormEngine` 操作会触发该表上的 V8 事件，加 `_InvokeType: 'Client'` 可跳过
+- `V8.Db.FromSql` 只传 SQL 字符串，参数占位符从 `@p0` 开始递增，动态值用 `.AddInParameter("@p0", value)` 绑定
+- 服务端 `V8.FormEngine` 操作默认不触发表单 V8 事件；确需触发时在参数中加 `_InvokeType: 'Client'`
 - 查询结果数量较大时务必分页，`_PageSize` 默认最大 1000
 - `V8.DbRead` 适用于不需要实时性的报表查询
 - 接口引擎的事务由平台自动管理，**不要手动调用** `V8.DbTrans.Commit/Rollback`
