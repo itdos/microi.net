@@ -206,6 +206,41 @@ return V8.ClientType != 'PC';
 
 ---
 
+## 9.1 后台直充/调账类行按钮
+
+会员积分、余额、库存、额度等会改动资产的后台行按钮，必须采用“前端按钮只收参数，后端接口负责事务”的模式。
+
+规则：
+- `MoreBtns` 使用 `ShowRow:true`，按钮只负责 `V8.ConfirmTips` 弹窗、读取金额/备注、调用接口和刷新表格。
+- 不要在 `V8Code` 里直接写 `V8.FormEngine.UptFormData` 改余额；余额更新、订单/流水生成、幂等校验都放到 ApiEngine。
+- 后端接口必须校验 `MemberId/Amount`，金额必须大于 0，并同时写资产主表和对应流水表；如系统已有订单表参与统计，也要同步生成已完成/已支付订单。
+- 备注字段要有默认值，例如 `平台直充积分`，并允许管理员在弹窗中修改。
+- 验证时至少做一次小额测试，读回主表余额、订单表和流水表；测试备注要明确标识，方便审计。
+
+按钮 V8Code 骨架：
+
+```js
+var row = V8.Form || {};
+var uid = 'admin_recharge_' + String(row.Id || '').replace(/[^a-zA-Z0-9_]/g, '');
+var html = '<div style="text-align:left;min-width:360px;line-height:1.6">'
+  + '<div style="margin-bottom:10px">会员：<b>' + (row.NickName || row.Phone || row.Id || '') + '</b></div>'
+  + '<input id="' + uid + '_amount" type="number" min="0" step="0.01" placeholder="请输入充值积分" />'
+  + '<textarea id="' + uid + '_remark">平台直充积分</textarea>'
+  + '</div>';
+
+V8.ConfirmTips(html, function () {
+  var amount = Number((document.getElementById(uid + '_amount') || {}).value || 0);
+  var remark = ((document.getElementById(uid + '_remark') || {}).value || '平台直充积分');
+  if (!amount || amount <= 0) { V8.Tips('请输入大于0的充值积分', false); return; }
+  V8.ApiEngine.Run({ ApiEngineKey: 'xxx_admin_recharge', MemberId: row.Id, Amount: amount, Remark: remark }, function (r) {
+    V8.Tips(r && r.Code == 1 ? '充值成功' : ((r && r.Msg) || '充值失败'), r && r.Code == 1);
+    if (r && r.Code == 1) V8.RefreshTable({ _PageIndex: -1 });
+  });
+}, null, { Title: '后台充值积分', OkText: '确认充值', CancelText: '取消' });
+```
+
+---
+
 ## 10. 反模式（避免）
 
 ❌ 把所有业务逻辑塞进 `V8Code`，不创建接口引擎

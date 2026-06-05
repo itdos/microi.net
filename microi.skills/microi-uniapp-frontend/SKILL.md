@@ -73,6 +73,36 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 </section>
 ```
 
+## 移动端分类/双栏列表独立滚动
+
+商品分类、知识库分类、通讯录分组、资产分类等“左侧分类 + 右侧列表”的移动端页面，根节点必须固定在一个视口内，不能让整页和内部列表同时滚动。
+
+- 根页面使用 `height:100vh; overflow:hidden; display:flex; flex-direction:column;`。
+- 分类主体使用 `flex:1; min-height:0; display:flex;`，并给底部 tabBar 预留 `padding-bottom: calc(tabBarHeight + env(safe-area-inset-bottom));`。
+- 左侧分类和右侧列表分别用 `scroll-view scroll-y`，高度来自父级 `height:100%` / `flex:1; min-height:0`，不要用整页滚动承载右侧商品列表。
+- 右侧分页必须绑定 `@scrolltolower`，设置合理 `lower-threshold`，并维护 `pageIndex/pageSize/loading/finished`，第一页重置列表，后续页追加列表。
+- 切换左侧分类或顶部专区时，必须重置分页状态并重新加载第一页；不能沿用旧分类的 `finished` 或 `pageIndex`。
+- 验收截图要重点看底部：内容不能被 tabBar 压住，页面底部不能出现整页滚动留下的大块空隙。
+
+参考结构：
+
+```vue
+<view class="page-category">
+  <view class="area-tabs">...</view>
+  <view class="cat-body">
+    <scroll-view class="cat-side" scroll-y>...</scroll-view>
+    <scroll-view class="cat-content" scroll-y lower-threshold="120" @scrolltolower="loadMore">...</scroll-view>
+  </view>
+</view>
+```
+
+```scss
+.page-category { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.cat-body { flex: 1; min-height: 0; display: flex; padding-bottom: calc(104rpx + env(safe-area-inset-bottom)); }
+.cat-side { width: 176rpx; height: 100%; }
+.cat-content { flex: 1; min-width: 0; height: 100%; }
+```
+
 ## H5 在 PC 浏览器必须自动模拟移动端
 
 移动端 UniApp H5 被 PC 浏览器访问时，不能按桌面宽屏铺满。必须在全局样式里用媒体查询生成手机预览壳。

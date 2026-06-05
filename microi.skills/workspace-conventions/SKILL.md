@@ -91,6 +91,25 @@ Pop-Location
 
 本地旁路配置必须保留 `OnlyLoopback=true`。自动化脚本可传 `Pwd="_DEV_BYPASS_"`，API 应按请求的 `OsClient` 替换为配置密码后继续走真实密码校验。不要把具体项目租户名或密码写进 skill；真实值只放环境配置文件。
 
+## V8 远端/本地同步收尾约定
+
+AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V8 代码后，任务结束前必须把远端当前生效代码同步回本地 `Microi-V8-Engine/<server>/<osClient>/` 目录，并做一次同步状态复核。
+
+适用范围包括：
+- `sys_apiengine.ApiV8Code` 接口引擎
+- `diy_table` 表单 V8 事件
+- `diy_field` 字段 V8 事件
+- `sys_menu` 模块按钮/Tab V8 代码
+- `wf_node` 工作流节点 V8 代码
+- `sys_datasource` 数据源 V8 代码
+
+收尾流程：
+- 若远端是通过 MCP 写入的，以远端当前生效代码为准回写本地文件。
+- 若本地文件是先手工修改的，先推送到远端，再重新拉取/复核，确保本地与远端一致。
+- 优先使用 Microi.VSCode 插件的同步/查看同步状态能力；没有可调用插件时，可在 `.tmp/` 写一次性同步脚本，但脚本必须先 dry-run 输出差异摘要，再 apply。
+- 复核结果应确认 touched 范围内 `Changed=0`、`Created=0`、`LocalOnly=0` 或说明剩余差异原因。
+- 空 V8 代码不生成本地 `.js` 文件；若已有空 `.js` 文件，收尾同步时应删除，避免被误判为本地未推送。
+
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：
