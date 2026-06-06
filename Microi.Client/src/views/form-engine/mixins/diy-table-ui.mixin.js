@@ -599,7 +599,7 @@ LoadFabPosition() {
             self.hideMoreMenu();
 
             var rect = event.currentTarget.getBoundingClientRect();
-            var menuWidth = 260;
+            var menuWidth = Math.min(420, window.innerWidth - 20);
             var menuLeft = rect.left;
             // 如果超出右边界，向左调整
             if (menuLeft + menuWidth > window.innerWidth) {
@@ -612,7 +612,7 @@ LoadFabPosition() {
 
             self._colMenuField = field;
             // 初始化筛选值
-            var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+            var fieldName = self.getColFieldName(field);
             if (self._colFilters[fieldName]) {
                 self._colFilterOperator = self._colFilters[fieldName].operator;
                 self._colFilterValue = self.normalizeColFilterValue(field, self._colFilters[fieldName].value, self._colFilterOperator);
@@ -620,6 +620,14 @@ LoadFabPosition() {
                 // 根据字段类型设置默认操作符
                 self._colFilterOperator = self._getDefaultOperator(field);
                 self._colFilterValue = self.isColFilterOptionField(field) ? [] : '';
+            }
+            self._colPageFilterKeyword = '';
+            if (self._colPageFilters[fieldName]) {
+                self._colPageFilterSelectedValues = (self._colPageFilters[fieldName].values || []).map(function(value) {
+                    return self.getColPageFilterValueKey(value);
+                });
+            } else {
+                self._colPageFilterSelectedValues = [];
             }
             self._colMenuVisible = true;
 
@@ -647,26 +655,92 @@ LoadFabPosition() {
             if (field.Type && (field.Type.toLowerCase().indexOf('int') > -1 || field.Type.toLowerCase().indexOf('decimal') > -1)) return '=';
             return 'Like';
         },
+        getColFieldName(field) {
+            if (!field) return '';
+            return this.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+        },
+        getActiveOrderBys() {
+            var self = this;
+            var result = {};
+            var orderBys = self._OrderBys || {};
+            Object.keys(orderBys).forEach(function(key) {
+                var direction = String(orderBys[key] || '').toLowerCase();
+                if (key && (direction === 'asc' || direction === 'desc')) {
+                    result[key] = direction;
+                }
+            });
+            return result;
+        },
+        syncLegacyOrderState() {
+            var self = this;
+            var orderBys = self.getActiveOrderBys();
+            var keys = Object.keys(orderBys);
+            self._OrderBys = orderBys;
+            if (keys.length > 0) {
+                var lastField = keys[keys.length - 1];
+                self._OrderBy = lastField;
+                self._OrderByType = orderBys[lastField];
+                self.LastOrderBy = orderBys[lastField] + '|' + lastField;
+            } else {
+                self._OrderBy = '';
+                self._OrderByType = '';
+                self.LastOrderBy = '';
+            }
+        },
+        applyTableOrderParams(param) {
+            var self = this;
+            var orderBys = self.getActiveOrderBys();
+            if (Object.keys(orderBys).length > 0) {
+                param._OrderBys = orderBys;
+                delete param._OrderBy;
+                delete param._OrderByType;
+                return;
+            }
+            if (!self.DiyCommon.IsNull(self._OrderBy) && !self.DiyCommon.IsNull(self._OrderByType)) {
+                param._OrderBy = self._OrderBy;
+                param._OrderByType = self._OrderByType;
+            }
+        },
+        clearColSort(fieldName) {
+            var self = this;
+            var orderBys = Object.assign({}, self._OrderBys || {});
+            if (fieldName) {
+                delete orderBys[fieldName];
+            } else {
+                orderBys = {};
+            }
+            self._OrderBys = orderBys;
+            if (self._OrderBy === fieldName || !fieldName) {
+                self._OrderBy = '';
+                self._OrderByType = '';
+                self.LastOrderBy = '';
+            }
+            self.syncLegacyOrderState();
+        },
         getColSortState(field) {
             var self = this;
-            var fieldName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+            var fieldName = self.getColFieldName(field);
+            if (self._OrderBys && self._OrderBys[fieldName]) return String(self._OrderBys[fieldName]).toLowerCase();
             if (self._OrderBy === fieldName && self._OrderByType) return self._OrderByType.toLowerCase();
             return '';
         },
         colMenuSort(direction) {
             var self = this;
             if (!self._colMenuField) return;
-            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
-            // 如果已经是当前排序，再次点击取消
-            if (self._OrderBy === fieldName && self._OrderByType.toLowerCase() === direction) {
-                self._OrderBy = '';
-                self._OrderByType = '';
-                self.LastOrderBy = '';
-            } else {
-                self._OrderBy = fieldName;
-                self._OrderByType = direction;
-                self.LastOrderBy = direction + '|' + fieldName;
+            var fieldName = self.getColFieldName(self._colMenuField);
+            var orderBys = Object.assign({}, self._OrderBys || {});
+            var currentDirection = orderBys[fieldName] ? String(orderBys[fieldName]).toLowerCase() : '';
+            if (!currentDirection && self._OrderBy === fieldName && self._OrderByType) {
+                currentDirection = self._OrderByType.toLowerCase();
             }
+            // 如果已经是当前排序，再次点击取消该列
+            if (currentDirection === direction) {
+                delete orderBys[fieldName];
+            } else {
+                orderBys[fieldName] = direction;
+            }
+            self._OrderBys = orderBys;
+            self.syncLegacyOrderState();
             self.hideColHeaderMenu();
             self.GetDiyTableRow();
         },
@@ -816,10 +890,165 @@ LoadFabPosition() {
             }
             return value;
         },
-        colMenuApplyFilter() {
+        getColPageFilterValueKey(value) {
+            if (value === null) return '__COL_PAGE_FILTER_NULL__';
+            if (value === undefined) return '__COL_PAGE_FILTER_UNDEFINED__';
+            if (value === '') return '__COL_PAGE_FILTER_EMPTY__';
+            if (typeof value === 'object') {
+                try {
+                    return 'object:' + JSON.stringify(value);
+                } catch (e) {
+                    return 'object:' + String(value);
+                }
+            }
+            return typeof value + ':' + String(value);
+        },
+        formatColPageFilterLabel(value) {
+            if (value === null || value === undefined || value === '') return '(空)';
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value);
+                } catch (e) {
+                    return String(value);
+                }
+            }
+            return String(value);
+        },
+        buildColPageFilterOptions(ignoreKeyword) {
+            var self = this;
+            var field = self._colMenuField;
+            if (!field) return [];
+            var fieldName = self.getColFieldName(field);
+            var rows = self.RenderedTableRowList || [];
+            var map = {};
+            var result = [];
+            rows.forEach(function(row) {
+                var value = row ? row[fieldName] : null;
+                var key = self.getColPageFilterValueKey(value);
+                if (!map[key]) {
+                    map[key] = {
+                        key: key,
+                        value: value,
+                        label: self.formatColPageFilterLabel(value),
+                        count: 0
+                    };
+                    result.push(map[key]);
+                }
+                map[key].count++;
+            });
+            if (ignoreKeyword === true) return result;
+            var keyword = String(self._colPageFilterKeyword || '').trim().toLowerCase();
+            if (!keyword) return result;
+            return result.filter(function(item) {
+                return String(item.label || '').toLowerCase().indexOf(keyword) > -1;
+            });
+        },
+        getColPageFilterOptions() {
+            return this.buildColPageFilterOptions(false);
+        },
+        isColPageFilterAllChecked() {
+            var self = this;
+            var options = self.getColPageFilterOptions();
+            if (options.length === 0) return false;
+            var selected = self._colPageFilterSelectedValues || [];
+            return options.every(function(opt) {
+                return selected.indexOf(opt.key) > -1;
+            });
+        },
+        isColPageFilterIndeterminate() {
+            var self = this;
+            var options = self.getColPageFilterOptions();
+            if (options.length === 0) return false;
+            var selected = self._colPageFilterSelectedValues || [];
+            var selectedCount = options.filter(function(opt) {
+                return selected.indexOf(opt.key) > -1;
+            }).length;
+            return selectedCount > 0 && selectedCount < options.length;
+        },
+        colPageFilterToggleAll(checked) {
+            var self = this;
+            var options = self.getColPageFilterOptions();
+            var selected = (self._colPageFilterSelectedValues || []).slice();
+            var visibleKeys = options.map(function(opt) { return opt.key; });
+            if (checked) {
+                visibleKeys.forEach(function(key) {
+                    if (selected.indexOf(key) === -1) selected.push(key);
+                });
+            } else {
+                selected = selected.filter(function(key) {
+                    return visibleKeys.indexOf(key) === -1;
+                });
+            }
+            self._colPageFilterSelectedValues = selected;
+        },
+        syncColPageFilterModel() {
+            var self = this;
+            if (!self._colMenuField) return false;
+            var fieldName = self.getColFieldName(self._colMenuField);
+            var allOptions = self.buildColPageFilterOptions(true);
+            var optionMap = {};
+            allOptions.forEach(function(opt) {
+                optionMap[opt.key] = opt;
+            });
+            var values = [];
+            (self._colPageFilterSelectedValues || []).forEach(function(key) {
+                if (optionMap[key] && values.findIndex(function(oldValue) {
+                    return self.getColPageFilterValueKey(oldValue) === key;
+                }) === -1) {
+                    values.push(optionMap[key].value);
+                }
+            });
+            if (values.length === 0) {
+                delete self._colPageFilters[fieldName];
+            } else {
+                self._colPageFilters[fieldName] = { values: values };
+            }
+            return true;
+        },
+        colMenuApplyPageFilter() {
+            var self = this;
+            if (!self.syncColPageFilterModel()) return;
+            self.refreshColMenuFilterResult();
+        },
+        colMenuApplyAllFilters() {
             var self = this;
             if (!self._colMenuField) return;
-            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            self.syncColFilterModel();
+            self.syncColPageFilterModel();
+            self.refreshColMenuFilterResult();
+        },
+        refreshColMenuFilterResult() {
+            var self = this;
+            self._rebuildColFilterWhere();
+            self.hideColHeaderMenu();
+            self.GetDiyTableRow({ _PageIndex: 1 });
+        },
+        buildColPageFilterWhere(fieldName, values) {
+            var result = [];
+            if (!fieldName || !Array.isArray(values) || values.length === 0) return result;
+            values.forEach(function(value, index) {
+                var condition = [];
+                if (values.length > 1 && index === 0) {
+                    condition.push('(');
+                }
+                if (values.length > 1 && index > 0) {
+                    condition.push('OR');
+                }
+                condition.push(fieldName);
+                condition.push('=');
+                condition.push(value === undefined ? null : value);
+                if (values.length > 1 && index === values.length - 1) {
+                    condition.push(')');
+                }
+                condition._isColPageFilter = true;
+                result.push(condition);
+            });
+            return result;
+        },
+        syncColFilterModel() {
+            var self = this;
+            if (!self._colMenuField) return false;
+            var fieldName = self.getColFieldName(self._colMenuField);
             var operator = self._colFilterOperator;
             var value = self._colFilterValue;
             if (self.isColFilterOptionField()) {
@@ -838,30 +1067,43 @@ LoadFabPosition() {
                     value: value
                 };
             }
-            self._rebuildColFilterWhere();
-            self.hideColHeaderMenu();
-            self.GetDiyTableRow({ _PageIndex: 1 });
+            return true;
+        },
+        colMenuApplyFilter() {
+            var self = this;
+            if (!self.syncColFilterModel()) return;
+            self.refreshColMenuFilterResult();
         },
         colMenuClearFilter() {
             var self = this;
             if (!self._colMenuField) return;
-            var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
+            var fieldName = self.getColFieldName(self._colMenuField);
             delete self._colFilters[fieldName];
+            delete self._colPageFilters[fieldName];
             self._colFilterValue = self.isColFilterOptionField() ? [] : '';
+            self._colPageFilterSelectedValues = [];
+            self.clearColSort(fieldName);
             self._rebuildColFilterWhere();
             self.hideColHeaderMenu();
             self.GetDiyTableRow({ _PageIndex: 1 });
         },
         _rebuildColFilterWhere() {
             var self = this;
-            // 从 Where 中移除所有列筛选相关条件（用 _colFilter_ 前缀标记）
-            self.Where = self.Where.filter(item => !item._isColFilter);
+            // 从 Where 中移除所有列头筛选相关条件
+            self.Where = self.Where.filter(item => !item._isColFilter && !item._isColPageFilter);
             // 重建
             for (var fieldName in self._colFilters) {
                 var filter = self._colFilters[fieldName];
                 var condition = [fieldName, filter.operator, filter.value];
                 condition._isColFilter = true;
                 self.Where.push(condition);
+            }
+            for (var pageFieldName in self._colPageFilters) {
+                var pageFilter = self._colPageFilters[pageFieldName];
+                var conditions = self.buildColPageFilterWhere(pageFieldName, pageFilter.values);
+                conditions.forEach(function(condition) {
+                    self.Where.push(condition);
+                });
             }
         },
         // ========== 列头菜单方法 END ==========

@@ -252,10 +252,9 @@ export default {
                 // _PageIndex: self.DiyTableRowPageIndex,
                 // _PageSize: self.DiyTableRowPageSize,
                 // _SysMenuId: self.SysMenuId,
-                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-                _OrderBy: self._OrderBy,
-                _OrderByType: self._OrderByType
+                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey
             };
+            self.applyTableOrderParams(param);
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
             }
@@ -303,7 +302,15 @@ export default {
             param.UserId = self.GetCurrentUser.Id;
 
             if (self.SearchWhere.length > 0) {
-                param._Where = self.SearchWhere;
+                param._Where = self.SearchWhere.slice();
+            }
+            if (self.Where.length > 0) {
+                if (!param._Where) {
+                    param._Where = [];
+                }
+                self.Where.forEach(function(item) {
+                    param._Where.push(item);
+                });
             }
 
             self.DiyCommon.FormExportFileV2(
