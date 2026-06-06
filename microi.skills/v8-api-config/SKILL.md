@@ -44,6 +44,23 @@ V8.Cache.Set(key, code, 60);
 return { Code: 1, Msg: '验证码已发送' };
 ```
 
+### 1.1 会员端 Token 优先级
+
+移动端/会员端自建 Token 与 Microi 后台 JWT 并存时，会员业务接口应明确 Token 优先级。MCP、后台自动化测试、PC 管理端代理调用常会在 `V8.Header.Token` 中带平台 JWT，如果接口要校验会员登录态，推荐优先读取显式会员参数或专用 Header，再回退平台 Header：
+
+```javascript
+function getMemberToken() {
+  var p = V8.Param || {};
+  var h = V8.Header || {};
+  var token = p.Token || p.token || h.MallMemberToken || h.mallmembertoken || h.Token || h.token || h.Authorization || h.authorization || '';
+  token = String(token || '').trim();
+  if (token.indexOf('Bearer ') === 0) token = token.substring(7).trim();
+  return token;
+}
+```
+
+不要让后台 JWT 覆盖前端显式传入的会员 Token，否则 MCP/Playwright 用会员账号做自动化测试时会误判为未登录。
+
 ## 2. 禁止外部调用（StopHttp）
 
 仅供其他接口引擎/V8 事件内部调用，不允许直接 HTTP 请求触发：
