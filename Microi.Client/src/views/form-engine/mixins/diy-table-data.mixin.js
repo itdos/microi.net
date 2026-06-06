@@ -230,9 +230,7 @@ export default {
         DiyTableRowSortChange(sortParam) {
             var self = this;
             if (self.DiyCommon.IsNull(sortParam.order)) {
-                self._OrderByType = "";
-                self._OrderBy = "";
-                self.LastOrderBy = "";
+                self.clearColSort(sortParam.prop);
             } else {
                 var orderByType = sortParam.order == "ascending" ? "asc" : "desc";
                 //-----修复Table组件排序不轮询的bug，永远返回的都是asc
@@ -248,9 +246,14 @@ export default {
                     orderByType = forType[currentIndex];
                 }
                 //-----end
-                self._OrderByType = orderByType;
-                self._OrderBy = sortParam.prop;
-                self.LastOrderBy = orderByType + "|" + sortParam.prop;
+                var orderBys = Object.assign({}, self._OrderBys || {});
+                if (self.DiyCommon.IsNull(orderByType)) {
+                    delete orderBys[sortParam.prop];
+                } else {
+                    orderBys[sortParam.prop] = orderByType;
+                }
+                self._OrderBys = orderBys;
+                self.syncLegacyOrderState();
             }
             self.GetDiyTableRow();
         },
@@ -414,10 +417,9 @@ export default {
                 // _PageIndex: self.DiyTableRowPageIndex,
                 // _PageSize: self.DiyTableRowPageSize,
                 // _SysMenuId: self.SysMenuId,
-                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-                _OrderBy: self._OrderBy,
-                _OrderByType: self._OrderByType
+                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey
             };
+            self.applyTableOrderParams(param);
             //2023-06-39：子表可关闭分页
             if (!self.TableChildConfig || (self.TableChildConfig && !self.TableChildConfig.DisablePagination)) {
                 param._PageIndex = self.DiyTableRowPageIndex;

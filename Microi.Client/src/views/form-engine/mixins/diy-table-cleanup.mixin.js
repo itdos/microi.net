@@ -136,6 +136,14 @@ beforeUnmount() {
         self.SearchNumber = {};
         self.SearchWhere = [];
         self.Where = [];
+        self._colFilters = {};
+        self._colPageFilterKeyword = "";
+        self._colPageFilterSelectedValues = [];
+        self._colPageFilters = {};
+        self._OrderBys = {};
+        self._OrderBy = "";
+        self._OrderByType = "";
+        self.LastOrderBy = "";
 
         // 选择状态
         self.TableMultipleSelection = [];
