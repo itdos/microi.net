@@ -75,7 +75,8 @@ export default {
             var self = this;
             if (!self._colMenuField) return '';
             var fieldName = self.DiyCommon.IsNull(self._colMenuField.AsName) ? self._colMenuField.Name : self._colMenuField.AsName;
-            if (self._OrderBy === fieldName) return self._OrderByType.toLowerCase() || '';
+            if (self._OrderBys && self._OrderBys[fieldName]) return String(self._OrderBys[fieldName]).toLowerCase();
+            if (self._OrderBy === fieldName && self._OrderByType) return self._OrderByType.toLowerCase() || '';
             return '';
         },
         // 性能优化：将频繁调用的方法转换为计算属性
@@ -481,6 +482,9 @@ export default {
             _colFilterOperator: 'Like',
             _colFilterValue: '',
             _colFilters: {}, // { fieldName: { operator, value } }
+            _colPageFilterKeyword: '',
+            _colPageFilterSelectedValues: [],
+            _colPageFilters: {}, // { fieldName: { values } }
             _batchDragPending: false,
             _batchDragSelecting: false,
             _batchDragSelectionMode: true,
@@ -546,6 +550,7 @@ export default {
             _lazyScrollTicking: false, // requestAnimationFrame 节流标记
             _OrderBy: "",
             _OrderByType: "",
+            _OrderBys: {},
             SearchFieldIds: [], // SearchFieldIds
             SortFieldIds: [],
             NotShowFields: [],

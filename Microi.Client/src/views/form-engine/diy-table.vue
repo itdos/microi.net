@@ -1195,7 +1195,7 @@
                             style="width: 100%; margin-bottom: 8px;"
                             clearable
                             placeholder="输入筛选值"
-                            @keyup.enter="colMenuApplyFilter()"
+                            @keyup.enter="colMenuApplyAllFilters()"
                         />
                         <!-- 日期时间 -->
                         <el-date-picker
@@ -1226,11 +1226,55 @@
                             style="width: 100%; margin-bottom: 8px;"
                             clearable
                             placeholder="输入筛选值"
-                            @keyup.enter="colMenuApplyFilter()"
+                            @keyup.enter="colMenuApplyAllFilters()"
                         />
+                    </div>
+                </div>
+                <div class="global-col-menu-divider"></div>
+                <!-- 当页筛选 -->
+                <div class="global-col-menu-section-title">
+                    <el-icon><Filter /></el-icon>
+                    <span>当页筛选条件</span>
+                </div>
+                <div class="global-col-menu-filter col-page-filter" @click.stop>
+                    <div v-if="_colMenuField" class="col-filter-body">
+                        <el-input
+                            v-model="_colPageFilterKeyword"
+                            size="small"
+                            class="col-page-filter-search"
+                            clearable
+                            placeholder="搜索"
+                        >
+                            <template #suffix>
+                                <el-icon><Search /></el-icon>
+                            </template>
+                        </el-input>
+                        <el-checkbox
+                            :model-value="isColPageFilterAllChecked()"
+                            :indeterminate="isColPageFilterIndeterminate()"
+                            @change="colPageFilterToggleAll"
+                        >
+                            全选
+                        </el-checkbox>
+                        <div class="col-page-filter-options" v-if="getColPageFilterOptions().length > 0">
+                            <el-checkbox-group v-model="_colPageFilterSelectedValues">
+                                <el-checkbox
+                                    v-for="opt in getColPageFilterOptions()"
+                                    :key="opt.key"
+                                    :label="opt.key"
+                                    :title="opt.label"
+                                    class="col-page-filter-option"
+                                >
+                                    <span class="col-page-filter-option-label">{{ opt.label }}</span>
+                                    <span class="col-page-filter-option-count">({{ opt.count }})</span>
+                                </el-checkbox>
+                            </el-checkbox-group>
+                        </div>
+                        <div v-else class="col-page-filter-empty">暂无可筛选值</div>
+                        <div class="col-page-filter-selected">已选{{ _colPageFilterSelectedValues.length }}项</div>
                         <div class="col-filter-actions">
                             <el-button size="small" @click="colMenuClearFilter()">清除</el-button>
-                            <el-button size="small" type="primary" @click="colMenuApplyFilter()">筛选</el-button>
+                            <el-button size="small" type="primary" @click="colMenuApplyAllFilters()">筛选</el-button>
                         </div>
                     </div>
                 </div>

@@ -273,8 +273,9 @@ export default {
         },
         GetColClassName(field) {
             var self = this;
-            if (self._OrderBy == field.Name) {
-                return "column-" + field.Name + " " + (self._OrderByType.toLocaleLowerCase() == "asc" ? "ascending" : "descending");
+            var sortState = self.getColSortState ? self.getColSortState(field) : '';
+            if (sortState) {
+                return "column-" + field.Name + " " + (sortState.toLocaleLowerCase() == "asc" ? "ascending" : "descending");
             }
             return "column-" + field.Name;
         },

@@ -767,8 +767,11 @@
     border: 1px solid var(--el-border-color, #e4e7ed);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-    min-width: 240px;
-    max-width: 300px;
+    width: min(420px, calc(100vw - 20px));
+    min-width: min(320px, calc(100vw - 20px));
+    max-width: 480px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     padding: 6px 0;
     animation: colMenuFadeIn 0.15s ease-out;
 }
@@ -824,6 +827,68 @@
         display: flex;
         justify-content: flex-end;
         gap: 8px;
+    }
+}
+.col-page-filter {
+    .col-page-filter-search {
+        margin-bottom: 8px;
+    }
+    .col-page-filter-options {
+        max-height: 240px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 2px 0 4px;
+    }
+    .col-page-filter-option {
+        display: grid !important;
+        grid-template-columns: 22px minmax(0, 1fr);
+        column-gap: 8px;
+        width: 100%;
+        min-width: 0;
+        height: 32px;
+        margin-right: 0;
+        align-items: center;
+        :deep(.el-checkbox__input) {
+            grid-column: 1;
+        }
+        :deep(.el-checkbox__label) {
+            grid-column: 2;
+            min-width: 0;
+            width: 100%;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 56px;
+            column-gap: 8px;
+            align-items: center;
+            padding-left: 0;
+            color: var(--el-text-color-primary, #303133);
+        }
+    }
+    :deep(.el-checkbox-group) {
+        display: flex;
+        flex-direction: column;
+    }
+    .col-page-filter-option-label {
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        white-space: nowrap;
+    }
+    .col-page-filter-option-count {
+        width: 56px;
+        text-align: right;
+        justify-self: end;
+        color: var(--el-text-color-secondary, #909399);
+    }
+    .col-page-filter-empty,
+    .col-page-filter-selected {
+        color: var(--el-text-color-secondary, #909399);
+        font-size: 12px;
+        line-height: 24px;
+    }
+    .col-page-filter-selected {
+        color: var(--el-text-color-primary, #303133);
+        font-weight: 600;
     }
 }
 
