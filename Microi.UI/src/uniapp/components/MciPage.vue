@@ -1,5 +1,14 @@
 <template>
-  <view class="mci-page mci-uni-page" :class="{ 'mci-uni-page--safe-bottom': safeBottom }">
+  <view
+    class="mci-page mci-uni-page"
+    :class="{
+      'mci-page--static': !animated,
+      'mci-uni-page--safe-top': safeTop,
+      'mci-uni-page--safe-bottom': safeBottom,
+      'mci-tech-grid': techGrid
+    }"
+    :data-mci-shape="shape || undefined"
+  >
     <slot />
   </view>
 </template>
@@ -7,7 +16,11 @@
 <script setup>
 defineOptions({ name: 'MciPage' });
 defineProps({
-  safeBottom: { type: Boolean, default: true }
+  safeTop: { type: Boolean, default: false },
+  safeBottom: { type: Boolean, default: true },
+  animated: { type: Boolean, default: true },
+  techGrid: { type: Boolean, default: false },
+  shape: { type: String, default: '' }
 });
 </script>
 
@@ -15,9 +28,13 @@ defineProps({
 .mci-uni-page {
   min-height: 100vh;
   box-sizing: border-box;
-  background: var(--mci-bg-page);
+  background: var(--mci-gradient-page, var(--mci-bg-page));
   color: var(--mci-text-primary);
   font-family: var(--mci-font-family);
+}
+
+.mci-uni-page--safe-top {
+  padding-top: var(--mci-safe-top);
 }
 
 .mci-uni-page--safe-bottom {
