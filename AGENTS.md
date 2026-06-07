@@ -506,7 +506,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 32 个）：
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 34 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -528,7 +528,8 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Vue3 前端 SDK（请求、Token、上传、资源 URL、ApiEngine/FormEngine）
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
-- `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
+- `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
+- `microi.skills/microi-ui/SKILL.md` — Microi.UI / MCI-UI 组件库、主题 palette、圆角/扁平、Web/UniApp 用法
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试

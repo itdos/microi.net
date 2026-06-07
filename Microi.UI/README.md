@@ -17,6 +17,29 @@ Microi.UI/
   src/uniapp/      uni-app Vue 3 components for mobile projects
 ```
 
+## Design Runtime
+
+MCI-UI supports project-level theme, motion, and shape preferences:
+
+```js
+import { initMciDesign, setMciPalette, setMciShape } from '@microi/mci-ui/runtime';
+
+initMciDesign({
+  theme: 'light',
+  palette: 'red', // black | white | red | orange | yellow | green | cyan | blue | purple
+  shape: 'rounded', // rounded | flat
+  motion: 'full' // full | reduced
+});
+
+setMciPalette('blue');
+setMciShape('flat');
+```
+
+- `rounded` is recommended for mobile commerce, membership, consumer apps, and brand pages.
+- `flat` is recommended for B-side websites, dashboards, and tool-style pages. Flat mode still keeps borders, shadows, hover lift, and pressed feedback.
+- `palette` controls the brand primary color while preserving contrast through `--mci-text-on-primary`.
+- Page shells use entrance motion by default. Data pages should pair the page shell with skeleton loading states.
+
 ## Web Usage
 
 ```js
@@ -48,8 +71,8 @@ export function createApp() {
 
 - `MciPage`: safe-area aware page shell
 - `MciNavbar`: mobile navigation shell
-- `MciButton`: brand button with variants
-- `MciCard`: compact surface/card
+- `MciButton`: brand button with variants, pressed feedback, optional sheen, and shape tokens
+- `MciCard`: compact surface/card with elevation, hover lift, optional sheen, and glass/focus variants
 - `MciSkeleton`: skeleton loading for data pages
 - `MciDataState`: loading/empty/error state wrapper
 - `MciRichText`: mobile-friendly rich text container with image/text spacing rules
