@@ -6,6 +6,36 @@ const USER_KEY = 'microi_user';
 
 let redirectingToLogin = false;
 
+function getRuntimeUni() {
+  try {
+    if (typeof uni !== 'undefined' && uni && typeof uni === 'object') return uni;
+  } catch (e) {}
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.uni) return globalThis.uni;
+  } catch (e) {}
+  return null;
+}
+
+function uniRequestAdapter(options = {}) {
+  const runtimeUni = getRuntimeUni();
+  if (!runtimeUni || typeof runtimeUni.request !== 'function') {
+    return Promise.reject(new Error('uni.request is not available in current runtime.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    runtimeUni.request({
+      url: options.url,
+      method: options.method || 'POST',
+      data: options.data,
+      header: options.header || options.headers || {},
+      timeout: options.timeout,
+      responseType: options.responseType,
+      success: resolve,
+      fail: reject
+    });
+  });
+}
+
 function redirectToLogin() {
   if (redirectingToLogin) return;
   redirectingToLogin = true;
@@ -57,6 +87,7 @@ export const V8 = createMicroiV8({
   userKey: USER_KEY,
   maxConcurrent: 8,
   appendOsClientQuery: true,
+  requestAdapter: uniRequestAdapter,
   onAuthExpired: () => {
     removeToken();
     redirectToLogin();

@@ -15,6 +15,9 @@ function getGlobalValue(key) {
 }
 
 function getUni() {
+  try {
+    if (typeof uni !== 'undefined' && uni && typeof uni === 'object') return uni;
+  } catch (e) {}
   const runtimeUni = getGlobalValue('uni');
   return runtimeUni && typeof runtimeUni === 'object' ? runtimeUni : null;
 }

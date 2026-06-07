@@ -229,10 +229,20 @@
       </view>
     </view>
 
-    <!-- 加载状态 -->
-    <view class="loading-state" v-if="loading">
-      <view class="loading-spinner"></view>
-      <text class="loading-text">{{ t('common.loading') }}</text>
+    <!-- 加载骨架屏 -->
+    <view class="detail-skeleton" v-if="loading">
+      <view class="skeleton-hero"></view>
+      <view class="skeleton-panel">
+        <view class="skeleton-line skeleton-price"></view>
+        <view class="skeleton-line skeleton-title"></view>
+        <view class="skeleton-line skeleton-subtitle"></view>
+      </view>
+      <view class="skeleton-panel">
+        <view class="skeleton-row" v-for="i in 4" :key="i">
+          <view class="skeleton-line skeleton-label"></view>
+          <view class="skeleton-line skeleton-value"></view>
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -1101,32 +1111,75 @@ export default {
   }
 }
 
-/* 加载状态 */
-.loading-state {
+/* 加载骨架屏 */
+.detail-skeleton {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 24rpx;
+  padding: 24rpx 32rpx calc(140rpx + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+.skeleton-hero {
+  height: 520rpx;
+  border-radius: 0 0 32rpx 32rpx;
+}
+
+.skeleton-panel {
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: var(--mci-bg-elevated);
+  border: 1rpx solid var(--mci-border-color);
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.skeleton-hero,
+.skeleton-line {
+  background: linear-gradient(90deg, var(--mci-bg-surface) 25%, var(--mci-bg-card-hover) 50%, var(--mci-bg-surface) 75%);
+  background-size: 400% 100%;
+  animation: mciShimmer 1.5s ease infinite;
+}
+
+.skeleton-line {
+  height: 24rpx;
+  border-radius: 999rpx;
+}
+
+.skeleton-price {
+  width: 42%;
+  height: 44rpx;
+  margin-bottom: 24rpx;
+}
+
+.skeleton-title {
+  width: 72%;
+  height: 34rpx;
+  margin-bottom: 18rpx;
+}
+
+.skeleton-subtitle {
+  width: 52%;
+}
+
+.skeleton-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 22rpx;
 }
 
-.loading-spinner {
-  width: 64rpx;
-  height: 64rpx;
-  border: 4rpx solid #eee;
-  border-top-color: var(--theme, #6C2BD9);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 20rpx;
+.skeleton-row:last-child {
+  margin-bottom: 0;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.skeleton-label {
+  width: 28%;
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: #999;
+.skeleton-value {
+  width: 54%;
 }
 
 .detail-scroll {

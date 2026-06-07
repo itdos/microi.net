@@ -13,6 +13,41 @@ const MODE_STORAGE_KEY = 'mci-theme'
 // MCI 设计系统主色（与 Microi.Client / microi.app 移动端 mci-color-primary 保持一致）
 const DEFAULT_COLOR = '#6C2BD9'
 const DEFAULT_MODE = 'light'
+const TAB_BAR_ROUTES = [
+  'pages/mall/index',
+  'pages/news/index',
+  'pages/workspace/index',
+  'pages/message/index',
+  'pages/profile/index'
+]
+
+function getSystemTheme() {
+  try {
+    const baseInfo = uni.getAppBaseInfo ? uni.getAppBaseInfo() : null
+    if (baseInfo && (baseInfo.theme === 'light' || baseInfo.theme === 'dark')) {
+      return baseInfo.theme
+    }
+  } catch (e) {}
+
+  try {
+    const sysInfo = uni.getSystemInfoSync()
+    if (sysInfo && (sysInfo.theme === 'light' || sysInfo.theme === 'dark')) {
+      return sysInfo.theme
+    }
+  } catch (e) {}
+
+  return DEFAULT_MODE
+}
+
+function isCurrentTabBarPage() {
+  try {
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const current = pages && pages.length ? pages[pages.length - 1] : null
+    return !!(current && current.route && TAB_BAR_ROUTES.includes(current.route))
+  } catch (e) {
+    return false
+  }
+}
 
 // 获取当前主题色
 export function getTheme() {
@@ -36,14 +71,7 @@ export function getThemeMode() {
     if (saved === 'light' || saved === 'dark') return saved
   } catch (e) {}
 
-  try {
-    const sysInfo = uni.getSystemInfoSync()
-    if (sysInfo && (sysInfo.theme === 'light' || sysInfo.theme === 'dark')) {
-      return sysInfo.theme
-    }
-  } catch (e) {}
-
-  return DEFAULT_MODE
+  return getSystemTheme()
 }
 
 // 设置主题模式
@@ -185,15 +213,18 @@ export function applyThemeMode(mode) {
  * 同步 tabBar 配色（小程序 / App）
  */
 export function applyTabBarTheme(mode, color) {
+  if (!isCurrentTabBarPage()) return
   const isDark = mode === 'dark'
   const selected = color || getTheme()
   try {
-    uni.setTabBarStyle({
+    const task = uni.setTabBarStyle({
       color: isDark ? 'rgba(255,255,255,0.58)' : '#888A9A',
       selectedColor: selected,
       backgroundColor: isDark ? '#121218' : '#FFFFFF',
-      borderStyle: isDark ? 'white' : 'black'
+      borderStyle: isDark ? 'white' : 'black',
+      fail: () => {}
     })
+    if (task && typeof task.catch === 'function') task.catch(() => {})
   } catch (e) {}
 }
 
