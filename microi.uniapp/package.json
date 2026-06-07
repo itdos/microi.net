@@ -18,7 +18,9 @@
     "build:app": "uni build -p app",
     "build:h5": "uni build -p h5",
     "check:ui": "node scripts/check-mci-compliance.js",
-    "test": "npm run check:ui && npm run build:mp-weixin && npm run build:h5"
+    "visual:auth-prompts": "node scripts/visual-message-button.js",
+    "visual:message": "npm run visual:auth-prompts",
+    "test": "npm run check:ui && npm run build:mp-weixin && npm run build:h5 && npm run visual:auth-prompts"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080720251210001",

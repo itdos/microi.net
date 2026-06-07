@@ -23,16 +23,14 @@
 		</view>
 
 		<!-- 未登录提示 -->
-		<view class="login-prompt" v-if="!isLoggedIn">
-			<view class="prompt-card">
-				<text class="prompt-icon">🔒</text>
-				<text class="prompt-title">{{ t('common.loginFirst') }}</text>
-				<text class="prompt-desc">{{ t('message.loginHint') }}</text>
-				<view class="prompt-btn" :style="{ background: themeGradient }" @tap="goLogin">
-					<text>{{ t('common.loginNow') }}</text>
-				</view>
-			</view>
-		</view>
+		<mci-auth-prompt
+			v-if="!isLoggedIn"
+			:title="t('common.loginFirst')"
+			:desc="t('message.loginHint')"
+			:action-text="t('common.loginNow')"
+			:gradient="themeGradient"
+			@action="goLogin"
+		/>
 
 		<!-- 搜索栏 -->
 		<view class="search-section" v-if="isLoggedIn">
@@ -202,12 +200,16 @@
 	import {
 		themeMixin
 	} from '@/utils/theme.js'
+	import MciAuthPrompt from '@/components/mci-auth-prompt/mci-auth-prompt.vue'
 	import {
 		getSignalR,
 		connectSignalR
 	} from '@/utils/signalr.js'
 
 	export default {
+		components: {
+			MciAuthPrompt
+		},
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -853,62 +855,6 @@
 	}
 	
 	
-	/* 未登录提示 */
-	.login-prompt {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0 48rpx;
-	}
-
-	.prompt-card {
-		width: 100%;
-		background: #fff;
-		border-radius: 24rpx;
-		padding: 60rpx 40rpx;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.06);
-	}
-
-	.prompt-icon {
-		font-size: 80rpx;
-		margin-bottom: 20rpx;
-	}
-
-	.prompt-title {
-		font-size: 34rpx;
-		font-weight: 600;
-		color: #333;
-		margin-bottom: 12rpx;
-	}
-
-	.prompt-desc {
-		font-size: 26rpx;
-		color: #999;
-		margin-bottom: 40rpx;
-	}
-
-	.prompt-btn {
-		/* bg: themeGradient inline */
-		padding: 20rpx 80rpx;
-		border-radius: 44rpx;
-		box-shadow: 0 8rpx 24rpx rgba(78, 110, 242, 0.3);
-		transition: transform 0.15s ease;
-
-		&:active {
-			transform: scale(0.97);
-		}
-
-		text {
-			color: #fff;
-			font-size: 30rpx;
-			font-weight: 500;
-		}
-	}
-
 	.search-wrap {
 		display: flex;
 		align-items: center;
