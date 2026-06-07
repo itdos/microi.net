@@ -1,0 +1,40 @@
+@import "./tokens.css";
+
+.mci-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--mci-bg-page);
+  color: var(--mci-text-primary);
+  font-family: var(--mci-font-family);
+}
+
+.mci-safe-bottom {
+  padding-bottom: var(--mci-safe-bottom);
+}
+
+.mci-card {
+  box-sizing: border-box;
+  border: 1px solid var(--mci-border);
+  border-radius: var(--mci-radius-md);
+  background: var(--mci-bg-surface);
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.mci-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--mci-skeleton-a), var(--mci-skeleton-b), var(--mci-skeleton-a));
+  background-size: 240% 100%;
+  animation: mciSkeleton 1.15s ease-in-out infinite;
+}
+
+@keyframes mciSkeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mci-skeleton {
+    animation: none;
+  }
+}

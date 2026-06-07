@@ -525,6 +525,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/v8-template-engine/SKILL.md` — Microi V8 模板引擎（表格/表单 V8 模板）
 - `microi.skills/v8-menu-buttons/SKILL.md` — v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
 - `microi.skills/microi-client-frontend/SKILL.md` — Microi.Client 前台源码架构说明
+- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Vue3 前端 SDK（请求、Token、上传、资源 URL、ApiEngine/FormEngine）
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
