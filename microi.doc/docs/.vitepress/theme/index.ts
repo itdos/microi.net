@@ -11,6 +11,7 @@ import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
+import "./styles/mci-site.scss";
 
 export default {
     ...DefaultTheme,

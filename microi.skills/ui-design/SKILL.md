@@ -22,6 +22,17 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ---
 
+## 样式隔离与抗覆盖
+
+- Microi.UI 页面或局部 UI 必须使用 `.mci-page`、`data-mci-ui-root` 或项目级 `.mci-*` 根容器包裹，避免被宿主项目、第三方组件库、Markdown 渲染器的全局 CSS 意外覆盖。
+- 所有可复用组件必须使用 `mci-` 前缀和 BEM 风格类名；不要写全局 `button`、`input`、`img`、`table`、`div` 选择器。确实需要 reset 时必须限制在 `.mci-page` 或 `[data-mci-ui-root]` 内。
+- 业务页面不得用高优先级全局选择器覆盖 MCI 组件，例如 `.card *`、`button {}`、`img {}`、`.page .mci-card {}`。需要定制时用组件 props、CSS 变量或项目级 wrapper。
+- 第三方 UI 组件必须放在项目 wrapper 内，例如 `.mci-third-party-scope`，颜色、圆角、阴影、间距映射到 `--mci-*` token，而不是直接把第三方默认主题暴露到页面。
+- Web 项目优先用 Vue `scoped` / CSS Modules / 明确命名空间；uni-app 项目优先用页面级 `mci-*` 根类和组件根类。新增全局样式前必须检查是否会影响其它项目页面。
+- 文档站、官网、企业站这类 Markdown/VitePress 项目，应在主题层统一收口视觉，不要在每一篇文档里写互相竞争的散装 CSS。
+
+---
+
 ## 高端视觉标准
 
 - 每个新页面必须有首屏视觉重心：核心数据、主任务、产品/品牌对象或可操作内容应在第一屏明确出现，不能只有说明文字或空白装饰。
