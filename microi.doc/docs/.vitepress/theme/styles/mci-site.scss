@@ -65,10 +65,25 @@ body {
   background: var(--mci-site-gradient-page);
 }
 
+body:has(.VPHome):not(:has(.ai-login-page)) {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(123, 63, 228, .24), transparent 28rem),
+    radial-gradient(circle at 70% 22%, rgba(8, 145, 178, .20), transparent 30rem),
+    radial-gradient(circle at 52% 64%, rgba(181, 18, 32, .18), transparent 34rem),
+    linear-gradient(135deg, #090a16 0%, #151025 48%, #071827 100%) !important;
+  color: #e8ecff;
+}
+
 body:not(:has(.ai-login-page)) .Layout {
   position: relative;
   isolation: isolate;
   background: var(--mci-site-gradient-page);
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .Layout,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPContent,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPHome {
+  background: transparent !important;
 }
 
 body:not(:has(.ai-login-page)) .Layout::before {
@@ -119,6 +134,43 @@ body:not(:has(.ai-login-page)) .DocSearch-Button {
 
 .dark body:not(:has(.ai-login-page)) .DocSearch-Button {
   background: rgba(15,23,42,.82) !important;
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar {
+  border-bottom-color: rgba(255,255,255,.10) !important;
+  background:
+    linear-gradient(90deg, rgba(181,18,32,.18), transparent 36%, rgba(8,145,178,.16)),
+    rgba(7,10,22,.78) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.26) !important;
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarTitle .title,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuLink,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuGroup .button,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar .VPNavBarMenu a {
+  color: rgba(248,250,252,.94) !important;
+  text-shadow: 0 1px 12px rgba(0,0,0,.32);
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuLink:hover,
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuGroup .button:hover {
+  color: #fff !important;
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .DocSearch-Button {
+  border-color: rgba(255,255,255,.16) !important;
+  background: rgba(255,255,255,.10) !important;
+  color: rgba(248,250,252,.78) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 10px 24px rgba(0,0,0,.12) !important;
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .DocSearch-Button *,
+body:has(.VPHome):not(:has(.ai-login-page)) .DocSearch-Button .DocSearch-Button-Keys {
+  color: inherit !important;
+}
+
+body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar .divider {
+  background-color: rgba(255,255,255,.12) !important;
 }
 
 body:not(:has(.ai-login-page)) .VPSidebar {
@@ -311,13 +363,27 @@ body:not(:has(.ai-login-page)) .VPDocAsideOutline .outline-link.active {
 }
 
 body:has(.VPHome) .VPHero .actions .VPButton {
-  min-height: 46px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 56px;
+  padding: 0 30px !important;
   border: 0 !important;
   border-radius: 999px !important;
   color: #fff !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  white-space: nowrap;
   background: var(--mci-site-gradient-primary) !important;
   box-shadow: 0 14px 32px rgba(181,18,32,.28) !important;
   transition: transform .22s ease, box-shadow .22s ease, filter .22s ease !important;
+}
+
+body:has(.VPHome) .VPHero .actions .VPButton .text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
 }
 
 body:has(.VPHome) .VPHero .actions .VPButton:nth-child(2) {
@@ -329,13 +395,13 @@ body:has(.VPHome) .VPHero .actions .VPButton:nth-child(3) {
 }
 
 body:has(.VPHome) .VPHero .actions .VPButton:nth-child(4) {
-  color: #3a2500 !important;
-  background: var(--mci-site-gradient-gold) !important;
-  box-shadow: 0 14px 32px rgba(217,162,58,.26) !important;
+  background: linear-gradient(135deg, #0f9f6e, #0891b2) !important;
 }
 
 body:has(.VPHome) .VPHero .actions .VPButton:nth-child(5) {
-  background: linear-gradient(135deg, #0f9f6e, #0891b2) !important;
+  color: #3a2500 !important;
+  background: var(--mci-site-gradient-gold) !important;
+  box-shadow: 0 14px 32px rgba(217,162,58,.26) !important;
 }
 
 body:has(.VPHome) .VPHero .actions .VPButton:hover {
@@ -390,7 +456,7 @@ body:has(.VPHome) .price-item {
 
 body:has(.VPHome) .ai-chat-section,
 body:has(.VPHome) .product-showcase {
-  color: var(--mci-site-ink) !important;
+  color: #f8fafc !important;
 }
 
 body:has(.VPHome) .ai-chat-section .section-subtitle,
@@ -398,47 +464,47 @@ body:has(.VPHome) .product-showcase .section-subtitle,
 body:has(.VPHome) .product-showcase .card-desc,
 body:has(.VPHome) .product-showcase .price-label,
 body:has(.VPHome) .product-showcase .card-pricing {
-  color: #475569 !important;
-  -webkit-text-fill-color: #475569 !important;
+  color: rgba(226,232,240,.74) !important;
+  -webkit-text-fill-color: rgba(226,232,240,.74) !important;
 }
 
 body:has(.VPHome) .product-showcase .card-title,
 body:has(.VPHome) .product-showcase .price-value {
-  color: #171923 !important;
-  -webkit-text-fill-color: #171923 !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
 }
 
 body:has(.VPHome) .ai-chat-section .chat-inner,
 body:has(.VPHome) .product-showcase .product-card {
   background:
-    linear-gradient(135deg, rgba(181,18,32,.08), rgba(8,145,178,.06)),
-    rgba(255,255,255,.88) !important;
-  border-color: rgba(31,41,55,.10) !important;
-  box-shadow: 0 22px 56px rgba(24,32,48,.13), inset 0 1px 0 rgba(255,255,255,.82) !important;
+    linear-gradient(135deg, rgba(181,18,32,.16), rgba(8,145,178,.10)),
+    rgba(15,23,42,.60) !important;
+  border-color: rgba(255,255,255,.13) !important;
+  box-shadow: 0 28px 70px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.10) !important;
 }
 
 body:has(.VPHome) .ai-chat-section .msg-bubble,
 body:has(.VPHome) .ai-chat-section .chat-input-area,
 body:has(.VPHome) .ai-chat-section .quick-btn {
-  background: rgba(255,255,255,.82) !important;
-  border-color: rgba(31,41,55,.10) !important;
-  color: #334155 !important;
+  background: rgba(255,255,255,.10) !important;
+  border-color: rgba(255,255,255,.12) !important;
+  color: rgba(248,250,252,.90) !important;
 }
 
 body:has(.VPHome) .ai-chat-section .msg-text,
 body:has(.VPHome) .ai-chat-section .powered-tip,
 body:has(.VPHome) .ai-chat-section .powered-tip a {
-  color: #475569 !important;
+  color: rgba(226,232,240,.76) !important;
 }
 
 body:has(.VPHome) .ai-chat-section .chat-input {
-  color: #171923 !important;
+  color: #f8fafc !important;
 }
 
 body:has(.VPHome) .product-showcase .tag,
 body:has(.VPHome) .product-showcase .price-item {
-  border-color: rgba(31,41,55,.08) !important;
-  background: rgba(255,255,255,.70) !important;
+  border-color: rgba(255,255,255,.12) !important;
+  background: rgba(255,255,255,.09) !important;
 }
 
 @keyframes mciSiteFadeUp {

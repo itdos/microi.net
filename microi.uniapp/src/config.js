@@ -27,7 +27,7 @@ export default {
   // ============ 平台信息 ============
   appName: 'Loading...',
   appSubTitle: '',
-  logoUrl: '/static/logo.png',
+  logoUrl: '/static/microi-blue-256.png',
 
   // ============ 小程序授权登录 ============
   // 微信登录接口（兼容旧配置）
