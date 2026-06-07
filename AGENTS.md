@@ -529,7 +529,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
-- `microi.skills/microi-ui/SKILL.md` — Microi.UI / MCI-UI 组件库、主题 palette、圆角/扁平、Web/UniApp 用法
+- `microi.skills/microi-ui/SKILL.md` — 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
