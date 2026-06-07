@@ -109,3 +109,7 @@ npm run pack:check
 ## Design Rule
 
 Business pages should import MCI-UI components or project-level wrappers based on MCI-UI. Third-party UI libraries may be used under the hood, but their visual language should be normalized through `--mci-*` tokens and `mci-*` components.
+
+Wrap pages or embedded UI areas with `.mci-page` or `data-mci-ui-root`. Microi.UI keeps its reset, typography, media, and token defaults scoped under these roots where possible, which reduces accidental overrides from host projects, Markdown renderers, and third-party component libraries.
+
+Shared classes must keep the `mci-` prefix. Avoid generic global selectors such as `button`, `.card`, `.list`, or `img` in business projects; customize with component props, `--mci-*` variables, or project-level wrappers.

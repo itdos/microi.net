@@ -1,5 +1,38 @@
 @import "./tokens.css";
 
+.mci-page,
+[data-mci-ui-root] {
+  isolation: isolate;
+  font-family: var(--mci-font-family);
+  color: var(--mci-text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.mci-page *,
+.mci-page *::before,
+.mci-page *::after,
+[data-mci-ui-root] *,
+[data-mci-ui-root] *::before,
+[data-mci-ui-root] *::after {
+  box-sizing: border-box;
+}
+
+.mci-page :where(button, input, textarea, select),
+[data-mci-ui-root] :where(button, input, textarea, select) {
+  font: inherit;
+}
+
+.mci-page :where(button),
+[data-mci-ui-root] :where(button) {
+  color: inherit;
+}
+
+.mci-page :where(img, video, canvas, svg),
+[data-mci-ui-root] :where(img, video, canvas, svg) {
+  max-width: 100%;
+}
+
 .mci-page {
   position: relative;
   min-height: 100vh;

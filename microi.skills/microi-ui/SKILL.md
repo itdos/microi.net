@@ -28,12 +28,20 @@ When the user does not name a UI style or UI library, default to Microi.UI for M
 
 - Call `initMciDesign()` at app startup or provide an equivalent project-level theme service.
 - Support `theme: light | dark`, `palette: black | white | red | orange | yellow | green | cyan | blue | purple`, `shape: rounded | flat`, and `motion: full | reduced`.
+- Wrap Microi.UI pages or embedded UI areas with `.mci-page` or `data-mci-ui-root` so resets, typography, tokens, and component styles are scoped and less likely to be overwritten by host projects or third-party CSS.
 - Use `MciPage` as the page shell when possible. Pages should have entrance motion by default and respect top/bottom safe areas on mobile.
 - Use `MciSection` for major content sections, `MciCell` for settings/menu/list rows, `MciTabs` for segmented navigation, `MciMetricCard`/`MciAssetCard` for asset/summary numbers, `MciActionBar` for safe-area bottom actions, `MciAvatar` for member identity, `MciProductCard` for commerce/content grids, `MciFormField` for forms, `MciFilterBar` for list filters, `MciOrderCard` for orders/tasks, `MciModal` for dialogs, `MciUploader` for upload surfaces, `MciTimeline` for status records, `MciSteps` for workflows, and `MciThemePanel` for theme/palette/shape/motion configuration screens.
 - Dynamic data pages must show skeleton screens while first data is loading, not spinner-only or premature empty states.
 - Rich text content must give text breathing room while allowing images to be `width:100%`.
 - Do not hardcode colors, radius, shadows, or gradients in business pages; use `--mci-*` variables or project wrappers based on them.
 - Buttons/cards/clickable cells must preserve hover/focus/pressed feedback. White and yellow palettes must use `--mci-text-on-primary` instead of fixed white text.
+
+## Style Isolation Rules
+
+- Use only `mci-` prefixed public classes for shared styles. Do not ship generic global selectors such as `button {}`, `.card {}`, `.list {}`, or `img {}`.
+- Put component-local details in Vue scoped styles or component root classes. Global token/reset rules must be limited to `.mci-page` or `[data-mci-ui-root]`.
+- When adapting uni-ui, uView, TDesign, FirstUI, Element Plus, or VitePress Markdown content, wrap the third-party output and map its visible colors/radius/shadows to `--mci-*` variables instead of modifying library internals directly.
+- For docs/official-site work, prefer a single VitePress theme layer that styles `VPDoc`, `VPHome`, tables, code blocks, sidebars, and feature cards consistently. Avoid per-document one-off CSS unless the page is a special showcase.
 
 ## Vue 3 Web Usage
 
