@@ -317,7 +317,7 @@ export default {
      * 支持：http绝对路径、JSON对象字符串、相对路径
      */
     getServerPath(path, fileServer) {
-      if (!path) return '/static/logo.png'
+      if (!path) return '/static/microi-blue-256.png'
       // 已经是完整 URL
       if (path.toLowerCase().startsWith('http')) return path
       // JSON 对象字符串（如 {"Id":"...","Path":"https://...","State":1}）

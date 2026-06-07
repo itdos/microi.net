@@ -76,3 +76,5 @@ For non-H5 uni-app targets, DOM attributes may not exist. Store the preference t
 - Add any new reusable component to `Microi.UI/src/web` and/or `Microi.UI/src/uniapp`, then export it from the matching `index.js`.
 - Update `microi.doc/docs/doc/system-engine/microi-ui.md` and, when the English homepage/sidebar links to it, `microi.doc/docs/en/doc/system-engine/microi-ui.md`.
 - Validate with `npm run check`, `npm run pack:check`, and the relevant `microi.doc` build when docs changed.
+- For official sites, docs sites, product pages, and enterprise sites, take screenshots of the nav/header, hero actions, and representative cards. Verify nav/background contrast, button text vertical centering, and card background harmony before considering the UI done.
+- When styling host frameworks such as VitePress, avoid broad overrides that accidentally turn a dark landing page into a light-header/light-card hybrid. Scope home-page and document-page styles separately.

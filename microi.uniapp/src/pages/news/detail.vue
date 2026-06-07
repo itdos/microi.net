@@ -40,10 +40,17 @@
       <view class="bottom-space"></view>
     </scroll-view>
 
-    <!-- 加载状态 -->
-    <view class="loading-state" v-if="loading">
-      <view class="loading-spinner"></view>
-      <text class="loading-text">{{ t('common.loading') }}</text>
+    <!-- 加载骨架屏 -->
+    <view class="article-skeleton" v-if="loading">
+      <view class="skeleton-panel skeleton-header">
+        <view class="skeleton-line skeleton-title-line"></view>
+        <view class="skeleton-line skeleton-title-short"></view>
+        <view class="skeleton-line skeleton-meta-line"></view>
+      </view>
+      <view class="skeleton-cover"></view>
+      <view class="skeleton-panel skeleton-body">
+        <view class="skeleton-line" v-for="i in 7" :key="i" :class="{ 'is-short': i === 7 }"></view>
+      </view>
     </view>
 
     <!-- 错误状态 -->
@@ -292,32 +299,68 @@ export default {
   height: 60rpx;
 }
 
-/* 加载状态 */
-.loading-state {
+/* 加载骨架屏 */
+.article-skeleton {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  gap: 24rpx;
+  padding: 30rpx 32rpx 80rpx;
+  overflow: hidden;
 }
 
-.loading-spinner {
-  width: 64rpx;
-  height: 64rpx;
-  border: 4rpx solid #eee;
-  border-top-color: var(--theme, #6C2BD9);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.skeleton-panel {
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: var(--mci-bg-elevated);
+  border: 1rpx solid var(--mci-border-color);
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.skeleton-cover {
+  height: 360rpx;
+  border-radius: 28rpx;
+}
+
+.skeleton-cover,
+.skeleton-line {
+  background: linear-gradient(90deg, var(--mci-bg-surface) 25%, var(--mci-bg-card-hover) 50%, var(--mci-bg-surface) 75%);
+  background-size: 400% 100%;
+  animation: mciShimmer 1.5s ease infinite;
+}
+
+.skeleton-line {
+  height: 24rpx;
+  border-radius: 999rpx;
   margin-bottom: 20rpx;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.skeleton-line:last-child {
+  margin-bottom: 0;
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: #999;
+.skeleton-title-line {
+  width: 86%;
+  height: 36rpx;
+}
+
+.skeleton-title-short {
+  width: 58%;
+  height: 36rpx;
+}
+
+.skeleton-meta-line {
+  width: 38%;
+  height: 22rpx;
+  margin-top: 16rpx;
+}
+
+.skeleton-body .skeleton-line {
+  width: 100%;
+}
+
+.skeleton-body .skeleton-line.is-short {
+  width: 64%;
 }
 
 /* 错误状态 */

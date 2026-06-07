@@ -15,7 +15,10 @@
     "build:mp-toutiao": "uni build -p mp-toutiao",
     "build:mp-lark": "uni build -p mp-lark",
     "build:mp-xhs": "uni build -p mp-xhs",
-    "build:app": "uni build -p app"
+    "build:app": "uni build -p app",
+    "build:h5": "uni build -p h5",
+    "check:ui": "node scripts/check-mci-compliance.js",
+    "test": "npm run check:ui && npm run build:mp-weixin && npm run build:h5"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080720251210001",
