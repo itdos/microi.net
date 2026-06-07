@@ -37,6 +37,11 @@ const theme = read('src/utils/theme.js');
 const app = read('src/App.vue');
 const design = read('src/styles/mci-design.scss');
 const config = read('src/config.js');
+const pkg = JSON.parse(read('package.json'));
+const messagePage = read('src/pages/message/index.vue');
+const workspacePage = read('src/pages/workspace/index.vue');
+const authPrompt = read('src/components/mci-auth-prompt/mci-auth-prompt.vue');
+const visualAuthPrompt = read('scripts/visual-message-button.js');
 
 assert(request.includes('function uniRequestAdapter'), 'request.js must define an explicit uni.request adapter.');
 assert(request.includes('requestAdapter: uniRequestAdapter'), 'Configured Microi V8 instance must use the uni.request adapter.');
@@ -47,6 +52,11 @@ assert(theme.includes('task.catch'), 'theme.js must swallow setTabBarStyle Promi
 assert(!config.includes('/static/logo.png'), 'config.js must not point to missing /static/logo.png.');
 assert(!read('src/pages/login/index.vue').includes('/static/logo.png'), 'login page must not fall back to missing /static/logo.png.');
 assert(exists('src/static/microi-blue-256.png'), 'Default Microi logo asset must exist.');
+assert(exists('scripts/visual-message-button.js'), 'Visual screenshot check for the message login button must exist.');
+assert(pkg.scripts && pkg.scripts['visual:auth-prompts'], 'package.json must expose npm run visual:auth-prompts.');
+assert(pkg.scripts && pkg.scripts.test && pkg.scripts.test.includes('npm run visual:auth-prompts'), 'npm test must run the auth prompt screenshot checks.');
+assert(visualAuthPrompt.includes('workspace-login.png'), 'Visual screenshot check must include the workspace auth prompt.');
+assert(visualAuthPrompt.includes('message-login.png'), 'Visual screenshot check must include the message auth prompt.');
 
 assert(app.includes("@import './styles/mci-design.scss'"), 'App.vue must import the MCI design stylesheet.');
 for (const token of [
@@ -63,6 +73,14 @@ for (const token of [
 assert(!/\n\s*button\s*\{/.test(design), 'MCI stylesheet must not use broad global button selectors.');
 assert(!/\n\s*img\s*\{/.test(design), 'MCI stylesheet must not use broad global img selectors.');
 assert(!/\n\s*\.card\s*\{/.test(design), 'MCI stylesheet must not use broad global .card selectors.');
+assert(messagePage.includes('<mci-auth-prompt'), 'message page must use the shared mci-auth-prompt component.');
+assert(workspacePage.includes('<mci-auth-prompt'), 'workspace page must use the shared mci-auth-prompt component.');
+assert(!messagePage.includes('class="login-prompt"') && !messagePage.includes('class="prompt-btn"'), 'message page must not keep duplicated auth prompt markup/styles.');
+assert(!workspacePage.includes('class="login-prompt"') && !workspacePage.includes('class="prompt-btn"'), 'workspace page must not keep duplicated auth prompt markup/styles.');
+assert(/\.mci-auth-prompt__button\s*\{[\s\S]*display:\s*flex/.test(authPrompt), 'auth prompt button must use flex layout for centering.');
+assert(/\.mci-auth-prompt__button\s*\{[\s\S]*align-items:\s*center/.test(authPrompt), 'auth prompt button must align text vertically centered.');
+assert(/\.mci-auth-prompt__button\s*\{[\s\S]*justify-content:\s*center/.test(authPrompt), 'auth prompt button must center text horizontally.');
+assert(/\.mci-auth-prompt__button\s*\{[\s\S]*line-height:\s*1/.test(authPrompt), 'auth prompt button must use stable line-height.');
 
 for (const page of listVuePages(path.join(src, 'pages'))) {
   const content = read(page);

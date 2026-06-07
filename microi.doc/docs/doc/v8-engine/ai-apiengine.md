@@ -6,6 +6,14 @@
 
 ---
 
+## 🎬 视频演示：AI本地编程环境搭建
+
+> 快速在本地搭建AI编程环境
+
+<iframe src="https://meeting.tencent.com/crm/lvDYAP1Dff" width="100%" height="500" frameborder="0" allowfullscreen style="border-radius: 8px; margin: 8px 0;"></iframe>
+
+---
+
 ## 🎬 视频演示：20 分钟快速开发一套进销存系统
 
 > 利用 AI + Microi吾码低代码平台，在约 20 分钟内从零搭建一套完整的进销存系统（含建表、菜单、接口引擎、表单事件）。

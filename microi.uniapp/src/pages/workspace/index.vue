@@ -20,16 +20,14 @@
     </view>
 
     <!-- 未登录提示 -->
-    <view class="login-prompt" v-if="!isLoggedIn">
-      <view class="prompt-card">
-        <text class="prompt-icon">🔒</text>
-        <text class="prompt-title">{{ t('common.loginFirst') }}</text>
-        <text class="prompt-desc">{{ t('workspace.loginHint') }}</text>
-        <view class="prompt-btn" :style="{ background: themeGradient }" @tap="goLogin">
-          <text>{{ t('common.loginNow') }}</text>
-        </view>
-      </view>
-    </view>
+    <mci-auth-prompt
+      v-if="!isLoggedIn"
+      :title="t('common.loginFirst')"
+      :desc="t('workspace.loginHint')"
+      :action-text="t('common.loginNow')"
+      :gradient="themeGradient"
+      @action="goLogin"
+    />
 
     <!-- 内容区域 -->
     <scroll-view
@@ -138,8 +136,12 @@ import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 import { getSourceTag } from '@/utils/platform.js'
+import MciAuthPrompt from '@/components/mci-auth-prompt/mci-auth-prompt.vue'
 
 export default {
+  components: {
+    MciAuthPrompt
+  },
   mixins: [themeMixin],
   data() {
     return {
@@ -531,62 +533,6 @@ export default {
   font-size: 22rpx;
   color: rgba(255,255,255,0.7);
   margin-top: 2rpx;
-}
-
-/* 未登录提示 */
-.login-prompt {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 48rpx;
-}
-
-.prompt-card {
-  width: 100%;
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 60rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.06);
-}
-
-.prompt-icon {
-  font-size: 80rpx;
-  margin-bottom: 20rpx;
-}
-
-.prompt-title {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12rpx;
-}
-
-.prompt-desc {
-  font-size: 26rpx;
-  color: #999;
-  margin-bottom: 40rpx;
-}
-
-.prompt-btn {
-  /* bg: themeGradient inline */
-  padding: 20rpx 80rpx;
-  border-radius: 44rpx;
-  box-shadow: 0 8rpx 24rpx rgba(78, 110, 242, 0.3);
-  transition: transform 0.15s ease;
-
-  &:active {
-    transform: scale(0.97);
-  }
-
-  text {
-    color: #fff;
-    font-size: 30rpx;
-    font-weight: 500;
-  }
 }
 
 /* 内容滚动区 */
