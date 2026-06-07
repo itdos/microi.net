@@ -103,6 +103,50 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 .cat-content { flex: 1; min-width: 0; height: 100%; }
 ```
 
+## 数据页必须区分加载态与空态
+
+任何依赖接口/数据库返回列表的数据页，都必须有三态：`loading`、`data`、`empty`。接口请求结束前只能显示“图标 + 数据加载中...”，不能提前显示“暂无数据/暂无明细/空空如也”。
+
+- `loading` 初始值设为 `true`（或进入页面立即设为 `true`），请求 `finally` 中再置为 `false`。
+- 空态必须使用 `!loading && list.length === 0`，不能直接写 `v-if="!list.length"`。
+- 加载态和空态都要有统一视觉：小图标/动效 + 文案；空态可带一个简短行动按钮，但不要出现调试字段或接口错误堆栈。
+- 切换 tab、筛选、搜索、分类、分页重载第一页时，应重新进入 loading；加载下一页时可用底部小 loading，不要盖住已有数据。
+- 请求失败时结束 loading，并给用户 toast 或错误状态；不要静默失败后停在“加载中”，也不要把失败误显示成“暂无数据”。
+
+参考结构：
+
+```vue
+<view v-for="item in list" :key="item.Id">...</view>
+<DataState v-if="loading" loading />
+<DataState v-else-if="!list.length" empty-text="暂无数据" />
+```
+
+```js
+const loading = ref(true);
+const list = ref([]);
+
+async function load() {
+  loading.value = true;
+  try {
+    const r = await queryList();
+    list.value = r.Code === 1 ? (r.Data || []) : [];
+  } finally {
+    loading.value = false;
+  }
+}
+```
+
+## 列表型资料页必须提供完整管理动作
+
+地址、联系人、收款方式、发票抬头、车辆、设备、证照、银行卡等用户维护型资料页，不能只展示简略列表。除非业务明确只读，移动端必须提供：
+
+- 查看完整信息：点击卡片或“详情”打开详情页/弹层，显示列表里省略的所有关键字段。
+- 新增和编辑：新增与编辑可以复用同一表单，编辑时要带 Id 并回填现有值。
+- 删除：必须有二次确认，并校验当前用户只能删除自己的资料；删除成功后刷新列表。
+- 默认/启用类状态：同一用户只允许一个默认值时，后端保存接口要负责互斥清理，前端不能只改本地 UI。
+- 权限与接口：后端接口必须用 token/当前用户校验所有权，不能信任前端传来的 MemberId/UserId。
+- 空态行动：没有数据时给出新增入口，但仍要遵守上面的加载态规则。
+
 ## 移动端资产/奖励流水展示
 
 收益明细、积分明细、奖励明细、充值记录、订单流水等页面要面向用户展示“发生了什么”和“是否到账”，不要直接暴露后台调试字段。
