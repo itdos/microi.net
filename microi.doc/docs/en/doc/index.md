@@ -16,7 +16,7 @@
 🔥 AI Local V8 Engine Programming (VS Code Copilot / Cursor / Claude + MCP + Skills), AI Online Programming, AI Data Analysis<br>
 .NET10 + Vue3 + Cross-Database / Cross-Platform, Distributed Architecture, High Performance (L1/L2 Cache), Open Source, Multi-Terminal Unified
 
-[Documentation](https://microi.net/) · [Try Online](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [OpenClaw](https://gitee.com/microi-net/microi.openclaw)
+[Documentation](https://microi.net/) · [Try Online](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [Microi UI](/en/doc/system-engine/microi-ui) · [OpenClaw](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 

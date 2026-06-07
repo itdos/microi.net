@@ -3,6 +3,7 @@
     {
       "path": "pages/mall/index",
       "style": {
+        "navigationBarTitleText": "商城",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"
@@ -11,6 +12,7 @@
     {
       "path": "pages/news/index",
       "style": {
+        "navigationBarTitleText": "资讯",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"
@@ -19,6 +21,7 @@
     {
       "path": "pages/workspace/index",
       "style": {
+        "navigationBarTitleText": "工作台",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"
@@ -27,6 +30,7 @@
     {
       "path": "pages/message/index",
       "style": {
+        "navigationBarTitleText": "消息",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"
@@ -35,6 +39,7 @@
     {
       "path": "pages/profile/index",
       "style": {
+        "navigationBarTitleText": "我的",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"
@@ -43,6 +48,7 @@
     {
       "path": "pages/message/chat",
       "style": {
+        "navigationBarTitleText": "会话",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
         "backgroundColor": "#f5f7fa"
@@ -51,6 +57,7 @@
     {
       "path": "pages/mall/detail",
       "style": {
+        "navigationBarTitleText": "商品详情",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
         "backgroundColor": "#f5f7fa"
@@ -59,6 +66,7 @@
     {
       "path": "pages/news/detail",
       "style": {
+        "navigationBarTitleText": "资讯详情",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "black",
         "backgroundColor": "#ffffff"
@@ -67,6 +75,7 @@
     {
       "path": "pages/login/index",
       "style": {
+        "navigationBarTitleText": "登录",
         "navigationStyle": "custom",
         "navigationBarTextStyle": "white",
         "backgroundColor": "#f5f7fa"

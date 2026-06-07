@@ -19,6 +19,9 @@ hero:
       text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
     - theme: brand
+      text: 吾码UI
+      link: /doc/system-engine/microi-ui
+    - theme: brand
       text: OpenClaw 吾码小龙虾
       link: https://gitee.com/microi-net/microi.openclaw
     - theme: brand

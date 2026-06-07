@@ -22,7 +22,12 @@ Microi.UI/
 MCI-UI supports project-level theme, motion, and shape preferences:
 
 ```js
-import { initMciDesign, setMciPalette, setMciShape } from '@microi/mci-ui/runtime';
+import {
+  initMciDesign,
+  setMciPalette,
+  setMciShape,
+  toggleMciTheme
+} from '@microi/mci-ui/runtime';
 
 initMciDesign({
   theme: 'light',
@@ -33,6 +38,7 @@ initMciDesign({
 
 setMciPalette('blue');
 setMciShape('flat');
+toggleMciTheme();
 ```
 
 - `rounded` is recommended for mobile commerce, membership, consumer apps, and brand pages.
@@ -73,9 +79,32 @@ export function createApp() {
 - `MciNavbar`: mobile navigation shell
 - `MciButton`: brand button with variants, pressed feedback, optional sheen, and shape tokens
 - `MciCard`: compact surface/card with elevation, hover lift, optional sheen, and glass/focus variants
-- `MciSkeleton`: skeleton loading for data pages
+- `MciCell`: list/settings/menu row for mobile and web surfaces
+- `MciSection`: section shell with title, description, eyebrow, and actions
+- `MciThemePanel`: ready-to-use theme/palette/shape/motion switcher
+- `MciTabs`: segmented navigation for categories, filters, and state tabs
+- `MciMetricCard`: asset, income, dashboard, and campaign metric card
+- `MciActionBar`: safe-area aware bottom action bar
+- `MciAvatar`: member/user avatar with fallback text
+- `MciProductCard`: commerce product card for malls and activity grids
+- `MciFormField`: labeled form field with help/error states
+- `MciFilterBar`: filter/search action bar for list pages
+- `MciAssetCard`: balance, points, income, and dashboard asset card
+- `MciOrderCard`: order, approval, task, and service record card
+- `MciModal`: modal dialog with mask, header, body, and footer slots
+- `MciUploader`: upload drop-zone/chooser shell
+- `MciTimeline`: timeline for status flow and activity records
+- `MciSteps`: process steps for orders, workflows, and onboarding
+- `MciSkeleton`: skeleton loading for list, grid, banner, detail, and metric pages
 - `MciDataState`: loading/empty/error state wrapper
 - `MciRichText`: mobile-friendly rich text container with image/text spacing rules
+
+## Quality Checks
+
+```bash
+npm run check
+npm run pack:check
+```
 
 ## Design Rule
 

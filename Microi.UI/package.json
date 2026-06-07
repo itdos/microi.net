@@ -4,6 +4,23 @@
   "private": true,
   "description": "MCI-UI for Microi Vue3 websites and uni-app mobile projects.",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "microi",
+    "mci-ui",
+    "vue3",
+    "uni-app",
+    "design-system",
+    "theme"
+  ],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/theme/runtime.js && node --check src/web/index.js && node --check src/uniapp/index.js",
+    "pack:check": "npm pack --dry-run"
+  },
   "sideEffects": [
     "**/*.css",
     "**/*.scss",

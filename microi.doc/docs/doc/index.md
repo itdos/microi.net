@@ -16,7 +16,7 @@
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
 .NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
 
-[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 

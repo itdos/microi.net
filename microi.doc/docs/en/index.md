@@ -19,6 +19,9 @@ hero:
       text: Gitee Source Code
       link: https://gitee.com/ITdos/microi.net
     - theme: brand
+      text: Microi UI
+      link: /en/doc/system-engine/microi-ui
+    - theme: brand
       text: OpenClaw
       link: https://gitee.com/microi-net/microi.openclaw
   image:
