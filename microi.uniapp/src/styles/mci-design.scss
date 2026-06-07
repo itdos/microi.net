@@ -261,6 +261,7 @@ page[data-theme="dark"] .mci-page-texture {
 }
 
 .prompt-card,
+.mci-auth-prompt__card,
 .menu-card,
 .news-item,
 .product-card,
@@ -322,6 +323,7 @@ page[data-theme="dark"] .mci-page-texture {
 
 .mci-btn,
 .prompt-btn,
+.mci-auth-prompt__button,
 .empty-btn,
 .filter-confirm-btn,
 .pwd-confirm {
@@ -477,7 +479,8 @@ page[data-theme="dark"] .mci-page-texture {
 .pwd-cancel,
 .pwd-confirm,
 .empty-btn,
-.prompt-btn {
+.prompt-btn,
+.mci-auth-prompt__button {
   min-height: 88rpx;
   transition: transform var(--mci-duration-fast) ease, box-shadow var(--mci-duration-fast) ease, background-color var(--mci-duration-fast) ease;
 }
@@ -507,7 +510,8 @@ page[data-theme="dark"] .mci-page-texture {
 .pwd-cancel:active,
 .pwd-confirm:active,
 .empty-btn:active,
-.prompt-btn:active {
+.prompt-btn:active,
+.mci-auth-prompt__button:active {
   transform: scale(0.97);
 }
 
@@ -581,6 +585,7 @@ page[data-theme="dark"] .mci-page-texture {
 .filter-confirm-btn,
 .empty-btn,
 .prompt-btn,
+.mci-auth-prompt__button,
 .error-btn {
   color: var(--mci-text-on-primary) !important;
 }
@@ -590,6 +595,7 @@ page[data-theme="dark"] .mci-page-texture {
 .filter-confirm-btn text,
 .empty-btn text,
 .prompt-btn text,
+.mci-auth-prompt__button text,
 .error-btn text {
   color: var(--mci-text-on-primary) !important;
 }
