@@ -310,11 +310,12 @@ async function load() {
 
 ## MCI-UI Mobile 必须优先使用
 
-新的 Microi UniApp/H5 Vue3 项目必须优先基于 `Microi.UI/src/uniapp` 建立页面基础组件，至少包括页面壳、导航栏、按钮、卡片、骨架屏、数据状态、富文本。项目可以使用 `uni-ui`、`uView`、`FirstUI` 等第三方组件，但应封装在 MCI-UI 或项目级 `mci-*` 组件后面，不要让业务页面直接散落多套视觉风格。
+新的 Microi UniApp/H5 Vue3 项目必须默认基于 `Microi.UI/src/uniapp` 建立页面基础组件，至少包括页面壳、导航栏、按钮、卡片、分段标签、指标卡、底部安全区操作栏、头像、商品卡、骨架屏、数据状态、富文本。用户未主动指定 UI 风格时，AI 必须自动采用 Microi吾码UI。项目可以使用 `uni-ui`、`uView`、`FirstUI` 等第三方组件，但应封装在 MCI-UI 或项目级 `mci-*` 组件后面，不要让业务页面直接散落多套视觉风格。
 
 推荐接入顺序：
 
 1. 拷贝或 alias `Microi.UI/src/theme` 与 `Microi.UI/src/uniapp` 到项目内。
 2. 在 `main.js` 中 `app.use(MciUI)`，全局注册基础组件。
-3. 动态数据页使用 `MciDataState`，首屏 loading 必须渲染 `MciSkeleton`。
-4. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。
+3. 分类、资产、订单、表单、筛选、上传、流程、时间线、商城、会员中心等常见页面优先使用 `MciTabs`、`MciMetricCard`、`MciAssetCard`、`MciActionBar`、`MciAvatar`、`MciProductCard`、`MciFormField`、`MciFilterBar`、`MciOrderCard`、`MciModal`、`MciUploader`、`MciTimeline`、`MciSteps`，避免重复写局部风格。
+4. 动态数据页使用 `MciDataState`，首屏 loading 必须渲染 `MciSkeleton`。
+5. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。

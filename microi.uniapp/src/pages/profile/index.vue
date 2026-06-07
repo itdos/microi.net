@@ -1,11 +1,6 @@
 <template>
   <view class="profile-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
-    <view class="mci-aurora">
-      <view class="mci-aurora__orb mci-aurora__orb--1"></view>
-      <view class="mci-aurora__orb mci-aurora__orb--2"></view>
-      <view class="mci-aurora__orb mci-aurora__orb--3"></view>
-      <view class="mci-aurora__orb mci-aurora__orb--4"></view>
-    </view>
+    <view class="mci-page-texture"></view>
     <!-- 顶部用户卡片 -->
     <view class="user-card" :style="{ paddingTop: statusBarHeight + 'px', background: themeColor }">
       <view class="card-bg">

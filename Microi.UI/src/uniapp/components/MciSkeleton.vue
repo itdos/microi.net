@@ -1,12 +1,32 @@
 <template>
   <view class="mci-uni-skeleton" :class="`mci-uni-skeleton--${type}`">
-    <view v-for="item in rows" :key="item" class="mci-uni-skeleton__row">
-      <view class="mci-skeleton mci-uni-skeleton__media" />
-      <view class="mci-uni-skeleton__copy">
-        <view class="mci-skeleton mci-uni-skeleton__line" />
+    <template v-if="type === 'banner'">
+      <view class="mci-skeleton mci-uni-skeleton__banner" />
+      <view class="mci-skeleton mci-uni-skeleton__line mci-uni-skeleton__line--wide" />
+      <view class="mci-skeleton mci-uni-skeleton__line" />
+    </template>
+    <template v-else-if="type === 'detail'">
+      <view class="mci-skeleton mci-uni-skeleton__hero" />
+      <view class="mci-skeleton mci-uni-skeleton__line mci-uni-skeleton__line--wide" />
+      <view class="mci-skeleton mci-uni-skeleton__line" />
+      <view class="mci-skeleton mci-uni-skeleton__line mci-uni-skeleton__line--short" />
+    </template>
+    <template v-else-if="type === 'metric'">
+      <view v-for="item in rows" :key="item" class="mci-uni-skeleton__metric">
         <view class="mci-skeleton mci-uni-skeleton__line mci-uni-skeleton__line--short" />
+        <view class="mci-skeleton mci-uni-skeleton__number" />
+        <view class="mci-skeleton mci-uni-skeleton__line" />
       </view>
-    </view>
+    </template>
+    <template v-else>
+      <view v-for="item in rows" :key="item" class="mci-uni-skeleton__row">
+        <view class="mci-skeleton mci-uni-skeleton__media" />
+        <view class="mci-uni-skeleton__copy">
+          <view class="mci-skeleton mci-uni-skeleton__line" />
+          <view class="mci-skeleton mci-uni-skeleton__line mci-uni-skeleton__line--short" />
+        </view>
+      </view>
+    </template>
   </view>
 </template>
 
@@ -26,6 +46,12 @@ defineProps({
 }
 
 .mci-uni-skeleton--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+}
+
+.mci-uni-skeleton--metric {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20rpx;
@@ -73,5 +99,39 @@ defineProps({
 
 .mci-uni-skeleton__line--short {
   width: 62%;
+}
+
+.mci-uni-skeleton__line--wide {
+  width: 92%;
+}
+
+.mci-uni-skeleton__banner,
+.mci-uni-skeleton__hero {
+  width: 100%;
+  display: block;
+}
+
+.mci-uni-skeleton__banner {
+  height: 260rpx;
+}
+
+.mci-uni-skeleton__hero {
+  height: 420rpx;
+}
+
+.mci-uni-skeleton__number {
+  width: 70%;
+  height: 56rpx;
+  border-radius: 999rpx;
+}
+
+.mci-uni-skeleton__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+  padding: 24rpx;
+  border-radius: var(--mci-shape-card);
+  background: var(--mci-bg-surface);
+  box-sizing: border-box;
 }
 </style>

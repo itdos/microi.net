@@ -1,5 +1,6 @@
 :root,
 page {
+  color-scheme: light;
   --mci-color-primary: #B51220;
   --mci-color-primary-strong: #8E0613;
   --mci-color-accent-gold: #D9A23A;
@@ -51,14 +52,22 @@ page {
   --mci-space-5: 20px;
   --mci-space-6: 24px;
   --mci-space-8: 32px;
+  --mci-space-10: 40px;
+  --mci-space-12: 48px;
 
   --mci-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --mci-font-mono: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
   --mci-text-xs: 12px;
   --mci-text-sm: 13px;
   --mci-text-base: 15px;
   --mci-text-lg: 17px;
   --mci-text-xl: 20px;
   --mci-text-2xl: 24px;
+  --mci-text-3xl: 32px;
+  --mci-text-4xl: 42px;
+  --mci-line-tight: 1.2;
+  --mci-line-normal: 1.55;
+  --mci-line-loose: 1.8;
 
   --mci-shadow-sm: 0 2px 8px rgba(24, 32, 48, .08);
   --mci-shadow-md: 0 8px 24px rgba(24, 32, 48, .10);
@@ -95,6 +104,14 @@ page {
   --mci-idle-y: -4px;
 
   --mci-touch-target: 44px;
+  --mci-container-sm: 720px;
+  --mci-container-md: 960px;
+  --mci-container-lg: 1180px;
+  --mci-container-xl: 1360px;
+  --mci-z-sticky: 20;
+  --mci-z-dropdown: 50;
+  --mci-z-modal: 100;
+  --mci-z-toast: 120;
   --mci-safe-top: env(safe-area-inset-top, 0px);
   --mci-safe-right: env(safe-area-inset-right, 0px);
   --mci-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -124,6 +141,7 @@ page[data-mci-shape="flat"],
 
 :root[data-theme="dark"],
 page[data-theme="dark"] {
+  color-scheme: dark;
   --mci-bg-page: #10131A;
   --mci-bg-base: #0B0F16;
   --mci-bg-surface: #181C25;

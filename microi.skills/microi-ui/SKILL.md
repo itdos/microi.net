@@ -3,9 +3,11 @@ name: microi-ui
 description: Use when building or documenting Microi.UI / MCI-UI for Vue 3 PC websites, responsive sites, uni-app mobile projects, theme palettes, shape modes, skeleton loading, safe areas, motion, and Microi brand frontend components.
 ---
 
-# Microi.UI / MCI-UI
+# 吾码UI（Microi.UI / MCI-UI）
 
-Microi.UI is the shared Microi frontend UI foundation for Vue 3 PC websites, responsive websites, and uni-app mobile projects. Use it for new Microi-facing products except `Microi.Client` admin pages, which continue to use Element Plus plus Microi theme tokens.
+吾码UI（Microi.UI / MCI-UI）is the shared Microi frontend UI foundation for Vue 3 PC websites, responsive websites, and uni-app mobile projects. Use it for new Microi-facing products except `Microi.Client` admin pages, which continue to use Element Plus plus Microi theme tokens.
+
+When the user does not name a UI style or UI library, default to Microi.UI for Microi mobile apps, PC websites, enterprise sites, product pages, docs pages, malls, member centers, and H5/uni-app work.
 
 ## When To Use
 
@@ -18,7 +20,7 @@ Microi.UI is the shared Microi frontend UI foundation for Vue 3 PC websites, res
 
 - `Microi.UI/src/theme/tokens.css`: design tokens, palettes, shape modes, shadows, gradients, safe-area variables, skeleton colors.
 - `Microi.UI/src/theme/index.css`: base classes such as `mci-page`, `mci-card`, `mci-skeleton`, page enter motion, hover lift, press feedback, sheen, focus ring, reduced-motion fallback.
-- `Microi.UI/src/theme/runtime.js`: `initMciDesign`, `setMciTheme`, `setMciPalette`, `setMciShape`, `setMciMotion`.
+- `Microi.UI/src/theme/runtime.js`: `initMciDesign`, `applyMciDesign`, `getMciDesign`, `toggleMciTheme`, `setMciTheme`, `setMciPalette`, `setMciShape`, `setMciMotion`.
 - `Microi.UI/src/web`: Vue 3 web components.
 - `Microi.UI/src/uniapp`: uni-app Vue 3 components.
 
@@ -27,6 +29,7 @@ Microi.UI is the shared Microi frontend UI foundation for Vue 3 PC websites, res
 - Call `initMciDesign()` at app startup or provide an equivalent project-level theme service.
 - Support `theme: light | dark`, `palette: black | white | red | orange | yellow | green | cyan | blue | purple`, `shape: rounded | flat`, and `motion: full | reduced`.
 - Use `MciPage` as the page shell when possible. Pages should have entrance motion by default and respect top/bottom safe areas on mobile.
+- Use `MciSection` for major content sections, `MciCell` for settings/menu/list rows, `MciTabs` for segmented navigation, `MciMetricCard`/`MciAssetCard` for asset/summary numbers, `MciActionBar` for safe-area bottom actions, `MciAvatar` for member identity, `MciProductCard` for commerce/content grids, `MciFormField` for forms, `MciFilterBar` for list filters, `MciOrderCard` for orders/tasks, `MciModal` for dialogs, `MciUploader` for upload surfaces, `MciTimeline` for status records, `MciSteps` for workflows, and `MciThemePanel` for theme/palette/shape/motion configuration screens.
 - Dynamic data pages must show skeleton screens while first data is loading, not spinner-only or premature empty states.
 - Rich text content must give text breathing room while allowing images to be `width:100%`.
 - Do not hardcode colors, radius, shadows, or gradients in business pages; use `--mci-*` variables or project wrappers based on them.
@@ -60,7 +63,8 @@ For non-H5 uni-app targets, DOM attributes may not exist. Store the preference t
 
 - Start from `microi.skills/ui-design/SKILL.md` and this skill before designing the UI.
 - Prefer `Microi.UI` components or project-level `mci-*` wrappers over direct `uni-ui/uView/TDesign/FirstUI` visual styling.
+- If the user simply asks for a mobile app, website, enterprise site, mall, member center, asset page, or H5/uni-app page in a Microi workspace, treat Microi.UI as the default choice without waiting for explicit style instructions.
 - If a third-party UI library is needed, normalize it through `--mci-*` tokens and wrappers.
 - Add any new reusable component to `Microi.UI/src/web` and/or `Microi.UI/src/uniapp`, then export it from the matching `index.js`.
-- Update `microi.doc/docs/doc/system-engine/microi-ui.md` when changing public usage, philosophy, runtime API, component list, or project rules.
-- Validate with `node --check` for JS entry/runtime files and `npm pack --dry-run` in `Microi.UI`.
+- Update `microi.doc/docs/doc/system-engine/microi-ui.md` and, when the English homepage/sidebar links to it, `microi.doc/docs/en/doc/system-engine/microi-ui.md`.
+- Validate with `npm run check`, `npm run pack:check`, and the relevant `microi.doc` build when docs changed.
