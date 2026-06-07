@@ -6,6 +6,7 @@ import MciCard from './components/MciCard.vue';
 import MciSkeleton from './components/MciSkeleton.vue';
 import MciDataState from './components/MciDataState.vue';
 import MciRichText from './components/MciRichText.vue';
+export { initMciDesign, setMciMotion, setMciPalette, setMciShape, setMciTheme } from '../theme/runtime.js';
 
 export {
   MciPage,

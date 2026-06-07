@@ -14,7 +14,8 @@
     "./web": "./src/web/index.js",
     "./uniapp": "./src/uniapp/index.js",
     "./theme": "./src/theme/index.css",
-    "./tokens": "./src/theme/tokens.css"
+    "./tokens": "./src/theme/tokens.css",
+    "./runtime": "./src/theme/runtime.js"
   },
   "peerDependencies": {
     "vue": "^3.4.0"

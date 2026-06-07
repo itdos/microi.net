@@ -3,21 +3,67 @@ name: ui-design
 description: Microi UI design system guidance. Use when designing PC Vue, Element Plus, uni-app H5, dashboards, forms, cards, gradients, responsive layout, skeleton loading states, mobile safe areas, and visual polish.
 ---
 
-# Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
+# Microi吾码设计规范
 
-你正在为 Microi 吾码平台创建界面。所有页面、组件、弹窗必须遵循本规范，打造统一的赛博、炫技、科技感视觉体验。
+你正在为 Microi 吾码平台创建界面。所有页面、组件、弹窗必须遵循本规范，打造高级、克制、具有科技感和品牌识别度的视觉体验。
 
 > **适用平台**：PC 端（Vue 3 + Element Plus + SCSS）、移动端 H5/uni-app/原生 WebView（纯 CSS / 无第三方组件库）
-> **核心理念**：酷炫但不卡顿，炫技但可维护，多端统一同时尊重平台差异
-> **变量前缀**：所有 CSS 变量统一使用 `--mci-` 前缀（Microi Cool Interface）
+> **核心理念**：高级但不浮夸，动效丰富但可维护，多端统一同时尊重平台差异
+> **变量前缀**：所有 CSS 变量统一使用 `--mci-` 前缀（Microi Interface）
 
 ---
 
 ## 整体风格定义
 
-- **风格关键词**：明亮多彩、渐变流光、科技感、轻量精致、视觉张力
-- **质感**：柔和多层阴影、玻璃拟态（Glassmorphism）、霓虹渐变光晕、极光光斑底图
-- **氛围**：默认亮色多彩主题（colorful + gradient + soft shadow），暗黑主题作为可选切换；光影流动、精致微动效
+- **风格关键词**：高级、通透、科技感、品牌化、轻量精致、视觉张力。
+- **质感**：柔和多层阴影、清晰边界、结构化光影、细腻纹理、精致微动效。
+- **氛围**：默认亮色多彩主题（colorful + gradient + soft shadow），暗黑主题作为可选切换；避免廉价装饰，优先用布局、层级、动效和真实内容建立高级感。
+- **参考吸收**：可参考 Tuniao UI 这类移动端 UI 库的组件完整度、色彩节奏、入场动效和模板化能力，但 Microi 视觉必须通过 `--mci-*` token 与 MCI-UI 组件形成自己的品牌系统，不照搬第三方外观。
+
+---
+
+## 高端视觉标准
+
+- 每个新页面必须有首屏视觉重心：核心数据、主任务、产品/品牌对象或可操作内容应在第一屏明确出现，不能只有说明文字或空白装饰。
+- 页面进入必须有轻量入场动效，默认使用 `mci-page-enter` / `mci-fade-up`；列表、商品、指标卡使用 30-60ms 交错延迟，不能整页同时僵硬出现。
+- 页面停留时允许微弱的停留动效：扫光、细线流动、图标轻浮动、状态光标闪烁等；振幅必须小，且只用 `transform` / `opacity` / `background-position`。
+- 所有可点击元素必须有三态反馈：默认、hover/focus、active/pressed；PC 使用 hover lift，移动端使用按压缩放或背景反馈。
+- 扁平风格也要有层次：减少圆角不等于没有阴影，必须保留细边框、柔和投影、hover 伪元素阴影和清晰分组。
+- 背景装饰优先使用结构化方案：网格、细线、扫描高光、低透明纹理、内容相关图片或 3D 场景；不要使用离散光球、散点噪声、模糊色块堆叠作为主要视觉。
+
+---
+
+## 形态模式（圆角 / 扁平）
+
+Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="rounded"` 与 `data-mci-shape="flat"`。
+
+```css
+:root {
+  --mci-shape-card: var(--mci-radius-xl);
+  --mci-shape-panel: var(--mci-radius-lg);
+  --mci-shape-button: var(--mci-radius-pill);
+  --mci-shape-input: var(--mci-radius-md);
+}
+
+:root[data-mci-shape="rounded"] {
+  --mci-shape-card: 20px;
+  --mci-shape-panel: 16px;
+  --mci-shape-button: 999px;
+  --mci-shape-input: 12px;
+}
+
+:root[data-mci-shape="flat"] {
+  --mci-shape-card: 6px;
+  --mci-shape-panel: 4px;
+  --mci-shape-button: 4px;
+  --mci-shape-input: 4px;
+}
+```
+
+- 圆角风格适合移动端商城、会员中心、消费类应用、品牌展示页。
+- 扁平风格适合 B 端官网、数据看板、工具型 Web、强调效率的页面。
+- 所有组件只引用 `--mci-shape-*`，不要在业务页面硬编码一堆 `border-radius`。
+- 切换形态时只改变圆角 token，不改变布局尺寸，避免切换主题时页面跳动。
 
 ---
 
@@ -29,7 +75,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ```css
 :root[data-theme="dark"] {
-  /* 主色 — 紫蓝霓虹 */
+  /* 主色 — 科技紫蓝 */
   --mci-color-primary: #722BFF;
   --mci-color-primary-light: #9B5FFF;
   --mci-color-primary-dark: #5A1FCC;
@@ -128,13 +174,33 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ### 颜色使用规则
 
+- **主题模型分两层**：`data-theme="light|dark"` 控制明暗底色，`data-mci-palette="black|white|red|orange|yellow|green|cyan|blue|purple"` 控制品牌主色。
+- **所有移动端与 PC 网站项目必须支持主流主色切换**：黑、白、红、橙、黄、绿、青、蓝、紫至少 9 个 palette。后台管理系统可由 Element Plus 主题承载，但也必须映射到 `--mci-*` token。
+- **palette 不得只换按钮底色**：必须同步覆盖 `--mci-color-primary`、`--mci-color-primary-strong`、`--mci-text-on-primary`、`--mci-border-glow`、`--mci-gradient-primary`、`--mci-shadow-button`、`--mci-shadow-button-hover`。
+- **白色/黄色主题必须单独处理文字颜色**：主按钮文字使用 `--mci-text-on-primary`，白色主题用深色字，黄色主题用深棕/深灰字，禁止固定白字。
 - **主色**用于核心交互元素（按钮、链接、选中态）
 - **Accent Red / Danger** 用于危险操作、错误、热门标记
 - **Accent Blue / Info** 用于信息提示、次要按钮
 - **Accent Gold / Warning** 用于重要强调、VIP 标签、价格、警告
 - **Accent Cyan / Success** 用于成功状态、在线标识
-- 默认主题为亮色多彩，强调渐变和柔和阴影；暗黑主题作为用户可选项
-- 用户主题偏好持久化到 `localStorage('mci-theme')`，初次访问跟随系统 `prefers-color-scheme`
+- 默认主题为亮色 + 红色 palette；暗黑主题和主色 palette 都作为用户可选项。
+- 用户主题偏好持久化到 `mci-theme`、`mci-palette`、`mci-shape`，初次访问可跟随系统 `prefers-color-scheme`。
+
+### 主色 Palette 必备定义
+
+```css
+:root[data-mci-palette="black"]  { --mci-color-primary:#111827; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="white"]  { --mci-color-primary:#F8FAFC; --mci-text-on-primary:#111827; }
+:root[data-mci-palette="red"]    { --mci-color-primary:#B51220; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="orange"] { --mci-color-primary:#EA580C; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="yellow"] { --mci-color-primary:#D9A23A; --mci-text-on-primary:#3A2500; }
+:root[data-mci-palette="green"]  { --mci-color-primary:#16A34A; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="cyan"]   { --mci-color-primary:#0891B2; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="blue"]   { --mci-color-primary:#2563EB; --mci-text-on-primary:#fff; }
+:root[data-mci-palette="purple"] { --mci-color-primary:#7C3AED; --mci-text-on-primary:#fff; }
+```
+
+实际项目优先直接使用 `Microi.UI/src/theme/tokens.css`，不要复制这段最小示例；新增 palette 时必须补充悬浮阴影、边框高光和渐变。
 
 ### 移动端可读性底线
 
@@ -145,9 +211,9 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ---
 
-## 阴影体系（酷炫的核心）
+## 阴影体系（层次与质感）
 
-阴影是塑造层次感和酷炫感的关键。采用多层阴影叠加。
+阴影是塑造层次感、可点击性和高级质感的关键。采用多层阴影叠加，但不要做脏、糊、重的阴影。
 
 ```css
 :root {
@@ -173,7 +239,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
   --mci-shadow-dropdown: 0 10px 40px rgba(0, 0, 0, 0.45),
                          0 0 20px rgba(114, 43, 255, 0.08);
 
-  /* 霓虹发光 */
+  /* 强调发光 */
   --mci-glow-primary: 0 0 15px var(--mci-color-primary-glow),
                       0 0 45px rgba(114, 43, 255, 0.1);
   --mci-glow-red: 0 0 15px rgba(255, 46, 99, 0.3),
@@ -205,7 +271,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 | 按钮按下态 | `--mci-shadow-button-hover`（移动端无 hover，只用按下/默认） |
 | 弹窗/抽屉 | `--mci-shadow-dialog` |
 | 下拉菜单 | `--mci-shadow-dropdown` |
-| 霓虹强调元素 | `--mci-glow-*` |
+| 强调元素 | `--mci-glow-*` |
 
 ---
 
@@ -367,7 +433,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ---
 
-## 动效规范（拉满但不卡）
+## 动效规范（丰富但不卡）
 
 ### 性能铁律
 
@@ -378,7 +444,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 5. **动画时长控制**：微交互 150-250ms，转场 300-400ms，装饰动效 600ms-2s
 6. **使用 `prefers-reduced-motion` 媒体查询**提供无动画回退
 7. **移动端额外限制**：禁用 `backdrop-filter: blur()` 大面积使用（中低端机型严重掉帧），最多用于小型胶囊/标签
-8. **移动端装饰背景**：使用 Aurora Orbs（4-5 个大尺寸模糊渐变光斑 + 慢速 `transform` 漂移），禁用 Canvas 粒子和密集星空
+8. **移动端装饰背景**：优先使用结构化渐变、网格、细线、扫光和内容图片；禁用 Canvas 装饰点、密集散点、离散光球、模糊色块堆叠。
 
 ### Timing Functions
 
@@ -505,30 +571,31 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 }
 ```
 
-#### 4. 霓虹边框呼吸灯
+#### 4. 焦点边框扫光
 
 ```scss
-.mci-neon-border {
+.mci-focus-border {
   position: relative;
   border: 1px solid var(--mci-border-glow);
   border-radius: var(--mci-radius-lg);
+  overflow: hidden;
 
   &::before {
     content: '';
     position: absolute;
-    inset: -1px;
+    inset: 0;
     border-radius: inherit;
-    background: var(--mci-gradient-primary);
-    z-index: -1;
-    opacity: 0.5;
-    filter: blur(8px);
-    animation: mciNeonPulse 3s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+    transform: translateX(-110%) skewX(-18deg);
+    animation: mciFocusSweep 3.6s ease-in-out infinite;
+    pointer-events: none;
   }
 }
 
-@keyframes mciNeonPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+@keyframes mciFocusSweep {
+  0%, 42% { transform: translateX(-110%) skewX(-18deg); opacity: 0; }
+  58% { opacity: .85; }
+  100% { transform: translateX(120%) skewX(-18deg); opacity: 0; }
 }
 ```
 
@@ -860,7 +927,7 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 - ❌ `:hover` 单独使用（用 `@media (hover: hover)` 包裹）
 - ❌ 大面积 `backdrop-filter: blur()`
-- ❌ JS 粒子（Canvas/WebGL）
+- ❌ JS 随机装饰点（Canvas/WebGL）
 - ❌ 实时阴影动画
 - ❌ 复杂的 `filter` 动画（`blur`, `drop-shadow` 不要在动画中切换）
 - ❌ 自动播放视频背景
@@ -869,124 +936,61 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ## 装饰性背景（低性能消耗方案）
 
-### 页面底层渐变光斑（PC 和高端移动端）
+### 结构化背景
+
+Microi 背景必须服务内容层级，不能喧宾夺主。优先使用网格、细线、低透明纹理、扫光和内容相关图片；不要使用离散光球、模糊色块堆叠、密集散点噪声作为主要视觉。
 
 ```scss
 .mci-page-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: var(--mci-bg-base);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: -20%; left: -10%;
-    width: 60%; height: 60%;
-    background: radial-gradient(circle, rgba(114, 43, 255, 0.06) 0%, transparent 70%);
-    filter: blur(80px);
-    pointer-events: none;
-  }
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: -20%; right: -10%;
-    width: 50%; height: 50%;
-    background: radial-gradient(circle, rgba(41, 184, 255, 0.04) 0%, transparent 70%);
-    filter: blur(80px);
-    pointer-events: none;
-  }
-}
-```
-
-### Aurora Orbs（极光光斑 — 推荐的成熟大气背景）
-
-取代细碎的 CSS 星空，使用 4 个大尺寸高斯模糊渐变光斑做缓慢漂移。视觉上更稳重、大气、有层次，性能上只走 GPU 合成层（`transform` + `opacity`），不触发重排重绘，移动端流畅运行。
-
-```scss
-.mci-aurora {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  /* ⚠️ 必须为负！装饰背景是“背景层”，要始终置于内容之下。
-     若为 0，由于它是 position:fixed 的“定位元素”，会绘制在同堆叠上下文中
-     无 z-index 的普通文字（如标题/副标题）之上。若背景含半透明渐变（如 rgba(...,0.94)），
-     会把下方文字“洗白”变成黑烟看不清——pointer-events:none 还会让 elementFromPoint 测不到它，极难排查。 */
-  z-index: -1;
   overflow: hidden;
-  contain: strict;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(181,18,32,.06), transparent 32%),
+    linear-gradient(180deg, var(--mci-bg-base), var(--mci-bg-page));
 }
-.mci-aurora__orb {
+
+.mci-page-bg::before {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.55;
-  will-change: transform;
-  animation: mciAuroraDrift var(--dur, 26s) ease-in-out infinite alternate;
-}
-.mci-aurora__orb--1 {
-  width: 520px; height: 520px;
-  top: -120px; left: -100px;
-  background: radial-gradient(circle, var(--mci-color-primary) 0%, transparent 65%);
-  --dur: 22s;
-}
-.mci-aurora__orb--2 {
-  width: 460px; height: 460px;
-  top: 28%; right: -140px;
-  background: radial-gradient(circle, var(--mci-color-accent-blue) 0%, transparent 65%);
-  --dur: 28s;
-  animation-delay: -8s;
-}
-.mci-aurora__orb--3 {
-  width: 580px; height: 580px;
-  bottom: -180px; left: 18%;
-  background: radial-gradient(circle, var(--mci-color-accent-pink) 0%, transparent 65%);
-  opacity: 0.4;
-  --dur: 32s;
-  animation-delay: -14s;
-}
-.mci-aurora__orb--4 {
-  width: 380px; height: 380px;
-  top: 55%; left: -80px;
-  background: radial-gradient(circle, var(--mci-color-accent-cyan) 0%, transparent 65%);
-  opacity: 0.45;
-  --dur: 26s;
-  animation-delay: -4s;
-}
-@keyframes mciAuroraDrift {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(40px, -30px, 0) scale(1.08); }
-  100% { transform: translate3d(-30px, 20px, 0) scale(0.95); }
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(31,41,55,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31,41,55,.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.75), transparent 78%);
 }
 
-/* 暗黑主题下光斑更浓 */
-:root[data-theme="dark"] .mci-aurora__orb {
-  opacity: 0.35;
-  filter: blur(80px);
+.mci-page-bg::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.20), transparent);
+  transform: skewX(-18deg);
+  animation: mciBackgroundSweep 8s ease-in-out infinite;
 }
+
+@keyframes mciBackgroundSweep {
+  0%, 18% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+  30% { opacity: .72; }
+  54%, 100% { transform: translateX(360%) skewX(-18deg); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mci-aurora__orb { animation: none; }
+  .mci-page-bg::after { animation: none; }
 }
 ```
 
-HTML 结构（无需 JS，纯静态 4 个 div）：
-```html
-<div class="mci-aurora" aria-hidden="true">
-  <span class="mci-aurora__orb mci-aurora__orb--1"></span>
-  <span class="mci-aurora__orb mci-aurora__orb--2"></span>
-  <span class="mci-aurora__orb mci-aurora__orb--3"></span>
-  <span class="mci-aurora__orb mci-aurora__orb--4"></span>
-</div>
-```
+### 背景层级排查
 
-> 性能预算：4 个 orb 各占一个合成层，移动端 60fps 稳定。GPU 显存占用约 12MB（基于 580×580 + 4×blur(60px)）。
-
-> 🩺 **「文字被背景洗白看不清」排查口诀（反复踩坑专用）**：
-> 1. 现象：某页标题/副标题/顶部标签发灰发淡，但同页按钮、卡片内文字清晰。
-> 2. 根因：全屏 `position:fixed` 的装饰背景（aurora / 渐变层）`z-index >= 0` 且含半透明色，盖在了**无 z-index 的普通文字**之上。`pointer-events:none` 让 `elementFromPoint` 测不到它，`getComputedStyle` 又显示文字颜色完全正常，极易误判。
-> 3. 验证：`document.querySelector('.装饰背景').style.display='none'` 后截图，若文字立刻清晰即可确诊。
-> 4. 修复（二选一或都做）：① 装饰背景 `z-index:-1`；② 页面根容器 `position:relative` + `.page-xxx > :not(.装饰背景){ position:relative; z-index:1; }` 把所有内容抬到背景之上。
-> 5. ⚠️ 别再只改文字颜色！颜色本来就是对的，问题在**堆叠层级**，改色无效。
+- 装饰背景必须 `pointer-events:none` 且位于内容下方。全屏 `position:fixed` 背景如果 `z-index >= 0`，会覆盖无 z-index 的普通文字。
+- 如果标题/副标题发灰、按钮文字却正常，先临时隐藏背景层验证，不要只改文字颜色。
+- 推荐修复方式：背景 `z-index:-1`；页面根容器 `position:relative`；所有内容区域保持正常堆叠上下文。
 
 ### 网格背景
 
@@ -1014,7 +1018,7 @@ HTML 结构（无需 JS，纯静态 4 个 div）：
 - [ ] 提供 `prefers-reduced-motion` 无动画回退
 - [ ] 移动端：`:hover` 用 `@media (hover: hover)` 包裹
 - [ ] 移动端：所有可点击元素 ≥ 44×44px
-- [ ] 移动端：星空粒子 ≤ 30 颗
+- [ ] 移动端：背景装饰不使用密集随机点或大面积模糊色块
 - [ ] 动态数据页：首屏使用骨架屏，不用 spinner/“加载中”文案代替
 - [ ] 移动端：使用 `env(safe-area-inset-*)` 适配安全区，顶部/底部 fixed 区域在 iOS 与 Android 均不遮挡内容
 
@@ -1022,16 +1026,45 @@ HTML 结构（无需 JS，纯静态 4 个 div）：
 
 ## 主题切换实现
 
+### 首选：Microi.UI runtime
+
 ```js
+import { initMciDesign, setMciPalette, setMciShape, setMciTheme } from '@microi/mci-ui/runtime';
+
+initMciDesign({
+  theme: 'light',     // light | dark
+  palette: 'red',     // black | white | red | orange | yellow | green | cyan | blue | purple
+  shape: 'rounded',   // rounded | flat
+  motion: 'full'      // full | reduced
+});
+
+setMciPalette('blue');
+setMciShape('flat');
+setMciTheme('dark');
+```
+
+业务页面只允许调用运行时或项目级主题服务，不要在页面里散写 `document.documentElement.setAttribute(...)`。
+
+### 原生 Web 降级实现
+
+```js
+const PALETTES = ['black','white','red','orange','yellow','green','cyan','blue','purple'];
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   try { localStorage.setItem('mci-theme', theme); } catch(e) {}
 }
+function setPalette(palette) {
+  const next = PALETTES.includes(palette) ? palette : 'red';
+  document.documentElement.setAttribute('data-mci-palette', next);
+  try { localStorage.setItem('mci-palette', next); } catch(e) {}
+}
 
 const saved = (() => { try { return localStorage.getItem('mci-theme'); } catch(e) { return null; } })();
+const savedPalette = (() => { try { return localStorage.getItem('mci-palette'); } catch(e) { return null; } })();
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 // 默认亮色多彩主题，仅当系统明确设置为深色或用户主动选择深色时启用 dark
 setTheme(saved || (prefersDark ? 'dark' : 'light'));
+setPalette(savedPalette || 'red');
 
 // 监听系统主题变化
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -1064,8 +1097,10 @@ uni-app 中没有 `document` 对象（小程序端），所以推荐两套方案
 ```
 
 ```js
-// utils/theme.js
-const KEY = 'mci_theme';
+// utils/theme.js（无 Microi.UI runtime 时的降级写法）
+const THEME_KEY = 'mci_theme';
+const PALETTE_KEY = 'mci_palette';
+const PALETTES = ['black','white','red','orange','yellow','green','cyan','blue','purple'];
 function applyClass(theme) {
   if (typeof document !== 'undefined' && document.documentElement) {
     const cls = document.documentElement.classList;
@@ -1073,14 +1108,25 @@ function applyClass(theme) {
     cls.add('theme-' + theme);
   }
 }
-export function getTheme() { try { return uni.getStorageSync(KEY) || 'light'; } catch (e) { return 'light'; } }
+function applyPalette(palette) {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.setAttribute('data-mci-palette', palette);
+  }
+}
+export function getTheme() { try { return uni.getStorageSync(THEME_KEY) || 'light'; } catch (e) { return 'light'; } }
+export function getPalette() { try { return uni.getStorageSync(PALETTE_KEY) || 'red'; } catch (e) { return 'red'; } }
 export function setTheme(theme) {
   if (!['light','dark','auto'].includes(theme)) theme = 'light';
-  try { uni.setStorageSync(KEY, theme); } catch(e) {}
+  try { uni.setStorageSync(THEME_KEY, theme); } catch(e) {}
   applyClass(theme); return theme;
 }
+export function setPalette(palette) {
+  if (!PALETTES.includes(palette)) palette = 'red';
+  try { uni.setStorageSync(PALETTE_KEY, palette); } catch(e) {}
+  applyPalette(palette); return palette;
+}
 export function toggleTheme() { return setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
-export function initTheme() { applyClass(getTheme()); }
+export function initTheme() { applyClass(getTheme()); applyPalette(getPalette()); }
 ```
 
 ```vue
@@ -1114,7 +1160,8 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 ### 主题切换 UI 入口规范
 
 - 入口位置：「我的」页面服务菜单 / 顶部状态栏图标 / 设置页第一项
-- 形式：图标 + 文案（🌙 暗色 / ☀️ 亮色 / 🌗 跟随系统），点击后立即生效，弹 Toast 反馈
+- 形式：明暗模式用图标 + 文案（暗色 / 亮色 / 跟随系统），主色用色板按钮（黑、白、红、橙、黄、绿、青、蓝、紫），点击后立即生效，弹 Toast 反馈。
+- 色板必须有选中态、无障碍名称和足够触摸面积；白色色板必须有边框，黄色色板文字必须深色。
 - 切换后立刻持久化（uni.setStorageSync），下次启动 App 在 `onLaunch` 自动 `initTheme()` 应用
 
 ### 主题颜色变量必须用 var(--mci-*) 而非硬编码
@@ -1233,7 +1280,18 @@ SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�
 ### 5. 必备微动效（每个可点击元素都要有反馈�?
 ```scss
 .cell, .entry-item, .product-card, .zone-card {
-  transition: transform .2s ease, box-shadow .2s ease;
+  position: relative;
+  transition: transform .2s ease;
+}
+.cell::after, .entry-item::after, .product-card::after, .zone-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--mci-shadow-card-hover);
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
 }
 .cell:active, .entry-item:active { transform: scale(0.94); }
 
@@ -1432,4 +1490,7 @@ MCI-UI 已在吾码源码根目录落地：`Microi.UI/`。
 - 新的移动端 UniApp/H5 项目应优先使用 `Microi.UI/src/uniapp` 中的 `MciPage`、`MciNavbar`、`MciButton`、`MciCard`、`MciSkeleton`、`MciDataState`、`MciRichText`，再按业务补项目组件。
 - 新的 PC 官网、产品站、文档站、响应式网站应优先使用 `Microi.UI/src/web` 和 `Microi.UI/src/theme`，不要直接套后台 Element Plus 风格。
 - `Microi.UI/src/theme/tokens.css` 是品牌 token 源头；新组件颜色、圆角、阴影、间距、安全区、骨架屏都必须走 `--mci-*` 变量。
+- `Microi.UI/src/theme/runtime.js` 是主题运行时入口；项目应通过 `initMciDesign()`、`setMciPalette()`、`setMciShape()`、`setMciTheme()` 统一设置黑白红橙黄绿青蓝紫主色、圆角/扁平、亮暗主题和动效偏好。
+- `MciPage` 默认带页面入场动效；业务页如果有特殊路由转场，可以关闭 `animated` 后使用项目级转场，但不能让动态页面无反馈地直接闪现。
+- `MciButton`、`MciCard` 必须保留 hover/pressed/focus/sheen 等基础反馈；业务组件可以封装样式，但不能删掉交互状态。
 - 第三方 UI 库只能作为底层能力或局部补充，不能绕过 MCI-UI 直接决定产品视觉。
