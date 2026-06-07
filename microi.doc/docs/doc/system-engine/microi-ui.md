@@ -160,6 +160,22 @@ setMciMotion('reduced');
 toggleMciTheme();</code></pre>
 </section>
 
+## 样式隔离
+
+<section class="mci-ui-guard-panel">
+  <div>
+    <span class="mci-ui-kicker">Style Guard</span>
+    <h3>吾码UI必须在复杂项目里保持自己的视觉边界。</h3>
+    <p>官网、文档站、企业站、移动端应用经常混用第三方 UI、Markdown、富文本和项目老 CSS。MCI-UI 通过命名空间、根容器、token 和主题层收口，尽量避免样式被其它组件覆盖。</p>
+  </div>
+  <div class="mci-ui-guard-grid">
+    <article><b>根容器</b><span>页面或局部 UI 使用 <code>.mci-page</code> 或 <code>data-mci-ui-root</code> 包裹。</span></article>
+    <article><b>命名空间</b><span>共享类名统一 <code>mci-</code> 前缀，不写泛化 <code>button</code>、<code>.card</code>、<code>img</code>。</span></article>
+    <article><b>token 收口</b><span>颜色、圆角、阴影、间距通过 <code>--mci-*</code> 控制，不直接改库内部样式。</span></article>
+    <article><b>主题层</b><span>官网/文档站使用 VitePress theme 层统一美化，避免每篇文档散装 CSS。</span></article>
+  </div>
+</section>
+
 ## 组件预览
 
 下面是按吾码UI设计 token 绘制的组件截图式预览。真实项目中组件会使用同一套 `--mci-*` 变量、主题 runtime、圆角/扁平模式、骨架屏和安全区规则，因此不同业务系统会保持统一的 Microi 品牌质感。
@@ -392,70 +408,109 @@ toggleMciTheme();</code></pre>
 
 ## 组件代码示例
 
-### 页面与区块
-
-```vue
-<MciPage safe-area tech-grid shape="rounded">
-  <MciSection title="核心能力" description="统一品牌、主题、动效和组件体验" animated>
-    <div class="mci-grid mci-grid--3">
-      <MciCard interactive animated sheen>...</MciCard>
-      <MciCard interactive animated sheen>...</MciCard>
-      <MciCard interactive animated sheen>...</MciCard>
+<section class="mci-ui-recipe-grid" v-pre>
+  <article class="mci-ui-recipe-card">
+    <div class="mci-ui-recipe-card__visual is-page">
+      <div class="mci-recipe-browser">
+        <span></span><span></span><span></span>
+        <b>MciPage</b>
+      </div>
+      <div class="mci-recipe-hero"></div>
+      <div class="mci-recipe-mini-grid"><i></i><i></i><i></i></div>
     </div>
-  </MciSection>
-</MciPage>
-```
+    <div class="mci-ui-recipe-card__body">
+      <span class="mci-ui-kicker">Layout Recipe</span>
+      <h3>页面与区块</h3>
+      <p>用 <code>MciPage</code> 做页面 shell，区块统一交给 <code>MciSection</code>，首屏、网格、入场动效和结构化背景一套成型。</p>
+      <div class="mci-code-window">
+        <span>&lt;MciPage safe-area tech-grid shape="rounded"&gt;</span>
+        <span>  &lt;MciSection title="核心能力" description="统一品牌、主题、动效和组件体验" animated&gt;</span>
+        <span>    &lt;div class="mci-grid mci-grid--3"&gt;</span>
+        <span>      &lt;MciCard interactive animated sheen&gt;...&lt;/MciCard&gt;</span>
+        <span>      &lt;MciCard interactive animated sheen&gt;...&lt;/MciCard&gt;</span>
+        <span>      &lt;MciCard interactive animated sheen&gt;...&lt;/MciCard&gt;</span>
+        <span>    &lt;/div&gt;</span>
+        <span>  &lt;/MciSection&gt;</span>
+        <span>&lt;/MciPage&gt;</span>
+      </div>
+    </div>
+  </article>
 
-### 移动端商品/内容列表
+  <article class="mci-ui-recipe-card">
+    <div class="mci-ui-recipe-card__visual is-mobile">
+      <div class="mci-recipe-phone">
+        <div class="mci-recipe-tabs"><b>全部</b><span>内容</span><span>商品</span></div>
+        <div class="mci-recipe-products"><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="mci-ui-recipe-card__body">
+      <span class="mci-ui-kicker">List Recipe</span>
+      <h3>移动端商品/内容列表</h3>
+      <p>列表页必须有骨架屏、状态切换和稳定网格。接口未返回前不显示空态，商品/内容卡片保持统一比例。</p>
+      <div class="mci-code-window">
+        <span>&lt;MciTabs v-model="type" :options="typeOptions" /&gt;</span>
+        <span>&nbsp;</span>
+        <span>&lt;MciDataState :loading="loading" skeleton-type="grid" :empty="!items.length"&gt;</span>
+        <span>  &lt;div class="mci-grid mci-grid--2"&gt;</span>
+        <span>    &lt;MciProductCard</span>
+        <span>      v-for="item in items"</span>
+        <span>      :key="item.Id"</span>
+        <span>      :title="item.Name"</span>
+        <span>      :image="item.Cover"</span>
+        <span>      :price="item.Price"</span>
+        <span>      :tag="item.TagName"</span>
+        <span>    /&gt;</span>
+        <span>  &lt;/div&gt;</span>
+        <span>&lt;/MciDataState&gt;</span>
+      </div>
+    </div>
+  </article>
 
-```vue
-<MciTabs v-model="type" :options="typeOptions" />
+  <article class="mci-ui-recipe-card">
+    <div class="mci-ui-recipe-card__visual is-asset">
+      <div class="mci-recipe-metric"><small>累计收益</small><b>¥949.79</b><span>今日 +128.00</span></div>
+      <div class="mci-recipe-action"><button>加入购物车</button><button>立即购买</button></div>
+    </div>
+    <div class="mci-ui-recipe-card__body">
+      <span class="mci-ui-kicker">Action Recipe</span>
+      <h3>资产与底部操作栏</h3>
+      <p>资产指标用强视觉卡承载，底部操作栏必须兼容安全区，主次按钮层级明确，移动端点击有按压反馈。</p>
+      <div class="mci-code-window">
+        <span>&lt;MciMetricCard label="累计收益" value="949.79" suffix="元" trend="今日 +0.00" /&gt;</span>
+        <span>&nbsp;</span>
+        <span>&lt;MciActionBar&gt;</span>
+        <span>  &lt;MciButton variant="plain" block&gt;加入购物车&lt;/MciButton&gt;</span>
+        <span>  &lt;MciButton variant="primary" block sheen&gt;立即购买&lt;/MciButton&gt;</span>
+        <span>&lt;/MciActionBar&gt;</span>
+      </div>
+    </div>
+  </article>
 
-<MciDataState :loading="loading" skeleton-type="grid" :empty="!items.length">
-  <div class="mci-grid mci-grid--2">
-    <MciProductCard
-      v-for="item in items"
-      :key="item.Id"
-      :title="item.Name"
-      :image="item.Cover"
-      :price="item.Price"
-      :tag="item.TagName"
-    />
-  </div>
-</MciDataState>
-```
-
-### 资产与底部操作栏
-
-```vue
-<MciMetricCard label="累计收益" value="949.79" suffix="元" trend="今日 +0.00" />
-
-<MciActionBar>
-  <MciButton variant="plain" block>加入购物车</MciButton>
-  <MciButton variant="primary" block sheen>立即购买</MciButton>
-</MciActionBar>
-```
-
-### 表单、筛选与流程
-
-```vue
-<MciFilterBar title="高级筛选">
-  <MciFormField v-model="keyword" placeholder="请输入关键词" />
-  <MciTabs v-model="status" :options="statusOptions" />
-  <template #actions>
-    <MciButton variant="primary">查询</MciButton>
-  </template>
-</MciFilterBar>
-
-<MciOrderCard title="服务工单" status="处理中" amount="¥299.00">
-  <template #actions>
-    <MciButton variant="plain">查看</MciButton>
-  </template>
-</MciOrderCard>
-
-<MciSteps :steps="steps" :current="1" />
-<MciTimeline :items="timeline" />
-```
+  <article class="mci-ui-recipe-card">
+    <div class="mci-ui-recipe-card__visual is-flow">
+      <div class="mci-recipe-filter"><b>筛选</b><span>关键词</span><span>状态</span><button>查询</button></div>
+      <div class="mci-recipe-flow"><i></i><span></span><i></i><span></span><i></i></div>
+    </div>
+    <div class="mci-ui-recipe-card__body">
+      <span class="mci-ui-kicker">Flow Recipe</span>
+      <h3>表单、筛选与流程</h3>
+      <p>筛选、订单卡、步骤条、时间轴应该作为一个业务组合出现，既能承载查询，也能表达状态流转。</p>
+      <div class="mci-code-window">
+        <span>&lt;MciFilterBar title="高级筛选"&gt;</span>
+        <span>  &lt;MciFormField v-model="keyword" placeholder="请输入关键词" /&gt;</span>
+        <span>  &lt;MciTabs v-model="status" :options="statusOptions" /&gt;</span>
+        <span>  &lt;template #actions&gt;</span>
+        <span>    &lt;MciButton variant="primary"&gt;查询&lt;/MciButton&gt;</span>
+        <span>  &lt;/template&gt;</span>
+        <span>&lt;/MciFilterBar&gt;</span>
+        <span>&nbsp;</span>
+        <span>&lt;MciOrderCard title="服务工单" status="处理中" amount="¥299.00" /&gt;</span>
+        <span>&lt;MciSteps :steps="steps" :current="1" /&gt;</span>
+        <span>&lt;MciTimeline :items="timeline" /&gt;</span>
+      </div>
+    </div>
+  </article>
+</section>
 
 ## 通用业务场景适配
 
@@ -756,6 +811,7 @@ toggleMciTheme();</code></pre>
 
 .vp-doc._doc_system-engine_microi-ui h2 {
   position: relative;
+  scroll-margin-top: 104px;
   margin-top: 52px;
   padding: 18px 0 10px;
   color: var(--mci-doc-ink);
@@ -781,7 +837,9 @@ toggleMciTheme();</code></pre>
 .mci-ui-theme-lab,
 .mci-ui-structure,
 .mci-ui-runtime-panel,
+.mci-ui-guard-panel,
 .mci-ui-preview-grid,
+.mci-ui-recipe-grid,
 .mci-ui-scenario-panel,
 .mci-ui-template-grid,
 .mci-ui-ai-panel,
@@ -794,6 +852,7 @@ toggleMciTheme();</code></pre>
 .mci-ui-theme-lab,
 .mci-ui-structure,
 .mci-ui-runtime-panel,
+.mci-ui-guard-panel,
 .mci-ui-scenario-panel,
 .mci-ui-ai-panel,
 .mci-ui-check-panel,
@@ -816,6 +875,7 @@ toggleMciTheme();</code></pre>
 .mci-ui-theme-lab::before,
 .mci-ui-structure::before,
 .mci-ui-runtime-panel::before,
+.mci-ui-guard-panel::before,
 .mci-ui-scenario-panel::before,
 .mci-ui-ai-panel::before,
 .mci-ui-check-panel::before,
@@ -842,6 +902,7 @@ toggleMciTheme();</code></pre>
 .mci-ui-structure__tree,
 .mci-ui-structure__desc,
 .mci-ui-runtime-panel > *,
+.mci-ui-guard-panel > *,
 .mci-ui-scenario-panel > *,
 .mci-ui-ai-panel > *,
 .mci-ui-check-panel > *,
@@ -854,6 +915,7 @@ toggleMciTheme();</code></pre>
 .mci-ui-theme-lab h3,
 .mci-ui-structure h3,
 .mci-ui-runtime-panel h3,
+.mci-ui-guard-panel h3,
 .mci-ui-scenario-panel h3,
 .mci-ui-ai-panel h3,
 .mci-ui-check-panel h3,
@@ -869,6 +931,7 @@ toggleMciTheme();</code></pre>
 .mci-ui-theme-lab p,
 .mci-ui-structure p,
 .mci-ui-runtime-panel p,
+.mci-ui-guard-panel p,
 .mci-ui-scenario-panel p,
 .mci-ui-ai-panel p,
 .mci-ui-third-panel p {
@@ -1082,6 +1145,424 @@ toggleMciTheme();</code></pre>
 .mci-template-shot.is-mobile em { color: rgba(58,37,0,.72); }
 .mci-template-shot.is-dashboard { background: linear-gradient(135deg, #2563eb, #0891b2); }
 .mci-template-shot.is-service { background: linear-gradient(135deg, #111827, #374151); }
+
+.mci-ui-guard-panel {
+  grid-template-columns: minmax(0, .86fr) minmax(420px, 1.14fr);
+  align-items: center;
+}
+
+.mci-ui-guard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mci-ui-guard-grid article {
+  position: relative;
+  overflow: hidden;
+  min-height: 142px;
+  padding: 18px;
+  border: 1px solid rgba(31,41,55,.10);
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.92), rgba(248,250,252,.72)),
+    linear-gradient(135deg, rgba(181,18,32,.08), rgba(8,145,178,.08));
+  box-shadow: 0 16px 38px rgba(24,32,48,.10);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.mci-ui-guard-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--mci-doc-red), var(--mci-doc-gold), var(--mci-doc-cyan));
+}
+
+.mci-ui-guard-grid article:hover {
+  transform: translateY(-4px);
+  border-color: rgba(181,18,32,.22);
+  box-shadow: 0 26px 58px rgba(24,32,48,.15);
+}
+
+.mci-ui-guard-grid b {
+  display: block;
+  color: var(--mci-doc-ink);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.mci-ui-guard-grid span {
+  display: block;
+  margin-top: 10px;
+  color: var(--mci-doc-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.mci-ui-guard-grid code {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(181,18,32,.08);
+  color: var(--mci-doc-red-dark);
+  font-size: .92em;
+  font-weight: 800;
+}
+
+.mci-ui-recipe-grid {
+  display: grid;
+  gap: 22px;
+  margin: 24px 0 42px;
+}
+
+.mci-ui-recipe-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(260px, .78fr) minmax(0, 1.22fr);
+  gap: 22px;
+  padding: clamp(18px, 3vw, 26px);
+  border: 1px solid rgba(31,41,55,.10);
+  border-radius: 28px;
+  background:
+    linear-gradient(120deg, rgba(181,18,32,.08), transparent 42%),
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.92));
+  box-shadow: 0 24px 62px rgba(24,32,48,.13);
+  transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+}
+
+.mci-ui-recipe-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--mci-doc-red), var(--mci-doc-gold), var(--mci-doc-cyan));
+}
+
+.mci-ui-recipe-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -32%;
+  width: 22%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.56), transparent);
+  transform: skewX(-18deg);
+  animation: mciDocShotSweep 6.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.mci-ui-recipe-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(181,18,32,.22);
+  box-shadow: 0 30px 76px rgba(24,32,48,.17);
+}
+
+.mci-ui-recipe-card__visual,
+.mci-ui-recipe-card__body {
+  position: relative;
+  z-index: 1;
+}
+
+.mci-ui-recipe-card__visual {
+  min-height: 310px;
+  padding: 18px;
+  border: 1px solid rgba(31,41,55,.10);
+  border-radius: 22px;
+  background:
+    linear-gradient(rgba(31,41,55,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31,41,55,.05) 1px, transparent 1px),
+    linear-gradient(135deg, #fff, #f4f7fb);
+  background-size: 30px 30px, 30px 30px, 100% 100%;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 16px 34px rgba(24,32,48,.08);
+}
+
+.mci-ui-recipe-card__body h3 {
+  margin: 14px 0 0;
+  color: var(--mci-doc-ink);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.16;
+  letter-spacing: 0;
+}
+
+.mci-ui-recipe-card__body p {
+  margin: 12px 0 16px;
+  color: var(--mci-doc-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.mci-ui-recipe-card__body code {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(181,18,32,.08);
+  color: var(--mci-doc-red-dark);
+  font-size: .92em;
+  font-weight: 800;
+}
+
+.mci-ui-recipe-card__body pre,
+.mci-code-window {
+  max-height: 310px;
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(37,99,235,.10), transparent 44%),
+    #111827;
+  box-shadow: 0 18px 42px rgba(15,23,42,.22);
+  resize: vertical;
+  color: #e5e7eb;
+  font-family: var(--mci-doc-mono, "SFMono-Regular", "Cascadia Code", Consolas, monospace);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.mci-ui-recipe-card__body pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mci-code-window span {
+  display: block;
+  min-height: 1.7em;
+  color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mci-recipe-browser {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 12px 26px rgba(24,32,48,.08);
+}
+
+.mci-recipe-browser span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--mci-doc-red);
+}
+
+.mci-recipe-browser span:nth-child(2) { background: var(--mci-doc-gold); }
+.mci-recipe-browser span:nth-child(3) { background: var(--mci-doc-cyan); }
+
+.mci-recipe-browser b {
+  margin-left: auto;
+  color: var(--mci-doc-ink);
+  font-size: 13px;
+}
+
+.mci-recipe-hero {
+  height: 92px;
+  margin-top: 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  box-shadow: 0 18px 42px rgba(181,18,32,.24);
+}
+
+.mci-recipe-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.mci-recipe-mini-grid i {
+  height: 92px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 12px 24px rgba(24,32,48,.08);
+}
+
+.mci-ui-recipe-card__visual.is-mobile {
+  display: grid;
+  place-items: center;
+}
+
+.mci-recipe-phone {
+  width: min(220px, 100%);
+  min-height: 286px;
+  padding: 14px;
+  border-radius: 30px;
+  background: #111827;
+  box-shadow: 0 24px 54px rgba(15,23,42,.25);
+}
+
+.mci-recipe-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+
+.mci-recipe-tabs b,
+.mci-recipe-tabs span {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.mci-recipe-tabs b {
+  color: #fff;
+  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+}
+
+.mci-recipe-products {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mci-recipe-products i {
+  height: 88px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92) 0 54%, rgba(255,255,255,.78) 54% 100%),
+    linear-gradient(135deg, rgba(181,18,32,.18), rgba(37,99,235,.12));
+}
+
+.mci-ui-recipe-card__visual.is-asset {
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+}
+
+.mci-recipe-metric {
+  min-height: 190px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.22), transparent 36%),
+    linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  box-shadow: 0 22px 48px rgba(181,18,32,.24);
+}
+
+.mci-recipe-metric small,
+.mci-recipe-metric span {
+  color: rgba(255,255,255,.82);
+  font-weight: 800;
+}
+
+.mci-recipe-metric b {
+  color: #fff;
+  font-size: 38px;
+  line-height: 1;
+}
+
+.mci-recipe-action {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 14px 30px rgba(24,32,48,.10);
+}
+
+.mci-recipe-action button,
+.mci-recipe-filter button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  box-shadow: 0 12px 26px rgba(181,18,32,.20);
+  font-weight: 900;
+}
+
+.mci-recipe-action button:first-child {
+  color: var(--mci-doc-red-dark);
+  border: 1px solid rgba(181,18,32,.18);
+  background: #fff;
+  box-shadow: none;
+}
+
+.mci-ui-recipe-card__visual.is-flow {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+}
+
+.mci-recipe-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.90);
+  box-shadow: 0 14px 30px rgba(24,32,48,.10);
+}
+
+.mci-recipe-filter b {
+  grid-column: 1 / -1;
+  color: var(--mci-doc-ink);
+  font-size: 20px;
+}
+
+.mci-recipe-filter span {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--mci-doc-muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.mci-recipe-flow {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.90);
+  box-shadow: 0 14px 30px rgba(24,32,48,.10);
+}
+
+.mci-recipe-flow i {
+  width: 18px;
+  height: 18px;
+  border: 4px solid #fff;
+  border-radius: 999px;
+  background: var(--mci-doc-red);
+  box-shadow: 0 0 0 4px rgba(181,18,32,.12);
+}
+
+.mci-recipe-flow span {
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #fff, #eef2f7);
+}
 
 .mci-ui-scenario-panel,
 .mci-ui-check-panel,
@@ -2241,10 +2722,13 @@ toggleMciTheme();</code></pre>
 .dark .mci-ui-value-grid article,
 .dark .mci-ui-component-grid article,
 .dark .mci-ui-shot,
+.dark .mci-ui-recipe-card,
+.dark .mci-ui-recipe-card__visual,
 .dark .mci-ui-showcase,
 .dark .mci-ui-theme-lab,
 .dark .mci-ui-structure,
 .dark .mci-ui-runtime-panel,
+.dark .mci-ui-guard-panel,
 .dark .mci-ui-scenario-panel,
 .dark .mci-ui-ai-panel,
 .dark .mci-ui-check-panel,
@@ -2281,10 +2765,14 @@ toggleMciTheme();</code></pre>
 .dark .mci-ui-runtime-panel h3,
 .dark .mci-ui-flow-card b,
 .dark .mci-ui-theme-grid b,
+.dark .mci-ui-guard-grid b,
 .dark .mci-ui-template-grid strong,
 .dark .mci-ui-scenario-grid b,
 .dark .mci-ui-check-grid b,
 .dark .mci-ui-third-steps b,
+.dark .mci-ui-recipe-card__body h3,
+.dark .mci-recipe-browser b,
+.dark .mci-recipe-filter b,
 .dark .vp-doc._doc_system-engine_microi-ui h2 {
   color: #e2e8f0;
 }
@@ -2295,10 +2783,12 @@ toggleMciTheme();</code></pre>
 .dark .mci-ui-runtime-panel p,
 .dark .mci-ui-flow-card span,
 .dark .mci-ui-theme-grid span,
+.dark .mci-ui-guard-grid span,
 .dark .mci-ui-template-grid p,
 .dark .mci-ui-scenario-grid span,
 .dark .mci-ui-check-grid span,
 .dark .mci-ui-third-steps em,
+.dark .mci-ui-recipe-card__body p,
 .dark .mci-shot-filter span,
 .dark .mci-shot-form span,
 .dark .mci-shot-form p,
@@ -2310,6 +2800,7 @@ toggleMciTheme();</code></pre>
 
 .dark .mci-ui-flow-card,
 .dark .mci-ui-theme-grid article,
+.dark .mci-ui-guard-grid article,
 .dark .mci-shot-form span,
 .dark .mci-shot-form p,
 .dark .mci-shot-filter span,
@@ -2320,14 +2811,21 @@ toggleMciTheme();</code></pre>
 .dark .mci-shot-steps div,
 .dark .mci-ui-scenario-grid article,
 .dark .mci-ui-check-grid article,
-.dark .mci-ui-third-steps article {
+.dark .mci-ui-third-steps article,
+.dark .mci-recipe-browser,
+.dark .mci-recipe-mini-grid i,
+.dark .mci-recipe-action,
+.dark .mci-recipe-filter,
+.dark .mci-recipe-flow {
   background: rgba(15,23,42,.86);
   border-color: rgba(255,255,255,.10);
 }
 
 .dark .mci-ui-scenario-panel code,
 .dark .mci-ui-check-panel code,
-.dark .mci-ui-third-panel code {
+.dark .mci-ui-third-panel code,
+.dark .mci-ui-guard-grid code,
+.dark .mci-ui-recipe-card__body code {
   background: rgba(248,113,113,.12);
   color: #fecaca;
 }
@@ -2352,10 +2850,12 @@ toggleMciTheme();</code></pre>
   .mci-ui-scenario-grid,
   .mci-ui-check-grid,
   .mci-ui-third-steps,
+  .mci-ui-recipe-card,
   .mci-ui-showcase,
   .mci-ui-theme-lab,
   .mci-ui-structure,
   .mci-ui-runtime-panel,
+  .mci-ui-guard-panel,
   .mci-ui-ai-panel,
   .mci-ui-third-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2365,6 +2865,7 @@ toggleMciTheme();</code></pre>
   .mci-ui-theme-lab,
   .mci-ui-structure,
   .mci-ui-runtime-panel,
+  .mci-ui-guard-panel,
   .mci-ui-ai-panel,
   .mci-ui-third-panel {
     grid-template-columns: 1fr;
@@ -2389,13 +2890,25 @@ toggleMciTheme();</code></pre>
   .mci-ui-scenario-grid,
   .mci-ui-check-grid,
   .mci-ui-third-steps,
+  .mci-ui-guard-grid,
   .mci-ui-theme-grid {
     grid-template-columns: 1fr;
   }
 
   .mci-ui-runtime-panel pre,
-  .mci-ui-code-grid pre {
+  .mci-ui-code-grid pre,
+  .mci-ui-recipe-card__body pre,
+  .mci-code-window {
     font-size: 12px;
+  }
+
+  .mci-ui-recipe-card {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .mci-ui-recipe-card__visual {
+    min-height: 260px;
   }
 }
 </style>
