@@ -1,6 +1,6 @@
 ---
 name: ui-design
-description: Microi UI design system guidance. Use when designing PC Vue, Element Plus, uni-app H5, dashboards, forms, cards, gradients, responsive layout, and visual polish.
+description: Microi UI design system guidance. Use when designing PC Vue, Element Plus, uni-app H5, dashboards, forms, cards, gradients, responsive layout, skeleton loading states, mobile safe areas, and visual polish.
 ---
 
 # Microi 酷炫 UI 设计规范（DESIGN SYSTEM）
@@ -328,9 +328,42 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ### 移动端规则
 - 所有可点击元素（按钮、tab、列表项）**最小尺寸 44×44px**
-- 顶部导航栏 padding-top 必须包含 `var(--mci-safe-top)`
-- 底部 tab bar padding-bottom 必须包含 `var(--mci-safe-bottom)`
+- 顶部导航栏、沉浸式 header、返回按钮区域必须包含 `var(--mci-safe-top)`，不能假设状态栏固定 20px 或 44px。
+- 底部 tab bar、底部固定操作栏、悬浮购买按钮必须包含 `var(--mci-safe-bottom)`，不能贴住 iPhone home indicator 或 Android 手势条。
+- 左右全屏容器、横屏弹窗、沉浸式背景必须兼容 `var(--mci-safe-left/right)`，避免刘海横屏遮挡。
 - 列表项之间最小间距 8px，避免误触
+
+---
+
+## 骨架屏 Loading 设计规范
+
+所有依赖接口、数据库、远程资源或异步计算的数据区域，首屏加载态必须使用骨架屏（Skeleton Screen），不能只显示 spinner、进度圈、空图标或“数据加载中...”文案。骨架屏属于基础体验规范，适用于 PC、移动端 H5、uni-app、小程序和 WebView。
+
+- 骨架屏形态必须接近最终内容版式：列表用行骨架，表格用表头+行骨架，卡片/商品用网格骨架，详情页用大图区+标题/段落骨架，仪表盘用指标卡骨架。
+- 加载期间不能提前显示“暂无数据/暂无明细/空空如也”；空态只能在请求完成且确认无数据后出现。
+- 骨架颜色使用主题变量或中性色阶，不要使用高饱和主色大面积闪烁；亮色主题推荐 `rgba(255,255,255,.72)` 与 `rgba(232,221,205,.9)`，暗色主题推荐低对比深灰阶。
+- 动画只允许使用 `background-position`、`opacity` 或 `transform`，节奏控制在 1.0s 到 1.4s；必须支持 `prefers-reduced-motion` 关闭或弱化动画。
+- 分页加载下一页时，只在列表底部追加紧凑骨架，不覆盖已有内容；切换筛选/分类重载第一页时才显示首屏骨架。
+- 骨架块必须有稳定尺寸、圆角和间距，加载前后不能造成明显布局跳动。
+
+参考样式：
+
+```scss
+.mci-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(255,255,255,.72), rgba(232,221,205,.9), rgba(255,255,255,.72));
+  background-size: 240% 100%;
+  animation: mciSkeleton 1.15s ease-in-out infinite;
+}
+@keyframes mciSkeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mci-skeleton { animation: none; }
+}
+```
 
 ---
 
@@ -716,6 +749,8 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
 
 ### 2. 状态栏 / 安全区适配
 
+移动端页面必须同时考虑 iPhone 刘海屏/Dynamic Island/Home Indicator、Android 状态栏/虚拟导航栏/手势条、不同 WebView 容器和横竖屏差异。不要用固定像素硬顶或硬底来“凑”安全区。
+
 ```scss
 .mci-mobile-page {
   min-height: 100vh;
@@ -727,6 +762,14 @@ description: Microi UI design system guidance. Use when designing PC Vue, Elemen
   background-image: var(--mci-gradient-bg);
 }
 ```
+
+落地要求：
+
+- HTML/H5 必须设置 `viewport-fit=cover`，否则 iOS 的 `env(safe-area-inset-*)` 不会按预期生效。
+- uni-app 页面需要结合 `uni.getSystemInfoSync().statusBarHeight` 或平台导航栏高度，状态栏高度用于占位，内容安全边距仍使用 `env(safe-area-inset-*)` 兜底。
+- 顶部 fixed/sticky 导航使用 `padding-top: max(var(--mci-safe-top), statusBarHeight)` 的等价实现；返回按钮触摸区域要随顶部安全区整体下移。
+- 底部 fixed 操作栏和 tabBar 使用 `padding-bottom: calc(var(--mci-safe-bottom) + 8px)` 或项目等价间距，页面主体同步预留底部高度，避免按钮遮挡列表最后一项。
+- 安卓三键导航、手势导航和 iOS Safari/PWA/WebView 都要截图验收；不能只在 PC 模拟器或单一 iPhone 尺寸上看起来正常。
 
 ### 3. 底部 TabBar
 
@@ -972,7 +1015,8 @@ HTML 结构（无需 JS，纯静态 4 个 div）：
 - [ ] 移动端：`:hover` 用 `@media (hover: hover)` 包裹
 - [ ] 移动端：所有可点击元素 ≥ 44×44px
 - [ ] 移动端：星空粒子 ≤ 30 颗
-- [ ] 移动端：使用 `env(safe-area-inset-*)` 适配安全区
+- [ ] 动态数据页：首屏使用骨架屏，不用 spinner/“加载中”文案代替
+- [ ] 移动端：使用 `env(safe-area-inset-*)` 适配安全区，顶部/底部 fixed 区域在 iOS 与 Android 均不遮挡内容
 
 ---
 
@@ -1370,3 +1414,22 @@ microi_set_engine_anonymous {
 }
 ```
 
+
+## MCI-UI 与第三方组件库策略
+
+Microi 的 UI 规范不应该只停留在 skills 文档。面向品牌长期建设时，应形成可复用的 MCI-UI 体系：设计变量、基础样式、组件约定、示例站点、移动端与 PC 网站组件库。
+
+- UniApp 项目不强制业务页面直接依赖某一个第三方 UI 库。推荐把 `uni-ui` 作为官方跨端基础组件底座之一，但业务视觉必须通过 `MCI-UI Mobile` 或项目级 `mci-*` 组件封装承载，避免页面直接散落 `uni-ui/uView/FirstUI/TDesign` 风格。
+- PC 后台管理系统继续使用 Element Plus，不替换选型；但主题变量、间距、骨架屏、空态、安全区、表单密度和品牌色必须服从 `--mci-*` 设计变量。
+- PC 官网、产品站、文档站、营销页和响应式网站应优先使用 `MCI-UI Web` 的设计变量与轻量组件。只有当页面是强表单、强数据录入或后台化工具时，才引入 Element Plus、TDesign Vue、Naive UI、Arco Design Vue 等成熟组件库作为底座。
+- MCI-UI 应分层建设：`@microi/theme` 负责 tokens；`@microi/v8` 负责前端 SDK；`@microi/ui-mobile` 面向 UniApp；`@microi/ui-web` 面向官网和响应式站点；`Microi.Client` 后台则用 Element Plus + MCI theme。
+- `microi.doc` 作为 VitePress 官方文档站，应逐步成为 MCI-UI 的展示入口：组件演示、设计变量、移动端骨架屏、安全区、富文本、上传资源、主题切换都应该有可查看示例，而不是只写在 skill 中。
+
+## MCI-UI 源码落地位置
+
+MCI-UI 已在吾码源码根目录落地：`Microi.UI/`。
+
+- 新的移动端 UniApp/H5 项目应优先使用 `Microi.UI/src/uniapp` 中的 `MciPage`、`MciNavbar`、`MciButton`、`MciCard`、`MciSkeleton`、`MciDataState`、`MciRichText`，再按业务补项目组件。
+- 新的 PC 官网、产品站、文档站、响应式网站应优先使用 `Microi.UI/src/web` 和 `Microi.UI/src/theme`，不要直接套后台 Element Plus 风格。
+- `Microi.UI/src/theme/tokens.css` 是品牌 token 源头；新组件颜色、圆角、阴影、间距、安全区、骨架屏都必须走 `--mci-*` 变量。
+- 第三方 UI 库只能作为底层能力或局部补充，不能绕过 MCI-UI 直接决定产品视觉。

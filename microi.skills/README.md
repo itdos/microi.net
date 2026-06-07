@@ -196,3 +196,7 @@ AI：参考 v8-crud-api Skill，生成完整代码：
 ## License
 
 MIT
+
+## 新增通用前端 SDK Skill
+
+- `microi.skills/microi-frontend-sdk/SKILL.md`：Microi Vue3 前端 SDK 规范，覆盖请求、Token、上传、资源 URL、ApiEngine/FormEngine、Vue3 app 挂载。所有移动端 H5、UniApp、PC 官网、响应式站点和独立前端项目都应优先参考。

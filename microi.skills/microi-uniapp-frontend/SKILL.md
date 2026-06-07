@@ -1,6 +1,6 @@
 ---
 name: microi-uniapp-frontend
-description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or fixing any Microi uni-app/mobile H5 project that renders uploaded assets, avatars, mobile H5 pages, tabBar, fixed bottom bars, or explicit business asset selection.
+description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or fixing any Microi uni-app/mobile H5 project that renders uploaded assets, avatars, skeleton loading states, mobile safe areas, tabBar, fixed bottom bars, or explicit business asset selection.
 ---
 
 # Microi UniApp 前端通用规范
@@ -103,21 +103,24 @@ row.OwnerAvatarUrl = await resolveAvatarUrl(rawAvatar);
 .cat-content { flex: 1; min-width: 0; height: 100%; }
 ```
 
-## 数据页必须区分加载态与空态
+## 数据页必须使用骨架屏 Loading
 
-任何依赖接口/数据库返回列表的数据页，都必须有三态：`loading`、`data`、`empty`。接口请求结束前只能显示“图标 + 数据加载中...”，不能提前显示“暂无数据/暂无明细/空空如也”。
+任何依赖接口/数据库返回数据的移动端页面，都必须区分 `loading`、`data`、`empty`，并且首屏加载态必须使用骨架屏（Skeleton Screen）。接口请求结束前不能提前显示“暂无数据/暂无明细/空空如也”，也不能只用“图标 + 数据加载中...”或单独 spinner 作为页面级 loading。
 
-- `loading` 初始值设为 `true`（或进入页面立即设为 `true`），请求 `finally` 中再置为 `false`。
-- 空态必须使用 `!loading && list.length === 0`，不能直接写 `v-if="!list.length"`。
-- 加载态和空态都要有统一视觉：小图标/动效 + 文案；空态可带一个简短行动按钮，但不要出现调试字段或接口错误堆栈。
-- 切换 tab、筛选、搜索、分类、分页重载第一页时，应重新进入 loading；加载下一页时可用底部小 loading，不要盖住已有数据。
-- 请求失败时结束 loading，并给用户 toast 或错误状态；不要静默失败后停在“加载中”，也不要把失败误显示成“暂无数据”。
+- `loading` 初始值设为 `true`（或进入页面同步设为 `true`），请求 `finally` 中再置为 `false`；未登录、无权限、参数缺失等提前返回分支也必须关闭 `loading`。
+- 首屏加载、切换 tab、筛选、搜索、分类、重新加载第一页时，应显示与最终版式接近的骨架：列表页用列表骨架，双列商品用网格骨架，详情页用详情骨架，首页 Banner/卡片区用对应区域骨架。
+- 分页追加下一页时不能遮住已有数据，可在列表底部追加紧凑骨架行/骨架卡片；已有数据仍保持可阅读和可滚动。
+- 空态必须使用 `!loading && list.length === 0`，不能直接写 `v-if="!list.length"`；空态可以用图标、文案和行动按钮，但只能在请求完成后出现。
+- 请求失败时结束 loading，并给用户 toast、错误空态或可重试入口；不要静默失败后停在骨架屏，也不要把失败误显示成“暂无数据”。
+- 通用组件可以保留 `DataState` 处理空态，但其 `loading` 分支必须渲染骨架屏，不得渲染加载文案作为主体。
+- 骨架屏样式必须遵循 `microi.skills/ui-design/SKILL.md` 的骨架屏 Loading 设计规范：形态贴近最终内容、尺寸稳定、主题适配、动效克制，并支持弱化动效。
 
 参考结构：
 
 ```vue
+<SkeletonGrid v-if="loading && !list.length" :rows="6" />
 <view v-for="item in list" :key="item.Id">...</view>
-<DataState v-if="loading" loading />
+<SkeletonList v-if="loading && list.length" compact :rows="2" />
 <DataState v-else-if="!list.length" empty-text="暂无数据" />
 ```
 
@@ -133,6 +136,37 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+```
+
+## 移动端安全区必须兼容 iOS 与 Android
+
+任何 UniApp/H5 移动端页面都必须同时适配 iPhone 刘海屏/Dynamic Island/Home Indicator、Android 状态栏/虚拟导航栏/手势条、微信/浏览器/WebView 容器差异。不要用固定 `20px/44px/64px` 直接硬编码顶部或底部间距。
+
+- `manifest.json` / H5 模板必须确保 viewport 含 `viewport-fit=cover`，否则 iOS 的 `env(safe-area-inset-*)` 不会完整生效。
+- 页面根节点使用 `min-height:100vh` 或固定视口布局时，顶部内容、底部固定栏和内部滚动容器必须一起考虑安全区，不能只给根节点加 padding。
+- 顶部自定义导航栏应结合 `uni.getSystemInfoSync().statusBarHeight` 和 CSS `env(safe-area-inset-top)`：状态栏占位负责不同系统高度，导航按钮和标题整体下移，返回按钮触摸区不能压到刘海/状态栏。
+- 底部 `tabBar`、购买栏、提交栏、批量操作栏等 fixed 元素必须使用 `padding-bottom: env(safe-area-inset-bottom)`，主体内容必须额外预留底部高度，避免最后一条数据被按钮或 tabBar 遮挡。
+- 双栏分类页、聊天页、详情页带底部按钮时，内部 `scroll-view` 要用 `flex:1; min-height:0` 承载滚动，并在滚动容器底部预留 `calc(fixedBarHeight + env(safe-area-inset-bottom))`。
+- H5 在 PC 手机壳模式下，fixed 顶栏/底栏仍要限制在手机壳宽度内；不能铺满整个桌面浏览器。
+- 验收必须至少覆盖一个 iPhone 刘海/灵动岛尺寸、一个 Android 高状态栏或虚拟导航栏尺寸、一个 PC H5 手机壳尺寸，截图检查顶部不被遮挡、底部按钮不贴边、列表最后一项可见。
+
+参考样式：
+
+```scss
+.page-mobile {
+  min-height: 100vh;
+  padding-bottom: calc(112rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.mci-navbar {
+  padding-top: env(safe-area-inset-top);
+}
+.bottom-bar {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 ```
 
@@ -257,7 +291,30 @@ async function load() {
 每次改动 UniApp/H5 前端后，至少做以下验证：
 
 - 运行项目可用的窄范围诊断或构建命令。
+- 动态数据页面首屏必须截图确认显示骨架屏；接口结束后再显示数据或空态，不能闪现“暂无数据”。
+- 至少用 iOS 刘海/灵动岛尺寸、Android 状态栏/虚拟导航栏尺寸、PC H5 手机壳尺寸检查安全区。
 - PC 宽屏访问 H5，截图确认页面在手机壳内、底部 tabBar 可见、固定底栏没有铺满桌面。
 - 对关键图片和头像页面截图，确认显示真实图片而不是空白、首字母占位或失效图。
 - 对关键业务资产选择流程，验证首次进入不自动选中，刷新后无效选择会被清空。
-- 截图复核 PC 手机壳、底部 tabBar、主题背景、关键头像、私有图片、金额显示和未读角标。
+- 截图复核 PC 手机壳、顶部安全区、底部安全区、底部 tabBar、主题背景、关键头像、私有图片、金额显示和未读角标。
+
+## Microi Frontend SDK 必须接入
+
+任何 Microi UniApp/H5 Vue3 项目都必须优先使用 `microi.skills/microi.v8.js` 作为统一前端 SDK，并参考 `microi.skills/microi-frontend-sdk/SKILL.md`。新项目不得再手写分散的 `uni.request`、Token 存储、上传、私有文件 URL、头像解析、`ApiEngine` 或 `FormEngine` 包装。
+
+- 项目内落地位置默认是 `src/utils/microi.v8.js`。
+- 项目请求层只创建一个已配置的 `V8 = createMicroiV8({...})` 实例，并导出稳定的业务包装函数，例如 `callEngine`、`formEngineGet`、`uploadFile`、`sanitizeAssetUrl`。
+- `main.js` / `main.ts` 必须执行 `V8.install(app)`，让组件可通过 `$V8` / `$Microi` 使用统一 SDK。
+- 已有页面导出的老函数名可以保留，但内部必须委托 SDK，不能继续复制请求、Token、上传和资源解析逻辑。
+- SDK 不绑定任何 UI 库；页面 UI 仍遵守本 Skill 的骨架屏、安全区、移动端富文本和资源展示规范。
+
+## MCI-UI Mobile 必须优先使用
+
+新的 Microi UniApp/H5 Vue3 项目必须优先基于 `Microi.UI/src/uniapp` 建立页面基础组件，至少包括页面壳、导航栏、按钮、卡片、骨架屏、数据状态、富文本。项目可以使用 `uni-ui`、`uView`、`FirstUI` 等第三方组件，但应封装在 MCI-UI 或项目级 `mci-*` 组件后面，不要让业务页面直接散落多套视觉风格。
+
+推荐接入顺序：
+
+1. 拷贝或 alias `Microi.UI/src/theme` 与 `Microi.UI/src/uniapp` 到项目内。
+2. 在 `main.js` 中 `app.use(MciUI)`，全局注册基础组件。
+3. 动态数据页使用 `MciDataState`，首屏 loading 必须渲染 `MciSkeleton`。
+4. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。

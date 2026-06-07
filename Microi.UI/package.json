@@ -1,0 +1,22 @@
+{
+  "name": "@microi/mci-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCI-UI for Microi Vue3 websites and uni-app mobile projects.",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css",
+    "**/*.scss",
+    "**/*.vue"
+  ],
+  "exports": {
+    ".": "./src/web/index.js",
+    "./web": "./src/web/index.js",
+    "./uniapp": "./src/uniapp/index.js",
+    "./theme": "./src/theme/index.css",
+    "./tokens": "./src/theme/tokens.css"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  }
+}

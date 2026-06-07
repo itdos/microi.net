@@ -1,0 +1,75 @@
+:root,
+page {
+  --mci-color-primary: #B51220;
+  --mci-color-primary-strong: #8E0613;
+  --mci-color-accent-gold: #D9A23A;
+  --mci-color-accent-blue: #2563EB;
+  --mci-color-accent-cyan: #0891B2;
+  --mci-color-success: #0F9F6E;
+  --mci-color-warning: #B7791F;
+  --mci-color-danger: #D92D20;
+
+  --mci-bg-page: #F6F2EA;
+  --mci-bg-surface: #FFFFFF;
+  --mci-bg-muted: #F5F7FA;
+  --mci-bg-soft: #FFF8EA;
+  --mci-border: rgba(31, 41, 55, .10);
+  --mci-border-strong: rgba(31, 41, 55, .18);
+
+  --mci-text-primary: #171923;
+  --mci-text-secondary: #4B5563;
+  --mci-text-tertiary: #8A94A6;
+  --mci-text-inverse: #FFFFFF;
+  --mci-text-on-gold: #4A2D00;
+
+  --mci-radius-xs: 4px;
+  --mci-radius-sm: 6px;
+  --mci-radius-md: 8px;
+  --mci-radius-lg: 12px;
+  --mci-radius-xl: 16px;
+  --mci-radius-pill: 999px;
+
+  --mci-space-1: 4px;
+  --mci-space-2: 8px;
+  --mci-space-3: 12px;
+  --mci-space-4: 16px;
+  --mci-space-5: 20px;
+  --mci-space-6: 24px;
+  --mci-space-8: 32px;
+
+  --mci-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --mci-text-xs: 12px;
+  --mci-text-sm: 13px;
+  --mci-text-base: 15px;
+  --mci-text-lg: 17px;
+  --mci-text-xl: 20px;
+  --mci-text-2xl: 24px;
+
+  --mci-shadow-sm: 0 2px 8px rgba(24, 32, 48, .08);
+  --mci-shadow-md: 0 8px 24px rgba(24, 32, 48, .10);
+  --mci-shadow-lg: 0 16px 42px rgba(24, 32, 48, .14);
+
+  --mci-touch-target: 44px;
+  --mci-safe-top: env(safe-area-inset-top, 0px);
+  --mci-safe-right: env(safe-area-inset-right, 0px);
+  --mci-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mci-safe-left: env(safe-area-inset-left, 0px);
+
+  --mci-skeleton-a: rgba(255, 255, 255, .72);
+  --mci-skeleton-b: rgba(224, 218, 207, .92);
+}
+
+:root[data-theme="dark"],
+page[data-theme="dark"] {
+  --mci-bg-page: #10131A;
+  --mci-bg-surface: #181C25;
+  --mci-bg-muted: #202635;
+  --mci-bg-soft: #2A2230;
+  --mci-border: rgba(255, 255, 255, .10);
+  --mci-border-strong: rgba(255, 255, 255, .18);
+  --mci-text-primary: #F8FAFC;
+  --mci-text-secondary: #CBD5E1;
+  --mci-text-tertiary: #94A3B8;
+  --mci-skeleton-a: rgba(255, 255, 255, .08);
+  --mci-skeleton-b: rgba(255, 255, 255, .16);
+}
