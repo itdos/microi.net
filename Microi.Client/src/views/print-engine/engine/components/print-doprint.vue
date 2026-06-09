@@ -104,6 +104,9 @@ const doPrint = () => {
   })
   // 追加打印专项修复样式
   collectedStyles += `<style>
+    @page {
+      margin: 0;
+    }
     /* 重置 body 背景防止染色 */
     html, body {
       background: #fff !important;
@@ -176,17 +179,22 @@ const doPrint = () => {
     // 等待图片等资源加载后再触发打印
     setTimeout(() => {
       normalizePrintTablePagination(doc)
-      try { win.focus() } catch (e) { /* ignore */ }
-      try {
-        if (win.StyleMedia) {
-          doc.execCommand('print', false, null)
-        } else {
+      // Force layout after moving rows, then give Chrome print preview a tick
+      // to capture the normalized DOM instead of a boundary-clipped layout.
+      void doc.body.offsetHeight
+      setTimeout(() => {
+        try { win.focus() } catch (e) { /* ignore */ }
+        try {
+          if (win.StyleMedia) {
+            doc.execCommand('print', false, null)
+          } else {
+            win.print()
+          }
+        } catch (e) {
           win.print()
         }
-      } catch (e) {
-        win.print()
-      }
-      console.log('浏览器打印窗口已打开')
+        console.log('浏览器打印窗口已打开')
+      }, 80)
     }, 300)
   }
 
