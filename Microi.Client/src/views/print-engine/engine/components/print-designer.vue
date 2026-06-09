@@ -650,6 +650,9 @@ const doPrint = () => {
     }
   })
   collectedStyles += `<style>
+    @page {
+      margin: 0;
+    }
     html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     table, .hiprint-printElement-tableTarget, .hiprint-printElement-tableTarget table {
@@ -688,11 +691,16 @@ const doPrint = () => {
     doc.body.innerHTML = wrapper.outerHTML
     setTimeout(() => {
       normalizePrintTablePagination(doc)
-      try { win.focus() } catch (e) { /* ignore */ }
-      try {
-        if (win.StyleMedia) { doc.execCommand('print', false, null) } else { win.print() }
-      } catch (e) { win.print() }
-      console.log('浏览器打印窗口已打开')
+      // Force layout after moving rows, then give Chrome print preview a tick
+      // to capture the normalized DOM instead of a boundary-clipped layout.
+      void doc.body.offsetHeight
+      setTimeout(() => {
+        try { win.focus() } catch (e) { /* ignore */ }
+        try {
+          if (win.StyleMedia) { doc.execCommand('print', false, null) } else { win.print() }
+        } catch (e) { win.print() }
+        console.log('浏览器打印窗口已打开')
+      }, 80)
     }, 300)
   }
   document.body.appendChild(iframe)

@@ -2,7 +2,11 @@ export function normalizePrintTablePagination(doc) {
   if (!doc || !doc.querySelectorAll) return
 
   const tableSelector = 'table.hiprint-printElement-tableTarget'
-  const overflowTolerance = 0.5
+  // Keep a small printable safety zone at the bottom of each paper. Browser
+  // print preview may recalculate page content with a slightly smaller
+  // printable area than the screen DOM, so rows placed flush to the paper edge
+  // can be clipped and appear as "missing" at page boundaries.
+  const bottomSafetyGap = 18
   const maxPasses = 20
 
   const getPapers = () => Array.from(doc.querySelectorAll('.hiprint-printPaper'))
@@ -22,7 +26,7 @@ export function normalizePrintTablePagination(doc) {
 
     for (let paperIndex = 0; paperIndex < papers.length; paperIndex++) {
       const paper = papers[paperIndex]
-      const paperBottom = paper.getBoundingClientRect().bottom - overflowTolerance
+      const paperBottom = paper.getBoundingClientRect().bottom - bottomSafetyGap
       const tables = Array.from(paper.querySelectorAll(tableSelector))
 
       for (let tableIndex = 0; tableIndex < tables.length; tableIndex++) {
