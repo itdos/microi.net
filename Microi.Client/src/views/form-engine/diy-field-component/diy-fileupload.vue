@@ -268,6 +268,7 @@ import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, n
 import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets, Edit, View } from '@element-plus/icons-vue';
 import { ElMessageBox, ElImageViewer } from 'element-plus';
 import Sortable from 'sortablejs';
+import { useDiyStore } from "@/pinia";
 
 // 禁用属性继承
 defineOptions({
@@ -313,6 +314,11 @@ const emit = defineEmits(['update:modelValue', 'CallbackRunV8Code', 'CallbackGoU
 const instance = getCurrentInstance();
 const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
 const DiyApi = instance.appContext.config.globalProperties.DiyApi;
+const diyStore = useDiyStore();
+const SysConfig = computed(() => ({
+    ...(diyStore.SysConfig || {}),
+    ...(props.SysConfig || {})
+}));
 
 // 响应式数据
 const uploadRef = ref(null);
@@ -566,7 +572,7 @@ const openCadPreview = (url, fileName, fileObj) => {
             '/api/HDFS/GetPrivateFileUrl',
             {
                 FilePathName: previewStoragePath,
-                HDFS: props.SysConfig.HDFS || 'Aliyun',
+                HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
                 FormDataId: props.TableRowId,
                 FieldId: props.field.Id
@@ -807,7 +813,7 @@ const setRealPath = (fileId, filePath, isLimit) => {
             '/api/HDFS/GetPrivateFileUrl',
             {
                 FilePathName: filePath,
-                HDFS: props.SysConfig.HDFS || 'Aliyun',
+                HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
                 FormDataId: props.TableRowId,
                 FieldId: props.field.Id
@@ -988,10 +994,9 @@ const GoUrl = (url) => {
         imagePreviewVisible.value = true;
         return;
     }
-    
     if (
-        props.SysConfig &&
-        (props.SysConfig.Is_online_office || props.SysConfig.OnlyOfficeApiBase) &&
+        SysConfig.value &&
+        (SysConfig.value.Is_online_office || SysConfig.value.OnlyOfficeApiBase) &&
         (url.indexOf('.doc') != -1 ||
             url.indexOf('.docx') != -1 ||
             url.indexOf('.xls') != -1 ||
@@ -1089,7 +1094,7 @@ const GetUploadPath = (field, file) => {
                     '/api/HDFS/GetPrivateFileUrl',
                     {
                         FilePathName: filePathName,
-                        HDFS: props.SysConfig.HDFS || 'Aliyun',
+                        HDFS: SysConfig.value.HDFS || 'Aliyun',
                         FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
                         FormDataId: props.TableRowId,
                         FieldId: field.Id
