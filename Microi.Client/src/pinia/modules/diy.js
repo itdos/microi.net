@@ -164,19 +164,27 @@ export const useDiyStore = defineStore("diy", {
             LocalStorageManager.set("SysConfig", val);
 
             // 从SysConfig同步PageSizes和DefaultPageSize
+            let hasValidPageSizes = false;
             if (val?.PageSizes) {
                 try {
                     const configPageSizes = typeof val.PageSizes === 'string' ? JSON.parse(val.PageSizes) : val.PageSizes;
                     if (Array.isArray(configPageSizes) && configPageSizes.length > 0) {
-                        DiyCommon.PageSizes = configPageSizes.map(Number).filter(n => n > 0).sort((a, b) => a - b);
+                        const pageSizes = configPageSizes.map(Number).filter(n => n > 0).sort((a, b) => a - b);
+                        if (pageSizes.length > 0) {
+                            DiyCommon.PageSizes = pageSizes;
+                            DiyCommon.DefaultPageSize = pageSizes[0];
+                            hasValidPageSizes = true;
+                        }
                     }
                 } catch (e) {}
             }
             if (val?.DefaultPageSize) {
                 const defaultSize = Number(val.DefaultPageSize);
                 if (defaultSize > 0) {
-                    DiyCommon.DefaultPageSize = defaultSize;
-                    if (!DiyCommon.PageSizes.includes(defaultSize)) {
+                    if (!hasValidPageSizes || DiyCommon.PageSizes.includes(defaultSize)) {
+                        DiyCommon.DefaultPageSize = defaultSize;
+                    }
+                    if (!hasValidPageSizes && !DiyCommon.PageSizes.includes(defaultSize)) {
                         DiyCommon.PageSizes.push(defaultSize);
                         DiyCommon.PageSizes.sort((a, b) => a - b);
                     }

@@ -39,3 +39,4 @@ src/views/webos/
 !bin/Release/default.conf
 !bin/Release/publish-*.sh
 !bin/Release/.gitignore
+test-results

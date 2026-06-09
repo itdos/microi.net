@@ -258,6 +258,7 @@ import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, n
 import { UploadFilled, Delete, Rank, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
+import { useDiyStore } from "@/pinia";
 
 // 禁用属性继承
 defineOptions({
@@ -303,6 +304,11 @@ const emit = defineEmits(['update:modelValue', 'CallbackRunV8Code']);
 const instance = getCurrentInstance();
 const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
 const DiyApi = instance.appContext.config.globalProperties.DiyApi;
+const diyStore = useDiyStore();
+const SysConfig = computed(() => ({
+    ...(diyStore.SysConfig || {}),
+    ...(props.SysConfig || {})
+}));
 
 // 响应式数据
 const uploadRef = ref(null);
@@ -724,7 +730,7 @@ const setRealPath = (imgId, imgPath, isLimit) => {
             '/api/HDFS/GetPrivateFileUrl',
             {
                 FilePathName: imgPath,
-                HDFS: props.SysConfig.HDFS || 'Aliyun',
+                HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
                 FormDataId: props.TableRowId,
                 FieldId: props.field.Id
@@ -931,7 +937,7 @@ const GetUploadPath = (img) => {
                     '/api/HDFS/GetPrivateFileUrl',
                     {
                         FilePathName: imgPathName,
-                        HDFS: props.SysConfig.HDFS || 'Aliyun',
+                        HDFS: SysConfig.value.HDFS || 'Aliyun',
                         FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
                         FormDataId: props.TableRowId,
                         FieldId: props.field.Id
