@@ -1187,7 +1187,9 @@ export default {
             // if (!self.DiyCommon.IsNull(field.Config) && self.DiyCommon.IsNull(field.Config)) {
             //     field.Config = ''
             // }
-
+            if(field.Name == 'ShengchengZQRW'){
+                debugger;
+            }
             // 值变更V8事件代码迁移
             if(field.Config && field.Config.V8Code && !field.V8Code){
                 field.V8Code = field.Config.V8Code;

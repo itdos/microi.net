@@ -19,6 +19,7 @@ import {
 import { buildDefaultRemoteData } from '../utils/util.js'
 import { usePrintEngineStore } from '../stores/printEngine'
 import { get } from '../utils/axiosInstance'
+import { normalizePrintTablePagination } from '../utils/print-pagination.js'
 const printEngineStore = usePrintEngineStore()
 // 工具
 import { newHiprintPrintTemplate, removeHiprintPrintTemplate } from '../utils/template-helper'
@@ -162,7 +163,7 @@ const doPrint = () => {
 
   const iframe = document.createElement('iframe')
   iframe.id = 'hiwprint_iframe'
-  iframe.style.cssText = 'visibility:hidden;height:0;width:0;position:absolute;'
+  iframe.style.cssText = 'visibility:hidden;position:absolute;left:-10000px;top:0;width:297mm;height:210mm;border:0;'
   iframe.srcdoc = `<!DOCTYPE html><html><head><title></title><meta charset="UTF-8">${collectedStyles}</head><body style="background:#fff!important;"></body></html>`
 
   let fired = false
@@ -174,6 +175,7 @@ const doPrint = () => {
     doc.body.innerHTML = wrapper.outerHTML
     // 等待图片等资源加载后再触发打印
     setTimeout(() => {
+      normalizePrintTablePagination(doc)
       try { win.focus() } catch (e) { /* ignore */ }
       try {
         if (win.StyleMedia) {

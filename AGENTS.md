@@ -525,16 +525,16 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/v8-template-engine/SKILL.md` — Microi V8 模板引擎（表格/表单 V8 模板）
 - `microi.skills/v8-menu-buttons/SKILL.md` — v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
 - `microi.skills/microi-client-frontend/SKILL.md` — Microi.Client 前台源码架构说明
-- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Vue3 前端 SDK（请求、Token、上传、资源 URL、ApiEngine/FormEngine）
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
-- `microi.skills/microi-ui/SKILL.md` — 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法
+- `microi.skills/microi-ui/SKILL.md` — 吾码UI（Microi.UI / MCI-UI）
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-datasource-mapping/SKILL.md` — microi-datasource-mapping — 数据源 Key/Value 映射规范
+- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Frontend SDK
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
 - `microi.skills/uniapp-mall-assets/SKILL.md` — 商城前端：图片 / 资源路径规范
