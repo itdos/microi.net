@@ -185,6 +185,20 @@ function normalizeUploadData(body) {
   return { ...raw, Path: path, Url: url };
 }
 
+function normalizeClientUploadPath(value) {
+  let path = String(value || 'upload').trim().replace(/\\/g, '/');
+  if (/^(https?:|data:|blob:|file:)/i.test(path)) throw new Error('Invalid upload path.');
+  path = path.replace(/^\/+/, '').replace(/\/+$/, '').replace(/\/{2,}/g, '/');
+  if (!path || path.startsWith('~') || path.includes('..') || path.includes(':')) {
+    throw new Error('Invalid upload path.');
+  }
+  const parts = path.split('/').filter(Boolean);
+  if (!parts.length || parts.some((item) => item === '.' || item === '..')) {
+    throw new Error('Invalid upload path.');
+  }
+  return parts.join('/');
+}
+
 function normalizeFileUrlData(data, assetUrl, fallback = '') {
   const raw = Array.isArray(data) ? (data[0] || '') : (data || '');
   if (typeof raw === 'string') return assetUrl(raw || fallback);
@@ -205,6 +219,72 @@ function getHeaderValue(headers, key) {
 function normalizeBearer(value) {
   const text = String(value || '').trim();
   return /^Bearer\s+/i.test(text) ? text.replace(/^Bearer\s+/i, '') : text;
+}
+
+function isUploadFileLike(value) {
+  if (!value) return false;
+  if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
+  return typeof value.arrayBuffer === 'function';
+}
+
+function pickUploadFileLike(value) {
+  if (!value) return null;
+  if (isUploadFileLike(value)) return value;
+  if (typeof value !== 'object') return null;
+  const keys = ['file', 'raw', 'blob', 'originFileObj', 'tempFile', 'data'];
+  for (const key of keys) {
+    const picked = pickUploadFileLike(value[key]);
+    if (picked) return picked;
+  }
+  return null;
+}
+
+function pickUploadFileName(value) {
+  if (!value) return '';
+  if (typeof value === 'object') {
+    if (value.name) return String(value.name);
+    const keys = ['file', 'raw', 'blob', 'originFileObj', 'tempFile', 'data'];
+    for (const key of keys) {
+      const name = pickUploadFileName(value[key]);
+      if (name) return name;
+    }
+    const path = value.path || value.tempFilePath || value.url || value.src || value.localUrl || value.fullPath || '';
+    if (path) return inferUploadFileName(path);
+  }
+  return '';
+}
+
+function inferUploadFileName(value) {
+  const text = String(value || '').split('?')[0].split('#')[0];
+  const name = decodeURIComponent((text.split('/').pop() || '').trim());
+  return name && name.indexOf(':') < 0 ? name : '';
+}
+
+function pickUploadFileSource(filePath, options = {}) {
+  const candidates = [options.file, filePath];
+  for (const item of candidates) {
+    if (!item) continue;
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object') {
+      const path = item.path || item.tempFilePath || item.url || item.src || item.localUrl || item.fullPath || '';
+      if (path) return String(path);
+    }
+  }
+  return '';
+}
+
+async function resolveFetchUploadFile(filePath, options = {}) {
+  const direct = pickUploadFileLike(options.file) || pickUploadFileLike(filePath);
+  const name = options.fileName || pickUploadFileName(options.file) || pickUploadFileName(filePath) || inferUploadFileName(filePath) || 'file';
+  if (direct) return { file: direct, name };
+
+  const source = pickUploadFileSource(filePath, options);
+  if (source && typeof fetch === 'function' && /^(blob:|data:)/i.test(source)) {
+    const res = await fetch(source);
+    const blob = await res.blob();
+    return { file: blob, name };
+  }
+  return { file: null, name };
 }
 
 function createQueue(maxConcurrent) {
@@ -530,8 +610,10 @@ export function createMicroiV8(options = {}) {
       ...(options.headers || {})
     };
     if (config.osClient) {
+      Object.keys(headers).forEach((key) => {
+        if (String(key).toLowerCase() === 'osclient') delete headers[key];
+      });
       headers.OsClient = config.osClient;
-      headers.osclient = config.osClient;
     }
     if (token) {
       headers.Token = token;
@@ -672,43 +754,67 @@ export function createMicroiV8(options = {}) {
   async function uploadFile(filePath, options = {}) {
     const runtimeUni = getUni();
     const action = options.action || (options.anonymous ? 'UniappUploadAnonymous' : 'UniappUpload');
+    const rawFormData = options.formData || {};
     const uploadData = {
+      ...rawFormData,
       OsClient: config.osClient,
-      Path: options.path || 'upload',
       Limit: options.limit === false ? 'false' : 'true',
       Preview: options.preview === false ? 'false' : 'true',
-      Multiple: options.multiple ? 'true' : 'false',
-      ...(options.formData || {})
+      Multiple: options.multiple ? 'true' : 'false'
     };
+    uploadData.Path = normalizeClientUploadPath(options.path || uploadData.Path || uploadData.path || 'upload');
+    delete uploadData.path;
 
     let body;
-    if (runtimeUni && typeof runtimeUni.uploadFile === 'function') {
-      body = await new Promise((resolve, reject) => {
-        runtimeUni.uploadFile({
-          url: buildUrl(options.url || `/api/HDFS/${action}`),
-          filePath,
-          name: options.name || 'file',
-          header: buildHeaders({ ...options, headers: options.headers || {} }),
-          formData: uploadData,
-          success: (res) => resolve(parseMaybeJson(res.data, res.data)),
-          fail: reject
-        });
-      });
-    } else if (typeof fetch === 'function' && typeof FormData !== 'undefined') {
-      const file = options.file || filePath;
+    const fetchSource = pickUploadFileSource(filePath, options);
+    const canFetchUpload = typeof fetch === 'function' && typeof FormData !== 'undefined' &&
+      (!!pickUploadFileLike(options.file) || !!pickUploadFileLike(filePath) || /^(blob:|data:)/i.test(fetchSource));
+    const uploadByFetch = async () => {
+      const picked = await resolveFetchUploadFile(filePath, options);
+      const file = picked.file;
       if (!file) throw new Error('No file provided for upload.');
       const formData = new FormData();
       Object.keys(uploadData).forEach((key) => formData.append(key, uploadData[key]));
-      formData.append(options.name || 'file', file, options.fileName || (file && file.name) || 'file');
+      formData.append(options.name || 'file', file, picked.name || (file && file.name) || 'file');
       const res = await fetch(buildUrl(options.url || `/api/HDFS/${action}`), {
         method: 'POST',
         headers: buildUploadHeaders({ ...options, headers: options.headers || {} }),
         body: formData
       });
       const text = await res.text();
-      body = parseMaybeJson(text, text);
-    } else {
-      throw new Error('No upload adapter found for MicroiV8.');
+      return parseMaybeJson(text, text);
+    };
+
+    if (options.preferFetch === true && canFetchUpload) {
+      try {
+        body = await uploadByFetch();
+      } catch (e) {
+        if (!(runtimeUni && typeof runtimeUni.uploadFile === 'function')) throw e;
+      }
+    }
+    if (!body) {
+      if (runtimeUni && typeof runtimeUni.uploadFile === 'function') {
+        try {
+          body = await new Promise((resolve, reject) => {
+            runtimeUni.uploadFile({
+              url: buildUrl(options.url || `/api/HDFS/${action}`),
+              filePath,
+              name: options.name || 'file',
+              header: buildUploadHeaders({ ...options, headers: options.headers || {} }),
+              formData: uploadData,
+              success: (res) => resolve(parseMaybeJson(res.data, res.data)),
+              fail: reject
+            });
+          });
+        } catch (e) {
+          if (!canFetchUpload) throw e;
+          body = await uploadByFetch();
+        }
+      } else if (canFetchUpload) {
+        body = await uploadByFetch();
+      } else {
+        throw new Error('No upload adapter found for MicroiV8.');
+      }
     }
 
     if (!body || body.Code !== 1) {

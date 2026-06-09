@@ -330,3 +330,18 @@ async function load() {
 3. 分类、资产、订单、表单、筛选、上传、流程、时间线、商城、会员中心等常见页面优先使用 `MciTabs`、`MciMetricCard`、`MciAssetCard`、`MciActionBar`、`MciAvatar`、`MciProductCard`、`MciFormField`、`MciFilterBar`、`MciOrderCard`、`MciModal`、`MciUploader`、`MciTimeline`、`MciSteps`，避免重复写局部风格。
 4. 动态数据页使用 `MciDataState`，首屏 loading 必须渲染 `MciSkeleton`。
 5. 商品详情、公告、协议等富文本使用 `MciRichText` 或遵循同等结构。
+
+## UniApp 上传路径与 Header 规则
+
+任何移动端图片、头像、身份认证、付款凭证、富文本图片、收款码上传，都必须走项目统一的 `uploadFile` 包装，并最终委托 `microi.v8.js` 的 `V8.uploadFile`。页面里不得直接调用 `/api/HDFS/UniappUpload`，不得临时手写 `uni.uploadFile`。
+
+- `uni.uploadFile` / `fetch(FormData)` 必须使用上传专用 header，严禁携带 `Content-Type: application/json`。multipart 的 boundary 应由运行时自动生成。
+- 上传 `Path` 必须是后端允许的安全相对路径，例如 `mall/pay-proof`、`mall/member/avatar`、`module/business-scene`。
+- 禁止上传路径写成 `/mall/pay-proof`、`https://...`、`C:\...`、`../x`、`mall//x`、`~xxx`，也不要把本地临时文件路径当作 HDFS `Path`。
+- SDK 必须统一归一化 `options.path`、`formData.Path`、`formData.path`，并且不允许业务页通过 `formData` 把 `Path` 覆盖成非法值。
+- 项目级 `uploadFile(filePath, options)` 只能做默认路径和业务语义包装，必须透传 `{ ...options }`，不能丢掉 `headers`、`action`、`anonymous`、`file`、`formData`、`silentError` 等 SDK 选项。
+- H5 页面从 `uni.chooseImage` 得到 `tempFiles[0].file` 时必须保留下来；如果只拿到 `tempFiles[0]` 或 `blob:` / `data:` 临时路径，也要传给 SDK，不得只保存字符串后丢弃文件对象。上传时传 `file` 并设置 `preferFetch:true`，让线上浏览器优先走标准 `fetch + FormData`。SDK 必须识别 `File` / `Blob`、`file/raw/blob/originFileObj` 等嵌套字段以及 `blob:` / `data:` 临时路径，不能只依赖 `uni.uploadFile`，否则生产 H5 可能出现 `No upload adapter found for MicroiV8`。
+- 上传、提交、支付、凭证、认证等关键按钮严禁空 `catch`。失败必须 `toast` 展示 `Msg/message`，同时 `console.error` 记录，并在 `finally` 还原 loading/uploading 状态，不能让用户感觉点击后没有任何反应。
+- 修改上传相关逻辑后，必须用 `rg "uploadFile\\(|uni.uploadFile|UniappUpload"` 检查所有上传入口，至少验证付款凭证、头像/证件/收款码等一个私有图场景。
+
+如果接口返回“移动端文件上传路径不合法！”，优先检查实际 multipart formData 里是否存在合法 `Path`，以及请求 header 是否错误设置了 JSON Content-Type；不要只看页面代码里传入的 `path` 字面量。

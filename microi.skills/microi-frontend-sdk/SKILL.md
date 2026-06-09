@@ -61,6 +61,21 @@ Pages and business API modules should import the configured instance or wrapper 
 - Token and user storage should use `V8.getToken`, `V8.setToken`, `V8.clearToken`, `V8.getUser`, and `V8.setUser`.
 - Safe area data should use `V8.getSafeArea` when JavaScript needs platform values; CSS should still use `env(safe-area-inset-*)`.
 
+## Upload Rules
+
+`V8.uploadFile` is the only allowed Microi frontend upload entry. The SDK implementation must:
+
+- Use multipart upload headers. Never send `Content-Type: application/json` through `uni.uploadFile` or `fetch(FormData)`.
+- Send only one tenant header key: `OsClient`. Remove incoming `osclient` / `OsClient` duplicates before adding the configured tenant.
+- Send `OsClient` in `formData` and keep the endpoint query `?OsClient=tenant` when `appendOsClientQuery` is enabled.
+- Normalize upload `Path` centrally from `options.path`, `formData.Path`, or `formData.path`.
+- Keep mobile upload paths as safe relative paths such as `mall/pay-proof` or `mall/member/avatar`. Do not use `/mall/pay-proof`, full URLs, drive paths, `..`, `:`, `//`, or `~`.
+- Let thin project wrappers pass through all options with `{ ...options, path: options.path || defaultPath }`, so page-specific `headers`, `action`, `anonymous`, `file`, `formData`, and `silentError` are not lost.
+- In H5 pages, keep the real `File` object returned by `uni.chooseImage` (`tempFiles[0].file` when available). If H5 only returns `tempFiles[0]` or a `blob:` / `data:` temp path, pass that through too; do not discard it. Call `V8.uploadFile(..., { file, preferFetch:true })`. The SDK must recognize `File` / `Blob`, common nested fields such as `file` / `raw` / `blob` / `originFileObj`, and `blob:` / `data:` paths, then use `fetch + FormData` first and fall back between `uni.uploadFile` and fetch when possible.
+- Upload submit handlers must not use empty `catch` blocks. Show a toast with `body.Msg` / `error.message`, log the error for diagnostics, and always reset the uploading state in `finally`.
+
+When an upload suddenly reports `移动端文件上传路径不合法！`, first inspect the actual multipart form fields and headers. In Microi mobile/member-token flows, the backend validates `Path` before HDFS upload; a wrong `Content-Type` can make the backend fail to read form fields and surface as a path error.
+
 ## Project Wrapper Rule
 
 Keep business-facing function names stable. If an existing project exports `callEngine`, `formEngineGet`, `getImageUrl`, `parseImages`, or `uploadFile`, keep those exports and delegate internally to `V8`. This avoids broad page churn while still enforcing one SDK.
