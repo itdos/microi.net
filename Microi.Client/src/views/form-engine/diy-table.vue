@@ -1562,6 +1562,46 @@ export default {
     methods: {
       // ========== 移动端FAB拖拽 ==========
               //可传入外键Id值 、父表model
+        GetConfiguredPageSizes() {
+            var self = this;
+            var pageSizes = [];
+            if (self.SysConfig && self.SysConfig.PageSizes) {
+                try {
+                    var configPageSizes = typeof self.SysConfig.PageSizes === "string" ? JSON.parse(self.SysConfig.PageSizes) : self.SysConfig.PageSizes;
+                    if (Array.isArray(configPageSizes)) {
+                        pageSizes = configPageSizes;
+                    }
+                } catch (error) {
+                    pageSizes = [];
+                }
+            }
+            if ((!pageSizes || pageSizes.length == 0) && self.DiyCommon && Array.isArray(self.DiyCommon.PageSizes)) {
+                pageSizes = self.DiyCommon.PageSizes;
+            }
+            return pageSizes.map(Number).filter((size) => size > 0).sort((a, b) => a - b);
+        },
+        GetDefaultTablePageSize(options = {}) {
+            var self = this;
+            var pageSizes = self.GetConfiguredPageSizes();
+            var menuDefault = Number(options.menuDefault || (self.SysMenuModel && self.SysMenuModel.DefaultPageSize));
+            if (menuDefault > 0 && (pageSizes.length == 0 || pageSizes.includes(menuDefault))) {
+                return menuDefault;
+            }
+            var sysDefault = Number(self.DiyCommon && self.DiyCommon.DefaultPageSize);
+            if (sysDefault > 0 && (pageSizes.length == 0 || pageSizes.includes(sysDefault))) {
+                return sysDefault;
+            }
+            return pageSizes.length > 0 ? pageSizes[0] : 15;
+        },
+        NormalizeTablePageSize(size, options = {}) {
+            var self = this;
+            var pageSizes = self.GetConfiguredPageSizes();
+            var pageSize = Number(size);
+            if (pageSize > 0 && (pageSizes.length == 0 || pageSizes.includes(pageSize))) {
+                return pageSize;
+            }
+            return self.GetDefaultTablePageSize(options);
+        },
         async Init(parentFormModel, v8) {
             var self = this;
 
@@ -1657,11 +1697,9 @@ export default {
             // this.DiyCommon.DefaultPageSize || this.DefaultPageSize
             try {
                 var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
-                if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
-                    self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
-                }
+                self.DiyTableRowPageSize = self.NormalizeTablePageSize(cacheDiyTableRowPageSize);
             } catch (error) {
-                self.DiyTableRowPageSize = self.DiyCommon.DefaultPageSize || 10;
+                self.DiyTableRowPageSize = self.GetDefaultTablePageSize();
             }
             //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
             self.GetAllData({ IsInit: true });

@@ -703,11 +703,9 @@ export default {
             }
             try {
                 var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
-                if (self.DiyCommon.IsNull(cacheDiyTableRowPageSize)
-                    && self.SysMenuModel.DefaultPageSize
-                    && self.SysMenuModel.DefaultPageSize > 0) {
-                    self.DiyTableRowPageSize = self.SysMenuModel.DefaultPageSize;
-                }
+                self.DiyTableRowPageSize = self.NormalizeTablePageSize(cacheDiyTableRowPageSize, {
+                    menuDefault: self.SysMenuModel.DefaultPageSize
+                });
                 // 🔥 手机端 + 卡片模式强制每页 15 条（PC端不限制）
                 if (self.diyStore && self.diyStore.IsPhoneView
                     && self.TableDisplayMode === 'Card' && self.DiyTableRowPageSize > 15) {
