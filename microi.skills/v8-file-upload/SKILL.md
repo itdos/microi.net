@@ -47,6 +47,16 @@ var filePath = upResult.Data[0].Path;  // 相对路径，存数据库
 var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 ```
 
+### UniApp / H5 客户端直传路径规则
+
+移动端通过 `/api/HDFS/UniappUpload` 上传时，前端必须走 `microi.v8.js` 的 `V8.uploadFile`，不要在页面里手写 `uni.uploadFile`。客户端上传的 `Path` 与服务端 `V8.Method.Upload` 示例不同，必须是安全相对路径：
+
+- 正确：`mall/pay-proof`、`mall/member/avatar`、`order/proof`
+- 错误：`/mall/pay-proof`、`https://...`、`C:\...`、`../x`、`mall//x`、`~x`
+- multipart 请求不能带 `Content-Type: application/json`，否则后端可能读不到 `Path` 表单字段并返回“移动端文件上传路径不合法！”
+- `OsClient` 只能保留一个规范字段，避免同时提交 `OsClient`、`osclient` 或 query/header/formData 多处互相冲突。
+- 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `No upload adapter found for MicroiV8`。
+
 ## 公有桶 vs 私有桶
 
 | 类型 | `Limit` | 访问 URL | 用途 |
