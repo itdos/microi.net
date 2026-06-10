@@ -1,7 +1,7 @@
 <template>
-    <div>
+    <div class="onlyoffice-editor-shell">
         <!-- 编辑器容器 -->
-        <div id="onlyoffice-editor"></div>
+        <div id="onlyoffice-editor" class="onlyoffice-editor"></div>
 
         <!-- 加载状态 -->
         <div v-if="loading" class="loading">ONLYOFFICE编辑器加载中...</div>
@@ -124,10 +124,15 @@ export default {
          */
         initializeEditor() {
             try {
+                if (this.docEditor) {
+                    this.docEditor.destroyEditor();
+                    this.docEditor = null;
+                }
+
                 // 合并配置
                 const editorConfig = {
                     width: "100%",
-                    height: window.innerHeight - 100 + "px",
+                    height: "100%",
                     type: "desktop",
                     ...this.config
                 };
@@ -153,11 +158,41 @@ export default {
 </script>
 
 <style scoped>
+.onlyoffice-editor-shell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.onlyoffice-editor {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.onlyoffice-editor-shell :deep(iframe) {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    border: 0;
+}
+
 .loading,
 .error {
-    padding: 20px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 260px;
+    padding: 18px 22px;
     text-align: center;
-    font-size: 16px;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(25, 35, 55, 0.12);
+    z-index: 2;
 }
 
 .error {

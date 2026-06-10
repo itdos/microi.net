@@ -65,14 +65,28 @@ export default {
             self.$emit("CallbackForm", { ...self.FormDiyTableModel });
         },
         //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
-        GoUrl(url) {
+        GoUrl(file) {
             var self = this;
+            var url = typeof file === "object" && file !== null ? file.url || file.filePath || file.FilePath || file.Path : file;
+            var fileName = typeof file === "object" && file !== null ? file.fileName || file.FileName || file.name || file.Name : "";
+            var fileSize = typeof file === "object" && file !== null ? file.fileSize || file.FileSize || file.size || file.Size : "";
+            if (!url) {
+                return;
+            }
             if (
                 self.SysConfig &&
                 (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase) &&
                 (url.indexOf(".doc") != -1 || url.indexOf(".docx") != -1 || url.indexOf(".xls") != -1 || url.indexOf(".xlsx") != -1 || url.indexOf(".ppt") != -1 || url.indexOf(".pptx") != -1)
             ) {
-                self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
+                var params = new URLSearchParams();
+                params.set("filePath", url);
+                if (fileName) {
+                    params.set("fileName", fileName);
+                }
+                if (fileSize) {
+                    params.set("fileSize", fileSize);
+                }
+                self.$router.push(`/online-office?${params.toString()}`);
                 self.$emit("CallbackFormClose");
             } else {
                 window.open(url, "_blank", "noopener,noreferrer");
