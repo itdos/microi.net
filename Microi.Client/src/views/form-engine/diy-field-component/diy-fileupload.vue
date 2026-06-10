@@ -32,7 +32,7 @@
         <div v-if="FormMode != 'View' && field.Visible && !field.Config.FileUpload.Multiple && !DiyCommon.IsNull(modelValue) && modelValue != '正在上传中...'"
             class="single-file-display">
             <div class="file-info">
-                <el-icon class="file-icon" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])" style="cursor: pointer;">
+                <el-icon class="file-icon" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())" style="cursor: pointer;">
                     <component :is="getFileIcon(GetFileName(modelValue))" />
                 </el-icon>
                 <div class="file-detail">
@@ -46,7 +46,7 @@
                     <span
                         v-else
                         class="file-name" 
-                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])"
+                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())"
                     >
                         {{ GetFileName(modelValue) }}
                     </span>
@@ -66,7 +66,7 @@
                     <component :is="getFileIcon(GetFileName(modelValue))" />
                 </el-icon>
                 <div class="file-detail">
-                    <span class="file-name" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                    <span class="file-name" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'], getSingleFileMeta())">
                         {{ GetFileName(modelValue) }}
                     </span>
                     <span class="file-size">{{ getSingleFileSize() }}</span>
@@ -86,7 +86,7 @@
                     <el-icon class="drag-handle"><Rank /></el-icon>
                     <el-icon 
                         class="file-icon" 
-                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'])"
+                        @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file)"
                         style="cursor: pointer;"
                     >
                         <component :is="getFileIcon(file.Name)" />
@@ -102,7 +102,7 @@
                             <span 
                                 v-else
                                 class="file-name" 
-                                @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'])"
+                                @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file)"
                             >
                                 {{ file.Name }}
                             </span>
@@ -120,7 +120,7 @@
                             type="success" 
                             size="small"
                             style="cursor: pointer;"
-                            @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'])"
+                            @click="GoUrl(FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath'], file)"
                         >
                             已上传
                         </el-tag>
@@ -980,7 +980,7 @@ const JsonToFileList = (arr) => {
 };
 
 // 打开URL
-const GoUrl = (url) => {
+const GoUrl = (url, fileMeta = null) => {
     console.log('GoUrl called with:', url);
     if (DiyCommon.IsNull(url) || url === './static/img/loading.gif' || url === './static/img/img-load-fail.jpg') {
         console.warn('Invalid URL:', url);
@@ -1004,10 +1004,20 @@ const GoUrl = (url) => {
             url.indexOf('.ppt') != -1 ||
             url.indexOf('.pptx') != -1)
     ) {
-        emit('CallbackGoUrl', url);
+        emit('CallbackGoUrl', buildOnlineOfficePayload(url, fileMeta));
     } else {
         window.open(url, '_blank', 'noopener,noreferrer');
     }
+};
+
+const buildOnlineOfficePayload = (url, fileMeta = null) => {
+    const meta = fileMeta || {};
+    return {
+        url,
+        filePath: url,
+        fileName: meta.Name || meta.name || GetFileName(props.modelValue) || GetFileName(url),
+        fileSize: meta.Size || meta.size || getSingleFileRawSize()
+    };
 };
 
 // 获取文件名
@@ -1039,17 +1049,31 @@ const formatFileSize = (bytes) => {
 
 // 获取单文件的大小
 const getSingleFileSize = () => {
+    return formatFileSize(getSingleFileRawSize());
+};
+
+const getSingleFileRawSize = () => {
     // 先规范化数据
     const normalized = normalizeValue(props.modelValue);
     
     // 如果是对象（单文件JSON格式），从对象中读取Size
     if (typeof normalized === 'object' && normalized !== null && normalized.Size) {
-        return formatFileSize(normalized.Size);
+        return normalized.Size;
     }
     // 兼容老数据（字符串格式）- 尝试从旧的FileSize字段读取
     const sizeKey = props.field.Name + '_FileSize';
-    const size = props.FormDiyTableModel[sizeKey];
-    return formatFileSize(size);
+    return props.FormDiyTableModel[sizeKey];
+};
+
+const getSingleFileMeta = () => {
+    const normalized = normalizeValue(props.modelValue);
+    if (typeof normalized === 'object' && normalized !== null) {
+        return normalized;
+    }
+    return {
+        Name: GetFileName(props.modelValue),
+        Size: getSingleFileRawSize()
+    };
 };
 
 // 获取上传后的下载地址（用于View模式）

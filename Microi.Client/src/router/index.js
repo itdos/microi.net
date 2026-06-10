@@ -34,6 +34,19 @@ export const constantRoutes = [
             }
         ]
     },
+    {
+        path: "/online-office",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "online_office",
+                component: () => import("@/views/form-engine/diy-components/onlyoffice.vue"),
+                meta: { title: "在线文档", keepAlive: false }
+            }
+        ]
+    },
     // WebOS 桌面路由（全屏，无经典传统 Layout 包裹，仅在 webos 模块存在时注册）
     ...(hasWebOS ? [{
         path: "/os",
