@@ -97,10 +97,14 @@ try {
     var stats = {
         TableInserted: 0,
         TableUpdated: 0,
+        TableIdRemapped: 0,
         FieldInserted: 0,
         FieldUpdated: 0,
+        FieldIdRemapped: 0,
         MenuInserted: 0,
         MenuUpdated: 0,
+        MenuIdRemapped: 0,
+        ReferenceRowsUpdated: 0,
         FlowInserted: 0,
         FlowUpdated: 0,
         NodeInserted: 0,
@@ -109,6 +113,260 @@ try {
         LineUpdated: 0,
         ApiEngineInserted: 0,
         ApiEngineUpdated: 0
+    };
+
+    // ==================== 辅助函数：导入 Id 对齐和引用修复 ====================
+
+    var idMaps = {
+        Table: {},
+        Field: {},
+        Menu: {}
+    };
+
+    var menuJsonFields = [
+        'SelectFields', 'MobileListFields', 'SearchFieldIds', 'SortFieldIds',
+        'TableDiyFieldIds', 'NotShowFields', 'StatisticsFields', 'FixedFields',
+        'TableHeaders', 'InTableEditFields', 'MoreBtns', 'FormBtns', 'PageBtns',
+        'PageTabs', 'BatchSelectMoreBtns', 'ExportMoreBtns', 'DiyConfig', 'JoinTables'
+    ];
+    var fieldJsonFields = ['Config', 'Data', 'BindRole'];
+
+    var addInParameters = function (db, params) {
+        for (var pIndex = 0; pIndex < params.length; pIndex++) {
+            db = db.AddInParameter('@p' + pIndex, params[pIndex]);
+        }
+        return db;
+    };
+
+    var execNonQuery = function (sql, params) {
+        return addInParameters(V8.Db.FromSql(sql), params || []).ExecuteNonQuery();
+    };
+
+    var normalizeId = function (id) {
+        if (id === undefined || id === null) return '';
+        return String(id);
+    };
+
+    var addIdMap = function (type, oldId, newId, label) {
+        var oldKey = normalizeId(oldId);
+        var newKey = normalizeId(newId);
+        if (!oldKey || !newKey || oldKey == newKey) return;
+        if (!idMaps[type]) idMaps[type] = {};
+        if (idMaps[type][oldKey] == newKey) return;
+
+        idMaps[type][oldKey] = newKey;
+        idMaps[type][oldKey.toLowerCase()] = newKey;
+
+        if (type == 'Table') stats.TableIdRemapped++;
+        else if (type == 'Field') stats.FieldIdRemapped++;
+        else if (type == 'Menu') stats.MenuIdRemapped++;
+
+        debugLog['id_remap_' + type + '_' + oldKey] = (label || '') + '：' + oldKey + ' -> ' + newKey;
+    };
+
+    var findMappedId = function (value) {
+        if (typeof value !== 'string') return value;
+        var lowerValue = value.toLowerCase();
+        var mapNames = ['Table', 'Field', 'Menu'];
+        for (var m = 0; m < mapNames.length; m++) {
+            var map = idMaps[mapNames[m]];
+            if (map[value]) return map[value];
+            if (map[lowerValue]) return map[lowerValue];
+        }
+        return value;
+    };
+
+    var hasAnyIdMap = function () {
+        for (var mapName in idMaps) {
+            if (Object.prototype.hasOwnProperty.call(idMaps, mapName)) {
+                var map = idMaps[mapName];
+                for (var key in map) {
+                    if (Object.prototype.hasOwnProperty.call(map, key)) return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    var replaceIdsDeep = function (value, state) {
+        if (value === null || value === undefined) return value;
+        if (typeof value == 'string') {
+            var mapped = findMappedId(value);
+            if (mapped !== value) state.changed = true;
+            return mapped;
+        }
+        if (Array.isArray(value)) {
+            var arr = [];
+            for (var a = 0; a < value.length; a++) {
+                arr.push(replaceIdsDeep(value[a], state));
+            }
+            return arr;
+        }
+        if (typeof value == 'object') {
+            var obj = {};
+            for (var key in value) {
+                if (Object.prototype.hasOwnProperty.call(value, key)) {
+                    obj[key] = replaceIdsDeep(value[key], state);
+                }
+            }
+            return obj;
+        }
+        return value;
+    };
+
+    var replaceIdsInJsonText = function (text) {
+        if (!text || typeof text !== 'string') return text;
+        var trimText = text.trim();
+        if (!trimText || (trimText.charAt(0) != '{' && trimText.charAt(0) != '[')) return text;
+        try {
+            var parsed = JSON.parse(text);
+            var state = { changed: false };
+            var mapped = replaceIdsDeep(parsed, state);
+            return state.changed ? JSON.stringify(mapped) : text;
+        } catch (jsonError) {
+            return text;
+        }
+    };
+
+    var applyDirectIdMaps = function (row, fields) {
+        var changed = false;
+        for (var f = 0; f < fields.length; f++) {
+            var fieldName = fields[f];
+            if (row[fieldName]) {
+                var mapped = findMappedId(row[fieldName]);
+                if (mapped !== row[fieldName]) {
+                    row[fieldName] = mapped;
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    };
+
+    var applyJsonIdMaps = function (row, fields) {
+        var changed = false;
+        for (var f = 0; f < fields.length; f++) {
+            var fieldName = fields[f];
+            if (row[fieldName]) {
+                var mapped = replaceIdsInJsonText(row[fieldName]);
+                if (mapped !== row[fieldName]) {
+                    row[fieldName] = mapped;
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    };
+
+    var syncReferenceRows = function (tableName, directFields, jsonFields) {
+        if (!hasAnyIdMap()) return 0;
+        var rowsResult = V8.FormEngine.GetTableData(tableName, {
+            OsClient: V8.OsClient,
+            _PageSize: 99999
+        });
+        if (rowsResult.Code != 1 || !rowsResult.Data) return 0;
+
+        var updated = 0;
+        var rows = rowsResult.Data || [];
+        for (var r = 0; r < rows.length; r++) {
+            var row = rows[r];
+            if (!row.Id) continue;
+            var model = { Id: row.Id, OsClient: V8.OsClient };
+            var changed = false;
+
+            for (var d = 0; d < directFields.length; d++) {
+                var directField = directFields[d];
+                if (row[directField]) {
+                    var mappedDirect = findMappedId(row[directField]);
+                    if (mappedDirect !== row[directField]) {
+                        model[directField] = mappedDirect;
+                        changed = true;
+                    }
+                }
+            }
+
+            for (var j = 0; j < jsonFields.length; j++) {
+                var jsonField = jsonFields[j];
+                if (row[jsonField]) {
+                    var mappedJson = replaceIdsInJsonText(row[jsonField]);
+                    if (mappedJson !== row[jsonField]) {
+                        model[jsonField] = mappedJson;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed) {
+                var uptReferenceResult = V8.FormEngine.UptFormData(tableName, model);
+                if (uptReferenceResult.Code == 1) {
+                    updated++;
+                } else {
+                    debugLog['reference_sync_error_' + tableName + '_' + row.Id] = uptReferenceResult.Msg;
+                }
+            }
+        }
+        stats.ReferenceRowsUpdated += updated;
+        return updated;
+    };
+
+    var applyPackageIdMaps = function () {
+        if (!hasAnyIdMap()) return;
+
+        var packageFields = Package.DiyFields || [];
+        for (var pf = 0; pf < packageFields.length; pf++) {
+            applyDirectIdMaps(packageFields[pf], ['TableId']);
+            applyJsonIdMaps(packageFields[pf], fieldJsonFields);
+        }
+
+        var packageMenus = Package.SysMenus || [];
+        for (var pm = 0; pm < packageMenus.length; pm++) {
+            applyDirectIdMaps(packageMenus[pm], ['ParentId', 'DiyTableId']);
+            applyJsonIdMaps(packageMenus[pm], menuJsonFields);
+        }
+
+        var packageDdl = Package.DDLStatements || [];
+        for (var pd = 0; pd < packageDdl.length; pd++) {
+            applyDirectIdMaps(packageDdl[pd], ['TableId']);
+        }
+    };
+
+    var syncMappedReferences = function () {
+        if (!hasAnyIdMap()) return 0;
+        applyPackageIdMaps();
+        var updated = 0;
+        updated += syncReferenceRows('diy_field', ['TableId'], fieldJsonFields);
+        updated += syncReferenceRows('sys_menu', ['ParentId', 'DiyTableId'], menuJsonFields);
+        return updated;
+    };
+
+    var remapTableIdInDatabase = function (oldId, newId, tableName) {
+        try {
+            execNonQuery('UPDATE diy_table SET Id = @p0 WHERE Id = @p1 AND IsDeleted<>1', [newId, oldId]);
+            execNonQuery('UPDATE diy_field SET TableId = @p0 WHERE TableId = @p1 AND IsDeleted<>1', [newId, oldId]);
+            execNonQuery('UPDATE sys_menu SET DiyTableId = @p0 WHERE DiyTableId = @p1 AND IsDeleted<>1', [newId, oldId]);
+            addIdMap('Table', oldId, newId, tableName || '');
+        } catch (remapError) {
+            debugLog['table_id_remap_error_' + newId] = remapError.message;
+        }
+    };
+
+    var remapFieldIdInDatabase = function (oldId, newId, fieldName) {
+        try {
+            execNonQuery('UPDATE diy_field SET Id = @p0 WHERE Id = @p1 AND IsDeleted<>1', [newId, oldId]);
+            addIdMap('Field', oldId, newId, fieldName || '');
+        } catch (remapError) {
+            debugLog['field_id_remap_error_' + newId] = remapError.message;
+        }
+    };
+
+    var remapMenuIdInDatabase = function (oldId, newId, menuName) {
+        try {
+            execNonQuery('UPDATE sys_menu SET Id = @p0 WHERE Id = @p1 AND IsDeleted<>1', [newId, oldId]);
+            execNonQuery('UPDATE sys_menu SET ParentId = @p0 WHERE ParentId = @p1 AND IsDeleted<>1', [newId, oldId]);
+            addIdMap('Menu', oldId, newId, menuName || '');
+        } catch (remapError) {
+            debugLog['menu_id_remap_error_' + newId] = remapError.message;
+        }
     };
 
     // ==================== 步骤0：执行DDL创建表和字段 ====================
@@ -333,24 +591,7 @@ try {
             existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data;
             //如果存在此tableName，但又不存在taleId，将此tableName的Id修改为应用商城的diy_table的Id
             if (existsByName && !existsById) {
-                try {
-                    V8.Db.FromSql("UPDATE diy_table SET Id = '" + table.Id + "' WHERE Name = '" + table.Name + "' and IsDeleted<>1")
-                        .ExecuteNonQuery();
-                } catch (error) {
-
-                }
-                try {
-                    V8.Db.FromSql("UPDATE diy_field SET TableId = '" + table.Id + "' WHERE TableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
-                        .ExecuteNonQuery();
-                } catch (error) {
-
-                }
-                try {
-                    V8.Db.FromSql("UPDATE sys_menu SET DiyTableId = '" + table.Id + "' WHERE DiyTableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
-                        .ExecuteNonQuery();
-                } catch (error) {
-
-                }
+                remapTableIdInDatabase(checkByNameResult.Data.Id, table.Id, table.Name);
 
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Id.toLowerCase()}`);
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Name.toLowerCase()}`);
@@ -439,12 +680,9 @@ try {
                 debugLog['★SelectApi_checkByName_HasData'] = !!(checkByNameResult.Data);
             }
             if (checkByNameResult.Code == 1) {
-                try {
-                    V8.Db.FromSql("UPDATE diy_field SET Id = '" + field.Id + "' WHERE TableId = '" + field.TableId + "' AND Name = '" + field.Name + "' and IsDeleted<>1").ExecuteNonQuery();
-                } catch (error) {
-                    if (isSelectApi) {
-                        debugLog['★SelectApi_updateId_error'] = error.message;
-                    }
+                var oldFieldId = checkByNameResult.Data && checkByNameResult.Data.Id;
+                if (oldFieldId && oldFieldId != field.Id) {
+                    remapFieldIdInDatabase(oldFieldId, field.Id, field.Name);
                 }
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${field.TableId.toLowerCase()}`);
                 exists = true;
@@ -616,6 +854,11 @@ try {
             }
 
         }
+    }
+
+    var step2ReferenceRowsUpdated = syncMappedReferences();
+    if (step2ReferenceRowsUpdated > 0) {
+        debugLog.step2ReferenceRowsUpdated = step2ReferenceRowsUpdated;
     }
 
     for (var i = 0; i < diyTables.length; i++) {
@@ -971,6 +1214,33 @@ try {
         }
 
         var exists = checkExists('sys_menu', menu.Id);
+        if (!exists) {
+            var matchedMenu = null;
+            if (menu.ModuleEngineKey) {
+                var menuByKeyResult = V8.FormEngine.GetFormData('sys_menu', {
+                    OsClient: V8.OsClient,
+                    _Where: [['ModuleEngineKey', '=', menu.ModuleEngineKey]],
+                    _PageSize: 1
+                });
+                if (menuByKeyResult.Code == 1 && menuByKeyResult.Data) {
+                    matchedMenu = menuByKeyResult.Data;
+                }
+            }
+            if (!matchedMenu && menu.Url) {
+                var menuByUrlResult = V8.FormEngine.GetFormData('sys_menu', {
+                    OsClient: V8.OsClient,
+                    _Where: [['Url', '=', menu.Url]],
+                    _PageSize: 1
+                });
+                if (menuByUrlResult.Code == 1 && menuByUrlResult.Data) {
+                    matchedMenu = menuByUrlResult.Data;
+                }
+            }
+            if (matchedMenu && matchedMenu.Id && matchedMenu.Id != menu.Id) {
+                remapMenuIdInDatabase(matchedMenu.Id, menu.Id, menu.Name || menu.ModuleEngineKey || menu.Url);
+                exists = true;
+            }
+        }
 
         //如果传入了 InstallParentSysMenuId，并且当前菜单的ParentId并不存在于待导入的菜单中
         if (InstallParentSysMenuId && sysMenus.findIndex(m => m.Id === menu.ParentId) === -1) {
@@ -1029,6 +1299,11 @@ try {
         if (menu.ModuleEngineKey) {
             V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${menu.ModuleEngineKey.toLowerCase()}`);
         }
+    }
+
+    var step3ReferenceRowsUpdated = syncMappedReferences();
+    if (step3ReferenceRowsUpdated > 0) {
+        debugLog.step3ReferenceRowsUpdated = step3ReferenceRowsUpdated;
     }
 
     debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated;
@@ -1298,10 +1573,11 @@ try {
         },
         执行概览: {
             DDL建表: '执行' + (stats.DDLExecuted || 0) + '条，跳过' + (stats.DDLSkipped || 0) + '条，补充物理字段' + (stats.FieldsAdded || 0) + '个',
-            表结构: '新增' + stats.TableInserted + '条，修改' + stats.TableUpdated + '条',
-            字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条',
+            表结构: '新增' + stats.TableInserted + '条，修改' + stats.TableUpdated + '条，Id对齐' + stats.TableIdRemapped + '条',
+            字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条，Id对齐' + stats.FieldIdRemapped + '条',
             物理字段同步: '重命名' + (stats.PhysicalFieldsRenamed || 0) + '个，修改' + (stats.PhysicalFieldsModified || 0) + '个，新增' + (stats.PhysicalFieldsAdded || 0) + '个',
-            菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条',
+            菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条，Id对齐' + stats.MenuIdRemapped + '条',
+            引用修复: '更新' + stats.ReferenceRowsUpdated + '行',
             工作流: '新增' + stats.FlowInserted + '条，修改' + stats.FlowUpdated + '条',
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
