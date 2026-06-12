@@ -76,6 +76,8 @@ export function createApp() {
 ## Component Baseline
 
 - `MciPage`: safe-area aware page shell
+- `MciHeroPanel`: branded first-viewport hero/status panel
+- `MciBottomNav`: custom icon bottom navigation with active state, badge, and optional raised center action
 - `MciNavbar`: mobile navigation shell
 - `MciButton`: brand button with variants, pressed feedback, optional sheen, and shape tokens
 - `MciCard`: compact surface/card with elevation, hover lift, optional sheen, and glass/focus variants
@@ -111,9 +113,27 @@ For mobile H5 and uni-app products, MCI-UI provides an opinionated high-polish c
 - `.mci-mobile-titlebar`: section title and action row.
 - `.mci-mobile-chip-row` / `.mci-mobile-chip`: colored option tags and compact states.
 - `.mci-mobile-bottom-nav`: custom bottom navigation when native tabBar is too limited or unstable.
+- `.mci-mobile-rich-card`: rich business list card with title, status, meta, media, and actions.
+- `.mci-mobile-meta-grid`: detail fields and key-value facts.
+- `.mci-mobile-option-grid`: card/chip-style form choices.
+- `.mci-mobile-photo-grid`: photo upload/display grid.
+- `.mci-mobile-sheet`: polished bottom sheet container.
+- `.mci-mobile-chart-card` / `.mci-mobile-kpi-strip`: chart and dashboard surfaces.
+- `.mci-mobile-empty-result`: empty state with icon, title, description, and action.
 - `.mci-mobile-form-section`: long-form section rhythm with icon marks.
 
 The premium layer is intentionally brand-neutral. Project palettes, logo colors, and `--mci-color-primary` drive the final visual identity.
+
+## Scene Rules
+
+- Login pages use an atmosphere area plus floating form panel. Primary login and phone-login buttons must be icon + text.
+- Home/workbench pages expose the next action in the first viewport.
+- Profile pages use identity headers, shortcut cards, grouped grids, and settings panels.
+- Mobile lists use rich business cards, not table-like rows.
+- Detail/report pages start with a status overview, then facts, timeline, media, rich text, and safe-area actions.
+- Long forms use section headers, option cards, upload grids, and fixed bottom submit bars.
+- Bottom navigation must include icons and active states. Text-only navigation is not acceptable.
+- Charts put KPI numbers before graphics and keep palettes controlled.
 
 ## Quality Checks
 

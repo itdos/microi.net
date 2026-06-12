@@ -1,25 +1,31 @@
 ---
 name: microi-ui
-description: Use when building or documenting Microi.UI / MCI-UI for Vue 3 PC websites, responsive sites, uni-app mobile projects, theme palettes, shape modes, skeleton loading, safe areas, motion, and Microi brand frontend components.
+description: Use when building or documenting Microi.UI / MCI-UI for Vue 3 websites, responsive sites, uni-app mobile projects, theme palettes, shape modes, premium mobile UI, skeleton loading, safe areas, motion, and Microi brand frontend components.
+applyTo: "**/*.{vue,js,ts,css,scss,md,json}"
 ---
 
-# 吾码UI（Microi.UI / MCI-UI）
+# Microi.UI / MCI-UI
 
-吾码UI（Microi.UI / MCI-UI）is the shared Microi frontend UI foundation for Vue 3 PC websites, responsive websites, and uni-app mobile projects. Use it for new Microi-facing products except `Microi.Client` admin pages, which continue to use Element Plus plus Microi theme tokens.
+Microi.UI is the shared frontend design system for Microi products. Use it for Vue 3 websites, responsive sites, H5, and uni-app mobile projects. PC admin pages can still use Element Plus, but their visual tokens, loading states, empty states, motion, and brand colors should align with `--mci-*` tokens.
 
-When the user does not name a UI style or UI library, default to Microi.UI for Microi mobile apps, PC websites, enterprise sites, product pages, docs pages, malls, member centers, and H5/uni-app work.
+When the user asks for a Microi mobile app, H5, mini-program, customer portal, staff app, member center, official site, product site, activity page, dashboard, or report page and does not name another design system, default to Microi.UI.
 
-## When To Use
+This is an automatic rule. Do not wait for the user to explicitly say "follow `microi.skills/microi-ui/SKILL.md`". If the repository, requirement, file path, or project context belongs to the Microi ecosystem and the work touches frontend UI, website UI, H5, uni-app, mini-program, customer/staff/member pages, reports, dashboards, or visual polish, load and apply this skill by default.
 
-- New mobile H5 / uni-app apps, malls, member centers, asset pages, order flows, and activity pages.
-- PC official sites, enterprise websites, product sites, docs sites, and responsive marketing/product pages.
-- Project work involving Microi brand theme, palette switching, rounded/flat style switching, safe areas, skeleton loading, rich text display, and page motion.
-- AI-generated frontends that should feel consistent across projects instead of scattering one-off CSS or third-party UI visual styles.
+## Core Promise
+
+Microi.UI is not only a component set. It is a visual delivery standard for AI-built software:
+
+- Every first viewport must have a clear visual anchor.
+- Every page must use brand-aware color and component hierarchy.
+- Every important action must be obvious, beautiful, and reachable.
+- Every list/detail/form must be built from reusable scene patterns, not copied one-off CSS.
+- Every mobile page must respect safe areas, loading states, pressed feedback, and bottom actions.
 
 ## Source Layout
 
-- `Microi.UI/src/theme/tokens.css`: design tokens, palettes, shape modes, shadows, gradients, safe-area variables, skeleton colors.
-- `Microi.UI/src/theme/index.css`: base classes such as `mci-page`, `mci-card`, `mci-skeleton`, page enter motion, hover lift, press feedback, sheen, focus ring, reduced-motion fallback.
+- `Microi.UI/src/theme/tokens.css`: design tokens, palettes, radius, shadows, motion, mobile scene variables.
+- `Microi.UI/src/theme/index.css`: base classes, page shell, mobile premium primitives, skeleton, motion, bottom navigation, rich cards, sheets, form options.
 - `Microi.UI/src/theme/runtime.js`: `initMciDesign`, `applyMciDesign`, `getMciDesign`, `toggleMciTheme`, `setMciTheme`, `setMciPalette`, `setMciShape`, `setMciMotion`.
 - `Microi.UI/src/web`: Vue 3 web components.
 - `Microi.UI/src/uniapp`: uni-app Vue 3 components.
@@ -28,87 +34,225 @@ When the user does not name a UI style or UI library, default to Microi.UI for M
 
 - Call `initMciDesign()` at app startup or provide an equivalent project-level theme service.
 - Support `theme: light | dark`, `palette: black | white | red | orange | yellow | green | cyan | blue | purple`, `shape: rounded | flat`, and `motion: full | reduced`.
-- Wrap Microi.UI pages or embedded UI areas with `.mci-page` or `data-mci-ui-root` so resets, typography, tokens, and component styles are scoped and less likely to be overwritten by host projects or third-party CSS.
-- Use `MciPage` as the page shell when possible. Pages should have entrance motion by default and respect top/bottom safe areas on mobile.
-- For every UniApp/H5/mobile project, also apply `microi.skills/microi-mobile-app-quality/SKILL.md` as a mandatory quality gate.
-- Use `MciSection` for major content sections, `MciCell` for settings/menu/list rows, `MciTabs` for segmented navigation, `MciMetricCard`/`MciAssetCard` for asset/summary numbers, `MciActionBar` for safe-area bottom actions, `MciAvatar` for member identity, `MciProductCard` for commerce/content grids, `MciFormField` for forms, `MciFilterBar` for list filters, `MciOrderCard` for orders/tasks, `MciModal` for dialogs, `MciUploader` for upload surfaces, `MciTimeline` for status records, `MciSteps` for workflows, and `MciThemePanel` for theme/palette/shape/motion configuration screens.
-- When the same UI pattern appears in two or more places, extract a Microi.UI component or a project-level `mci-*` wrapper with props/slots for text, icons, actions, states, and small variants. Do not copy/paste cards, auth prompts, empty states, data states, action bars, filter bars, or button groups into separate pages.
-- Dynamic data pages must show skeleton screens while first data is loading, not spinner-only or premature empty states.
-- Rich text content must give text breathing room while allowing images to be `width:100%`.
-- `MciUploader` and project upload wrappers must support re-select/replacement after a file is chosen, tap-to-fullscreen preview, close preview, upload progress, retry, and failure toast. Upload components must update only the bound file field, not reset the whole form.
-- Do not hardcode colors, radius, shadows, or gradients in business pages; use `--mci-*` variables or project wrappers based on them.
-- Buttons/cards/clickable cells must preserve hover/focus/pressed feedback. White and yellow palettes must use `--mci-text-on-primary` instead of fixed white text.
-- Primary buttons, pill buttons, and action chips must use flex/inline-flex centering, explicit `align-items:center`, `justify-content:center`, stable height/min-height, and `line-height:1` on the text node. Text that should be centered must be visually centered on both axes, not merely padded until it looks close.
+- Wrap Microi.UI pages or embedded UI areas with `.mci-page` or `[data-mci-ui-root]`.
+- Use `MciPage` as the page shell. Mobile customer/staff/member pages should usually use `premium`.
+- Do not hardcode colors, shadows, radius, gradients, or safe-area spacing in business pages. Use `--mci-*` variables or `mci-*` classes.
+- Only public shared classes with `mci-` prefix are allowed. Do not introduce external UI library names, copied class names, or generic globals such as `.card`, `.list`, `button {}`.
+- If a UI pattern appears in two or more pages, extract a Microi.UI component or project-level `mci-*` wrapper.
+- Dynamic pages must show skeleton screens during first load, not spinner-only or premature empty states.
+- Prominent buttons must use icon plus text, centered with flex, stable height, loading state, and pressed feedback.
+- Native mini-program buttons such as `open-type="getPhoneNumber"` must be styled as Microi primary buttons and remove default button borders.
+- API headers must pass `OsClient` as one exact value such as `lxwb`, never duplicated values such as `lxwb, lxwb`.
+
+## Component Selection
+
+- `MciPage`: page shell, safe area, motion, premium mobile background.
+- `MciHeroPanel`: branded first-viewport hero/status panel.
+- `MciBottomNav`: custom bottom navigation with icon, badge, active state, optional raised center item.
+- `MciButton`: primary, plain, gold, cool, ghost actions.
+- `MciCard`: general content container.
+- `MciCell`: settings/menu/list rows.
+- `MciSection`: major sections.
+- `MciTabs`: segmented navigation and content switching.
+- `MciMetricCard` / `MciAssetCard`: numbers, assets, summaries.
+- `MciOrderCard`: orders, work orders, tasks, repair requests.
+- `MciActionBar`: safe-area bottom actions.
+- `MciAvatar`: member/customer/staff identity.
+- `MciProductCard`: commerce/content grids.
+- `MciFormField`: forms and data entry.
+- `MciFilterBar`: list search/filter area.
+- `MciModal`: dialogs and confirmations.
+- `MciUploader`: image/file upload.
+- `MciTimeline`: service records, repair progress, approval records.
+- `MciSteps`: workflows and status stages.
+- `MciSkeleton`: loading placeholders.
+- `MciDataState`: empty/error/success states.
+- `MciRichText`: reports, articles, instructions.
 
 ## Premium Mobile Visual Standard
 
-Microi mobile apps must feel like polished mobile products, not admin forms squeezed into a phone viewport. For uni-app/H5 projects, use the Microi mobile premium layer before writing page-local CSS:
+Mobile apps must feel like polished products, not admin forms squeezed into a phone viewport.
 
-- Use `MciPage premium` or `.mci-page--mobile-premium` as the page shell for customer-facing, staff-facing, member-center, workbench, order, report, and form pages.
-- First screens should have a strong visual anchor: a branded hero panel, identity banner, search/action capsule, or large status card. Do not start important mobile pages with a plain title and a flat list.
-- Hero headlines must fit the real copy on common phone widths. For Chinese business titles, reduce display size before accepting ugly wrapping; primary buttons under the hero must never be covered by floating quick-action panels.
-- Build mobile pages from layered blocks: hero/banner, floating quick-action panel, metric cards, section titlebars, content cards, bottom action/navigation. Avoid a monotonous vertical stack of identical white cards.
-- Use soft radial page backgrounds, translucent glass panels, colored icon bubbles, pill tags, and elevated bottom bars through `--mci-*` tokens and `.mci-mobile-*` classes. Do not hardcode an unrelated third-party style name or library identity into Microi files.
-- Use `.mci-mobile-hero`, `.mci-mobile-panel`, `.mci-mobile-bubble-grid`, `.mci-mobile-stat-grid`, `.mci-mobile-titlebar`, `.mci-mobile-chip-row`, `.mci-mobile-bottom-nav`, and `.mci-mobile-form-section` where the pattern fits.
-- Login pages should use a top atmosphere area plus a floating form panel. The form panel needs clear mode switching, thick rounded inputs, high-contrast primary action, and enough empty space below.
-- “My/Profile” pages should use an identity header, two or more highlighted shortcut cards, grouped function grids, and settings/info panels. Do not render profile pages as a plain list unless the product is intentionally utilitarian.
-- Workbench/home pages should expose the next action within the first viewport: pending tasks, due plans, reports, repair entry, or quick actions. Metric cards should be scan-friendly and visually differentiated.
-- List pages should use rich business cards with title, status pill, metadata, time, and primary action. Avoid table-like rows on mobile.
-- Detail pages should use an overview hero/status block, sectioned facts, timeline/steps, media/report content, and a safe-area bottom action when an action is expected.
-- Form pages should use section headers with small icon marks, large clean input areas, upload grids, colored option chips, and a fixed safe-area submit bar for long forms.
-- Native `uni-app` tabBar may be used only when it is visually and technically stable. If H5/runtime validation shows tabBar slot/runtime errors or insufficient visual control, use a custom Microi bottom navigation component styled like `.mci-mobile-bottom-nav`.
-- All high-polish choices must remain brand-aware: derive hero gradients, icon bubble colors, and button shadows from the project logo or configured `--mci-color-primary` / accent tokens.
+Use these primitives before writing page-local CSS:
 
-### Mobile Icon, Button, And Motion Gate
+- `.mci-page--mobile-premium`
+- `.mci-mobile-hero`
+- `.mci-mobile-panel`
+- `.mci-mobile-bubble-grid`
+- `.mci-mobile-stat-grid`
+- `.mci-mobile-titlebar`
+- `.mci-mobile-chip-row`
+- `.mci-mobile-bottom-nav`
+- `.mci-mobile-rich-card`
+- `.mci-mobile-meta-grid`
+- `.mci-mobile-option-grid`
+- `.mci-mobile-photo-grid`
+- `.mci-mobile-sheet`
+- `.mci-mobile-chart-card`
+- `.mci-mobile-kpi-strip`
+- `.mci-mobile-empty-result`
 
-- Bottom navigation, homepage quick actions, member-center shortcuts, grid actions, and floating actions must use recognizable icons. Single Chinese characters such as `首` / `单` / `报` / `我` are text placeholders, not icons.
-- Prominent actions such as login, go-login, submit, confirm, repair, accept-order, upload-photo, and generate-report must be icon + text buttons with loading and pressed states.
-- Native mini-program buttons such as `open-type="getPhoneNumber"` must be styled to match Microi primary buttons and must remove default button borders.
-- Mobile pages must include restrained motion: hero/panel/card entrance, tap feedback, and skeleton shimmer or pulse. Motion must not cause layout shift, text clipping, or operational distraction.
-- Visual acceptance must inspect bottom navigation, homepage shortcuts, profile shortcuts, login, empty-state action buttons, and fixed bottom submit buttons.
-- Visual acceptance must also inspect the first viewport at 375px and 430px widths. Check hero title wrapping, hero action visibility, floating panel overlap, and the first content panel spacing.
+### First Viewport Rule
 
-## Style Isolation Rules
+The first viewport must show one of these anchors:
 
-- Use only `mci-` prefixed public classes for shared styles. Do not ship generic global selectors such as `button {}`, `.card {}`, `.list {}`, or `img {}`.
-- Put component-local details in Vue scoped styles or component root classes. Global token/reset rules must be limited to `.mci-page` or `[data-mci-ui-root]`.
-- When adapting uni-ui, uView, TDesign, FirstUI, Element Plus, or VitePress Markdown content, wrap the third-party output and map its visible colors/radius/shadows to `--mci-*` variables instead of modifying library internals directly.
-- For docs/official-site work, prefer a single VitePress theme layer that styles `VPDoc`, `VPHome`, tables, code blocks, sidebars, and feature cards consistently. Avoid per-document one-off CSS unless the page is a special showcase.
+- branded hero panel with CTA
+- identity/member header
+- workbench status card
+- report/status overview
+- search plus category panel
+- image-led content hero
+- KPI dashboard summary
 
-## Vue 3 Web Usage
+Do not start a mobile page with only a flat title and a plain list.
 
-```js
-import { createApp } from 'vue';
-import MciUI, { initMciDesign } from '@microi/mci-ui/web';
-import '@microi/mci-ui/theme';
+### Layering Rule
 
-initMciDesign({ theme: 'light', palette: 'red', shape: 'rounded', motion: 'full' });
+High-quality mobile pages should usually compose:
 
-createApp(App).use(MciUI).mount('#app');
-```
+1. atmosphere background or hero
+2. floating quick-action or stats panel
+3. titlebar with action
+4. rich business cards
+5. bottom navigation or fixed action bar
 
-## UniApp Usage
+Avoid a monotonous stack of identical white cards.
 
-```js
-import MciUI, { initMciDesign } from '@/mci-ui/uniapp/index.js';
-import '@/mci-ui/theme/index.css';
+### Icon Rule
 
-initMciDesign({ theme: 'light', palette: 'red', shape: 'rounded', motion: 'full' });
-app.use(MciUI);
-```
+Bottom navigation, home quick actions, profile shortcuts, grid actions, floating actions, empty-state actions, and primary buttons must use recognizable icons. Single Chinese characters are placeholders, not icons.
 
-For non-H5 uni-app targets, DOM attributes may not exist. Store the preference through `initMciDesign()` and pass `shape`, `safeTop`, `safeBottom`, or project theme classes into page shells/components where needed.
+### Motion Rule
+
+Use restrained motion: page entrance, staggered cards, tap feedback, skeleton shimmer, optional hero idle/sheen. Motion must not cause layout shift, clipped text, or operational distraction. Respect `motion: reduced`.
+
+## Mobile Scene Blueprints
+
+### Login / Register
+
+- Do not force role switching unless the business explicitly has separate login systems.
+- For Microi account login, use the platform login flow correctly; do not call nonexistent methods.
+- For WeChat mini-program customer login, support phone authorization and registration/binding.
+- Use top atmosphere plus floating form panel.
+- Inputs must be thick, rounded, readable, and grouped.
+- Primary login / go-login / phone login buttons must be icon plus text, high contrast, and full width where appropriate.
+- Show social/quick-login entries only when they actually work.
+
+### Home / Workbench
+
+- Expose the next action in the first viewport: pending orders, due plans, reports, repairs, approvals, or quick actions.
+- Use `MciHeroPanel` or `.mci-mobile-hero`.
+- Use floating quick actions with icons.
+- Use metric cards for counts and status.
+- Use rich cards for recent tasks or reports.
+- Hero text must fit 375px and 430px widths. Reduce title size before accepting ugly wrapping.
+- Floating panels must not cover hero buttons.
+
+### Profile / My
+
+- Use identity header with avatar, name, role/customer, status, and at least one visual badge.
+- Use two or more highlighted shortcut cards or a service grid.
+- Group settings and business entries into panels.
+- Do not render profile as a plain list unless the product is intentionally utilitarian.
+
+### List
+
+- Mobile lists should use business cards, not table-like rows.
+- Each card needs title, status pill, key metadata, time, and primary action.
+- Add filter/search/tabs above lists when data types differ.
+- Use skeleton cards during loading and meaningful empty states.
+- Long titles and metadata must ellipsize or wrap intentionally without breaking card height.
+
+### Detail / Report
+
+- Start with overview hero/status block.
+- Then show facts, timeline/steps, media, rich report content, and action area.
+- Important status must be visible without scrolling.
+- Reports should use `MciRichText`, readable line height, image max width, and share/read/confirm actions.
+- If an action is expected, use `MciActionBar` or fixed safe-area submit bar.
+
+### Form / Upload
+
+- Use section headers with small icon marks.
+- Use large clean input areas and enough vertical spacing.
+- Use colored option chips or option cards for important choices.
+- Upload surfaces must support re-select/replacement, preview, close preview, progress, retry, and failure toast.
+- Long forms need a fixed safe-area submit bar.
+
+### Bottom Navigation
+
+- Prefer `MciBottomNav` when native tabbar limits visual quality or causes runtime issues.
+- Must include icons, labels, active state, and stable tap targets.
+- Raised center action is allowed for create/scan/repair/report actions.
+- Do not use text-only navigation.
+
+### Popup / Sheet / Dialog
+
+- Use dimmed overlay, clear sheet radius, handle line for bottom sheets, and compact action hierarchy.
+- Bottom sheets should not cover irreversible actions without confirmation.
+- Confirmation dialogs should show clear icon/status and one primary action.
+
+### Chart / Dashboard
+
+- Numbers come before charts.
+- Use 2-4 high-signal metrics in the first screen.
+- Use a small palette; do not make every chart a rainbow.
+- For dense dashboards, choose either clean light analytics or dark command-center style, not a random mix.
+
+### Messages / Social / News
+
+- Messages need avatar/icon, type, title, summary, time, unread marker, and action if needed.
+- Social/content feeds need strong media ratio, author identity, tags, and engagement actions.
+- News/content pages need category tabs, hero or featured story, and readable cards.
+
+### Commerce / Activity
+
+- Use image-led cards, price/status anchors, promotional tags, and bottom purchase/action area.
+- Cart/order pages need visible selection state, quantity controls, totals, and fixed checkout bar.
+- Activity pages need a campaign hero, progress/status, reward/action panels, and rules panel.
+
+## Website / PC Site Standard
+
+- Build the actual product/site experience, not a generic landing shell.
+- First viewport must make the brand/product/place/object obvious.
+- For landing heroes, use real/generated bitmap imagery or an immersive interactive scene when appropriate. Do not rely on decorative gradients alone.
+- Hero text should not sit inside a card.
+- SaaS/CRM/operation sites should be quiet, dense, scannable, and work-focused.
+- Product/venue/portfolio sites can be more visual, but the primary object must be inspectable.
+- Use `MciHeroPanel`, `MciSection`, `MciCard`, `MciMetricCard`, and `MciButton` before page-local CSS.
+
+## Backend Menu Pairing
+
+When creating a Microi low-code system, backend menus should not all be first-level menus. Use at least two levels for real systems:
+
+- Customer Center: customers, contacts, bindings.
+- Asset/Device Center: equipment/assets.
+- Operation Center: plans, orders, records, repairs.
+- Report Center: reports, read logs.
+- System/Config Center: dictionaries, settings, templates.
+
+The mobile app information architecture should match these business domains where practical.
 
 ## AI Implementation Checklist
 
-- Start from `microi.skills/ui-design/SKILL.md` and this skill before designing the UI.
-- Prefer `Microi.UI` components or project-level `mci-*` wrappers over direct `uni-ui/uView/TDesign/FirstUI` visual styling.
-- If the user simply asks for a mobile app, website, enterprise site, mall, member center, asset page, or H5/uni-app page in a Microi workspace, treat Microi.UI as the default choice without waiting for explicit style instructions.
-- If a third-party UI library is needed, normalize it through `--mci-*` tokens and wrappers.
-- Add any new reusable component to `Microi.UI/src/web` and/or `Microi.UI/src/uniapp`, then export it from the matching `index.js`.
-- Before adding page-local markup/styles, scan sibling pages and existing components for the same pattern. If two pages need the same structure with only copy, icon, route, or state differences, build one reusable component and pass those differences through props/slots/events.
-- Update `microi.doc/docs/doc/system-engine/microi-ui.md` and, when the English homepage/sidebar links to it, `microi.doc/docs/en/doc/system-engine/microi-ui.md`.
-- Validate with `npm run check`, `npm run pack:check`, and the relevant `microi.doc` build when docs changed.
-- When the user asks for "automated tests", "fully automated testing", "全自动化测试", or equivalent after UI/frontend changes, include screenshot-based visual verification in the test chain whenever a browser/H5/devtools target is available. Builds and static checks alone are not enough.
-- For official sites, docs sites, product pages, enterprise sites, and Microi mobile/H5 pages, take screenshots of the nav/header, hero/actions, auth/empty/data states, representative cards, and bottom bars. Verify nav/background contrast, button text vertical and horizontal centering, card background harmony, safe areas, and no text clipping before considering the UI done.
-- When styling host frameworks such as VitePress, avoid broad overrides that accidentally turn a dark landing page into a light-header/light-card hybrid. Scope home-page and document-page styles separately.
+- Auto-detect this skill for Microi frontend, website, H5, uni-app, mini-program, customer portal, staff app, member center, dashboard, report, activity, and visual redesign tasks.
+- Read this skill and `microi.skills/ui-design/SKILL.md` before designing UI.
+- Inspect the logo/brand colors and derive palette before writing pages.
+- Choose scene blueprint first, component second, CSS last.
+- Use Microi.UI components or project-level `mci-*` wrappers over direct third-party visual styling.
+- Update `Microi.UI` when a reusable pattern appears across projects.
+- Update `microi.doc/docs/doc/system-engine/microi-ui.md` when Microi.UI behavior or standards change.
+- Validate with `npm run check`, `npm run pack:check`, and docs build when possible.
+- For UI/frontend work, use screenshot-based visual verification when a browser/H5/devtools target is available.
+- Inspect at 375px and 430px widths for mobile pages.
+- Check hero title wrapping, action visibility, floating panel overlap, bottom nav icons, empty states, form submit bars, and button centering.
+
+## Prohibited Output
+
+- No external UI library identity or copied class prefix inside Microi.UI files or docs.
+- No text-only bottom navigation.
+- No generic global CSS selectors.
+- No duplicate `OsClient` header values.
+- No login calls to undefined API methods.
+- No all-first-level backend menu planning for business systems.
+- No page that has only plain lists, plain buttons, and no visual anchor when the product is customer/staff-facing.

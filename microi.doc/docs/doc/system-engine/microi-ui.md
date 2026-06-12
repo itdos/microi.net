@@ -557,6 +557,27 @@ toggleMciTheme();</code></pre>
   </article>
 </section>
 
+## 高级移动端视觉规范
+
+Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让客户、员工、会员、师傅、运营人员打开后能立即感受到产品级体验。AI 在生成移动端或 H5/小程序/App 页面时，应默认把下面规则作为验收门槛，不需要用户额外提示。
+
+<section class="mci-ui-check-panel">
+  <span class="mci-ui-kicker">Mobile Premium</span>
+  <h3>移动端页面必须先有场景蓝图，再写组件和样式。</h3>
+  <div class="mci-ui-check-grid">
+    <article><b>首屏锚点</b><span>首页、登录页、我的页、报表页必须有品牌 Hero、身份头、状态总览、搜索分类或 KPI 区块，不能只放标题和列表。</span></article>
+    <article><b>底部导航</b><span>优先使用 <code>MciBottomNav</code> 或等价封装，必须包含真实图标、文字、激活态、角标和稳定点击区域。</span></article>
+    <article><b>高级首屏</b><span>优先使用 <code>MciHeroPanel</code> 或 <code>.mci-mobile-hero</code>，标题需适配 375px / 430px 宽度，按钮不能被浮层遮挡。</span></article>
+    <article><b>富卡片列表</b><span>工单、报告、商品、消息、新闻、活动、维修记录等列表使用业务卡片：标题、状态、摘要、时间、主操作缺一不可。</span></article>
+    <article><b>表单上传</b><span>长表单分段展示，底部固定安全区提交；图片/文件上传必须有预览、替换、进度、失败反馈。</span></article>
+    <article><b>动效反馈</b><span>页面入场、卡片错峰、按钮按压、骨架屏 shimmer 需要存在但克制，并尊重 reduced motion。</span></article>
+    <article><b>按钮质感</b><span>登录、去登录、提交、接单、生成报告、上传照片等显眼按钮必须是图标+文字，并具备 loading/disabled/pressed 状态。</span></article>
+    <article><b>后台联动</b><span>真实业务系统的后台菜单必须至少两级分组，移动端信息架构应与客户中心、设备中心、运营中心、报表中心等领域对应。</span></article>
+  </div>
+</section>
+
+移动端常用公共样式包括 <code>.mci-mobile-hero</code>、<code>.mci-mobile-panel</code>、<code>.mci-mobile-bottom-nav</code>、<code>.mci-mobile-rich-card</code>、<code>.mci-mobile-meta-grid</code>、<code>.mci-mobile-option-grid</code>、<code>.mci-mobile-photo-grid</code>、<code>.mci-mobile-sheet</code>、<code>.mci-mobile-chart-card</code>、<code>.mci-mobile-kpi-strip</code> 和 <code>.mci-mobile-empty-result</code>。当同一结构出现在两个以上页面时，应沉淀为 <code>Mci*</code> 组件或项目级 <code>mci-*</code> 封装。
+
 ## AI 开发规则
 
 <section class="mci-ui-ai-panel">
@@ -566,7 +587,7 @@ toggleMciTheme();</code></pre>
     <p>这条规则让 AI 生成的页面从第一版开始就具备统一主题、骨架屏、安全区、动效和品牌 token，而不是每个项目临时拼装样式。</p>
   </div>
   <div class="mci-ui-ai-prompt">
-    <span>推荐提示词</span>
+    <span>默认识别规则</span>
     <pre><code>使用 Microi.UI / MCI-UI 开发此 Vue 3/uni-app 页面。
 遵循 microi.skills/ui-design/SKILL.md 和 microi.skills/microi-ui/SKILL.md。
 页面必须支持 light/dark、黑白红橙黄绿青蓝紫 palette、rounded/flat、骨架屏、安全区、页面入场和点击反馈。

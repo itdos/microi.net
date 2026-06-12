@@ -123,6 +123,27 @@ page {
   --mci-mobile-section-gap: 18px;
   --mci-mobile-card-pad: 18px;
   --mci-mobile-nav-height: 76px;
+  --mci-mobile-nav-item-size: 54px;
+  --mci-mobile-nav-icon-size: 24px;
+  --mci-mobile-action-height: 52px;
+  --mci-mobile-hero-min-h: 188px;
+  --mci-mobile-hero-title: 30px;
+  --mci-mobile-hero-title-compact: 26px;
+  --mci-mobile-media-radius: 18px;
+  --mci-mobile-media-ratio: 4 / 3;
+  --mci-mobile-list-gap: 14px;
+  --mci-mobile-sheet-radius: 30px;
+  --mci-mobile-sheet-bg: rgba(255, 255, 255, .94);
+  --mci-mobile-tabbar-bg: rgba(255, 255, 255, .90);
+  --mci-mobile-tabbar-active-bg: rgba(181, 18, 32, .11);
+  --mci-mobile-tabbar-active-color: var(--mci-color-primary);
+  --mci-mobile-option-bg: rgba(255, 255, 255, .74);
+  --mci-mobile-option-active-bg: rgba(181, 18, 32, .10);
+  --mci-mobile-chart-a: #5B8CFF;
+  --mci-mobile-chart-b: #35D0A6;
+  --mci-mobile-chart-c: #FFB648;
+  --mci-mobile-chart-d: #FF6B8B;
+  --mci-mobile-chart-e: #8B5CF6;
   --mci-container-sm: 720px;
   --mci-container-md: 960px;
   --mci-container-lg: 1180px;
@@ -184,6 +205,11 @@ page[data-theme="dark"] {
   --mci-shadow-button: 0 10px 24px rgba(248, 113, 113, .18);
   --mci-shadow-button-hover: 0 16px 34px rgba(248, 113, 113, .24);
   --mci-gradient-page: linear-gradient(135deg, rgba(248,113,113,.08), transparent 32%), linear-gradient(180deg, var(--mci-bg-base), var(--mci-bg-page));
+  --mci-mobile-sheet-bg: rgba(24, 28, 37, .94);
+  --mci-mobile-tabbar-bg: rgba(24, 28, 37, .88);
+  --mci-mobile-tabbar-active-bg: rgba(248, 113, 113, .14);
+  --mci-mobile-option-bg: rgba(255, 255, 255, .06);
+  --mci-mobile-option-active-bg: rgba(248, 113, 113, .12);
 }
 
 :root[data-mci-palette="black"],
