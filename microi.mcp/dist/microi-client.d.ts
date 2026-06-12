@@ -341,6 +341,8 @@ export declare class MicroiClient {
         Number?: string;
         Desc?: string;
         JsonStr: string;
+        RoutePath?: string;
+        ComponentPath?: string;
     }): Promise<ApiResponse>;
     listBlueprints(keyword?: string): Promise<ApiResponse>;
     getBlueprint(blueprintId: string): Promise<ApiResponse>;

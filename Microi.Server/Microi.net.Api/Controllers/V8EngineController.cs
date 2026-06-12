@@ -668,7 +668,8 @@ namespace Microi.net.Api
             if (string.IsNullOrWhiteSpace(jsonStr)) return Ok(new DosResult(0, null, "JsonStr 不能为空"));
             var result = await V8McpLogic.SavePageEngine(
                 osClient, param["PageId"].Val<string>(), title,
-                param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr);
+                param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr,
+                param["RoutePath"].Val<string>(), param["ComponentPath"].Val<string>());
             return Ok(result);
         }
 

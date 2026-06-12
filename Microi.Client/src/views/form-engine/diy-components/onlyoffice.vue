@@ -14,7 +14,7 @@
                     </div>
                 </div>
             </div>
-            <el-button class="download-btn" type="primary" :disabled="!filePath" :loading="downloadLoading" @click="downloadFile">
+            <el-button class="download-btn" type="primary" :disabled="!filePath || previewLoading" :loading="downloadLoading" @click="downloadFile">
                 <el-icon><Download /></el-icon>
                 <span>下载文件</span>
             </el-button>
@@ -28,7 +28,7 @@
             <DynamicOnlyOfficeEditor v-if="Load" :document-server-url="serverUrl" :config="editorConfig" @editor-ready="onEditorReady" />
             <div v-else class="empty-file">
                 <el-icon><WarningFilled /></el-icon>
-                <span>未指定预览文件</span>
+                <span>{{ previewLoading ? "正在获取文档预览地址..." : previewError || "未指定预览文件" }}</span>
             </div>
         </div>
     </div>
@@ -36,7 +36,7 @@
 
 <script>
 import DynamicOnlyOfficeEditor from "../diy-components/onlyoffice-base.vue";
-import { computed } from "vue";
+import { computed, getCurrentInstance } from "vue";
 import { useDiyStore } from "@/pinia";
 import { Document, Download, WarningFilled } from "@element-plus/icons-vue";
 
@@ -48,15 +48,18 @@ export default {
         WarningFilled
     },
     setup() {
+        const instance = getCurrentInstance();
         const diyStore = useDiyStore();
         const OsClient = computed(() => diyStore.OsClient);
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const DiyCommon = instance?.appContext?.config?.globalProperties?.DiyCommon;
         return {
             diyStore,
             OsClient,
             SysConfig,
             GetCurrentUser,
+            DiyCommon,
             Document,
             Download,
             WarningFilled
@@ -71,6 +74,14 @@ export default {
             fileName: "",
             fileType: "",
             fileSize: "",
+            sourceFilePath: "",
+            isPrivate: false,
+            hdfs: "",
+            formEngineKey: "",
+            formDataId: "",
+            fieldId: "",
+            previewLoading: false,
+            previewError: "",
             downloadLoading: false
         };
     },
@@ -85,51 +96,36 @@ export default {
             return this.formatFileSize(this.fileSize);
         }
     },
-    mounted() {
+    async mounted() {
         var self = this;
-        var filePath = self.safeDecode(self.$route.query.filePath || "");
+        var routeFilePath = self.safeDecode(self.$route.query.filePath || "");
+        var sourceFilePath = self.safeDecode(self.$route.query.filePathName || self.$route.query.sourceFilePath || self.$route.query.storagePath || "");
         var fileName = self.safeDecode(self.$route.query.fileName || self.$route.query.name || "");
         var fileSize = self.$route.query.fileSize || self.$route.query.size || "";
-        var fileType = "";
-        if (filePath) {
-            fileType = self.getFileExtension(filePath);
+        var isPrivate = self.parseBoolean(self.$route.query.isPrivate || self.$route.query.limit || self.$route.query.Limit);
+        if (!sourceFilePath && self.isExpiringSignedUrl(routeFilePath)) {
+            sourceFilePath = self.deriveFilePathNameFromSignedUrl(routeFilePath);
+            isPrivate = true;
         }
-        self.filePath = filePath;
-        self.fileName = fileName || self.getFileNameFromUrl(filePath);
-        self.fileType = fileType;
+
+        self.sourceFilePath = sourceFilePath;
+        self.isPrivate = isPrivate;
+        self.hdfs = self.safeDecode(self.$route.query.hdfs || self.$route.query.HDFS || "");
+        self.formEngineKey = self.safeDecode(self.$route.query.formEngineKey || self.$route.query.FormEngineKey || "");
+        self.formDataId = self.safeDecode(self.$route.query.formDataId || self.$route.query.FormDataId || "");
+        self.fieldId = self.safeDecode(self.$route.query.fieldId || self.$route.query.FieldId || "");
+        self.fileName = fileName || self.getFileNameFromUrl(sourceFilePath || routeFilePath);
+        self.fileType = self.getFileExtension(self.fileName || sourceFilePath || routeFilePath);
         self.fileSize = fileSize;
 
         const currentUser = self.GetCurrentUser || {};
         self.serverUrl = (self.SysConfig && self.SysConfig.OnlyOfficeApiBase) || "";
-        self.editorConfig = {
-            width: "100%",
-            height: "100%",
-            document: {
-                fileType: fileType,
-                key: "document-" + Date.now(),
-                title: self.fileName || "查看文档",
-                url: filePath,
-                permissions: {
-                    edit: false,
-                    download: true
-                }
-            },
-            // documentType: "word",
-            // token : 'nas.OnlyOffice',
-            editorConfig: {
-                callbackUrl: "https://example.com/url-to-callback.ashx",
-                // mode: 'edit',
-                mode: "view",
-                lang: "zh-CN",
-                user: {
-                    id: currentUser.Id || "preview-user",
-                    name: currentUser.Name || currentUser.Account || "预览用户"
-                }
-            }
-        };
         if (self.fileName) {
             document.title = self.fileName + " - 在线文档";
         }
+        const filePath = await self.resolvePreviewFilePath(routeFilePath);
+        self.filePath = filePath;
+        self.editorConfig = self.buildEditorConfig(filePath, currentUser);
         self.Load = !!filePath;
         self.loadRemoteFileSize();
     },
@@ -144,7 +140,13 @@ export default {
                 return value;
             }
         },
+        parseBoolean(value) {
+            return value === true || value === 1 || value === "1" || value === "true" || value === "True";
+        },
         getFileExtension(url) {
+            if (!url) {
+                return "";
+            }
             // 处理URL中的查询参数部分
             const baseUrl = url.split("?")[0];
 
@@ -160,6 +162,97 @@ export default {
             const baseUrl = url.split("?")[0].split("#")[0];
             const name = baseUrl.split("/").pop();
             return this.safeDecode(name || "");
+        },
+        isExpiringSignedUrl(url) {
+            if (!url || !/^https?:\/\//i.test(url)) {
+                return false;
+            }
+            return /([?&](X-Amz-|OSSAccessKeyId|Signature|Expires|Expires=|x-oss-))/i.test(url);
+        },
+        deriveFilePathNameFromSignedUrl(url) {
+            try {
+                const parsed = new URL(url);
+                return decodeURIComponent(parsed.pathname || "").replace(/^\/+/, "");
+            } catch (error) {
+                return "";
+            }
+        },
+        shouldRefreshPrivateUrl() {
+            return !!this.sourceFilePath && (this.isPrivate || this.isExpiringSignedUrl(this.filePath));
+        },
+        resolvePreviewFilePath(fallbackUrl) {
+            if (!this.sourceFilePath || (!this.isPrivate && !this.isExpiringSignedUrl(fallbackUrl))) {
+                return Promise.resolve(fallbackUrl || this.sourceFilePath || "");
+            }
+            this.previewLoading = true;
+            this.previewError = "";
+            return this.getFreshPrivateFileUrl(this.sourceFilePath)
+                .then((url) => url || fallbackUrl)
+                .catch((error) => {
+                    this.previewError = error?.message || "文档预览地址获取失败";
+                    return fallbackUrl || "";
+                })
+                .finally(() => {
+                    this.previewLoading = false;
+                });
+        },
+        getFreshPrivateFileUrl(filePathName) {
+            return new Promise((resolve, reject) => {
+                if (!this.DiyCommon || !this.DiyCommon.Post) {
+                    reject(new Error("文件服务未初始化"));
+                    return;
+                }
+                this.DiyCommon.Post(
+                    "/api/HDFS/GetPrivateFileUrl",
+                    {
+                        FilePathName: filePathName,
+                        HDFS: this.hdfs || (this.SysConfig && this.SysConfig.HDFS) || "Aliyun",
+                        FormEngineKey: this.formEngineKey,
+                        FormDataId: this.formDataId,
+                        FieldId: this.fieldId,
+                        Limit: true
+                    },
+                    (result) => {
+                        if ((this.DiyCommon.Result && this.DiyCommon.Result(result)) || result?.Code === 1) {
+                            resolve(result.Data);
+                        } else {
+                            reject(new Error(result?.Msg || "文档预览地址获取失败"));
+                        }
+                    },
+                    () => reject(new Error("文档预览地址获取失败"))
+                );
+            });
+        },
+        buildEditorConfig(filePath, currentUser) {
+            if (!filePath) {
+                return {};
+            }
+            return {
+                width: "100%",
+                height: "100%",
+                document: {
+                    fileType: this.fileType,
+                    key: "document-" + Date.now(),
+                    title: this.fileName || "查看文档",
+                    url: filePath,
+                    permissions: {
+                        edit: false,
+                        download: true
+                    }
+                },
+                // documentType: "word",
+                // token : 'nas.OnlyOffice',
+                editorConfig: {
+                    callbackUrl: "https://example.com/url-to-callback.ashx",
+                    // mode: 'edit',
+                    mode: "view",
+                    lang: "zh-CN",
+                    user: {
+                        id: currentUser.Id || "preview-user",
+                        name: currentUser.Name || currentUser.Account || "预览用户"
+                    }
+                }
+            };
         },
         formatFileSize(size) {
             if (typeof size === "string" && /[a-zA-Z\u4e00-\u9fa5]/.test(size)) {
@@ -193,11 +286,14 @@ export default {
                 .catch(() => {});
         },
         async downloadFile() {
-            if (!this.filePath || this.downloadLoading) {
+            if (!this.filePath || this.downloadLoading || this.previewLoading) {
                 return;
             }
             this.downloadLoading = true;
             try {
+                if (this.shouldRefreshPrivateUrl()) {
+                    this.filePath = await this.getFreshPrivateFileUrl(this.sourceFilePath);
+                }
                 const response = await fetch(this.filePath);
                 if (!response.ok) {
                     throw new Error("download failed");

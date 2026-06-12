@@ -506,7 +506,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 34 个）：
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 35 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -537,6 +537,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Frontend SDK
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
+- `microi.skills/production-readonly-audit/SKILL.md` — Microi 正式环境只读业务巡检
 - `microi.skills/uniapp-mall-assets/SKILL.md` — 商城前端：图片 / 资源路径规范
 - `microi.skills/v8-explorer-tree/SKILL.md` — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 - `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）

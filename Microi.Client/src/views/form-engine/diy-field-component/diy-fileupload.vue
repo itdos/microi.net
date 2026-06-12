@@ -1012,9 +1012,17 @@ const GoUrl = (url, fileMeta = null) => {
 
 const buildOnlineOfficePayload = (url, fileMeta = null) => {
     const meta = fileMeta || {};
+    const sourceFilePath = meta.Path || meta.path || getFileStoragePath(meta);
+    const isPrivateFile = props.field.Config?.FileUpload?.Limit === true;
     return {
         url,
         filePath: url,
+        filePathName: sourceFilePath,
+        isPrivate: isPrivateFile,
+        hdfs: SysConfig.value.HDFS || 'Aliyun',
+        formEngineKey: props.DiyTableModel.Name || props.field.TableId || '',
+        formDataId: props.TableRowId || '',
+        fieldId: props.field.Id || '',
         fileName: meta.Name || meta.name || GetFileName(props.modelValue) || GetFileName(url),
         fileSize: meta.Size || meta.size || getSingleFileRawSize()
     };
@@ -1072,6 +1080,7 @@ const getSingleFileMeta = () => {
     }
     return {
         Name: GetFileName(props.modelValue),
+        Path: getFileStoragePath(),
         Size: getSingleFileRawSize()
     };
 };
