@@ -7,6 +7,25 @@ description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or f
 
 本 Skill 适用于任何 Microi 吾码 UniApp/H5 项目，包括商城、OA、ERP、MES、CRM、互联网项目、预约项目等。不要把规则写成某一个业务应用专属规范。
 
+## 移动端质量门禁必须先读
+
+创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`。该 Skill 中的底部导航真实图标、重要按钮图标化、登录 API 校验、微信手机号快捷登录、后台二级菜单和页面动效要求，属于交付验收条件，不是可选优化。
+
+## 登录页与手机号快捷登录
+
+- 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。
+- 账号密码登录必须先检查项目本地 SDK 实际导出，常见是 `V8.Login(param)` 或 `/api/SysUser/Login`。禁止凭空写 `V8.Login.Login(...)` 这类未验证子对象。
+- 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个规范值，例如 `lxwb`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `lxwb, lxwb`。
+- 微信小程序手机号快捷登录必须使用 `<button open-type="getPhoneNumber">`，通过 `@getphonenumber` 获取 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`。前端不能假设能直接拿到手机号明文。
+- H5/App 可提供手机号输入兜底，但必须确认后端接口支持 `Phone` 登录；微信小程序优先走 `Code + LoginCode`。
+- 登录按钮、去登录按钮、手机号授权按钮必须是图标 + 文案按钮，具备 loading、disabled/pressed 反馈，且原生 button 默认边框要清掉。
+
+## 首屏 Hero 与浮动面板验收
+
+- 移动端首屏 Hero 标题必须按真实中文文案调字号和行高，不能为了“震撼”把业务入口标题做得过大，导致一行半、孤字换行或压住按钮。
+- Hero 下方如果有浮动快捷入口面板，必须给 Hero 底部预留按钮安全区，并控制面板负 margin；面板只能覆盖装饰留白，不能盖住“立即登录 / 查看报告 / 提交”等主按钮的圆角、阴影或点击区域。
+- 交付前至少检查 375px 与 430px 宽度首屏截图，确认标题、主按钮、次按钮、浮动面板、第二块内容没有重叠、裁切或不美观换行。
+
 ## 资源 URL 必须集中解析
 
 数据库中的图片、附件、头像、Logo、卡面图、单据图片等字段常见保存形式：
