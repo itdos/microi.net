@@ -70,21 +70,49 @@ export default {
             var url = typeof file === "object" && file !== null ? file.url || file.filePath || file.FilePath || file.Path : file;
             var fileName = typeof file === "object" && file !== null ? file.fileName || file.FileName || file.name || file.Name : "";
             var fileSize = typeof file === "object" && file !== null ? file.fileSize || file.FileSize || file.size || file.Size : "";
-            if (!url) {
+            var filePathName = typeof file === "object" && file !== null ? file.filePathName || file.FilePathName || file.sourceFilePath || file.SourceFilePath : "";
+            var isPrivate = typeof file === "object" && file !== null ? file.isPrivate || file.IsPrivate || file.limit || file.Limit : "";
+            var hdfs = typeof file === "object" && file !== null ? file.hdfs || file.HDFS : "";
+            var formEngineKey = typeof file === "object" && file !== null ? file.formEngineKey || file.FormEngineKey : "";
+            var formDataId = typeof file === "object" && file !== null ? file.formDataId || file.FormDataId : "";
+            var fieldId = typeof file === "object" && file !== null ? file.fieldId || file.FieldId : "";
+            var isPrivateFile = isPrivate === true || isPrivate === "true" || isPrivate === 1 || isPrivate === "1";
+            var targetUrl = fileName || filePathName || url;
+            if (!url && !filePathName) {
                 return;
             }
             if (
                 self.SysConfig &&
                 (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase) &&
-                (url.indexOf(".doc") != -1 || url.indexOf(".docx") != -1 || url.indexOf(".xls") != -1 || url.indexOf(".xlsx") != -1 || url.indexOf(".ppt") != -1 || url.indexOf(".pptx") != -1)
+                (targetUrl.indexOf(".doc") != -1 || targetUrl.indexOf(".docx") != -1 || targetUrl.indexOf(".xls") != -1 || targetUrl.indexOf(".xlsx") != -1 || targetUrl.indexOf(".ppt") != -1 || targetUrl.indexOf(".pptx") != -1)
             ) {
                 var params = new URLSearchParams();
-                params.set("filePath", url);
+                if (!isPrivateFile || !filePathName) {
+                    params.set("filePath", url);
+                }
                 if (fileName) {
                     params.set("fileName", fileName);
                 }
                 if (fileSize) {
                     params.set("fileSize", fileSize);
+                }
+                if (filePathName) {
+                    params.set("filePathName", filePathName);
+                }
+                if (isPrivate !== "") {
+                    params.set("isPrivate", isPrivateFile ? "1" : "0");
+                }
+                if (hdfs) {
+                    params.set("hdfs", hdfs);
+                }
+                if (formEngineKey) {
+                    params.set("formEngineKey", formEngineKey);
+                }
+                if (formDataId) {
+                    params.set("formDataId", formDataId);
+                }
+                if (fieldId) {
+                    params.set("fieldId", fieldId);
                 }
                 self.$router.push(`/online-office?${params.toString()}`);
                 self.$emit("CallbackFormClose");

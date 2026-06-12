@@ -2666,10 +2666,14 @@ namespace Microi.net
         /// <summary>
         /// 保存界面引擎（新增或更新 mic_page）
         /// </summary>
-        public static async Task<DosResult<object>> SavePageEngine(string osClient, string pageId, string title, string number, string desc, string jsonStr)
+        public static async Task<DosResult<object>> SavePageEngine(string osClient, string pageId, string title, string number, string desc, string jsonStr, string routePath = null, string componentPath = null)
         {
             try
             {
+                var normalizedJson = NormalizePageEngineJsonObj(jsonStr);
+                if (!normalizedJson.Ok) return new DosResult<object>(0, null, normalizedJson.Msg);
+                jsonStr = normalizedJson.Value;
+
                 if (!string.IsNullOrWhiteSpace(pageId))
                 {
                     // 更新
@@ -2682,6 +2686,8 @@ namespace Microi.net
                     };
                     if (!string.IsNullOrWhiteSpace(number)) uptData["Number"] = number;
                     if (!string.IsNullOrWhiteSpace(desc)) uptData["Desc"] = desc;
+                    if (!string.IsNullOrWhiteSpace(routePath)) uptData["RoutePath"] = routePath;
+                    if (!string.IsNullOrWhiteSpace(componentPath)) uptData["ComponentPath"] = componentPath;
 
                     var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("mic_page", uptData);
                     if (uptResult.Code != 1)
@@ -2710,6 +2716,8 @@ namespace Microi.net
                     };
                     if (!string.IsNullOrWhiteSpace(number)) addData["Number"] = number;
                     if (!string.IsNullOrWhiteSpace(desc)) addData["Desc"] = desc;
+                    if (!string.IsNullOrWhiteSpace(routePath)) addData["RoutePath"] = routePath;
+                    if (!string.IsNullOrWhiteSpace(componentPath)) addData["ComponentPath"] = componentPath;
 
                     var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("mic_page", addData);
                     if (addResult.Code != 1)
@@ -2755,6 +2763,122 @@ namespace Microi.net
             if (token == null || token.Type == JTokenType.Null) return "";
             if (token.Type == JTokenType.String) return token.Val<string>() ?? "";
             return token.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private static (bool Ok, string Value, string Msg) NormalizePageEngineJsonObj(string rawValue)
+        {
+            if (rawValue.DosIsNullOrWhiteSpace()) return (false, "", "JsonObj 不能为空");
+            try
+            {
+                JToken token = JToken.Parse(rawValue);
+                if (token.Type == JTokenType.String)
+                {
+                    token = JToken.Parse(token.Val<string>() ?? "");
+                }
+
+                var candidate = UnwrapPageEngineJsonObj(token);
+                if (!(candidate is JObject obj))
+                {
+                    return (false, "", "JsonObj 必须是 JSON 对象");
+                }
+
+                if (obj["formConfig"] == null || obj["formConfig"].Type == JTokenType.Null)
+                {
+                    obj["formConfig"] = new JObject();
+                }
+                else if (obj["formConfig"].Type != JTokenType.Object)
+                {
+                    return (false, "", "JsonObj.formConfig 必须是 JSON 对象");
+                }
+
+                if (obj["wrapperList"] == null || obj["wrapperList"].Type == JTokenType.Null)
+                {
+                    obj["wrapperList"] = new JArray();
+                }
+                else if (obj["wrapperList"].Type != JTokenType.Array)
+                {
+                    return (false, "", "JsonObj.wrapperList 必须是 JSON 数组");
+                }
+
+                return (true, obj.ToString(Newtonsoft.Json.Formatting.None), "");
+            }
+            catch (Exception ex)
+            {
+                return (false, "", "JsonObj 不是合法 JSON：" + ex.Message);
+            }
+        }
+
+        private static JToken UnwrapPageEngineJsonObj(JToken token)
+        {
+            if (token == null) return null;
+            if (token.Type == JTokenType.String)
+            {
+                var raw = token.Val<string>();
+                if (raw.DosIsNullOrWhiteSpace()) return token;
+                return UnwrapPageEngineJsonObj(JToken.Parse(raw));
+            }
+
+            if (!(token is JObject obj)) return token;
+            var jsonObj = obj["JsonObj"] ?? obj["jsonObj"];
+            if (jsonObj != null) return UnwrapPageEngineJsonObj(jsonObj);
+            var jsonStr = obj["JsonStr"] ?? obj["jsonStr"];
+            if (jsonStr != null) return UnwrapPageEngineJsonObj(jsonStr);
+
+            var formData = obj["formData"] as JObject ?? obj["FormData"] as JObject;
+            if (formData != null)
+            {
+                var formJsonObj = formData["JsonObj"] ?? formData["jsonObj"];
+                if (formJsonObj != null) return UnwrapPageEngineJsonObj(formJsonObj);
+                if (formData["formConfig"] != null || formData["wrapperList"] != null) return formData;
+            }
+
+            return obj;
+        }
+
+        private static (bool Ok, string Value, string Msg) NormalizePrintPageObj(string rawValue)
+        {
+            if (rawValue.DosIsNullOrWhiteSpace()) return (false, "", "PageObj 不能为空");
+            try
+            {
+                JToken token = JToken.Parse(rawValue);
+                if (token.Type == JTokenType.String)
+                {
+                    token = JToken.Parse(token.Val<string>() ?? "");
+                }
+                if (token is JObject wrapper && (wrapper["PageObj"] != null || wrapper["pageObj"] != null))
+                {
+                    token = wrapper["PageObj"] ?? wrapper["pageObj"];
+                    if (token.Type == JTokenType.String) token = JToken.Parse(token.Val<string>() ?? "");
+                }
+
+                if (!(token is JObject obj)) return (false, "", "PageObj 必须是 JSON 对象");
+                if (!(obj["panels"] is JArray panels) || panels.Count == 0)
+                {
+                    return (false, "", "PageObj.panels 必须是非空 JSON 数组");
+                }
+
+                for (var i = 0; i < panels.Count; i++)
+                {
+                    if (!(panels[i] is JObject panel))
+                    {
+                        return (false, "", $"PageObj.panels[{i}] 必须是 JSON 对象");
+                    }
+                    if (panel["printElements"] == null || panel["printElements"].Type == JTokenType.Null)
+                    {
+                        panel["printElements"] = new JArray();
+                    }
+                    else if (panel["printElements"].Type != JTokenType.Array)
+                    {
+                        return (false, "", $"PageObj.panels[{i}].printElements 必须是 JSON 数组");
+                    }
+                }
+
+                return (true, obj.ToString(Newtonsoft.Json.Formatting.None), "");
+            }
+            catch (Exception ex)
+            {
+                return (false, "", "PageObj 不是合法 JSON：" + ex.Message);
+            }
         }
 
         private static (bool Ok, string Value, string Msg) NormalizeMenuJsonArray(string fieldName, string rawValue, List<string> warnings = null)
@@ -3101,8 +3225,9 @@ namespace Microi.net
                 if (title.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "Title 不能为空");
                 var pageObj = ToJsonString(param["PageObj"]);
                 if (pageObj.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "PageObj 不能为空");
-                var pageCheck = ValidateJsonIfPresent("PageObj", pageObj);
+                var pageCheck = NormalizePrintPageObj(pageObj);
                 if (!pageCheck.Ok) return new DosResult<object>(0, null, pageCheck.Msg);
+                pageObj = pageCheck.Value;
                 var printObj = ToJsonString(param["PrintObj"]);
                 var printCheck = ValidateJsonIfPresent("PrintObj", printObj);
                 if (!printCheck.Ok) return new DosResult<object>(0, null, printCheck.Msg);

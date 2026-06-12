@@ -41,6 +41,9 @@
 | `microi_list_pages` | 列出界面引擎页面 | 只读 |
 | `microi_get_page` | 获取界面引擎页面 JSON | 只读 |
 | `microi_save_page` | 创建或更新界面引擎页面 | 读写 |
+| `microi_validate_page_design` | 校验并规范化界面引擎 JsonObj | 只读 |
+| `microi_build_page_design` | 根据自然语言生成界面引擎 JsonObj，可确认后写入 mic_page | 读写（需确认） |
+| `microi_save_page_design` | 保存 AI 生成的界面引擎 JsonObj，带规范化和确认 | 读写（需确认） |
 | `microi_get_manifest_schema` | 获取完整系统 Manifest 协议、示例和字段名配置规范 | 只读 |
 | `microi_plan_system` | 从完整系统 Manifest 生成 dry-run 执行计划 | 只读 |
 | `microi_generate_system` | 按 Manifest 编排表、字段、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收 | 读写（需确认） |
@@ -58,6 +61,9 @@
 | `microi_run_data_source` | 执行数据源引擎用于验收 | 读写（需确认） |
 | `microi_list_print_templates` | 列出打印模板 | 只读 |
 | `microi_save_print_template` | 创建或更新打印模板 | 读写（需确认） |
+| `microi_validate_print_design` | 校验并规范化打印引擎 PageObj/PrintObj | 只读 |
+| `microi_build_print_template_design` | 根据自然语言生成 hiprint PageObj/PrintObj，可确认后写入 mic_print | 读写（需确认） |
+| `microi_save_print_template_design` | 保存 AI 生成的打印模板，带规范化和确认 | 读写（需确认） |
 | `microi_save_workflow_package` | 一次性保存工作流设计、节点和连线 | 读写（需确认） |
 | `microi_save_job` | 创建或更新定时任务 | 读写（需确认） |
 

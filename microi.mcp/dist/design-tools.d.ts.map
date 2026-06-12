@@ -1,0 +1,1 @@
+{"version":3,"file":"design-tools.d.ts","sourceRoot":"","sources":["../src/design-tools.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAEpE,OAAO,KAAK,EAAE,YAAY,EAAe,MAAM,oBAAoB,CAAC;AACpE,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,aAAa,CAAC;AAiCpD,wBAAgB,mBAAmB,CAAC,MAAM,EAAE,SAAS,EAAE,MAAM,EAAE,YAAY,EAAE,OAAO,EAAE,gBAAgB,GAAG,IAAI,CAuM5G"}

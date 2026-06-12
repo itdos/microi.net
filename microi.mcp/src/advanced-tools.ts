@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { MicroiClient, ApiResponse } from './microi-client.js';
 import type { McpServerContext } from './server.js';
+import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
 
 type JsonRecord = Record<string, unknown>;
 type ToolContent = { type: 'text'; text: string };
@@ -582,8 +583,21 @@ function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; wa
     plan.push(`create_or_update_module ${getString(item, 'name', 'Name')}`);
   });
   permissions.forEach((item) => plan.push(`set_permission ${getString(item, 'roleId', 'RoleId') || 'admin'}`));
-  pages.forEach((item) => plan.push(`save_page ${getString(item, 'title', 'Title')}`));
-  printTemplates.forEach((item) => plan.push(`save_print_template ${getString(item, 'title', 'Title')}`));
+  pages.forEach((item, pageIndex) => {
+    const normalizedPage = normalizePageJsonObj(item.json ?? item.JsonObj ?? item.JsonStr ?? item);
+    errors.push(...normalizedPage.errors.map((error) => `pages[${pageIndex}]: ${error}`));
+    warnings.push(...normalizedPage.warnings.map((warning) => `pages[${pageIndex}]: ${warning}`));
+    plan.push(`save_page ${getString(item, 'title', 'Title')}`);
+  });
+  printTemplates.forEach((item, printIndex) => {
+    const page = normalizePrintPageObj(item.PageObj ?? item.pageObj);
+    const data = normalizePrintObj(item.PrintObj ?? item.printObj);
+    errors.push(...page.errors.map((error) => `printTemplates[${printIndex}].PageObj: ${error}`));
+    warnings.push(...page.warnings.map((warning) => `printTemplates[${printIndex}].PageObj: ${warning}`));
+    errors.push(...data.errors.map((error) => `printTemplates[${printIndex}].PrintObj: ${error}`));
+    warnings.push(...data.warnings.map((warning) => `printTemplates[${printIndex}].PrintObj: ${warning}`));
+    plan.push(`save_print_template ${getString(item, 'title', 'Title')}`);
+  });
   workflows.forEach((item, workflowIndex) => {
     const check = validateWorkflowPackage(item);
     errors.push(...check.errors.map((error) => `workflows[${workflowIndex}]: ${error}`));
@@ -895,6 +909,10 @@ function dataSourcePayload(dataSource: JsonRecord): JsonRecord {
 }
 
 function printTemplatePayload(template: JsonRecord): JsonRecord {
+  const page = normalizePrintPageObj(template.PageObj ?? template.pageObj);
+  if (!page.ok || !page.json) throw new Error(`printTemplates.${getString(template, 'Title', 'title') || '(untitled)'} PageObj invalid: ${page.errors.join('; ')}`);
+  const printObj = normalizePrintObj(template.PrintObj ?? template.printObj);
+  if (!printObj.ok || !printObj.json) throw new Error(`printTemplates.${getString(template, 'Title', 'title') || '(untitled)'} PrintObj invalid: ${printObj.errors.join('; ')}`);
   return compactObject({
     ...template,
     Id: getString(template, 'Id', 'printId', 'PrintId') || undefined,
@@ -902,8 +920,8 @@ function printTemplatePayload(template: JsonRecord): JsonRecord {
     Number: getString(template, 'Number', 'number'),
     Desc: getString(template, 'Desc', 'desc', 'description'),
     DataApi: getString(template, 'DataApi', 'dataApi'),
-    PageObj: stringifyConfig(template.PageObj ?? template.pageObj),
-    PrintObj: stringifyConfig(template.PrintObj ?? template.printObj),
+    PageObj: page.json,
+    PrintObj: printObj.json,
   });
 }
 
@@ -961,8 +979,27 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       }],
       permissions: [{ roleId: 'admin', moduleNames: ['Orders'] }],
       dataSources: [],
-      pages: [],
-      printTemplates: [],
+      pages: [{
+        title: 'Operations Dashboard',
+        number: 'page_operations_dashboard',
+        routePath: '/page/operations-dashboard',
+        JsonObj: {
+          formConfig: { gutter: 0, mask: false, drag: false, hover: false, shadow: true, link: true, dark: false, dynamicStyle: { padding: '12px 0 0 0', backgroundColor: '#f3f4f6', opacity: 1 } },
+          wrapperList: [
+            { type: 'pannel', label: 'Card', wrapperOption: { span: 24, height: 180, titleOption: { hidden: true, title: 'Core Metrics' } }, widgetList: [] },
+          ],
+        },
+      }],
+      printTemplates: [{
+        title: 'Business Print Template',
+        number: 'print_business_template',
+        PageObj: {
+          panels: [
+            { index: 0, name: 'A4 Template', paperType: 'A4', height: 297, width: 210, paperHeader: 0, paperFooter: 841.8897637795277, printElements: [] },
+          ],
+        },
+        PrintObj: {},
+      }],
       workflows: [{
         FlowDesign: { FlowName: 'Order approval', TableId: '<Biz_Order table id or tableName-resolved id>', IsEnable: 1 },
         Nodes: [
@@ -998,6 +1035,9 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
       'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
       'Use dryRun=true until the user explicitly asks to write.',
+      'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
+      'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
+      'For natural-language UI or print design, prefer microi_build_page_design or microi_build_print_template_design, then save after confirmation.',
     ],
   };
 }
@@ -1233,12 +1273,18 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
         }
 
         for (const page of getArray(manifest, 'pages', 'Pages')) {
+          const normalizedPage = normalizePageJsonObj(page.json ?? page.JsonObj ?? page.JsonStr ?? page);
+          if (!normalizedPage.ok || !normalizedPage.json) {
+            return textResult(JSON.stringify({ ok: false, failedAt: 'savePage:normalize', page, errors: normalizedPage.errors, warnings: normalizedPage.warnings, results }, null, 2), true);
+          }
           const response = await client.savePageEngine({
             PageId: getString(page, 'pageId', 'PageId', 'Id') || undefined,
             Title: getString(page, 'title', 'Title'),
             Number: getString(page, 'number', 'Number') || undefined,
             Desc: getString(page, 'desc', 'Desc') || undefined,
-            JsonStr: stringifyConfig(page.json ?? page.JsonObj ?? page.JsonStr) || '{}',
+            JsonStr: normalizedPage.json,
+            RoutePath: getString(page, 'routePath', 'RoutePath') || undefined,
+            ComponentPath: getString(page, 'componentPath', 'ComponentPath') || undefined,
           });
           results.push({ step: 'savePage', title: getString(page, 'title', 'Title'), response });
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'savePage', page, response, results }, null, 2), true);
