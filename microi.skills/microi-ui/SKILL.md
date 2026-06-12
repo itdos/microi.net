@@ -34,6 +34,7 @@ When the user does not name a UI style or UI library, default to Microi.UI for M
 - When the same UI pattern appears in two or more places, extract a Microi.UI component or a project-level `mci-*` wrapper with props/slots for text, icons, actions, states, and small variants. Do not copy/paste cards, auth prompts, empty states, data states, action bars, filter bars, or button groups into separate pages.
 - Dynamic data pages must show skeleton screens while first data is loading, not spinner-only or premature empty states.
 - Rich text content must give text breathing room while allowing images to be `width:100%`.
+- `MciUploader` and project upload wrappers must support re-select/replacement after a file is chosen, tap-to-fullscreen preview, close preview, upload progress, retry, and failure toast. Upload components must update only the bound file field, not reset the whole form.
 - Do not hardcode colors, radius, shadows, or gradients in business pages; use `--mci-*` variables or project wrappers based on them.
 - Buttons/cards/clickable cells must preserve hover/focus/pressed feedback. White and yellow palettes must use `--mci-text-on-primary` instead of fixed white text.
 - Primary buttons, pill buttons, and action chips must use flex/inline-flex centering, explicit `align-items:center`, `justify-content:center`, stable height/min-height, and `line-height:1` on the text node. Text that should be centered must be visually centered on both axes, not merely padded until it looks close.
