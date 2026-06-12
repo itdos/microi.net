@@ -16,7 +16,7 @@
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
 .NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
 
-[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 
@@ -128,7 +128,7 @@
 <tr><td>🗄️ <strong>跨数据库</strong></td><td>MySql 5.5+ / SqlServer 2016+ / Oracle 11g+，支持读写分离 / 分库分表</td></tr>
 <tr><td>☁️ <strong>分布式部署</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
 <tr><td>💾 <strong>分布式缓存</strong></td><td>Redis 哨兵模式</td></tr>
-<tr><td>📂 <strong><a href="/doc/advanced/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
+<tr><td>📂 <strong><a href="/doc/more/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
 <tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
 <tr><td>🔍 <strong><a href="/doc/system-engine/search-engine">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>
@@ -143,7 +143,7 @@
 <tbody>
 <tr><td>📄 <strong>模板引擎</strong></td><td>表单/表格支持在线 HTML 模板渲染</td></tr>
 <tr><td>📂 <strong><a href="/doc/system-engine/databases">数据库管理</a></strong></td><td>一键加载第三方数据库，接口引擎中访问任意数据库</td></tr>
-<tr><td>📑 <strong><a href="/doc/advanced/office">Office 引擎</a></strong></td><td>集成 OnlyOffice，本地设计模板，导出/打印</td></tr>
+<tr><td>📑 <strong><a href="/doc/more/office">Office 引擎</a></strong></td><td>集成 OnlyOffice，本地设计模板，导出/打印</td></tr>
 <tr><td>🔐 <strong>细粒度权限</strong></td><td>精确到每张表、每个字段、每个菜单、每个按钮、每个接口</td></tr>
 <tr><td>🔑 <strong>单点登录</strong></td><td>支持第三方系统 ↔ 低代码平台双向单点登录</td></tr>
 <tr><td>💬 <strong>微信公众平台</strong></td><td>多公众号 / 多小程序配置、模板消息</td></tr>
@@ -167,7 +167,7 @@
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td><strong>开源版</strong></td><td>免费</td><td>PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
-<tr><td><strong>个人版</strong></td><td>￥999</td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、永久有效</strong></td></tr>
+<tr><td><strong>个人版</strong></td><td>￥999</td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong></td></tr>
 <tr><td><strong>企业版</strong></td><td>￥2.5w</td><td>提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong></td></tr>
 </tbody>
 </table>
