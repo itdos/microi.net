@@ -939,7 +939,7 @@ export class MicroiClient {
 
   async savePageEngine(data: {
     PageId?: string; Title: string; Number?: string;
-    Desc?: string; JsonStr: string;
+    Desc?: string; JsonStr: string; RoutePath?: string; ComponentPath?: string;
   }): Promise<ApiResponse> {
     return this.post(API.SAVE_PAGE_ENGINE, {
       OsClient: this.config.osClient,

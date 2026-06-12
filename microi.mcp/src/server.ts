@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo } from './microi-client.js';
 import { registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
+import { registerDesignTools } from './design-tools.js';
+import { normalizePageJsonObj } from './design-engine.js';
 
 /** MCP Server 上下文（用于区分不同租户） */
 export interface McpServerContext {
@@ -1749,19 +1751,27 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_page',
-    `Create or update a page engine page for OsClient "${osClient}". The jsonStr must be a valid page engine JSON with formData/wrapperList/widgetList structure. Pass pageId to update an existing page, or omit to create a new one.`,
+    `Create or update a page engine page for OsClient "${osClient}". Accepts raw JsonObj, {JsonObj}, {JsonStr}, a mic_page row, or {formData:{JsonObj}} and normalizes it to the canonical JsonObj saved in mic_page.JsonObj. Pass pageId to update an existing page, or omit to create a new one.`,
     {
       pageId: z.string().optional().describe('Page Id to update. Omit to create a new page.'),
       title: z.string().describe('Page title (e.g. "销售仪表盘", "数据概览")'),
       number: z.string().optional().describe('Page number/code (auto-generated if omitted)'),
       desc: z.string().optional().describe('Page description'),
-      jsonStr: z.string().describe('Complete page JSON configuration string. Must contain formData with wrapperList and widgetList structure. Refer to page engine documentation for the JSON schema.'),
+      jsonStr: z.string().optional().describe('Page Engine JsonObj string. Prefer json for object input.'),
+      json: z.unknown().optional().describe('Page Engine JSON object/string in any common AI output shape.'),
+      routePath: z.string().optional().describe('Optional route path saved to mic_page.RoutePath.'),
+      componentPath: z.string().optional().describe('Optional component path saved to mic_page.ComponentPath.'),
     },
-    async ({ pageId, title, number, desc, jsonStr }) => {
+    async ({ pageId, title, number, desc, jsonStr, json, routePath, componentPath }) => {
       try {
+        const normalized = normalizePageJsonObj(json ?? jsonStr);
+        if (!normalized.ok || !normalized.json) {
+          return { content: [{ type: 'text', text: JSON.stringify(normalized, null, 2) }], isError: true };
+        }
         const result = await client.savePageEngine({
           PageId: pageId, Title: title, Number: number,
-          Desc: desc, JsonStr: jsonStr,
+          Desc: desc, JsonStr: normalized.json,
+          RoutePath: routePath, ComponentPath: componentPath,
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -1774,6 +1784,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     },
   );
 
+  registerDesignTools(server, client, context);
   registerAdvancedTools(server, client, context);
   registerBlueprintTools(server, client, context);
 
