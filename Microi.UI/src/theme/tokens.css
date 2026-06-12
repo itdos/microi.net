@@ -20,6 +20,11 @@ page {
   --mci-bg-glass-border: rgba(255, 255, 255, .42);
   --mci-bg-card: rgba(255, 255, 255, .94);
   --mci-bg-card-hover: #FFFFFF;
+  --mci-bg-mobile-wash: #F7FAF9;
+  --mci-bg-mobile-hero: linear-gradient(135deg, rgba(181, 18, 32, .96) 0%, rgba(240, 68, 56, .90) 46%, rgba(8, 145, 178, .84) 100%);
+  --mci-bg-mobile-hero-soft: linear-gradient(135deg, rgba(181, 18, 32, .12) 0%, rgba(255, 255, 255, .72) 48%, rgba(8, 145, 178, .13) 100%);
+  --mci-bg-mobile-panel: rgba(255, 255, 255, .92);
+  --mci-bg-mobile-chip: rgba(255, 255, 255, .72);
   --mci-border: rgba(31, 41, 55, .10);
   --mci-border-strong: rgba(31, 41, 55, .18);
   --mci-border-glow: rgba(181, 18, 32, .22);
@@ -39,6 +44,10 @@ page {
   --mci-radius-2xl: 22px;
   --mci-radius-pill: 999px;
   --mci-radius-full: 9999px;
+  --mci-mobile-radius-card: 22px;
+  --mci-mobile-radius-panel: 28px;
+  --mci-mobile-radius-hero: 32px;
+  --mci-mobile-radius-bubble: 20px;
 
   --mci-shape-card: 16px;
   --mci-shape-panel: 12px;
@@ -77,6 +86,9 @@ page {
   --mci-shadow-card-hover: 0 18px 42px rgba(24, 32, 48, .14), 0 8px 24px rgba(181, 18, 32, .08);
   --mci-shadow-button: 0 10px 22px rgba(181, 18, 32, .18);
   --mci-shadow-button-hover: 0 16px 34px rgba(181, 18, 32, .24);
+  --mci-shadow-mobile-card: 0 18px 44px rgba(31, 41, 55, .10), 0 1px 0 rgba(255, 255, 255, .75) inset;
+  --mci-shadow-mobile-float: 0 22px 54px rgba(24, 32, 48, .16);
+  --mci-shadow-mobile-glow: 0 18px 40px rgba(181, 18, 32, .20);
   --mci-shadow-dialog: 0 28px 80px rgba(24, 32, 48, .20);
   --mci-shadow-dropdown: 0 18px 50px rgba(24, 32, 48, .16);
   --mci-elevation-0: none;
@@ -90,6 +102,9 @@ page {
   --mci-gradient-cool: linear-gradient(135deg, #2563EB 0%, #0891B2 100%);
   --mci-gradient-surface: linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,255,255,.82) 100%);
   --mci-gradient-page: linear-gradient(135deg, rgba(181,18,32,.06), transparent 32%), linear-gradient(180deg, var(--mci-bg-base), var(--mci-bg-page));
+  --mci-gradient-mobile-page: radial-gradient(circle at 18% 0%, rgba(181,18,32,.12), transparent 32%), radial-gradient(circle at 92% 9%, rgba(8,145,178,.13), transparent 28%), linear-gradient(180deg, #FFFFFF 0%, var(--mci-bg-mobile-wash) 42%, var(--mci-bg-page) 100%);
+  --mci-gradient-mobile-card: linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.88) 100%);
+  --mci-gradient-mobile-accent: linear-gradient(135deg, var(--mci-color-primary) 0%, #F9736B 52%, var(--mci-color-accent-cyan) 100%);
 
   --mci-ease-out: cubic-bezier(.22, 1, .36, 1);
   --mci-ease-smooth: cubic-bezier(.4, 0, .2, 1);
@@ -104,6 +119,10 @@ page {
   --mci-idle-y: -4px;
 
   --mci-touch-target: 44px;
+  --mci-mobile-page-x: 18px;
+  --mci-mobile-section-gap: 18px;
+  --mci-mobile-card-pad: 18px;
+  --mci-mobile-nav-height: 76px;
   --mci-container-sm: 720px;
   --mci-container-md: 960px;
   --mci-container-lg: 1180px;

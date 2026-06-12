@@ -99,6 +99,22 @@ export function createApp() {
 - `MciDataState`: loading/empty/error state wrapper
 - `MciRichText`: mobile-friendly rich text container with image/text spacing rules
 
+## Premium Mobile Layer
+
+For mobile H5 and uni-app products, MCI-UI provides an opinionated high-polish composition layer. Use it when building workbenches, member centers, mobile order flows, report pages, staff task apps, customer service apps, and other product-grade mobile experiences.
+
+- `MciPage premium` or `.mci-page--mobile-premium`: safe-area page shell with soft branded background and bottom-nav spacing.
+- `.mci-mobile-hero`: large branded first-screen panel for identity, status, and core actions.
+- `.mci-mobile-panel`: elevated translucent panel for floating content, grouped actions, forms, and detail blocks.
+- `.mci-mobile-bubble-grid` / `.mci-mobile-bubble`: icon shortcut grids.
+- `.mci-mobile-stat-grid` / `.mci-mobile-stat`: mobile dashboard metrics.
+- `.mci-mobile-titlebar`: section title and action row.
+- `.mci-mobile-chip-row` / `.mci-mobile-chip`: colored option tags and compact states.
+- `.mci-mobile-bottom-nav`: custom bottom navigation when native tabBar is too limited or unstable.
+- `.mci-mobile-form-section`: long-form section rhythm with icon marks.
+
+The premium layer is intentionally brand-neutral. Project palettes, logo colors, and `--mci-color-primary` drive the final visual identity.
+
 ## Quality Checks
 
 ```bash

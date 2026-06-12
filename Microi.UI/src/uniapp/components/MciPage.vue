@@ -3,6 +3,7 @@
     class="mci-page mci-uni-page"
     :class="{
       'mci-page--static': !animated,
+      'mci-page--mobile-premium': premium,
       'mci-uni-page--safe-top': safeTop,
       'mci-uni-page--safe-bottom': safeBottom,
       'mci-tech-grid': techGrid
@@ -19,6 +20,7 @@ defineProps({
   safeTop: { type: Boolean, default: false },
   safeBottom: { type: Boolean, default: true },
   animated: { type: Boolean, default: true },
+  premium: { type: Boolean, default: false },
   techGrid: { type: Boolean, default: false },
   shape: { type: String, default: '' }
 });

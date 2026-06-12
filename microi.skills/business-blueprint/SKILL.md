@@ -109,11 +109,23 @@ description: Microi 业务架构蓝图（System Blueprint）— design-time 系�
       { "table": "crm_customer", "x": 50, "y": 50,
         "relations": [{ "to": "crm_contact", "type": "1:N", "via": "CustomerId" }] }
     ]
+  },
+  "menuTree": {
+    "requiredDepth": 2,
+    "groups": [
+      { "name": "客户中心", "children": ["客户管理", "联系人管理"] },
+      { "name": "业务运营", "children": ["工单管理", "服务记录"] },
+      { "name": "报表中心", "children": ["检测报告", "阅读日志"] }
+    ]
   }
 }
 ```
 
 `refs` 内可填的资源类型：`tables` `fields`（"table.field"）`engines` `menus` `v8Events`（"table:eventType"）`dataSources` `printTemplates` `workflows` `pages` `jobs`。
+
+后台菜单必须在蓝图阶段规划为至少两级结构。客户、设备、工单、报告、日志、配置等业务域应先形成父级菜单，再把具体 CRUD/报表/日志页面作为子菜单写入 Manifest/MCP；不要把所有模块平铺为一级菜单。
+
+如果是改造已生成系统，蓝图不能停留在建议层。必须列出现有一级菜单、目标父级菜单、每个子菜单的 `ParentId` 迁移关系，并通过 MCP 回读 `sys_menu` 验证迁移完成。
 
 ## 不要做的事
 
