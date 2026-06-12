@@ -1,5 +1,7 @@
 import '../theme/index.css';
 import MciPage from './components/MciPage.vue';
+import MciHeroPanel from './components/MciHeroPanel.vue';
+import MciBottomNav from './components/MciBottomNav.vue';
 import MciNavbar from './components/MciNavbar.vue';
 import MciButton from './components/MciButton.vue';
 import MciCard from './components/MciCard.vue';
@@ -35,6 +37,8 @@ export {
 
 export {
   MciPage,
+  MciHeroPanel,
+  MciBottomNav,
   MciNavbar,
   MciButton,
   MciCard,
@@ -61,6 +65,8 @@ export {
 
 export const components = [
   MciPage,
+  MciHeroPanel,
+  MciBottomNav,
   MciNavbar,
   MciButton,
   MciCard,
