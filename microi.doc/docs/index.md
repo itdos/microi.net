@@ -33,8 +33,8 @@ features:
   - icon: 🤖
     title: AI 编程、数据分析
     details: VS Code 插件一键拉取业务代码 + 数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成知识库——AI 精准了解你的 V8 API 和每一张数据库表。写代码、远程真机执行、逐行断点调试全在 VS Code 内闭环完成，保存即部署，无需编译发布。自然语言提问即可分析业务数据，自动差量同步向量数据库，更精准的 AI 结果。支持 AI 训练、AI 微调、AI 提示词管理，完善的自然语言转 SQL/V8 引擎代码。接入 OpenClaw 小龙虾，支持远程集群管理
-    link: https://gitee.com/microi-net/microi.openclaw
-    linkText: OpenClaw 吾码小龙虾
+    link: https://microi.net/doc/v8-engine/ai-apiengine.html
+    linkText: AI本地编程文档
   - icon: 🔗
     title: API 接口引擎
     details: 在线使用JavaScript编写后端api接口，支持 AI 在线编程 + VS Code 本地 AI 编程，代码生成准确率高达 99%。极致的性能与开发效率，无需编译发布，保存即生效。支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等
