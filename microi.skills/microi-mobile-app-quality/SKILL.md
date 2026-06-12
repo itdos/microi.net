@@ -1,11 +1,14 @@
 ---
 name: microi-mobile-app-quality
 description: Microi mobile app quality gate for UniApp/H5/WeChat mini programs. Use when creating, redesigning, fixing, testing, or delivering any Microi mobile project, including login, tab navigation, quick actions, buttons, animations, menu hierarchy, and mobile visual acceptance.
+applyTo: "**/*.{vue,js,ts,css,scss,json,md}"
 ---
 
 # Microi Mobile App Quality Gate
 
 This skill is mandatory for every Microi UniApp/H5/WeChat mini program delivery. It records recurring mobile mistakes that must not be repeated.
+
+Automatic trigger: if a task touches a Microi mobile app, H5, WeChat mini program, App build, uni-app project, login page, tabbar, homepage, profile page, workbench, report page, visual redesign, or mobile acceptance, apply this skill even when the user does not explicitly name it.
 
 ## 1. Navigation And Quick Actions Must Use Real Icons
 

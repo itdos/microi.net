@@ -542,3 +542,21 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/v8-explorer-tree/SKILL.md` — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 - `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）
 - `microi.skills/workspace-conventions/SKILL.md` — Microi 工作区全局约定
+
+## Microi 前端 / 移动端默认 UI 规范
+
+当任务涉及 Microi 生态中的移动端、H5、微信小程序、App、Vue3 网站、官网、产品站、企业站、客户门户、员工工作台、会员中心、报表页、活动页、可视化看板或任何 UI 美化/重构时，AI 必须默认自动套用以下规范，不需要用户手动再次声明：
+
+- `microi.skills/microi-ui/SKILL.md`
+- `microi.skills/ui-design/SKILL.md`
+- `microi.skills/microi-mobile-app-quality/SKILL.md`
+- `microi.skills/microi-uniapp-frontend/SKILL.md`（仅 UniApp/H5/小程序/App 项目）
+
+默认行为：
+- 用户未主动指定其它设计系统时，前端视觉基底采用 Microi.UI / MCI-UI。
+- 业务页面优先使用 `Microi.UI/` 的 tokens、主题运行时、`Mci*` 组件和 `mci-*` 公共样式。
+- 移动端底部导航、首页入口、我的页快捷入口、主要按钮必须有真实图标，不能用文字占位。
+- 登录页必须优先参考真实 SDK 和标准登录页实现，不能猜测不存在的 API。
+- `OsClient` 请求头必须只有一个规范值，不能因为大小写重复导致 `lxwb, lxwb` 这类合并值。
+- 真实业务后台菜单必须规划为至少两级结构，不能把所有模块平铺为一级菜单。
+- 吾码源码、文档、skills 和 CSS 命名中不能出现外部 UI 品牌名、外部类名前缀或照搬痕迹。
