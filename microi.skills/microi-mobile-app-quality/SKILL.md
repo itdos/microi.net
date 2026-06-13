@@ -18,6 +18,7 @@ Required:
 - Use Microi.UI icons, project `mci-icon-*` CSS icons, iconfont, or a stable bundled icon component.
 - Bottom nav items such as Home, Orders, Reports, Repair, Mine must show icons, not Chinese single-character substitutes like `首` / `单` / `报` / `我`.
 - Homepage entry grids and Mine/Profile shortcuts must follow the same rule.
+- Profile/settings/info blocks such as theme, tenant, version, account, about, customer binding, and service entries must use real icons. Do not use single Chinese characters such as `租` / `版` / `客` as icon substitutes.
 - Icons must be real visual symbols and must not rely on remote placeholder images.
 - If SVG or image icons are used, assets must be local, versioned, and checked for mini-program packaging.
 
@@ -157,30 +158,82 @@ Acceptance:
 The login page must not force users to switch between two identity tabs before they can log in.
 
 Required:
-- Provide one direct account/password login surface for Microi system users.
-- Provide WeChat mini-program phone quick login using `<button open-type="getPhoneNumber">`.
+- For H5/App, provide one account-or-phone + password form. Do not place a separate phone-only customer login form next to the account/password form unless the backend explicitly supports and requires that second path.
+- For WeChat mini programs, make phone authorization the default login surface using `<button open-type="getPhoneNumber">`. Account/password login may be a secondary fallback, but it must be collapsed or secondary, not displayed as a full second login system beside phone authorization.
 - In WeChat mini programs, phone quick login must pass the returned phone `code` to the backend, and must also call `uni.login()` to get a fresh `LoginCode` when the backend needs OpenId/UnionId.
 - In H5/App fallback, provide manual phone input only if the backend supports phone login.
-- Make login copy clear: staff use system account; customers use phone quick login.
+- Make login copy clear: account/phone + password is one path; WeChat phone authorization is the mini-program default path.
+- Do not show internal implementation metadata on the login page such as current tenant, OsClient, mobile build version, API host, or debug version blocks.
 
 Forbidden:
 - Staff/Customer tab switch as the primary login model unless the user explicitly requires it.
+- Two simultaneously visible full login systems such as “account + password” plus “phone input login” on the same screen.
 - Pretending the frontend can directly read a WeChat phone number from `getPhoneNumber`; modern WeChat returns a code.
 - Implementing phone login only as a text input when the target is WeChat mini program.
+- Showing tenant/version/debug blocks to end users.
 
 Acceptance:
 - Inspect the standard reference at `microi.uniapp/src/pages/login/index.vue` before implementing.
 - Test account login path and phone-login button rendering.
 - Build H5 and WeChat mini program targets.
 
+## 9. Theme Switching Must Be Real And Global
+
+When a customer asks for an alternate visual style, keep the current accepted theme as a named option instead of overwriting it unless the user explicitly asks to remove it.
+
+Required:
+- Name each theme by visual intent, not by temporary customer wording. Examples: `清新绿红`, `品牌经典`, `专业深色`.
+- Persist theme choice with `uni.setStorageSync` or the project theme runtime.
+- Make the theme switch available before login when the product has a Mine/Profile/Settings page that can be opened while logged out.
+- Show theme switching as a compact "Switch Theme" action that opens a modal/bottom sheet. Do not dump every theme option directly on the Mine/Profile page unless the page is explicitly a settings page.
+- Apply theme state to every page root, fixed bottom nav, empty states, skeletons, buttons, cards, and H5 desktop phone shell. A theme that only changes the current page is incomplete.
+- Mini-program builds cannot rely only on `document.documentElement`; use page root classes, CSS variables, or a cross-platform theme service.
+- If page-local scoped CSS hardcodes colors, add theme-aware overrides or refactor to `--mci-*` variables.
+- On H5, theme changes must not destabilize uni-app router patching. If reactive page-root class switching causes scheduler/`parentNode`/`updateSlots` errors, use a stable page class plus a theme service that applies `html/body` attributes and repairs page-root classes after route DOM changes.
+- Bottom navigation must guard against tapping the active route, debounce repeated taps, and defer route changes briefly after a theme switch so DOM/theme updates finish before `uni.reLaunch`.
+
+Forbidden:
+- Deleting a previously accepted design when adding a customer-preference theme.
+- A theme switch whose effect disappears after navigation or app restart.
+- Theme cards/options using text-only fake icons.
+- Theme switching that breaks bottom navigation or produces Vue scheduler errors.
+
+Acceptance:
+- Switch themes on the logged-out Mine/Profile page and navigate to Home, Login, List, Detail, and Form pages.
+- Confirm bottom nav, primary buttons, cards, empty state, and page background all change consistently.
+- Reload the H5 page or restart the mini program and confirm the selected theme is restored.
+- Run screenshot verification for every route in `pages.json` under every named theme. Check text contrast, especially shortcut cards, report cards, empty states, bottom nav, hero text, and modal/sheet content.
+
+## 10. Report/List Detail Auth Must Preserve User Identity
+
+List-to-detail navigation must keep the caller identity model. Staff, customer, and public/share routes may need different APIs even when they open the same visual report detail page.
+
+Required:
+- If staff can see a report list through authenticated FormEngine or backend account APIs, report detail must use the same staff-authenticated path or pass a valid staff token.
+- If customers open reports, use customer token or binding-aware interface engines.
+- If external users open a shared report, use a share token route and do not require staff/customer login.
+- Do not send an empty `CustomerToken` for staff users and then interpret the backend response as "not logged in".
+- Preserve current session before opening detail pages and avoid clearing staff token unless an authenticated staff endpoint actually returns an auth-expired code.
+
+Forbidden:
+- Reusing a customer anonymous report-detail engine for staff list clicks without a staff credential path.
+- Redirecting to login after clicking a report/list item that was already visible to the logged-in user.
+
+Acceptance:
+- Test staff list -> report/detail, customer list -> report/detail, and share-token detail separately.
+- Confirm no unexpected login redirect happens after clicking a visible card.
+
 ## Final Delivery Checklist
 
 Before marking a mobile project complete:
 - Icons: bottom nav, homepage quick actions, profile shortcuts, primary buttons.
-- Login: direct account login, WeChat phone quick login, no fake identity-switch dependency, SDK API verified.
+- Login: one account/phone + password path for H5/App, WeChat phone authorization as mini-program default, no simultaneous duplicate login systems, no tenant/version/debug blocks, SDK API verified.
 - Buttons: icon + text, pressed state, loading state.
 - Menus: backend planned as at least two-level tree.
 - Headers: `osclient` is a single canonical header value, not duplicated by case.
 - First viewport: hero text and floating quick panels are screenshot-checked for no clipping or overlap.
 - Motion: entrance, tap, skeleton animation present and restrained.
+- Theme: named themes persist, can be switched while logged out, and affect all pages plus bottom navigation.
+- Theme QA: every `pages.json` route is screenshot-checked in every named theme; no low-contrast text and no Vue scheduler/router errors after switching theme then navigating.
+- Auth QA: list-to-detail routes preserve staff/customer/share identity and do not redirect visible items back to login.
 - Verification: `build:h5`, `build:mp-weixin`, and `build:app` when scripts exist; H5 route smoke test and console check.
