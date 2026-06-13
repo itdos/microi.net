@@ -1118,7 +1118,7 @@
                 v-show="_colMenuVisible"
                 ref="globalColMenu"
                 class="global-col-header-menu"
-                :style="{ top: _colMenuPosition.top + 'px', left: _colMenuPosition.left + 'px' }"
+                :style="{ top: _colMenuPosition.top + 'px', left: _colMenuPosition.left + 'px', maxHeight: _colMenuPosition.maxHeight ? _colMenuPosition.maxHeight + 'px' : undefined }"
                 @click.stop
             >
                 <!-- 升序 -->

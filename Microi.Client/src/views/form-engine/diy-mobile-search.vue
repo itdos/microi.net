@@ -399,10 +399,8 @@ export default {
                                 self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
                             }
 
-                            // 临时解决方案：强制将下拉框变为文本框
-                            if (id.TextBox) {
-                                field.Component = "Text";
-                            }
+                            // 临时解决方案：强制将下拉框变为文本框；日期时间字段仍保持日期控件，且不污染原字段对象。
+                            const searchField = id.TextBox && field.Component !== "DateTime" ? { ...field, Component: "Text" } : field;
 
                             // 复选框类型搜索
                             if (
@@ -410,15 +408,15 @@ export default {
                                 Array.isArray(field.Data) &&
                                 field.Data.length > 0 &&
                                 field.Config.DataSourceSqlRemote !== true &&
-                                ((field.Component === "Select" && field.Config.DataSource === "Data") ||
-                                    (field.Component === "MultipleSelect" && field.Config.DataSource === "Data") ||
-                                    field.Component === "Checkbox" ||
-                                    field.Component === "Radio")
+                                ((searchField.Component === "Select" && field.Config.DataSource === "Data") ||
+                                    (searchField.Component === "MultipleSelect" && field.Config.DataSource === "Data") ||
+                                    searchField.Component === "Checkbox" ||
+                                    searchField.Component === "Radio")
                             ) {
                                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
                                     self.SearchCheckbox[field.Name] = [];
                                 }
-                                result.push(field);
+                                result.push(searchField);
                             }
                             // 文本类型搜索
                             else if (
@@ -426,14 +424,14 @@ export default {
                                 (!Array.isArray(field.Data) ||
                                     field.Data.length === 0 ||
                                     field.Config.DataSourceSqlRemote === true ||
-                                    field.Component === "Department" ||
-                                    field.Component === "Cascader" ||
-                                    field.Component === "SelectTree")
+                                    searchField.Component === "Department" ||
+                                    searchField.Component === "Cascader" ||
+                                    searchField.Component === "SelectTree")
                             ) {
-                                if ((field.Component === "Select" || field.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
+                                if ((searchField.Component === "Select" || searchField.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                                     self.SearchSelect[field.Name] = [];
                                 }
-                                result.push(field);
+                                result.push(searchField);
                             }
                             // 无类型限制
                             else if (self.DiyCommon.IsNull(type)) {

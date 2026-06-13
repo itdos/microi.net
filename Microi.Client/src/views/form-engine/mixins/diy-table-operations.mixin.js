@@ -308,6 +308,9 @@ export default {
             if (self.SearchWhere.length > 0) {
                 param._Where = self.SearchWhere.slice();
             }
+            if (self.PropsWhere && self.PropsWhere.length > 0) {
+                param._Where = self.mergeWhereList(param._Where, self.PropsWhere);
+            }
             if (self.Where.length > 0) {
                 if (!param._Where) {
                     param._Where = [];
