@@ -1,79 +1,79 @@
 ---
 name: microi-ui
-description: Use when building or documenting Microi.UI / MCI-UI for Vue 3 websites, responsive sites, uni-app mobile projects, theme palettes, shape modes, premium mobile UI, skeleton loading, safe areas, motion, and Microi brand frontend components.
+description: 用于构建或编写 Microi.UI / MCI-UI 文档，覆盖 Vue 3 网站、响应式站点、uni-app 移动端、主题色板、形态模式、高品质移动端界面、骨架屏、安全区、动效和 Microi 品牌前端组件。
 applyTo: "**/*.{vue,js,ts,css,scss,md,json}"
 ---
 
 # Microi.UI / MCI-UI
 
-Microi.UI is the shared frontend design system for Microi products. Use it for Vue 3 websites, responsive sites, H5, and uni-app mobile projects. PC admin pages can still use Element Plus, but their visual tokens, loading states, empty states, motion, and brand colors should align with `--mci-*` tokens.
+Microi.UI 是 Microi 产品共享前端设计系统。Vue 3 网站、响应式站点、H5 和 uni-app 移动端项目都应使用它。PC 后台页面仍可使用 Element Plus，但视觉变量、加载状态、空状态、动效和品牌色应与 `--mci-*` 变量保持一致。
 
-When the user asks for a Microi mobile app, H5, mini-program, customer portal, staff app, member center, official site, product site, activity page, dashboard, or report page and does not name another design system, default to Microi.UI.
+当用户要求制作 Microi 移动端应用、H5、小程序、客户门户、员工端、会员中心、官网、产品站、活动页、仪表盘或报告页，且没有指定其它设计系统时，默认使用 Microi.UI。
 
-This is an automatic rule. Do not wait for the user to explicitly say "follow `microi.skills/microi-ui/SKILL.md`". If the repository, requirement, file path, or project context belongs to the Microi ecosystem and the work touches frontend UI, website UI, H5, uni-app, mini-program, customer/staff/member pages, reports, dashboards, or visual polish, load and apply this skill by default.
+这是自动规则。不要等用户明确说“遵循 `microi.skills/microi-ui/SKILL.md`”。只要仓库、需求、文件路径或项目上下文属于 Microi 生态，且工作涉及前端界面、网站界面、H5、uni-app、小程序、客户/员工/会员页面、报告、仪表盘或视觉打磨，就默认读取并应用本 skill。
 
-## Core Promise
+## 核心承诺
 
-Microi.UI is not only a component set. It is a visual delivery standard for AI-built software:
+Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 
-- Every first viewport must have a clear visual anchor.
-- Every page must use brand-aware color and component hierarchy.
-- Every important action must be obvious, beautiful, and reachable.
-- Every list/detail/form must be built from reusable scene patterns, not copied one-off CSS.
-- Every mobile page must respect safe areas, loading states, pressed feedback, and bottom actions.
+- 每个首屏都必须有明确视觉锚点。
+- 每个页面都必须使用有品牌意识的色彩和组件层级。
+- 每个重要操作都必须明显、美观且容易触达。
+- 每个列表、详情、表单都应基于可复用场景模式构建，而不是复制一次性 CSS。
+- 每个移动端页面都必须处理安全区、加载状态、按下反馈和底部操作。
 
-## Source Layout
+## 源码结构
 
-- `Microi.UI/src/theme/tokens.css`: design tokens, palettes, radius, shadows, motion, mobile scene variables.
-- `Microi.UI/src/theme/index.css`: base classes, page shell, mobile premium primitives, skeleton, motion, bottom navigation, rich cards, sheets, form options.
-- `Microi.UI/src/theme/runtime.js`: `initMciDesign`, `applyMciDesign`, `getMciDesign`, `toggleMciTheme`, `setMciTheme`, `setMciPalette`, `setMciShape`, `setMciMotion`.
-- `Microi.UI/src/web`: Vue 3 web components.
-- `Microi.UI/src/uniapp`: uni-app Vue 3 components.
+- `Microi.UI/src/theme/tokens.css`：设计变量、色板、圆角、阴影、动效、移动端场景变量。
+- `Microi.UI/src/theme/index.css`：基础类、页面壳、移动端高品质基础能力、骨架屏、动效、底部导航、富内容卡片、面板、表单选项。
+- `Microi.UI/src/theme/runtime.js`：`initMciDesign`、`applyMciDesign`、`getMciDesign`、`toggleMciTheme`、`setMciTheme`、`setMciPalette`、`setMciShape`、`setMciMotion`。
+- `Microi.UI/src/web`：Vue 3 Web 组件。
+- `Microi.UI/src/uniapp`：uni-app Vue 3 组件。
 
-## Required Defaults
+## 默认要求
 
-- Call `initMciDesign()` at app startup or provide an equivalent project-level theme service.
-- Support `theme: light | dark`, `palette: black | white | red | orange | yellow | green | cyan | blue | purple`, `shape: rounded | flat`, and `motion: full | reduced`.
-- Wrap Microi.UI pages or embedded UI areas with `.mci-page` or `[data-mci-ui-root]`.
-- Use `MciPage` as the page shell. Mobile customer/staff/member pages should usually use `premium`.
-- Do not hardcode colors, shadows, radius, gradients, or safe-area spacing in business pages. Use `--mci-*` variables or `mci-*` classes.
-- Only public shared classes with `mci-` prefix are allowed. Do not introduce external UI library names, copied class names, or generic globals such as `.card`, `.list`, `button {}`.
-- If a UI pattern appears in two or more pages, extract a Microi.UI component or project-level `mci-*` wrapper.
-- Dynamic pages must show skeleton screens during first load, not spinner-only or premature empty states.
-- Prominent buttons must use icon plus text, centered with flex, stable height, loading state, and pressed feedback.
-- Native mini-program buttons such as `open-type="getPhoneNumber"` must be styled as Microi primary buttons and remove default button borders.
-- API headers must pass `OsClient` as one exact value such as `lxwb`, never duplicated values such as `lxwb, lxwb`.
+- 应用启动时调用 `initMciDesign()`，或提供等效的项目级主题服务。
+- 支持 `theme: light | dark`、`palette: black | white | red | orange | yellow | green | cyan | blue | purple`、`shape: rounded | flat`、`motion: full | reduced`。
+- Microi.UI 页面或嵌入式界面区域使用 `.mci-page` 或 `[data-mci-ui-root]` 包裹。
+- 使用 `MciPage` 作为页面壳。移动端客户/员工/会员页面通常应使用 `premium`。
+- 业务页面不要硬编码颜色、阴影、圆角、渐变或安全区间距。使用 `--mci-*` 变量或 `mci-*` 类。
+- 只允许使用 `mci-` 前缀的公开共享类。不要引入外部 UI 库名称、复制来的类名，或 `.card`、`.list`、`button {}` 这类泛化全局选择器。
+- 如果某个界面模式出现在两个及以上页面中，要抽取成 Microi.UI 组件或项目级 `mci-*` 封装。
+- 动态页面首次加载必须显示骨架屏，不能只有 spinner，也不能过早显示空状态。
+- 醒目按钮必须使用图标加文字，flex 居中，固定高度，具备加载态和按下反馈。
+- `open-type="getPhoneNumber"` 这类小程序原生按钮必须样式化为 Microi 主按钮，并移除默认边框。
+- API 请求头必须把 `OsClient` 作为单一准确值传递，例如 `lxwb`，不得出现 `lxwb, lxwb` 这类重复值。
 
-## Component Selection
+## 组件选择
 
-- `MciPage`: page shell, safe area, motion, premium mobile background.
-- `MciHeroPanel`: branded first-viewport hero/status panel.
-- `MciBottomNav`: custom bottom navigation with icon, badge, active state, optional raised center item.
-- `MciButton`: primary, plain, gold, cool, ghost actions.
-- `MciCard`: general content container.
-- `MciCell`: settings/menu/list rows.
-- `MciSection`: major sections.
-- `MciTabs`: segmented navigation and content switching.
-- `MciMetricCard` / `MciAssetCard`: numbers, assets, summaries.
-- `MciOrderCard`: orders, work orders, tasks, repair requests.
-- `MciActionBar`: safe-area bottom actions.
-- `MciAvatar`: member/customer/staff identity.
-- `MciProductCard`: commerce/content grids.
-- `MciFormField`: forms and data entry.
-- `MciFilterBar`: list search/filter area.
-- `MciModal`: dialogs and confirmations.
-- `MciUploader`: image/file upload.
-- `MciTimeline`: service records, repair progress, approval records.
-- `MciSteps`: workflows and status stages.
-- `MciSkeleton`: loading placeholders.
-- `MciDataState`: empty/error/success states.
-- `MciRichText`: reports, articles, instructions.
+- `MciPage`：页面壳、安全区、动效、高品质移动端背景。
+- `MciHeroPanel`：带品牌感的首屏/状态面板。
+- `MciBottomNav`：自定义底部导航，支持图标、角标、激活态和可选凸起中间项。
+- `MciButton`：主按钮、朴素按钮、金色按钮、冷色按钮、幽灵按钮。
+- `MciCard`：通用内容容器。
+- `MciCell`：设置、菜单、列表行。
+- `MciSection`：主要分区。
+- `MciTabs`：分段导航和内容切换。
+- `MciMetricCard` / `MciAssetCard`：数字、资产、汇总。
+- `MciOrderCard`：订单、工单、任务、维修申请。
+- `MciActionBar`：安全区底部操作。
+- `MciAvatar`：会员、客户、员工身份。
+- `MciProductCard`：商品/内容网格。
+- `MciFormField`：表单和数据录入。
+- `MciFilterBar`：列表搜索/筛选区域。
+- `MciModal`：弹窗和确认。
+- `MciUploader`：图片/文件上传。
+- `MciTimeline`：服务记录、维修进度、审批记录。
+- `MciSteps`：流程和状态阶段。
+- `MciSkeleton`：加载占位。
+- `MciDataState`：空、错、成功状态。
+- `MciRichText`：报告、文章、说明。
 
-## Premium Mobile Visual Standard
+## 高品质移动端视觉标准
 
-Mobile apps must feel like polished products, not admin forms squeezed into a phone viewport.
+移动端应用必须像经过打磨的产品，而不是把后台表单硬塞进手机视口。
 
-Use these primitives before writing page-local CSS:
+写页面局部 CSS 前，优先使用这些基础能力：
 
 - `.mci-page--mobile-premium`
 - `.mci-mobile-hero`
@@ -92,192 +92,192 @@ Use these primitives before writing page-local CSS:
 - `.mci-mobile-kpi-strip`
 - `.mci-mobile-empty-result`
 
-### First Viewport Rule
+### 首屏规则
 
-The first viewport must show one of these anchors:
+首屏必须展示以下任一视觉锚点：
 
-- branded hero panel with CTA
-- identity/member header
-- workbench status card
-- report/status overview
-- search plus category panel
-- image-led content hero
-- KPI dashboard summary
+- 带品牌感的首屏面板和 CTA
+- 身份/会员头部
+- 工作台状态卡
+- 报告/状态总览
+- 搜索加分类面板
+- 图片主导的内容首屏
+- KPI 仪表盘摘要
 
-Do not start a mobile page with only a flat title and a plain list.
+移动端页面不要只用平铺标题和普通列表开头。
 
-### Layering Rule
+### 层次规则
 
-High-quality mobile pages should usually compose:
+高品质移动端页面通常由以下层次组成：
 
-1. atmosphere background or hero
-2. floating quick-action or stats panel
-3. titlebar with action
-4. rich business cards
-5. bottom navigation or fixed action bar
+1. 氛围背景或首屏
+2. 悬浮快捷操作或统计面板
+3. 带操作的标题栏
+4. 富业务卡片
+5. 底部导航或固定操作栏
 
-Avoid a monotonous stack of identical white cards.
+避免单调堆叠相同白卡。
 
-### Icon Rule
+### 图标规则
 
-Bottom navigation, home quick actions, profile shortcuts, grid actions, floating actions, empty-state actions, settings/info rows, theme options, and primary buttons must use recognizable icons. Single Chinese characters such as `租`, `版`, `客`, or `我` are placeholders, not icons.
+底部导航、首页快捷操作、个人中心快捷项、九宫格操作、悬浮操作、空状态操作、设置/信息行、主题选项和主按钮必须使用可识别图标。`租`、`版`、`客`、`我` 这类单个汉字是占位，不是图标。
 
-### Motion Rule
+### 动效规则
 
-Use restrained motion: page entrance, staggered cards, tap feedback, skeleton shimmer, optional hero idle/sheen. Motion must not cause layout shift, clipped text, or operational distraction. Respect `motion: reduced`.
+使用克制动效：页面入场、卡片错落出现、点击反馈、骨架屏流光、可选首屏闲置动效/高光。动效不能导致布局位移、文字裁切或操作干扰。尊重 `motion: reduced`。
 
-## Mobile Scene Blueprints
+## 移动端场景蓝图
 
-### Login / Register
+### 登录/注册
 
-- Do not force role switching unless the business explicitly has separate login systems.
-- H5/App login should normally be one account-or-phone + password form, not separate account and phone login blocks shown together.
-- WeChat mini-program login should default to phone authorization with `<button open-type="getPhoneNumber">`; account/password fallback can exist as a secondary collapsed option when staff login is required.
-- For Microi account login, use the platform login flow correctly; do not call nonexistent methods.
-- For WeChat mini-program customer login, support phone authorization and registration/binding.
-- Do not show current tenant, OsClient, API host, mobile version, or debug metadata blocks to end users on login/profile pages.
-- Use top atmosphere plus floating form panel.
-- Inputs must be thick, rounded, readable, and grouped.
-- Primary login / go-login / phone login buttons must be icon plus text, high contrast, and full width where appropriate.
-- Show social/quick-login entries only when they actually work.
+- 除非业务明确有独立登录系统，否则不要强制用户切换角色。
+- H5/App 登录通常应是一个账号或手机号 + 密码表单，不要把账号登录块和手机号登录块并列展示。
+- 微信小程序登录默认使用 `<button open-type="getPhoneNumber">` 手机号授权；需要员工登录时，账号/密码兜底可以作为折叠或次级选项存在。
+- Microi 账号登录要正确使用平台登录流程，不要调用不存在的方法。
+- 微信小程序客户登录要支持手机号授权和注册/绑定。
+- 登录页/个人中心不要向终端用户展示当前租户、OsClient、API host、移动端版本或调试元数据块。
+- 使用顶部氛围加悬浮表单面板。
+- 输入框要厚实、圆润、清晰，并成组呈现。
+- 主登录、去登录、手机号登录按钮必须图标加文字，高对比，并在合适场景下满宽。
+- 只有真实可用时才显示社交/快捷登录入口。
 
-### Home / Workbench
+### 首页/工作台
 
-- Expose the next action in the first viewport: pending orders, due plans, reports, repairs, approvals, or quick actions.
-- Use `MciHeroPanel` or `.mci-mobile-hero`.
-- Use floating quick actions with icons.
-- Use metric cards for counts and status.
-- Use rich cards for recent tasks or reports.
-- Hero text must fit 375px and 430px widths. Reduce title size before accepting ugly wrapping.
-- Floating panels must not cover hero buttons.
+- 首屏展示下一步操作：待处理订单、到期计划、报告、报修、审批或快捷操作。
+- 使用 `MciHeroPanel` 或 `.mci-mobile-hero`。
+- 使用带图标的悬浮快捷操作。
+- 使用指标卡展示数量和状态。
+- 使用富卡片展示近期任务或报告。
+- 首屏文字必须适配 375px 和 430px 宽度。出现难看换行前，先减小标题字号。
+- 悬浮面板不得覆盖首屏按钮。
 
-### Profile / My
+### 个人中心/我的
 
-- Use identity header with avatar, name, role/customer, status, and at least one visual badge.
-- Use two or more highlighted shortcut cards or a service grid.
-- Group settings and business entries into panels.
-- Theme switching can live here and must be usable before login when the profile page is reachable while logged out.
-- Settings/info rows must use real icons. Do not use single-character badges as icons for tenant, version, theme, or account entries.
-- Do not render profile as a plain list unless the product is intentionally utilitarian.
+- 使用身份头部，包含头像、姓名、角色/客户、状态和至少一个视觉徽章。
+- 使用两个以上高亮快捷卡或服务宫格。
+- 设置项和业务入口要分组成面板。
+- 主题切换可以放在这里；如果未登录也能访问个人中心，则登录前也必须可用。
+- 设置/信息行必须使用真实图标。租户、版本、主题或账号入口不要用单字徽章当图标。
+- 除非产品明确是极简工具型，否则不要把个人中心渲染成纯列表。
 
-### Theme Options
+### 主题选项
 
-- If a customer requests a new visual style after a prior design was accepted, preserve the prior design as a named theme unless the user explicitly asks to remove it.
-- Theme names should describe visual intent, such as `清新绿红`, `品牌经典`, or `专业深色`.
-- Persist the selected theme and apply it to page roots, fixed bottom nav, buttons, cards, empty states, skeletons, forms, reports, and H5 desktop phone shell.
-- For uni-app and WeChat mini-programs, do not rely only on `document.documentElement`; bind theme class or variables at every page root through a project-level theme service.
-- On profile/settings pages, expose theme switching as a compact action that opens a bottom sheet or modal. Do not render all theme choices directly on the main profile page unless the page is explicitly a full settings page.
-- H5 uni-app theme switching must not break router patching. If reactive root class changes cause `parentNode`, `scheduler flush`, or `updateSlots` errors, keep Vue page classes stable and let the theme service apply/repair `html/body` attributes and page-root theme classes after DOM changes.
-- After switching theme, bottom navigation must still route cleanly. Guard active-route taps, debounce repeated taps, and defer navigation briefly if needed.
-- Screenshot every route in `pages.json` for every named theme. Text in shortcut cards, report cards, empty states, modals, and bottom nav must remain high contrast.
+- 如果客户在已接受旧设计后要求新视觉风格，除非用户明确要求移除，否则要把旧设计保留为一个命名主题。
+- 主题名称应描述视觉意图，例如 `清新绿红`、`品牌经典`、`专业深色`。
+- 持久化已选主题，并应用到页面根、固定底部导航、按钮、卡片、空状态、骨架屏、表单、报告和 H5 桌面手机壳。
+- uni-app 和微信小程序不能只依赖 `document.documentElement`；要通过项目级主题服务在每个页面根绑定主题类或变量。
+- 个人中心/设置页上的主题切换应是紧凑操作，打开底部面板或弹窗。除非页面明确是完整设置页，否则不要把所有主题选项直接渲染在个人中心首页。
+- H5 uni-app 主题切换不能破坏路由补丁。如果响应式根类变化导致 `parentNode`、`scheduler flush` 或 `updateSlots` 错误，要保持 Vue 页面类稳定，让主题服务在 DOM 变化后应用/修复 `html/body` 属性和页面根主题类。
+- 切换主题后，底部导航仍必须正常路由。要拦截当前路由点击、对重复点击防抖，并在必要时短暂延迟导航。
+- 每个命名主题都要对 `pages.json` 中每个路由截图。快捷卡片、报告卡片、空状态、弹窗和底部导航中的文字必须保持高对比。
 
-### List
+### 列表
 
-- Mobile lists should use business cards, not table-like rows.
-- Each card needs title, status pill, key metadata, time, and primary action.
-- Add filter/search/tabs above lists when data types differ.
-- Use skeleton cards during loading and meaningful empty states.
-- Long titles and metadata must ellipsize or wrap intentionally without breaking card height.
+- 移动端列表应使用业务卡片，而不是表格式行。
+- 每张卡片需要标题、状态胶囊、关键元数据、时间和主操作。
+- 数据类型不同的列表上方要增加筛选/搜索/标签。
+- 加载时使用骨架卡片，空数据时使用有意义的空状态。
+- 长标题和元数据要有意截断或换行，不能撑坏卡片高度。
 
-### Detail / Report
+### 详情/报告
 
-- Start with overview hero/status block.
-- Then show facts, timeline/steps, media, rich report content, and action area.
-- Important status must be visible without scrolling.
-- Reports should use `MciRichText`, readable line height, image max width, and share/read/confirm actions.
-- If an action is expected, use `MciActionBar` or fixed safe-area submit bar.
-- Preserve the viewer identity from list to detail: staff report cards should open staff-authenticated detail data, customer cards should open CustomerToken detail data, and shared links should open ShareToken detail data. Do not redirect a logged-in user to login after they click a card that was already visible to them.
+- 从概览首屏/状态块开始。
+- 然后展示事实信息、时间线/步骤、媒体、富报告内容和操作区。
+- 重要状态必须无需滚动即可看到。
+- 报告应使用 `MciRichText`、可读行高、图片最大宽度，以及分享/阅读/确认操作。
+- 如果页面预期有操作，使用 `MciActionBar` 或固定安全区提交栏。
+- 从列表到详情要保留查看者身份：员工报告卡打开员工鉴权详情数据，客户卡片打开 CustomerToken 详情数据，分享链接打开 ShareToken 详情数据。不要让已登录用户点击本来可见的卡片后被重定向到登录。
 
-### Form / Upload
+### 表单/上传
 
-- Use section headers with small icon marks.
-- Use large clean input areas and enough vertical spacing.
-- Use colored option chips or option cards for important choices.
-- Upload surfaces must support re-select/replacement, preview, close preview, progress, retry, and failure toast.
-- Long forms need a fixed safe-area submit bar.
+- 使用带小图标标记的分区标题。
+- 使用大而清爽的输入区域和足够垂直间距。
+- 重要选项使用彩色选项胶囊或选项卡片。
+- 上传区域必须支持重新选择/替换、预览、关闭预览、进度、重试和失败提示。
+- 长表单需要固定安全区提交栏。
 
-### Bottom Navigation
+### 底部导航
 
-- Prefer `MciBottomNav` when native tabbar limits visual quality or causes runtime issues.
-- Must include icons, labels, active state, and stable tap targets.
-- Raised center action is allowed for create/scan/repair/report actions.
-- Do not use text-only navigation.
+- 当原生 tabbar 限制视觉质量或造成运行时问题时，优先使用 `MciBottomNav`。
+- 必须包含图标、文字、激活态和稳定点击区域。
+- 创建、扫码、报修、报告等操作允许使用凸起中间按钮。
+- 不要使用纯文字导航。
 
-### Popup / Sheet / Dialog
+### 弹窗/底部面板/对话框
 
-- Use dimmed overlay, clear sheet radius, handle line for bottom sheets, and compact action hierarchy.
-- Bottom sheets should not cover irreversible actions without confirmation.
-- Confirmation dialogs should show clear icon/status and one primary action.
+- 使用暗色遮罩、明确的面板圆角、底部面板拖拽线和紧凑操作层级。
+- 底部面板不应在没有确认的情况下遮住不可逆操作。
+- 确认对话框应显示清晰图标/状态和一个主操作。
 
-### Chart / Dashboard
+### 图表/仪表盘
 
-- Numbers come before charts.
-- Use 2-4 high-signal metrics in the first screen.
-- Use a small palette; do not make every chart a rainbow.
-- For dense dashboards, choose either clean light analytics or dark command-center style, not a random mix.
+- 数字优先于图表。
+- 首屏使用 2-4 个高信号指标。
+- 使用少量配色，不要把每张图都做成彩虹。
+- 密集仪表盘应选择清爽浅色分析风格或深色指挥中心风格，不要随意混搭。
 
-### Messages / Social / News
+### 消息/社交/资讯
 
-- Messages need avatar/icon, type, title, summary, time, unread marker, and action if needed.
-- Social/content feeds need strong media ratio, author identity, tags, and engagement actions.
-- News/content pages need category tabs, hero or featured story, and readable cards.
+- 消息需要头像/图标、类型、标题、摘要、时间、未读标记，以及必要操作。
+- 社交/内容流需要稳定媒体比例、作者身份、标签和互动操作。
+- 资讯/内容页需要分类标签、首屏或精选故事，以及可读卡片。
 
-### Commerce / Activity
+### 商城/活动
 
-- Use image-led cards, price/status anchors, promotional tags, and bottom purchase/action area.
-- Cart/order pages need visible selection state, quantity controls, totals, and fixed checkout bar.
-- Activity pages need a campaign hero, progress/status, reward/action panels, and rules panel.
+- 使用图片主导卡片、价格/状态锚点、促销标签和底部购买/操作区。
+- 购物车/订单页需要可见选择状态、数量控件、合计和固定结算栏。
+- 活动页需要活动首屏、进度/状态、奖励/操作面板和规则面板。
 
-## Website / PC Site Standard
+## 网站/PC 站标准
 
-- Build the actual product/site experience, not a generic landing shell.
-- First viewport must make the brand/product/place/object obvious.
-- For landing heroes, use real/generated bitmap imagery or an immersive interactive scene when appropriate. Do not rely on decorative gradients alone.
-- Hero text should not sit inside a card.
-- SaaS/CRM/operation sites should be quiet, dense, scannable, and work-focused.
-- Product/venue/portfolio sites can be more visual, but the primary object must be inspectable.
-- Use `MciHeroPanel`, `MciSection`, `MciCard`, `MciMetricCard`, and `MciButton` before page-local CSS.
+- 构建真实产品/站点体验，不要做通用落地页外壳。
+- 首屏必须让品牌、产品、地点或对象足够明确。
+- 落地页首屏在合适时使用真实/生成位图或沉浸式互动场景，不要只依赖装饰渐变。
+- 首屏文字不要放在卡片里。
+- SaaS/CRM/运营站点应安静、密集、易扫读、聚焦工作。
+- 产品/场馆/作品集站点可以更视觉化，但主要对象必须可检查。
+- 写页面局部 CSS 前优先使用 `MciHeroPanel`、`MciSection`、`MciCard`、`MciMetricCard` 和 `MciButton`。
 
-## Backend Menu Pairing
+## 后台菜单配套
 
-When creating a Microi low-code system, backend menus should not all be first-level menus. Use at least two levels for real systems:
+创建 Microi 低代码系统时，后台菜单不应全部是一层菜单。真实系统至少使用两级：
 
-- Customer Center: customers, contacts, bindings.
-- Asset/Device Center: equipment/assets.
-- Operation Center: plans, orders, records, repairs.
-- Report Center: reports, read logs.
-- System/Config Center: dictionaries, settings, templates.
+- 客户中心：客户、联系人、绑定。
+- 资产/设备中心：设备、资产。
+- 运营中心：计划、订单、记录、报修。
+- 报告中心：报告、阅读日志。
+- 系统/配置中心：字典、设置、模板。
 
-The mobile app information architecture should match these business domains where practical.
+移动端信息架构在可行时应与这些业务域匹配。
 
-## AI Implementation Checklist
+## AI 实施清单
 
-- Auto-detect this skill for Microi frontend, website, H5, uni-app, mini-program, customer portal, staff app, member center, dashboard, report, activity, and visual redesign tasks.
-- Read this skill and `microi.skills/ui-design/SKILL.md` before designing UI.
-- Inspect the logo/brand colors and derive palette before writing pages.
-- Choose scene blueprint first, component second, CSS last.
-- Use Microi.UI components or project-level `mci-*` wrappers over direct third-party visual styling.
-- Update `Microi.UI` when a reusable pattern appears across projects.
-- Update `microi.doc/docs/doc/system-engine/microi-ui.md` when Microi.UI behavior or standards change.
-- Validate with `npm run check`, `npm run pack:check`, and docs build when possible.
-- For UI/frontend work, use screenshot-based visual verification when a browser/H5/devtools target is available.
-- For named themes, run screenshot verification across all `pages.json` routes in each theme and inspect console logs after switching theme then navigating.
-- Inspect at 375px and 430px widths for mobile pages.
-- Check hero title wrapping, action visibility, floating panel overlap, bottom nav icons, empty states, form submit bars, and button centering.
+- Microi 前端、网站、H5、uni-app、小程序、客户门户、员工端、会员中心、仪表盘、报告、活动和视觉重设计任务要自动识别本 skill。
+- 设计界面前读取本 skill 和 `microi.skills/ui-design/SKILL.md`。
+- 写页面前检查 logo/品牌色，并推导色板。
+- 先选场景蓝图，再选组件，最后写 CSS。
+- 优先使用 Microi.UI 组件或项目级 `mci-*` 封装，而不是直接套第三方视觉样式。
+- 当可复用模式跨项目出现时，更新 `Microi.UI`。
+- 当 Microi.UI 行为或标准变化时，更新 `microi.doc/docs/doc/system-engine/microi-ui.md`。
+- 可行时用 `npm run check`、`npm run pack:check` 和文档构建验证。
+- 对 UI/前端工作，只要有浏览器/H5/devtools 目标，就使用截图视觉验证。
+- 对命名主题，在每个主题下截图验证所有 `pages.json` 路由，并在切换主题再导航后检查控制台日志。
+- 移动端页面检查 375px 和 430px 宽度。
+- 检查首屏标题换行、操作可见性、悬浮面板重叠、底部导航图标、空状态、表单提交栏和按钮居中。
 
-## Prohibited Output
+## 禁止输出
 
-- No external UI library identity or copied class prefix inside Microi.UI files or docs.
-- No text-only bottom navigation.
-- No single-character fake icons for settings/profile/theme/info entries.
-- No generic global CSS selectors.
-- No duplicate `OsClient` header values.
-- No login calls to undefined API methods.
-- No simultaneous duplicate login systems on one login page unless explicitly required.
-- No user-facing current-tenant, API-host, or mobile-version debug blocks.
-- No theme switch that only affects one page or disappears after navigation/restart.
-- No profile page that dumps all theme options inline when a switch button plus sheet/modal would be cleaner.
-- No theme switch that causes uni-app router/scheduler errors after bottom navigation.
-- No report/list detail route that loses the staff/customer/share auth context and redirects visible items to login.
-- No all-first-level backend menu planning for business systems.
-- No page that has only plain lists, plain buttons, and no visual anchor when the product is customer/staff-facing.
+- Microi.UI 文件或文档内不得出现外部 UI 库身份或复制来的类名前缀。
+- 不得使用纯文字底部导航。
+- 设置/个人中心/主题/信息入口不得使用单字假图标。
+- 不得使用泛化全局 CSS 选择器。
+- 不得出现重复 `OsClient` 请求头值。
+- 不得调用未定义的登录接口。
+- 除非明确要求，一个登录页不得同时展示重复登录系统。
+- 不得向用户展示当前租户、API host 或移动端版本调试块。
+- 不得做只影响单页、导航或重启后消失的主题切换。
+- 当“切换按钮 + 面板/弹窗”更清爽时，不得在个人中心页内联堆出所有主题选项。
+- 主题切换不得在底部导航后造成 uni-app 路由/scheduler 错误。
+- 报告/列表详情路由不得丢失员工/客户/分享鉴权上下文，并把可见项目重定向到登录。
+- 业务系统后台菜单不得全部规划为一级菜单。
+- 面向客户/员工的产品页面不得只有普通列表、普通按钮且没有视觉锚点。

@@ -1,6 +1,6 @@
 ﻿---
 name: playwright-e2e
-description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。Use when testing PC Vue, uni-app H5, websites, page engines, mobile malls, ApiEngine/FormEngine contracts, login flows, write-flow closure, network guards, screenshots, reports, and Playwright Test for VSCode integration.
+description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
 ---
 
 # Microi 吾码 Playwright E2E 自动化测试

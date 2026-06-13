@@ -1,6 +1,6 @@
 ---
 name: page-engine
-description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。Use when creating dashboards, charts, tables, maps, widgets, page layouts, or validating mic_page formData JSON.
+description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用于创建仪表盘、图表、表格、地图、组件、页面布局，或校验 mic_page formData JSON。
 ---
 
 # Microi 界面引擎（Page Engine）页面 JSON 生成

@@ -1,21 +1,21 @@
 ---
 name: microi-frontend-sdk
-description: Microi frontend SDK usage rules for Vue 3, uni-app, H5, PC websites, and Microi.Client extensions. Use when creating or modifying frontend request, token, upload, file URL, ApiEngine, FormEngine, or app bootstrap code.
+description: Microi 前端 SDK 使用规范，适用于 Vue 3、uni-app、H5、PC 网站与 Microi.Client 扩展。用于创建或修改前端请求、登录态、上传、文件 URL、ApiEngine、FormEngine 或应用启动代码。
 ---
 
-# Microi Frontend SDK
+# Microi 前端 SDK
 
-All Vue 3 frontend projects should use `microi.skills/microi.v8.js` as the shared Microi frontend SDK. Do not start a new project by copying old Vue2/Vuex request wrappers or by hand-writing another token, upload, file URL, ApiEngine, or FormEngine layer.
+所有 Vue 3 前端项目都应使用 `microi.skills/microi.v8.js` 作为统一的 Microi 前端 SDK。新项目不要复制旧版 Vue2/Vuex 请求封装，也不要重新手写 token、上传、文件 URL、ApiEngine 或 FormEngine 层。
 
-## Required Pattern
+## 必须采用的模式
 
-Copy the SDK into the project source tree, usually:
+将 SDK 复制到项目源码目录，通常是：
 
 - uni-app: `src/utils/microi.v8.js`
-- PC Vue 3 website: `src/utils/microi.v8.js`
-- Microi.Client extension page: reuse the existing platform request layer when present, otherwise import the SDK from a local utility module.
+- PC Vue 3 网站: `src/utils/microi.v8.js`
+- Microi.Client 扩展页面：如果已有平台请求层就复用；否则从本地工具模块引入 SDK。
 
-Create exactly one configured instance in the project request module:
+在项目请求模块里只创建一个已配置实例：
 
 ```js
 import { createMicroiV8 } from './microi.v8.js';
@@ -37,7 +37,7 @@ export const V8 = createMicroiV8({
 });
 ```
 
-Mount it in Vue 3 bootstrap:
+在 Vue 3 启动入口挂载：
 
 ```js
 import { V8 } from './utils/request.js';
@@ -49,38 +49,38 @@ export function createApp() {
 }
 ```
 
-Pages and business API modules should import the configured instance or wrapper functions from the project request module, not from the canonical skill file directly.
+页面和业务接口模块应从项目请求模块导入已配置实例或薄封装函数，不要直接从标准 skill 文件导入。
 
-## What Must Use The SDK
+## 必须委托 SDK 的能力
 
-- `ApiEngine.Run`: direct `/apiengine/{key}` calls should use `V8.ApiEngine.Run(key, data)`.
-- Legacy `/api/ApiEngine/Run` calls should use `V8.ApiEngine.RunLegacy(key, data)` only for old systems that still require it.
-- FormEngine CRUD should use `V8.FormEngine.*` or thin project wrappers such as `formEngineGet`.
-- Upload should use `V8.uploadFile`.
-- Images, avatars, rich text images, QR codes, payment proofs, certificates, and private files should use `V8.assetUrl`, `V8.resolveFileUrl`, or `V8.resolveAvatarUrl`.
-- Token and user storage should use `V8.getToken`, `V8.setToken`, `V8.clearToken`, `V8.getUser`, and `V8.setUser`.
-- Safe area data should use `V8.getSafeArea` when JavaScript needs platform values; CSS should still use `env(safe-area-inset-*)`.
+- `ApiEngine.Run`：直接调用 `/apiengine/{key}` 时使用 `V8.ApiEngine.Run(key, data)`。
+- 旧版 `/api/ApiEngine/Run` 只有在老系统仍然需要时才使用 `V8.ApiEngine.RunLegacy(key, data)`。
+- FormEngine CRUD 使用 `V8.FormEngine.*`，或使用 `formEngineGet` 这类项目薄封装。
+- 上传使用 `V8.uploadFile`。
+- 图片、头像、富文本图片、二维码、付款凭证、证件和私有文件使用 `V8.assetUrl`、`V8.resolveFileUrl` 或 `V8.resolveAvatarUrl`。
+- Token 与用户缓存使用 `V8.getToken`、`V8.setToken`、`V8.clearToken`、`V8.getUser` 和 `V8.setUser`。
+- JavaScript 需要平台安全区数值时使用 `V8.getSafeArea`；CSS 仍使用 `env(safe-area-inset-*)`。
 
-## Upload Rules
+## 上传规则
 
-`V8.uploadFile` is the only allowed Microi frontend upload entry. The SDK implementation must:
+`V8.uploadFile` 是 Microi 前端唯一允许的上传入口。SDK 实现必须：
 
-- Use multipart upload headers. Never send `Content-Type: application/json` through `uni.uploadFile` or `fetch(FormData)`.
-- Send only one tenant header key: `OsClient`. Remove incoming `osclient` / `OsClient` duplicates before adding the configured tenant.
-- Send `OsClient` in `formData` and keep the endpoint query `?OsClient=tenant` when `appendOsClientQuery` is enabled.
-- Normalize upload `Path` centrally from `options.path`, `formData.Path`, or `formData.path`.
-- Keep mobile upload paths as safe relative paths such as `mall/pay-proof` or `mall/member/avatar`. Do not use `/mall/pay-proof`, full URLs, drive paths, `..`, `:`, `//`, or `~`.
-- Let thin project wrappers pass through all options with `{ ...options, path: options.path || defaultPath }`, so page-specific `headers`, `action`, `anonymous`, `file`, `formData`, and `silentError` are not lost.
-- In H5 pages, keep the real `File` object returned by `uni.chooseImage` (`tempFiles[0].file` when available). If H5 only returns `tempFiles[0]` or a `blob:` / `data:` temp path, pass that through too; do not discard it. Call `V8.uploadFile(..., { file, preferFetch:true })`. The SDK must recognize `File` / `Blob`, common nested fields such as `file` / `raw` / `blob` / `originFileObj`, and `blob:` / `data:` paths, then use `fetch + FormData` first and fall back between `uni.uploadFile` and fetch when possible.
-- Upload submit handlers must not use empty `catch` blocks. Show a toast with `body.Msg` / `error.message`, log the error for diagnostics, and always reset the uploading state in `finally`.
+- 使用 multipart 上传头。`uni.uploadFile` 或 `fetch(FormData)` 不得发送 `Content-Type: application/json`。
+- 租户请求头只发送一个键：`OsClient`。添加配置租户前，先移除传入的 `osclient` / `OsClient` 重复键。
+- `formData` 中发送 `OsClient`；开启 `appendOsClientQuery` 时保留接口查询参数 `?OsClient=tenant`。
+- 上传 `Path` 统一从 `options.path`、`formData.Path` 或 `formData.path` 归一化。
+- 移动端上传路径必须是安全相对路径，例如 `mall/pay-proof` 或 `mall/member/avatar`。不要使用 `/mall/pay-proof`、完整 URL、磁盘路径、`..`、`:`、`//` 或 `~`。
+- 项目薄封装要通过 `{ ...options, path: options.path || defaultPath }` 透传全部选项，避免丢失页面级 `headers`、`action`、`anonymous`、`file`、`formData` 和 `silentError`。
+- H5 页面要保留 `uni.chooseImage` 返回的真实 `File` 对象（可用时为 `tempFiles[0].file`）。如果 H5 只返回 `tempFiles[0]` 或 `blob:` / `data:` 临时路径，也要继续传入，不要丢弃。调用 `V8.uploadFile(..., { file, preferFetch:true })`。SDK 必须识别 `File` / `Blob`、`file` / `raw` / `blob` / `originFileObj` 等常见嵌套字段，以及 `blob:` / `data:` 路径，然后优先使用 `fetch + FormData`，必要时在 `uni.uploadFile` 与 fetch 之间回退。
+- 上传提交处理不得使用空 `catch`。要用 `body.Msg` / `error.message` 提示用户，记录错误便于诊断，并在 `finally` 中重置上传状态。
 
-When an upload suddenly reports `移动端文件上传路径不合法！`, first inspect the actual multipart form fields and headers. In Microi mobile/member-token flows, the backend validates `Path` before HDFS upload; a wrong `Content-Type` can make the backend fail to read form fields and surface as a path error.
+当上传突然报 `移动端文件上传路径不合法！` 时，先检查实际 multipart 表单字段和请求头。在 Microi 移动端/会员 Token 流程中，后端会在 HDFS 上传前校验 `Path`；错误的 `Content-Type` 会导致后端读不到表单字段，并表现为路径错误。
 
-## Project Wrapper Rule
+## 项目封装规则
 
-Keep business-facing function names stable. If an existing project exports `callEngine`, `formEngineGet`, `getImageUrl`, `parseImages`, or `uploadFile`, keep those exports and delegate internally to `V8`. This avoids broad page churn while still enforcing one SDK.
+面向业务页面的函数名要保持稳定。如果已有项目导出 `callEngine`、`formEngineGet`、`getImageUrl`、`parseImages` 或 `uploadFile`，保留这些导出，内部委托给 `V8`。这样既能统一 SDK，又能避免大面积改页面。
 
-Correct:
+正确写法：
 
 ```js
 export function callEngine(key, params = {}, options = {}) {
@@ -92,44 +92,44 @@ export function getImageUrl(value) {
 }
 ```
 
-Avoid:
+避免写法：
 
 ```js
 uni.request({ url: apiBase + '/apiengine/' + key, header: { Token: token } });
 ```
 
-## Vue 3 Only
+## 仅支持 Vue 3
 
-New Microi frontend work is Vue 3 only. Do not add Vue2, Vuex, `Vue.prototype`, or conditional Vue2/uni-app compilation into `microi.v8.js`. State management belongs to the project, usually Pinia or local composables; the SDK owns only platform access, request, auth, upload, asset URLs, and small utilities.
+新的 Microi 前端工作只支持 Vue 3。不要把 Vue2、Vuex、`Vue.prototype` 或 Vue2/uni-app 条件编译加入 `microi.v8.js`。状态管理属于项目本身，通常使用 Pinia 或本地组合函数；SDK 只负责平台访问、请求、鉴权、上传、资源 URL 和小工具。
 
-## UI Independence
+## 界面层独立
 
-The SDK must not import Element Plus, uni-ui, uView, TDesign, FirstUI, Pinia, Vue Router, or axios. UI feedback is provided through configurable adapters:
+SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue Router 或 axios。界面反馈通过可配置适配器提供：
 
 - `toast(message)`
 - `confirm(message)`
 - `onAuthExpired(body, V8)`
 - optional `requestAdapter(options)`
 
-This keeps the same SDK usable in uni-app, PC websites, admin extensions, and docs demos.
+这样同一个 SDK 才能同时用于 uni-app、PC 网站、后台扩展页面和文档演示。
 
-## Verification
+## 验证
 
-After changing a project to use the SDK:
+将项目改为使用 SDK 后：
 
-- Run the relevant build or type check.
-- Test at least one authenticated ApiEngine call and one anonymous call.
-- Test one image or upload JSON field through `assetUrl`.
-- Test token expiry behavior if the task touched auth.
-- For uni-app H5, verify the SDK works in both mobile viewport and PC browser mobile shell.
+- 运行相关构建或类型检查。
+- 至少测试一次需要登录的 ApiEngine 调用和一次匿名调用。
+- 用 `assetUrl` 测试一个图片或上传 JSON 字段。
+- 如果任务涉及鉴权，测试 Token 过期行为。
+- 对 uni-app H5，同时验证移动视口和 PC 浏览器手机壳下 SDK 正常工作。
 
-## Pair With MCI-UI
+## 搭配 MCI-UI
 
-The SDK handles platform capability; MCI-UI handles product interface. New Microi Vue3 projects should combine both:
+SDK 负责平台能力，MCI-UI 负责产品界面。新的 Microi Vue3 项目应同时使用：
 
-- `microi.skills/microi.v8.js` for request, token, upload, file URL, ApiEngine/FormEngine.
-- `Microi.UI/src/theme` for `--mci-*` design tokens.
-- `Microi.UI/src/uniapp` for mobile/UniApp components.
-- `Microi.UI/src/web` for PC official sites and responsive websites.
+- `microi.skills/microi.v8.js`：请求、Token、上传、文件 URL、ApiEngine/FormEngine。
+- `Microi.UI/src/theme`：`--mci-*` 设计变量。
+- `Microi.UI/src/uniapp`：移动端/UniApp 组件。
+- `Microi.UI/src/web`：PC 官网和响应式网站组件。
 
-Do not solve UI state, skeleton loading, rich text spacing, or safe-area layout inside the SDK. Use MCI-UI components for that layer.
+不要在 SDK 内解决界面状态、骨架屏、富文本间距或安全区布局。这一层应使用 MCI-UI 组件处理。

@@ -1,6 +1,6 @@
 ---
 name: v8-template-engine
-description: Microi V8 template engine guidance. Use when writing table/form template rendering, V8.Result HTML/text output, row formatting, badges, images, and custom display logic.
+description: Microi V8 模板引擎指南。用于编写表格/表单模板渲染、V8.Result HTML/text 输出、行格式化、徽章、图片和自定义显示逻辑。
 ---
 
 # Microi V8 模板引擎（表格/表单 V8 模板）

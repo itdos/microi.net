@@ -1,6 +1,6 @@
 ---
 name: v8-cache-pattern
-description: Microi V8 Redis cache patterns. Use when reading or writing V8.Cache keys, tenant cache naming, TTL strategy, invalidation, HashSet/HashGet, and anti-stale data patterns.
+description: Microi V8 Redis 缓存模式。用于读写 V8.Cache 键、租户缓存命名、TTL 策略、失效处理、HashSet/HashGet 和防陈旧数据模式。
 ---
 
 # Microi V8 Redis 缓存模式

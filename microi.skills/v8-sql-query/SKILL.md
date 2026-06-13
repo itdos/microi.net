@@ -1,6 +1,6 @@
 ---
 name: v8-sql-query
-description: Microi V8 safe SQL query guidance. Use when choosing V8.FormEngine _Where or V8.Db.FromSql, parameterizing queries, joins, aggregates, and avoiding SQL injection.
+description: Microi V8 安全 SQL 查询指南。用于选择 V8.FormEngine _Where 或 V8.Db.FromSql，处理参数化查询、联表、聚合并避免 SQL 注入。
 ---
 
 # Microi V8 安全 SQL 查询
