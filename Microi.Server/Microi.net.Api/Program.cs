@@ -74,6 +74,10 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 //USE LINUX【发布到Linux使用以下代码】
 builder.WebHost.UseKestrel((host, options) =>
 {
+    // Long-running V8/API engine requests should not be aborted by Kestrel while business logic is still executing.
+    // Kestrel has no request-processing timeout by default; disable data-rate timeouts for slow request/response streams.
+    options.Limits.MinRequestBodyDataRate = null;
+    options.Limits.MinResponseDataRate = null;
     options.Limits.MaxRequestLineSize = int.MaxValue;//HTTP 请求行的最大允许大小。 默认为 8kb
     options.Limits.MaxRequestBufferSize = int.MaxValue;//请求缓冲区的最大大小。 默认为 1M
     options.Limits.MaxRequestBodySize = long.MaxValue;//任何请求正文的最大允许大小（以字节为单位）,默认 30,000,000 字节，大约为 28.6MB
