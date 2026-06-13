@@ -22,7 +22,9 @@ namespace Microi.net
         private static readonly RestClient _sharedClient = new RestClient(new RestClientOptions
         {
             ThrowOnAnyError = false,
-            MaxTimeout = 300000 // 5分钟默认超时
+            // Respect per-request V8.Http Timeout values; RestSharp uses the lower value between
+            // RestClientOptions.MaxTimeout and RestRequest.Timeout.
+            MaxTimeout = int.MaxValue
         });
 
         #region 2026-05-01 SSRF 防护
