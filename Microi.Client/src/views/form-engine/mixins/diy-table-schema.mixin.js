@@ -636,8 +636,7 @@ export default {
             result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
             self.HandlerBtns(result.Data.PageTabs);
             self.HandlerBtns(result.Data.BatchSelectMoreBtns);
-            // 🔥 始终开启复选框列，支持拖选批量功能；批量操作按钮仍由 BatchSelectMoreBtns.length > 0 控制
-            self.TableEnableBatch = true;
+            self.TableEnableBatch = self.HasBatchSelectMoreBtns(result.Data) || self.EnableMultipleSelect === true;
             self.HandlerBtns(result.Data.ExportMoreBtns);
             // result.Data.PageBtns.forEach(element => {
             // });

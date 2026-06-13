@@ -65,7 +65,7 @@ export default {
             if (this.IsOpenTableSingleSelect()) {
                 return !!(model && this.TableSelectedRow && this.TableSelectedRow.Id === model.Id);
             }
-            return this.TableEnableBatch && this.isCardSelected(model);
+            return this.CanUseTableSelection() && this.isCardSelected(model);
         },
         selectOpenTableSingleRow(row) {
             var self = this;
@@ -95,8 +95,9 @@ export default {
             self.TableMultipleSelection = val;
             self.EmitOpenTableSelectionChange(OldTableMultipleSelection, "Y");
         },
-        HasBatchSelectMoreBtns() {
-            var buttons = this.SysMenuModel && this.SysMenuModel.BatchSelectMoreBtns;
+        HasBatchSelectMoreBtns(sysMenuModel) {
+            var menu = sysMenuModel || this.SysMenuModel;
+            var buttons = menu && menu.BatchSelectMoreBtns;
             if (!buttons) return false;
             if (Array.isArray(buttons)) return buttons.length > 0;
             if (typeof buttons === 'string') {
@@ -109,8 +110,11 @@ export default {
             }
             return false;
         },
+        CanUseTableSelection() {
+            return this.TableEnableBatch === true && (this.HasBatchSelectMoreBtns() || this.EnableMultipleSelect === true);
+        },
         CanBatchDragSelection() {
-            return this.TableDisplayMode === 'Table' && this.TableEnableBatch === true;
+            return this.TableDisplayMode === 'Table' && this.CanUseTableSelection();
         },
         IsRowSelected(row) {
             if (!row || !row.Id) return false;
@@ -140,13 +144,28 @@ export default {
         //  - 'index'：序号那一列（type=index，附加 class-name=diy-batch-drag-zone）
         //  - 'blank'：表格空白处（表体内但不落在任何数据单元格上）
         // 返回 null 表示落在数据单元格 → 不启用拖动，放行原生文本选择。
-        GetBatchDragStartZone(target) {
+        IsBatchDragScrollbarTarget(target, bodyWrapper, event) {
+            if (!target || !target.closest) return false;
+            if (target.closest('.el-scrollbar__bar, .el-scrollbar__thumb')) return true;
+            if (!bodyWrapper || !event || !bodyWrapper.getBoundingClientRect) return false;
+            var rect = bodyWrapper.getBoundingClientRect();
+            var x = event.clientX || 0;
+            var y = event.clientY || 0;
+            var scrollbarSize = 18;
+            var hasHorizontal = bodyWrapper.scrollWidth > bodyWrapper.clientWidth + 1;
+            var hasVertical = bodyWrapper.scrollHeight > bodyWrapper.clientHeight + 1;
+            if (hasHorizontal && y >= rect.bottom - scrollbarSize && y <= rect.bottom && x >= rect.left && x <= rect.right) return true;
+            if (hasVertical && x >= rect.right - scrollbarSize && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+            return false;
+        },
+        GetBatchDragStartZone(target, event) {
             if (!target || !target.closest) return null;
             var tableEl = document.getElementById('diy-table-' + this.TableId);
             if (tableEl && !tableEl.contains(target)) return null;
             // 必须在表体区域内（排除表头、分页、工具栏）
             var bodyWrapper = target.closest('.el-table__body-wrapper');
             if (!bodyWrapper || (tableEl && !tableEl.contains(bodyWrapper))) return null;
+            if (this.IsBatchDragScrollbarTarget(target, bodyWrapper, event)) return null;
             // 复选框列 / 序号列（标记了 diy-batch-drag-zone，或原生 selection 列类名）
             if (target.closest('td.diy-batch-drag-zone') || target.closest('td.el-table-column--selection')) {
                 return 'zone';
@@ -271,7 +290,7 @@ export default {
             var self = this;
             if (!self.CanBatchDragSelection() || !event || event.button !== 0 || !event.target || !event.target.closest) return;
             // 🔥 只允许在复选框列、序号列或表格空白处发起拖动批量选择；数据单元格放行文本选择。
-            var zone = self.GetBatchDragStartZone(event.target);
+            var zone = self.GetBatchDragStartZone(event.target, event);
             if (!zone) return;
             var row = zone === 'blank' ? null : self.GetBatchDragRowByElement(event.target);
             self._batchDragPending = true;

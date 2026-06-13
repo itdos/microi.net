@@ -35,6 +35,17 @@ namespace Microi.net.Api
             return Encoding.UTF8.GetString(Convert.FromBase64String(codeBase64));
         }
 
+        private static int IntOrDefault(JObject param, string name, int defaultValue)
+        {
+            var token = param?[name];
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return defaultValue;
+            var raw = token.ToString();
+            if (string.IsNullOrWhiteSpace(raw)) return defaultValue;
+            if (int.TryParse(raw, out var value)) return value;
+            if (token.Type == JTokenType.Boolean) return token.Val<bool>() ? 1 : 0;
+            return defaultValue;
+        }
+
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
         {
@@ -401,7 +412,7 @@ namespace Microi.net.Api
             var result = await V8McpLogic.AddField(
                 osClient, tableId, name, label,
                 param["Type"].Val<string>(), param["Component"].Val<string>(),
-                param["Visible"]?.Val<int>() ?? 1, param["AppVisible"]?.Val<int>() ?? 1,
+                IntOrDefault(param, "Visible", 1), IntOrDefault(param, "AppVisible", 1),
                 param["Tab"].Val<string>(), param["TableWidth"]?.Val<int>() ?? 120,
                 param["Sort"]?.Val<int>() ?? 100, param["NameConfirm"]?.Val<int>() ?? 0,
                 param["Readonly"]?.Val<int>() ?? 0,
@@ -425,7 +436,7 @@ namespace Microi.net.Api
                 osClient, name,
                 param["DiyTableId"].Val<string>(),
                 param["ComponentName"].Val<string>(), param["ComponentPath"].Val<string>(),
-                param["Display"]?.Val<int>() ?? 1, param["AppDisplay"]?.Val<int>() ?? 1,
+                IntOrDefault(param, "Display", 1), IntOrDefault(param, "AppDisplay", 1),
                 param["OpenType"].Val<string>(), param["Url"].Val<string>(),
                 param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100,
                 param["Icon"].Val<string>(), param["SearchFieldIds"].Val<string>(),

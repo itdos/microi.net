@@ -1131,7 +1131,7 @@ LoadFabPosition() {
             if (self.PropsTableType === 'OpenTable') {
                 if (self.IsOpenTableSingleSelect()) {
                     self.selectOpenTableSingleRow(item);
-                } else if (self.TableEnableBatch) {
+                } else if (self.CanUseTableSelection()) {
                     self.toggleCardSelection(item);
                 }
                 return;
