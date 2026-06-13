@@ -1,6 +1,6 @@
 ---
 name: v8-workflow
-description: Microi V8 workflow event guidance. Use when writing approval flow conditions, node V8 code, wf_flowdesign/wf_node/wf_line logic, V8.WF variables, and workflow routing.
+description: Microi V8 工作流事件指南。用于编写审批流条件、节点 V8 代码、wf_flowdesign/wf_node/wf_line 逻辑、V8.WF 变量和工作流路由。
 ---
 
 # Microi V8 工作流事件开发
@@ -15,11 +15,11 @@ description: Microi V8 workflow event guidance. Use when writing approval flow c
 
 ```javascript
 /*
- * V8 Workflow
- * WorkflowKey: your_workflow_key
+ * V8 工作流
+ * WorkflowKey: 示例流程Key
  * EventType: WFNodeLine/WFNodeStart/WFNodeEnd
  * Version: v1.0.0
- * Function:
+ * 功能说明：
  * - 完整说明该工作流 V8 控制的节点动作、路线条件、审批变量和副作用。
  */
 ```

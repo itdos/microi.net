@@ -1,6 +1,6 @@
 ---
 name: v8-mongodb
-description: Microi V8 MongoDB guidance. Use when using V8.MongoDb AddFormData, UptFormData, DelFormData, GetFormData, GetTableData, object filters, and document IDs.
+description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb AddFormData、UptFormData、DelFormData、GetFormData、GetTableData、对象过滤和文档 Id。
 ---
 
 # Microi V8 MongoDB 操作

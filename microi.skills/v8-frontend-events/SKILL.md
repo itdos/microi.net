@@ -1,6 +1,6 @@
 ---
 name: v8-frontend-events
-description: Microi frontend V8 event guidance. Use when writing browser-side field events, buttons, list events, V8.EventName, V8.Form, dynamic visibility, validation, and UI interactions.
+description: Microi 前端 V8 事件指南。用于编写浏览器端字段事件、按钮、列表事件、V8.EventName、V8.Form、动态显隐、校验和界面交互。
 ---
 
 # Microi V8 前端事件大全

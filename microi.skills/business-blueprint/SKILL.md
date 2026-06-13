@@ -1,13 +1,13 @@
 ---
 name: business-blueprint
-description: Microi 业务架构蓝图（System Blueprint）— design-time 系统知识图谱，AI 生成低代码系统时防幻觉的唯一事实源
+description: Microi 业务架构蓝图（System Blueprint）— 设计期系统知识图谱，AI 生成低代码系统时防幻觉的唯一事实源
 ---
 
 # Microi 业务架构蓝图（System Blueprint）
 
 ## 这是什么
 
-业务架构蓝图是 Microi 吾码的 **design-time 系统总图**，不是 n8n / Dify / ComfyUI 那种 runtime 工作流。它一次同时承担三个职责：
+业务架构蓝图是 Microi 吾码的 **设计期系统总图**，不是 n8n / Dify / ComfyUI 那种运行时工作流。它一次同时承担三个职责：
 
 1. **可视化总图** — 用户在前端 X6 画布拖拽节点，完整描述一个业务系统的组成
 2. **AI 事实源** — AI 生成代码、表、接口引擎、菜单前必读的"宪法"，防止幻觉
@@ -129,7 +129,7 @@ description: Microi 业务架构蓝图（System Blueprint）— design-time 系�
 
 ## 不要做的事
 
-- ❌ 不要把蓝图当成 runtime 执行器（它不会自动跑接口、不会调度任务）
+- ❌ 不要把蓝图当成运行时执行器（它不会自动跑接口、不会调度任务）
 - ❌ 不要在审批工作流（jsPlumb / wf_flowdesign）里用蓝图替代 — 两者并存，蓝图是设计图，工作流是执行图
 - ❌ 不要跳过 `microi_get_blueprint` 直接生成代码 — 会产生幻觉（编造字段名、引用不存在的引擎）
 - ❌ 写入 BlueprintData 必须是合法 JSON 字符串（后端会用 JObject.Parse 校验）

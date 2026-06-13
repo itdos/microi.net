@@ -1,6 +1,6 @@
 ---
 name: production-readonly-audit
-description: Microi 正式环境只读业务巡检规范。Use when checking production business data such as members, balances, orders, stock cards, rewards, points, redeem money, logs, and settlement correctness without changing live data.
+description: Microi 正式环境只读业务巡检规范。用于在不改动线上数据的前提下，检查会员、余额、订单、库存卡、奖励、积分、兑换金额、日志和结算正确性等生产业务数据。
 ---
 
 # Microi 正式环境只读业务巡检

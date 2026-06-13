@@ -1,12 +1,16 @@
 /*
- * Microi V8 Frontend SDK
- * Vue 3 first, zero required UI/store dependency.
- * Works in uni-app, H5, normal Vue 3 websites, and PC admin extensions.
+ * Microi V8 前端标准开发包。
+ * 面向 Vue 3 与 uni-app 项目，不强依赖固定的界面库或状态管理方案。
+ * 统一封装吾码接口引擎、表单引擎、文件服务、登录态与旧版 V8 前端接口。
  */
 
+// 默认把这些状态码视为登录态失效，便于各端统一跳转或清理缓存。
 const DEFAULT_AUTH_CODES = [401, -1, 1001, 1002];
+
+// 禁用常见占位图和外部二维码资源，避免前端误把临时素材带到正式项目。
 const DEFAULT_BLOCKED_ASSET = /(qrserver\.com|create-qr-code|picsum\.photos|placehold\.co|placeholder\.com|dummyimage\.com)/i;
 
+// 兼容浏览器、uni-app、小程序运行时以及测试环境中的全局对象读取。
 function getGlobalValue(key) {
   try {
     if (typeof globalThis !== 'undefined' && globalThis[key] !== undefined) return globalThis[key];
@@ -23,6 +27,7 @@ function hasWindow() {
   return typeof window !== 'undefined' && !!window;
 }
 
+// 下面这些方法只做路径与查询参数拼装，不参与业务语义判断。
 function normalizeBase(url) {
   return String(url || '').replace(/\/+$/, '');
 }
@@ -67,6 +72,7 @@ function parseMaybeJson(value, fallback = {}) {
   }
 }
 
+// 没有 uni 或浏览器缓存时退回内存缓存，保证单元测试和服务端渲染不会崩溃。
 function createMemoryStorage() {
   const cache = new Map();
   return {
@@ -142,6 +148,7 @@ function deserializeUser(value) {
   return parseMaybeJson(value, null);
 }
 
+// 吾码文件字段可能来自上传控件、HDFS 接口、字符串或 JSON 字符串，这里统一抽取可用路径。
 function extractUploadPath(value) {
   if (!value) return '';
   if (typeof value === 'object') {
@@ -187,14 +194,14 @@ function normalizeUploadData(body) {
 
 function normalizeClientUploadPath(value) {
   let path = String(value || 'upload').trim().replace(/\\/g, '/');
-  if (/^(https?:|data:|blob:|file:)/i.test(path)) throw new Error('Invalid upload path.');
+  if (/^(https?:|data:|blob:|file:)/i.test(path)) throw new Error('上传路径不合法。');
   path = path.replace(/^\/+/, '').replace(/\/+$/, '').replace(/\/{2,}/g, '/');
   if (!path || path.startsWith('~') || path.includes('..') || path.includes(':')) {
-    throw new Error('Invalid upload path.');
+    throw new Error('上传路径不合法。');
   }
   const parts = path.split('/').filter(Boolean);
   if (!parts.length || parts.some((item) => item === '.' || item === '..')) {
-    throw new Error('Invalid upload path.');
+    throw new Error('上传路径不合法。');
   }
   return parts.join('/');
 }
@@ -221,6 +228,7 @@ function normalizeBearer(value) {
   return /^Bearer\s+/i.test(text) ? text.replace(/^Bearer\s+/i, '') : text;
 }
 
+// 兼容浏览器上传对象、组件包装对象和 uni-app 临时文件路径。
 function isUploadFileLike(value) {
   if (!value) return false;
   if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
@@ -287,6 +295,7 @@ async function resolveFetchUploadFile(filePath, options = {}) {
   return { file: null, name };
 }
 
+// 控制接口并发，适合列表页批量请求时给后端和小程序运行时减压。
 function createQueue(maxConcurrent) {
   const limit = Number(maxConcurrent || 0);
   if (!limit || limit <= 0) {
@@ -350,6 +359,7 @@ function defaultConfirm(message) {
   return Promise.resolve(true);
 }
 
+// fetch 的超时需要 AbortController；不支持时由运行时自身处理。
 function createFetchTimeout(timeout) {
   if (typeof AbortController === 'undefined') return {};
   const controller = new AbortController();
@@ -379,6 +389,7 @@ function getSafeArea() {
   return { top: 0, bottom: 0, left: 0, right: 0, statusBarHeight: 0, windowHeight: 0, windowWidth: 0, platform: '' };
 }
 
+// 常用日期、数字与显示格式化，兼容旧版前端 V8 写法。
 function formatDate(value, format = 'yyyy-MM-dd HH:mm:ss') {
   const date = value instanceof Date ? value : new Date(value || Date.now());
   if (Number.isNaN(date.getTime())) return '';
@@ -470,6 +481,7 @@ function diffTime(value, unit, value2) {
   return map[unit];
 }
 
+// 老项目里常用 Date.prototype.Format/AddTime/DiffTime，这里只在缺失时补齐。
 function installDatePrototypeCompat() {
   if (typeof Date === 'undefined' || !Date.prototype) return;
   if (typeof Date.prototype.Format !== 'function') {
@@ -502,6 +514,7 @@ function installDatePrototypeCompat() {
 }
 
 export function createMicroiV8(options = {}) {
+  // 运行时配置可通过 createMicroiV8(options) 或 client.configure(next) 覆盖。
   let config = {
     apiBase: '',
     webBase: '',
@@ -527,6 +540,7 @@ export function createMicroiV8(options = {}) {
   const storage = options.storage || createDefaultStorage();
   let runQueued = createQueue(config.maxConcurrent);
 
+  // 更新配置后立即刷新并发队列，保证 maxConcurrent 热更新生效。
   function configure(next = {}) {
     config = { ...config, ...next };
     if (Object.prototype.hasOwnProperty.call(next, 'maxConcurrent')) {
@@ -595,6 +609,7 @@ export function createMicroiV8(options = {}) {
     }
   }
 
+  // 所有相对地址默认走 apiBase，必要时自动追加 OsClient。
   function buildUrl(url) {
     let fullUrl = /^(https?:|data:|blob:|file:)/i.test(String(url || '')) ? String(url) : joinUrl(config.apiBase, url);
     if (config.appendOsClientQuery && config.osClient && fullUrl.indexOf('/apiengine/') < 0) {
@@ -603,6 +618,7 @@ export function createMicroiV8(options = {}) {
     return fullUrl;
   }
 
+  // 普通请求统一携带 OsClient、Token 与 Authorization，减少各项目重复拼装。
   function buildHeaders(options = {}) {
     const token = options.auth === false ? '' : getToken();
     const headers = {
@@ -632,6 +648,7 @@ export function createMicroiV8(options = {}) {
     return headers;
   }
 
+  // 请求核心：优先走自定义适配器，其次 uni.request，最后回退 fetch。
   async function request(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
@@ -679,7 +696,7 @@ export function createMicroiV8(options = {}) {
             if (typeof timer.cleanup === 'function') timer.cleanup();
           }
         } else {
-          throw new Error('No request adapter found for MicroiV8.');
+          throw new Error('未找到 MicroiV8 请求适配器。');
         }
       }
 
@@ -691,11 +708,11 @@ export function createMicroiV8(options = {}) {
       if (options.auth !== false && isAuthExpired(body, statusCode)) {
         handleAuthExpired(body);
         if (options.silentError !== true) toast((body && body.Msg) || '登录已过期');
-        throw body || new Error('Login expired');
+        throw body || new Error('登录已过期');
       }
 
       if (statusCode >= 400) {
-        const error = body || new Error(`Request failed: ${statusCode}`);
+        const error = body || new Error(`请求失败: ${statusCode}`);
         if (options.silentError !== true) toast((body && body.Msg) || `请求失败: ${statusCode}`);
         throw error;
       }
@@ -719,6 +736,7 @@ export function createMicroiV8(options = {}) {
     return request({ ...options, url, data, method: 'POST' });
   }
 
+  // 资源地址统一过滤占位图，并兼容 HDFS 私有文件、FileServer 和绝对地址。
   function assetUrl(value) {
     const picked = extractUploadPath(value);
     if (!picked || isBlockedAsset(picked)) return '';
@@ -751,6 +769,7 @@ export function createMicroiV8(options = {}) {
     return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || assetUrl(path);
   }
 
+  // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
   async function uploadFile(filePath, options = {}) {
     const runtimeUni = getUni();
     const action = options.action || (options.anonymous ? 'UniappUploadAnonymous' : 'UniappUpload');
@@ -772,7 +791,7 @@ export function createMicroiV8(options = {}) {
     const uploadByFetch = async () => {
       const picked = await resolveFetchUploadFile(filePath, options);
       const file = picked.file;
-      if (!file) throw new Error('No file provided for upload.');
+      if (!file) throw new Error('未提供上传文件。');
       const formData = new FormData();
       Object.keys(uploadData).forEach((key) => formData.append(key, uploadData[key]));
       formData.append(options.name || 'file', file, picked.name || (file && file.name) || 'file');
@@ -813,13 +832,13 @@ export function createMicroiV8(options = {}) {
       } else if (canFetchUpload) {
         body = await uploadByFetch();
       } else {
-        throw new Error('No upload adapter found for MicroiV8.');
+        throw new Error('未找到 MicroiV8 上传适配器。');
       }
     }
 
     if (!body || body.Code !== 1) {
       if (options.silentError !== true) toast((body && body.Msg) || '上传失败');
-      throw body || new Error('Upload failed');
+      throw body || new Error('上传失败');
     }
 
     const data = normalizeUploadData(body);
@@ -869,6 +888,7 @@ export function createMicroiV8(options = {}) {
     return promise;
   }
 
+  // 兼容旧版 FormEngine 调用：既支持 (table, row, callback)，也支持完整参数对象。
   function normalizeLegacyFormArgs(first, second, third, rowModelMode = false) {
     let data = {};
     let callback = third;
@@ -1152,6 +1172,7 @@ export function createMicroiV8(options = {}) {
     return client;
   }
 
+  // 现代接口：新项目优先使用这些小写方法和命名空间。
   const client = {
     get config() {
       return config;
@@ -1204,6 +1225,7 @@ export function createMicroiV8(options = {}) {
     }
   };
 
+  // 旧版前端 V8 依赖的后端接口路径，保留原名称以减少迁移成本。
   const legacyApi = {
     MicroiInit: '/apiengine/microi-init',
     GetSysConfig: '/api/DiyTable/getSysConfig',
@@ -1237,6 +1259,7 @@ export function createMicroiV8(options = {}) {
     ApiEngine: {}
   };
 
+  // 旧版接口：尽量保持历史项目里的调用名、字段名和回调形态。
   Object.assign(client, {
     Store: null,
     IDE: getUni() ? 'UniApp' : 'PCVue3',
@@ -1340,7 +1363,7 @@ export function createMicroiV8(options = {}) {
     },
     RefreshToken: async function refreshToken(callback) {
       const token = legacyGetToken();
-      if (!token) return { Code: 0, Msg: 'Token is empty.' };
+      if (!token) return { Code: 0, Msg: 'Token 为空。' };
       const result = await legacyPost(legacyApi.RefreshToken, { authorization: token });
       if (result && result.Code) legacySetCurrentUser(result.Data || {});
       if (typeof callback === 'function') callback(result);
@@ -1441,6 +1464,7 @@ export function createMicroiV8(options = {}) {
     }
   });
 
+  // 这些属性在旧项目中常被直接赋值，因此保留取值器和赋值器同步到 config。
   Object.defineProperties(client, {
     ApiBase: {
       get: () => config.apiBase,
@@ -1456,6 +1480,7 @@ export function createMicroiV8(options = {}) {
     }
   });
 
+  // 新旧两套接口引擎调用方式并存：字符串 key 走新路由，对象参数兼容旧路由。
   Object.assign(client.ApiEngine, {
     Run(urlOrKey, dataOrCallback, callback) {
       if (typeof urlOrKey === 'string') {
@@ -1472,6 +1497,7 @@ export function createMicroiV8(options = {}) {
     RunLegacy: apiEngineRunLegacy
   });
 
+  // 模块引擎和表单引擎沿用旧版命名，内部统一走 legacyPost。
   client.ModuleEngine = {
     Run(moduleKeyOrParam, dataOrCallback, callback) {
       const data = typeof moduleKeyOrParam === 'string'

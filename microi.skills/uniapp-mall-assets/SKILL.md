@@ -1,6 +1,6 @@
 ---
 name: uniapp-mall-assets
-description: 数字经济商城 uni-app H5（mci.lsg.uniapp）资源/图片路径与 FileServer 前缀强制规范。Use when rendering MainImg, Avatar, BannerImg, CardImage, MainImage, Cover or any user-uploaded asset path in uni-app `<image :src>` or PC mall pages.
+description: 数字经济商城 uni-app H5（mci.lsg.uniapp）资源/图片路径与 FileServer 前缀强制规范。用于在 uni-app `<image :src>` 或 PC 商城页面渲染 MainImg、Avatar、BannerImg、CardImage、MainImage、Cover 或任何用户上传资源路径。
 ---
 
 # 商城前端：图片 / 资源路径规范

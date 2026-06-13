@@ -1,6 +1,6 @@
 ---
 name: v8-explorer-tree
-description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 / 字段V8事件 / 模块引擎按钮）。覆盖 diy_table V8 事件、diy_field V8 事件、sys_menu 按钮 JSON 拆分回写，含 7 条安全不变量。Use when implementing the VSCode tree provider for V8 events, refactoring directory layout, or handling sys_menu button JSON serialization.
+description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 / 字段V8事件 / 模块引擎按钮）。覆盖 diy_table V8 事件、diy_field V8 事件、sys_menu 按钮 JSON 拆分回写，含 7 条安全不变量。用于实现 VSCode V8 事件树、重构目录布局或处理 sys_menu 按钮 JSON 序列化。
 ---
 
 # v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）

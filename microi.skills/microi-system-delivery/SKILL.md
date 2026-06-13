@@ -1,6 +1,6 @@
 ---
 name: microi-system-delivery
-description: Microi 吾码从自然语言交付完整系统的总控规范。Use when designing, generating, upgrading, testing, syncing, or delivering a complete Microi system through MCP, VS Code extension, V8 engines, low-code metadata, UniApp/H5, PC admin, and Playwright E2E.
+description: Microi 吾码从自然语言交付完整系统的总控规范。用于通过 MCP、VS Code 插件、V8 引擎、低代码元数据、UniApp/H5、PC 后台和 Playwright E2E 设计、生成、升级、测试、同步或交付完整 Microi 系统。
 ---
 
 # Microi 全系统交付复盘与总控规范

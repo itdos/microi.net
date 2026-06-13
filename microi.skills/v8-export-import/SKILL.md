@@ -1,6 +1,6 @@
 ---
 name: v8-export-import
-description: Microi V8 Excel import/export guidance. Use when using V8.Office.ExportExcel, ExcelToList, custom headers, image export, file response, and batch data import validation.
+description: Microi V8 Excel 导入导出指南。用于使用 V8.Office.ExportExcel、ExcelToList、自定义表头、图片导出、文件响应和批量数据导入校验。
 ---
 
 # Microi V8 Excel 导入导出

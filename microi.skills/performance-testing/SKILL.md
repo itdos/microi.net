@@ -1,6 +1,6 @@
 ---
 name: performance-testing
-description: Microi 高并发、性能压力测试规范。Use when load testing ApiEngine, V8 events, FormEngine CRUD, VS Code plugin performance tab, stress/spike/soak tests, reports, concurrency, throughput, latency percentiles, and bottleneck diagnosis.
+description: Microi 高并发、性能压力测试规范。用于对 ApiEngine、V8 事件、FormEngine CRUD、VS Code 插件性能页、压力/尖峰/长稳测试、报告、并发、吞吐、延迟分位和瓶颈诊断做压测。
 ---
 
 # Microi 高并发性能压力测试

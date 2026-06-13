@@ -1,6 +1,6 @@
 ---
 name: microi-client-frontend
-description: Microi.Client source architecture guide. Use when modifying Microi.Client Vue frontend code, especially form-engine, diy-table, diy-form-full, workflow panels, sys_menu buttons, frontend V8 events, or routing/page/dialog/drawer behavior.
+description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由以及页面/弹窗/抽屉行为。
 ---
 
 # Microi.Client 前台源码架构说明
@@ -189,7 +189,7 @@ Page 模式要特别注意：
 
 通用规则：
 
-- 本地值只表示用户显式选择；系统默认值应在 computed/runtime fallback 中读取。
+- 本地值只表示用户显式选择；系统默认值应在计算属性/运行时兜底中读取。
 - 对历史默认值（如 `#409eff`）要在 persisted-state `afterHydrate` 中归一化为空，避免旧默认被误判为用户手动选择。
 - 主题色相关组件、图标、导航、移动端个人中心都要使用同一条 fallback：用户手动值 > `SysConfig.ThemeColor` > 平台默认值。
 
@@ -206,7 +206,7 @@ Page 模式要特别注意：
   - `V8CodeShow: return true;` 是否显示。
   - `V8CodeShow: V8.Result = false;` 是否仍兼容。
 
-## Microi Frontend SDK 约束
+## Microi 前端 SDK 约束
 
 当修改 `Microi.Client` 之外的 Vue3 前端、PC 官网、移动 H5 或定制微前端页面时，必须优先读取 `microi.skills/microi-frontend-sdk/SKILL.md` 并使用 `microi.skills/microi.v8.js`。`Microi.Client` 主后台已有平台请求与 Pinia 体系时，可以复用现有平台能力；但新增独立页面、外部站点、插件页、嵌入式页面不得再复制旧 Vue2/Vuex 版 `microi.v8.js`。
 
