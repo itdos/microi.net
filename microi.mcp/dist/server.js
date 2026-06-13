@@ -1116,7 +1116,7 @@ export function createMcpServer(client, context) {
             const result = await client.addField({
                 TableId: tableId, Name: name, Label: label,
                 Type: normalizedType, Component: component,
-                Visible: visible, AppVisible: appVisible,
+                Visible: visible ?? 1, AppVisible: appVisible ?? 1,
                 Tab: tab, TableWidth: tableWidth, Sort: sort ?? nextSortFor(tableId),
                 Readonly: readonlyVal,
                 NotEmpty: notEmpty, Unique: unique,
@@ -1420,7 +1420,7 @@ export function createMcpServer(client, context) {
             const result = await client.createModule({
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
                 ComponentName: componentName, ComponentPath: componentPath,
-                Display: display, AppDisplay: appDisplay,
+                Display: display ?? 1, AppDisplay: appDisplay ?? 1,
                 OpenType: openType, Url: url, Sort: sort,
                 Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
                 DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere, DiyConfig: diyConfig,

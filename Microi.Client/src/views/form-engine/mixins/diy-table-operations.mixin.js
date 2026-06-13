@@ -56,6 +56,10 @@ export default {
         },
         SwitchTableBatch() {
             var self = this;
+            if (!self.HasBatchSelectMoreBtns() && self.EnableMultipleSelect !== true) {
+                self.TableEnableBatch = false;
+                return;
+            }
             self.TableEnableBatch = !self.TableEnableBatch;
         },
         InitSearch() {

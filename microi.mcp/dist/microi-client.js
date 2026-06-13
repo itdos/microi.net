@@ -497,6 +497,8 @@ export class MicroiClient {
         return this.post(API.ADD_FIELD, {
             OsClient: this.config.osClient,
             ...data,
+            Visible: data.Visible ?? 1,
+            AppVisible: data.AppVisible ?? 1,
         });
     }
     async updateField(patch) {
@@ -535,6 +537,8 @@ export class MicroiClient {
         return this.post(API.CREATE_MODULE, {
             OsClient: this.config.osClient,
             ...data,
+            Display: data.Display ?? 1,
+            AppDisplay: data.AppDisplay ?? 1,
         });
     }
     async setRolePermission(roleId, menuIds) {
