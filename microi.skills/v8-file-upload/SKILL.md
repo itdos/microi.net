@@ -1,6 +1,6 @@
 ---
 name: v8-file-upload
-description: Microi V8 file upload and download guidance. Use when handling V8.FilesByteBase64, V8.Method.Upload, private file URLs, file responses, HDFS, OSS, MinIO, and S3 storage.
+description: Microi V8 文件上传下载指南。用于处理 V8.FilesByteBase64、V8.Method.Upload、私有文件 URL、文件响应、HDFS、OSS、MinIO 和 S3 存储。
 ---
 
 # Microi V8 文件上传下载
@@ -55,7 +55,7 @@ var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 - 错误：`/mall/pay-proof`、`https://...`、`C:\...`、`../x`、`mall//x`、`~x`
 - multipart 请求不能带 `Content-Type: application/json`，否则后端可能读不到 `Path` 表单字段并返回“移动端文件上传路径不合法！”
 - `OsClient` 只能保留一个规范字段，避免同时提交 `OsClient`、`osclient` 或 query/header/formData 多处互相冲突。
-- 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `No upload adapter found for MicroiV8`。
+- 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 ## 公有桶 vs 私有桶
 

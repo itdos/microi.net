@@ -534,8 +534,8 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-datasource-mapping/SKILL.md` — microi-datasource-mapping — 数据源 Key/Value 映射规范
-- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Frontend SDK
-- `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi Mobile App Quality Gate
+- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi 前端 SDK
+- `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi 移动端质量门禁
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
 - `microi.skills/production-readonly-audit/SKILL.md` — Microi 正式环境只读业务巡检

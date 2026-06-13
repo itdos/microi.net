@@ -1,239 +1,239 @@
 ---
 name: microi-mobile-app-quality
-description: Microi mobile app quality gate for UniApp/H5/WeChat mini programs. Use when creating, redesigning, fixing, testing, or delivering any Microi mobile project, including login, tab navigation, quick actions, buttons, animations, menu hierarchy, and mobile visual acceptance.
+description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序。用于创建、重设计、修复、测试或交付任何 Microi 移动端项目，覆盖登录、底部导航、快捷入口、按钮、动效、菜单层级与移动端视觉验收。
 applyTo: "**/*.{vue,js,ts,css,scss,json,md}"
 ---
 
-# Microi Mobile App Quality Gate
+# Microi 移动端质量门禁
 
-This skill is mandatory for every Microi UniApp/H5/WeChat mini program delivery. It records recurring mobile mistakes that must not be repeated.
+每次交付 Microi UniApp/H5/微信小程序时都必须应用本 skill。这里记录的是移动端项目反复出现、必须避免的问题。
 
-Automatic trigger: if a task touches a Microi mobile app, H5, WeChat mini program, App build, uni-app project, login page, tabbar, homepage, profile page, workbench, report page, visual redesign, or mobile acceptance, apply this skill even when the user does not explicitly name it.
+自动触发：只要任务涉及 Microi 移动端应用、H5、微信小程序、App 构建、uni-app 项目、登录页、tabbar、首页、我的页、工作台、报告页、视觉重设计或移动端验收，即使用户没有明确点名，也要应用本 skill。
 
-## 1. Navigation And Quick Actions Must Use Real Icons
+## 1. 导航和快捷入口必须使用真实图标
 
-Bottom navigation, homepage quick entries, member-center shortcuts, grid actions, and floating actions must show recognizable icons above or beside text.
+底部导航、首页快捷入口、会员中心快捷项、九宫格操作和悬浮操作，必须在文字上方或旁边显示可识别的图标。
 
-Required:
-- Use Microi.UI icons, project `mci-icon-*` CSS icons, iconfont, or a stable bundled icon component.
-- Bottom nav items such as Home, Orders, Reports, Repair, Mine must show icons, not Chinese single-character substitutes like `首` / `单` / `报` / `我`.
-- Homepage entry grids and Mine/Profile shortcuts must follow the same rule.
-- Profile/settings/info blocks such as theme, tenant, version, account, about, customer binding, and service entries must use real icons. Do not use single Chinese characters such as `租` / `版` / `客` as icon substitutes.
-- Icons must be real visual symbols and must not rely on remote placeholder images.
-- If SVG or image icons are used, assets must be local, versioned, and checked for mini-program packaging.
+要求：
+- 使用 Microi.UI 图标、项目 `mci-icon-*` CSS 图标、iconfont 或稳定的本地图标组件。
+- 首页、订单、报告、报修、我的等底部导航项必须显示图标，不能用 `首` / `单` / `报` / `我` 这类单字代替。
+- 首页入口宫格和我的/个人中心快捷项同样适用。
+- 主题、租户、版本、账号、关于、客户绑定、服务入口等个人中心/设置/信息块必须使用真实图标，不能用 `租` / `版` / `客` 这类单字代替。
+- 图标必须是真实视觉符号，不能依赖远程占位图。
+- 如果使用 SVG 或图片图标，资源必须本地化、纳入版本管理，并检查小程序打包结果。
 
-Forbidden:
-- Text-only nav icons.
-- Single Chinese characters used as fake icons.
-- Missing-icon placeholders, 404 remote icons, or emoji-only icon systems.
+禁止：
+- 纯文字导航图标。
+- 用单个汉字冒充图标。
+- 缺失图标占位、404 远程图标或只靠 emoji 的图标体系。
 
-Acceptance:
-- Inspect every bottom nav and homepage/member shortcut in screenshots.
-- Confirm icon plus label is visible, aligned, and tappable on H5, WeChat mini program, and App build targets.
+验收：
+- 截图检查每个底部导航、首页快捷入口和会员快捷入口。
+- 确认 H5、微信小程序和 App 构建目标中，图标加文字可见、对齐且可点击。
 
-## 2. Do Not Guess Microi Frontend SDK Login APIs
+## 2. 不要猜测 Microi 前端 SDK 登录接口
 
-Before writing login code, inspect the local project SDK wrapper such as `src/utils/microi.v8.js`, `src/utils/api.js`, or the standard `microi.uniapp` login implementation.
+编写登录代码前，先检查本地项目 SDK 封装，例如 `src/utils/microi.v8.js`、`src/utils/api.js`，或标准 `microi.uniapp` 登录实现。
 
-Required:
-- Use the actual exported API. If the SDK exposes `V8.Login(param)`, do not write `V8.Login.Login(...)`.
-- Staff/account login should call the platform login endpoint through the project SDK wrapper, normally `/api/SysUser/Login` or `V8.Login(param)`.
-- Token extraction must support both response headers and response body fallback.
-- The first test after login implementation must include a real click on the login button and a console/network check.
+要求：
+- 使用实际导出的接口。如果 SDK 暴露的是 `V8.Login(param)`，不要写 `V8.Login.Login(...)`。
+- 员工/账号登录应通过项目 SDK 封装调用平台登录端点，通常是 `/api/SysUser/Login` 或 `V8.Login(param)`。
+- Token 提取必须同时支持响应头和响应体兜底。
+- 登录实现后的第一个测试必须包含真实点击登录按钮，并检查控制台和网络请求。
 
-Forbidden:
-- Inventing nested SDK objects.
-- Treating interface-engine login and `SysUser` account login as the same contract.
-- Shipping a login page without testing the actual button path.
+禁止：
+- 凭空编造 SDK 子对象。
+- 把接口引擎登录和 `SysUser` 账号登录当作同一个契约。
+- 未测试真实按钮路径就交付登录页。
 
-Acceptance:
-- H5 route `/pages/login/login` or the project login route opens without console errors.
-- Clicking account login never throws `V8.Login.Login is not a function`.
+验收：
+- H5 路由 `/pages/login/login` 或项目登录路由打开时无控制台错误。
+- 点击账号登录不会抛出 `V8.Login.Login is not a function`。
 
-## 3. OsClient Headers Must Not Be Duplicated
+## 3. OsClient 请求头不得重复
 
-Microi requests must send one case-insensitive OsClient header only. Browser, proxy, or server runtimes may merge duplicate case variants such as `OsClient` and `osclient` into `lxwb, lxwb`, which breaks tenant recognition.
+Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览器、代理或服务端运行时可能把 `OsClient` 和 `osclient` 这类大小写重复键合并成 `lxwb, lxwb`，导致租户识别失败。
 
-Required:
-- Build request headers through a helper that deletes existing case-insensitive matches before setting `osclient`.
-- Prefer one canonical header key, normally lowercase `osclient`, with a single value such as `lxwb`.
-- Apply the same case-insensitive de-duplication to `Authorization` / `authorization` and any other singleton auth headers.
-- Request body/query may include `OsClient` when the Microi endpoint contract needs it, but headers must still contain only one `osclient` value.
+要求：
+- 通过统一工具构建请求头，设置 `osclient` 前先删除已有的不区分大小写匹配项。
+- 优先使用一个标准键，通常是小写 `osclient`，并且只传一个值，例如 `lxwb`。
+- `Authorization` / `authorization` 以及其它单值鉴权头也要做同样的大小写去重。
+- 当 Microi 端点契约需要时，请求体或查询参数可以包含 `OsClient`，但请求头仍只能包含一个 `osclient` 值。
 
-Forbidden:
-- Setting both `headers.OsClient` and `headers.osclient`.
-- Setting both `headers.Authorization` and `headers.authorization`.
-- Shipping after seeing a network header value like `lxwb, lxwb`.
+禁止：
+- 同时设置 `headers.OsClient` 和 `headers.osclient`。
+- 同时设置 `headers.Authorization` 和 `headers.authorization`。
+- 网络面板里已经看到 `lxwb, lxwb` 仍然交付。
 
-Acceptance:
-- Inspect the login request in the network panel or request adapter logs.
-- Confirm the header is exactly `osclient: lxwb` for the target tenant, not comma-merged.
+验收：
+- 在网络面板或请求适配器日志里检查登录请求。
+- 确认目标租户请求头正好是 `osclient: lxwb`，没有被逗号合并。
 
-## 4. Important Buttons Must Be Icon Buttons
+## 4. 重要按钮必须带图标
 
-Prominent actions must use polished icon + text buttons.
+醒目的主操作必须使用打磨过的图标加文字按钮。
 
-Required:
-- Login, Go Login, Submit, Save, Confirm, Accept Order, Repair, Generate Report, Upload Photo, and primary hero actions must include an icon.
-- Buttons must have visible pressed state, loading state, disabled state, and enough height for touch.
-- Primary buttons should use project brand gradient or solid brand color, with restrained shadow and safe text contrast.
-- Native mini-program buttons such as `open-type="getPhoneNumber"` must be styled to match `mci-btn` and remove default borders.
+要求：
+- 登录、去登录、提交、保存、确认、接单、报修、生成报告、上传照片以及首屏主操作必须包含图标。
+- 按钮必须有可见的按下态、加载态、禁用态，并有足够触控高度。
+- 主按钮应使用项目品牌渐变或品牌纯色，阴影克制，文字对比度安全。
+- `open-type="getPhoneNumber"` 这类小程序原生按钮必须样式化为 `mci-btn`，并移除默认边框。
 
-Forbidden:
-- Plain text-only primary buttons in hero, empty state, login, or fixed bottom bars.
-- Buttons whose text is not vertically centered.
-- Buttons without loading feedback for async actions.
+禁止：
+- 首屏、空状态、登录页或固定底栏里出现纯文字主按钮。
+- 按钮文字没有垂直居中。
+- 异步操作按钮没有加载反馈。
 
-Acceptance:
-- Screenshot empty states, login, and form submit pages.
-- Confirm the primary action has an icon, proper loading copy, and active feedback.
+验收：
+- 截图检查空状态、登录页和表单提交页。
+- 确认主操作有图标、合适的加载文案和按下反馈。
 
-## 5. Hero Text And Floating Panels Must Not Overlap
+## 5. 首屏文字和浮层不得重叠
 
-Mobile first screens often combine a large hero and a floating quick-action panel. This layout must be visually inspected because oversized Chinese headlines and aggressive negative margins can cause awkward line breaks or cover primary buttons.
+移动端首屏常组合大首屏区域和悬浮快捷面板。这个布局必须视觉检查，因为过大的中文标题和激进的负边距容易造成难看的换行或遮挡主按钮。
 
-Required:
-- Hero titles must use a size that fits the real Chinese copy at common 375px and 430px phone widths.
-- Keep line-height relaxed enough for two-line Chinese headlines; avoid huge display text inside compact operational heroes.
-- When using a floating quick-action panel, reserve bottom padding inside the hero for actions and keep the negative margin shallow enough that it overlaps only decorative space.
-- Primary hero buttons must remain fully visible and tappable, including shadow and rounded bottom edge.
+要求：
+- 首屏标题必须使用能适配真实中文文案的字号，在常见 375px 和 430px 手机宽度下都要可读。
+- 两行中文标题要有足够行高；紧凑业务首屏内不要使用过大的展示字。
+- 使用悬浮快捷面板时，首屏底部要给操作区预留内边距，负边距只能轻微覆盖装饰空间。
+- 首屏主按钮必须完整可见且可点击，包括阴影和圆角底边。
 
-Forbidden:
-- Hero title wrapping into an ugly single-character or two-character second line.
-- Floating panels covering login/report/submit buttons.
-- Solving overlap by hiding buttons or reducing tap targets below mobile usability.
+禁止：
+- 首屏标题换行成难看的单字或双字第二行。
+- 悬浮面板覆盖登录、报告或提交按钮。
+- 通过隐藏按钮或缩小触控区域来解决重叠。
 
-Acceptance:
-- Screenshot the first viewport at 375px and 430px widths.
-- Check the hero headline, primary/secondary buttons, and the next floating panel for clipping or overlap.
+验收：
+- 在 375px 和 430px 宽度截图首屏。
+- 检查首屏标题、主/次按钮和后续悬浮面板是否裁切或重叠。
 
-## 6. Backend Menus Must Be Planned And Written As At Least Two Levels
+## 6. 后台菜单必须规划为至少两级
 
-For real business systems, backend menus must not be dumped as many first-level menus.
+真实业务系统的后台菜单不能简单堆成一批一级菜单。
 
-Required:
-- Create parent menu groups first, then child CRUD modules under those groups.
-- A business module with more than three related pages must have a parent folder menu.
-- Suggested grouping examples:
-  - Customer Center: Customers, Sites, Contacts, Customer Account Binding.
-  - Equipment Center: Equipment Ledger, Equipment Templates, Maintenance Parameters.
-  - Maintenance Operations: Plans, Work Orders, Service Records, Repair Requests.
-  - Report Center: Inspection Reports, Read Logs, Print/Share Templates.
-  - System Configuration: Dictionaries, Jobs, Integration Settings.
-- When using Manifest/MCP, include parent modules and child modules explicitly. `ParentId` must be set for child modules.
-- Dry-run plans must list the final menu tree, not only flat menu names.
-- If the user asks to fix an existing backend with MCP, do the remote work: read `sys_menu`, create missing parent `SecondMenu` rows, update existing child `ParentId` / `Sort`, grant admin role permission to new parent menus, then read back the menu tree.
-- Do not stop at writing this rule into a skill when the user explicitly asks to modify the current MCP tenant.
+要求：
+- 先创建父级菜单分组，再把子级 CRUD 模块放到对应分组下。
+- 相关页面超过三个的业务模块必须有父级目录菜单。
+- 建议分组示例：
+  - 客户中心：客户、站点、联系人、客户账号绑定。
+  - 设备中心：设备台账、设备模板、维保参数。
+  - 维保运营：计划、工单、服务记录、维修申请。
+  - 报告中心：巡检报告、阅读日志、打印/分享模板。
+  - 系统配置：字典、任务、集成设置。
+- 使用 Manifest/MCP 时，必须显式包含父模块和子模块。子模块必须设置 `ParentId`。
+- dry-run 计划必须列出最终菜单树，不能只列平铺菜单名。
+- 如果用户要求通过 MCP 修复已有后台，要真正执行远端工作：读取 `sys_menu`，创建缺失的父级 `SecondMenu` 行，更新现有子菜单 `ParentId` / `Sort`，给管理员角色授权新父菜单，然后回读菜单树。
+- 当用户明确要求修改当前 MCP 租户时，不要只把规则写进 skill 就停下。
 
-Forbidden:
-- Creating all generated modules directly under root.
-- Mixing customer master data, work orders, reports, logs, and settings at the same menu level.
+禁止：
+- 把所有生成模块直接创建到根菜单。
+- 把客户主数据、工单、报告、日志和设置混在同一级。
 
-Acceptance:
-- After MCP generation, read back `sys_menu` and confirm menu depth.
-- The final response must mention the actual menu tree written through MCP and any permission refresh performed.
+验收：
+- MCP 生成后回读 `sys_menu` 并确认菜单深度。
+- 最终回复必须说明通过 MCP 写入的真实菜单树，以及执行过的权限刷新。
 
-## 7. Mobile Pages Need Motion, But Motion Must Be Useful
+## 7. 移动端页面需要动效，但动效必须有用
 
-Mobile products should not feel like static admin forms.
+移动端产品不应像静态后台表单。
 
-Required:
-- Use subtle entrance animation for page hero, panels, cards, and important action areas.
-- Use pressed feedback for tap targets.
-- Skeleton loading should shimmer or pulse lightly.
-- Decorative motion should be low amplitude and must not distract from task completion.
-- Respect reduced-motion preferences where supported.
+要求：
+- 页面首屏、面板、卡片和重要操作区使用克制的入场动画。
+- 点击目标要有按下反馈。
+- 骨架屏应有轻微流光或脉冲。
+- 装饰动效幅度要小，不能干扰任务完成。
+- 支持时尊重减少动态效果偏好。
 
-Forbidden:
-- Entire app with no interaction feedback.
-- Heavy looping animations on dense operational lists.
-- Motion that causes layout shifts or overlaps text.
+禁止：
+- 整个应用没有交互反馈。
+- 在密集业务列表上使用重度循环动画。
+- 动效导致布局位移或文字重叠。
 
-Acceptance:
-- Browser/device inspection confirms cards, panels, buttons, or skeletons have visible but restrained motion.
-- No animation causes horizontal overflow, text clipping, or fixed-bar jitter.
+验收：
+- 浏览器或设备检查确认卡片、面板、按钮或骨架屏有可见但克制的动效。
+- 没有动画导致横向溢出、文字裁切或固定栏抖动。
 
-## 8. Login Page Must Be A Direct Login Surface
+## 8. 登录页必须是直接登录界面
 
-The login page must not force users to switch between two identity tabs before they can log in.
+登录页不能强迫用户先在两个身份标签之间切换才能登录。
 
-Required:
-- For H5/App, provide one account-or-phone + password form. Do not place a separate phone-only customer login form next to the account/password form unless the backend explicitly supports and requires that second path.
-- For WeChat mini programs, make phone authorization the default login surface using `<button open-type="getPhoneNumber">`. Account/password login may be a secondary fallback, but it must be collapsed or secondary, not displayed as a full second login system beside phone authorization.
-- In WeChat mini programs, phone quick login must pass the returned phone `code` to the backend, and must also call `uni.login()` to get a fresh `LoginCode` when the backend needs OpenId/UnionId.
-- In H5/App fallback, provide manual phone input only if the backend supports phone login.
-- Make login copy clear: account/phone + password is one path; WeChat phone authorization is the mini-program default path.
-- Do not show internal implementation metadata on the login page such as current tenant, OsClient, mobile build version, API host, or debug version blocks.
+要求：
+- H5/App 提供一个账号或手机号 + 密码表单。除非后端明确支持并要求第二条路径，否则不要把独立手机号客户登录表单和账号密码表单并列展示。
+- 微信小程序默认使用 `<button open-type="getPhoneNumber">` 的手机号授权登录。账号密码登录可以作为次级兜底，但必须折叠或弱化，不能和手机号授权并列成第二套完整登录系统。
+- 微信小程序手机号快捷登录必须把返回的手机号 `code` 传给后端；当后端需要 OpenId/UnionId 时，还必须调用 `uni.login()` 获取新的 `LoginCode`。
+- H5/App 兜底只有在后端支持手机号登录时才提供手动手机号输入。
+- 登录文案要清楚：账号/手机号 + 密码是一条路径；微信手机号授权是小程序默认路径。
+- 登录页不要展示当前租户、OsClient、移动端构建版本、API host、调试版本块等内部实现信息。
 
-Forbidden:
-- Staff/Customer tab switch as the primary login model unless the user explicitly requires it.
-- Two simultaneously visible full login systems such as “account + password” plus “phone input login” on the same screen.
-- Pretending the frontend can directly read a WeChat phone number from `getPhoneNumber`; modern WeChat returns a code.
-- Implementing phone login only as a text input when the target is WeChat mini program.
-- Showing tenant/version/debug blocks to end users.
+禁止：
+- 除非用户明确要求，否则把员工/客户身份标签作为主登录模型。
+- 同屏展示两套完整登录系统，例如“账号 + 密码”和“手机号输入登录”并列。
+- 假设前端可以从 `getPhoneNumber` 直接读取微信手机号；现代微信返回的是 code。
+- 目标是微信小程序时，只把手机号登录实现成文本输入。
+- 向终端用户展示租户、版本或调试块。
 
-Acceptance:
-- Inspect the standard reference at `microi.uniapp/src/pages/login/index.vue` before implementing.
-- Test account login path and phone-login button rendering.
-- Build H5 and WeChat mini program targets.
+验收：
+- 实现前检查标准参考 `microi.uniapp/src/pages/login/index.vue`。
+- 测试账号登录路径和手机号登录按钮渲染。
+- 构建 H5 和微信小程序目标。
 
-## 9. Theme Switching Must Be Real And Global
+## 9. 主题切换必须真实且全局生效
 
-When a customer asks for an alternate visual style, keep the current accepted theme as a named option instead of overwriting it unless the user explicitly asks to remove it.
+当客户要求增加另一种视觉风格时，除非用户明确要求删除，否则要把当前已认可设计保留为一个命名主题，而不是直接覆盖。
 
-Required:
-- Name each theme by visual intent, not by temporary customer wording. Examples: `清新绿红`, `品牌经典`, `专业深色`.
-- Persist theme choice with `uni.setStorageSync` or the project theme runtime.
-- Make the theme switch available before login when the product has a Mine/Profile/Settings page that can be opened while logged out.
-- Show theme switching as a compact "Switch Theme" action that opens a modal/bottom sheet. Do not dump every theme option directly on the Mine/Profile page unless the page is explicitly a settings page.
-- Apply theme state to every page root, fixed bottom nav, empty states, skeletons, buttons, cards, and H5 desktop phone shell. A theme that only changes the current page is incomplete.
-- Mini-program builds cannot rely only on `document.documentElement`; use page root classes, CSS variables, or a cross-platform theme service.
-- If page-local scoped CSS hardcodes colors, add theme-aware overrides or refactor to `--mci-*` variables.
-- On H5, theme changes must not destabilize uni-app router patching. If reactive page-root class switching causes scheduler/`parentNode`/`updateSlots` errors, use a stable page class plus a theme service that applies `html/body` attributes and repairs page-root classes after route DOM changes.
-- Bottom navigation must guard against tapping the active route, debounce repeated taps, and defer route changes briefly after a theme switch so DOM/theme updates finish before `uni.reLaunch`.
+要求：
+- 主题命名要表达视觉意图，不要沿用临时客户措辞。例如：`清新绿红`、`品牌经典`、`专业深色`。
+- 用 `uni.setStorageSync` 或项目主题运行时持久化主题选择。
+- 如果产品有未登录也可打开的我的/个人中心/设置页，主题切换必须在登录前可用。
+- 主题切换应是紧凑的“切换主题”操作，打开弹窗或底部面板；除非页面明确是完整设置页，否则不要把所有主题选项直接堆在我的/个人中心首页。
+- 主题状态要作用到每个页面根节点、固定底部导航、空状态、骨架屏、按钮、卡片和 H5 桌面手机壳。只改变当前页的主题是不完整的。
+- 小程序构建不能只依赖 `document.documentElement`；应使用页面根类、CSS 变量或跨端主题服务。
+- 如果页面局部 scoped CSS 写死颜色，要增加主题覆盖或重构为 `--mci-*` 变量。
+- H5 主题变化不能破坏 uni-app 路由补丁。如果响应式页面根类切换导致 scheduler/`parentNode`/`updateSlots` 错误，使用稳定页面类，并通过主题服务给 `html/body` 写属性、在路由 DOM 变化后修复页面根主题类。
+- 底部导航必须防止重复点击当前路由、对连续点击做防抖，并在主题切换后略微延迟路由跳转，确保 DOM/主题更新先于 `uni.reLaunch` 完成。
 
-Forbidden:
-- Deleting a previously accepted design when adding a customer-preference theme.
-- A theme switch whose effect disappears after navigation or app restart.
-- Theme cards/options using text-only fake icons.
-- Theme switching that breaks bottom navigation or produces Vue scheduler errors.
+禁止：
+- 新增客户偏好主题时删除此前已认可设计。
+- 主题切换效果在导航或重启后消失。
+- 主题卡片/选项使用纯文字假图标。
+- 主题切换破坏底部导航或产生 Vue scheduler 错误。
 
-Acceptance:
-- Switch themes on the logged-out Mine/Profile page and navigate to Home, Login, List, Detail, and Form pages.
-- Confirm bottom nav, primary buttons, cards, empty state, and page background all change consistently.
-- Reload the H5 page or restart the mini program and confirm the selected theme is restored.
-- Run screenshot verification for every route in `pages.json` under every named theme. Check text contrast, especially shortcut cards, report cards, empty states, bottom nav, hero text, and modal/sheet content.
+验收：
+- 在未登录的我的/个人中心页切换主题，并导航到首页、登录页、列表页、详情页和表单页。
+- 确认底部导航、主按钮、卡片、空状态和页面背景都一致变化。
+- 刷新 H5 页面或重启小程序后确认已选主题恢复。
+- 对 `pages.json` 中每个路由、每个命名主题做截图验证。重点检查文字对比度，尤其是快捷卡片、报告卡片、空状态、底部导航、首屏文字和弹窗/底部面板内容。
 
-## 10. Report/List Detail Auth Must Preserve User Identity
+## 10. 报告/列表详情必须保留用户身份
 
-List-to-detail navigation must keep the caller identity model. Staff, customer, and public/share routes may need different APIs even when they open the same visual report detail page.
+从列表进入详情时必须保留调用者身份模型。即使打开的是同一个视觉报告详情页，员工、客户和公开/分享路线也可能需要不同接口。
 
-Required:
-- If staff can see a report list through authenticated FormEngine or backend account APIs, report detail must use the same staff-authenticated path or pass a valid staff token.
-- If customers open reports, use customer token or binding-aware interface engines.
-- If external users open a shared report, use a share token route and do not require staff/customer login.
-- Do not send an empty `CustomerToken` for staff users and then interpret the backend response as "not logged in".
-- Preserve current session before opening detail pages and avoid clearing staff token unless an authenticated staff endpoint actually returns an auth-expired code.
+要求：
+- 如果员工通过已鉴权 FormEngine 或后台账号接口能看到报告列表，报告详情必须使用同样的员工鉴权路径或传有效员工 token。
+- 客户打开报告时，使用客户 token 或感知绑定关系的接口引擎。
+- 外部用户打开分享报告时，使用分享 token 路由，不要求员工/客户登录。
+- 不要给员工用户发送空 `CustomerToken`，然后把后端响应解释为“未登录”。
+- 打开详情页前保留当前会话；除非员工鉴权端点真实返回登录过期码，否则不要清除员工 token。
 
-Forbidden:
-- Reusing a customer anonymous report-detail engine for staff list clicks without a staff credential path.
-- Redirecting to login after clicking a report/list item that was already visible to the logged-in user.
+禁止：
+- 员工列表点击时，直接复用客户匿名报告详情引擎且没有员工凭证路径。
+- 登录用户点击已经可见的报告/列表项后被重定向到登录页。
 
-Acceptance:
-- Test staff list -> report/detail, customer list -> report/detail, and share-token detail separately.
-- Confirm no unexpected login redirect happens after clicking a visible card.
+验收：
+- 分别测试员工列表 -> 报告详情、客户列表 -> 报告详情、分享 token 详情。
+- 确认点击可见卡片后不会发生意外登录跳转。
 
-## Final Delivery Checklist
+## 最终交付清单
 
-Before marking a mobile project complete:
-- Icons: bottom nav, homepage quick actions, profile shortcuts, primary buttons.
-- Login: one account/phone + password path for H5/App, WeChat phone authorization as mini-program default, no simultaneous duplicate login systems, no tenant/version/debug blocks, SDK API verified.
-- Buttons: icon + text, pressed state, loading state.
-- Menus: backend planned as at least two-level tree.
-- Headers: `osclient` is a single canonical header value, not duplicated by case.
-- First viewport: hero text and floating quick panels are screenshot-checked for no clipping or overlap.
-- Motion: entrance, tap, skeleton animation present and restrained.
-- Theme: named themes persist, can be switched while logged out, and affect all pages plus bottom navigation.
-- Theme QA: every `pages.json` route is screenshot-checked in every named theme; no low-contrast text and no Vue scheduler/router errors after switching theme then navigating.
-- Auth QA: list-to-detail routes preserve staff/customer/share identity and do not redirect visible items back to login.
-- Verification: `build:h5`, `build:mp-weixin`, and `build:app` when scripts exist; H5 route smoke test and console check.
+移动端项目标记完成前必须确认：
+- 图标：底部导航、首页快捷入口、个人中心快捷项、主按钮。
+- 登录：H5/App 只有一条账号/手机号 + 密码路径；微信手机号授权是小程序默认路径；没有并列重复登录系统，没有租户/版本/调试块；SDK 接口已核验。
+- 按钮：图标 + 文字、按下态、加载态。
+- 菜单：后台规划为至少两级树。
+- 请求头：`osclient` 是唯一标准请求头值，没有因大小写重复。
+- 首屏：首屏文字和悬浮快捷面板已截图检查，无裁切或重叠。
+- 动效：入场、点击、骨架屏动画存在且克制。
+- 主题：命名主题可持久化，未登录可切换，并影响所有页面和底部导航。
+- 主题质检：每个 `pages.json` 路由在每个命名主题下都截图检查；切换主题再导航后，没有低对比文字，也没有 Vue scheduler/router 错误。
+- 鉴权质检：列表到详情路由保留员工/客户/分享身份，不会把已可见项目重定向回登录页。
+- 验证：脚本存在时运行 `build:h5`、`build:mp-weixin` 和 `build:app`；执行 H5 路由冒烟测试和控制台检查。

@@ -1,35 +1,35 @@
 ---
 name: microi-db-schema
-description: Microi吾码 database schema and dictionary guidance. Use when Codex needs to inspect or explain Microi platform tables from AI-Project/microi/db.json, map diy_table/diy_field/sys_menu relationships, locate V8 event storage fields, generate safe V8 FormEngine queries against system tables, or reason about workflow, SaaS, permission, menu, API engine, datasource, and system configuration schemas.
+description: Microi 吾码数据库结构与字典指南。用于检查或解释 AI-Project/microi/db.json 中的 Microi 平台表，梳理 diy_table/diy_field/sys_menu 关系，定位 V8 事件存储字段，生成安全的系统表 V8 FormEngine 查询，或分析工作流、SaaS、权限、菜单、接口引擎、数据源和系统配置结构。
 ---
 
 # Microi DB Schema
 
-Use this skill to answer schema questions and write code that depends on Microi吾码 platform table names, field names, and relationships.
+使用本 skill 回答数据库结构问题，并编写依赖 Microi 吾码平台表名、字段名和关系的代码。
 
-## Quick Workflow
+## 快速流程
 
-1. Read `references/schema.md` for the complete database structure: fixed fields, core relationships, V8 event fields, all table categories, and per-field details for every core table.
-2. Prefer `V8.FormEngine` with `_Where` for schema-aware V8 code. Use `V8.Db.FromSql` only for joins, aggregates, or cases FormEngine cannot express, and always parameterize values.
-3. Treat `AI-Project/microi/db.json` as the authoritative source for the current exported field list. It lists configurable fields; DIY tables also carry fixed system fields (`Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserName`, `IsDeleted`) not in the export.
+1. 阅读 `references/schema.md` 获取完整数据库结构：固定字段、核心关系、V8 事件字段、全部表分类，以及每张核心表的字段明细。
+2. 编写感知结构的 V8 代码时，优先使用带 `_Where` 的 `V8.FormEngine`。只有联表、聚合或 FormEngine 无法表达的场景才使用 `V8.Db.FromSql`，并且必须参数化动态值。
+3. 将 `AI-Project/microi/db.json` 视为当前导出字段列表的权威来源。它列出可配置字段；DIY 表还带有导出中未列出的固定系统字段（`Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`）。
 
-## Core Model
+## 核心模型
 
-- `diy_table` stores table/form metadata and table-level V8 events.
-- `diy_field` stores fields for each DIY table, including component type, validation, visibility, data source, field events, and template V8.
-- `sys_menu` turns a DIY table into a menu/module page and stores query, button, import/export, card/mobile, workflow, and permission-facing module configuration.
-- `sys_apiengine` stores interface engine definitions; call them with `V8.ApiEngine.Run(ApiEngineKey, params)`.
-- `sys_datasource` stores reusable data sources for components and pages.
-- `microi_database` maps extension database keys to `V8.Dbs.<DbKey>`.
-- `wf_*` tables store workflow design, nodes, lines, instances, work items, and history.
+- `diy_table` 存储表单/表元数据和表级 V8 事件。
+- `diy_field` 存储每张 DIY 表的字段，包括组件类型、校验、可见性、数据源、字段事件和模板 V8。
+- `sys_menu` 将 DIY 表转换为菜单/模块页面，并存储查询、按钮、导入导出、卡片/移动端、工作流和权限相关的模块配置。
+- `sys_apiengine` 存储接口引擎定义；通过 `V8.ApiEngine.Run(ApiEngineKey, params)` 调用。
+- `sys_datasource` 存储组件和页面可复用的数据源。
+- `microi_database` 将扩展数据库 key 映射到 `V8.Dbs.<DbKey>`。
+- `wf_*` 表存储工作流设计、节点、连线、实例、待办和历史。
 
-## Safety Notes
+## 安全注意
 
-- Do not assume every field listed in `_Fields` is a physical DB column. `TableChild`, `Button`, `Divider`, `DevComponent`, `OpenTable`, and `PhoneSMS` are configuration or interaction components.
-- Remember fixed fields on DIY tables: `Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserName`, `IsDeleted`.
-- Query non-deleted rows by default (`IsDeleted != 1`) when using raw SQL.
-- When changing schema metadata, account for cache invalidation and physical table changes; keep edits narrowly scoped.
-- When adding or updating low-code fields, prefer MCP native tools such as `microi_add_field` / `microi_update_field` over ad-hoc V8 metadata writes. A field row with `diy_field.TableId = null` can leave the physical column present but invisible to FormEngine/table schema loading.
-- When changing business enum fields, treat `diy_field.Data` and `diy_field.Config` as source-of-truth metadata. Verify the KeyValue keys match the values used by API engines and frontend filters, refresh schema caches, and read back the field row instead of trusting local constants.
-- Leave `diy_field.FormWidth` null/omitted for normal generated fields. Use `24` only for full-row controls such as `CodeEditor`, `Textarea`, `RichText`, upload, `TableChild`, map/layout, or custom components.
-- After schema changes, validate with `microi_get_db_schema` and refresh `diy_table_field_list` caches with `microi_refresh_schema_cache` when needed.
+- 不要假设 `_Fields` 中列出的每个字段都是物理数据库列。`TableChild`、`Button`、`Divider`、`DevComponent`、`OpenTable` 和 `PhoneSMS` 是配置或交互组件。
+- 记住 DIY 表固定字段：`Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`。
+- 使用原生 SQL 时，默认只查询未删除数据（`IsDeleted != 1`）。
+- 修改结构元数据时，要考虑缓存失效和物理表变化；改动范围保持收敛。
+- 新增或更新低代码字段时，优先使用 `microi_add_field` / `microi_update_field` 等 MCP 原生工具，不要临时手写 V8 元数据。`diy_field.TableId = null` 的字段行可能导致物理列存在，但 FormEngine/表结构加载不可见。
+- 修改业务枚举字段时，将 `diy_field.Data` 和 `diy_field.Config` 视为事实源元数据。确认 KeyValue 键与接口引擎、前端筛选使用的值一致，刷新结构缓存，并回读字段行，不要只相信本地常量。
+- 普通生成字段的 `diy_field.FormWidth` 保持 null/省略。只有 `CodeEditor`、`Textarea`、`RichText`、上传、`TableChild`、地图/布局或自定义组件等整行控件才使用 `24`。
+- 结构变更后，用 `microi_get_db_schema` 验证，并在需要时用 `microi_refresh_schema_cache` 刷新 `diy_table_field_list` 缓存。

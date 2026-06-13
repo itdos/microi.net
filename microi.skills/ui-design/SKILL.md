@@ -1,6 +1,6 @@
 ---
 name: ui-design
-description: Microi UI design system guidance. Use when designing PC Vue, Element Plus, uni-app H5, dashboards, forms, cards, gradients, responsive layout, skeleton loading states, mobile safe areas, and visual polish.
+description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus、uni-app H5、仪表盘、表单、卡片、渐变、响应式布局、骨架屏、移动安全区和视觉打磨。
 ---
 
 # Microi吾码设计规范
@@ -1048,7 +1048,7 @@ Microi 背景必须服务内容层级，不能喧宾夺主。优先使用网格�
 
 ## 主题切换实现
 
-### 首选：Microi.UI runtime
+### 首选：Microi.UI 运行时
 
 ```js
 import { initMciDesign, setMciPalette, setMciShape, setMciTheme } from '@microi/mci-ui/runtime';
@@ -1119,7 +1119,7 @@ uni-app 中没有 `document` 对象（小程序端），所以推荐两套方案
 ```
 
 ```js
-// utils/theme.js（无 Microi.UI runtime 时的降级写法）
+// utils/theme.js（无 Microi.UI 运行时时的降级写法）
 const THEME_KEY = 'mci_theme';
 const PALETTE_KEY = 'mci_palette';
 const PALETTES = ['black','white','red','orange','yellow','green','cyan','blue','purple'];

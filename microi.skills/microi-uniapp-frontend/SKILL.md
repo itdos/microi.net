@@ -1,6 +1,6 @@
 ---
 name: microi-uniapp-frontend
-description: Microi 吾码 UniApp/H5 前端通用规范。Use when building or fixing any Microi uni-app/mobile H5 project that renders uploaded assets, avatars, skeleton loading states, mobile safe areas, tabBar, fixed bottom bars, or explicit business asset selection.
+description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复任何 Microi uni-app/移动端 H5 项目，覆盖上传资源渲染、头像、骨架屏、移动安全区、tabBar、固定底栏和明确业务素材选择。
 ---
 
 # Microi UniApp 前端通用规范
@@ -341,7 +341,7 @@ async function load() {
 - 对关键业务资产选择流程，验证首次进入不自动选中，刷新后无效选择会被清空。
 - 截图复核 PC 手机壳、顶部安全区、底部安全区、底部 tabBar、主题背景、关键头像、私有图片、金额显示、未读角标、空态/未登录态和关键按钮文字上下左右居中。按钮文字偏上、偏下、偏左、偏右都算验收失败。
 
-## Microi Frontend SDK 必须接入
+## Microi 前端 SDK 必须接入
 
 任何 Microi UniApp/H5 Vue3 项目都必须优先使用 `microi.skills/microi.v8.js` 作为统一前端 SDK，并参考 `microi.skills/microi-frontend-sdk/SKILL.md`。新项目不得再手写分散的 `uni.request`、Token 存储、上传、私有文件 URL、头像解析、`ApiEngine` 或 `FormEngine` 包装。
 
@@ -387,7 +387,7 @@ async function load() {
 - 禁止上传路径写成 `/mall/pay-proof`、`https://...`、`C:\...`、`../x`、`mall//x`、`~xxx`，也不要把本地临时文件路径当作 HDFS `Path`。
 - SDK 必须统一归一化 `options.path`、`formData.Path`、`formData.path`，并且不允许业务页通过 `formData` 把 `Path` 覆盖成非法值。
 - 项目级 `uploadFile(filePath, options)` 只能做默认路径和业务语义包装，必须透传 `{ ...options }`，不能丢掉 `headers`、`action`、`anonymous`、`file`、`formData`、`silentError` 等 SDK 选项。
-- H5 页面从 `uni.chooseImage` 得到 `tempFiles[0].file` 时必须保留下来；如果只拿到 `tempFiles[0]` 或 `blob:` / `data:` 临时路径，也要传给 SDK，不得只保存字符串后丢弃文件对象。上传时传 `file` 并设置 `preferFetch:true`，让线上浏览器优先走标准 `fetch + FormData`。SDK 必须识别 `File` / `Blob`、`file/raw/blob/originFileObj` 等嵌套字段以及 `blob:` / `data:` 临时路径，不能只依赖 `uni.uploadFile`，否则生产 H5 可能出现 `No upload adapter found for MicroiV8`。
+- H5 页面从 `uni.chooseImage` 得到 `tempFiles[0].file` 时必须保留下来；如果只拿到 `tempFiles[0]` 或 `blob:` / `data:` 临时路径，也要传给 SDK，不得只保存字符串后丢弃文件对象。上传时传 `file` 并设置 `preferFetch:true`，让线上浏览器优先走标准 `fetch + FormData`。SDK 必须识别 `File` / `Blob`、`file/raw/blob/originFileObj` 等嵌套字段以及 `blob:` / `data:` 临时路径，不能只依赖 `uni.uploadFile`，否则生产 H5 可能出现 `未找到 MicroiV8 上传适配器。`。
 - 上传、提交、支付、凭证、认证等关键按钮严禁空 `catch`。失败必须 `toast` 展示 `Msg/message`，同时 `console.error` 记录，并在 `finally` 还原 loading/uploading 状态，不能让用户感觉点击后没有任何反应。
 - 修改上传相关逻辑后，必须用 `rg "uploadFile\\(|uni.uploadFile|UniappUpload"` 检查所有上传入口，至少验证付款凭证、头像/证件/收款码等一个私有图场景。
 

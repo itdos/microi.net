@@ -1,6 +1,6 @@
 ---
 name: v8-table-event
-description: Microi V8 table event development. Use when writing InFormV8, SubmitFormV8, SubmitBeforeServerV8, SubmitAfterServerV8, OutFormV8, DataFilterV8, and transaction-aware events.
+description: Microi V8 表单事件开发。用于编写 InFormV8、SubmitFormV8、SubmitBeforeServerV8、SubmitAfterServerV8、OutFormV8、DataFilterV8 和事务感知事件。
 ---
 
 # Microi V8 表单事件开发
@@ -16,10 +16,10 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 ```javascript
 /*
  * V8 Event
- * TableKey: your_table_key
+ * TableKey: 示例表Key
  * EventType: SubmitBeforeServerV8
  * Version: v1.0.0
- * Function:
+ * 功能说明：
  * - 完整说明该事件的触发时机、校验/加工逻辑、读写字段和阻止提交条件。
  */
 ```

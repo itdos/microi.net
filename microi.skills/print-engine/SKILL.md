@@ -1,6 +1,6 @@
 ---
 name: print-engine
-description: 生成和审查 Microi 打印引擎 Print Engine 模板 JSON。Use when creating mic_print templates, PageObj layouts, PrintObj data binding, printable reports, labels, or contracts.
+description: 生成和审查 Microi 打印引擎 Print Engine 模板 JSON。用于创建 mic_print 模板、PageObj 布局、PrintObj 数据绑定、可打印报告、标签或合同。
 ---
 
 # Microi 打印引擎（Print Engine）模板 JSON 生成

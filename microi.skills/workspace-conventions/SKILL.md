@@ -1,6 +1,6 @@
 ---
 name: workspace-conventions
-description: Microi 工作区全局约定。Use when working in this workspace to ensure temp files, generated artifacts, and project-specific content are placed correctly and do not pollute the repository root.
+description: Microi 工作区全局约定。用于在本工作区工作时，确保临时文件、生成产物和项目专属内容放在正确位置，不污染仓库根目录。
 applyTo: "**"
 ---
 
