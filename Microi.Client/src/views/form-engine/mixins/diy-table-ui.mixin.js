@@ -605,9 +605,11 @@ LoadFabPosition() {
             if (menuLeft + menuWidth > window.innerWidth) {
                 menuLeft = window.innerWidth - menuWidth - 10;
             }
+            var menuTop = rect.bottom + 4;
             self._colMenuPosition = {
-                top: rect.bottom + 4,
-                left: menuLeft
+                top: menuTop,
+                left: menuLeft,
+                maxHeight: Math.max(240, window.innerHeight - menuTop - 12)
             };
 
             self._colMenuField = field;

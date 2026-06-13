@@ -568,7 +568,7 @@ export default {
                                 self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
                             }
 
-                            const forceTextInput = !self.IsSearchOptionControl(field) && self.IsSearchTextInput(id);
+                            const forceTextInput = field.Component !== "DateTime" && !self.IsSearchOptionControl(field) && self.IsSearchTextInput(id);
                             const searchField = forceTextInput ? { ...field, Component: "Text" } : field;
                             const searchFieldKey = field.AsName || field.Name;
 

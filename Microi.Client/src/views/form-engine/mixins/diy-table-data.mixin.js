@@ -4,6 +4,28 @@ import { debounce } from "lodash";
 
 export default {
     methods: {
+        mergeWhereList(baseWhere, appendWhere) {
+            var result = Array.isArray(baseWhere) ? baseWhere.slice() : [];
+            if (!Array.isArray(appendWhere) || appendWhere.length === 0) {
+                return result;
+            }
+            appendWhere.forEach(function(item) {
+                if (!item) return;
+                if (Array.isArray(item)) {
+                    result.push(item.slice());
+                    return;
+                }
+                var index = result.findIndex(function(d) {
+                    return d && !Array.isArray(d) && d.Name == item.Name;
+                });
+                if (index === -1) {
+                    result.push(Object.assign({}, item));
+                } else {
+                    result[index] = Object.assign({}, result[index], item);
+                }
+            });
+            return result;
+        },
         DiyTableLoad(tree, treeNode, resolve) {
             var self = this;
             // 若未配置树形父级字段，默认使用 ParentId；避免发送 _Where: [["","=",id]] 这种非法请求，
@@ -450,7 +472,7 @@ export default {
             }
 
             if (self.PropsWhere && self.PropsWhere.length > 0) {
-                param._Where = self.PropsWhere;
+                param._Where = self.mergeWhereList(param._Where, self.PropsWhere);
             }
 
             //2024-12-14新增

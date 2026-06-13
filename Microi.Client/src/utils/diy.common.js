@@ -121,6 +121,7 @@ var DiyCommon = {
             Name: "CreateTime",
             Type: "varchar(50)",
             Component: "DateTime",
+            Config: { DateTimeType: "datetime" },
             TableName: "",
             TableId: ""
         },
@@ -148,6 +149,7 @@ var DiyCommon = {
             Name: "UpdateTime",
             Type: "varchar(50)",
             Component: "DateTime",
+            Config: { DateTimeType: "datetime" },
             TableName: "",
             TableId: ""
         }
