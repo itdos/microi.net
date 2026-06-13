@@ -506,7 +506,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## V8 引擎编码最佳实践（Skills）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 35 个）：
+编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 36 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -528,13 +528,14 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/page-engine/SKILL.md` — Microi 界面引擎（Page Engine）页面 JSON 生成
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
-- `microi.skills/microi-ui/SKILL.md` — 吾码UI（Microi.UI / MCI-UI）
+- `microi.skills/microi-ui/SKILL.md` — Microi.UI / MCI-UI
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-datasource-mapping/SKILL.md` — microi-datasource-mapping — 数据源 Key/Value 映射规范
 - `microi.skills/microi-frontend-sdk/SKILL.md` — Microi Frontend SDK
+- `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi Mobile App Quality Gate
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
 - `microi.skills/production-readonly-audit/SKILL.md` — Microi 正式环境只读业务巡检

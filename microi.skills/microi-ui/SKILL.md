@@ -120,7 +120,7 @@ Avoid a monotonous stack of identical white cards.
 
 ### Icon Rule
 
-Bottom navigation, home quick actions, profile shortcuts, grid actions, floating actions, empty-state actions, and primary buttons must use recognizable icons. Single Chinese characters are placeholders, not icons.
+Bottom navigation, home quick actions, profile shortcuts, grid actions, floating actions, empty-state actions, settings/info rows, theme options, and primary buttons must use recognizable icons. Single Chinese characters such as `租`, `版`, `客`, or `我` are placeholders, not icons.
 
 ### Motion Rule
 
@@ -131,8 +131,11 @@ Use restrained motion: page entrance, staggered cards, tap feedback, skeleton sh
 ### Login / Register
 
 - Do not force role switching unless the business explicitly has separate login systems.
+- H5/App login should normally be one account-or-phone + password form, not separate account and phone login blocks shown together.
+- WeChat mini-program login should default to phone authorization with `<button open-type="getPhoneNumber">`; account/password fallback can exist as a secondary collapsed option when staff login is required.
 - For Microi account login, use the platform login flow correctly; do not call nonexistent methods.
 - For WeChat mini-program customer login, support phone authorization and registration/binding.
+- Do not show current tenant, OsClient, API host, mobile version, or debug metadata blocks to end users on login/profile pages.
 - Use top atmosphere plus floating form panel.
 - Inputs must be thick, rounded, readable, and grouped.
 - Primary login / go-login / phone login buttons must be icon plus text, high contrast, and full width where appropriate.
@@ -153,7 +156,20 @@ Use restrained motion: page entrance, staggered cards, tap feedback, skeleton sh
 - Use identity header with avatar, name, role/customer, status, and at least one visual badge.
 - Use two or more highlighted shortcut cards or a service grid.
 - Group settings and business entries into panels.
+- Theme switching can live here and must be usable before login when the profile page is reachable while logged out.
+- Settings/info rows must use real icons. Do not use single-character badges as icons for tenant, version, theme, or account entries.
 - Do not render profile as a plain list unless the product is intentionally utilitarian.
+
+### Theme Options
+
+- If a customer requests a new visual style after a prior design was accepted, preserve the prior design as a named theme unless the user explicitly asks to remove it.
+- Theme names should describe visual intent, such as `清新绿红`, `品牌经典`, or `专业深色`.
+- Persist the selected theme and apply it to page roots, fixed bottom nav, buttons, cards, empty states, skeletons, forms, reports, and H5 desktop phone shell.
+- For uni-app and WeChat mini-programs, do not rely only on `document.documentElement`; bind theme class or variables at every page root through a project-level theme service.
+- On profile/settings pages, expose theme switching as a compact action that opens a bottom sheet or modal. Do not render all theme choices directly on the main profile page unless the page is explicitly a full settings page.
+- H5 uni-app theme switching must not break router patching. If reactive root class changes cause `parentNode`, `scheduler flush`, or `updateSlots` errors, keep Vue page classes stable and let the theme service apply/repair `html/body` attributes and page-root theme classes after DOM changes.
+- After switching theme, bottom navigation must still route cleanly. Guard active-route taps, debounce repeated taps, and defer navigation briefly if needed.
+- Screenshot every route in `pages.json` for every named theme. Text in shortcut cards, report cards, empty states, modals, and bottom nav must remain high contrast.
 
 ### List
 
@@ -170,6 +186,7 @@ Use restrained motion: page entrance, staggered cards, tap feedback, skeleton sh
 - Important status must be visible without scrolling.
 - Reports should use `MciRichText`, readable line height, image max width, and share/read/confirm actions.
 - If an action is expected, use `MciActionBar` or fixed safe-area submit bar.
+- Preserve the viewer identity from list to detail: staff report cards should open staff-authenticated detail data, customer cards should open CustomerToken detail data, and shared links should open ShareToken detail data. Do not redirect a logged-in user to login after they click a card that was already visible to them.
 
 ### Form / Upload
 
@@ -244,6 +261,7 @@ The mobile app information architecture should match these business domains wher
 - Update `microi.doc/docs/doc/system-engine/microi-ui.md` when Microi.UI behavior or standards change.
 - Validate with `npm run check`, `npm run pack:check`, and docs build when possible.
 - For UI/frontend work, use screenshot-based visual verification when a browser/H5/devtools target is available.
+- For named themes, run screenshot verification across all `pages.json` routes in each theme and inspect console logs after switching theme then navigating.
 - Inspect at 375px and 430px widths for mobile pages.
 - Check hero title wrapping, action visibility, floating panel overlap, bottom nav icons, empty states, form submit bars, and button centering.
 
@@ -251,8 +269,15 @@ The mobile app information architecture should match these business domains wher
 
 - No external UI library identity or copied class prefix inside Microi.UI files or docs.
 - No text-only bottom navigation.
+- No single-character fake icons for settings/profile/theme/info entries.
 - No generic global CSS selectors.
 - No duplicate `OsClient` header values.
 - No login calls to undefined API methods.
+- No simultaneous duplicate login systems on one login page unless explicitly required.
+- No user-facing current-tenant, API-host, or mobile-version debug blocks.
+- No theme switch that only affects one page or disappears after navigation/restart.
+- No profile page that dumps all theme options inline when a switch button plus sheet/modal would be cleaner.
+- No theme switch that causes uni-app router/scheduler errors after bottom navigation.
+- No report/list detail route that loses the staff/customer/share auth context and redirects visible items to login.
 - No all-first-level backend menu planning for business systems.
 - No page that has only plain lists, plain buttons, and no visual anchor when the product is customer/staff-facing.
