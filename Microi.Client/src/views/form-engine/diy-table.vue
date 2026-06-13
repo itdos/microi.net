@@ -143,7 +143,7 @@
                                         && SysMenuModel.BatchSelectMoreBtns
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
                             <el-checkbox
-                                v-if="TableDisplayMode == 'Card' && TableEnableBatch"
+                                v-if="TableDisplayMode == 'Card' && CanUseTableSelection()"
                                 v-model="cardSelectAll"
                                 @change="toggleCardSelectAll"
                                 :indeterminate="cardSelection.length > 0 && cardSelection.length < DiyTableRowList.length"
@@ -454,7 +454,7 @@
                             />
                         </template>
                     </el-table-column>
-                    <el-table-column v-else-if="TableEnableBatch" type="selection" label="#" width="35" class-name="diy-batch-drag-zone"> </el-table-column>
+                    <el-table-column v-else-if="CanUseTableSelection()" type="selection" label="#" width="35" class-name="diy-batch-drag-zone"> </el-table-column>
                     <el-table-column
                         type="index"
                         :label="$t('Msg.SerialNo')"
@@ -959,7 +959,7 @@
                                             :label="item.Id"
                                         />
                                     </div>
-                                    <div v-else-if="TableEnableBatch"
+                                    <div v-else-if="CanUseTableSelection()"
                                         class="card-checkbox-wrapper"
                                         @click.stop="toggleCardSelection(item)"
                                         style="flex:1;justify-content:left;">
