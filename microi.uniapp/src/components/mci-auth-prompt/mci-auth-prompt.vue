@@ -43,6 +43,9 @@ export default {
 <style lang="scss" scoped>
 .mci-auth-prompt {
   flex: 1;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;

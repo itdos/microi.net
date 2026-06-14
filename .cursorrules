@@ -502,6 +502,12 @@ console.log('调试信息')                                  // 控制台输出�
 - 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 
 
+## MCP default visibility
+
+- When creating sys_menu modules, default `Display` and `AppDisplay` to `1` unless the user explicitly asks to hide the menu.
+- When creating diy_field fields, default `Visible` and `AppVisible` to `1` unless the user explicitly asks to hide the field.
+
+
 ---
 
 ## V8 引擎编码最佳实践（Skills）

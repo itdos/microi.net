@@ -20,14 +20,15 @@
     </view>
 
     <!-- 未登录提示 -->
-    <mci-auth-prompt
-      v-if="!isLoggedIn"
-      :title="t('common.loginFirst')"
-      :desc="t('workspace.loginHint')"
-      :action-text="t('common.loginNow')"
-      :gradient="themeGradient"
-      @action="goLogin"
-    />
+    <view v-if="!isLoggedIn" class="workspace-auth-wrap">
+      <mci-auth-prompt
+        :title="t('common.loginFirst')"
+        :desc="t('workspace.loginHint')"
+        :action-text="t('common.loginNow')"
+        :gradient="themeGradient"
+        @action="goLogin"
+      />
+    </view>
 
     <!-- 内容区域 -->
     <scroll-view
@@ -539,6 +540,15 @@ export default {
 .ws-content {
   flex: 1;
   height: 0;
+}
+
+.workspace-auth-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* 骨架屏 */
