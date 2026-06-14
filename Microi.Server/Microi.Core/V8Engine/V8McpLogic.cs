@@ -2306,6 +2306,298 @@ namespace Microi.net
         #region CreateModule
 
         /// <summary>
+        /// MCP menu auto-configuration helpers for sys_menu list/search/mobile defaults.
+        /// </summary>
+        private sealed class McpMenuFieldMeta
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Label { get; set; } = "";
+            public string TableId { get; set; } = "";
+            public string TableName { get; set; } = "";
+            public string TableDescription { get; set; } = "";
+            public string Component { get; set; } = "";
+            public string Type { get; set; } = "";
+            public int Sort { get; set; }
+            public bool IsSystem { get; set; }
+        }
+
+        private sealed class McpMenuDefaults
+        {
+            public string SearchFieldIds { get; set; } = "";
+            public string TableDiyFieldIds { get; set; } = "";
+            public string SelectFields { get; set; } = "";
+            public string SortFieldIds { get; set; } = "";
+            public string NotShowFields { get; set; } = "";
+            public string StatisticsFields { get; set; } = "";
+            public string MobileListFields { get; set; } = "";
+            public string CardTitleTagFields { get; set; } = "";
+            public string CardBottomTagFields { get; set; } = "";
+            public string DefaultOrderBy { get; set; } = "";
+            public List<string> Warnings { get; } = new List<string>();
+        }
+
+        private static readonly HashSet<string> McpTechnicalFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "CreateTime", "UpdateTime", "CreateUser", "UserId", "UserName", "OsClient", "IsDeleted", "ParentId", "ParentIds"
+        };
+
+        private static readonly HashSet<string> McpLayoutComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "Button"
+        };
+
+        private static readonly HashSet<string> McpHeavyListComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Textarea", "RichText", "CodeEditor", "JsonTable", "ImgUpload", "FileUpload", "TableChild", "Map", "MapArea", "Html", "DevComponent"
+        };
+
+        private static readonly HashSet<string> McpExactSearchComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Select", "MultipleSelect", "Radio", "Checkbox", "Switch", "Department", "SelectTree", "TreeCheckbox", "Cascader", "Address"
+        };
+
+        private static string McpFieldText(McpMenuFieldMeta field)
+        {
+            return $"{field.Name} {field.Label} {field.Component} {field.Type}".ToLowerInvariant();
+        }
+
+        private static bool McpHasKeyword(McpMenuFieldMeta field, params string[] keywords)
+        {
+            var text = McpFieldText(field);
+            return keywords.Any(keyword => text.IndexOf(keyword.ToLowerInvariant(), StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static bool McpIsLayoutField(McpMenuFieldMeta field)
+        {
+            return McpLayoutComponents.Contains(field.Component ?? "");
+        }
+
+        private static bool McpIsHeavyListField(McpMenuFieldMeta field)
+        {
+            return McpHeavyListComponents.Contains(field.Component ?? "");
+        }
+
+        private static bool McpIsIdLikeField(McpMenuFieldMeta field)
+        {
+            if (field == null) return false;
+            var name = field.Name ?? "";
+            if (McpTechnicalFieldNames.Contains(name)) return true;
+            if (name.Equals("Id", StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.EndsWith("Id", StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.EndsWith("Ids", StringComparison.OrdinalIgnoreCase)) return true;
+            return McpHasKeyword(field, "外键", "编号id", "关联id", "租户", "tenant", "osclient");
+        }
+
+        private static bool McpShouldHideInMenu(McpMenuFieldMeta field)
+        {
+            if (field == null || field.IsSystem) return false;
+            return McpIsIdLikeField(field) || McpIsLayoutField(field) || McpIsHeavyListField(field);
+        }
+
+        private static bool McpIsDateField(McpMenuFieldMeta field)
+        {
+            return string.Equals(field.Component, "DateTime", StringComparison.OrdinalIgnoreCase)
+                || McpHasKeyword(field, "date", "time", "日期", "时间");
+        }
+
+        private static bool McpIsNumericField(McpMenuFieldMeta field)
+        {
+            var type = (field.Type ?? "").ToLowerInvariant();
+            return type.Contains("int") || type.Contains("decimal") || type.Contains("bigint");
+        }
+
+        private static int McpSearchScore(McpMenuFieldMeta field)
+        {
+            var score = 0;
+            if (McpHasKeyword(field, "name", "title", "subject", "名称", "姓名", "标题", "主题")) score += 100;
+            if (McpHasKeyword(field, "no", "code", "sn", "number", "编号", "单号", "编码", "账号")) score += 90;
+            if (McpHasKeyword(field, "status", "state", "type", "category", "level", "状态", "类型", "分类", "等级")) score += 80;
+            if (McpHasKeyword(field, "user", "owner", "person", "manager", "dept", "客户", "负责人", "人员", "部门", "商家", "供应商")) score += 70;
+            if (McpIsDateField(field)) score += 55;
+            if (McpExactSearchComponents.Contains(field.Component ?? "")) score += 30;
+            return score;
+        }
+
+        private static int McpListScore(McpMenuFieldMeta field)
+        {
+            var score = 0;
+            if (McpHasKeyword(field, "name", "title", "subject", "名称", "标题", "主题")) score += 100;
+            if (McpHasKeyword(field, "no", "code", "sn", "number", "编号", "单号", "编码")) score += 90;
+            if (McpHasKeyword(field, "status", "state", "type", "category", "level", "状态", "类型", "分类", "等级")) score += 80;
+            if (McpHasKeyword(field, "amount", "money", "price", "total", "count", "qty", "积分", "余额", "金额", "价格", "数量")) score += 65;
+            if (McpHasKeyword(field, "user", "owner", "person", "manager", "dept", "客户", "负责人", "人员", "部门", "商家")) score += 60;
+            if (McpIsDateField(field)) score += 45;
+            if (!McpIsHeavyListField(field) && !McpIsLayoutField(field)) score += 10;
+            return score;
+        }
+
+        private static JObject McpToMenuFieldObject(McpMenuFieldMeta field, bool forSearch = false)
+        {
+            var obj = new JObject
+            {
+                ["Id"] = field.Id.DosIsNullOrWhiteSpace() ? field.Name : field.Id,
+                ["AsName"] = "",
+                ["Name"] = field.Name,
+                ["Label"] = field.Label.DosIsNullOrWhiteSpace() ? field.Name : field.Label,
+                ["TableId"] = field.TableId,
+                ["TableName"] = field.TableName,
+                ["TableDescription"] = field.TableDescription,
+                ["IsVisible"] = true
+            };
+
+            if (forSearch)
+            {
+                var exact = McpExactSearchComponents.Contains(field.Component ?? "");
+                obj["DisplayType"] = exact ? "In" : "Out";
+                obj["DisplaySelect"] = exact;
+                if (exact) obj["Equal"] = true;
+            }
+
+            return obj;
+        }
+
+        private static string McpJson(JArray array)
+        {
+            return array != null && array.Count > 0 ? array.ToString(Newtonsoft.Json.Formatting.None) : "";
+        }
+
+        private static async Task<McpMenuDefaults> BuildDefaultModuleMenuConfig(string osClient, string diyTableId, string diyTableName)
+        {
+            var defaults = new McpMenuDefaults();
+            if (diyTableId.DosIsNullOrWhiteSpace()) return defaults;
+
+            var fields = new List<McpMenuFieldMeta>();
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort" },
+                    _Where = new List<object>()
+                    {
+                        new List<object>() { "TableId", "=", diyTableId },
+                        new List<object>() { "AND", "IsDeleted", "<>", 1 },
+                    },
+                    _OrderBy = "Sort",
+                    _OrderByType = "ASC",
+                    _PageIndex = 1,
+                    _PageSize = 5000
+                });
+
+                if (result.Code == 1 && result.Data != null)
+                {
+                    foreach (var item in result.Data)
+                    {
+                        var row = JObject.FromObject(item);
+                        var name = SafeJString(row, "Name");
+                        if (name.DosIsNullOrWhiteSpace()) continue;
+                        fields.Add(new McpMenuFieldMeta
+                        {
+                            Id = SafeJString(row, "Id"),
+                            Name = name,
+                            Label = SafeJString(row, "Label", name),
+                            TableId = SafeJString(row, "TableId", diyTableId),
+                            TableName = diyTableName ?? "",
+                            TableDescription = diyTableName ?? "",
+                            Component = SafeJString(row, "Component"),
+                            Type = SafeJString(row, "Type"),
+                            Sort = SafeJInt(row, "Sort", 100)
+                        });
+                    }
+                }
+                else if (result.Code != 1)
+                {
+                    defaults.Warnings.Add("Auto sys_menu fields skipped: failed to read diy_field. " + SafeString(result.Msg));
+                    return defaults;
+                }
+            }
+            catch (Exception ex)
+            {
+                defaults.Warnings.Add("Auto sys_menu fields skipped: " + ex.Message);
+                return defaults;
+            }
+
+            if (!fields.Any()) return defaults;
+
+            var systemFields = new[]
+            {
+                new McpMenuFieldMeta { Id = "CreateTime", Name = "CreateTime", Label = "创建时间", TableId = diyTableId, TableName = diyTableName ?? "", TableDescription = diyTableName ?? "", Component = "DateTime", Type = "varchar(25)", IsSystem = true },
+                new McpMenuFieldMeta { Id = "UpdateTime", Name = "UpdateTime", Label = "更新时间", TableId = diyTableId, TableName = diyTableName ?? "", TableDescription = diyTableName ?? "", Component = "DateTime", Type = "varchar(25)", IsSystem = true },
+                new McpMenuFieldMeta { Id = "UserName", Name = "UserName", Label = "创建人", TableId = diyTableId, TableName = diyTableName ?? "", TableDescription = diyTableName ?? "", Component = "Text", Type = "varchar(200)", IsSystem = true }
+            };
+
+            var visibleFields = fields.Where(f => !McpShouldHideInMenu(f)).ToList();
+            var rankedVisible = visibleFields
+                .OrderByDescending(McpListScore)
+                .ThenBy(f => f.Sort)
+                .ThenBy(f => f.Name)
+                .ToList();
+
+            var listFields = rankedVisible.Take(12).ToList();
+            if (!listFields.Any()) listFields = fields.Where(f => !McpIsLayoutField(f)).Take(8).ToList();
+
+            var searchCandidates = visibleFields.Concat(systemFields)
+                .Where(f => !McpIsHeavyListField(f) && !McpIsLayoutField(f))
+                .Select(f => new { Field = f, Score = McpSearchScore(f) })
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Field.Sort)
+                .Take(8)
+                .Select(x => x.Field)
+                .ToList();
+            if (!searchCandidates.Any()) searchCandidates = listFields.Take(4).ToList();
+
+            var sortFields = fields.Where(f => !McpShouldHideInMenu(f) && (McpIsDateField(f) || McpIsNumericField(f) || f.Name.Equals("Sort", StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(f => McpIsDateField(f) ? 2 : 1)
+                .ThenBy(f => f.Sort)
+                .Take(8)
+                .ToList();
+
+            var statisticsFields = fields.Where(f => !McpShouldHideInMenu(f) && McpIsNumericField(f)
+                    && McpHasKeyword(f, "amount", "money", "price", "total", "count", "qty", "score", "point", "积分", "余额", "金额", "价格", "数量", "人数", "总计"))
+                .OrderByDescending(McpListScore)
+                .ThenBy(f => f.Sort)
+                .Take(6)
+                .ToList();
+
+            var mobileFields = rankedVisible.Take(4).ToList();
+            var cardTitleFields = rankedVisible.Where(f => McpHasKeyword(f, "status", "state", "type", "category", "level", "状态", "类型", "分类", "等级")).Take(2).ToList();
+            var cardBottomFields = rankedVisible.Where(f => McpIsDateField(f) || McpIsNumericField(f)
+                    || McpHasKeyword(f, "amount", "money", "price", "count", "qty", "积分", "余额", "金额", "价格", "数量"))
+                .Take(3)
+                .ToList();
+
+            var defaultOrder = fields.FirstOrDefault(f => f.Name.Equals("CreateTime", StringComparison.OrdinalIgnoreCase))
+                ?? systemFields.FirstOrDefault(f => f.Name == "CreateTime");
+
+            defaults.TableDiyFieldIds = McpJson(new JArray(listFields.Select(f => f.Id)));
+            defaults.SelectFields = McpJson(new JArray(listFields.Select(f => McpToMenuFieldObject(f))));
+            defaults.SearchFieldIds = McpJson(new JArray(searchCandidates.Select(f => McpToMenuFieldObject(f, true))));
+            defaults.SortFieldIds = McpJson(new JArray(sortFields.Select(f => f.Id)));
+            defaults.NotShowFields = McpJson(new JArray(fields.Where(McpShouldHideInMenu).Select(f => f.Id)));
+            defaults.StatisticsFields = McpJson(new JArray(statisticsFields.Select(f => new JObject { ["Id"] = f.Id, ["Type"] = "Sum" })));
+            defaults.MobileListFields = McpJson(new JArray(mobileFields.Select(f => McpToMenuFieldObject(f))));
+            defaults.CardTitleTagFields = McpJson(new JArray(cardTitleFields.Select(f => McpToMenuFieldObject(f))));
+            defaults.CardBottomTagFields = McpJson(new JArray(cardBottomFields.Select(f => McpToMenuFieldObject(f))));
+            if (defaultOrder != null)
+            {
+                defaults.DefaultOrderBy = new JArray
+                {
+                    new JObject
+                    {
+                        ["Id"] = defaultOrder.Id.DosIsNullOrWhiteSpace() ? defaultOrder.Name : defaultOrder.Id,
+                        ["Name"] = defaultOrder.Name,
+                        ["Type"] = "DESC",
+                        ["Sort"] = 0
+                    }
+                }.ToString(Newtonsoft.Json.Formatting.None);
+            }
+
+            return defaults;
+        }
+
+        /// <summary>
         /// 新增功能模块（sys_menu）
         /// </summary>
         public static async Task<DosResult<object>> CreateModule(
@@ -2432,6 +2724,22 @@ namespace Microi.net
                 if (!exportBtnsNormalized.Ok) return new DosResult<object>(0, null, exportBtnsNormalized.Msg);
                 var pageBtnsNormalized = NormalizeMenuJsonArray("PageBtns", pageBtns, buttonWarnings);
                 if (!pageBtnsNormalized.Ok) return new DosResult<object>(0, null, pageBtnsNormalized.Msg);
+
+                if (!diyTableId.DosIsNullOrWhiteSpace())
+                {
+                    var menuDefaults = await BuildDefaultModuleMenuConfig(osClient, diyTableId, diyTableName);
+                    if (searchFieldIds.DosIsNullOrWhiteSpace()) searchFieldIds = menuDefaults.SearchFieldIds;
+                    if (tableDiyFieldIds.DosIsNullOrWhiteSpace()) tableDiyFieldIds = menuDefaults.TableDiyFieldIds;
+                    if (selectFields.DosIsNullOrWhiteSpace()) selectFields = menuDefaults.SelectFields;
+                    if (sortFieldIds.DosIsNullOrWhiteSpace()) sortFieldIds = menuDefaults.SortFieldIds;
+                    if (notShowFields.DosIsNullOrWhiteSpace()) notShowFields = menuDefaults.NotShowFields;
+                    if (statisticsFields.DosIsNullOrWhiteSpace()) statisticsFields = menuDefaults.StatisticsFields;
+                    if (mobileListFields.DosIsNullOrWhiteSpace()) mobileListFields = menuDefaults.MobileListFields;
+                    if (cardTitleTagFields.DosIsNullOrWhiteSpace()) cardTitleTagFields = menuDefaults.CardTitleTagFields;
+                    if (cardBottomTagFields.DosIsNullOrWhiteSpace()) cardBottomTagFields = menuDefaults.CardBottomTagFields;
+                    if (defaultOrderBy.DosIsNullOrWhiteSpace()) defaultOrderBy = menuDefaults.DefaultOrderBy;
+                    if (menuDefaults.Warnings.Any()) buttonWarnings.AddRange(menuDefaults.Warnings);
+                }
 
                 var menuData = new JObject
                 {
