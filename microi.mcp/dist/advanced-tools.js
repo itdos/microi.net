@@ -103,6 +103,9 @@ function getFieldRefs(record, ...keys) {
                 displaySelect: typeof source.displaySelect === 'boolean'
                     ? source.displaySelect
                     : (typeof source.DisplaySelect === 'boolean' ? source.DisplaySelect : undefined),
+                equal: typeof source.equal === 'boolean'
+                    ? source.equal
+                    : (typeof source.Equal === 'boolean' ? source.Equal : undefined),
             };
         }).filter((item) => item.ref);
     }
@@ -326,6 +329,7 @@ function buildFieldConfig(sourceType, options) {
     return { config: {}, warnings };
 }
 function toSearchFieldModel(meta, ref) {
+    const component = componentKey(meta);
     return compactObject({
         Id: meta.id,
         AsName: ref?.asName || '',
@@ -334,8 +338,10 @@ function toSearchFieldModel(meta, ref) {
         TableId: meta.tableId,
         TableName: meta.tableName,
         TableDescription: meta.tableDescription || meta.tableName,
-        DisplayType: ref?.displayType || 'Out',
-        DisplaySelect: ref?.displaySelect ?? false,
+        DisplayType: ref?.displayType || (EXACT_SEARCH_COMPONENTS.has(component) || isDateField(meta) || component === 'numbertext' ? 'In' : 'Out'),
+        DisplaySelect: ref?.displaySelect ?? ['opentable', 'joinform', 'department', 'selecttree'].includes(component),
+        Equal: ref?.equal ?? (EXACT_SEARCH_COMPONENTS.has(component) || component === 'numbertext' ? true : undefined),
+        IsVisible: true,
     });
 }
 function resolveFieldRefs(lookup, tableId, tableName, refs, context) {
@@ -357,15 +363,210 @@ function getExplicitJsonString(record, ...keys) {
     }
     return '';
 }
+const TECHNICAL_FIELD_NAMES = new Set([
+    'id', 'osclient', 'isdeleted', 'createuserid', 'updateuserid', 'deleteuserid',
+    'tenantid', 'storeid', 'userid', 'userids', 'roleid', 'roleids', 'parentid',
+    'parentids', 'class', 'code', 'enname', 'endescription',
+]);
+const LAYOUT_COMPONENTS = new Set([
+    'button', 'divider', 'collapsegroup', 'tabs', 'alert', 'statictext', 'html', 'devcomponent',
+]);
+const HEAVY_LIST_COMPONENTS = new Set([
+    'textarea', 'richtext', 'codeeditor', 'jsontable', 'imgupload', 'fileupload',
+    'tablechild', 'map', 'maparea', 'jointable', 'opentable', 'treecheckbox', 'transfer',
+]);
+const SEARCHABLE_COMPONENTS = new Set([
+    'text', 'textarea', 'select', 'multipleselect', 'radio', 'checkbox', 'datetime',
+    'date', 'numbertext', 'autonumber', 'switch', 'department', 'address', 'cascader',
+    'selecttree', 'opentable', 'joinform', 'autocomplete', 'taginput',
+]);
+const EXACT_SEARCH_COMPONENTS = new Set([
+    'select', 'multipleselect', 'radio', 'checkbox', 'switch', 'department', 'selecttree',
+    'opentable', 'joinform', 'cascader',
+]);
+function lower(value) {
+    return (value || '').trim().toLowerCase();
+}
+function fieldText(field) {
+    return `${field.name || ''} ${field.label || ''} ${field.component || ''} ${field.type || ''}`.toLowerCase();
+}
+function hasKeyword(text, keywords) {
+    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+function componentKey(field) {
+    return lower(field.component || 'Text');
+}
+function isLayoutField(field) {
+    return LAYOUT_COMPONENTS.has(componentKey(field));
+}
+function isHeavyListField(field) {
+    return HEAVY_LIST_COMPONENTS.has(componentKey(field));
+}
+function isIdLikeField(field) {
+    const name = field.name || '';
+    const normalized = lower(name).replace(/[_\-\s]+/g, '');
+    if (TECHNICAL_FIELD_NAMES.has(normalized))
+        return true;
+    if (/^(.*id|.*ids|.*idlist|.*guid)$/.test(normalized) && !/idcard|identity|cardid/.test(normalized))
+        return true;
+    if (/Id$|ID$|Ids$|IDs$|Guid$/u.test(name) && !/IdCard|IDCard|Identity|CardId/u.test(name))
+        return true;
+    return false;
+}
+function shouldHideInMenuList(field) {
+    if (isSystemFieldName(field.name) && !['CreateTime', 'UpdateTime', 'UserName'].some((name) => name.toLowerCase() === field.name.toLowerCase()))
+        return true;
+    if (isIdLikeField(field))
+        return true;
+    if (isLayoutField(field))
+        return true;
+    if (isHeavyListField(field))
+        return true;
+    return componentKey(field).includes('hidden');
+}
+function uniqueFields(fields) {
+    const seen = new Set();
+    return fields.filter((field) => {
+        const key = field.id || field.name;
+        if (!key || seen.has(key))
+            return false;
+        seen.add(key);
+        return true;
+    });
+}
+function rankedFields(fields, score) {
+    return fields
+        .map((field, index) => ({ field, index, score: score(field) }))
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .map((item) => item.field);
+}
+function isNumericField(field) {
+    const type = lower(field.type);
+    return componentKey(field) === 'numbertext'
+        || type.startsWith('decimal')
+        || type === 'int'
+        || type === 'bigint';
+}
+function isDateField(field) {
+    const text = fieldText(field);
+    return componentKey(field) === 'datetime' || hasKeyword(text, ['time', 'date', '日期', '时间']);
+}
+function defaultSearchRef(meta) {
+    const component = componentKey(meta);
+    const exact = EXACT_SEARCH_COMPONENTS.has(component) || component === 'numbertext' || component === 'rate' || component === 'progress';
+    return {
+        ref: meta.name,
+        displayType: exact || isDateField(meta) ? 'In' : 'Out',
+        displaySelect: ['opentable', 'joinform', 'department', 'selecttree'].includes(component),
+        equal: exact ? true : undefined,
+    };
+}
+function searchFieldScore(field) {
+    const text = fieldText(field);
+    let score = 0;
+    if (hasKeyword(text, ['name', 'title', 'no', 'code', 'account', 'phone', 'mobile', 'email', '名称', '标题', '编号', '账号', '电话', '手机', '邮箱']))
+        score += 50;
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', 'level', 'class', '状态', '类型', '分类', '等级']))
+        score += 45;
+    if (hasKeyword(text, ['customer', 'member', 'user', 'owner', '负责人', '客户', '会员', '用户', '联系人']))
+        score += 35;
+    if (isDateField(field))
+        score += 25;
+    if (isNumericField(field) && !hasKeyword(text, ['phone', 'mobile', 'tel', '电话', '手机']))
+        score += 15;
+    if (componentKey(field) === 'textarea')
+        score -= 25;
+    return score;
+}
+function listFieldScore(field) {
+    const text = fieldText(field);
+    let score = 0;
+    if (hasKeyword(text, ['name', 'title', 'no', 'code', '名称', '标题', '编号']))
+        score += 70;
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', '状态', '类型', '分类']))
+        score += 45;
+    if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'phone', 'mobile', '客户', '会员', '用户', '负责人', '电话', '手机']))
+        score += 35;
+    if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '金额', '价格', '总额', '数量', '积分', '余额']))
+        score += 30;
+    if (isDateField(field))
+        score += 15;
+    if (componentKey(field) === 'autonumber')
+        score += 55;
+    return score;
+}
+function defaultHiddenFields(fields) {
+    return uniqueFields(fields.filter(shouldHideInMenuList));
+}
 function defaultListFields(fields) {
-    const hidden = new Set(['Id', 'OsClient', 'IsDeleted']);
-    const businessFields = fields.filter((field) => !hidden.has(field.name) && !field.component.toLowerCase().includes('hidden'));
+    const businessFields = fields.filter((field) => !shouldHideInMenuList(field));
     const source = businessFields.length ? businessFields : fields;
-    return source.slice(0, Math.min(8, source.length));
+    return uniqueFields(rankedFields(source, listFieldScore)).slice(0, Math.min(12, source.length));
 }
 function defaultSearchFields(fields) {
-    const searchableComponents = new Set(['Text', 'Textarea', 'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'DateTime', 'Date', 'NumberText', 'AutoNumber']);
-    return fields.filter((field) => searchableComponents.has(field.component || 'Text')).slice(0, 4);
+    const candidates = fields.filter((field) => !shouldHideInMenuList(field) && SEARCHABLE_COMPONENTS.has(componentKey(field)));
+    const ranked = rankedFields(candidates, searchFieldScore).filter((field) => searchFieldScore(field) > 0);
+    return uniqueFields((ranked.length ? ranked : candidates)).slice(0, Math.min(8, candidates.length));
+}
+function defaultSortFields(fields) {
+    const candidates = fields.filter((field) => !shouldHideInMenuList(field) && (isDateField(field) || isNumericField(field) || lower(field.name) === 'sort'));
+    return uniqueFields(rankedFields(candidates, (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['update', '修改']))
+            return 80;
+        if (hasKeyword(text, ['create', '创建']))
+            return 75;
+        if (lower(field.name) === 'sort')
+            return 70;
+        if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', '金额', '价格', '数量']))
+            return 60;
+        return 20;
+    })).slice(0, Math.min(8, candidates.length));
+}
+function defaultStatisticsFields(fields) {
+    const blocked = ['phone', 'mobile', 'tel', 'status', 'state', 'sort', 'rate', 'level', '电话', '手机', '状态', '排序', '等级'];
+    const candidates = fields.filter((field) => {
+        const text = fieldText(field);
+        return !shouldHideInMenuList(field)
+            && isNumericField(field)
+            && !hasKeyword(text, blocked)
+            && hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', 'score', 'point', 'balance', '金额', '价格', '总额', '数量', '积分', '余额', '面积', '重量']);
+    });
+    return uniqueFields(rankedFields(candidates, (field) => hasKeyword(fieldText(field), ['amount', 'money', 'price', 'total', '金额', '价格', '总额']) ? 80 : 40)).slice(0, 6);
+}
+function defaultMobileFields(fields) {
+    const candidates = defaultListFields(fields);
+    const title = rankedFields(candidates, (field) => hasKeyword(fieldText(field), ['name', 'title', 'no', 'code', '名称', '标题', '编号']) ? 100 : 0)[0];
+    const tags = rankedFields(candidates.filter((field) => field !== title), (field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', '状态', '类型', '分类']) ? 80 : 0);
+    const rest = candidates.filter((field) => field !== title && !tags.slice(0, 1).includes(field));
+    return uniqueFields([title, ...tags.slice(0, 1), ...rest].filter(Boolean)).slice(0, 4);
+}
+function defaultCardTitleFields(fields) {
+    return rankedFields(defaultListFields(fields), (field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'level', '状态', '类型', '分类', '等级']) ? 100 : 0)
+        .filter((field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'level', '状态', '类型', '分类', '等级']))
+        .slice(0, 2);
+}
+function defaultCardBottomFields(fields) {
+    return rankedFields(defaultListFields(fields), (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '积分', '余额', '金额', '价格', '数量']))
+            return 90;
+        if (isDateField(field))
+            return 60;
+        return 0;
+    }).filter((field) => {
+        const text = fieldText(field);
+        return isDateField(field) || hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '积分', '余额', '金额', '价格', '数量']);
+    }).slice(0, 3);
+}
+function defaultOrderByFromFields(fields, tableId, tableName) {
+    const candidates = fields.length ? fields : [systemFieldMeta(tableId, tableName, 'CreateTime')];
+    const field = candidates.find((item) => lower(item.name) === 'createtime')
+        || candidates.find((item) => lower(item.name) === 'updatetime')
+        || candidates.find((item) => lower(item.name) === 'sort');
+    if (!field)
+        return undefined;
+    return JSON.stringify([{ Id: field.id, Name: field.name, Type: lower(field.name) === 'sort' ? 'ASC' : 'DESC', Sort: 0 }]);
 }
 function buildDefaultOrderBy(module, lookup, tableId, tableName) {
     const canonical = getValue(module, 'DefaultOrderBy');
@@ -402,7 +603,7 @@ function resolveModuleFields(module, lookup, tableId, tableName) {
     const searchRefs = getFieldRefs(module, 'searchFields', 'SearchFields', 'searchFieldNames', 'SearchFieldNames');
     const resolvedSearch = searchRefs.length
         ? resolveFieldRefs(lookup, tableId, tableName, searchRefs, 'module.searchFields')
-        : defaultSearchFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name } }));
+        : defaultSearchFields(tableFields).map((meta) => ({ meta, ref: defaultSearchRef(meta) }));
     if (!getExplicitJsonString(module, 'searchFieldIds', 'SearchFieldIds') && resolvedSearch.length) {
         output.SearchFieldIds = JSON.stringify(resolvedSearch.map(({ meta, ref }) => toSearchFieldModel(meta, ref)));
     }
@@ -428,21 +629,36 @@ function resolveModuleFields(module, lookup, tableId, tableName) {
         if (getExplicitJsonString(module, ...item.explicitKeys))
             continue;
         const refs = getFieldRefs(module, ...item.refKeys);
-        if (!refs.length)
+        const defaultByCanonical = {
+            SortFieldIds: defaultSortFields(tableFields),
+            NotShowFields: defaultHiddenFields(tableFields),
+            MobileListFields: defaultMobileFields(tableFields),
+            CardTitleTagFields: defaultCardTitleFields(tableFields),
+            CardBottomTagFields: defaultCardBottomFields(tableFields),
+            InTableEditFields: [],
+        };
+        if (!refs.length && !defaultByCanonical[item.canonical]?.length)
             continue;
-        const resolved = resolveFieldRefs(lookup, tableId, tableName, refs, `module.${item.canonical}`);
+        const resolved = refs.length
+            ? resolveFieldRefs(lookup, tableId, tableName, refs, `module.${item.canonical}`)
+            : defaultByCanonical[item.canonical].map((meta) => ({ meta, ref: { ref: meta.name } }));
         output[item.canonical] = JSON.stringify(item.objectArray
             ? resolved.map(({ meta, ref }) => toSearchFieldModel(meta, ref))
             : resolved.map(({ meta }) => meta.id));
     }
     const statisticsRefs = getFieldRefs(module, 'statisticsFieldNames', 'StatisticsFieldNames', 'statFields', 'StatFields');
-    if (!getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields') && statisticsRefs.length) {
-        output.StatisticsFields = JSON.stringify(resolveFieldRefs(lookup, tableId, tableName, statisticsRefs, 'module.statisticsFields').map(({ meta, ref }) => ({
-            Id: meta.id,
-            Type: ref.type || 'SUM',
-        })));
+    if (!getExplicitJsonString(module, 'statisticsFields', 'StatisticsFields')) {
+        const resolvedStatistics = statisticsRefs.length
+            ? resolveFieldRefs(lookup, tableId, tableName, statisticsRefs, 'module.statisticsFields')
+            : defaultStatisticsFields(tableFields).map((meta) => ({ meta, ref: { ref: meta.name, type: 'Sum' } }));
+        if (resolvedStatistics.length)
+            output.StatisticsFields = JSON.stringify(resolvedStatistics.map(({ meta, ref }) => ({
+                Id: meta.id,
+                Type: ref.type || 'Sum',
+            })));
     }
-    const defaultOrderBy = buildDefaultOrderBy(module, lookup, tableId, tableName);
+    const defaultOrderBy = buildDefaultOrderBy(module, lookup, tableId, tableName)
+        || (getExplicitJsonString(module, 'DefaultOrderBy', 'defaultOrderBy') ? undefined : defaultOrderByFromFields(tableFields, tableId, tableName));
     if (defaultOrderBy)
         output.DefaultOrderBy = defaultOrderBy;
     return output;
@@ -475,6 +691,60 @@ function populateFieldLookupFromSchema(lookup, schemaData, tableIdByName) {
         }
     }
 }
+function tableFieldComponent(field) {
+    return lower(getString(field, 'component', 'Component') || 'Text');
+}
+function tableFieldText(field) {
+    return `${getString(field, 'name', 'Name')} ${getString(field, 'label', 'Label')} ${getString(field, 'component', 'Component')}`.toLowerCase();
+}
+function autoTableTabForField(field, index) {
+    const text = tableFieldText(field);
+    const component = tableFieldComponent(field);
+    if (['imgupload', 'fileupload', 'richtext', 'codeeditor', 'jsontable', 'tablechild', 'map', 'maparea', 'textarea'].includes(component)
+        || hasKeyword(text, ['remark', 'note', 'content', 'file', 'image', 'attach', 'map', '备注', '说明', '内容', '附件', '图片', '地图'])) {
+        return 'attachment';
+    }
+    if (hasKeyword(text, ['phone', 'mobile', 'email', 'address', 'city', 'contact', '联系人', '电话', '手机', '邮箱', '地址', '城市'])) {
+        return 'contact';
+    }
+    if (hasKeyword(text, ['status', 'state', 'type', 'category', 'amount', 'money', 'price', 'count', 'date', 'time', '状态', '类型', '分类', '金额', '价格', '数量', '时间', '日期'])) {
+        return 'business';
+    }
+    return index < 8 ? 'basic' : 'extra';
+}
+function buildDefaultTableLayout(table) {
+    const fields = getArray(table, 'fields', 'Fields');
+    const explicitTabs = getValue(table, 'tabs', 'Tabs');
+    const fieldTabs = new Map();
+    const column = getNumber(table, 'column', 'Column') ?? (fields.length > 6 ? 2 : undefined);
+    if (explicitTabs !== undefined && explicitTabs !== null && explicitTabs !== '')
+        return { fieldTabs, column };
+    const nonLayoutFields = fields.filter((field) => !LAYOUT_COMPONENTS.has(tableFieldComponent(field)));
+    if (nonLayoutFields.length <= 12)
+        return { fieldTabs, column };
+    const labels = {
+        basic: { Name: '基础信息', Icon: 'fas fa-id-card', Sort: 10 },
+        contact: { Name: '联系信息', Icon: 'fas fa-address-book', Sort: 20 },
+        business: { Name: '业务信息', Icon: 'fas fa-briefcase', Sort: 30 },
+        attachment: { Name: '附件备注', Icon: 'fas fa-paperclip', Sort: 40 },
+        extra: { Name: '扩展信息', Icon: 'fas fa-layer-group', Sort: 50 },
+    };
+    const used = new Set();
+    nonLayoutFields.forEach((field, index) => {
+        const fieldName = getString(field, 'name', 'Name');
+        if (!fieldName || getString(field, 'tab', 'Tab'))
+            return;
+        const tabId = autoTableTabForField(field, index);
+        fieldTabs.set(fieldName, tabId);
+        used.add(tabId);
+    });
+    const ordered = ['basic', 'contact', 'business', 'attachment', 'extra'].filter((tabId) => used.has(tabId));
+    return {
+        tabs: ordered.map((tabId) => ({ Id: tabId, Name: labels[tabId].Name, Icon: labels[tabId].Icon, Sort: labels[tabId].Sort })),
+        fieldTabs,
+        column,
+    };
+}
 function buildPlan(manifest) {
     const errors = [];
     const warnings = [];
@@ -500,6 +770,10 @@ function buildPlan(manifest) {
         if (!name)
             errors.push(`tables[${tableIndex}].name 不能为空`);
         plan.push(`create_table ${name || `(index ${tableIndex})`}`);
+        const layout = buildDefaultTableLayout(table);
+        if (layout.tabs?.length) {
+            warnings.push(`table ${name || `(index ${tableIndex})`} has many fields; generator will create diy_table.Tabs and assign empty field Tab values automatically`);
+        }
         if (name)
             manifestFieldsByTable.set(name.toLowerCase(), new Set());
         getArray(table, 'fields', 'Fields').forEach((field, fieldIndex) => {
@@ -939,10 +1213,11 @@ function manifestGuide(osClient) {
             tables: [{
                     name: 'Biz_Order',
                     description: 'Order main table',
+                    tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
                     fields: [
-                        { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
-                        { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', notEmpty: 1, tableWidth: 160, sort: 20 },
-                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
+                        { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
+                        { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
+                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
                     ],
                 }],
             engines: [{ apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" }],
@@ -995,16 +1270,25 @@ function manifestGuide(osClient) {
             jobs: [],
         },
         naturalFieldKeys: {
+            tables: {
+                tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
+                column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
+            },
+            fields: {
+                component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
+                tab: 'Assign a field to a diy_table.Tabs Id/Name. For many fields, prefer table-level Tabs; use CollapseGroup or field component Tabs only when an in-page section needs collapsible or nested grouping.',
+            },
             modules: {
                 table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
-                listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields.',
-                searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array.',
-                sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds.',
-                hiddenFields: 'Field names/labels/ids to hide. Produces NotShowFields.',
+                listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields. When omitted, generator chooses title/no/status/person/amount/time fields.',
+                searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array. When omitted, generator chooses title/no/status/type/category/person/time fields.',
+                sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds. When omitted, generator chooses date/time, Sort and numeric business fields.',
+                hiddenFields: 'Field names/labels/ids to hide. Produces NotShowFields. When omitted, generator hides Id-like fields, foreign keys, system fields and layout/large controls.',
                 editableFields: 'Field names/labels/ids for in-table editing. Produces InTableEditFields.',
-                mobileFields: 'Field names/labels/ids for mobile card list. Produces MobileListFields.',
-                cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields.',
-                cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields.',
+                mobileFields: 'Field names/labels/ids for mobile card list. Produces MobileListFields. When omitted, generator picks 3-4 compact title/status/summary fields.',
+                cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields. When omitted, generator picks status/type/category fields.',
+                cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields. When omitted, generator picks amount/count/date fields.',
+                statisticsFields: 'Field names/labels/ids for table footer statistics. When omitted, generator sums amount/price/count/point/balance numeric fields.',
             },
         },
         rules: [
@@ -1014,6 +1298,8 @@ function manifestGuide(osClient) {
             'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
             'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
             'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
+            'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
+            'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
             'Use dryRun=true until the user explicitly asks to write.',
             'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
             'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
@@ -1099,10 +1385,11 @@ export function registerAdvancedTools(server, client, context) {
             }
             for (const table of getArray(manifest, 'tables', 'Tables')) {
                 const tableName = getString(table, 'name', 'Name');
+                const tableLayout = buildDefaultTableLayout(table);
                 const response = await client.createTable(tableName, getString(table, 'description', 'Description'), {
-                    Tabs: stringifyConfig(table.tabs ?? table.Tabs),
+                    Tabs: stringifyConfig(table.tabs ?? table.Tabs ?? tableLayout.tabs),
                     IsTree: getNumber(table, 'isTree', 'IsTree'),
-                    Column: getNumber(table, 'column', 'Column'),
+                    Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
                     FormOpenType: getString(table, 'formOpenType', 'FormOpenType'),
                     FormOpenWidth: getString(table, 'formOpenWidth', 'FormOpenWidth'),
                 });
@@ -1123,7 +1410,7 @@ export function registerAdvancedTools(server, client, context) {
                         Component: getString(field, 'component', 'Component'),
                         Visible: getNumber(field, 'visible', 'Visible') ?? 1,
                         AppVisible: getNumber(field, 'appVisible', 'AppVisible') ?? 1,
-                        Tab: getString(field, 'tab', 'Tab'),
+                        Tab: getString(field, 'tab', 'Tab') || tableLayout.fieldTabs.get(getString(field, 'name', 'Name')),
                         TableWidth: getNumber(field, 'tableWidth', 'TableWidth'),
                         Sort: getNumber(field, 'sort', 'Sort'),
                         Readonly: getNumber(field, 'readonly', 'Readonly'),

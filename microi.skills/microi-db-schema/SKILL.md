@@ -23,6 +23,25 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 - `microi_database` 将扩展数据库 key 映射到 `V8.Dbs.<DbKey>`。
 - `wf_*` 表存储工作流设计、节点、连线、实例、待办和历史。
 
+## sys_menu 生成默认配置
+
+通过自然语言 + MCP 创建后端菜单时，不能只写 `Name`、`DiyTableId` 和基础路由。绑定 `diyTableId` 的 CRUD 菜单应显式配置，或允许 MCP/后端自动推断以下字段：
+
+- `TableDiyFieldIds` / `SelectFields`：列表列优先选择名称、标题、编号、状态、类型、负责人、金额、数量、时间等业务可读字段。
+- `SearchFieldIds`：默认选择名称/标题/编号、状态/类型/分类、负责人/部门/客户、日期时间等常用筛选字段；`Select`、`Radio`、`Checkbox`、`Switch`、`Department`、树/级联/地址等控件默认按等值筛选。
+- `NotShowFields`：默认隐藏 `Id`、`XxxId`、`XxxIds`、租户/系统字段、布局控件，以及富文本、上传、地图、子表、代码编辑器等不适合表格展示的重字段。
+- `SortFieldIds` / `DefaultOrderBy`：默认包含日期时间、`Sort`、金额/数量等排序字段，并优先按 `CreateTime DESC`。
+- `StatisticsFields`：金额、价格、数量、积分、余额、人数、总计等数值字段默认配置 `Sum` 统计。
+- `MobileListFields` / `CardTitleTagFields` / `CardBottomTagFields`：移动端或卡片列表默认保留 3-4 个高信息密度字段，标题标签优先状态/类型/分类，底部标签优先金额/数量/时间。
+
+显式配置优先级最高；未指定时由 MCP 生成器或后端 `CreateModule` 兜底补齐，避免空白菜单配置。
+
+## 表单控件与布局
+
+表单控件以 `Microi.Client/src/views/form-engine/diy-field-component/` 和 `diy-component-list.json` 为事实源。当前常用组件包括：`Text`、`Guid`、`Textarea`、`NumberText`、`DateTime`、`Select`、`MultipleSelect`、`Radio`、`Checkbox`、`Switch`、`Rate`、`Progress`、`Slider`、`ColorPicker`、`AutoNumber`、`Button`、`Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText`、`CodeEditor`、`JsonTable`、`ImgUpload`、`FileUpload`、`Autocomplete`、`TagInput`、`Transfer`、`Cascader`、`Address`、`Department`、`SelectTree`、`TreeCheckbox`、`OpenTable`、`JoinTable`、`JoinForm`、`TableChild`、`Map`、`MapArea`、`Qrcode`、`FontAwesome`、`DevComponent`。
+
+字段较多的表单不要全部堆在一页：优先设置 `diy_table.Tabs`，并给字段写入 `diy_field.Tab`，常见分组为基础信息、联系信息、业务信息、附件备注、扩展信息。局部区域再用 `CollapseGroup` 或字段级 `Tabs` 控件做折叠/分段；`Textarea`、`RichText`、`CodeEditor`、上传、地图、子表、布局/自定义控件等使用 `FormWidth=24` 独占整行。
+
 ## 安全注意
 
 - 不要假设 `_Fields` 中列出的每个字段都是物理数据库列。`TableChild`、`Button`、`Divider`、`DevComponent`、`OpenTable` 和 `PhoneSMS` 是配置或交互组件。
