@@ -51,6 +51,14 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 - 用户明确要求通过 MCP 修正当前后台菜单时，不能只更新 Skill 或文档后停下。必须回读 `sys_menu`，创建缺失的父级 `SecondMenu`，更新现有子菜单 `ParentId` / `Sort`，给管理员角色补父菜单权限，最后再次回读验证树结构。
 - 表单布局默认遵守平台约定，例如 PC 双列；字段显示顺序要跟业务表单顺序一致。
 
+绑定 `diyTableId` 创建 CRUD 菜单时，必须配置或允许 MCP/后端自动推断 `TableDiyFieldIds`、`SelectFields`、`SearchFieldIds`、`SortFieldIds`、`NotShowFields`、`StatisticsFields`、`MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`、`DefaultOrderBy`。列表列、搜索列、移动端卡片列不能为空白；`Id/XxxId/XxxIds`、系统字段、布局控件和富文本/上传/地图/子表等重字段默认不展示在列表。
+
+搜索字段默认覆盖名称/标题/编号、状态/类型/分类、负责人/部门/客户、日期时间；金额、价格、数量、积分、余额、人数等数值字段默认进入 `StatisticsFields`。选择类、开关、部门、树、级联、地址等字段应尽量使用等值筛选。
+
+字段较多的表单必须做视觉分组：优先使用 `diy_table.Tabs` 和字段 `Tab` 划分基础信息、联系信息、业务信息、附件备注、扩展信息；局部复杂区域再使用 `CollapseGroup` 或字段级 `Tabs` 控件折叠/分段。不要把 15 个以上字段无分组平铺在一个表单里。
+
+表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。
+
 ### 3. 关联字段与表单设计
 
 外键字段不能只生成一个 `XxxId`。

@@ -83,6 +83,8 @@ Manifest 的 `modules` 支持直接使用字段名配置列表和搜索，不需
 - `searchFields`：搜索字段，自动生成 `SearchFieldIds` 对象数组。
 - `sortFields`、`hiddenFields`、`editableFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`：分别生成 `SortFieldIds`、`NotShowFields`、`InTableEditFields`、`MobileListFields`、卡片标签字段配置。
 
+未显式配置时，MCP 会按字段语义自动补齐后台菜单体验：`NotShowFields` 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段，`SearchFieldIds` 默认选择名称、标题、编号、状态、分类、负责人、时间等常用筛选，`StatisticsFields` 默认选择金额、价格、数量、积分、余额等数值字段，`MobileListFields` 和卡片标签字段默认选择移动端可读的 3-4 个核心字段。字段较多的表单会优先使用 `diy_table.Tabs` 和字段 `Tab` 做基础信息、联系信息、业务信息、附件备注、扩展信息分组，必要时再使用 `CollapseGroup` / 字段级 `Tabs` 控件美化局部区域。
+
 Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。
 
 ```json

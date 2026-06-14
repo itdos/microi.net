@@ -339,6 +339,11 @@ BOUNDARY RULES:
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
+## sys_menu 自动增强默认值（创建后端菜单必须关注）
+- 绑定 diyTableId 创建菜单时，不要只写 Name/DiyTableId。应配置或允许 MCP/后端自动推断：TableDiyFieldIds、SelectFields、SearchFieldIds、SortFieldIds、NotShowFields、StatisticsFields、MobileListFields、CardTitleTagFields、CardBottomTagFields、DefaultOrderBy。
+- NotShowFields 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；SearchFieldIds 默认选择标题、名称、编号、状态、类型、分类、负责人、时间等常用筛选；StatisticsFields 默认选择金额、价格、数量、积分、余额等数值字段；MobileListFields 默认选择 3-4 个卡片可读字段。
+- 如果用户显式指定上述字段，以用户配置为准；否则 microi_generate_system 和后端 CreateModule 会按真实 diy_field 元数据补齐。
+
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
 主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
 - 后端使用 Ulid 随机段（非时间戳）生成唯一 URL 后缀，碰撞自动重试最多 5 次
@@ -1228,7 +1233,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
       description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
-      tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Name":"基本信息"},{"Name":"详细信息"}]\'). Groups fields into tabs.'),
+      tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Id":"basic","Name":"基本信息","Sort":10},{"Id":"business","Name":"业务信息","Sort":20}]\'). Groups fields into diy_table.Tabs. When using microi_generate_system, many-field tables can be auto-tabbed.'),
       isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
       column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
       formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
@@ -1594,7 +1599,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       url: z.string().optional().describe('URL if openType is "Url"'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
       icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
-      searchFieldIds: z.string().optional().describe('Comma-separated field Ids to show in search bar (e.g. "fieldId1,fieldId2")'),
+      searchFieldIds: z.string().optional().describe('SearchFieldIds JSON/object-array string. If omitted and diyTableId is bound, backend infers common searchable fields such as title/name/no/status/type/category/person/time.'),
       tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
       defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
       sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
@@ -1606,14 +1611,14 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       exportMoreBtns: z.string().optional().describe('Export menu extra buttons JSON ARRAY (string).'),
       pageBtns: z.string().optional().describe('Page-level top buttons JSON ARRAY (string).'),
       sortFieldIds: z.string().optional().describe('Comma-separated field Ids that user can sort by. JSON array string also accepted.'),
-      notShowFields: z.string().optional().describe('JSON array string of field Ids hidden in form view.'),
+      notShowFields: z.string().optional().describe('JSON array string of field Ids hidden from the list. If omitted and diyTableId is bound, backend hides Id-like fields, foreign keys, system fields, layout controls and heavy fields such as upload/rich text/map/child table.'),
       sqlJoin: z.string().optional().describe('Custom SQL JOIN clause for the list query (e.g. "LEFT JOIN Diy_Customer C ON A.CustomerId=C.Id"). Use aliases A=main table, B/C/D=joined tables.'),
       joinTables: z.string().optional().describe('JSON array of joined tables for select fields cross-table: [{Id,AsName:"B",Name:"Diy_Xxx",Description:"xxx",IsVisible:true}]'),
       selectFields: z.string().optional().describe('JSON array of selectable fields (cross-table) for the list view.'),
-      statisticsFields: z.string().optional().describe('JSON array of fields to show as table footer statistics (e.g. [{Id,Type:"Sum"}], Type=Sum|Avg|Max|Min|Count).'),
+      statisticsFields: z.string().optional().describe('JSON array of fields to show as table footer statistics (e.g. [{Id,Type:"Sum"}], Type=Sum|Avg|Max|Min|Count). If omitted and diyTableId is bound, backend infers amount/price/count/point/balance numeric fields.'),
       inTableEdit: z.number().optional().describe('Enable inline edit in list view (1=yes,0=no). Default: 0'),
       inTableEditFields: z.string().optional().describe('JSON array string of field Ids that allow inline edit (when inTableEdit=1).'),
-      mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile list cards.'),
+      mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile/card list. If omitted and diyTableId is bound, backend picks compact title/status/summary fields.'),
       cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
       cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
     },
