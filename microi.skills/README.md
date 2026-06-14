@@ -80,7 +80,7 @@ git clone https://gitee.com/microi-net/microi.skills.git
 ```markdown
 ## V8 引擎编码最佳实践
 
-编写 V8 引擎代码时，参考以下 Skill 文件：
+编写 V8 引擎代码时，参考以下技能文件：
 - microi.skills/v8-crud-api/SKILL.md — 增删改查
 - microi.skills/v8-table-event/SKILL.md — 表单事件
 - microi.skills/v8-sql-query/SKILL.md — SQL 查询
@@ -111,7 +111,7 @@ description: Microi V8 引擎代码编写最佳实践
 globs: ["microi-v8-engine/**/*.js"]
 ---
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取 API 用法和最佳实践：
+编写 V8 引擎代码时，参考以下技能文件获取 API 用法和最佳实践：
 - @microi.skills/v8-crud-api/SKILL.md
 - @microi.skills/v8-table-event/SKILL.md
 - @microi.skills/v8-sql-query/SKILL.md

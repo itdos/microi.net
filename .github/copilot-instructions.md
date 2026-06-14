@@ -502,17 +502,17 @@ console.log('调试信息')                                  // 控制台输出�
 - 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 
 
-## MCP default visibility
+## MCP 默认显隐规则
 
-- When creating sys_menu modules, default `Display` and `AppDisplay` to `1` unless the user explicitly asks to hide the menu.
-- When creating diy_field fields, default `Visible` and `AppVisible` to `1` unless the user explicitly asks to hide the field.
+- 创建 `sys_menu` 菜单模块时，除非用户明确要求隐藏，否则 `Display` 和 `AppDisplay` 默认设为 `1`。
+- 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
 
 
 ---
 
-## V8 引擎编码最佳实践（Skills）
+## V8 引擎编码最佳实践（技能）
 
-编写 V8 引擎代码时，参考以下 Skill 文件获取代码模板和安全规范（共 36 个）：
+编写 V8 引擎代码时，参考以下技能文件获取代码模板和安全规范（共 36 个）：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
