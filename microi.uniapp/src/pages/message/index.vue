@@ -23,14 +23,15 @@
 		</view>
 
 		<!-- 未登录提示 -->
-		<mci-auth-prompt
-			v-if="!isLoggedIn"
-			:title="t('common.loginFirst')"
-			:desc="t('message.loginHint')"
-			:action-text="t('common.loginNow')"
-			:gradient="themeGradient"
-			@action="goLogin"
-		/>
+		<view v-if="!isLoggedIn" class="message-auth-wrap">
+			<mci-auth-prompt
+				:title="t('common.loginFirst')"
+				:desc="t('message.loginHint')"
+				:action-text="t('common.loginNow')"
+				:gradient="themeGradient"
+				@action="goLogin"
+			/>
+		</view>
 
 		<!-- 搜索栏 -->
 		<view class="search-section" v-if="isLoggedIn">
@@ -757,6 +758,15 @@
 		background: #f5f7fa;
 		padding: 16rpx 24rpx;
 		flex-shrink: 0;
+	}
+
+	.message-auth-wrap {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding-bottom: env(safe-area-inset-bottom);
 	}
 
 	/* zhy筛选下拉样式 */

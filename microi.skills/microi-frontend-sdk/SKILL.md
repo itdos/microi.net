@@ -61,12 +61,22 @@ export function createApp() {
 - Token 与用户缓存使用 `V8.getToken`、`V8.setToken`、`V8.clearToken`、`V8.getUser` 和 `V8.setUser`。
 - JavaScript 需要平台安全区数值时使用 `V8.getSafeArea`；CSS 仍使用 `env(safe-area-inset-*)`。
 
+## 请求头规则
+
+SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业务 wrapper 或上传逻辑各自拼接租户和鉴权头。
+
+- `osclient` 必须作为唯一租户请求头键，值为当前租户，例如 `xjy`。写入前删除已有 `OsClient` / `osclient` / 任意大小写变体。
+- `Authorization` 写入前也必须删除已有 `Authorization` / `authorization` 变体。需要同时兼容平台 Token 时，可以保留单独的 `Token` 请求头，但它也必须先做大小写去重。
+- 页面传入的 `headers` / `header` 要先合并，再统一去重；禁止 `headers.OsClient = ...` 和 `headers.osclient = ...` 同时存在。
+- 小程序授权登录、账号登录、刷新 Token、FormEngine、ApiEngine、上传都必须走同一套去重逻辑。
+- 验收时检查真实网络请求：不得出现 `osclient: xjy, xjy`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
+
 ## 上传规则
 
 `V8.uploadFile` 是 Microi 前端唯一允许的上传入口。SDK 实现必须：
 
 - 使用 multipart 上传头。`uni.uploadFile` 或 `fetch(FormData)` 不得发送 `Content-Type: application/json`。
-- 租户请求头只发送一个键：`OsClient`。添加配置租户前，先移除传入的 `osclient` / `OsClient` 重复键。
+- 租户请求头只发送一个键：`osclient`。添加配置租户前，先移除传入的 `osclient` / `OsClient` 重复键。
 - `formData` 中发送 `OsClient`；开启 `appendOsClientQuery` 时保留接口查询参数 `?OsClient=tenant`。
 - 上传 `Path` 统一从 `options.path`、`formData.Path` 或 `formData.path` 归一化。
 - 移动端上传路径必须是安全相对路径，例如 `mall/pay-proof` 或 `mall/member/avatar`。不要使用 `/mall/pay-proof`、完整 URL、磁盘路径、`..`、`:`、`//` 或 `~`。

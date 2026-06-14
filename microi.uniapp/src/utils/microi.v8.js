@@ -19,6 +19,9 @@ function getGlobalValue(key) {
 }
 
 function getUni() {
+  try {
+    if (typeof uni !== 'undefined' && uni && typeof uni === 'object') return uni;
+  } catch (e) {}
   const runtimeUni = getGlobalValue('uni');
   return runtimeUni && typeof runtimeUni === 'object' ? runtimeUni : null;
 }
@@ -221,6 +224,14 @@ function getHeaderValue(headers, key) {
     if (String(name).toLowerCase() === lower) return headers[name];
   }
   return '';
+}
+
+function setSingletonHeader(headers, key, value) {
+  const lower = String(key).toLowerCase();
+  Object.keys(headers).forEach((name) => {
+    if (String(name).toLowerCase() === lower) delete headers[name];
+  });
+  if (value !== undefined && value !== null && value !== '') headers[key] = value;
 }
 
 function normalizeBearer(value) {
@@ -618,23 +629,18 @@ export function createMicroiV8(options = {}) {
     return fullUrl;
   }
 
-  // 普通请求统一携带 OsClient、Token 与 Authorization，减少各项目重复拼装。
+  // 普通请求统一携带 osclient、Token 与 Authorization，减少各项目重复拼装。
   function buildHeaders(options = {}) {
     const token = options.auth === false ? '' : getToken();
     const headers = {
       'Content-Type': 'application/json',
+      ...(options.header || {}),
       ...(options.headers || {})
     };
-    if (config.osClient) {
-      Object.keys(headers).forEach((key) => {
-        if (String(key).toLowerCase() === 'osclient') delete headers[key];
-      });
-      headers.OsClient = config.osClient;
-    }
+    if (config.osClient) setSingletonHeader(headers, 'osclient', config.osClient);
     if (token) {
-      headers.Token = token;
-      headers.Authorization = `Bearer ${token}`;
-      headers.authorization = `Bearer ${token}`;
+      setSingletonHeader(headers, 'Token', token);
+      setSingletonHeader(headers, 'Authorization', `Bearer ${token}`);
     }
     if (options.apiEngine) headers.apiengine = '1';
     return headers;

@@ -12,12 +12,16 @@ const visualTargets = [
     label: 'message',
     route: '/#/pages/message/index',
     screenshot: 'message-login.png',
+    headerSelector: '.msg-header',
+    promptSelector: '.mci-auth-prompt__card',
     buttonSelector: '.mci-auth-prompt__button'
   },
   {
     label: 'workspace',
     route: '/#/pages/workspace/index',
     screenshot: 'workspace-login.png',
+    headerSelector: '.ws-header',
+    promptSelector: '.mci-auth-prompt__card',
     buttonSelector: '.mci-auth-prompt__button'
   }
 ];
@@ -272,35 +276,57 @@ async function main() {
         returnByValue: true,
         expression: `(() => {
           const selector = ${JSON.stringify(target.buttonSelector)};
+          const promptSelector = ${JSON.stringify(target.promptSelector)};
+          const headerSelector = ${JSON.stringify(target.headerSelector)};
           const btn = document.querySelector(selector);
           if (!btn) return { ok: false, reason: 'missing ' + selector };
+          const prompt = document.querySelector(promptSelector);
+          if (!prompt) return { ok: false, reason: 'missing ' + promptSelector };
+          const header = document.querySelector(headerSelector);
+          if (!header) return { ok: false, reason: 'missing ' + headerSelector };
+          const tabbar = document.querySelector('uni-tabbar, .uni-tabbar');
           const textCandidates = Array.from(btn.querySelectorAll('span, uni-text, text, *'))
             .filter((el) => (el.textContent || '').trim().length > 0);
           const text = textCandidates.find((el) => el.children.length === 0) || textCandidates[0] || btn;
           const btnRect = btn.getBoundingClientRect();
           const textRect = text.getBoundingClientRect();
+          const promptRect = prompt.getBoundingClientRect();
+          const headerRect = header.getBoundingClientRect();
+          const tabbarRect = tabbar ? tabbar.getBoundingClientRect() : null;
           const btnStyle = getComputedStyle(btn);
           const textStyle = getComputedStyle(text);
           const btnCenterY = btnRect.top + btnRect.height / 2;
           const textCenterY = textRect.top + textRect.height / 2;
           const btnCenterX = btnRect.left + btnRect.width / 2;
           const textCenterX = textRect.left + textRect.width / 2;
+          const promptCenterY = promptRect.top + promptRect.height / 2;
+          const availableTop = Math.max(0, headerRect.bottom);
+          const availableBottom = tabbarRect && tabbarRect.top > availableTop ? tabbarRect.top : window.innerHeight;
+          const availableCenterY = availableTop + (availableBottom - availableTop) / 2;
           const centerDeltaY = Math.abs(btnCenterY - textCenterY);
           const centerDeltaX = Math.abs(btnCenterX - textCenterX);
+          const promptCenterDeltaY = Math.abs(promptCenterY - availableCenterY);
           const maxDeltaY = Math.max(2, btnRect.height * 0.06);
           const maxDeltaX = Math.max(2, btnRect.width * 0.06);
+          const maxPromptDeltaY = Math.max(16, (availableBottom - availableTop) * 0.08);
           const cssOk = (btnStyle.display === 'flex' || btnStyle.display === 'inline-flex') &&
             btnStyle.alignItems === 'center' &&
             btnStyle.justifyContent === 'center' &&
             textStyle.lineHeight !== 'normal';
           return {
-            ok: cssOk && centerDeltaY <= maxDeltaY && centerDeltaX <= maxDeltaX,
+            ok: cssOk && centerDeltaY <= maxDeltaY && centerDeltaX <= maxDeltaX && promptCenterDeltaY <= maxPromptDeltaY,
             cssOk,
             centerDeltaY,
             centerDeltaX,
+            promptCenterDeltaY,
             maxDeltaY,
             maxDeltaX,
+            maxPromptDeltaY,
+            availableTop,
+            availableBottom,
+            availableCenterY,
             button: { left: btnRect.left, top: btnRect.top, width: btnRect.width, height: btnRect.height },
+            prompt: { left: promptRect.left, top: promptRect.top, width: promptRect.width, height: promptRect.height },
             text: { left: textRect.left, top: textRect.top, width: textRect.width, height: textRect.height, value: (text.textContent || '').trim() },
             display: btnStyle.display,
             alignItems: btnStyle.alignItems,
@@ -313,11 +339,11 @@ async function main() {
       const metrics = metricsResult.result.value;
       if (!metrics || !metrics.ok) {
         console.error(JSON.stringify(metrics, null, 2));
-        fail(`${target.label} login button is not centered. Screenshot: ${screenshotPath}`);
+        fail(`${target.label} auth prompt or login button is not centered. Screenshot: ${screenshotPath}`);
         return;
       }
 
-      console.log(`Visual check passed: ${target.label} login button centered. Screenshot: ${screenshotPath}`);
+      console.log(`Visual check passed: ${target.label} auth prompt and login button centered. Screenshot: ${screenshotPath}`);
     }
   } finally {
     if (cdp) cdp.close();
