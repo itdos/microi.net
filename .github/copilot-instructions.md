@@ -495,6 +495,9 @@ console.log('调试信息')                                  // 控制台输出�
 - 先调用 `microi_get_db_schema` 了解已有表、菜单、字段，避免重复建模。
 - 再调用 `microi_get_manifest_schema` 获取完整 Manifest 协议和示例。
 - 将需求整理为 Manifest，模块配置优先写字段名：`listFields`、`searchFields`、`sortFields`、`hiddenFields`、`mobileFields`、`cardTitleFields`、`cardBottomFields`。MCP 会自动解析为 `diy_field.Id`、`SelectFields`、`SearchFieldIds` 等 `sys_menu` 所需格式。
+- 创建绑定 `diyTableId` 的后台菜单时，必须配置或允许 MCP/后端自动推断 `TableDiyFieldIds`、`SelectFields`、`SearchFieldIds`、`SortFieldIds`、`NotShowFields`、`StatisticsFields`、`MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`、`DefaultOrderBy`。
+- `NotShowFields` 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；`SearchFieldIds` 默认选择名称、标题、编号、状态、分类、负责人、时间等常用筛选；`StatisticsFields` 默认选择金额、价格、数量、积分、余额等数值字段；移动端/卡片列默认保留 3-4 个核心可读字段。
+- 表单控件以 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json` 为事实源。字段较多时优先使用 `diy_table.Tabs` 和字段 `Tab` 分组，局部复杂区域再用 `CollapseGroup` 或字段级 `Tabs` 控件折叠/分段。
 - 生成或新增字段时，普通字段默认不要设置 `diy_field.FormWidth`（保持 null/省略）；只有 `CodeEditor`、`Textarea`、`RichText`、上传、子表、地图/布局/自定义等需要独占整行的控件才设置为 `24`。
 - 生成审批流时，Manifest 的 workflows 需包含 FlowDesign、Nodes、Lines；连线标题默认使用 `{起点节点} 到 {终点节点}`，多路线节点优先生成设置 `V8.NextNodeId` 的 `LineValueV8`。
 - 保存工作流前调用 `microi_check_workflow_package` 检查拓扑，必要时用 `microi_test_workflow_condition` 带样例表单数据测试图形条件路线。
@@ -502,10 +505,12 @@ console.log('调试信息')                                  // 控制台输出�
 - 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 
 
-## MCP default visibility
+## MCP 默认显隐规则
 
-- When creating sys_menu modules, default `Display` and `AppDisplay` to `1` unless the user explicitly asks to hide the menu.
-- When creating diy_field fields, default `Visible` and `AppVisible` to `1` unless the user explicitly asks to hide the field.
+- 创建 `sys_menu` 菜单模块时，除非用户明确要求隐藏，否则 `Display` 和 `AppDisplay` 默认设为 `1`。
+- 绑定 `diyTableId` 的菜单默认补齐列表列、搜索列、隐藏列、排序列、统计列、移动端/卡片列和默认排序；用户显式传入的 `sys_menu` JSON 优先。
+- 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
+- 字段较多的表单默认优先生成 `diy_table.Tabs`，并给字段写入 `Tab`；整行控件才使用 `FormWidth=24`。
 
 
 ---

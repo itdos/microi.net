@@ -6,7 +6,7 @@ import { useDebounceFn } from '@vueuse/core'
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
-export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1)) {
+export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1), requestPageSize = ref()) {
   //把webapi数据同步到jsonObj
   const setResponse = (response) => {
     let wrapperNumber = widgetObj.widgetOption.wrapperNumber //当前组件所在容器编号
@@ -34,6 +34,13 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
     }
   }
   //加载webapi数据
+  const getPageSize = () => {
+    const overrideValue = requestPageSize?.value
+    const rawValue = overrideValue || widgetObj.widgetParams[7]?.value
+    const pageSize = Number(rawValue)
+    return Number.isFinite(pageSize) ? pageSize : -1
+  }
+
   const loadRemoteData = async () => {
     let params = {}
     if (dateRange.value) {
@@ -41,9 +48,10 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
       params.end = dateRange.value[1]
     }
     //添加分页条件
-    if (currentPage.value !== -1 && widgetObj.widgetParams[7]?.value !== -1) {
+    const activePageSize = getPageSize()
+    if (currentPage.value !== -1 && activePageSize > 0) {
       params.currentPage = currentPage.value
-      params.pageSize = widgetObj.widgetParams[7]?.value
+      params.pageSize = activePageSize
     }
 
     if (widgetObj.widgetParams[0].typeOptions.dataJson.searchData) {
@@ -67,9 +75,9 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
     }
     else {
       //模拟本地分页
-      if (dynamicData && currentPage.value !== -1 && widgetObj.widgetParams[7] && widgetObj.widgetParams[7]?.value !== -1) {
-        let start = (currentPage.value - 1) * widgetObj.widgetParams[7]?.value
-        let end = start + widgetObj.widgetParams[7]?.value
+      if (dynamicData && currentPage.value !== -1 && activePageSize > 0) {
+        let start = (currentPage.value - 1) * activePageSize
+        let end = start + activePageSize
         //这里需要根据接口返回的数据进行分页，这里只是模拟（目前只有tabel组件用到分页）
         if (widgetObj.widgetParams[0].typeOptions.dataJson.bodyData) {
           widgetObj.widgetParams[0].typeOptions.dataJson.bodyData = dynamicData?.slice(start, end)

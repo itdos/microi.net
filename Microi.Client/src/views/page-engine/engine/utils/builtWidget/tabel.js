@@ -237,6 +237,47 @@ export const tabel = {
       type: 'color',
       value: '#409eff',
     },
+    {
+      sort: 17,
+      label: '滚动方向',
+      type: 'select',
+      value: 'off',
+      typeOptions: {
+        options: [
+          { label: '关闭', value: 'off' },
+          { label: '向上滚动', value: 'up' },
+          { label: '向下滚动', value: 'down' },
+        ],
+      }
+    },
+    {
+      sort: 18,
+      label: '滚动速度(px/秒)',
+      type: 'number',
+      value: 20,
+      typeOptions: {
+        min: 1,
+        max: 300,
+        step: 1,
+      }
+    },
+    {
+      sort: 19,
+      label: '自动分页',
+      type: 'switch',
+      value: false,
+    },
+    {
+      sort: 20,
+      label: '分页间隔(秒)',
+      type: 'number',
+      value: 5,
+      typeOptions: {
+        min: 1,
+        max: 3600,
+        step: 1,
+      }
+    },
 
 
   ],

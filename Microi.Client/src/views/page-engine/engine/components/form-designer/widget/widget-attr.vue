@@ -228,7 +228,7 @@
                 </template>
                 <el-input
                   style="width: 166px"
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @input="handleInputChange(index, $event)"
                   type="textarea"
                   :rows="item.typeOptions.rows"
@@ -259,7 +259,7 @@
                 <el-input
                   :disabled="item.typeOptions?.disabled"
                   size="small"
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @input="handleInputChange(index, $event)"
                 ></el-input>
               </template>
@@ -267,7 +267,7 @@
               <template v-else-if="item.type === 'number'">
                 <el-input-number
                   size="small"
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                   :min="item.typeOptions?.min"
                   :max="item.typeOptions?.max"
@@ -279,14 +279,14 @@
                 <el-color-picker
                   show-alpha
                   size="small"
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                 ></el-color-picker>
               </template>
 
               <template v-else-if="item.type === 'switch'">
                 <el-switch
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                   :disabled="item.typeOptions?.disabled"
                 ></el-switch>
@@ -296,7 +296,7 @@
                 <el-slider
                   style="width: 90%"
                   show-stops
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                   :min="item.typeOptions?.min"
                   :max="item.typeOptions?.max"
@@ -307,7 +307,7 @@
               <template v-else-if="item.type === 'select'">
                 <el-select
                   size="small"
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                 >
                   <el-option
@@ -320,7 +320,7 @@
               </template>
               <template v-else-if="item.type === 'radio'">
                 <el-radio-group
-                  :model-value="localInputValues[index] || item.value"
+                  :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
                 >
                   <el-radio
@@ -407,6 +407,8 @@ import { DiyCommon } from '@/utils/diy.common'
 import JsonEditor from 'ceel-json-editor'
 import 'jsoneditor/dist/jsoneditor.css'
 import { ElMessage } from 'element-plus'
+import { widgetList as builtWidgetList } from '../../../utils/builtWidget.js'
+import { deepClone } from '../../../utils/util'
 
 import codemirror from '../../codemirror/index.vue'
 
@@ -438,8 +440,45 @@ onBeforeUnmount(() => {
 // 本地输入值缓存，用于防抖
 const localInputValues = ref({})
 
+const getLocalValue = (index, fallback) => (
+  Object.prototype.hasOwnProperty.call(localInputValues.value, index)
+    ? localInputValues.value[index]
+    : fallback
+)
+
+const normalizeCurWidgetParams = () => {
+  const widget = curWidget.value
+  if (!widget?.type) return
+
+  const templateParams = builtWidgetList.find(
+    (item) => item.type === widget.type
+  )?.widgetParams
+  if (!Array.isArray(templateParams)) return
+
+  if (!Array.isArray(widget.widgetParams)) {
+    widget.widgetParams = []
+  }
+
+  const currentSorts = new Set(widget.widgetParams.map((item) => item?.sort))
+  let changed = false
+
+  templateParams.forEach((param) => {
+    if (!currentSorts.has(param.sort)) {
+      widget.widgetParams.push(deepClone(param))
+      currentSorts.add(param.sort)
+      changed = true
+    }
+  })
+
+  if (changed) {
+    widget.widgetParams.sort((a, b) => Number(a.sort) - Number(b.sort))
+  }
+}
+
 // 初始化本地输入值
 const initLocalValues = () => {
+  normalizeCurWidgetParams()
+  localInputValues.value = {}
   if (curWidget.value?.widgetParams) {
     curWidget.value.widgetParams.forEach((item, index) => {
       localInputValues.value[index] = item.value
