@@ -516,6 +516,32 @@ const prependScrollSegment = (pageNumber, dataJson) => {
   return rows.length
 }
 
+const padScrollSegmentsForLoop = () => {
+  const reusableSegments = scrollSegments.filter(
+    (segment) => Array.isArray(segment.rows) && segment.rows.length
+  )
+  if (!reusableSegments.length || scrollSegments.length >= scrollMaxSegments) {
+    return false
+  }
+
+  let index = 0
+  while (scrollSegments.length < scrollMaxSegments) {
+    const segment = reusableSegments[index % reusableSegments.length]
+    scrollSegments.push({
+      page: segment.page,
+      rows: segment.rows,
+    })
+    index++
+  }
+
+  scrollPreviousPage = getScrollPreviousPageNumber(scrollSegments[0].page)
+  scrollNextPage = getScrollNextPageNumber(
+    scrollSegments[scrollSegments.length - 1].page
+  )
+  applyScrollSegmentsToDataJson()
+  return true
+}
+
 const fillScrollBuffer = async () => {
   const runId = scrollBufferRunId
   if (scrollPrefetchPromise) return scrollPrefetchPromise
@@ -538,6 +564,16 @@ const fillScrollBuffer = async () => {
       }
       if (!appended) return
 
+      await nextTick()
+      tableRef.value?.doLayout?.()
+    }
+
+    if (
+      runId === scrollBufferRunId &&
+      isAutoScroll.value &&
+      scrollSegments.length < scrollMaxSegments
+    ) {
+      padScrollSegmentsForLoop()
       await nextTick()
       tableRef.value?.doLayout?.()
     }
@@ -612,24 +648,38 @@ const getAverageRowHeight = () => {
 }
 
 const trimScrolledHeadSegment = async () => {
-  if (scrollSegments.length <= 1) return false
+  if (scrollSegments.length <= 1) {
+    if (!padScrollSegmentsForLoop()) return false
+    await nextTick()
+    tableRef.value?.doLayout?.()
+    await nextTick()
+  }
 
   const firstSegment = scrollSegments[0]
   const averageRowHeight = getAverageRowHeight()
   if (!averageRowHeight) return false
 
   const firstSegmentHeight = firstSegment.rows.length * averageRowHeight
-  if (scrollPosition < firstSegmentHeight) return false
+  const { maxScrollTop } = getTableScrollState()
+  const isAtScrollableEnd =
+    scrollDirection.value === 'up' &&
+    maxScrollTop > 0 &&
+    maxScrollTop - scrollPosition <= 1
+
+  if (scrollPosition < firstSegmentHeight && !isAtScrollableEnd) return false
 
   scrollSegments.shift()
-  scrollPosition = Math.max(0, scrollPosition - firstSegmentHeight)
+  scrollPosition =
+    scrollPosition >= firstSegmentHeight
+      ? Math.max(0, scrollPosition - firstSegmentHeight)
+      : 0
   applyScrollSegmentsToDataJson()
   scrollPreviousPage = getScrollPreviousPageNumber(scrollSegments[0].page)
   await nextTick()
   tableRef.value?.doLayout?.()
   await nextTick()
   setTableScrollTop(scrollPosition)
-  fillScrollBuffer()
+  await fillScrollBuffer()
   return true
 }
 
