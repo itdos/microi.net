@@ -60,7 +60,7 @@
                 </div>
 
                 <!-- 验证码输入框 -->
-                <div v-if="SysConfig.EnableCaptcha" class="login-input-param captcha">
+                <div v-if="EnableCaptcha" class="login-input-param captcha">
                     <el-input 
                         v-model="CaptchaValue" 
                         type="text" 
@@ -74,7 +74,7 @@
                                 <el-icon color="white"><Lock /></el-icon>
                             </div>
                         </template>
-                        <template #append v-if="SysConfig.EnableCaptcha">
+                        <template #append v-if="EnableCaptcha">
                             <div class="captcha-wrapper">
                                 <img 
                                     id="CaptchaImg" 
@@ -371,6 +371,9 @@ export default {
                 .replace("$SysShortTitle$", this.SysConfig?.SysShortTitle || "")
                 .replace("$SysTitle$", this.SysConfig?.SysTitle || "")
                 .replace("$CompanyName$", this.SysConfig?.CompanyName || "");
+        },
+        EnableCaptcha() {
+            return this.isEnabledFlag(this.SysConfig?.EnableCaptcha);
         }
     },
     data() {
@@ -505,6 +508,14 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     },
 
     methods: {
+        isEnabledFlag(value) {
+            if (value === true || value === 1) return true;
+            if (typeof value === "string") {
+                var text = value.trim().toLowerCase();
+                return text === "1" || text === "true" || text === "yes" || text === "on";
+            }
+            return false;
+        },
         normalizeIframeRouteUrl(url) {
             if (!url) return url;
             var rawUrl = String(url).trim();
@@ -646,7 +657,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             if (sysConfig) {
                 self.diyStore.setSysConfig(sysConfig);
                 // Logo
-                if (sysConfig.EnableCaptcha || imgId) {
+                if (self.isEnabledFlag(sysConfig.EnableCaptcha) || imgId) {
                     self.$axios
                         .get(self.DiyCommon.GetApiBase() + "/api/Captcha/GetCaptcha", {
                             params: {
@@ -809,7 +820,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 OsClient: self.OsClient,
                 _ClientType: "PC"
             };
-            if (self.SysConfig.EnableCaptcha) {
+            if (self.EnableCaptcha) {
                 loginParam._CaptchaId = self.CaptchaId;
                 loginParam._CaptchaValue = self.CaptchaValue;
             }
@@ -831,8 +842,10 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         self.GotoSystem();
                     }
                 } else {
-                    self.GetCaptcha();
-                    self.CaptchaValue = "";
+                    if (self.EnableCaptcha) {
+                        self.GetCaptcha();
+                        self.CaptchaValue = "";
+                    }
                     // 使用 Vue 响应式状态控制
                 }
                 self.LoginWaiting = false;

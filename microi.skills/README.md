@@ -1,8 +1,8 @@
 # Microi Skills
 
-**Microi 吾码 V8 引擎 AI 编程技能集合** — 让 AI 在编写 V8 接口引擎和表单事件代码时，自动遵循最佳实践。
+**Microi 吾码项目级 AI 编程技能集合** — 让 AI 在低代码建模、V8 接口引擎、表单事件、PC 前端、UniApp/H5/小程序、Microi.UI、自动化测试和系统交付中自动遵循最佳实践。
 
-> Skills 是一系列结构化指令文件（SKILL.md），告诉 AI 工具在特定场景下**应该如何写代码**。每个 Skill 覆盖一个 V8 开发场景，包含完整的 API 用法、代码模板和安全规范。
+> Skills 是一系列结构化指令文件（SKILL.md），告诉 AI 工具在特定场景下**应该如何写代码、如何建模、如何设计界面、如何测试验收**。每个 Skill 覆盖一个明确场景，包含 API 用法、代码模板、设计约束、质量门禁和安全规范。
 
 ---
 
@@ -46,6 +46,22 @@
 | **microi-ui** | 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法 | `microi-ui/SKILL.md` |
 | **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
 
+### 项目交付、前端与移动端
+
+| Skill | 场景 | 文件 |
+|-------|------|------|
+| **business-blueprint** | 从需求生成业务蓝图、模块边界、数据模型与接口清单 | `business-blueprint/SKILL.md` |
+| **microi-system-delivery** | 自然语言到完整系统交付的总控、MCP 编排、验收和复盘 | `microi-system-delivery/SKILL.md` |
+| **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
+| **microi-uniapp-frontend** | Microi UniApp/H5 通用前端规范、安全区、资源解析、骨架屏、主题与页面质量 | `microi-uniapp-frontend/SKILL.md` |
+| **microi-mobile-app-quality** | 移动端质量门禁：登录、验证码、图标、菜单层级、主题、动效、截图验收 | `microi-mobile-app-quality/SKILL.md` |
+| **microi-datasource-mapping** | 数据源 Key/Value 映射、下拉枚举与前后端显示值一致性 | `microi-datasource-mapping/SKILL.md` |
+| **v8-formengine-http** | 移动端/外部系统直接调用 FormEngine HTTP 路由的约定 | `v8-formengine-http/SKILL.md` |
+| **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
+| **workspace-conventions** | 工作区文件放置、临时产物、项目专属目录和根目录污染防护 | `workspace-conventions/SKILL.md` |
+| **production-readonly-audit** | 正式环境只读巡检，不改动线上数据的业务核对流程 | `production-readonly-audit/SKILL.md` |
+| **uniapp-mall-assets** | 数字经济商城 UniApp 资源/图片路径与 FileServer 前缀规范 | `uniapp-mall-assets/SKILL.md` |
+
 ### 自动化测试
 
 | Skill | 场景 | 文件 |
@@ -78,9 +94,9 @@ git clone https://gitee.com/microi-net/microi.skills.git
 在项目根目录的 `.github/copilot-instructions.md` 文件末尾追加：
 
 ```markdown
-## V8 引擎编码最佳实践
+## Microi 项目技能规范
 
-编写 V8 引擎代码时，参考以下技能文件：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付时，参考以下技能文件：
 - microi.skills/v8-crud-api/SKILL.md — 增删改查
 - microi.skills/v8-table-event/SKILL.md — 表单事件
 - microi.skills/v8-sql-query/SKILL.md — SQL 查询
@@ -107,17 +123,21 @@ git clone https://gitee.com/microi-net/microi.skills.git
 
 ```
 ---
-description: Microi V8 引擎代码编写最佳实践
-globs: ["microi-v8-engine/**/*.js"]
+description: Microi 项目技能规范
+globs: ["microi-v8-engine/**/*.js", "Microi.Client/**/*.{vue,js,ts,css,scss}", "microi.uniapp/**/*.{vue,js,ts,css,scss,json}", "AI-Project/**/*.{vue,js,ts,css,scss,json,md}", "Microi.UI/**/*.{vue,js,ts,css,scss,md}", "microi.skills/**/*.md"]
 ---
 
-编写 V8 引擎代码时，参考以下技能文件获取 API 用法和最佳实践：
+处理 Microi 项目时，按任务类型参考以下技能文件获取 API 用法、界面规范和验收门禁：
 - @microi.skills/v8-crud-api/SKILL.md
 - @microi.skills/v8-table-event/SKILL.md
 - @microi.skills/v8-sql-query/SKILL.md
 - @microi.skills/v8-http-integration/SKILL.md
 - @microi.skills/v8-cache-pattern/SKILL.md
 - @microi.skills/v8-security/SKILL.md
+- @microi.skills/microi-ui/SKILL.md
+- @microi.skills/microi-uniapp-frontend/SKILL.md
+- @microi.skills/microi-mobile-app-quality/SKILL.md
+- @microi.skills/microi-system-delivery/SKILL.md
 ```
 
 > Cursor 会在匹配 `microi-v8-engine/**/*.js` 的文件中自动加载这些规则。
@@ -140,15 +160,19 @@ done
 在项目根目录的 `CLAUDE.md` 中追加：
 
 ```markdown
-## V8 引擎编码 Skills
+## Microi 项目 Skills
 
-编写 V8 引擎代码时，参阅以下文件：
+处理 Microi 项目时，按任务类型参阅以下文件：
 - microi.skills/v8-crud-api/SKILL.md
 - microi.skills/v8-table-event/SKILL.md
 - microi.skills/v8-sql-query/SKILL.md
 - microi.skills/v8-http-integration/SKILL.md
 - microi.skills/v8-cache-pattern/SKILL.md
 - microi.skills/v8-security/SKILL.md
+- microi.skills/microi-ui/SKILL.md
+- microi.skills/microi-uniapp-frontend/SKILL.md
+- microi.skills/microi-mobile-app-quality/SKILL.md
+- microi.skills/microi-system-delivery/SKILL.md
 ```
 
 **方式 B：批量追加内容到 `CLAUDE.md`**

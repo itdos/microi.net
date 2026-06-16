@@ -16,6 +16,10 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 - 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。
 - 账号密码登录必须先检查项目本地 SDK 实际导出，常见是 `V8.Login(param)` 或 `/api/SysUser/Login`。禁止凭空写 `V8.Login.Login(...)` 这类未验证子对象。
 - 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个规范值，例如 `lxwb`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `lxwb, lxwb`。
+- 账号密码登录只有在同时拿到成功码、有效 token 和有效用户 `Id` 时才算成功。Microi 登录 token 可能在响应头 `authorization`，用户信息可能在响应体 `Data`；两者任一缺失都要清理 SDK token、本地用户缓存和 session。
+- 恢复本地会话时必须重新校验 token 和用户 `Id`，禁止出现页面显示 `admin` 但状态仍是“未登录”的半登录状态。
+- 账号密码登录调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)` 前，必须读取 `/api/DiyTable/GetSysConfig` 或 `V8.GetSysConfig(true)`，并根据 `Sys_Config.EnableCaptcha` 决定是否显示图形验证码。判断函数必须兼容 `1`、`true`、`'1'`、`'true'`，不要直接 `!!cfg.EnableCaptcha`。
+- 开启验证码时，页面必须通过 `GET /api/Captcha/GetCaptcha` 获取验证码图片，读取响应头 `captchaid`，提交账号登录时传 `_CaptchaId` 和 `_CaptchaValue`；登录失败后清空输入并刷新验证码。未开启验证码时不显示验证码，不传空验证码字段。
 - 微信小程序手机号快捷登录必须使用 `<button open-type="getPhoneNumber">`，通过 `@getphonenumber` 获取 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`。前端不能假设能直接拿到手机号明文。
 - H5/App 可提供手机号输入兜底，但必须确认后端接口支持 `Phone` 登录；微信小程序优先走 `Code + LoginCode`。
 - 登录按钮、去登录按钮、手机号授权按钮必须是图标 + 文案按钮，具备 loading、disabled/pressed 反馈，且原生 button 默认边框要清掉。
@@ -296,10 +300,22 @@ async function load() {
 - 已选资产刷新后失效时清空选择，不能自动换成第一条。
 - 规则同时写在 UI 状态和提交前校验中。
 
+## 账号角色与会话状态
+
+- Microi 企业移动端默认要从 `sys_user.RoleIds`、`_Roles`、`Roles`、`RoleName`、`Level` 解析内部账号角色，不要只用“是否登录”控制界面。
+- 角色能力必须集中在 Pinia/session store 中计算，例如 `isTechnician`、`isServiceAgent`、`isCustomerAccount`、`canAcceptOrders`、`canManageCustomers`、`canViewReports`。多角色账号取能力并集，`Level>=999` 或“超级管理员”给全权限。
+- 客户账号判断要精确，只把“客户”“客户账号”“客户用户”或明确包含“客户账号”的角色当作客户侧账号；不要把“客户管理”等后台角色误判为客户。
+- 所有页面、底部导航、按钮、未登录提示、头像姓名和角色文本都必须读同一个 session store。页面不能直接读取旧 storage 展示用户名。
+- 客户小程序手机号登录得到的是业务 `CustomerToken`，与员工 `sys_user` token 是两条会话；客户数据必须通过绑定关系过滤，不要把客户账号塞进员工接口绕过权限。
+- 登出、登录失败、token 缺失、用户 `Id` 缺失时要统一清理 `Token`、`staffUser/customerUser`、绑定信息和本地 session。
+
 ## 数字、主题、上传与消息
 
 - 资产金额、积分、余额、库存值、累计充值、收益等数字要按空间自适应格式化。金额很大时显示为 `1.23万`、`123万`、`1.2亿` 等，不能撑破卡片。
 - 主题切换必须全局生效：`html/body/page/uni-page-body` 与每个页面根节点都要能继承主题变量，不能只在“我的”一个页面生效。
+- 自定义底部导航、固定提交栏、悬浮操作条等 fixed 组件在 H5 中优先使用 `--mci-*` 主题变量并继承 `html/body` 的主题状态，不要为了换主题让 fixed 组件自己订阅 theme store 后动态切换根 class。小程序端可以绑定稳定主题 class，但 H5 路由切换期间不要改 Vue/uni 托管根节点结构。
+- H5 主题服务只允许修改 `html`、`body` 的 `data-*` 属性、主题 class 和 CSS 变量。不要用 `querySelectorAll('.mci-page')`、`MutationObserver`、定时扫描或手动补 class 去改 `.mci-page`、`uni-page-body`、`uni-page`、`RouterView` 下的节点；否则切主题后点击导航容易出现 `Cannot assign to read only property '_'`、`Cannot read properties of null (reading 'type')`、`parentNode`、`scheduler flush` 等错误。
+- 彩色圆形快捷入口必须显式设置内部图标色。主题切换时要同时覆盖 `background` 与 `color`，尤其要检查 `.mci-bubble:nth-child(n)`、`.entry:nth-child(n)` 等高优先级基础样式，避免绿色圆底配绿色图标、灰色圆底配低对比图标。
 - 如果项目有 H5 自动翻译/MutationObserver 兜底，中文模式下不得把文本节点或属性恢复为旧的 `originalText`；中文模式只刷新原文缓存并退出，英文模式才写入翻译文本。否则异步接口把状态从“未认证”改为“认证已通过”后，自动翻译可能把 DOM 又改回旧状态。
 - iOS Safari 上传图片后必须验证表单其它字段不丢失；上传组件只更新文件字段，不得重置整张表单对象。
 - 消息、待办、审批、约单、审核类入口必须支持未读角标；已读后角标消失。
@@ -339,6 +355,7 @@ async function load() {
 - 至少用 iOS 刘海/灵动岛尺寸、Android 状态栏/虚拟导航栏尺寸、PC H5 手机壳尺寸检查安全区。
 - PC 宽屏访问 H5，截图确认页面在手机壳内、底部 tabBar 可见、固定底栏没有铺满桌面。
 - 对关键图片和头像页面截图，确认显示真实图片而不是空白、首字母占位或失效图。
+- 对每个主题至少截图首页快捷入口和底部导航，确认选中态、未选中态、图标圆底和内部图标都已经随主题变化，并且对比度清晰。
 - 对关键业务资产选择流程，验证首次进入不自动选中，刷新后无效选择会被清空。
 - 截图复核 PC 手机壳、顶部安全区、底部安全区、底部 tabBar、主题背景、关键头像、私有图片、金额显示、未读角标、空态/未登录态和关键按钮文字上下左右居中。按钮文字偏上、偏下、偏左、偏右都算验收失败。
 - 未登录/未授权态必须额外截图确认：提示卡片位于 header 与 tabBar/底栏之间的可用区域中心，不能只横向居中但纵向贴顶。
@@ -370,15 +387,17 @@ async function load() {
 
 - 登录页不要同时铺开两套完整登录系统。H5/App 默认只做一个“账号/手机号 + 密码”表单；微信小程序默认展示 `<button open-type="getPhoneNumber">` 手机号授权登录，账号密码只能作为次级折叠/备用入口。
 - 微信小程序手机号授权登录必须使用 `@getphonenumber` 的 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`；不要假设前端能拿到手机号明文。
+- 账号密码兜底入口必须跟随 `Sys_Config.EnableCaptcha`：开启时显示验证码图片和输入框，提交 `_CaptchaId/_CaptchaValue`；关闭时完全隐藏且不提交空字段。
 - 登录页、我的页、设置页不要向终端用户展示“当前租户 / OsClient / 移动端版本 / API 地址 / 调试版本”等内部实现块。
 - “当前租户、移动端版本、主题、账号、关于、绑定客户”等信息项如果确实要展示，图标必须是真实图标或 `mci-icon-*` 图形；禁止用 `租`、`版`、`客` 这类单字当图标。
 - 客户要求新增视觉风格时，优先把已验收风格保留为命名主题，再新增客户偏好主题；除非用户明确要求删除旧主题。
+- 产品有指定默认主题时，theme store 的 `DEFAULT_THEME` 必须与该主题一致；但用户切换过主题后，本地持久化选择优先生效，不能每次启动又强制回默认。
 - 主题切换必须能在未登录状态使用，并持久化到本地存储；切换后要覆盖每个页面根节点、底部导航、按钮、卡片、空态、骨架屏、表单、H5 PC 手机壳背景。
 - “我的/设置”页不要把所有主题选项直接铺在主页面。默认展示当前主题和“切换主题”按钮，点击后用底部弹层或模态层选择主题。
 - 小程序端不能只依赖 `document.documentElement` 切主题；每个页面根节点必须有主题 class、主题变量或项目级主题 store，确保跨页面和重启后生效。
-- H5 端主题切换后必须继续验证底部导航。若切换主题后点击导航出现 `parentNode`、`scheduler flush`、`updateSlots` 等 Vue/uni-app 路由补丁错误，不能交付；改用稳定 page class + `html/body` 主题属性 + DOM 观察/延迟补 class 的主题服务，并给底部导航加当前页 no-op、重复点击防抖和短延迟跳转。
+- H5 端主题切换后必须继续验证底部导航。若切换主题后点击导航出现 `parentNode`、`scheduler flush`、`updateSlots`、`read only property '_'`、`null (reading 'type')` 等 Vue/uni-app 路由补丁错误，不能交付；改用稳定页面 class + `html/body` 主题属性/变量驱动，停止 DOM 观察或延迟补 class，并给底部导航加当前页 no-op、重复点击防抖和短延迟跳转。
 - scoped CSS 中的硬编码颜色必须补主题覆盖，或改为 `--mci-*` 变量。验收时至少切换主题后检查首页、登录页、列表页、详情页、表单页和我的页。
-- 主题验收必须遍历 `pages.json` 的所有页面，在每个主题下做截图或视觉断言，重点检查“我的”快捷入口、报告卡片、空态、按钮、底部导航、弹层文字是否高对比可读。
+- 主题验收必须遍历 `pages.json` 的所有页面，在每个主题下做截图或视觉断言，重点检查“我的”快捷入口、报告卡片、报告详情、骨架屏、加载过渡、空态、按钮、底部导航、弹层文字是否高对比可读。报告详情要单独检查封面英文标识（如 `INSPECTION REPORT`）、状态胶囊、印章/水印、摘要卡和正文。
 - 列表进入详情必须保持身份路径：员工列表点报告详情走员工 token/FormEngine 权限，客户列表点报告详情走 CustomerToken，分享链接走 ShareToken；禁止员工点击可见报告后因为传空 CustomerToken 被跳回登录。
 
 ## UniApp 上传路径与 Header 规则

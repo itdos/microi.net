@@ -221,6 +221,7 @@ Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="round
 ### 移动端可读性底线
 
 - 移动端首页、商城、分享海报、资产页必须优先保证阅读清楚。浅色背景上的正文、占位文字、标签、金额、按钮文字不得使用低透明度浅灰或低对比金色。
+- 移动端底部导航、首页快捷入口、个人中心快捷入口的图标对比度与文字同等重要。彩色圆底图标必须显式设定内部图标色，并在每个主题截图确认可见。
 - 关键正文与背景对比度建议不低于 4.5:1；大标题、海报大字、促销卡标题不低于 3:1。金色渐变按钮默认使用深红/深棕文字，不使用白字。
 - 在渐变、图片、红金背景上放文字时，文字必须是实色且有足够字重；不要依赖 `opacity: .6` 这类弱化文字承载业务信息。
 - 完成移动端风格改造后，必须配合 Playwright、浏览器 DevTools、微信开发者工具自动化或项目已有 E2E 工具进行截图和关键文字对比度检查，复核首页第一屏、列表页、登录页、分享海报、空态/未登录态和关键按钮。
@@ -1098,11 +1099,18 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 
 uni-app 中没有 `document` 对象（小程序端），所以推荐两套方案并存：
 
-**方案A · H5 直接操作 documentElement（最简单）**
+**方案A · H5 只操作 html/body 安全外壳**
+
+H5 端只能把主题状态写到 `html`、`body` 的 `data-*` 属性、主题 class 和 CSS 变量，再让 `uni-page-body`、页面根和 fixed 组件通过变量继承。不要用 `querySelectorAll('.mci-page')`、`MutationObserver`、定时扫描或“延迟补 class”去修改 `.mci-page`、`uni-page-body`、`uni-page`、`RouterView` 下的节点，这些节点由 Vue/uni-app 管理，切主题后导航时可能触发 `Cannot assign to read only property '_'`、`Cannot read properties of null (reading 'type')`、`parentNode`、`scheduler flush` 等错误。
 
 ```scss
 /* 在 mci-design.scss 加暗色定义 */
-.theme-dark, page.theme-dark {
+html.theme-dark,
+body.theme-dark,
+html.theme-dark uni-page-body,
+body.theme-dark uni-page-body,
+page.theme-dark,
+.theme-dark {
   --mci-color-primary: #8B5CF6;
   --mci-bg-base: #0B0B1F;
   --mci-bg-card: rgba(28, 28, 60, 0.85);
@@ -1125,9 +1133,12 @@ const PALETTE_KEY = 'mci_palette';
 const PALETTES = ['black','white','red','orange','yellow','green','cyan','blue','purple'];
 function applyClass(theme) {
   if (typeof document !== 'undefined' && document.documentElement) {
-    const cls = document.documentElement.classList;
-    cls.remove('theme-light', 'theme-dark', 'theme-auto');
-    cls.add('theme-' + theme);
+    [document.documentElement, document.body].forEach(function(el) {
+      if (!el) return;
+      el.classList.remove('theme-light', 'theme-dark', 'theme-auto');
+      el.classList.add('theme-' + theme);
+      el.setAttribute('data-mci-theme', theme);
+    });
   }
 }
 function applyPalette(palette) {
@@ -1185,6 +1196,8 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 - 形式：明暗模式用图标 + 文案（暗色 / 亮色 / 跟随系统），主色用色板按钮（黑、白、红、橙、黄、绿、青、蓝、紫），点击后立即生效，弹 Toast 反馈。
 - 色板必须有选中态、无障碍名称和足够触摸面积；白色色板必须有边框，黄色色板文字必须深色。
 - 切换后立刻持久化（uni.setStorageSync），下次启动 App 在 `onLaunch` 自动 `initTheme()` 应用
+- H5 fixed 底部导航、固定提交栏和悬浮操作条优先吃 `--mci-*` CSS 变量，不要在主题切换时让组件自己订阅 store 后动态切换根 class。若切主题后点击导航报 Vue scheduler、`parentNode`、`read only property '_'` 或 `null (reading 'type')`，说明主题实现改动了 Vue/uni 托管节点，必须改为 html/body 变量方案。
+- 骨架屏、加载过渡、报告详情、英文小标题、印章/水印、状态胶囊、摘要卡和富文本容器也属于主题范围。每个主题切换后都要重新触发 loading 态并打开至少一个详情页截图，不能只看首页。
 
 ### 主题颜色变量必须用 var(--mci-*) 而非硬编码
 

@@ -180,6 +180,15 @@ import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.
 import { encryptPassword } from '@/utils/crypto.js'
 import { getLoginProvider, getAuthLoginApi, getClientType, supportsAuthLogin, getPlatformName, getPlatformNameEn } from '@/utils/platform.js'
 
+function isEnabledFlag(value) {
+  if (value === true || value === 1) return true
+  if (typeof value === 'string') {
+    const text = value.trim().toLowerCase()
+    return text === '1' || text === 'true' || text === 'yes' || text === 'on'
+  }
+  return false
+}
+
 export default {
   mixins: [themeMixin],
   data() {
@@ -274,9 +283,13 @@ export default {
           const cfg = result.Data
 
           // 是否开启验证码
-          this.enableCaptcha = !!cfg.EnableCaptcha
+          this.enableCaptcha = isEnabledFlag(cfg.EnableCaptcha)
           if (this.enableCaptcha) {
             this.getCaptcha()
+          } else {
+            this.captchaId = ''
+            this.captchaValue = ''
+            this.captchaImgSrc = ''
           }
 
           // 动态设置系统标题

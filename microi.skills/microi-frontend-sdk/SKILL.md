@@ -61,6 +61,43 @@ export function createApp() {
 - Token 与用户缓存使用 `V8.getToken`、`V8.setToken`、`V8.clearToken`、`V8.getUser` 和 `V8.setUser`。
 - JavaScript 需要平台安全区数值时使用 `V8.getSafeArea`；CSS 仍使用 `env(safe-area-inset-*)`。
 
+## 登录与验证码封装
+
+SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。
+
+要求：
+- 提供 `isEnabledFlag(value)` 或等价工具，统一判断 `Sys_Config.EnableCaptcha`。它必须把 `true`、`1`、`'true'`、`'1'` 识别为开启，把 `false`、`0`、`'false'`、`'0'`、空值识别为关闭。
+- 提供 `getSysConfig()`，内部调用 `V8.GetSysConfig(true)` 或 `/api/DiyTable/GetSysConfig`，并保持当前租户 `OsClient` 一致。
+- 提供 `getCaptcha()`，内部调用 `GET /api/Captcha/GetCaptcha`，`responseType:'arraybuffer'`，从响应头读取 `captchaid`，返回 `{ CaptchaId, ImageSrc }`。
+- 提供账号登录封装时，只有在页面传入验证码时才追加 `_CaptchaId/_CaptchaValue`；不要在未开启验证码时提交空字段。
+- PC Vue、UniApp H5、微信小程序和 App 的账号密码登录都必须使用同一套验证码判断和登录参数契约。
+
+参考薄封装：
+
+```js
+export function isEnabledFlag(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    const text = value.trim().toLowerCase();
+    return text === '1' || text === 'true' || text === 'yes' || text === 'on';
+  }
+  return false;
+}
+
+export async function getSysConfig() {
+  return await V8.GetSysConfig(true);
+}
+
+export async function login(account, pwd, captcha = {}) {
+  return V8.Login({
+    Account: account,
+    Pwd: pwd,
+    _CaptchaId: captcha.CaptchaId || undefined,
+    _CaptchaValue: captcha.CaptchaValue || undefined
+  });
+}
+```
+
 ## 请求头规则
 
 SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业务 wrapper 或上传逻辑各自拼接租户和鉴权头。
