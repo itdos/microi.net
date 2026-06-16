@@ -502,17 +502,17 @@ console.log('调试信息')                                  // 控制台输出�
 - 只有用户明确同意写入时，才用 `dryRun:false` 并传 `confirmExecution`，随后调用 `microi_validate_system` 验收。
 
 
-## MCP 默认显隐规则
+## MCP default visibility
 
-- 创建 `sys_menu` 菜单模块时，除非用户明确要求隐藏，否则 `Display` 和 `AppDisplay` 默认设为 `1`。
-- 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
+- When creating sys_menu modules, default `Display` and `AppDisplay` to `1` unless the user explicitly asks to hide the menu.
+- When creating diy_field fields, default `Visible` and `AppVisible` to `1` unless the user explicitly asks to hide the field.
 
 
 ---
 
-## V8 引擎编码最佳实践（技能）
+## Microi 项目技能规范
 
-编写 V8 引擎代码时，参考以下技能文件获取代码模板和安全规范（共 36 个）：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 36 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -536,16 +536,16 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
 - `microi.skills/microi-ui/SKILL.md` — Microi.UI / MCI-UI
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
-- `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
-- `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
-- `microi.skills/microi-datasource-mapping/SKILL.md` — microi-datasource-mapping — 数据源 Key/Value 映射规范
-- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi 前端 SDK
-- `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi 移动端质量门禁
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
+- `microi.skills/microi-frontend-sdk/SKILL.md` — Microi 前端 SDK
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
+- `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi 移动端质量门禁
+- `microi.skills/microi-datasource-mapping/SKILL.md` — microi-datasource-mapping — 数据源 Key/Value 映射规范
+- `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）
+- `microi.skills/v8-explorer-tree/SKILL.md` — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
+- `microi.skills/workspace-conventions/SKILL.md` — Microi 工作区全局约定
 - `microi.skills/production-readonly-audit/SKILL.md` — Microi 正式环境只读业务巡检
 - `microi.skills/uniapp-mall-assets/SKILL.md` — 商城前端：图片 / 资源路径规范
-- `microi.skills/v8-explorer-tree/SKILL.md` — v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
-- `microi.skills/v8-formengine-http/SKILL.md` — FormEngine HTTP 路由约定（外部系统调用）
-- `microi.skills/workspace-conventions/SKILL.md` — Microi 工作区全局约定
+- `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
+- `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试

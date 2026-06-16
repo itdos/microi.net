@@ -206,6 +206,16 @@ Page 模式要特别注意：
   - `V8CodeShow: return true;` 是否显示。
   - `V8CodeShow: V8.Result = false;` 是否仍兼容。
 
+## 7.1 登录验证码与 Sys_Config
+
+修改 `Microi.Client/src/views/login/index.vue` 或任何 PC 端登录扩展时，必须遵守平台登录验证码契约：
+
+- 登录页加载系统配置后，用统一的 `isEnabledFlag(SysConfig.EnableCaptcha)` 判断是否开启验证码。`EnableCaptcha` 可能是 `1`、`true`、`'1'`、`'true'`，不能直接 `!!SysConfig.EnableCaptcha`。
+- 开启时显示验证码输入框，调用 `GET /api/Captcha/GetCaptcha` 获取图片，读取响应头 `captchaid`，调用 `/api/SysUser/login` 时提交 `_CaptchaId/_CaptchaValue`。
+- 登录失败时刷新验证码并清空输入；未开启时隐藏验证码并且不提交空验证码字段。
+- PC 端和移动端都调用同一个后端登录契约，不能只在某一端支持验证码。
+- 修改后要至少验证 `EnableCaptcha=1`、`EnableCaptcha='1'`、`EnableCaptcha=false` 三种情况。
+
 ## Microi 前端 SDK 约束
 
 当修改 `Microi.Client` 之外的 Vue3 前端、PC 官网、移动 H5 或定制微前端页面时，必须优先读取 `microi.skills/microi-frontend-sdk/SKILL.md` 并使用 `microi.skills/microi.v8.js`。`Microi.Client` 主后台已有平台请求与 Pinia 体系时，可以复用现有平台能力；但新增独立页面、外部站点、插件页、嵌入式页面不得再复制旧 Vue2/Vuex 版 `microi.v8.js`。

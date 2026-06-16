@@ -48,6 +48,16 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 更新 VS Code 插件生成模板时，要同步检查当前已生成的 `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md`、`.cursorrules` 和 Cursor rules，避免模板下一次刷新又把英文写回来。
 - 收尾时用 `rg` 扫描明显英文规范短语（如 `Use when`、`Required:`、`Forbidden:`、`Acceptance:`、`Quick Workflow`、`MCP default visibility`）。剩余英文必须属于必要标识符或专有名词。
 
+## VS Code 插件空目录生成规则
+
+Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
+
+强制要求：
+- 插件的“初始化AI配置”必须能在空目录生成 `microi.skills/`、`.github/copilot-instructions.md`、`AGENTS.md`、`CLAUDE.md`、`.cursorrules`、`.cursor/rules/microi-skills.mdc`、类型提示、`jsconfig.json` 和 MCP 配置。
+- Cursor rule 的 `globs` 必须覆盖任意新建项目目录下的常见源码、配置和文档文件，例如 `**/*.{vue,js,ts,jsx,tsx,css,scss,json,md,mdc,cs,csproj,xml,yml,yaml}`，不能只覆盖 `Microi-V8-Engine/**/*.js`。
+- 生成文案必须明确：普通用户不需要手动克隆 skills，也不需要每次对 AI 说“严格遵循 microi.skills”；只要插件初始化成功，AI 就应默认按 skills 工作。
+- 插件升级时应继续保护用户本地修改过的 skill 文件，只覆盖插件曾生成且用户未改过的文件。
+
 ## Microi 版本号规则
 
 Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格式，从 `1.0.0` 开始。每次发布时最后一位加 1；当某一位超过 `9` 时向前一位进位并将当前位归 `0`，例如 `1.0.9 -> 1.1.0`、`1.9.9 -> 2.0.0`。
