@@ -1,6 +1,6 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "versionRule": "Microi version uses three numeric parts. Each publish increments the last part; when a part exceeds 9 it carries to the previous part: 1.0.9 -> 1.1.0, 1.9.9 -> 2.0.0.",
   "managedBy": "Microi.VSCode/bump-version.js",
-  "updatedAt": "2026-06-16T08:11:54.937Z"
+  "updatedAt": "2026-06-16T12:22:36.141Z"
 }

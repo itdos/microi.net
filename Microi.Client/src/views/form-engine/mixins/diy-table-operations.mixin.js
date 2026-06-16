@@ -111,7 +111,57 @@ export default {
         },
         FormSet(fieldName, value, row) {
             var self = this;
-            row[fieldName] = value; // 0
+            if (!fieldName) return;
+            var targetField = null;
+            if (Array.isArray(self.DiyFieldList)) {
+                targetField = self.DiyFieldList.find(function (field) {
+                    return field && (field.Name == fieldName || field.AsName == fieldName);
+                });
+            }
+            var rowFieldName = targetField && !self.DiyCommon.IsNull(targetField.AsName) ? targetField.AsName : fieldName;
+            var targetRow = row || self.CurrentSelectedRowModel;
+            if (!targetRow) return;
+
+            targetRow[fieldName] = value;
+            targetRow[rowFieldName] = value;
+
+            var renderRow = targetRow;
+            var rowIndex = self.FindDiyTableRowIndexByRow(targetRow);
+            if (rowIndex > -1) {
+                renderRow = Object.assign({}, self.DiyTableRowList[rowIndex] || targetRow);
+                renderRow[fieldName] = value;
+                renderRow[rowFieldName] = value;
+            }
+
+            self.RefreshRowTemplateEngineResult(renderRow);
+
+            if (rowIndex > -1) {
+                self.DiyTableRowList.splice(rowIndex, 1, renderRow);
+            } else if (typeof self.$forceUpdate === "function") {
+                self.$forceUpdate();
+            }
+            return value;
+        },
+        FindDiyTableRowIndexByRow(row) {
+            var self = this;
+            if (!row || !Array.isArray(self.DiyTableRowList)) return -1;
+            if (self.DiyTableRowList.indexOf(row) > -1) {
+                return self.DiyTableRowList.indexOf(row);
+            }
+            if (self.DiyCommon.IsNull(row.Id)) return -1;
+            return self.DiyTableRowList.findIndex(function (item) {
+                return item && item.Id == row.Id;
+            });
+        },
+        RefreshRowTemplateEngineResult(row) {
+            var self = this;
+            if (!row || !Array.isArray(self.DiyFieldList)) return;
+            self.DiyFieldList.forEach(function (field) {
+                if (!field || self.DiyCommon.IsNull(field.V8TmpEngineTable)) return;
+                try {
+                    row[field.Name + "_TmpEngineResult"] = self.RunFieldTemplateEngine(field, row);
+                } catch (e) {}
+            });
         },
         FieldSet(fieldName, attrName, value) {
             var self = this;

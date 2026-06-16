@@ -211,9 +211,32 @@ LoadFabPosition() {
             }
             self.DiyCommon.Post(apiUrl, param, function (result) {
                 if (self.DiyCommon.Result(result)) {
+                    self._ApplySavedRowToTable(row, formData);
+                    var pendingRefreshParam = self._PendingFieldValueChangeRefreshParam;
+                    self._PendingFieldValueChangeRefreshParam = null;
+                    if (pendingRefreshParam && typeof self.GetDiyTableRow === 'function') {
+                        self.GetDiyTableRow(pendingRefreshParam);
+                        setTimeout(function () {
+                            self._ApplySavedRowToTable(row, formData);
+                        }, 1000);
+                        setTimeout(function () {
+                            self._ApplySavedRowToTable(row, formData);
+                        }, 2500);
+                    }
                     self.DiyCommon.Tips(self.$t('Msg.Success'));
                 }
             });
+        },
+        _ApplySavedRowToTable(row, formData) {
+            var self = this;
+            if (!row || !Array.isArray(self.DiyTableRowList)) return;
+            var rowIndex = typeof self.FindDiyTableRowIndexByRow === 'function' ? self.FindDiyTableRowIndexByRow(row) : -1;
+            if (rowIndex < 0) return;
+            var renderRow = Object.assign({}, self.DiyTableRowList[rowIndex] || row, formData || {}, row);
+            if (typeof self.RefreshRowTemplateEngineResult === 'function') {
+                self.RefreshRowTemplateEngineResult(renderRow);
+            }
+            self.DiyTableRowList.splice(rowIndex, 1, renderRow);
         },
         /** Submit 模式：登记待提交。 */
         _RecordPendingChange(payload) {

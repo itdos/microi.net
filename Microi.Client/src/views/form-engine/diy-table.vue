@@ -1772,7 +1772,18 @@ export default {
                     V8.Form = form; // 当前Form表单所有字段值
                     // V8.Form = row;
                     V8.FormSet = (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
+                        var result = self.FormSet(fieldName, value, row);
+                        if (fieldName) {
+                            var targetField = Array.isArray(self.DiyFieldList)
+                                ? self.DiyFieldList.find(function (item) {
+                                    return item && (item.Name == fieldName || item.AsName == fieldName);
+                                })
+                                : null;
+                            var targetFieldName = targetField && !self.DiyCommon.IsNull(targetField.AsName) ? targetField.AsName : fieldName;
+                            form[fieldName] = value;
+                            form[targetFieldName] = value;
+                        }
+                        return result;
                     }; // 给Form表单其它字段赋值
                     V8.EventName = "FormIn";
                     self.SetV8DefaultValue(V8);
@@ -1828,22 +1839,55 @@ export default {
             var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
                 if (field
-                    && (field.V8Code || field.Config.V8Code)) {
+                    && (field.V8Code || (field.Config && field.Config.V8Code))) {
+                    var fieldModelName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+                    var hasNewValue = thisValue && typeof thisValue == "object" && Object.prototype.hasOwnProperty.call(thisValue, "New");
+                    var currentValue = hasNewValue ? thisValue.New : undefined;
+                    if (row && currentValue !== undefined && field.Name) {
+                        row[field.Name] = currentValue;
+                        row[fieldModelName] = currentValue;
+                    }
                     var form = { ...row };
+                    if (currentValue !== undefined && field.Name) {
+                        form[field.Name] = currentValue;
+                        form[fieldModelName] = currentValue;
+                    }
                     // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
                     V8.Form = form; // 当前Form表单所有字段值
                     V8.OldForm = self.OldDiyTableRowList.find((item) => item.Id == row.Id);
                     // V8.Form = row;
                     V8.ThisValue = thisValue;
                     V8.FormSet = (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
-                    }; // 给Form表单其它字段赋值
+                        var result = self.FormSet(fieldName, value, row);
+                        if (fieldName) {
+                            var targetField = Array.isArray(self.DiyFieldList)
+                                ? self.DiyFieldList.find(function (item) {
+                                    return item && (item.Name == fieldName || item.AsName == fieldName);
+                                })
+                                : null;
+                            var targetFieldName = targetField && !self.DiyCommon.IsNull(targetField.AsName) ? targetField.AsName : fieldName;
+                            form[fieldName] = value;
+                            form[targetFieldName] = value;
+                        }
+                        return result;
+                    };
                     V8.RefreshChildTable = self.RefreshChildTable;
                     V8.EventName = "FieldValueChange";
                     self.SetV8DefaultValue(V8, field);
+                    V8.RefreshTable = (param) => {
+                        var refreshParam = param || {};
+                        self._PendingFieldValueChangeRefreshParam = refreshParam;
+                        setTimeout(function () {
+                            if (self._PendingFieldValueChangeRefreshParam === refreshParam) {
+                                self._PendingFieldValueChangeRefreshParam = null;
+                                self.GetDiyTableRow(refreshParam);
+                            }
+                        }, 3000);
+                        return true;
+                    };
 
                     // eval(btn.V8Code)
-                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + (field.V8Code || field.Config.V8Code) + " \n})()");
+                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + (field.V8Code || (field.Config && field.Config.V8Code)) + " \n})()");
                     if (V8Result !== undefined) {
                         callback && callback(V8.Result || V8Result);
                         return V8Result;
