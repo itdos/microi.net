@@ -12,12 +12,13 @@
     <el-input-number
         v-model="ModelValue"
         :disabled="GetFieldReadOnly(field)"
-        :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
-        :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+        :step="GetNumberStep(field)"
+        :precision="GetNumberPrecision(field)"
         :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
         :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
         label=""
         :placeholder="GetFieldPlaceholder(field)"
+        @mousedown.capture="(event) => { return HandleInputNumberControlMouseDown(event, field); }"
         @change="
             (currentValue, oldValue) => {
                 return InputOnBlur(currentValue, oldValue, field);
@@ -75,11 +76,12 @@ import _ from "underscore";
 export default {
     name: "diy-input-number",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
         return {
             ModelValue: null,
             LastModelValue: null,
+            NumberChangeRunningKey: "",
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -184,6 +186,16 @@ export default {
             }
             return form[field.Name];
         },
+        GetNumberStep(field) {
+            var step = Number(field && field.Config ? field.Config.NumberTextStep : null);
+            if (!Number.isFinite(step) || step <= 0) return 1;
+            return step;
+        },
+        GetNumberPrecision(field) {
+            var precision = Number(field && field.Config ? field.Config.NumberTextPrecision : null);
+            if (!Number.isFinite(precision) || precision < 0) return 0;
+            return Math.floor(precision);
+        },
         NormalizeNumberValue(val) {
             if (val === null || val === undefined) return null;
             if (typeof val === "string") {
@@ -193,12 +205,70 @@ export default {
             if (Number.isNaN(num)) return null;
             return num;
         },
+        IsSameNumberValue(value1, value2) {
+            var num1 = this.NormalizeNumberValue(value1);
+            var num2 = this.NormalizeNumberValue(value2);
+            if (num1 === null && num2 === null) return true;
+            return num1 === num2;
+        },
+        RoundNumberValue(value, precision) {
+            if (value === null || value === undefined) return null;
+            if (!Number.isFinite(value)) return null;
+            var numberPrecision = Number.isFinite(precision) ? precision : 0;
+            if (numberPrecision <= 0) return Math.round(value);
+            var factor = Math.pow(10, numberPrecision);
+            return Math.round((value + Number.EPSILON) * factor) / factor;
+        },
+        GetNextNumberValue(currentValue, direction, field) {
+            var self = this;
+            var current = self.NormalizeNumberValue(currentValue);
+            if (current === null) current = 0;
+            var nextValue = current + self.GetNumberStep(field) * direction;
+            return self.RoundNumberValue(nextValue, self.GetNumberPrecision(field));
+        },
+        GetNumberChangeKey(currentValue, oldValue) {
+            return String(this.NormalizeNumberValue(oldValue)) + "->" + String(this.NormalizeNumberValue(currentValue));
+        },
+        HandleInputNumberControlMouseDown(event, field) {
+            var self = this;
+            var target = event && event.target;
+            if (!target || typeof target.closest !== "function") return;
+
+            var controlEl = target.closest(".el-input-number__increase, .el-input-number__decrease");
+            if (!controlEl) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") {
+                event.stopImmediatePropagation();
+            }
+
+            if (controlEl.classList.contains("is-disabled") || self.GetFieldReadOnly(field)) return;
+
+            self.SelectField(field);
+            var oldValue = self.NormalizeNumberValue(self.ModelValue);
+            var direction = controlEl.classList.contains("el-input-number__increase") ? 1 : -1;
+            var currentValue = self.GetNextNumberValue(oldValue, direction, field);
+            if (self.IsSameNumberValue(currentValue, oldValue)) return;
+
+            return self.InputOnBlur(currentValue, oldValue, field);
+        },
         ModelChangeMethods(item) {
             var self = this;
             var normalized = self.NormalizeNumberValue(item);
-            self.ModelValue = normalized;
+            if (!self.IsSameNumberValue(self.ModelValue, normalized)) {
+                self.ModelValue = normalized;
+            }
+            self.UpdateFormDiyTableModelValue(normalized);
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
+        },
+        UpdateFormDiyTableModelValue(value) {
+            var self = this;
+            if (!self.FormDiyTableModel || !self.field || !self.field.Name) return;
+            var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
+            self.FormDiyTableModel[self.field.Name] = value;
+            self.FormDiyTableModel[fieldName] = value;
         },
         FieldOnKeyup(event, field) {
             var self = this;
@@ -207,8 +277,10 @@ export default {
         NumberTextChange(currentValue, oldValue, field) {
             return new Promise((resolve, reject) => {
                 var self = this;
+                currentValue = self.NormalizeNumberValue(currentValue);
+                oldValue = self.NormalizeNumberValue(oldValue);
                 self.ModelChangeMethods(currentValue);
-                if (field.Component == "NumberText" && (field.V8Code || field.Config.V8Code)) {
+                if (field.Component == "NumberText" && (field.V8Code || (field.Config && field.Config.V8Code))) {
                     self.$emit("CallbackRunV8Code", {
                         field: field,
                         thisValue: {
@@ -233,10 +305,14 @@ export default {
         async InputOnBlur(currentValue, oldValue, field) {
             var self = this;
             var msg = self.$t("Msg.Success");
-            console.log(msg);
-            console.log("InputOnBlur", currentValue, oldValue, field);
-            let res = await self.NumberTextChange(currentValue, oldValue, field);
-            if (res === false) return;
+            currentValue = self.NormalizeNumberValue(currentValue);
+            oldValue = self.NormalizeNumberValue(oldValue);
+            var changeKey = self.GetNumberChangeKey(currentValue, oldValue);
+            if (self.NumberChangeRunningKey == changeKey) return;
+            self.NumberChangeRunningKey = changeKey;
+            try {
+                let res = await self.NumberTextChange(currentValue, oldValue, field);
+                if (res === false) return;
 
             //如果是表内编辑，失去焦点要自动保存
             if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
@@ -283,7 +359,6 @@ export default {
                     return;
                 }
                 // self.DiyCommon.UptDiyTableRow(param, function(result){
-                console.log(apiUrl, param);
                 self.DiyCommon.Post(apiUrl, param, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.LastModelValue = self.ModelValue;
@@ -292,10 +367,15 @@ export default {
                 });
             }
             self.$emit("CallbackFormValueChange", self.field, currentValue);
+            } finally {
+                if (self.NumberChangeRunningKey == changeKey) {
+                    self.NumberChangeRunningKey = "";
+                }
+            }
         },
         CommonV8CodeChange(item, field) {
             var self = this;
-            if (field.V8Code || field.Config.V8Code) {
+            if (field.V8Code || (field.Config && field.Config.V8Code)) {
                 // self.RunV8Code(field, item)
                 self.$emit("CallbackRunV8Code", {
                     field: field,
