@@ -160,11 +160,15 @@
                             :dataCommentListLoading="DataCommentListLoading"
                             :dataVersionList="DataVersionList"
                             :dataVersionListLoading="DataVersionListLoading"
+                            :diyFieldList="DiyFieldList"
+                            :replyComment="ReplyComment"
                             :btnLoading="BtnLoading"
                             :form-data="WfFormData"
                             :formMode="FormMode"
                             :hideInlineSubmit="ShowWfTopSubmitBtn"
                             @submit-comment="SubmitComment"
+                            @reply-comment="StartReplyComment"
+                            @cancel-reply-comment="CancelReplyComment"
                             @callback-start-work="CallbackStartWork"
                             @callback-send-work="CallbackSendWork"
                             @callback-get-form-data="CallbackGetFormData"
@@ -174,7 +178,6 @@
                             @refresh-data-version="LoadDataVersion"
                             @preview-data-version="PreviewDataVersion"
                             @load-data-version="LoadDataVersionToForm"
-                            @save-data-version="SaveDataVersionAsCurrent"
                         />
                     </el-col>
                 </el-row>
@@ -376,7 +379,7 @@
                 </div>
             </template>
             <el-row class="clear" :gutter="20">
-                <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
+                <el-col :span="ShowFormRight() ? 18 : 24" :xs="24">
                     <DiyForm
                         ref="fieldForm"
                         :AutoInit="false"
@@ -411,7 +414,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="4" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -427,11 +430,15 @@
                         :dataCommentListLoading="DataCommentListLoading"
                         :dataVersionList="DataVersionList"
                         :dataVersionListLoading="DataVersionListLoading"
+                        :diyFieldList="DiyFieldList"
+                        :replyComment="ReplyComment"
                         :btnLoading="BtnLoading"
                         :form-data="WfFormData"
                         :formMode="FormMode"
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
+                        @reply-comment="StartReplyComment"
+                        @cancel-reply-comment="CancelReplyComment"
                         @callback-start-work="CallbackStartWork"
                         @callback-send-work="CallbackSendWork"
                         @callback-get-form-data="CallbackGetFormData"
@@ -441,7 +448,6 @@
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
                         @load-data-version="LoadDataVersionToForm"
-                        @save-data-version="SaveDataVersionAsCurrent"
                     />
                 </el-col>
             </el-row>
@@ -667,7 +673,7 @@
             </template>
 
             <el-row class="clear" :gutter="20">
-                <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
+                <el-col :span="ShowFormRight() ? 18 : 24" :xs="24">
                     <DiyForm
                         ref="fieldForm"
                         :AutoInit="false"
@@ -702,7 +708,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="4" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -718,11 +724,15 @@
                         :dataCommentListLoading="DataCommentListLoading"
                         :dataVersionList="DataVersionList"
                         :dataVersionListLoading="DataVersionListLoading"
+                        :diyFieldList="DiyFieldList"
+                        :replyComment="ReplyComment"
                         :btnLoading="BtnLoading"
                         :form-data="WfFormData"
                         :formMode="FormMode"
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
+                        @reply-comment="StartReplyComment"
+                        @cancel-reply-comment="CancelReplyComment"
                         @callback-start-work="CallbackStartWork"
                         @callback-send-work="CallbackSendWork"
                         @callback-get-form-data="CallbackGetFormData"
@@ -732,7 +742,6 @@
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
                         @load-data-version="LoadDataVersionToForm"
-                        @save-data-version="SaveDataVersionAsCurrent"
                     />
                 </el-col>
             </el-row>
@@ -841,12 +850,16 @@
                 :dataCommentListLoading="DataCommentListLoading"
                 :dataVersionList="DataVersionList"
                 :dataVersionListLoading="DataVersionListLoading"
+                :diyFieldList="DiyFieldList"
+                :replyComment="ReplyComment"
                 :btnLoading="BtnLoading"
                 :form-data="WfFormData"
                 :formMode="FormMode"
                 :hideInlineSubmit="ShowWfTopSubmitBtn"
                 :isMobileDrawer="true"
                 @submit-comment="SubmitComment"
+                @reply-comment="StartReplyComment"
+                @cancel-reply-comment="CancelReplyComment"
                 @callback-start-work="CallbackStartWork"
                 @callback-send-work="CallbackSendWork"
                 @callback-get-form-data="CallbackGetFormData"
@@ -856,9 +869,42 @@
                 @refresh-data-version="LoadDataVersion"
                 @preview-data-version="PreviewDataVersion"
                 @load-data-version="LoadDataVersionToForm"
-                @save-data-version="SaveDataVersionAsCurrent"
             />
         </el-drawer>
+        <el-dialog
+            v-model="ShowDataVersionPreviewDialog"
+            class="data-version-preview-dialog"
+            :title="'数据版本预览 ' + ((PreviewDataVersionItem && PreviewDataVersionItem.Version) || '')"
+            :width="diyStore.IsPhoneView ? '94%' : '920px'"
+            append-to-body
+            destroy-on-close
+            @opened="ApplyDataVersionPreviewData"
+        >
+            <DiyForm
+                v-if="ShowDataVersionPreviewDialog && TableId"
+                :key="'data_version_preview_' + PreviewDataVersionKey"
+                ref="fieldFormDataVersionPreview"
+                :FormMode="'View'"
+                :LoadMode="'DataVersionPreview'"
+                :TableId="TableId"
+                :TableName="TableName"
+                :TableRowId="''"
+                :DefaultValues="PreviewDataVersionData || {}"
+                :SelectFields="FieldFormSelectFields"
+                :FixedTabs="FieldFormFixedTabs"
+                :HideFields="FieldFormHideFields"
+                :ParentForm="FatherFormModel"
+                :ApiReplace="ApiReplace"
+                :EventReplace="EventReplace"
+                :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
+                :CurrentTableData="DiyTableRowList"
+                :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                :ShowHideField="ShowHideField"
+                :DataAppend="DataAppend"
+                @CallbackGetDiyField="CallbackGetDiyFieldPreview"
+                @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
+            />
+        </el-dialog>
         <el-dialog
             v-model="ShowDraftDialog"
             class="draft-box-dialog"

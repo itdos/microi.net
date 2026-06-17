@@ -169,6 +169,10 @@ export default {
 
                 // 普通数据源 Data，值就是字符串
                 if (self._isPlainDataSource()) {
+                    if (self._isMultipleSelect()) {
+                        self.ModelValue = self._normalizePlainDataSourceValue(normalizedVal);
+                        return;
+                    }
                     var resolved = self._resolveDataSourceValue(normalizedVal);
                     // 优先从 field.Data 中取同引用，避免同值不触发重选
                     if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
@@ -187,18 +191,7 @@ export default {
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
-                        self.ModelValue = normalizedVal;
-                        return;
-                    }
-                    if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.Key == normalizedVal);
-                        if (found) {
-                            self.ModelValue = found;
-                            return;
-                        }
-                    }
-                    self.ModelValue = normalizedVal;
+                    self.ModelValue = self._normalizeKeyValueValue(normalizedVal);
                     return;
                 }
                 // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
@@ -217,6 +210,10 @@ export default {
 
                 // 普通数据源 Data，值就是字符串
                 if (self._isPlainDataSource()) {
+                    if (self._isMultipleSelect()) {
+                        self.ModelValue = self._normalizePlainDataSourceValue(normalizedVal);
+                        return;
+                    }
                     var resolved = self._resolveDataSourceValue(normalizedVal);
                     if (!self.DiyCommon.IsNull(resolved) && Array.isArray(self.field.Data)) {
                         var hit = self.field.Data.find(function (it) { return it == resolved || String(it) === String(resolved); });
@@ -234,21 +231,7 @@ export default {
                 }
                 // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-                    if (typeof normalizedVal === "object" && normalizedVal !== null && !Array.isArray(normalizedVal)) {
-                        // 已经是对象，直接使用
-                        self.ModelValue = normalizedVal;
-                        return;
-                    }
-                    // newVal 是 Key 字符串，需要从 Data 中找到对应对象
-                    if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.Key == normalizedVal);
-                        if (found) {
-                            self.ModelValue = found;
-                            return;
-                        }
-                    }
-                    // 找不到对应对象，暂存 key，等 Data 加载后再匹配
-                    self.ModelValue = normalizedVal;
+                    self.ModelValue = self._normalizeKeyValueValue(normalizedVal);
                     return;
                 }
                 // SQL/DataSource/ApiEngine 数据源：单选 + 存储形式为"字段"时，值是字符串，需转为对象
@@ -274,6 +257,11 @@ export default {
                 // 只有在需要重置数据源时才同步 ModelValue
                 // 如果是普通数据源Data或KeyValue，处理方式不同
                 if (self._isPlainDataSource()) {
+                    if (self._isMultipleSelect()) {
+                        self.ModelValue = self._normalizePlainDataSourceValue(self.ModelValue);
+                        self.NeedResetDataSourse = true;
+                        return;
+                    }
                     // 普通数据源：ModelValue 可能是字符串、数字、对象（历史遗留），统一规整
                     var normalizedCurrent = self._resolveDataSourceValue(self.ModelValue);
                     var delData = self.field.Data.find((item) => {
@@ -289,10 +277,7 @@ export default {
                         self.ModelValue = normalizedCurrent;
                     }
                 } else if (self.field.Config.DataSource === "KeyValue") {
-                    var delData = self.field.Data.find((item) => {
-                        return item.Key == self.ModelValue || (typeof self.ModelValue === 'object' && item.Key == self.ModelValue.Key);
-                    });
-                    if (delData) self.ModelValue = delData;
+                    self.ModelValue = self._normalizeKeyValueValue(self.ModelValue);
                 } else {
                     // 其他数据源（Sql/DataSource/ApiEngine），item是对象
                     var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
@@ -366,8 +351,10 @@ export default {
         if (self._isPlainDataSource()) {
             // 普通数据源：兼容历史遗留数据（对象/数组/数字），统一规整为字符串
             // 并尽量从 field.Data 中找到完全相等的引用，确保 el-select 能匹配上
-            self.ModelValue = self._resolveDataSourceValue(modelValue);
-            if (!self.DiyCommon.IsNull(self.ModelValue) && self.field.Data && self.field.Data.length > 0) {
+            self.ModelValue = self._isMultipleSelect()
+                ? self._normalizePlainDataSourceValue(modelValue)
+                : self._resolveDataSourceValue(modelValue);
+            if (!self._isMultipleSelect() && !self.DiyCommon.IsNull(self.ModelValue) && self.field.Data && self.field.Data.length > 0) {
                 var matchedItem = self.field.Data.find(function (item) {
                     return item == self.ModelValue || String(item) === String(self.ModelValue);
                 });
@@ -377,25 +364,7 @@ export default {
             }
         } else if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
             // KeyValue 数据源，存储的是对象或Key字符串
-            if (typeof modelValue === 'object' && modelValue !== null) {
-                // 如果已经是对象，标准化为大驼峰
-                self.ModelValue = {
-                    Key: modelValue.Key || modelValue.key || '',
-                    Value: modelValue.Value || modelValue.value || ''
-                };
-            } else {
-                // 如果是Key字符串，从Data中找到对应的对象
-                self.ModelValue = self._isEmptySelectValue(modelValue) ? "" : modelValue;
-                if (!self._isEmptySelectValue(modelValue) && self.field.Data && self.field.Data.length > 0) {
-                    var found = self.field.Data.find(item => (item.Key || item.key) == modelValue);
-                    if (found) {
-                        self.ModelValue = {
-                            Key: found.Key || found.key || '',
-                            Value: found.Value || found.value || ''
-                        };
-                    }
-                }
-            }
+            self.ModelValue = self._normalizeKeyValueValue(modelValue);
         } else if (typeof modelValue == "string") {
             if (modelValue.startsWith("{") || modelValue.startsWith("[")) {
                 try {
@@ -601,6 +570,67 @@ export default {
             }).filter(function (item) {
                 return !self._isEmptySelectValue(item);
             });
+        },
+        _normalizePlainDataSourceValue(value) {
+            var self = this;
+            if (!self._isMultipleSelect()) {
+                return self._resolveDataSourceValue(value);
+            }
+            if (self._isEmptySelectValue(value)) return [];
+            var arr = Array.isArray(value) ? value : self.normalizeSelectValue(value);
+            if (!Array.isArray(arr)) arr = self._isEmptySelectValue(arr) ? [] : [arr];
+            return arr.map(function (item) {
+                return self._resolveDataSourceValue(item);
+            }).filter(function (item) {
+                return !self.DiyCommon.IsNull(item);
+            });
+        },
+        _normalizeKeyValueItem(item) {
+            var self = this;
+            if (self._isEmptySelectValue(item)) return null;
+            if (item && typeof item === "object" && !Array.isArray(item)) {
+                var key = item.Key !== undefined ? item.Key : item.key;
+                var value = item.Value !== undefined ? item.Value : item.value;
+                return {
+                    Key: key !== undefined ? key : "",
+                    Value: value !== undefined ? value : (key !== undefined ? key : "")
+                };
+            }
+            if (self.field && Array.isArray(self.field.Data)) {
+                var found = self.field.Data.find(function (dataItem) {
+                    if (!dataItem || typeof dataItem !== "object") return false;
+                    var dataKey = dataItem.Key !== undefined ? dataItem.Key : dataItem.key;
+                    return dataKey == item;
+                });
+                if (found) {
+                    return {
+                        Key: found.Key !== undefined ? found.Key : (found.key !== undefined ? found.key : ""),
+                        Value: found.Value !== undefined ? found.Value : (found.value !== undefined ? found.value : item)
+                    };
+                }
+            }
+            return {
+                Key: item,
+                Value: item
+            };
+        },
+        _normalizeKeyValueValue(value) {
+            var self = this;
+            var isMultiple = self._isMultipleSelect();
+            if (self._isEmptySelectValue(value)) return isMultiple ? [] : "";
+            if (isMultiple) {
+                var arr = Array.isArray(value) ? value : self.normalizeSelectValue(value);
+                if (!Array.isArray(arr)) arr = self._isEmptySelectValue(arr) ? [] : [arr];
+                return arr.map(function (item) {
+                    return self._normalizeKeyValueItem(item);
+                }).filter(function (item) {
+                    return item && !self._isEmptySelectValue(item);
+                });
+            }
+            var singleValue = Array.isArray(value)
+                ? value.find(function (item) { return !self._isEmptySelectValue(item); })
+                : value;
+            return self._normalizeKeyValueItem(singleValue) || "";
         },
         _getEmptyModelValue() {
             return this.field && this.field.Component === "MultipleSelect" ? [] : "";
@@ -903,19 +933,15 @@ export default {
             var self = this;
             // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
             var saveItem = item;
-            if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
-                // 将旧数据的小写key/value转换为大驼峰Key/Value
-                var normalizedItem = {
-                    Key: item.Key || item.key || '',
-                    Value: item.Value || item.value || ''
-                };
-                // ModelValue 和 FormDiyTableModel 都保存标准化后的对象
-                self.ModelValue = normalizedItem;
+            if (field.Config.DataSource === "KeyValue") {
+                saveItem = self._normalizeKeyValueValue(item);
+                // ModelValue 和 FormDiyTableModel 都保存标准化后的对象/对象数组
+                self.ModelValue = saveItem;
                 var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
-                self.FormDiyTableModel[fieldName] = normalizedItem;
-                // emit 也发送标准化后的对象
-                self.$emit("ModelChange", normalizedItem);
-                self.$emit("update:modelValue", normalizedItem);
+                self.FormDiyTableModel[fieldName] = saveItem;
+                // emit 也发送标准化后的对象/对象数组
+                self.$emit("ModelChange", saveItem);
+                self.$emit("update:modelValue", saveItem);
             } else {
                 self.ModelChangeMethods(saveItem);
             }
