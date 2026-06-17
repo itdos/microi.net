@@ -1463,9 +1463,10 @@ export default {
             var V8 = v8 ? v8 : {};
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
-                    V8.Form = self.DeleteFormProperty(row);
+                    var buttonRow = self.GetCurrentFormButtonRow(row);
+                    V8.Form = self.DeleteFormProperty(buttonRow);
                     V8.FormSet = (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
+                        return self.FormSet(fieldName, value, buttonRow);
                     };
                     V8.OpenForm = (row, type) => {
                         return self.OpenDetail(row, type, true);
@@ -1494,10 +1495,41 @@ export default {
         },
 
         // ========== 工具方法 ==========
+        GetCurrentFormButtonRow(row) {
+            var self = this;
+            var currentFormData = {};
+            var activeForm = null;
+            if (typeof self.GetActiveFieldForm === "function") {
+                activeForm = self.GetActiveFieldForm();
+            } else if (self.$refs) {
+                activeForm = self.$refs.fieldForm || self.$refs.fieldFormPage;
+                if (Array.isArray(activeForm)) {
+                    activeForm = activeForm[0];
+                }
+            }
+            if (activeForm && typeof activeForm.GetFormData === "function") {
+                currentFormData = activeForm.GetFormData() || {};
+            }
+            var buttonRow = {
+                ...(row || {}),
+                ...(currentFormData || {})
+            };
+            if (row && row._V8) {
+                buttonRow._V8 = row._V8;
+            }
+            self.CurrentRowModel = {
+                ...(self.CurrentRowModel || {}),
+                ...buttonRow
+            };
+            return buttonRow;
+        },
         DeleteFormProperty(form) {
-            Reflect.deleteProperty(form, "_RowMoreBtnsOut");
-            Reflect.deleteProperty(form, "_RowMoreBtnsIn");
-            return form;
+            var cleanForm = {
+                ...(form || {})
+            };
+            Reflect.deleteProperty(cleanForm, "_RowMoreBtnsOut");
+            Reflect.deleteProperty(cleanForm, "_RowMoreBtnsIn");
+            return cleanForm;
         },
         ParentFormSet(fieldName, value) {
             var self = this;
@@ -1507,8 +1539,15 @@ export default {
             var self = this;
             if (row) {
                 row[fieldName] = value;
-            } else if (self.CurrentRowModel) {
+            }
+            if (self.CurrentRowModel) {
                 self.CurrentRowModel[fieldName] = value;
+            }
+            var activeForm = typeof self.GetActiveFieldForm === "function" ? self.GetActiveFieldForm() : null;
+            if (activeForm && typeof activeForm.SetFormData === "function") {
+                activeForm.SetFormData({
+                    [fieldName]: value
+                });
             }
         },
         FieldSet(fieldName, attrName, value) {

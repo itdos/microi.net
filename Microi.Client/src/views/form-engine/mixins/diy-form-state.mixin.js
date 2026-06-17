@@ -520,14 +520,27 @@ export default {
             if (lastMeta) lastMeta._collapseClass += " collapse-group-visible-last";
 
             rows.forEach((row, rowIndex) => {
+                var rowSpan = row.reduce(function (total, childField) {
+                    var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                    if (!span || span < 1) span = 24;
+                    if (span > 24) span = 24;
+                    return total + span;
+                }, 0);
+                var rowRemain = Math.max(0, 24 - rowSpan);
                 row.forEach((childField, colIndex) => {
                     var childMeta = metaMap.get(childField);
                     if (!childMeta) return;
+                    var childSpan = parseInt(childField._span || childField.FormWidth || 24, 10);
+                    if (!childSpan || childSpan < 1) childSpan = 24;
+                    if (childSpan > 24) childSpan = 24;
                     childMeta._collapseClass += " collapse-group-row collapse-group-row-" + rowIndex;
                     if (rowIndex === 0) childMeta._collapseClass += " collapse-group-row-first";
                     if (rowIndex === rows.length - 1) childMeta._collapseClass += " collapse-group-row-last";
                     if (colIndex === 0) childMeta._collapseClass += " collapse-group-row-start";
                     if (colIndex === row.length - 1) childMeta._collapseClass += " collapse-group-row-end";
+                    if (colIndex === row.length - 1 && rowRemain > 0) {
+                        childMeta._collapseClass += " collapse-group-row-open-end collapse-group-last-span-" + childSpan + " collapse-group-row-remain-" + rowRemain;
+                    }
                 });
             });
         },
@@ -718,9 +731,9 @@ export default {
 
             self.SetFieldRuntimeValue(field, "_fieldTabsHidden", false);
             self.SetFieldRuntimeValue(field, "_fieldTabsStateKey", stateKey);
-            self.SetFieldRuntimeValueOnce(field, "_fieldTabsActiveKey", activeKey);
+            self.SetFieldRuntimeValue(field, "_fieldTabsActiveKey", activeKey);
             self.SetFieldRuntimeValue(field, "_fieldTabsChildCount", totalChildCount);
-            self.SetFieldRuntimeValueOnce(field, "_fieldTabsPanes", runtimePanes);
+            self.SetFieldRuntimeValue(field, "_fieldTabsPanes", runtimePanes);
             self.AppendFieldRuntimeClass(field, "field-tabs-header field-tabs-theme-" + theme);
         },
         ApplyFieldTabsRowClasses(visibleChildFields) {
@@ -758,14 +771,25 @@ export default {
             self.AppendFieldRuntimeClass(visibleChildFields[visibleChildFields.length - 1], "field-tabs-visible-last");
 
             rows.forEach((row, rowIndex) => {
+                var rowSpan = row.reduce(function (total, childField) {
+                    var span = parseInt(childField._span || childField.FormWidth || 24, 10);
+                    if (!span || span < 1) span = 24;
+                    if (span > 24) span = 24;
+                    return total + span;
+                }, 0);
+                var rowRemain = Math.max(0, 24 - rowSpan);
                 row.forEach((childField, colIndex) => {
+                    var childSpan = parseInt(childField._span || childField.FormWidth || 24, 10);
+                    if (!childSpan || childSpan < 1) childSpan = 24;
+                    if (childSpan > 24) childSpan = 24;
                     self.AppendFieldRuntimeClass(
                         childField,
                         "field-tabs-row field-tabs-row-" + rowIndex +
                         (rowIndex === 0 ? " field-tabs-row-first" : "") +
                         (rowIndex === rows.length - 1 ? " field-tabs-row-last" : "") +
                         (colIndex === 0 ? " field-tabs-row-start" : "") +
-                        (colIndex === row.length - 1 ? " field-tabs-row-end" : "")
+                        (colIndex === row.length - 1 ? " field-tabs-row-end" : "") +
+                        (colIndex === row.length - 1 && rowRemain > 0 ? " field-tabs-row-open-end field-tabs-last-span-" + childSpan + " field-tabs-row-remain-" + rowRemain : "")
                     );
                 });
             });
