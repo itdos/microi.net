@@ -178,3 +178,17 @@
         }
     }
 }
+
+.data-version-preview-dialog {
+    .el-dialog__body {
+        padding-top: 8px;
+        max-height: 72vh;
+        overflow: auto;
+        background: var(--el-fill-color-extra-light, #fafafa);
+    }
+
+    .pluginPage,
+    .itdos-diy-form {
+        background: transparent;
+    }
+}

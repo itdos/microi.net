@@ -179,46 +179,41 @@
 
         &.collapse-group-expanded {
             .diy-collapse-group {
-                border-bottom-color: transparent;
+                border-bottom-color: var(--collapse-group-border);
                 border-bottom-left-radius: 0;
                 border-bottom-right-radius: 0;
-                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+                box-shadow: none;
             }
         }
     }
 
     .collapse-group-item {
-        background: var(--collapse-group-bg);
+        background: transparent;
         border-color: var(--collapse-group-border);
         border-style: solid;
         border-width: 0;
-        transition: background 0.2s ease, border-color 0.2s ease;
+        transition: border-color 0.2s ease;
 
         .container-form-item {
-            padding: 8px 8px 2px;
-            border-radius: 4px;
+            padding: 10px 12px 2px;
+            border-radius: 0;
+            background: transparent;
         }
 
         .el-form-item {
             margin-bottom: 12px;
         }
-
-        &:hover {
-            background: color-mix(in srgb, var(--collapse-group-color) 8%, var(--el-bg-color) 92%);
-        }
     }
 
     .collapse-group-row-first {
-        border-top: 1px solid var(--collapse-group-border);
-        padding-top: 8px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
+        border-top-width: 0;
+        padding-top: 2px;
     }
 
     .collapse-group-row-last {
         border-bottom: 1px solid var(--collapse-group-border);
-        padding-bottom: 8px;
-        margin-bottom: 8px;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
     }
 
     .collapse-group-row-start {
@@ -241,10 +236,11 @@
         .collapse-group-item {
             border-left-width: 1px;
             border-right-width: 1px;
+            background: transparent;
 
             .container-form-item {
-                padding-left: 6px;
-                padding-right: 6px;
+                padding-left: 10px;
+                padding-right: 10px;
             }
         }
 
@@ -259,7 +255,7 @@
         }
 
         .collapse-group-visible-first {
-            border-top-width: 1px;
+            border-top-width: 0;
             padding-top: 8px;
         }
 
@@ -267,8 +263,8 @@
             border-bottom-width: 1px;
             border-bottom-left-radius: 8px;
             border-bottom-right-radius: 8px;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
         }
     }
 
