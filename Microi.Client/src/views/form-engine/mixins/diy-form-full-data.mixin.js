@@ -142,7 +142,7 @@ export default {
         },
         CallbackGetDiyField(diyFieldList) {
             var self = this;
-            // self.DiyFieldList = diyFieldList
+            self.DiyFieldList = diyFieldList || [];
         },
         CallbackSetDiyTableModel(model) {
             var self = this;
@@ -201,22 +201,58 @@ export default {
                 self.DiyCommon.Tips(self.$t("Msg.EnterCommentContent"), false);
                 return;
             }
+            var submitData = {
+                TableRowId: self.TableRowId,
+                Content: self.CommentContent,
+                TableId: self.TableId
+            };
+            if (self.ReplyComment && self.ReplyComment.Id) {
+                submitData.ParentCommentId = self.ReplyComment.Id;
+                submitData.ReplyToUserId = self.ReplyComment.CreateUser || self.ReplyComment.UserId || "";
+                submitData.ReplyToUserName = self.GetCommentAuthor(self.ReplyComment);
+                submitData.ReplyToContent = self.GetCommentPlainText(self.ReplyComment.Content);
+            }
             self.BtnLoading = true;
             self.DiyCommon.FormEngine.AddFormData(
                 "diy_comment",
-                {
-                    TableRowId: self.TableRowId,
-                    Content: self.CommentContent,
-                    TableId: self.TableId
-                },
+                submitData,
                 function (result) {
                     if (result.Code == 1) {
                         self.CommentContent = "";
+                        self.ReplyComment = null;
                         self.GetCommentList();
                     }
                     self.BtnLoading = false;
                 }
             );
+        },
+        GetCommentAuthor(comment) {
+            if (!comment) return "用户";
+            return comment.Title || comment.UserName || comment.CreateUserName || comment.CreateUser || comment.UserId || "用户";
+        },
+        GetCommentPlainText(content) {
+            if (content === null || content === undefined) return "";
+            var text = typeof content === "string" ? content : String(content);
+            return text
+                .replace(/<script[\s\S]*?<\/script>/gi, " ")
+                .replace(/<style[\s\S]*?<\/style>/gi, " ")
+                .replace(/<[^>]*>/g, " ")
+                .replace(/&nbsp;/g, " ")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/&amp;/g, "&")
+                .replace(/&quot;/g, "\"")
+                .replace(/&#39;/g, "'")
+                .replace(/\s+/g, " ")
+                .trim();
+        },
+        StartReplyComment(comment) {
+            var self = this;
+            self.ReplyComment = comment || null;
+            self.FormRightType = "DataComment";
+        },
+        CancelReplyComment() {
+            this.ReplyComment = null;
         },
         GetDraftFieldFormRef() {
             var self = this;
@@ -432,6 +468,18 @@ export default {
                                 } else {
                                     item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
                                 }
+                                if (item.ParentCommentId && !item.ReplyToContent) {
+                                    var parentComment = result.Data.find(function (parent) {
+                                        return parent && parent.Id == item.ParentCommentId;
+                                    });
+                                    if (parentComment) {
+                                        item.ReplyToContent = self.GetCommentPlainText(parentComment.Content);
+                                        item.ReplyToUserName = item.ReplyToUserName || self.GetCommentAuthor(parentComment);
+                                    }
+                                }
+                                if (item.ReplyToContent) {
+                                    item.ReplyToContent = self.GetCommentPlainText(item.ReplyToContent);
+                                }
                             });
                             self.DataCommentList = result.Data;
                         } else {
@@ -458,19 +506,40 @@ export default {
                 return null;
             }
         },
+        GetDataVersionPreviewFormRef() {
+            var self = this;
+            var fieldForm = self.$refs && self.$refs.fieldFormDataVersionPreview;
+            if (Array.isArray(fieldForm)) {
+                fieldForm = fieldForm[0];
+            }
+            return fieldForm;
+        },
+        ApplyDataVersionPreviewData() {
+            var self = this;
+            var fieldForm = self.GetDataVersionPreviewFormRef();
+            if (!fieldForm || typeof fieldForm.ApplyVersionData !== "function" || !self.PreviewDataVersionData) {
+                return;
+            }
+            fieldForm.ApplyVersionData(self.PreviewDataVersionData);
+        },
+        CallbackGetDiyFieldPreview() {
+            var self = this;
+            self.$nextTick(function () {
+                self.ApplyDataVersionPreviewData();
+            });
+        },
         PreviewDataVersion(versionItem) {
             var self = this;
             var data = self.ParseDataVersionData(versionItem);
             if (!data) return;
-            var jsonText = JSON.stringify(data, null, 2);
-            self.DiyCommon.OsAlert(
-                "<pre style='max-height:520px;overflow:auto;margin:0;white-space:pre-wrap;font-size:12px;line-height:1.6;'>" +
-                    jsonText.replace(/[<>&]/g, function (s) {
-                        return { "<": "&lt;", ">": "&gt;", "&": "&amp;" }[s];
-                    }) +
-                "</pre>",
-                { Title: "数据版本 " + (versionItem.Version || ""), Icon: "info" }
-            );
+            data.Id = self.TableRowId || data.Id;
+            self.PreviewDataVersionItem = versionItem;
+            self.PreviewDataVersionData = data;
+            self.PreviewDataVersionKey++;
+            self.ShowDataVersionPreviewDialog = true;
+            self.$nextTick(function () {
+                self.ApplyDataVersionPreviewData();
+            });
         },
         LoadDataVersionToForm(versionItem) {
             var self = this;

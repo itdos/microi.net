@@ -61,13 +61,33 @@
                                 </template>
                                 <div class="log-card">
                                     <div class="log-title">{{ item.Title }}</div>
-                                    <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" class="log-row">
-                                        <span class="log-field">{{ log.Label }}</span>
-                                        <span class="log-arrow">
-                                            <span class="log-old">{{ log.OVal || ($t ? $t('Msg.EmptyValue') : '空') }}</span>
-                                            <el-icon><ArrowRight /></el-icon>
-                                            <span class="log-new">{{ log.NVal }}</span>
-                                        </span>
+                                    <div
+                                        v-for="log in item.Content"
+                                        :key="'datalog_content_' + log.Name"
+                                        class="log-row"
+                                        :class="{ 'is-large': IsLargeLogValue(log) }"
+                                    >
+                                        <template v-if="IsLargeLogValue(log)">
+                                            <div class="log-large-main">
+                                                <span class="log-field">{{ log.Label }}</span>
+                                                <div class="log-large-summary">
+                                                    <span class="log-old">{{ GetLogSummary(log.OVal) }}</span>
+                                                    <el-icon><ArrowRight /></el-icon>
+                                                    <span class="log-new">{{ GetLogSummary(log.NVal) }}</span>
+                                                </div>
+                                            </div>
+                                            <el-button size="small" text type="primary" @click="OpenLogDiff(log, item)">
+                                                查看差异
+                                            </el-button>
+                                        </template>
+                                        <template v-else>
+                                            <span class="log-field">{{ log.Label }}</span>
+                                            <span class="log-arrow">
+                                                <span class="log-old">{{ GetDisplayValue(log.OVal) }}</span>
+                                                <el-icon><ArrowRight /></el-icon>
+                                                <span class="log-new">{{ GetDisplayValue(log.NVal) }}</span>
+                                            </span>
+                                        </template>
                                     </div>
                                 </div>
                             </el-timeline-item>
@@ -105,10 +125,30 @@
                         </el-tooltip>
                     </div>
                     <div class="comment-input-wrapper">
+                        <div v-if="replyComment" class="comment-reply-target">
+                            <div class="comment-reply-head">
+                                <span>正在回复</span>
+                                <strong>{{ GetCommentAuthor(replyComment) }}</strong>
+                                <el-button size="small" text type="primary" @click="$emit('cancel-reply-comment')">取消</el-button>
+                            </div>
+                            <div class="comment-reply-preview">
+                                {{ IsCommentQuoteExpanded(replyComment) ? GetCommentPlainText(replyComment.Content) : GetCommentBrief(replyComment.Content, 96) }}
+                            </div>
+                            <el-button
+                                v-if="IsLongCommentText(replyComment.Content, 96)"
+                                class="comment-quote-toggle"
+                                size="small"
+                                text
+                                type="primary"
+                                @click="ToggleCommentQuote(replyComment)"
+                            >
+                                {{ IsCommentQuoteExpanded(replyComment) ? '收起原文' : '展开原文' }}
+                            </el-button>
+                        </div>
                         <el-input
                             type="textarea"
                             :rows="3"
-                            :placeholder="$t ? $t('Msg.EnterCommentContent') : '请输入评论内容'"
+                            :placeholder="replyComment ? '请输入回复内容' : ($t ? $t('Msg.EnterCommentContent') : '请输入评论内容')"
                             :model-value="commentContent"
                             @update:model-value="$emit('update:commentContent', $event)"
                         ></el-input>
@@ -139,8 +179,30 @@
                                     <el-avatar :size="28" :src="item.Avatar"></el-avatar>
                                 </template>
                                 <div class="log-card">
-                                    <div class="log-title">{{ item.Title || item.UserName || item.CreateUser || item.UserId }}</div>
+                                    <div class="log-title">{{ GetCommentAuthor(item) }}</div>
+                                    <div v-if="HasCommentQuote(item)" class="comment-quote">
+                                        <div class="comment-quote-title">回复 {{ item.ReplyToUserName || '上一条评论' }}</div>
+                                        <div class="comment-quote-content">
+                                            {{ IsCommentQuoteExpanded(item) ? GetCommentPlainText(item.ReplyToContent) : GetCommentBrief(item.ReplyToContent, 90) }}
+                                        </div>
+                                        <el-button
+                                            v-if="IsLongCommentText(item.ReplyToContent, 90)"
+                                            class="comment-quote-toggle"
+                                            size="small"
+                                            text
+                                            type="primary"
+                                            @click="ToggleCommentQuote(item)"
+                                        >
+                                            {{ IsCommentQuoteExpanded(item) ? '收起原文' : '展开原文' }}
+                                        </el-button>
+                                    </div>
                                     <div class="log-comment-content" v-safe-html="item.Content"></div>
+                                    <div class="comment-item-actions">
+                                        <el-button size="small" text type="primary" @click="$emit('reply-comment', item)">
+                                            <el-icon><ChatDotRound /></el-icon>
+                                            回复
+                                        </el-button>
+                                    </div>
                                 </div>
                             </el-timeline-item>
                         </el-timeline>
@@ -190,17 +252,13 @@
                                     </div>
                                 </div>
                                 <div class="version-actions">
-                                    <el-button size="small" text type="primary" @click="$emit('preview-data-version', item)">
+                                    <el-button size="small" type="primary" plain @click="$emit('preview-data-version', item)">
                                         <el-icon><View /></el-icon>
-                                        查看
+                                        预览
                                     </el-button>
-                                    <el-button size="small" text type="warning" @click="$emit('load-data-version', item)">
+                                    <el-button size="small" type="warning" plain @click="$emit('load-data-version', item)">
                                         <el-icon><RefreshLeft /></el-icon>
                                         加载
-                                    </el-button>
-                                    <el-button size="small" text type="success" @click="$emit('save-data-version', item)">
-                                        <el-icon><Select /></el-icon>
-                                        保存为当前
                                     </el-button>
                                 </div>
                             </div>
@@ -213,6 +271,24 @@
                 </div>
             </el-tab-pane>
         </el-tabs>
+        <el-dialog
+            v-model="showLogDiffDialog"
+            class="log-diff-dialog"
+            :title="GetLogDiffTitle()"
+            width="860px"
+            append-to-body
+        >
+            <div class="log-diff-grid">
+                <div class="log-diff-pane">
+                    <div class="log-diff-pane-title is-old">修改前</div>
+                    <pre>{{ GetLogDiffValue('OVal') }}</pre>
+                </div>
+                <div class="log-diff-pane">
+                    <div class="log-diff-pane-title is-new">修改后</div>
+                    <pre>{{ GetLogDiffValue('NVal') }}</pre>
+                </div>
+            </div>
+        </el-dialog>
     </div>
 </template>
 
@@ -232,7 +308,9 @@ export default {
         dataCommentListLoading: { type: Boolean, default: false },
         dataVersionList: { type: Array, default: () => [] },
         dataVersionListLoading: { type: Boolean, default: false },
+        diyFieldList: { type: Array, default: () => [] },
         commentContent: { type: String, default: "" },
+        replyComment: { type: Object, default: null },
         btnLoading: { type: Boolean, default: false },
         isMobileDrawer: { type: Boolean, default: false },
         formData: { type: Object, default: () => ({}) },
@@ -252,11 +330,15 @@ export default {
         "refresh-data-version",
         "preview-data-version",
         "load-data-version",
-        "save-data-version"
+        "reply-comment",
+        "cancel-reply-comment"
     ],
     data() {
         return {
-            innerActiveTab: this.modelValue || "WorkFlow"
+            innerActiveTab: this.modelValue || "WorkFlow",
+            showLogDiffDialog: false,
+            currentLogDiff: null,
+            expandedCommentQuotes: {}
         };
     },
     computed: {
@@ -267,6 +349,15 @@ export default {
             if (this.enableDataComment) tabs.push("DataComment");
             if (this.enableDataVersion) tabs.push("DataVersion");
             return tabs;
+        },
+        diyFieldMap() {
+            var result = {};
+            (this.diyFieldList || []).forEach(function (field) {
+                if (field && field.Name) {
+                    result[field.Name] = field;
+                }
+            });
+            return result;
         }
     },
     watch: {
@@ -338,6 +429,109 @@ export default {
                 Rollback: "回滚"
             };
             return map[action] || action || "版本";
+        },
+        GetEmptyText() {
+            return this.$t ? (this.$t("Msg.EmptyValue") || "空") : "空";
+        },
+        NormalizeLogValue(value) {
+            if (value === null || value === undefined || value === "") {
+                return "";
+            }
+            if (typeof value === "object") {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch (error) {
+                    return String(value);
+                }
+            }
+            return String(value);
+        },
+        StripHtml(value) {
+            var text = this.NormalizeLogValue(value);
+            if (!text) return "";
+            return text
+                .replace(/<script[\s\S]*?<\/script>/gi, " ")
+                .replace(/<style[\s\S]*?<\/style>/gi, " ")
+                .replace(/<[^>]*>/g, " ")
+                .replace(/&nbsp;/g, " ")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/&amp;/g, "&")
+                .replace(/&quot;/g, "\"")
+                .replace(/&#39;/g, "'")
+                .replace(/\s+/g, " ")
+                .trim();
+        },
+        GetDisplayValue(value) {
+            return this.StripHtml(value) || this.GetEmptyText();
+        },
+        GetLogField(log) {
+            if (!log || !log.Name) return {};
+            return this.diyFieldMap[log.Name] || {};
+        },
+        IsLargeLogValue(log) {
+            var field = this.GetLogField(log);
+            var component = (log && log.Component) || field.Component || "";
+            var largeComponents = ["RichText", "CodeEditor", "Textarea", "FileUpload", "ImgUpload", "TableChild", "Map", "JsonEditor"];
+            var oldValue = this.NormalizeLogValue(log && log.OVal);
+            var newValue = this.NormalizeLogValue(log && log.NVal);
+            return largeComponents.indexOf(component) > -1
+                || oldValue.length > 120
+                || newValue.length > 120
+                || oldValue.indexOf("\n") > -1
+                || newValue.indexOf("\n") > -1
+                || /<[^>]+>/.test(oldValue)
+                || /<[^>]+>/.test(newValue);
+        },
+        GetLogSummary(value) {
+            var text = this.GetDisplayValue(value);
+            return text.length > 54 ? text.substr(0, 54) + "..." : text;
+        },
+        OpenLogDiff(log, item) {
+            this.currentLogDiff = {
+                log: log || {},
+                item: item || {}
+            };
+            this.showLogDiffDialog = true;
+        },
+        GetLogDiffTitle() {
+            var log = this.currentLogDiff && this.currentLogDiff.log;
+            return "修改差异" + (log && log.Label ? " - " + log.Label : "");
+        },
+        GetLogDiffValue(key) {
+            var log = this.currentLogDiff && this.currentLogDiff.log;
+            return this.NormalizeLogValue(log && log[key]) || this.GetEmptyText();
+        },
+        GetCommentAuthor(comment) {
+            if (!comment) return "用户";
+            return comment.Title || comment.UserName || comment.CreateUserName || comment.CreateUser || comment.UserId || "用户";
+        },
+        GetCommentPlainText(content) {
+            return this.StripHtml(content);
+        },
+        GetCommentBrief(content, maxLength) {
+            var text = this.GetCommentPlainText(content);
+            if (!text) return "原文为空";
+            var max = maxLength || 90;
+            return text.length > max ? text.substr(0, max) + "..." : text;
+        },
+        IsLongCommentText(content, maxLength) {
+            return this.GetCommentPlainText(content).length > (maxLength || 90);
+        },
+        HasCommentQuote(item) {
+            return !!(item && (item.ParentCommentId || item.ReplyToContent || item.ReplyToUserName));
+        },
+        GetCommentQuoteKey(item) {
+            return (item && item.Id) || "__reply_target";
+        },
+        IsCommentQuoteExpanded(item) {
+            return !!this.expandedCommentQuotes[this.GetCommentQuoteKey(item)];
+        },
+        ToggleCommentQuote(item) {
+            var key = this.GetCommentQuoteKey(item);
+            var next = Object.assign({}, this.expandedCommentQuotes);
+            next[key] = !next[key];
+            this.expandedCommentQuotes = next;
         },
         OnTabChange(tabName) {
             this.SetActiveTab(tabName, true);
@@ -452,6 +646,40 @@ export default {
 
     .comment-input-wrapper {
         margin-bottom: 16px;
+        .comment-reply-target {
+            position: relative;
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--el-color-primary-light-7, #a0cfff);
+            border-radius: 8px;
+            background: var(--el-color-primary-light-9, #ecf5ff);
+
+            .comment-reply-head {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                color: var(--el-text-color-secondary, #909399);
+                font-size: 12px;
+
+                strong {
+                    color: var(--el-text-color-primary, #303133);
+                    font-weight: 600;
+                }
+
+                :deep(.el-button) {
+                    margin-left: auto;
+                    padding: 0 2px;
+                }
+            }
+
+            .comment-reply-preview {
+                margin-top: 6px;
+                color: var(--el-text-color-regular, #606266);
+                font-size: 12px;
+                line-height: 1.6;
+                word-break: break-word;
+            }
+        }
         :deep(.el-textarea__inner) {
             border-radius: 8px;
             font-size: 13px;
@@ -497,21 +725,28 @@ export default {
         .log-row {
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 6px;
             font-size: 12px;
             line-height: 1.6;
             padding: 2px 0;
+            min-width: 0;
 
             .log-field {
                 color: var(--el-color-primary, #409eff);
                 font-weight: 500;
                 flex-shrink: 0;
+                max-width: 108px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .log-arrow {
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
+                min-width: 0;
+                flex: 1;
                 color: var(--el-text-color-regular, #606266);
                 .log-old {
                     color: var(--el-text-color-placeholder, #a8abb2);
@@ -521,8 +756,71 @@ export default {
                     color: var(--el-color-danger, #f56c6c);
                     font-weight: 500;
                 }
+                .log-old,
+                .log-new {
+                    min-width: 0;
+                    max-width: 45%;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
                 .el-icon {
+                    flex: 0 0 auto;
                     color: var(--el-text-color-secondary, #909399);
+                }
+            }
+
+            &.is-large {
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 7px 0;
+                border-top: 1px dashed var(--el-border-color-lighter, #ebeef5);
+
+                &:first-of-type {
+                    border-top: none;
+                }
+
+                .log-large-main {
+                    min-width: 0;
+                    flex: 1;
+                }
+
+                .log-large-summary {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    min-width: 0;
+                    margin-top: 4px;
+                    color: var(--el-text-color-secondary, #909399);
+
+                    .log-old,
+                    .log-new {
+                        min-width: 0;
+                        max-width: 42%;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+
+                    .log-old {
+                        color: var(--el-text-color-placeholder, #a8abb2);
+                        text-decoration: line-through;
+                    }
+
+                    .log-new {
+                        color: var(--el-color-danger, #f56c6c);
+                        font-weight: 500;
+                    }
+
+                    .el-icon {
+                        flex: 0 0 auto;
+                    }
+                }
+
+                :deep(.el-button) {
+                    flex: 0 0 auto;
+                    padding: 2px 4px;
                 }
             }
         }
@@ -532,6 +830,44 @@ export default {
             line-height: 1.6;
             color: var(--el-text-color-regular, #606266);
             word-break: break-word;
+        }
+
+        .comment-quote {
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            border-left: 3px solid var(--el-color-primary-light-5, #79bbff);
+            border-radius: 6px;
+            background: var(--el-fill-color-blank, #fff);
+
+            .comment-quote-title {
+                margin-bottom: 4px;
+                color: var(--el-text-color-secondary, #909399);
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            .comment-quote-content {
+                color: var(--el-text-color-regular, #606266);
+                font-size: 12px;
+                line-height: 1.55;
+                word-break: break-word;
+            }
+        }
+
+        .comment-quote-toggle {
+            margin-top: 3px;
+            padding: 0;
+            height: 20px;
+        }
+
+        .comment-item-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 6px;
+
+            :deep(.el-button) {
+                padding: 2px 4px;
+            }
         }
     }
 
@@ -575,7 +911,9 @@ export default {
 
             :deep(.el-button) {
                 margin-left: 0;
-                padding: 4px 5px;
+                min-width: 62px;
+                padding: 5px 8px;
+                border-radius: 6px;
             }
         }
     }
@@ -587,6 +925,64 @@ export default {
         border: none;
         background: transparent;
         padding: 0;
+    }
+}
+
+:global(.log-diff-dialog) {
+    .el-dialog__body {
+        padding-top: 8px;
+    }
+
+    .log-diff-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .log-diff-pane {
+        min-width: 0;
+        border: 1px solid var(--el-border-color-lighter, #ebeef5);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--el-fill-color-extra-light, #fafafa);
+    }
+
+    .log-diff-pane-title {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+        font-size: 13px;
+        font-weight: 600;
+
+        &.is-old {
+            color: var(--el-text-color-secondary, #909399);
+        }
+
+        &.is-new {
+            color: var(--el-color-danger, #f56c6c);
+        }
+    }
+
+    pre {
+        margin: 0;
+        max-height: 56vh;
+        overflow: auto;
+        padding: 10px;
+        color: var(--el-text-color-primary, #303133);
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+}
+
+@media (max-width: 760px) {
+    :global(.log-diff-dialog) {
+        width: 92% !important;
+
+        .log-diff-grid {
+            grid-template-columns: 1fr;
+        }
     }
 }
 </style>

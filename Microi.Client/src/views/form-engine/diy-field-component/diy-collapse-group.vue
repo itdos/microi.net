@@ -1,5 +1,9 @@
 <template>
-    <div class="diy-collapse-group" :class="'diy-collapse-group--' + theme" @click="toggleCollapse">
+    <div
+        class="diy-collapse-group"
+        :class="['diy-collapse-group--' + theme, isCollapsed ? 'is-collapsed' : 'is-expanded']"
+        @click="toggleCollapse"
+    >
         <div class="diy-collapse-group__header">
             <el-icon class="diy-collapse-group__arrow">
                 <ArrowRight v-if="isCollapsed" />
@@ -197,28 +201,39 @@ defineExpose({
 
 <style lang="scss" scoped>
 .diy-collapse-group {
-    --group-color: var(--el-color-primary);
-    --group-bg: color-mix(in srgb, var(--group-color) 7%, var(--el-bg-color) 93%);
-    --group-border: var(--el-border-color-light);
+    --group-color: var(--collapse-group-color, var(--el-color-primary));
+    --group-bg: var(--collapse-group-bg, color-mix(in srgb, var(--group-color) 8%, var(--el-bg-color) 92%));
+    --group-border: var(--collapse-group-border, var(--el-border-color-light));
     width: 100%;
     border: 1px solid var(--group-border);
     border-radius: 8px;
     background: var(--group-bg);
     cursor: pointer;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
-    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.035);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 
     &:hover {
         border-color: var(--group-color);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.055);
+    }
+
+    &:active {
+        transform: translateY(1px);
+    }
+
+    &.is-expanded {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        box-shadow: none;
     }
 
     &__header {
-        min-height: 24px;
+        min-height: 26px;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 9px 12px;
+        padding: 9px 12px 9px 13px;
     }
 
     &__arrow,
@@ -232,6 +247,9 @@ defineExpose({
         height: 22px;
         border-radius: 50%;
         background: color-mix(in srgb, var(--group-color) 12%, var(--el-bg-color) 88%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     &__icon {
@@ -265,6 +283,9 @@ defineExpose({
 
     &__count {
         flex: 0 0 auto;
+        border-color: color-mix(in srgb, var(--group-color) 32%, var(--el-border-color-light) 68%);
+        color: var(--group-color);
+        background: color-mix(in srgb, var(--group-color) 4%, var(--el-bg-color) 96%);
     }
 
     &--primary { --group-color: var(--el-color-primary); }
