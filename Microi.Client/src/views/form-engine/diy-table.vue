@@ -119,7 +119,8 @@
                             </el-button>
                         </template>
                         <!-- 更多页面按钮 PageBtns -->
-                        <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
+                        <template v-if="!IsTrashMode
+                                        && (!diyStore.IsPhoneView || _IsTableChild)
                                         && SysMenuModel.PageBtns
                                         && SysMenuModel.PageBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
@@ -138,7 +139,8 @@
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
 
-                        <template v-if="(!diyStore.IsPhoneView || _IsTableChild)
+                        <template v-if="!IsTrashMode
+                                        && (!diyStore.IsPhoneView || _IsTableChild)
                                         && SysMenuModel
                                         && SysMenuModel.BatchSelectMoreBtns
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
@@ -197,6 +199,14 @@
                             </el-dropdown>
                         </template>
                         <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
+                        <el-button
+                            v-if="_EnableTrash && !_IsTableChild && PropsTableType !== 'OpenTable'"
+                            :type="IsTrashMode ? 'warning' : 'default'"
+                            :icon="RefreshLeft"
+                            @click="ToggleTrashMode"
+                        >
+                            {{ IsTrashMode ? '返回数据表' : '回收站' }}
+                        </el-button>
                     </div>
                     <!-- 通用搜索 -->
                     <div class="search-input-group"
@@ -315,7 +325,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute && !IsTrashMode" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -334,7 +344,7 @@
                                 <span class="mobile-fab-menu-label">{{ SysMenuModel && SysMenuModel.AddBtnText ? SysMenuModel.AddBtnText : $t('Msg.Add') }}</span>
                             </div>
                             <!--V8页面按钮 PageBtns-->
-                            <template v-if="SysMenuModel.PageBtns && SysMenuModel.PageBtns.length > 0">
+                            <template v-if="!IsTrashMode && SysMenuModel.PageBtns && SysMenuModel.PageBtns.length > 0">
                                 <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns" :key="'fab_pagebtn_' + btnIndex">
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
                                         <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -343,7 +353,7 @@
                                 </template>
                             </template>
                             <!--批量操作按钮-->
-                            <template v-if="SysMenuModel && SysMenuModel.BatchSelectMoreBtns && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                            <template v-if="!IsTrashMode && SysMenuModel && SysMenuModel.BatchSelectMoreBtns && SysMenuModel.BatchSelectMoreBtns.length > 0">
                                 <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns" :key="'fab_batchbtn_' + btnIndex">
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
                                         <div class="mobile-fab-menu-icon batch"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -667,7 +677,7 @@
                             <div style="display: flex;justify-content: right;align-items: center;">
                                 <template v-for="(btn, btnIndex) in (scope.row._RowMoreBtnsOut || [])" :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex">
                                     <el-button
-                                        v-if="btn.IsVisible && !TableChildField.Readonly"
+                                        v-if="!IsTrashMode && btn.IsVisible && !TableChildField.Readonly"
                                         :type="GetMoreBtnStyle(btn)"
                                         class="row-more-btns-out"
                                         :loading="BtnV8Loading"
@@ -694,11 +704,20 @@
                                 >
                                     {{ $t("Msg.Detail") }}
                                 </el-button>
+                                <el-button
+                                    v-if="IsTrashMode && scope.row._IsInTableAdd !== true"
+                                    type="success"
+                                    :icon="RefreshLeft"
+                                    :loading="BtnLoading"
+                                    @click.stop="RestoreTrashRow(scope.row)"
+                                >
+                                    恢复
+                                </el-button>
                                 <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                                 <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
                                 <!-- 流程引擎模式下：隐藏【编辑】项但保留【更多】按钮以提供删除/V8内部按钮 -->
                                 <el-button
-                                    v-if="
+                                    v-if="!IsTrashMode && (
                                         (!IsWorkFlowMenu() && TableChildFormMode != 'View' &&
                                             !TableChildField.Readonly &&
                                             _LimitEdit &&
@@ -706,7 +725,7 @@
                                             scope.row.IsVisibleEdit == true) ||
                                         (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.some(btn => btn.IsVisible)) ||
                                         (_LimitDel && scope.row.IsVisibleDel == true)
-                                    "
+                                    )"
                                     class="more-action-btn"
                                     @click.stop="showMoreMenu($event, scope.row)"
                                 >
@@ -968,7 +987,7 @@
                                     <el-button
                                         v-for="(btn, btnIndex) in item._RowMoreBtnsOut"
                                         :key="TypeFieldName + 'card_btn_out_' + item.Id + btnIndex"
-                                        v-show="btn.IsVisible && !TableChildField.Readonly"
+                                        v-show="!IsTrashMode && btn.IsVisible && !TableChildField.Readonly"
                                         :type="GetMoreBtnStyle(btn)"
                                         class="card-action-btn"
                                         :loading="BtnV8Loading"
@@ -991,6 +1010,18 @@
                                         <el-icon><Edit /></el-icon>
                                         {{ $t('Msg.Edit') }}
                                     </el-button>
+                                    <el-button
+                                        v-if="IsTrashMode"
+                                        class="card-action-btn"
+                                        @click.stop="RestoreTrashRow(item)"
+                                        size="small"
+                                        round
+                                        type="success"
+                                        plain
+                                    >
+                                        <el-icon><RefreshLeft /></el-icon>
+                                        恢复
+                                    </el-button>
                                     <!--工作流-去处理 按钮（OpenType=='WorkFlow' 时显示）-->
                                     <el-button
                                         v-if="IsWorkFlowMenu() && item._IsInTableAdd !== true"
@@ -1004,7 +1035,7 @@
                                         <fa-icon icon="far fa-clipboard-check" />
                                         去处理
                                     </el-button>
-                                    <template v-if="item._RowMoreBtnsIn && item._RowMoreBtnsIn.length > 0">
+                                    <template v-if="!IsTrashMode && item._RowMoreBtnsIn && item._RowMoreBtnsIn.length > 0">
                                         <el-button
                                             v-for="(btn, btnIndex) in item._RowMoreBtnsIn"
                                             :key="TypeFieldName + 'card_btn_in_' + item.Id + btnIndex"
@@ -1090,7 +1121,7 @@
                     <el-icon><Edit /></el-icon>
                     <span>{{ $t("Msg.Edit") }}</span>
                 </div>
-                <template v-if="_moreMenuRow && _moreMenuRow._RowMoreBtnsIn && _moreMenuRow._RowMoreBtnsIn.length > 0">
+                <template v-if="!IsTrashMode && _moreMenuRow && _moreMenuRow._RowMoreBtnsIn && _moreMenuRow._RowMoreBtnsIn.length > 0">
                     <template v-for="(btn, btnIndex) in _moreMenuRow._RowMoreBtnsIn" :key="'global_more_btn_' + btnIndex">
                         <div v-if="btn.IsVisible" class="global-more-menu-item" @click="handleMoreMenuAction('custom', btn)">
                             <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
@@ -2052,6 +2083,9 @@ export default {
         //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
         async OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
+            if (self.IsTrashMode) {
+                formMode = "View";
+            }
 
             self.BtnLoading = true;
             self.FormMode = formMode;

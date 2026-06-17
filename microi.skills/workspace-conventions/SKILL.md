@@ -64,6 +64,26 @@ Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格�
 
 `Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本和 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本。skills 同步到工作区时仍以每个文件的 hash 判断是否可覆盖：本地未改过的旧插件文件可自动升级，本地已修改的文件必须保留用户版本，不得仅凭版本号覆盖。
 
+## C# dynamic 强类型落地规则
+
+后端源码中从 `dynamic`、`JObject`、`ExpandoObject`、表单参数或 `DynamicHelper` 读取出来的值，如果后续要调用字符串方法、扩展方法或参与强类型判断，必须先显式落到强类型变量。不要用 `var` 承接 `DynamicHelper.GetDynamicStringValue(...)` 后再调用 `DosIsNullOrWhiteSpace()` 这类扩展方法，因为调用点可能仍按 dynamic 绑定，运行时会出现 `'string' does not contain a definition for ...`。
+
+错误写法：
+
+```csharp
+var tableName = DynamicHelper.GetDynamicStringValue(diyTableModel, "Name", "");
+if (tableName.DosIsNullOrWhiteSpace()) { return; }
+```
+
+推荐写法：
+
+```csharp
+string tableName = DynamicHelper.GetDynamicStringValue(diyTableModel, "Name", "");
+if (string.IsNullOrWhiteSpace(tableName)) { return; }
+```
+
+如果方法内部只通过 `DynamicHelper` 读取对象字段，方法参数优先声明为 `object`，不要声明为 `dynamic`。这样可以减少 C# 运行时动态绑定进入普通字符串工具链的机会。
+
 ## 根目录保留文件说明
 
 根目录只允许存在以下类型的文件和目录：

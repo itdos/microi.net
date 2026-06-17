@@ -30,6 +30,12 @@ beforeUnmount() {
             self.DataLogList = [];
             if (Array.isArray(self.DataCommentList)) self.DataCommentList.length = 0;
             self.DataCommentList = [];
+            if (Array.isArray(self.DataVersionList)) self.DataVersionList.length = 0;
+            self.DataVersionList = [];
+            if (Array.isArray(self.DraftList)) self.DraftList.length = 0;
+            self.DraftList = [];
+            self.CurrentDraftId = "";
+            self.ShowDraftDialog = false;
             if (Array.isArray(self.DiyTableRowList)) self.DiyTableRowList.length = 0;
             self.DiyTableRowList = [];
         } catch (e) {}

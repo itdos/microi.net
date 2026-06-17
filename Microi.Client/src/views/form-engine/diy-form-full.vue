@@ -60,6 +60,23 @@
                         <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
+                        <el-dropdown trigger="click">
+                            <el-button>
+                                {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                            </el-button>
+                            <template #dropdown>
+                                <el-dropdown-menu class="form-submit-btns">
+                                    <el-dropdown-item v-if="FormMode != 'View'" :disabled="SaveDiyTableCommonLoding || BtnLoading" @click="SaveToDraftBox">
+                                        <fa-icon icon="far fa-save" class="mr-1" />
+                                        保存至草稿箱
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                        <fa-icon icon="far fa-folder-open" class="mr-1" />
+                                        从草稿箱加载
+                                    </el-dropdown-item>
+                                </el-dropdown-menu>
+                            </template>
+                        </el-dropdown>
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
@@ -136,12 +153,16 @@
                             :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
                             :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                             :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                            :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
                             :dataLogList="DataLogList"
                             :dataLogListLoading="DataLogListLoading"
                             :dataCommentList="DataCommentList"
                             :dataCommentListLoading="DataCommentListLoading"
+                            :dataVersionList="DataVersionList"
+                            :dataVersionListLoading="DataVersionListLoading"
                             :btnLoading="BtnLoading"
                             :form-data="WfFormData"
+                            :formMode="FormMode"
                             :hideInlineSubmit="ShowWfTopSubmitBtn"
                             @submit-comment="SubmitComment"
                             @callback-start-work="CallbackStartWork"
@@ -150,6 +171,10 @@
                             @callback-field-set="CallbackFieldSet"
                             @refresh-data-log="LoadDataLog"
                             @refresh-data-comment="LoadDataComment"
+                            @refresh-data-version="LoadDataVersion"
+                            @preview-data-version="PreviewDataVersion"
+                            @load-data-version="LoadDataVersionToForm"
+                            @save-data-version="SaveDataVersionAsCurrent"
                         />
                     </el-col>
                 </el-row>
@@ -185,6 +210,14 @@
                             <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit'" @click="showMobileFabMenu = false; FormMode = 'View'">
                                 <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
+                            </div>
+                            <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                                <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
+                                <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                            </div>
+                            <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                                <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
+                                <span class="mobile-fab-menu-label">从草稿箱加载</span>
                             </div>
                             <!--表单更多按钮 FormBtns-->
                             <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -302,6 +335,14 @@
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu class="form-submit-btns">
+                                <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
+                                    <fa-icon icon="far fa-save" class="mr-1" />
+                                    保存至草稿箱
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                    <fa-icon icon="far fa-folder-open" class="mr-1" />
+                                    从草稿箱加载
+                                </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
                                         LimitDel() &&
@@ -379,12 +420,16 @@
                         :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                        :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
                         :dataCommentListLoading="DataCommentListLoading"
+                        :dataVersionList="DataVersionList"
+                        :dataVersionListLoading="DataVersionListLoading"
                         :btnLoading="BtnLoading"
                         :form-data="WfFormData"
+                        :formMode="FormMode"
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
@@ -393,6 +438,10 @@
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
                         @refresh-data-comment="LoadDataComment"
+                        @refresh-data-version="LoadDataVersion"
+                        @preview-data-version="PreviewDataVersion"
+                        @load-data-version="LoadDataVersionToForm"
+                        @save-data-version="SaveDataVersionAsCurrent"
                     />
                 </el-col>
             </el-row>
@@ -436,6 +485,14 @@
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                            <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
+                            <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                            <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
+                            <span class="mobile-fab-menu-label">从草稿箱加载</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
                         <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -568,6 +625,14 @@
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu class="form-submit-btns">
+                                <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
+                                    <fa-icon icon="far fa-save" class="mr-1" />
+                                    保存至草稿箱
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                    <fa-icon icon="far fa-folder-open" class="mr-1" />
+                                    从草稿箱加载
+                                </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
                                         LimitDel() &&
@@ -646,12 +711,16 @@
                         :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
                         :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                         :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                        :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
                         :dataLogList="DataLogList"
                         :dataLogListLoading="DataLogListLoading"
                         :dataCommentList="DataCommentList"
                         :dataCommentListLoading="DataCommentListLoading"
+                        :dataVersionList="DataVersionList"
+                        :dataVersionListLoading="DataVersionListLoading"
                         :btnLoading="BtnLoading"
                         :form-data="WfFormData"
+                        :formMode="FormMode"
                         :hideInlineSubmit="ShowWfTopSubmitBtn"
                         @submit-comment="SubmitComment"
                         @callback-start-work="CallbackStartWork"
@@ -660,6 +729,10 @@
                         @callback-field-set="CallbackFieldSet"
                         @refresh-data-log="LoadDataLog"
                         @refresh-data-comment="LoadDataComment"
+                        @refresh-data-version="LoadDataVersion"
+                        @preview-data-version="PreviewDataVersion"
+                        @load-data-version="LoadDataVersionToForm"
+                        @save-data-version="SaveDataVersionAsCurrent"
                     />
                 </el-col>
             </el-row>
@@ -703,6 +776,14 @@
                         <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                            <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
+                            <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                            <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
+                            <span class="mobile-fab-menu-label">从草稿箱加载</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
                         <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -753,12 +834,16 @@
                 :openDiyFormWorkFlowType="OpenDiyFormWorkFlowType"
                 :enableDataLog="!!(CurrentDiyTableModel.EnableDataLog && isCheckDataLog)"
                 :enableDataComment="!!CurrentDiyTableModel.EnableDataComment"
+                :enableDataVersion="!!CurrentDiyTableModel.EnableDataVersion"
                 :dataLogList="DataLogList"
                 :dataLogListLoading="DataLogListLoading"
                 :dataCommentList="DataCommentList"
                 :dataCommentListLoading="DataCommentListLoading"
+                :dataVersionList="DataVersionList"
+                :dataVersionListLoading="DataVersionListLoading"
                 :btnLoading="BtnLoading"
                 :form-data="WfFormData"
+                :formMode="FormMode"
                 :hideInlineSubmit="ShowWfTopSubmitBtn"
                 :isMobileDrawer="true"
                 @submit-comment="SubmitComment"
@@ -768,8 +853,54 @@
                 @callback-field-set="CallbackFieldSet"
                 @refresh-data-log="LoadDataLog"
                 @refresh-data-comment="LoadDataComment"
+                @refresh-data-version="LoadDataVersion"
+                @preview-data-version="PreviewDataVersion"
+                @load-data-version="LoadDataVersionToForm"
+                @save-data-version="SaveDataVersionAsCurrent"
             />
         </el-drawer>
+        <el-dialog
+            v-model="ShowDraftDialog"
+            class="draft-box-dialog"
+            title="草稿箱"
+            :width="diyStore.IsPhoneView ? '92%' : '760px'"
+            append-to-body
+            destroy-on-close
+        >
+            <div class="draft-box-toolbar">
+                <div class="draft-box-heading">
+                    <div class="draft-box-title">当前表单草稿</div>
+                    <div class="draft-box-subtitle">{{ (CurrentDiyTableModel && (CurrentDiyTableModel.Description || CurrentDiyTableModel.Name)) || TableName }}</div>
+                </div>
+                <el-button size="small" :loading="DraftListLoading" @click="LoadDraftList(false)">刷新</el-button>
+            </div>
+            <el-skeleton v-if="DraftListLoading" :rows="4" animated />
+            <el-empty v-else-if="!DraftList || DraftList.length == 0" description="暂无草稿" />
+            <div v-else class="draft-box-list">
+                <div
+                    v-for="draft in DraftList"
+                    :key="draft.Id"
+                    class="draft-box-item"
+                    :class="{ 'is-current': CurrentDraftId == draft.Id }"
+                >
+                    <div class="draft-box-main">
+                        <div class="draft-box-name">
+                            {{ draft.DraftName || '未命名草稿' }}
+                            <el-tag v-if="CurrentDraftId == draft.Id" size="small" type="success" effect="plain">当前</el-tag>
+                        </div>
+                        <div class="draft-box-meta">
+                            <span>{{ draft.CreateTime }}</span>
+                            <span>{{ draft.FormMode || 'Edit' }}</span>
+                            <span v-if="draft.TableRowId">数据：{{ draft.TableRowId }}</span>
+                        </div>
+                    </div>
+                    <div class="draft-box-actions">
+                        <el-button size="small" type="primary" @click="LoadDraftToForm(draft)">加载</el-button>
+                        <el-button size="small" type="danger" text @click="DeleteDraft(draft)">删除</el-button>
+                    </div>
+                </div>
+            </div>
+        </el-dialog>
     </div>
 </template>
 

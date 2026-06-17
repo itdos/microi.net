@@ -167,8 +167,12 @@ export default {
             if (!self.GetCurrentUser || !self.GetCurrentUser._RoleLimits) return [];
             return self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
         },
+        _EnableTrash() {
+            return !!(this.CurrentDiyTableModel && this.CurrentDiyTableModel.EnableTrash);
+        },
         _LimitAdd() {
             var self = this;
+            if (self.IsTrashMode) return false;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Add") > -1 || el.Permission.indexOf("Insert") > -1);
@@ -177,6 +181,7 @@ export default {
         },
         _LimitImport() {
             var self = this;
+            if (self.IsTrashMode) return false;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Import") > -1);
@@ -185,6 +190,7 @@ export default {
         },
         _LimitExport() {
             var self = this;
+            if (self.IsTrashMode) return false;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Export") > -1);
@@ -193,6 +199,7 @@ export default {
         },
         _LimitEdit() {
             var self = this;
+            if (self.IsTrashMode) return false;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Edit") > -1);
@@ -201,6 +208,7 @@ export default {
         },
         _LimitDel() {
             var self = this;
+            if (self.IsTrashMode) return false;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {//self.TableChildFormMode != "View" &&
                 return self._RoleLimitModel.some((el) => el.Permission.indexOf("Del") > -1);
@@ -276,6 +284,9 @@ export default {
             // 详情按钮
             if (self.IsPermission('NoDetail')) {
                 baseWidth += 80;
+            }
+            if (self.IsTrashMode) {
+                baseWidth += 90;
             }
             // 更多按钮（编辑/删除/内部自定义按钮）
             // WF 模式下仅考虑删除与内部自定义按钮（编辑项被隐藏）；非WF模式下考虑编辑+删除+内部按钮
@@ -509,6 +520,7 @@ export default {
             // BtnLoading:false,
             BtnV8Loading: false,
             ShowAllSearch: false,
+            IsTrashMode: false,
             TableRowListActiveTab: "", //TableRowList
             FormMode: "View",
             NeedDiyTemplateFieldLst: ["DevComponent", "TableChild", "Map", "MapArea", "FontAwesome", "ImgUpload"], //'Switch',

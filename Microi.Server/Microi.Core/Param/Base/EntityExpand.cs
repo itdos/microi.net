@@ -38,6 +38,9 @@ namespace Microi.net
         public string FormEngineFieldKey { get; set; }
         public string DataBaseId { get; set; }
         public int? EnableDataLog { get; set; }
+        public int? EnableDataComment { get; set; }
+        public int? EnableDataVersion { get; set; }
+        public int? EnableTrash { get; set; }
     }
 
     public partial class DiyField

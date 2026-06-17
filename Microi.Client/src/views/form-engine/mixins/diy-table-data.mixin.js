@@ -513,6 +513,9 @@ export default {
             }
 
             //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
+            if (self.IsTrashMode) {
+                param.IsDeleted = 1;
+            }
             if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
                 // param[self.TableChildFkFieldName] = self.TableChildFkValue;
                 //2021-10-25 新增：如果是传过来的父级formModel，以这个为准

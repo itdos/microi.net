@@ -501,6 +501,47 @@ export default {
                 });
             });
         },
+        ToggleTrashMode() {
+            var self = this;
+            self.IsTrashMode = !self.IsTrashMode;
+            self.TableMultipleSelection = [];
+            self.cardSelection = [];
+            self._moreMenuVisible = false;
+            self.GetDiyTableRow({ _PageIndex: 1 });
+        },
+        RestoreTrashRow(rowModel) {
+            var self = this;
+            if (!rowModel || self.DiyCommon.IsNull(rowModel.Id)) {
+                return;
+            }
+            self.DiyCommon.OsConfirm("确认恢复该回收站数据？", function () {
+                self.BtnLoading = true;
+                self.DiyCommon.Post(
+                    self.DiyApi.UptDiyTableRow,
+                    {
+                        FormEngineKey: self.CurrentDiyTableModel.Name,
+                        Id: rowModel.Id,
+                        _TableRowId: rowModel.Id,
+                        IsDeleted: 0,
+                        _IsTrashRestore: true,
+                        _FormData: {
+                            IsDeleted: 0
+                        }
+                    },
+                    function (result) {
+                        self.BtnLoading = false;
+                        if (self.DiyCommon.Result(result)) {
+                            self.DiyCommon.Tips(self.$t("Msg.Success"));
+                            self.GetDiyTableRow({ _PageIndex: 1 });
+                            self.$emit("CallbackGetDiyTableRow", {});
+                        }
+                    },
+                    function () {
+                        self.BtnLoading = false;
+                    }
+                );
+            });
+        },
         DownloadTemplate() {
             var self = this;
             //2021修改为取私有oss

@@ -67,17 +67,21 @@ export default {
         HasFabMenuItemsPage() {
             var self = this;
             if (self.FormMode == 'Edit') return true;
+            if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
+            if (!self.DiyCommon.IsNull(self.TableId) || !self.DiyCommon.IsNull(self.CurrentDiyTableModel && self.CurrentDiyTableModel.Id)) return true;
             return false;
         },
         // Dialog模式：FAB菜单是否有内容（取消编辑 / FormBtns / 删除）
         HasFabMenuItemsDialog() {
             var self = this;
             if (self.FormMode == 'Edit' && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+            if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
             if (self.LimitDel && typeof self.LimitDel == 'function' && self.LimitDel()
                 && self.FormMode != 'Add' && self.ShowDeleteBtn
                 && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+            if (!self.DiyCommon.IsNull(self.TableId) || !self.DiyCommon.IsNull(self.CurrentDiyTableModel && self.CurrentDiyTableModel.Id)) return true;
             return false;
         },
         // Drawer模式：与Dialog相同
@@ -148,10 +152,18 @@ export default {
             DataLogList: [],
             DataCommentListLoading: false,
             DataCommentList: [],
+            DataVersionListLoading: false,
+            DataVersionList: [],
             CommentContent: "",
+            DraftListLoading: false,
+            DraftList: [],
+            ShowDraftDialog: false,
+            CurrentDraftId: "",
             // 防止重复请求 + 标记是否已加载（用于切换 Tab 时懒加载）
             _DataLogLoadToken: 0,
             _DataCommentLoadToken: 0,
+            _DataVersionLoadToken: 0,
+            _DraftLoadToken: 0,
 
             // ========== 全新页面模式相关 ==========
             SaveDiyTableCommonLoding: false,

@@ -481,6 +481,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
         public bool? _ForceUpt { get; set; }
+        public bool? _IsTrashRestore { get; set; }
 
         /// <summary>
         /// 表单数据（使用JObject以避免序列化类型丢失，支持动态字段访问）
