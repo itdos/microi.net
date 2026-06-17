@@ -1,5 +1,14 @@
 <template>
-    <div class="diy-field-tabs" :class="['diy-field-tabs--' + theme, { 'is-design': LoadMode === 'Design' }]">
+    <div
+        class="diy-field-tabs"
+        :class="[
+            'diy-field-tabs--' + theme,
+            {
+                'is-design': LoadMode === 'Design',
+                'is-field-tabs-header': isRuntimeHeader
+            }
+        ]"
+    >
         <div v-if="description" class="diy-field-tabs__desc" v-safe-html="description"></div>
         <el-tabs
             v-model="activeKey"
@@ -19,15 +28,13 @@
                     <span class="diy-field-tabs__label" :class="{ 'is-active': pane.Key === activeKey }">
                         <fa-icon v-if="pane.Icon" :icon="pane.Icon" class="diy-field-tabs__icon" />
                         <span class="diy-field-tabs__title">{{ pane.Title }}</span>
-                        <el-tag
+                        <span
                             v-if="showFieldCount"
                             class="diy-field-tabs__count"
-                            size="small"
-                            effect="plain"
-                            round
+                            :style="getPaneCountStyle(pane)"
                         >
                             {{ getPaneCount(pane) }}
-                        </el-tag>
+                        </span>
                     </span>
                 </template>
             </el-tab-pane>
@@ -271,6 +278,9 @@ const panes = computed(() => {
 
 const description = computed(() => config.value.Description || "");
 const theme = computed(() => config.value.Theme || "default");
+const isRuntimeHeader = computed(() => {
+    return props.field && typeof props.field._collapseClass === "string" && props.field._collapseClass.indexOf("field-tabs-header") > -1;
+});
 const tabType = computed(() => {
     var type = config.value.Type || "";
     return type === "default" ? "" : type;
@@ -322,6 +332,11 @@ watch(
 const getPaneCount = (pane) => {
     if (pane && pane._fieldCount !== undefined) return pane._fieldCount;
     return pane && pane.FieldCount ? pane.FieldCount : 0;
+};
+
+const getPaneCountStyle = (pane) => {
+    if (!pane || pane.Key !== activeKey.value) return "";
+    return "color: var(--field-tabs-color) !important; background-color: #fff !important; border-color: #fff !important;";
 };
 
 const handleTabChange = (key) => {
@@ -463,22 +478,27 @@ defineExpose({
 <style lang="scss" scoped>
 .diy-field-tabs {
     --field-tabs-color: var(--el-color-primary);
-    --field-tabs-bg: var(--el-bg-color);
+    --field-tabs-bg: color-mix(in srgb, var(--field-tabs-color) 5%, var(--el-bg-color) 95%);
     --field-tabs-border: var(--el-border-color-light);
     width: 100%;
+    min-height: 44px;
     border: 1px solid var(--field-tabs-border);
     border-radius: 8px;
     background: var(--field-tabs-bg);
-    padding: 8px 10px 0;
+    padding: 0;
+    overflow: hidden;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
     &:hover {
         border-color: color-mix(in srgb, var(--field-tabs-color) 42%, var(--field-tabs-border) 58%);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    }
+
+    &.is-field-tabs-header {
+        border-radius: 8px 8px 0 0 !important;
     }
 
     &__desc {
-        padding: 0 2px 6px;
+        padding: 8px 12px 0;
         font-size: 12px;
         line-height: 18px;
         color: var(--el-text-color-secondary);
@@ -493,8 +513,22 @@ defineExpose({
         display: inline-flex;
         align-items: center;
         gap: 6px;
+        height: 100%;
+        line-height: 1;
         min-width: 0;
         max-width: 180px;
+
+        &.is-active {
+            .diy-field-tabs__icon {
+                color: var(--color-primary-text, #fff) !important;
+            }
+
+            .diy-field-tabs__count {
+                color: var(--field-tabs-color) !important;
+                background-color: #fff !important;
+                border-color: #fff !important;
+            }
+        }
     }
 
     &__title {
@@ -506,18 +540,100 @@ defineExpose({
     &__icon {
         flex: 0 0 auto;
         color: var(--field-tabs-color);
+        line-height: 1;
     }
 
     &__count {
         flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
         height: 18px;
-        line-height: 16px;
+        line-height: 1;
         padding: 0 6px;
+        border: 1px solid color-mix(in srgb, var(--field-tabs-color) 24%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--field-tabs-color) 10%, var(--el-bg-color) 90%);
+        color: var(--field-tabs-color);
+        font-size: 12px;
+        font-weight: 600;
+        box-sizing: border-box;
     }
 
     :deep(.el-tabs__header) {
         display: block !important;
-        margin-bottom: 0;
+        margin: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    :deep(.el-tabs__nav-wrap) {
+        display: flex !important;
+        align-items: center !important;
+        height: 42px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    :deep(.el-tabs__nav) {
+        border: 0 !important;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 42px !important;
+        padding: 5px 12px;
+        box-sizing: border-box;
+        background: transparent !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    :deep(.el-tabs__item) {
+        height: 32px;
+        min-height: 32px;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding: 0 14px;
+        box-sizing: border-box;
+        border: 1px solid transparent !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: var(--el-text-color-regular);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    :deep(.el-tabs__item:hover) {
+        color: var(--field-tabs-color);
+        background: color-mix(in srgb, var(--field-tabs-color) 8%, var(--el-bg-color) 92%) !important;
+    }
+
+    :deep(.el-tabs__item.is-active) {
+        color: var(--color-primary-text, #fff) !important;
+        background: var(--field-tabs-color) !important;
+        border-color: var(--field-tabs-color) !important;
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--field-tabs-color) 22%, transparent);
+    }
+
+    :deep(.el-tabs__item.is-active .diy-field-tabs__icon) {
+        color: var(--color-primary-text, #fff) !important;
+    }
+
+    :deep(.el-tabs__item.is-active .diy-field-tabs__count) {
+        color: var(--field-tabs-color) !important;
+        background-color: #fff !important;
+        border-color: #fff !important;
+    }
+
+    :deep(.el-tabs__item.is-active::before) {
+        display: none !important;
     }
 
     :deep(.el-tabs__content) {
@@ -525,12 +641,24 @@ defineExpose({
     }
 
     :deep(.el-tabs__nav-wrap::after) {
-        height: 1px;
+        display: none;
     }
 
     &--success { --field-tabs-color: var(--el-color-success); }
     &--warning { --field-tabs-color: var(--el-color-warning); }
     &--danger { --field-tabs-color: var(--el-color-danger); }
+}
+
+:global(.field-tabs-header) .diy-field-tabs {
+    border-radius: 8px 8px 0 0 !important;
+}
+
+:global(.field-tabs-header),
+:global(.field-tabs-header > .container-form-item),
+:global(.field-tabs-header .container-form-item > .el-form-item),
+:global(.field-tabs-header .container-form-item > .el-form-item > .el-form-item__content) {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }
 
 .tabs-config-list {

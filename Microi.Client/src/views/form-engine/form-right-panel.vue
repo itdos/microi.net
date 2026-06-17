@@ -275,8 +275,11 @@
             v-model="showLogDiffDialog"
             class="log-diff-dialog"
             :title="GetLogDiffTitle()"
-            width="860px"
+            width="min(1180px, 92vw)"
+            top="4vh"
             append-to-body
+            destroy-on-close
+            :close-on-click-modal="false"
         >
             <div class="log-diff-grid">
                 <div class="log-diff-pane">
@@ -928,61 +931,93 @@ export default {
     }
 }
 
-:global(.log-diff-dialog) {
-    .el-dialog__body {
-        padding-top: 8px;
-    }
+:global(.el-dialog.log-diff-dialog) {
+    max-width: calc(100vw - 48px);
+    margin-left: auto !important;
+    margin-right: auto !important;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 18px 52px rgba(15, 23, 42, 0.2);
+}
 
-    .log-diff-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-    }
+:global(.el-dialog.log-diff-dialog .el-dialog__header) {
+    margin: 0;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
 
-    .log-diff-pane {
-        min-width: 0;
-        border: 1px solid var(--el-border-color-lighter, #ebeef5);
-        border-radius: 8px;
-        overflow: hidden;
-        background: var(--el-fill-color-extra-light, #fafafa);
-    }
+:global(.el-dialog.log-diff-dialog .el-dialog__title) {
+    font-size: 14px;
+    font-weight: 600;
+}
 
-    .log-diff-pane-title {
-        padding: 8px 10px;
-        border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
-        font-size: 13px;
-        font-weight: 600;
+:global(.el-dialog.log-diff-dialog .el-dialog__body) {
+    padding: 12px;
+    max-height: 78vh;
+    overflow: hidden;
+    background: var(--el-fill-color-extra-light, #fafafa);
+}
 
-        &.is-old {
-            color: var(--el-text-color-secondary, #909399);
-        }
+:global(.log-diff-dialog .log-diff-grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    height: min(680px, 72vh);
+    min-height: 360px;
+}
 
-        &.is-new {
-            color: var(--el-color-danger, #f56c6c);
-        }
-    }
+:global(.log-diff-dialog .log-diff-pane) {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--el-bg-color, #fff);
+}
 
-    pre {
-        margin: 0;
-        max-height: 56vh;
-        overflow: auto;
-        padding: 10px;
-        color: var(--el-text-color-primary, #303133);
-        font-family: Consolas, Monaco, "Courier New", monospace;
-        font-size: 12px;
-        line-height: 1.55;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
+:global(.log-diff-dialog .log-diff-pane-title) {
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+    background: var(--el-fill-color-blank, #fff);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+:global(.log-diff-dialog .log-diff-pane-title.is-old) {
+    color: var(--el-text-color-secondary, #909399);
+}
+
+:global(.log-diff-dialog .log-diff-pane-title.is-new) {
+    color: var(--el-color-danger, #f56c6c);
+}
+
+:global(.log-diff-dialog pre) {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    overflow: auto;
+    padding: 12px;
+    color: var(--el-text-color-primary, #303133);
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    white-space: pre;
+    tab-size: 4;
 }
 
 @media (max-width: 760px) {
-    :global(.log-diff-dialog) {
-        width: 92% !important;
+    :global(.el-dialog.log-diff-dialog) {
+        width: 92vw !important;
+        max-width: 92vw;
+    }
 
-        .log-diff-grid {
-            grid-template-columns: 1fr;
-        }
+    :global(.log-diff-dialog .log-diff-grid) {
+        grid-template-columns: 1fr;
+        height: 76vh;
+        min-height: 0;
     }
 }
 </style>

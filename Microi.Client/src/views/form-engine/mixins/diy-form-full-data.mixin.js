@@ -1,4 +1,6 @@
 
+import { ElMessageBox } from "element-plus";
+
 export default {
     methods: {
         // ========== 保存表单（以diy-table.vue为准） ==========
@@ -291,7 +293,7 @@ export default {
             };
             return tableText + "草稿 " + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + " " + pad(now.getHours()) + ":" + pad(now.getMinutes());
         },
-        SaveToDraftBox() {
+        async SaveToDraftBox() {
             var self = this;
             if (self.FormMode == "View") {
                 self.DiyCommon.Tips("查看模式不能保存草稿。", false);
@@ -299,20 +301,22 @@ export default {
             }
             var snapshot = self.GetCurrentDraftSnapshot();
             if (!snapshot) return;
-            self.DiyCommon.OsPrompt(
-                "请输入草稿名称",
-                async function (draftName) {
-                    draftName = draftName || self.GetDraftDefaultName();
-                    await self.AddDraftData(draftName, snapshot);
-                },
-                null,
-                {
-                    Title: "保存至草稿箱",
-                    Icon: "info",
-                    OkText: "保存",
-                    CancelText: "取消"
-                }
-            );
+            var promptResult = null;
+            try {
+                promptResult = await ElMessageBox.prompt("请输入草稿名称", "保存至草稿箱", {
+                    confirmButtonText: "保存",
+                    cancelButtonText: "取消",
+                    inputValue: self.GetDraftDefaultName(),
+                    inputPlaceholder: "请输入草稿名称",
+                    closeOnClickModal: false,
+                    type: "info"
+                });
+            } catch (error) {
+                // 用户取消保存时不需要提示。
+                return;
+            }
+            var draftName = promptResult && promptResult.value ? promptResult.value : self.GetDraftDefaultName();
+            await self.AddDraftData(draftName, snapshot);
         },
         async AddDraftData(draftName, snapshot) {
             var self = this;
