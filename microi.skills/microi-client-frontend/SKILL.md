@@ -183,6 +183,24 @@ Page 模式要特别注意：
 
 ## 8. 运行时高频坑复盘
 
+### FormEngine 前端封装以 `diy.common.js` 为准
+
+前端 `DiyCommon.FormEngine` 不是后端 `FormEngine` 方法的一比一暴露，动表单引擎数据前必须先查 `Microi.Client/src/utils/diy.common.js` 的真实封装。单条新增评论、日志、草稿、配置等业务数据时使用：
+
+```js
+await DiyCommon.FormEngine.AddFormData("table_name", {
+  Field: "value"
+});
+```
+
+或：
+
+```js
+DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (result) {});
+```
+
+不要凭后端存在 `AddTableData` 就在前端写 `DiyCommon.FormEngine.AddTableData(...)`；该封装在 Microi.Client 中可能不存在，单条数据也不应该走批量新增。批量新增前先确认当前前端封装是否是 `AddFormDataBatch`，并按项目已有调用方式传参。
+
 ### Pinia persisted-state 覆盖 state 默认值
 
 当主题色、语言、布局等状态同时支持“系统默认值”和“用户手动选择”时，不能只在 `state()` 中写 fallback。Pinia persisted-state hydrate 会在 store 初始化后把本地旧值覆盖回来，导致 `SysConfig.ThemeColor` 等系统默认永远不生效。

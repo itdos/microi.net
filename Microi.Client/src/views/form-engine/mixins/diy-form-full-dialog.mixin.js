@@ -18,6 +18,7 @@ export default {
             self.ShowUpdateBtn = true;
             self.ShowDeleteBtn = true;
             self.ShowSaveBtn = true;
+            self.CurrentDraftId = "";
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
@@ -46,6 +47,7 @@ export default {
                 // 加载数据日志 + 评论（角色权限校验在 LoadDataLog 内部完成）
                 self.LoadDataLog();
                 self.LoadDataComment();
+                self.LoadDataVersion();
             }
         },
         // ========== 加载数据日志（可重复调用：保存后、切换 Tab 时） ==========
@@ -119,6 +121,47 @@ export default {
                 return;
             }
             self.GetCommentList();
+        },
+        LoadDataVersion() {
+            var self = this;
+            if (!self.CurrentDiyTableModel || !self.CurrentDiyTableModel.EnableDataVersion) {
+                self.DataVersionList = [];
+                self.DataVersionListLoading = false;
+                return;
+            }
+            if (self.DiyCommon.IsNull(self.TableRowId)) {
+                self.DataVersionList = [];
+                self.DataVersionListLoading = false;
+                return;
+            }
+
+            var token = ++self._DataVersionLoadToken;
+            self.DataVersionListLoading = true;
+            var where = [["TableRowId", "=", self.TableRowId]];
+            if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.Id)) {
+                where.push(["TableId", "=", self.CurrentDiyTableModel.Id]);
+            }
+
+            self.DiyCommon.FormEngine.GetTableData(
+                {
+                    FormEngineKey: "mic_data_version",
+                    _Where: where,
+                    _OrderBy: "CreateTime",
+                    _OrderByType: "DESC"
+                },
+                function (result) {
+                    if (token !== self._DataVersionLoadToken) return;
+                    try {
+                        if (result && result.Code == 1 && Array.isArray(result.Data)) {
+                            self.DataVersionList = result.Data;
+                        } else {
+                            self.DataVersionList = [];
+                        }
+                    } finally {
+                        self.DataVersionListLoading = false;
+                    }
+                }
+            );
         },
         _beginFieldFormOpen() {
             var self = this;
@@ -408,6 +451,9 @@ export default {
             if (self.CurrentDiyTableModel.EnableDataComment) {
                 return true;
             }
+            if (self.CurrentDiyTableModel.EnableDataVersion) {
+                return true;
+            }
             return false;
         },
         // ========== 关闭表单 ,zhy加了isPopstate，根据 isPopstate 决定是否回退历史，移动端不回退==========
@@ -540,6 +586,7 @@ export default {
             var self = this;
             // 清空 TableRowId，通过 v-if="TableId && TableRowId" 销毁 DiyForm 组件树
             self.TableRowId = '';
+            self.CurrentDraftId = "";
             self.CallbackSetFormDataFinish = false;
             self.CallbackSetDiyTableModelFinish = false;
 
