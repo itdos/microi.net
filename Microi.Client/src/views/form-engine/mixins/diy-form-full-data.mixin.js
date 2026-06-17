@@ -43,8 +43,9 @@ export default {
                     self.FormMode = formModeAfter;
                     self.TableRowId = formParam.TableRowId;
                     self.BtnLoading = formParam.SaveLoading;
+                    await self.DeleteCurrentDraftAfterSave();
 
-                    if (isClose === true && outFormV8Result.Result !== false) {
+                    if (isClose === true && (!outFormV8Result || outFormV8Result.Result !== false)) {
                         self.ShowFieldForm = false;
                         self.ShowFieldFormDrawer = false;
                     } else {
@@ -54,6 +55,7 @@ export default {
                         self.$nextTick(function () {
                             try { self.LoadDataLog && self.LoadDataLog(); } catch (e) {}
                             try { self.LoadDataComment && self.LoadDataComment(); } catch (e) {}
+                            try { self.LoadDataVersion && self.LoadDataVersion(); } catch (e) {}
                         });
                     }
 
@@ -200,10 +202,10 @@ export default {
                 return;
             }
             self.BtnLoading = true;
-            self.DiyCommon.FormEngine.AddTableData(
+            self.DiyCommon.FormEngine.AddFormData(
+                "diy_comment",
                 {
-                    FormEngineKey: "mic_data_comment",
-                    DataId: self.TableRowId,
+                    TableRowId: self.TableRowId,
                     Content: self.CommentContent,
                     TableId: self.TableId
                 },
@@ -216,6 +218,194 @@ export default {
                 }
             );
         },
+        GetDraftFieldFormRef() {
+            var self = this;
+            var fieldForm = self.$refs && (self.$refs.fieldForm || self.$refs.fieldFormPage);
+            if (Array.isArray(fieldForm)) {
+                fieldForm = fieldForm[0];
+            }
+            return fieldForm;
+        },
+        GetCurrentDraftSnapshot() {
+            var self = this;
+            var fieldForm = self.GetDraftFieldFormRef();
+            var data = null;
+            if (fieldForm && typeof fieldForm.GetDraftData === "function") {
+                data = fieldForm.GetDraftData();
+            } else if (self.CurrentRowModel) {
+                data = JSON.parse(JSON.stringify(self.CurrentRowModel));
+            }
+            if (!data) {
+                self.DiyCommon.Tips("当前表单尚未加载完成，请稍后再试。", false);
+                return null;
+            }
+            if (self.TableRowId && !data.Id) {
+                data.Id = self.TableRowId;
+            }
+            return data;
+        },
+        GetDraftDefaultName() {
+            var self = this;
+            var tableText = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Description || self.CurrentDiyTableModel.Name))
+                || self.TableName
+                || "表单";
+            var now = new Date();
+            var pad = function (num) {
+                return num < 10 ? "0" + num : "" + num;
+            };
+            return tableText + "草稿 " + now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + " " + pad(now.getHours()) + ":" + pad(now.getMinutes());
+        },
+        SaveToDraftBox() {
+            var self = this;
+            if (self.FormMode == "View") {
+                self.DiyCommon.Tips("查看模式不能保存草稿。", false);
+                return;
+            }
+            var snapshot = self.GetCurrentDraftSnapshot();
+            if (!snapshot) return;
+            self.DiyCommon.OsPrompt(
+                "请输入草稿名称",
+                async function (draftName) {
+                    draftName = draftName || self.GetDraftDefaultName();
+                    await self.AddDraftData(draftName, snapshot);
+                },
+                null,
+                {
+                    Title: "保存至草稿箱",
+                    Icon: "info",
+                    OkText: "保存",
+                    CancelText: "取消"
+                }
+            );
+        },
+        async AddDraftData(draftName, snapshot) {
+            var self = this;
+            if (!snapshot) {
+                snapshot = self.GetCurrentDraftSnapshot();
+            }
+            if (!snapshot) return;
+            var tableId = self.TableId || (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Id) || "";
+            var tableName = self.TableName || (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name) || "";
+            var result = await self.DiyCommon.FormEngine.AddFormData("mci_drafts", {
+                DraftName: draftName || self.GetDraftDefaultName(),
+                SourceTableId: tableId,
+                SourceTableName: tableName,
+                TableRowId: self.TableRowId || snapshot.Id || "",
+                SysMenuId: self.SysMenuId || "",
+                FormMode: self.FormMode || "",
+                Status: "Draft",
+                Data: JSON.stringify(snapshot),
+                Remark: ""
+            });
+            if (self.DiyCommon.Result(result)) {
+                if (result.Data && result.Data.Id) {
+                    self.CurrentDraftId = result.Data.Id;
+                }
+                self.DiyCommon.Tips("草稿已保存。");
+                self.LoadDraftList(false);
+            }
+        },
+        LoadDraftList(openDialog) {
+            var self = this;
+            var tableId = self.TableId || (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Id) || "";
+            if (self.DiyCommon.IsNull(tableId)) {
+                self.DraftList = [];
+                return;
+            }
+            var token = ++self._DraftLoadToken;
+            self.DraftListLoading = true;
+            if (openDialog === true) {
+                self.ShowDraftDialog = true;
+            }
+            var where = [
+                ["SourceTableId", "=", tableId],
+                ["Status", "=", "Draft"]
+            ];
+            if (self.GetCurrentUser && self.GetCurrentUser.Id) {
+                where.push(["CreateUser", "=", self.GetCurrentUser.Id]);
+            }
+            self.DiyCommon.FormEngine.GetTableData(
+                {
+                    FormEngineKey: "mci_drafts",
+                    _Where: where,
+                    _OrderBy: "CreateTime",
+                    _OrderByType: "DESC"
+                },
+                function (result) {
+                    if (token !== self._DraftLoadToken) return;
+                    try {
+                        self.DraftList = result && result.Code == 1 && Array.isArray(result.Data) ? result.Data : [];
+                    } finally {
+                        self.DraftListLoading = false;
+                    }
+                }
+            );
+        },
+        OpenDraftDialog() {
+            var self = this;
+            self.LoadDraftList(true);
+        },
+        ParseDraftData(draft) {
+            var self = this;
+            if (!draft || self.DiyCommon.IsNull(draft.Data)) {
+                return null;
+            }
+            try {
+                return typeof draft.Data === "string" ? JSON.parse(draft.Data) : JSON.parse(JSON.stringify(draft.Data));
+            } catch (error) {
+                self.DiyCommon.Tips("草稿数据解析失败：" + error.message, false);
+                return null;
+            }
+        },
+        LoadDraftToForm(draft) {
+            var self = this;
+            var data = self.ParseDraftData(draft);
+            if (!data) return;
+            self.CurrentDraftId = draft.Id || "";
+            self.TableRowId = draft.TableRowId || data.Id || self.TableRowId;
+            data.Id = self.TableRowId || data.Id;
+            var draftMode = draft.FormMode || self.FormMode || "Edit";
+            self.FormMode = draftMode == "View" ? "Edit" : draftMode;
+            self.ShowDraftDialog = false;
+            self.$nextTick(function () {
+                var fieldForm = self.GetDraftFieldFormRef();
+                if (!fieldForm || typeof fieldForm.ApplyVersionData !== "function") {
+                    self.DiyCommon.Tips("当前表单尚未加载完成，请稍后再试。", false);
+                    return;
+                }
+                fieldForm.ApplyVersionData(data);
+                self.CloseFormNeedConfirm = true;
+                self.DiyCommon.Tips("已加载草稿：" + (draft.DraftName || ""));
+            });
+        },
+        DeleteDraft(draft) {
+            var self = this;
+            if (!draft || !draft.Id) return;
+            self.DiyCommon.OsConfirm("确定删除草稿【" + (draft.DraftName || "") + "】？", async function () {
+                var result = await self.DiyCommon.FormEngine.DelFormData("mci_drafts", { Id: draft.Id });
+                if (self.DiyCommon.Result(result)) {
+                    if (self.CurrentDraftId == draft.Id) {
+                        self.CurrentDraftId = "";
+                    }
+                    self.DiyCommon.Tips("草稿已删除。");
+                    self.LoadDraftList(false);
+                }
+            });
+        },
+        async DeleteCurrentDraftAfterSave() {
+            var self = this;
+            if (self.DiyCommon.IsNull(self.CurrentDraftId)) {
+                return;
+            }
+            var draftId = self.CurrentDraftId;
+            self.CurrentDraftId = "";
+            try {
+                await self.DiyCommon.FormEngine.DelFormData("mci_drafts", { Id: draftId });
+                self.LoadDraftList(false);
+            } catch (error) {
+                self.CurrentDraftId = draftId;
+            }
+        },
         GetCommentList() {
             var self = this;
             if (self.DiyCommon.IsNull(self.TableRowId)) {
@@ -227,8 +417,8 @@ export default {
             self.DataCommentListLoading = true;
             self.DiyCommon.FormEngine.GetTableData(
                 {
-                    FormEngineKey: "mic_data_comment",
-                    _Where: [["DataId", "=", self.TableRowId]],
+                    FormEngineKey: "diy_comment",
+                    _Where: [["TableRowId", "=", self.TableRowId]],
                     _OrderBy: "CreateTime",
                     _OrderByType: "DESC"
                 },
@@ -253,6 +443,68 @@ export default {
                 }
             );
         },
+        ParseDataVersionData(versionItem) {
+            var self = this;
+            if (!versionItem || self.DiyCommon.IsNull(versionItem.Data)) {
+                return null;
+            }
+            try {
+                if (typeof versionItem.Data === "string") {
+                    return JSON.parse(versionItem.Data);
+                }
+                return JSON.parse(JSON.stringify(versionItem.Data));
+            } catch (error) {
+                self.DiyCommon.Tips("数据版本内容解析失败：" + error.message, false);
+                return null;
+            }
+        },
+        PreviewDataVersion(versionItem) {
+            var self = this;
+            var data = self.ParseDataVersionData(versionItem);
+            if (!data) return;
+            var jsonText = JSON.stringify(data, null, 2);
+            self.DiyCommon.OsAlert(
+                "<pre style='max-height:520px;overflow:auto;margin:0;white-space:pre-wrap;font-size:12px;line-height:1.6;'>" +
+                    jsonText.replace(/[<>&]/g, function (s) {
+                        return { "<": "&lt;", ">": "&gt;", "&": "&amp;" }[s];
+                    }) +
+                "</pre>",
+                { Title: "数据版本 " + (versionItem.Version || ""), Icon: "info" }
+            );
+        },
+        LoadDataVersionToForm(versionItem) {
+            var self = this;
+            var data = self.ParseDataVersionData(versionItem);
+            if (!data) return false;
+            data.Id = self.TableRowId || data.Id;
+            var fieldForm = self._getFieldFormRef ? self._getFieldFormRef() : self.$refs.fieldForm;
+            if (Array.isArray(fieldForm)) {
+                fieldForm = fieldForm[0];
+            }
+            if (!fieldForm || typeof fieldForm.ApplyVersionData !== "function") {
+                self.DiyCommon.Tips("当前表单尚未加载完成，请稍后再试。", false);
+                return false;
+            }
+            fieldForm.ApplyVersionData(data);
+            self.FormMode = "Edit";
+            self.CloseFormNeedConfirm = true;
+            self.DiyCommon.Tips("已加载数据版本 " + (versionItem.Version || ""));
+            return true;
+        },
+        SaveDataVersionAsCurrent(versionItem) {
+            var self = this;
+            if (!self.LoadDataVersionToForm(versionItem)) {
+                return;
+            }
+            self.$nextTick(function () {
+                self.SaveDiyTableCommon({
+                    SavedType: "Edit",
+                    Callback: function () {
+                        self.LoadDataVersion && self.LoadDataVersion();
+                    }
+                });
+            });
+        },
         SaveDiyTableCommonPage(isBack) {
             var self = this;
             try {
@@ -268,7 +520,8 @@ export default {
                 param.SavedType = "Edit";
                 self.$refs.fieldFormPage.FormSubmit(param, async function (success, formData, outFormV8Result) {
                     if (success == true) {
-                        if (isBack === true && outFormV8Result.Result !== false) {
+                        await self.DeleteCurrentDraftAfterSave();
+                        if (isBack === true && (!outFormV8Result || outFormV8Result.Result !== false)) {
                             self.Go_1();
                         } else {
                             self.FormMode = "Edit";

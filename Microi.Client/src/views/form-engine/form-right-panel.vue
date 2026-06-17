@@ -1,7 +1,6 @@
 <template>
     <div class="form-right-panel" :class="{ 'is-mobile-drawer': isMobileDrawer }">
         <el-tabs v-model="innerActiveTab" class="form-right-tabs" @update:model-value="OnTabChange">
-            <!-- 流程信息 -->
             <el-tab-pane v-if="openDiyFormWorkFlow" name="WorkFlow">
                 <template #label>
                     <span class="tab-label">
@@ -24,7 +23,6 @@
                 </div>
             </el-tab-pane>
 
-            <!-- 数据日志 -->
             <el-tab-pane v-if="enableDataLog" name="DataLog">
                 <template #label>
                     <span class="tab-label">
@@ -34,18 +32,28 @@
                 </template>
                 <div class="panel-card">
                     <div class="panel-toolbar">
-                        <el-button size="small" :loading="dataLogListLoading" @click="OnRefreshDataLog" link type="primary">
-                            <el-icon v-if="!dataLogListLoading"><Refresh /></el-icon>
-                            {{ $t ? $t('Msg.Refresh') || '刷新' : '刷新' }}
-                        </el-button>
+                        <div class="panel-toolbar-title">
+                            <el-icon><Document /></el-icon>
+                            <span>{{ $t ? $t('Msg.DataLog') || '数据日志' : '数据日志' }}</span>
+                        </div>
+                        <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
+                            <el-button
+                                circle
+                                size="small"
+                                :loading="dataLogListLoading"
+                                @click="OnRefreshDataLog"
+                            >
+                                <el-icon v-if="!dataLogListLoading"><Refresh /></el-icon>
+                            </el-button>
+                        </el-tooltip>
                     </div>
                     <div class="datalog-timeline" v-loading="dataLogListLoading">
                         <el-timeline v-if="dataLogList && dataLogList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataLogList"
                                 :key="item.Id"
-                                :type="'primary'"
-                                :size="'large'"
+                                type="primary"
+                                size="large"
                                 :timestamp="item.CreateTime"
                             >
                                 <template #dot>
@@ -53,11 +61,7 @@
                                 </template>
                                 <div class="log-card">
                                     <div class="log-title">{{ item.Title }}</div>
-                                    <div
-                                        v-for="log in item.Content"
-                                        :key="'datalog_content_' + log.Name"
-                                        class="log-row"
-                                    >
+                                    <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" class="log-row">
                                         <span class="log-field">{{ log.Label }}</span>
                                         <span class="log-arrow">
                                             <span class="log-old">{{ log.OVal || ($t ? $t('Msg.EmptyValue') : '空') }}</span>
@@ -76,7 +80,6 @@
                 </div>
             </el-tab-pane>
 
-            <!-- 数据评论 -->
             <el-tab-pane v-if="enableDataComment" name="DataComment">
                 <template #label>
                     <span class="tab-label">
@@ -86,10 +89,20 @@
                 </template>
                 <div class="panel-card">
                     <div class="panel-toolbar">
-                        <el-button size="small" :loading="dataCommentListLoading" @click="OnRefreshDataComment" link type="primary">
-                            <el-icon v-if="!dataCommentListLoading"><Refresh /></el-icon>
-                            {{ $t ? $t('Msg.Refresh') || '刷新' : '刷新' }}
-                        </el-button>
+                        <div class="panel-toolbar-title">
+                            <el-icon><ChatDotRound /></el-icon>
+                            <span>{{ $t ? $t('Msg.DataComment') || '数据评论' : '数据评论' }}</span>
+                        </div>
+                        <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
+                            <el-button
+                                circle
+                                size="small"
+                                :loading="dataCommentListLoading"
+                                @click="OnRefreshDataComment"
+                            >
+                                <el-icon v-if="!dataCommentListLoading"><Refresh /></el-icon>
+                            </el-button>
+                        </el-tooltip>
                     </div>
                     <div class="comment-input-wrapper">
                         <el-input
@@ -118,15 +131,15 @@
                             <el-timeline-item
                                 v-for="item in dataCommentList"
                                 :key="item.Id"
-                                :type="'primary'"
-                                :size="'large'"
+                                type="primary"
+                                size="large"
                                 :timestamp="item.CreateTime"
                             >
                                 <template #dot>
                                     <el-avatar :size="28" :src="item.Avatar"></el-avatar>
                                 </template>
                                 <div class="log-card">
-                                    <div class="log-title">{{ item.Title }}</div>
+                                    <div class="log-title">{{ item.Title || item.UserName || item.CreateUser || item.UserId }}</div>
                                     <div class="log-comment-content" v-safe-html="item.Content"></div>
                                 </div>
                             </el-timeline-item>
@@ -134,6 +147,67 @@
                         <div v-else class="panel-empty">
                             <el-icon><ChatDotRound /></el-icon>
                             <span>{{ dataCommentListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoData') : '暂无评论') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </el-tab-pane>
+
+            <el-tab-pane v-if="enableDataVersion" name="DataVersion">
+                <template #label>
+                    <span class="tab-label">
+                        <el-icon><Clock /></el-icon>
+                        <span>数据版本</span>
+                    </span>
+                </template>
+                <div class="panel-card">
+                    <div class="panel-toolbar">
+                        <div class="panel-toolbar-title">
+                            <el-icon><Clock /></el-icon>
+                            <span>数据版本</span>
+                        </div>
+                        <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
+                            <el-button
+                                circle
+                                size="small"
+                                :loading="dataVersionListLoading"
+                                @click="OnRefreshDataVersion"
+                            >
+                                <el-icon v-if="!dataVersionListLoading"><Refresh /></el-icon>
+                            </el-button>
+                        </el-tooltip>
+                    </div>
+                    <div class="version-list" v-loading="dataVersionListLoading">
+                        <div v-if="dataVersionList && dataVersionList.length > 0">
+                            <div v-for="item in dataVersionList" :key="item.Id" class="version-card">
+                                <div class="version-card-main">
+                                    <div class="version-title">
+                                        <el-tag size="small" type="primary" effect="dark">{{ item.Version || '1.0.0' }}</el-tag>
+                                        <el-tag size="small" :type="GetVersionActionType(item.Action)" effect="plain">{{ GetVersionActionText(item.Action) }}</el-tag>
+                                    </div>
+                                    <div class="version-meta">
+                                        <span>{{ item.CreateTime }}</span>
+                                        <span>{{ item.UserName || item.CreateUser || item.UserId }}</span>
+                                    </div>
+                                </div>
+                                <div class="version-actions">
+                                    <el-button size="small" text type="primary" @click="$emit('preview-data-version', item)">
+                                        <el-icon><View /></el-icon>
+                                        查看
+                                    </el-button>
+                                    <el-button size="small" text type="warning" @click="$emit('load-data-version', item)">
+                                        <el-icon><RefreshLeft /></el-icon>
+                                        加载
+                                    </el-button>
+                                    <el-button size="small" text type="success" @click="$emit('save-data-version', item)">
+                                        <el-icon><Select /></el-icon>
+                                        保存为当前
+                                    </el-button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="panel-empty">
+                            <el-icon><Clock /></el-icon>
+                            <span>{{ dataVersionListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoData') : '暂无版本') }}</span>
                         </div>
                     </div>
                 </div>
@@ -151,18 +225,35 @@ export default {
         openDiyFormWorkFlowType: { type: Object, default: () => ({}) },
         enableDataLog: { type: Boolean, default: false },
         enableDataComment: { type: Boolean, default: false },
+        enableDataVersion: { type: Boolean, default: false },
         dataLogList: { type: Array, default: () => [] },
         dataLogListLoading: { type: Boolean, default: false },
         dataCommentList: { type: Array, default: () => [] },
         dataCommentListLoading: { type: Boolean, default: false },
+        dataVersionList: { type: Array, default: () => [] },
+        dataVersionListLoading: { type: Boolean, default: false },
         commentContent: { type: String, default: "" },
         btnLoading: { type: Boolean, default: false },
         isMobileDrawer: { type: Boolean, default: false },
         formData: { type: Object, default: () => ({}) },
-        // 隐藏 wf-work-handler 内联的发起流程/处理工作提交按钮——由表单顶部的 CTA 接管
+        formMode: { type: String, default: "" },
         hideInlineSubmit: { type: Boolean, default: false }
     },
-    emits: ["update:modelValue", "update:commentContent", "submit-comment", "callback-start-work", "callback-send-work", "callback-get-form-data", "callback-field-set", "refresh-data-log", "refresh-data-comment"],
+    emits: [
+        "update:modelValue",
+        "update:commentContent",
+        "submit-comment",
+        "callback-start-work",
+        "callback-send-work",
+        "callback-get-form-data",
+        "callback-field-set",
+        "refresh-data-log",
+        "refresh-data-comment",
+        "refresh-data-version",
+        "preview-data-version",
+        "load-data-version",
+        "save-data-version"
+    ],
     data() {
         return {
             innerActiveTab: this.modelValue || "WorkFlow"
@@ -174,6 +265,7 @@ export default {
             if (this.openDiyFormWorkFlow) tabs.push("WorkFlow");
             if (this.enableDataLog) tabs.push("DataLog");
             if (this.enableDataComment) tabs.push("DataComment");
+            if (this.enableDataVersion) tabs.push("DataVersion");
             return tabs;
         }
     },
@@ -188,6 +280,9 @@ export default {
             this.EnsureActiveTab();
         },
         enableDataComment() {
+            this.EnsureActiveTab();
+        },
+        enableDataVersion() {
             this.EnsureActiveTab();
         }
     },
@@ -220,7 +315,29 @@ export default {
                 this.$emit("refresh-data-log");
             } else if (tabName === "DataComment" && !this.dataCommentListLoading && (!this.dataCommentList || this.dataCommentList.length === 0)) {
                 this.$emit("refresh-data-comment");
+            } else if (tabName === "DataVersion" && !this.dataVersionListLoading && (!this.dataVersionList || this.dataVersionList.length === 0)) {
+                this.$emit("refresh-data-version");
             }
+        },
+        GetVersionActionType(action) {
+            var map = {
+                Add: "success",
+                Update: "primary",
+                Delete: "danger",
+                Restore: "warning",
+                Rollback: "info"
+            };
+            return map[action] || "info";
+        },
+        GetVersionActionText(action) {
+            var map = {
+                Add: "新增",
+                Update: "修改",
+                Delete: "删除",
+                Restore: "恢复",
+                Rollback: "回滚"
+            };
+            return map[action] || action || "版本";
         },
         OnTabChange(tabName) {
             this.SetActiveTab(tabName, true);
@@ -230,6 +347,9 @@ export default {
         },
         OnRefreshDataComment() {
             this.$emit("refresh-data-comment");
+        },
+        OnRefreshDataVersion() {
+            this.$emit("refresh-data-version");
         },
         OnCallbackStartWork(payload, callback) {
             this.$emit("callback-start-work", payload, callback);
@@ -281,23 +401,37 @@ export default {
 
     .panel-card {
         background: var(--el-bg-color, #fff);
-        border-radius: 10px;
-        padding: 12px;
-        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
         border: 1px solid var(--el-border-color-lighter, #ebeef5);
+        border-radius: 8px;
+        padding: 12px;
     }
 
     .panel-toolbar {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         align-items: center;
-        gap: 6px;
-        margin-bottom: 8px;
-        :deep(.el-button) {
-            font-size: 12px;
+        gap: 8px;
+        margin-bottom: 10px;
+        min-height: 28px;
+
+        .panel-toolbar-title {
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--el-text-color-primary, #303133);
+            font-size: 13px;
+            font-weight: 600;
+
             .el-icon {
-                font-size: 13px;
+                color: var(--el-color-primary, #409eff);
             }
+        }
+
+        :deep(.el-button.is-circle) {
+            width: 28px;
+            height: 28px;
+            flex: 0 0 28px;
         }
     }
 
@@ -342,10 +476,15 @@ export default {
         }
     }
 
-    .log-card {
+    .log-card,
+    .version-card {
         background: var(--el-fill-color-light, #f5f7fa);
+        border: 1px solid transparent;
         border-radius: 8px;
         padding: 8px 10px;
+    }
+
+    .log-card {
         margin-top: 4px;
 
         .log-title {
@@ -395,13 +534,57 @@ export default {
             word-break: break-word;
         }
     }
+
+    .version-list {
+        min-height: 90px;
+    }
+
+    .version-card {
+        margin-bottom: 10px;
+        transition: border-color 0.16s ease, background-color 0.16s ease;
+
+        &:hover {
+            border-color: var(--el-border-color, #dcdfe6);
+            background: var(--el-fill-color-blank, #fff);
+        }
+
+        .version-card-main {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .version-title,
+        .version-meta,
+        .version-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .version-meta {
+            color: var(--el-text-color-secondary, #909399);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .version-actions {
+            justify-content: flex-end;
+            margin-top: 8px;
+
+            :deep(.el-button) {
+                margin-left: 0;
+                padding: 4px 5px;
+            }
+        }
+    }
 }
 
 .form-right-panel.is-mobile-drawer {
     padding: 0;
     .panel-card {
         border: none;
-        box-shadow: none;
         background: transparent;
         padding: 0;
     }

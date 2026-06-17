@@ -1464,6 +1464,37 @@ export default {
                 });
             }
         },
+        ApplyVersionData(rowData) {
+            var self = this;
+            if (!rowData) {
+                return;
+            }
+            var data = JSON.parse(JSON.stringify(rowData));
+            if (data.Id) {
+                self.FormDiyTableModel.Id = self.TableRowId || data.Id;
+            }
+            (self.DiyFieldList || []).forEach(function (field) {
+                if (!field || !field.Name) return;
+                if (Object.prototype.hasOwnProperty.call(data, field.Name)) {
+                    self.FormDiyTableModel[field.Name] = data[field.Name];
+                }
+            });
+            self.$emit("CallbackSetFormData", self.FormDiyTableModel);
+        },
+        GetDraftData() {
+            var self = this;
+            var data = {};
+            if (self.TableRowId || self.FormDiyTableModel.Id) {
+                data.Id = self.TableRowId || self.FormDiyTableModel.Id;
+            }
+            (self.DiyFieldList || []).forEach(function (field) {
+                if (!field || !field.Name) return;
+                if (Object.prototype.hasOwnProperty.call(self.FormDiyTableModel, field.Name)) {
+                    data[field.Name] = self.FormDiyTableModel[field.Name];
+                }
+            });
+            return JSON.parse(JSON.stringify(data));
+        },
         FormSet(fieldName, value, field) {
             var self = this;
             formTrace("diy-form:form-set", {

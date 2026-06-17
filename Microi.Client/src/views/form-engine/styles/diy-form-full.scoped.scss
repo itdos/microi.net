@@ -256,6 +256,12 @@
     &.v8 {
         background: linear-gradient(135deg, #409eff, #267be0);
     }
+    &.draft {
+        background: linear-gradient(135deg, #67c23a, #3f9b26);
+    }
+    &.draft-list {
+        background: linear-gradient(135deg, #e6a23c, #c07a12);
+    }
     &.delete {
         background: linear-gradient(135deg, #f56c6c, #c62828);
     }
@@ -317,5 +323,109 @@
         height: 44px;
         font-size: 15px;
         border-radius: 8px;
+    }
+}
+
+:deep(.draft-box-dialog) {
+    .el-dialog__body {
+        padding-top: 6px;
+    }
+}
+
+.draft-box-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.draft-box-heading {
+    min-width: 0;
+}
+
+.draft-box-title {
+    color: var(--el-text-color-primary, #303133);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.draft-box-subtitle {
+    margin-top: 3px;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.draft-box-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 52vh;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.draft-box-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+    background: var(--el-fill-color-extra-light, #fafafa);
+
+    &.is-current {
+        border-color: var(--el-color-success-light-5, #b3e19d);
+        background: var(--el-color-success-light-9, #f0f9eb);
+    }
+}
+
+.draft-box-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.draft-box-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--el-text-color-primary, #303133);
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.draft-box-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.draft-box-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .draft-box-item {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .draft-box-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }
