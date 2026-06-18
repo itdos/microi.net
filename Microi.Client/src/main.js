@@ -41,9 +41,14 @@ import { initThemeColor } from "./utils/theme-color";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
+import microApp from "@micro-zoe/micro-app";
 
 // 初始化主题色系统（必须在样式加载后执行）
 initThemeColor();
+
+// 前端微服务运行时。MicroApp 用于承载按租户从数据库/独立地址发布的 Vue3 定制页面。
+microApp.start();
+window.microApp = microApp;
 
 // 创建 Vue 3 应用实例
 const app = createApp(App);

@@ -27,6 +27,35 @@ namespace Microi.net
         {
             return string.Concat("Microi:", osClient, prefix, key.ToLowerInvariant());
         }
+        private static int IntOrDefaultWhenMissing(JObject param, string name, int defaultValue)
+        {
+            var token = param?[name];
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            {
+                return defaultValue;
+            }
+            var raw = token.ToString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return defaultValue;
+            }
+            if (int.TryParse(raw, out var value))
+            {
+                return value;
+            }
+            if (token.Type == JTokenType.Boolean)
+            {
+                return token.Val<bool>() ? 1 : 0;
+            }
+            return defaultValue;
+        }
+
+        private static void EnsureDiyFieldVisibilityDefaults(JObject param)
+        {
+            param["Visible"] = IntOrDefaultWhenMissing(param, "Visible", 1);
+            param["AppVisible"] = IntOrDefaultWhenMissing(param, "AppVisible", 1);
+        }
+
         public string CacheKeySqlCount(string osClient, string tableIdOrName, string sqlCount, List<System.Data.Common.DbParameter> sqlParams = null)
         {
             if (sqlCount.DosIsNullOrWhiteSpace())
@@ -698,6 +727,7 @@ namespace Microi.net
             try
             {
                 JObject param = await DefaultParam2(JsonHelper.ToJObject(dynamicParam));
+                EnsureDiyFieldVisibilityDefaults(param);
                 var lang = DiyMessage.Lang;
                 if (param["_Lang"] == null || param["_Lang"].Val<string>().DosIsNullOrWhiteSpace())
                 {
