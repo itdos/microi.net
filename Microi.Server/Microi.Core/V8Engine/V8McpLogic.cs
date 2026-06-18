@@ -4150,6 +4150,73 @@ namespace Microi.net
                     return new DosResult<object>(1, new { UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }, "");
                 }
 
+                var directFieldNames = new HashSet<string>
+                {
+                    "Label", "Component", "Visible", "AppVisible", "Readonly", "NotEmpty",
+                    "Unique", "Encrypt", "Sort", "FormWidth", "TableWidth", "Placeholder",
+                    "DefaultValue", "Tab", "Data", "Config", "Description", "InTableEdit",
+                    "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm"
+                };
+                var locatorNames = new HashSet<string> { "OsClient", "Id", "TableId", "TableName", "Name", "_InvokeType" };
+                var nonLocatorProps = patch.Properties()
+                    .Where(prop => !locatorNames.Contains(prop.Name))
+                    .Select(prop => prop.Name)
+                    .ToList();
+                var canDirectPatch = nonLocatorProps.Count > 0 && nonLocatorProps.All(name => directFieldNames.Contains(name));
+                if (canDirectPatch)
+                {
+                    var fieldId = await ResolveFieldIdAsync();
+                    if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "未找到字段，无法更新字段属性");
+                    var directPatch = new JObject { ["OsClient"] = osClient, ["Id"] = fieldId };
+                    foreach (var prop in patch.Properties())
+                    {
+                        if (directFieldNames.Contains(prop.Name))
+                        {
+                            directPatch[prop.Name] = prop.Value;
+                        }
+                    }
+                    var directResult = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", directPatch);
+                    if (directResult.Code != 1) return new DosResult<object>(0, null, "更新字段属性失败：" + directResult.Msg);
+                    return new DosResult<object>(1, new { UpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }, "");
+                }
+
+                async Task<JObject> ResolveFieldModelAsync()
+                {
+                    var fieldId = await ResolveFieldIdAsync();
+                    if (fieldId.DosIsNullOrWhiteSpace()) return null;
+                    var fieldLookup = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                    {
+                        OsClient = osClient,
+                        Id = fieldId
+                    });
+                    return fieldLookup.Code == 1 && fieldLookup.Data != null ? JObject.FromObject(fieldLookup.Data) : null;
+                }
+
+                var existingField = await ResolveFieldModelAsync();
+                if (existingField == null) return new DosResult<object>(0, null, "未找到字段，无法更新字段属性");
+                p.Id = existingField["Id"].Val<string>();
+                p.TableId = existingField["TableId"].Val<string>();
+                p.Name = patch["Name"] != null ? p.Name : existingField["Name"].Val<string>();
+                p.Label = patch["Label"] != null ? p.Label : existingField["Label"].Val<string>();
+                p.Type = patch["Type"] != null ? p.Type : existingField["Type"].Val<string>();
+                p.Component = patch["Component"] != null ? p.Component : existingField["Component"].Val<string>();
+                p.Visible = patch["Visible"] != null ? p.Visible : existingField["Visible"]?.Val<int>();
+                p.AppVisible = patch["AppVisible"] != null ? p.AppVisible : existingField["AppVisible"]?.Val<int>();
+                p.Readonly = patch["Readonly"] != null ? p.Readonly : existingField["Readonly"]?.Val<int>();
+                p.NotEmpty = patch["NotEmpty"] != null ? p.NotEmpty : existingField["NotEmpty"]?.Val<int>();
+                p.Unique = patch["Unique"] != null ? p.Unique : existingField["Unique"]?.Val<int>();
+                p.Encrypt = patch["Encrypt"] != null ? p.Encrypt : existingField["Encrypt"]?.Val<int>();
+                p.Sort = patch["Sort"] != null ? p.Sort : existingField["Sort"]?.Val<int>();
+                p.FormWidth = patch["FormWidth"] != null ? p.FormWidth : existingField["FormWidth"]?.Val<int?>();
+                p.TableWidth = patch["TableWidth"] != null ? p.TableWidth : existingField["TableWidth"]?.Val<int>();
+                p.Placeholder = patch["Placeholder"] != null ? p.Placeholder : existingField["Placeholder"].Val<string>();
+                p.DefaultValue = patch["DefaultValue"] != null ? p.DefaultValue : existingField["DefaultValue"].Val<string>();
+                p.Tab = patch["Tab"] != null ? p.Tab : existingField["Tab"].Val<string>();
+                p.Data = patch["Data"] != null ? p.Data : existingField["Data"].Val<string>();
+                p.Config = patch["Config"] != null ? p.Config : existingField["Config"].Val<string>();
+                p.Description = patch["Description"] != null ? p.Description : existingField["Description"].Val<string>();
+                p.InTableEdit = patch["InTableEdit"] != null ? p.InTableEdit : existingField["InTableEdit"]?.Val<int>();
+
                 var r = await MicroiEngine.FormEngine.UptDiyField(p);
                 if (r.Code != 1) return new DosResult<object>(r.Code, r.Data, r.Msg);
 
@@ -4211,6 +4278,7 @@ namespace Microi.net
                 {
                     OsClient = osClient,
                     _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort",
+                        "Visible", "AppVisible", "FormWidth", "TableWidth",
                         "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm", "UpdateTime" },
                     _Where = where,
                     _OrderBy = "Sort",

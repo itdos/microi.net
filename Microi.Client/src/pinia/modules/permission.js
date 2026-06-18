@@ -28,6 +28,7 @@ const pathMappings = {
     // form 相关映射
     "/microi.net/diy-form-page": "/diy/diy-form-page",
     "/diy/diy-components/iframe": "/form-engine/diy-components/iframe",
+    "/micro-app/host": "/micro-app/host",
     // system 相关映射
     "/itdos/system/sys-log": "/system/sys-log",
     "/itdos/system/sys-monitor": "/system/sys-monitor",
@@ -77,9 +78,31 @@ function isIframeMenu(item) {
     return item && (item.OpenType === "Iframe" || item.OpenType === "iframe" || (item.Url && item.Url.startsWith("/iframe/")));
 }
 
+function isMicroAppMenu(item) {
+    if (!item) return false;
+    const openType = String(item.OpenType || "").toLowerCase();
+    return openType === "microapp"
+        || openType === "micro-app"
+        || openType === "micro_app"
+        || (!DiyCommon.IsNull(item.ComponentPath) && String(item.ComponentPath).indexOf("/micro-app/host") > -1);
+}
+
+function appendMicroAppMeta(meta, item) {
+    meta.OpenType = item.OpenType;
+    meta.Url = item.Url;
+    meta.UrlApiEngineId = item.UrlApiEngineId;
+    meta.ComponentPath = item.ComponentPath;
+    meta.MicroAppUrl = item.MicroAppUrl;
+    meta.MicroAppUrlApiEngineId = item.MicroAppUrlApiEngineId;
+    return meta;
+}
+
 function GetComponent(item) {
     if (DiyCommon.IsNull(item.ComponentPath)) {
         return null;
+    }
+    if (item.ComponentPath.indexOf("micro-app/host") > -1) {
+        return () => import("@/views/micro-app/host.vue");
     }
     // 如果是微服务，也要返回 Null
     if (item.IsMicroiService) {
@@ -103,6 +126,9 @@ function GetComponent(item) {
     }
     if (item.ComponentPath.indexOf("diy/diy-table") > -1) {
         return DiyTable;
+    }
+    if (item.ComponentPath.indexOf("micro-app/host") > -1) {
+        return () => import("@/views/micro-app/host.vue");
     }
 
     // 标准化组件路径
@@ -180,6 +206,13 @@ function MenuBuild(result, data, isFater) {
                 } else {
                     item.Url = normalizeIframeRouteUrl(item.Url);
                 }
+            } else if (isMicroAppMenu(item)) {
+                item.MicroAppUrl = item.Url;
+                item.MicroAppUrlApiEngineId = item.UrlApiEngineId;
+                item.ComponentPath = "/micro-app/host";
+                if (DiyCommon.IsNull(item.Url) || item.Url.startsWith("http://") || item.Url.startsWith("https://") || item.Url.startsWith("/micro-app/")) {
+                    item.Url = "/micro-app-host/" + DiyCommon.GuidRemoveSing(item.Id);
+                }
             } else {
                 if (item.Url.indexOf("?") > -1) {
                     item.UrlParam = item.Url.split("?")[1];
@@ -209,7 +242,7 @@ function MenuBuild(result, data, isFater) {
                     name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
                     path: item.Url,
                     component: component,
-                    meta: {
+                    meta: appendMicroAppMeta({
                         Id: item.Id,
                         DiyTableId: item.DiyTableId,
                         Display: item.Display,
@@ -217,7 +250,7 @@ function MenuBuild(result, data, isFater) {
                         UrlParam: item.UrlParam,
                         title: item.Name,
                         icon: item.IconClass ? item.IconClass : ""
-                    },
+                    }, item),
                     children: []
                 };
 
@@ -234,7 +267,7 @@ function MenuBuild(result, data, isFater) {
                             path: coopyItem.Url,
                             component: GetComponent(coopyItem),
                             name: "menu_" + DiyCommon.GuidRemoveSing(coopyItem.Id),
-                            meta: {
+                            meta: appendMicroAppMeta({
                                 Id: coopyItem.Id,
                                 DiyTableId: coopyItem.DiyTableId,
                                 Display: coopyItem.Display,
@@ -242,7 +275,7 @@ function MenuBuild(result, data, isFater) {
                                 UrlParam: coopyItem.UrlParam,
                                 title: coopyItem.Name,
                                 icon: coopyItem.IconClass ? coopyItem.IconClass : ""
-                            }
+                            }, coopyItem)
                         }
                     ];
                     if (item._Child && item._Child.length == 1) {
@@ -271,7 +304,7 @@ function MenuBuild(result, data, isFater) {
                         Link: coopyItem.Link,
                         path: coopyItem.Url,
                         name: "menu_" + DiyCommon.GuidRemoveSing(coopyItem.Id),
-                        meta: {
+                        meta: appendMicroAppMeta({
                             Id: coopyItem.Id,
                             DiyTableId: coopyItem.DiyTableId,
                             Display: coopyItem.Display,
@@ -279,7 +312,7 @@ function MenuBuild(result, data, isFater) {
                             UrlParam: coopyItem.UrlParam,
                             title: coopyItem.Name,
                             icon: coopyItem.IconClass ? coopyItem.IconClass : ""
-                        }
+                        }, coopyItem)
                     };
                     if (component != null) {
                         menu.component = component;
@@ -298,7 +331,7 @@ function MenuBuild(result, data, isFater) {
                         path: item.Url,
                         component: component,
                         name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
-                        meta: {
+                        meta: appendMicroAppMeta({
                             Id: item.Id,
                             DiyTableId: item.DiyTableId,
                             Display: item.Display,
@@ -306,7 +339,7 @@ function MenuBuild(result, data, isFater) {
                             UrlParam: item.UrlParam,
                             title: item.Name,
                             icon: item.IconClass ? item.IconClass : ""
-                        },
+                        }, item),
                         children: []
                     };
                     MenuBuild(menu.children, item._Child, false);

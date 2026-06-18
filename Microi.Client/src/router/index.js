@@ -243,6 +243,19 @@ export const asyncRoutes = [
             }
         ]
     },
+    {
+        path: "/ai-workflow",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/ai-workflow",
+                name: "ai_workflow",
+                meta: { title: "AI工作流总览", keepAlive: false },
+                component: () => import("@/views/ai-workflow/index.vue")
+            }
+        ]
+    },
     // 业务架构蓝图（Business Blueprint）
     {
         path: "/blueprint/list",
@@ -253,7 +266,7 @@ export const asyncRoutes = [
                 path: "/blueprint/list",
                 name: "blueprint_list",
                 meta: { title: "业务架构蓝图", keepAlive: false },
-                component: () => import("@/views/blueprint/BlueprintList.vue")
+                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
@@ -280,7 +293,7 @@ export const asyncRoutes = [
                 path: "/state-machine/list",
                 name: "state_machine_list",
                 meta: { title: "状态机", keepAlive: false },
-                component: () => import("@/views/state-machine/StateMachineList.vue")
+                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
@@ -307,7 +320,7 @@ export const asyncRoutes = [
                 path: "/flow-engine/list",
                 name: "flow_engine_list",
                 meta: { title: "自动化流程", keepAlive: false },
-                component: () => import("@/views/flow-engine/FlowList.vue")
+                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
@@ -334,7 +347,7 @@ export const asyncRoutes = [
                 path: "/process-mining",
                 name: "process_mining",
                 meta: { title: "过程挖掘", keepAlive: false },
-                component: () => import("@/views/process-mining/ProcessMiningView.vue")
+                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
