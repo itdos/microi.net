@@ -40,7 +40,7 @@ namespace Microi.net.Api
             }
 
             var externalUrl = service["MsUrl"].Val<string>();
-            if (!IsDbStorage(service) && !externalUrl.DosIsNullOrWhiteSpace())
+            if (IsExternalStorage(service) && !externalUrl.DosIsNullOrWhiteSpace())
             {
                 return Redirect(externalUrl);
             }
@@ -68,20 +68,25 @@ namespace Microi.net.Api
             {
                 return NotFound($"MicroApp is not enabled or not found: {appKey}");
             }
-            if (!IsDbStorage(service))
+            if (IsExternalStorage(service))
             {
                 var externalUrl = service["MsUrl"].Val<string>();
                 return externalUrl.DosIsNullOrWhiteSpace() ? NotFound($"MicroApp has no database assets: {appKey}") : Redirect(externalUrl);
+            }
+            if (!IsFileStorage(service) && !IsDbStorage(service))
+            {
+                return NotFound($"MicroApp has no managed assets: {appKey}");
             }
 
             var currentVersion = ResolveVersion(service);
             assetPath = NormalizeAssetPath(assetPath);
             JObject asset = null;
+            Func<JObject, string, JObject> findAsset = IsFileStorage(service) ? FindFileAsset : FindAsset;
 
             if (!version.DosIsNullOrWhiteSpace() && !string.Equals(version, currentVersion, StringComparison.OrdinalIgnoreCase))
             {
                 var unversionedAssetPath = CombineAssetPath(version, assetPath);
-                asset = FindAsset(service, unversionedAssetPath);
+                asset = findAsset(service, unversionedAssetPath);
                 if (asset == null)
                 {
                     return NotFound($"MicroApp version is not current: {appKey}@{version}");
@@ -90,16 +95,49 @@ namespace Microi.net.Api
             }
             else
             {
-                asset = FindAsset(service, assetPath);
+                asset = findAsset(service, assetPath);
             }
 
             if (asset == null && assetPath.Equals("index.html", StringComparison.OrdinalIgnoreCase))
             {
-                asset = FindAsset(service, ResolveEntryPath(service));
+                asset = findAsset(service, ResolveEntryPath(service));
             }
             if (asset == null)
             {
                 return NotFound($"MicroApp asset not found: {appKey}@{currentVersion}/{assetPath}");
+            }
+
+            if (IsFileStorage(service))
+            {
+                var inlineBase64 = GetText(asset, "contentBase64", "ContentBase64");
+                if (!inlineBase64.DosIsNullOrWhiteSpace())
+                {
+                    byte[] inlineBytes;
+                    try
+                    {
+                        inlineBytes = Convert.FromBase64String(inlineBase64);
+                    }
+                    catch
+                    {
+                        return StatusCode(500, $"MicroApp inline asset base64 is invalid: {assetPath}");
+                    }
+
+                    var inlineContentType = GetText(asset, "contentType", "ContentType");
+                    if (inlineContentType.DosIsNullOrWhiteSpace())
+                    {
+                        inlineContentType = GuessContentType(assetPath);
+                    }
+                    SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                    return File(inlineBytes, inlineContentType);
+                }
+
+                var redirectUrl = await ResolveFileAssetUrl(osClient, asset);
+                if (redirectUrl.DosIsNullOrWhiteSpace())
+                {
+                    return NotFound($"MicroApp file asset has no URL: {assetPath}");
+                }
+                SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                return Redirect(redirectUrl);
             }
 
             var contentBase64 = GetText(asset, "contentBase64", "ContentBase64");
@@ -124,15 +162,7 @@ namespace Microi.net.Api
                 contentType = GuessContentType(assetPath);
             }
 
-            var sha256 = GetText(asset, "sha256", "Sha256");
-            if (!sha256.DosIsNullOrWhiteSpace())
-            {
-                Response.Headers["ETag"] = $"\"{sha256}\"";
-            }
-            Response.Headers["X-Microi-MicroApp"] = $"{appKey}@{currentVersion}";
-            Response.Headers["Cache-Control"] = assetPath.Equals("index.html", StringComparison.OrdinalIgnoreCase)
-                ? "no-cache, no-store, must-revalidate"
-                : "public, max-age=31536000, immutable";
+            SetAssetHeaders(appKey, currentVersion, assetPath, asset);
 
             return File(bytes, contentType);
         }
@@ -166,7 +196,7 @@ namespace Microi.net.Api
                 return Ok(new DosResult(0, null, "Requested version is not current."));
             }
 
-            var entryUrl = IsDbStorage(service)
+            var entryUrl = IsManagedStorage(service)
                 ? BuildAssetUrl(osClient, appKey, resolvedVersion, ResolveEntryPath(service))
                 : service["MsUrl"].Val<string>();
 
@@ -296,13 +326,62 @@ namespace Microi.net.Api
                 return storageMode.Equals("db", StringComparison.OrdinalIgnoreCase)
                     || storageMode.Equals("database", StringComparison.OrdinalIgnoreCase);
             }
-            var assetsJson = service == null ? "" : service["AssetsJson"].Val<string>();
-            return !assetsJson.DosIsNullOrWhiteSpace();
+            return HasDbAssetBundle(service);
+        }
+
+        private static bool IsFileStorage(JObject service)
+        {
+            var storageMode = service?["StorageMode"].Val<string>();
+            if (storageMode.DosIsNullOrWhiteSpace()) return false;
+            return storageMode.Equals("file", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("hdfs", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("oss", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("cdn", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("object", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("objectstorage", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsManagedStorage(JObject service)
+        {
+            return IsFileStorage(service) || IsDbStorage(service);
+        }
+
+        private static bool IsExternalStorage(JObject service)
+        {
+            return !IsManagedStorage(service);
+        }
+
+        private static bool HasDbAssetBundle(JObject service)
+        {
+            var assets = ReadAssets(service);
+            foreach (var item in assets)
+            {
+                if (item is JObject asset && !GetText(asset, "contentBase64", "ContentBase64").DosIsNullOrWhiteSpace())
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static JObject FindAsset(JObject service, string assetPath)
         {
             var assets = ReadAssets(service);
+            foreach (var item in assets)
+            {
+                if (item is not JObject asset) continue;
+                var path = NormalizeAssetPath(GetText(asset, "path", "Path"));
+                if (path.Equals(assetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return asset;
+                }
+            }
+            return null;
+        }
+
+        private static JObject FindFileAsset(JObject service, string assetPath)
+        {
+            var assets = ReadManifestAssets(service);
             foreach (var item in assets)
             {
                 if (item is not JObject asset) continue;
@@ -331,6 +410,86 @@ namespace Microi.net.Api
                 return new JArray();
             }
             return new JArray();
+        }
+
+        private static JArray ReadManifestAssets(JObject service)
+        {
+            var raw = service?["AssetManifestJson"].Val<string>();
+            if (raw.DosIsNullOrWhiteSpace()) return new JArray();
+            try
+            {
+                var token = JToken.Parse(raw);
+                if (token is JArray arr) return arr;
+                if (token is JObject obj && obj["assets"] is JArray assets) return assets;
+                if (token is JObject obj2 && obj2["Assets"] is JArray assets2) return assets2;
+            }
+            catch
+            {
+                return new JArray();
+            }
+            return new JArray();
+        }
+
+        private async Task<string> ResolveFileAssetUrl(string osClient, JObject asset)
+        {
+            var url = GetText(asset, "url", "Url", "fullPath", "FullPath", "fileUrl", "FileUrl", "publicUrl", "PublicUrl");
+            if (!url.DosIsNullOrWhiteSpace())
+            {
+                return await BuildPublicFileUrl(osClient, url);
+            }
+
+            var filePathName = GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath");
+            if (filePathName.DosIsNullOrWhiteSpace())
+            {
+                return "";
+            }
+            return await BuildPublicFileUrl(osClient, filePathName);
+        }
+
+        private async Task<string> BuildPublicFileUrl(string osClient, string filePathOrUrl)
+        {
+            var value = filePathOrUrl?.Trim();
+            if (value.DosIsNullOrWhiteSpace()) return "";
+            if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
+
+            var fileServer = await GetFileServer(osClient);
+            return $"{fileServer.TrimEnd('/')}/{value.TrimStart('/')}";
+        }
+
+        private static async Task<string> GetFileServer(string osClient)
+        {
+            try
+            {
+                dynamic result = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                if (result.Code == 1 && result.Data != null)
+                {
+                    var config = ToJObject(result.Data);
+                    var fileServer = config?["FileServer"].Val<string>();
+                    if (!fileServer.DosIsNullOrWhiteSpace()) return fileServer;
+                }
+            }
+            catch
+            {
+                // Use platform default below.
+            }
+            return "https://static.itdos.com";
+        }
+
+        private void SetAssetHeaders(string appKey, string currentVersion, string assetPath, JObject asset)
+        {
+            var sha256 = GetText(asset, "sha256", "Sha256");
+            if (!sha256.DosIsNullOrWhiteSpace())
+            {
+                Response.Headers["ETag"] = $"\"{sha256}\"";
+            }
+            Response.Headers["X-Microi-MicroApp"] = $"{appKey}@{currentVersion}";
+            Response.Headers["Cache-Control"] = assetPath.Equals("index.html", StringComparison.OrdinalIgnoreCase)
+                ? "no-cache, no-store, must-revalidate"
+                : "public, max-age=31536000, immutable";
         }
 
         private static string GetText(JObject obj, params string[] names)
