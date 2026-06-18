@@ -4279,7 +4279,7 @@ namespace Microi.net
                     OsClient = osClient,
                     _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort",
                         "Visible", "AppVisible", "FormWidth", "TableWidth",
-                        "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm", "UpdateTime" },
+                        "Data", "Config", "V8Code", "KeyupV8Code", "V8TmpEngineTable", "V8TmpEngineForm", "UpdateTime" },
                     _Where = where,
                     _OrderBy = "Sort",
                     _OrderByType = "ASC",
