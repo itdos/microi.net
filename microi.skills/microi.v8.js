@@ -531,6 +531,7 @@ export function createMicroiV8(options = {}) {
     webBase: '',
     fileServer: '',
     osClient: '',
+    token: '',
     tokenKey: 'microi_token',
     userKey: 'microi_user',
     loginUrl: '',
@@ -581,14 +582,16 @@ export function createMicroiV8(options = {}) {
   }
 
   function getToken() {
-    return storage.get(config.tokenKey) || '';
+    return config.token || storage.get(config.tokenKey) || '';
   }
 
   function setToken(token) {
+    config = { ...config, token: token || '' };
     storage.set(config.tokenKey, token || '');
   }
 
   function clearToken() {
+    config = { ...config, token: '' };
     storage.remove(config.tokenKey);
     storage.remove(config.userKey);
   }

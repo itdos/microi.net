@@ -36,6 +36,8 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 
 显式配置优先级最高；未指定时由 MCP 生成器或后端 `CreateModule` 兜底补齐，避免空白菜单配置。
 
+隐藏子表菜单规则：用于 `TableChild`、附件明细、微服务页面/路由子表等表单内嵌承载的 `sys_menu`，必须设置 `Display=0`、`AppDisplay=0`、`HasChild=0`。隐藏菜单不应再开启“是否有子集”，否则 PC/移动端菜单树会把上级业务菜单误判为空父菜单。
+
 ## 表单控件与布局
 
 表单控件以 `Microi.Client/src/views/form-engine/diy-field-component/` 和 `diy-component-list.json` 为事实源。当前常用组件包括：`Text`、`Guid`、`Textarea`、`NumberText`、`DateTime`、`Select`、`MultipleSelect`、`Radio`、`Checkbox`、`Switch`、`Rate`、`Progress`、`Slider`、`ColorPicker`、`AutoNumber`、`Button`、`Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText`、`CodeEditor`、`JsonTable`、`ImgUpload`、`FileUpload`、`Autocomplete`、`TagInput`、`Transfer`、`Cascader`、`Address`、`Department`、`SelectTree`、`TreeCheckbox`、`OpenTable`、`JoinTable`、`JoinForm`、`TableChild`、`Map`、`MapArea`、`Qrcode`、`FontAwesome`、`DevComponent`。

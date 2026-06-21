@@ -691,6 +691,7 @@ namespace Microi.net
                 DosResult result = await _iMicroiHDFS.GetPrivateFileUrl(new HDFSParam()
                 {
                     ClientModel = clientModel,
+                    Limit = param.Limit,
                     FileFullPath = param.FilePathName,
                     FileFullPaths = param.FilePathNames,
                     ReturnFileType = param.ReturnFileType

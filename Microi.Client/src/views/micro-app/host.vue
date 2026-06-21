@@ -19,6 +19,8 @@
             :url="entryUrl"
             :data="microAppData"
             :baseroute="baseRoute"
+            :default-page="microRoutePath || '/'"
+            router-mode="pure"
             keep-alive
         />
     </div>
@@ -48,6 +50,55 @@ function parseQueryString(queryString) {
     return result;
 }
 
+function normalizeMicroRoutePath(value) {
+    const routePath = safeDecode(value || "/").trim().replace(/^#/, "");
+    if (!routePath || routePath === "/") return "/";
+    return routePath.startsWith("/") ? routePath : "/" + routePath;
+}
+
+function parseMicroAppPath(value) {
+    const result = {
+        appKey: "",
+        version: "",
+        routePath: "",
+        isEntryUrl: false,
+        isFriendlyRoute: false
+    };
+    if (DiyCommon.IsNull(value)) return result;
+
+    const rawUrl = safeDecode(value).trim();
+    let parsedUrl = null;
+    try {
+        parsedUrl = new URL(rawUrl, window.location.origin);
+    } catch (error) {
+        parsedUrl = null;
+    }
+
+    const pathname = (parsedUrl ? parsedUrl.pathname : rawUrl.split(/[?#]/)[0]).replace(/\/+$/, "");
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments[0] !== "micro-app") return result;
+
+    const indexHtmlIndex = segments.findIndex((segment) => segment.toLowerCase() === "index.html");
+    if (indexHtmlIndex > -1) {
+        result.isEntryUrl = true;
+        result.appKey = safeDecode(segments[2] || "");
+        if (indexHtmlIndex > 3) {
+            result.version = safeDecode(segments[3] || "");
+        }
+    } else {
+        result.isFriendlyRoute = true;
+        result.appKey = safeDecode(segments[1] || "");
+        result.routePath = normalizeMicroRoutePath(segments.slice(2).map(safeDecode).join("/"));
+    }
+
+    if (parsedUrl) {
+        const routePath = parsedUrl.searchParams.get("microRoute") || parsedUrl.searchParams.get("routePath") || "";
+        if (routePath) result.routePath = normalizeMicroRoutePath(routePath);
+    }
+
+    return result;
+}
+
 function normalizeMicroAppName(value) {
     let name = String(value || "micro-app")
         .toLowerCase()
@@ -56,6 +107,24 @@ function normalizeMicroAppName(value) {
     if (!name) name = "micro-app";
     if (!/^[a-z]/.test(name)) name = "app-" + name;
     return name.substring(0, 64);
+}
+
+function removeMicroRouteQuery(url) {
+    if (DiyCommon.IsNull(url)) return "";
+    const rawUrl = String(url);
+    try {
+        const parsedUrl = new URL(rawUrl, window.location.origin);
+        parsedUrl.searchParams.delete("microRoute");
+        parsedUrl.searchParams.delete("routePath");
+        if (/^https?:\/\//i.test(rawUrl)) {
+            return parsedUrl.toString();
+        }
+        return parsedUrl.pathname + parsedUrl.search + parsedUrl.hash;
+    } catch (error) {
+        return rawUrl
+            .replace(/([?&])(microRoute|routePath)=[^&#]*&?/gi, "$1")
+            .replace(/[?&]$/, "");
+    }
 }
 
 function joinUrl(baseUrl, path) {
@@ -71,12 +140,14 @@ export default {
             error: "",
             entryUrl: "",
             appKey: "",
-            appVersion: ""
+            appVersion: "",
+            microRoutePath: ""
         };
     },
     computed: {
         microAppName() {
-            return normalizeMicroAppName(this.appKey || this.$route?.meta?.title || this.$route?.name);
+            const routeKey = this.$route?.meta?.Id || this.$route?.path || this.microRoutePath || "";
+            return normalizeMicroAppName(`${this.appKey || this.$route?.meta?.title || this.$route?.name}-${routeKey}`);
         },
         microAppKey() {
             return `${this.microAppName}@${this.entryUrl}`;
@@ -93,10 +164,13 @@ export default {
                 menuName: this.$route?.meta?.title || "",
                 appKey: this.appKey,
                 version: this.appVersion,
+                microRoute: this.microRoutePath,
                 route: {
                     path: this.$route?.path || "",
                     fullPath: this.$route?.fullPath || "",
-                    query: this.$route?.query || {}
+                    query: this.$route?.query || {},
+                    microRoute: this.microRoutePath,
+                    microRoutePath: this.microRoutePath
                 }
             };
         }
@@ -120,29 +194,53 @@ export default {
                 ...query
             };
 
-            const microAppUrl = safeDecode(all.src || all.url || meta.MicroAppUrl || meta.Url || "");
+            let microAppUrl = safeDecode(all.src || all.url || meta.MicroAppUrl || meta.Url || "");
             const urlApiEngineId = all.urlApiEngineId || meta.MicroAppUrlApiEngineId || meta.UrlApiEngineId || "";
             let appKey = all.appKey || all.AppKey || all.key || "";
             let version = all.version || all.Version || "";
+            let microRoutePath = safeDecode(all.microRoute || all.routePath || meta.MicroServiceRoutePath || meta.RoutePath || "");
+            const routePathConfig = parseMicroAppPath(route.path || "");
+
+            if (!appKey && routePathConfig.appKey) {
+                appKey = routePathConfig.appKey;
+            }
+            if (!microRoutePath && routePathConfig.routePath) {
+                microRoutePath = routePathConfig.routePath;
+            }
+
+            if (microAppUrl) {
+                const microAppUrlConfig = parseMicroAppPath(microAppUrl);
+                if (microAppUrlConfig.appKey) {
+                    appKey = microAppUrlConfig.appKey;
+                }
+                if (!version && microAppUrlConfig.version) {
+                    version = microAppUrlConfig.version;
+                }
+                if (!microRoutePath && microAppUrlConfig.routePath) {
+                    microRoutePath = microAppUrlConfig.routePath;
+                }
+                if (microAppUrlConfig.isFriendlyRoute) {
+                    microAppUrl = "";
+                }
+                try {
+                    const parsedUrl = new URL(microAppUrl, window.location.origin);
+                    if (!microRoutePath) {
+                        microRoutePath = safeDecode(parsedUrl.searchParams.get("microRoute") || parsedUrl.searchParams.get("routePath") || "");
+                    }
+                } catch (error) {
+                    // Keep the host tolerant of legacy relative values.
+                }
+            }
 
             if (!appKey && route.path && route.path.indexOf("/micro-app-host/") === 0) {
                 appKey = safeDecode(route.path.replace("/micro-app-host/", "").split("/")[0]);
             }
 
-            if (!appKey && microAppUrl) {
-                const match = microAppUrl.match(/\/micro-app\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/i);
-                if (match) {
-                    appKey = safeDecode(match[2]);
-                    if (!version && match[3] && match[3] !== "index.html") {
-                        version = safeDecode(match[3]);
-                    }
-                }
-            }
-
             return {
                 appKey: String(appKey || "").trim(),
                 version: String(version || "").trim(),
-                microAppUrl,
+                microRoutePath: normalizeMicroRoutePath(microRoutePath || "/"),
+                microAppUrl: removeMicroRouteQuery(microAppUrl),
                 urlApiEngineId: String(urlApiEngineId || "").trim()
             };
         },
@@ -155,6 +253,7 @@ export default {
                 const config = this.extractRouteConfig();
                 this.appKey = config.appKey;
                 this.appVersion = config.version;
+                this.microRoutePath = config.microRoutePath;
 
                 let url = config.microAppUrl;
                 if (config.urlApiEngineId) {

@@ -70,7 +70,7 @@
                         </div>
                         <span class="menu-item__name">{{ child.meta?.title || child.name }}</span>
                         <el-icon
-                            v-if="child.children && child.children.length > 0 && !isPhoneView"
+                            v-if="hasVisibleChildMenus(child) && !isPhoneView"
                             class="menu-item__arrow"
                         ><ArrowRight /></el-icon>
                     </div>
@@ -106,7 +106,7 @@
                     </div>
                     <span class="mci-cell__title">{{ item.meta?.title || item.name }}</span>
                     <el-icon
-                        v-if="item.children && item.children.length > 0"
+                        v-if="hasVisibleChildMenus(item)"
                         class="mci-cell__arrow"
                     ><ArrowRight /></el-icon>
                 </div>
@@ -200,9 +200,9 @@ watch(showSubMenu, (val) => {
 });
 
 const handleMenuClick = (menu) => {
-    if (menu.children && menu.children.length > 0) {
+    if (hasVisibleChildMenus(menu)) {
         currentSubMenu.value = menu;
-        currentSubMenuItems.value = menu.children;
+        currentSubMenuItems.value = getVisibleChildren(menu.children);
         subMenuStack.value = [menu];
         showSubMenu.value = true;
     } else {
@@ -211,10 +211,10 @@ const handleMenuClick = (menu) => {
 };
 
 const handleSubMenuClick = (item) => {
-    if (item.children && item.children.length > 0) {
+    if (hasVisibleChildMenus(item)) {
         subMenuStack.value.push(item);
         currentSubMenu.value = item;
-        currentSubMenuItems.value = item.children;
+        currentSubMenuItems.value = getVisibleChildren(item.children);
     } else {
         showSubMenu.value = false;
         navigateToMenu(item);
@@ -233,7 +233,11 @@ const navigateToMenu = (menu) => {
 
 const getVisibleChildren = (children) => {
     if (!children || !Array.isArray(children)) return [];
-    return children.filter(child => !!child.AppDisplay);
+    return children.filter(child => child.AppDisplay !== 0 && child.AppDisplay !== "0" && child.Display !== 0 && child.Display !== "0" && !child.hidden);
+};
+
+const hasVisibleChildMenus = (menu) => {
+    return getVisibleChildren(menu?.children).length > 0;
 };
 
 

@@ -241,3 +241,13 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 只保留 Vue3 写法，不新增 `Vue.prototype`、Vue2 条件编译或 Vuex 依赖。
 - 业务请求、Token、上传、资源 URL 解析统一委托 SDK 或 Microi.Client 现有平台请求层。
 - 后台仍使用 Element Plus；官网/产品站/文档站优先遵守 `microi.skills/ui-design/SKILL.md` 的 MCI-UI 策略。
+
+## Vue3 前端微服务宿主规则
+
+`sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
+
+同一个编译后的微服务可以绑定多个后台菜单和内部页面。`MicroAppHost` 的 `<micro-app name>` 必须包含菜单 Id、路由路径或其它实例维度，避免多个菜单共享同一个 appKey 时触发 `app name conflict`。入口 URL 中的 `microRoute/routePath` 只用于解析，最终应通过 `data.microRoute` 传给子应用，入口文件 URL 保持稳定。
+
+后台配置必须配套维护 `sys_microiservice_page` 路由子表，并在 `sys_microiservice` 表单上用隐藏子模块 + `TableChild` 显示页面/路由。`sys_menu` 选择微服务时要由前端 V8 事件实时加载页面列表，不能完全依赖 SQL 下拉里的表单变量替换。
+
+隐藏的 `TableChild`/子表菜单不得设置 `HasChild=1`。`Display=0` 或 `AppDisplay=0` 的菜单只用于表单子表承载，不应该让左侧菜单把上级业务菜单识别成空文件夹；前端动态路由和侧边栏判断父/子菜单时也必须只统计可见子菜单。
