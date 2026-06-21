@@ -214,7 +214,19 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", param._Lang));
             }
 
-            var bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
+            var usePrivateBucket = param.Limit != false;
+            var bucketName = usePrivateBucket
+                ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+            var endpoint = usePrivateBucket
+                ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+            var accessKeyId = usePrivateBucket
+                ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+            var accessKeySecret = usePrivateBucket
+                ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
             var config = new ClientConfiguration
             {
                 ConnectionTimeout = 5000,
@@ -229,9 +241,7 @@ namespace Microi.net
                     //如果是返回byte[]
                     if (param.ReturnFileType == "Byte")
                     {
-                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+                        ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret);
                         var ossObject = ossClient.GetObject(new GetObjectRequest(bucketName, param.FileFullPath.TrimStart('/')));
                         using (MemoryStream memStream = new MemoryStream())
                         {
@@ -243,27 +253,24 @@ namespace Microi.net
                     else
                     {
                         //如果是返回url，只给5秒钟时间
-                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
-                                config);
+                        ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
                         // 生成签名URL。
                         var req = new GeneratePresignedUriRequest(bucketName, param.FileFullPath.DosTrimStart('/'), SignHttpMethod.Get);
                         var uri = ossClient.GeneratePresignedUri(req);
                         //当OsClientNetwork=Internal时，使用的是局域网的oss地址AliOssPrivateEndpoint，返回的也是局域网临时url，因此要做替换。应该还有更好的解决方案，暂时不研究了。
                         //2024-07-24:支持https绑定域名访问私有桶
                         //var url = uri.AbsoluteUri.Replace("-internal.aliyuncs.com", ".aliyuncs.com");
-                        var url = clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>() + uri.PathAndQuery;
+                        var domain = usePrivateBucket
+                            ? clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>()
+                            : clientModel.OsClientModel["AliOssPublicDomain"].Val<string>();
+                        var url = domain + uri.PathAndQuery;
                         return new DosResult(1, url);
                     }
                 }
                 else
                 {
                     //如果是返回url，只给5秒钟时间
-                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
-                                config);
+                    ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
                     var listResult = new List<string>();
                     foreach (var fileFullPath in param.FileFullPaths)
                     {
@@ -273,7 +280,10 @@ namespace Microi.net
                         //当OsClientNetwork=Internal时，使用的是局域网的oss地址AliOssPrivateEndpoint，返回的也是局域网临时url，因此要做替换。应该还有更好的解决方案，暂时不研究了。
                         //2024-07-24:支持https绑定域名访问私有桶
                         //var url = uri.AbsoluteUri.Replace("-internal.aliyuncs.com", ".aliyuncs.com");
-                        var url = clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>() + uri.PathAndQuery;
+                        var domain = usePrivateBucket
+                            ? clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>()
+                            : clientModel.OsClientModel["AliOssPublicDomain"].Val<string>();
+                        var url = domain + uri.PathAndQuery;
                         listResult.Add(url);
                     }
                     return new DosResult(1, listResult);

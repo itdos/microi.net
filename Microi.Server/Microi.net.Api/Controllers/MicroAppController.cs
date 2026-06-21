@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace Microi.net.Api
@@ -20,6 +21,10 @@ namespace Microi.net.Api
     {
         private const string ServiceTable = "sys_microiservice";
         private const string DefaultVersion = "current";
+        private static readonly HttpClient PublicFileHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
 
         [HttpGet("~/micro-app/{osClient}/{appKey}/index.html")]
         [HttpHead("~/micro-app/{osClient}/{appKey}/index.html")]
@@ -39,7 +44,7 @@ namespace Microi.net.Api
                 return NotFound($"MicroApp is not enabled or not found: {appKey}");
             }
 
-            var externalUrl = service["MsUrl"].Val<string>();
+            var externalUrl = (service["MsUrl"].Val<string>() ?? "").Trim();
             if (IsExternalStorage(service) && !externalUrl.DosIsNullOrWhiteSpace())
             {
                 return Redirect(externalUrl);
@@ -70,8 +75,8 @@ namespace Microi.net.Api
             }
             if (IsExternalStorage(service))
             {
-                var externalUrl = service["MsUrl"].Val<string>();
-                return externalUrl.DosIsNullOrWhiteSpace() ? NotFound($"MicroApp has no database assets: {appKey}") : Redirect(externalUrl);
+                var externalUrl = (service["MsUrl"].Val<string>() ?? "").Trim();
+                return externalUrl.DosIsNullOrWhiteSpace() ? NotFound($"MicroApp has no external URL: {appKey}") : Redirect(externalUrl);
             }
             if (!IsFileStorage(service) && !IsDbStorage(service))
             {
@@ -136,6 +141,19 @@ namespace Microi.net.Api
                 {
                     return NotFound($"MicroApp file asset has no URL: {assetPath}");
                 }
+
+                var proxyBytes = await ReadFileAssetBytes(osClient, asset, redirectUrl);
+                if (proxyBytes != null)
+                {
+                    var proxyContentType = GetText(asset, "contentType", "ContentType");
+                    if (proxyContentType.DosIsNullOrWhiteSpace())
+                    {
+                        proxyContentType = GuessContentType(assetPath);
+                    }
+                    SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                    return File(proxyBytes, proxyContentType);
+                }
+
                 SetAssetHeaders(appKey, currentVersion, assetPath, asset);
                 return Redirect(redirectUrl);
             }
@@ -332,13 +350,11 @@ namespace Microi.net.Api
         private static bool IsFileStorage(JObject service)
         {
             var storageMode = service?["StorageMode"].Val<string>();
-            if (storageMode.DosIsNullOrWhiteSpace()) return false;
-            return storageMode.Equals("file", StringComparison.OrdinalIgnoreCase)
-                || storageMode.Equals("hdfs", StringComparison.OrdinalIgnoreCase)
-                || storageMode.Equals("oss", StringComparison.OrdinalIgnoreCase)
-                || storageMode.Equals("cdn", StringComparison.OrdinalIgnoreCase)
-                || storageMode.Equals("object", StringComparison.OrdinalIgnoreCase)
-                || storageMode.Equals("objectstorage", StringComparison.OrdinalIgnoreCase);
+            if (!storageMode.DosIsNullOrWhiteSpace())
+            {
+                return IsFileStorageMode(storageMode);
+            }
+            return HasFileAssetManifest(service);
         }
 
         private static bool IsManagedStorage(JObject service)
@@ -348,7 +364,30 @@ namespace Microi.net.Api
 
         private static bool IsExternalStorage(JObject service)
         {
+            var externalUrl = (service?["MsUrl"].Val<string>() ?? "").Trim();
+            if (externalUrl.DosIsNullOrWhiteSpace() || IsStorageSentinel(externalUrl))
+            {
+                return false;
+            }
             return !IsManagedStorage(service);
+        }
+
+        private static bool IsFileStorageMode(string storageMode)
+        {
+            return storageMode.Equals("file", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("hdfs", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("oss", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("cdn", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("object", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("objectstorage", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsStorageSentinel(string value)
+        {
+            return value.Equals("file", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("db", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("database", StringComparison.OrdinalIgnoreCase)
+                || IsFileStorageMode(value);
         }
 
         private static bool HasDbAssetBundle(JObject service)
@@ -357,6 +396,36 @@ namespace Microi.net.Api
             foreach (var item in assets)
             {
                 if (item is JObject asset && !GetText(asset, "contentBase64", "ContentBase64").DosIsNullOrWhiteSpace())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HasFileAssetManifest(JObject service)
+        {
+            var assets = ReadManifestAssets(service);
+            foreach (var item in assets)
+            {
+                if (item is not JObject asset) continue;
+                if (!GetText(
+                        asset,
+                        "filePathName",
+                        "FilePathName",
+                        "filePath",
+                        "FilePath",
+                        "url",
+                        "Url",
+                        "fullPath",
+                        "FullPath",
+                        "fileUrl",
+                        "FileUrl",
+                        "publicUrl",
+                        "PublicUrl",
+                        "contentBase64",
+                        "ContentBase64"
+                    ).DosIsNullOrWhiteSpace())
                 {
                     return true;
                 }
@@ -458,6 +527,76 @@ namespace Microi.net.Api
 
             var fileServer = await GetFileServer(osClient);
             return $"{fileServer.TrimEnd('/')}/{value.TrimStart('/')}";
+        }
+
+        private static async Task<byte[]> ReadFileAssetBytes(string osClient, JObject asset, string fileUrl)
+        {
+            var filePathName = GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath");
+            if (!filePathName.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var fileResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
+                    {
+                        OsClient = osClient,
+                        FilePathName = filePathName,
+                        Limit = false
+                    });
+                    if (fileResult.Code == 1 && fileResult.Data is byte[] fileBytes)
+                    {
+                        return fileBytes;
+                    }
+                }
+                catch
+                {
+                    // Fall back to public URL download below.
+                }
+            }
+            if (await IsTrustedPublicFileUrl(osClient, fileUrl))
+            {
+                return await DownloadPublicFileAssetBytes(fileUrl);
+            }
+            return null;
+        }
+
+        private static async Task<bool> IsTrustedPublicFileUrl(string osClient, string fileUrl)
+        {
+            if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var assetUri))
+            {
+                return false;
+            }
+            if (!assetUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && !assetUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var fileServer = await GetFileServer(osClient);
+            if (!Uri.TryCreate(fileServer, UriKind.Absolute, out var fileServerUri))
+            {
+                return false;
+            }
+            return assetUri.Host.Equals(fileServerUri.Host, StringComparison.OrdinalIgnoreCase)
+                && assetUri.Port == fileServerUri.Port;
+        }
+
+        private static async Task<byte[]> DownloadPublicFileAssetBytes(string fileUrl)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, fileUrl);
+                request.Headers.UserAgent.ParseAdd("Microi-MicroApp/1.0");
+                using var response = await PublicFileHttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+                return await response.Content.ReadAsByteArrayAsync();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static async Task<string> GetFileServer(string osClient)

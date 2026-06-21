@@ -14,7 +14,9 @@
         </template>
         <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body>
             <template #title>
-                <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" />
+                <span class="submenu-title-link" @click="handleSubMenuTitleClick(item)">
+                    <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" />
+                </span>
             </template>
             <sidebar-item
                 v-for="child in item.children?.filter((c) => c.Display !== 0)"
@@ -124,6 +126,18 @@ export default {
         getItemPath(item) {
             return item.path || "";
         },
+        handleSubMenuTitleClick(item) {
+            this.MenuClick(item);
+            const targetPath = this.resolvePath(item);
+            if (!targetPath || this.$route?.path === targetPath || this.$route?.fullPath === targetPath) {
+                return;
+            }
+            if (isExternal(targetPath)) {
+                window.open(targetPath, "_blank", "noopener,noreferrer");
+                return;
+            }
+            this.$router.push(targetPath).catch(() => {});
+        },
         resolvePath(routeModel) {
             // 兼容传入字符串或对象
             var routePath = typeof routeModel === "string" ? routeModel : routeModel.path || "";
@@ -158,3 +172,12 @@ export default {
     }
 };
 </script>
+
+<style scoped>
+.submenu-title-link {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+</style>

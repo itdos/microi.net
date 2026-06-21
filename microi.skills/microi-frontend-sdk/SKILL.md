@@ -180,3 +180,17 @@ SDK 负责平台能力，MCI-UI 负责产品界面。新的 Microi Vue3 项目�
 - `Microi.UI/src/web`：PC 官网和响应式网站组件。
 
 不要在 SDK 内解决界面状态、骨架屏、富文本间距或安全区布局。这一层应使用 MCI-UI 组件处理。
+
+## MicroApp 宿主 Token 同步
+
+Vue3 前端微服务通过 `window.microApp.getData()` 接收主平台上下文时，不能只把 `token` 放进普通配置对象后假设请求会自动携带。标准 `microi.v8.js` 必须支持 `config.token`，且 `getToken()` 要优先读取运行时 token，再回退到 `storage[tokenKey]`。
+
+微服务项目的 `configureMicroiV8()` 必须同时执行：
+
+```js
+const next = { apiBase: ctx.apiBase, osClient: ctx.osClient, token: ctx.token };
+microiV8.configure(next);
+if (ctx.token) microiV8.setToken?.(ctx.token);
+```
+
+验收时必须点击一个需要登录态的 `V8.FormEngine` 或 `V8.ApiEngine` 按钮，确认返回 `Code=1`，不能只看页面首屏渲染成功。

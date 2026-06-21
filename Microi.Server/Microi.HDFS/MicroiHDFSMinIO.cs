@@ -60,6 +60,9 @@ namespace Microi.net
                     minioClient.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());//"ap-southeast-1"
                 }
                 minioClient = minioClient.Build();
+                var bucketName = param.Limit == false
+                    ? clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>()
+                    : clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>();
 
                 //如果是单文件
                 if (!param.FileFullPath.DosIsNullOrWhiteSpace())
@@ -68,7 +71,7 @@ namespace Microi.net
                     if (param.ReturnFileType == "Byte")
                     {
                         GetObjectArgs getArgs = new GetObjectArgs()
-                                               .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>());
+                                               .WithBucket(bucketName);
                         //getArgs.WithFile(param.FilePathName.TrimStart('/'));
                         getArgs.WithObject(param.FileFullPath.TrimStart('/'));
 
@@ -88,7 +91,7 @@ namespace Microi.net
                     else//如果是返回Url
                     {
                         PresignedGetObjectArgs args = new PresignedGetObjectArgs()
-                                                .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>())
+                                                .WithBucket(bucketName)
                                                 .WithExpiry(60 * 30);//30分钟，后期建议动态配置
                         args = args.WithObject(param.FileFullPath.TrimStart('/'));
                         var url = await minioClient.PresignedGetObjectAsync(args);
@@ -99,7 +102,7 @@ namespace Microi.net
                 else //如果是多文件
                 {
                     PresignedGetObjectArgs args = new PresignedGetObjectArgs()
-                                                .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>())
+                                                .WithBucket(bucketName)
                                                 .WithExpiry(60 * 30);//30分钟，后期建议动态配置
                     var fileList = new List<string>();
                     foreach (var item in param.FileFullPaths)
