@@ -80,6 +80,7 @@ export default {
             formEngineKey: "",
             formDataId: "",
             fieldId: "",
+            canEdit: false,
             previewLoading: false,
             previewError: "",
             downloadLoading: false
@@ -114,6 +115,7 @@ export default {
         self.formEngineKey = self.safeDecode(self.$route.query.formEngineKey || self.$route.query.FormEngineKey || "");
         self.formDataId = self.safeDecode(self.$route.query.formDataId || self.$route.query.FormDataId || "");
         self.fieldId = self.safeDecode(self.$route.query.fieldId || self.$route.query.FieldId || "");
+        self.canEdit = self.parseBoolean(self.$route.query.canEdit || self.$route.query.allowEdit || self.$route.query.edit || self.$route.query.CanEdit);
         self.fileName = fileName || self.getFileNameFromUrl(sourceFilePath || routeFilePath);
         self.fileType = self.getFileExtension(self.fileName || sourceFilePath || routeFilePath);
         self.fileSize = fileSize;
@@ -227,25 +229,28 @@ export default {
             if (!filePath) {
                 return {};
             }
+            const documentType = this.getDocumentType(this.fileType);
+            const allowEdit = this.canEdit && documentType !== "pdf";
             return {
                 width: "100%",
                 height: "100%",
+                documentType,
                 document: {
                     fileType: this.fileType,
                     key: "document-" + Date.now(),
                     title: this.fileName || "查看文档",
                     url: filePath,
                     permissions: {
-                        edit: false,
+                        edit: allowEdit,
                         download: true
                     }
                 },
                 // documentType: "word",
                 // token : 'nas.OnlyOffice',
                 editorConfig: {
-                    callbackUrl: "https://example.com/url-to-callback.ashx",
+                    callbackUrl: (this.SysConfig && this.SysConfig.OnlyOfficeCallbackUrl) || "",
                     // mode: 'edit',
-                    mode: "view",
+                    mode: allowEdit ? "edit" : "view",
                     lang: "zh-CN",
                     user: {
                         id: currentUser.Id || "preview-user",
@@ -253,6 +258,19 @@ export default {
                     }
                 }
             };
+        },
+        getDocumentType(fileType) {
+            const type = String(fileType || "").toLowerCase();
+            if (type === "xls" || type === "xlsx" || type === "csv") {
+                return "cell";
+            }
+            if (type === "ppt" || type === "pptx") {
+                return "slide";
+            }
+            if (type === "pdf") {
+                return "pdf";
+            }
+            return "word";
         },
         formatFileSize(size) {
             if (typeof size === "string" && /[a-zA-Z\u4e00-\u9fa5]/.test(size)) {

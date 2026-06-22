@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using Dos.Common;
 using System;
+using System.IO;
 using System.Text;
 
 namespace Microi.net.Api
@@ -168,19 +169,39 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<IActionResult> UploadFileBase64([FromBody] JObject param)
         {
+            if (param == null && Request?.Body != null)
+            {
+                try
+                {
+                    Request.EnableBuffering();
+                    Request.Body.Position = 0;
+                    using var reader = new StreamReader(Request.Body, Encoding.UTF8, true, 1024, true);
+                    var rawBody = await reader.ReadToEndAsync();
+                    if (!rawBody.DosIsNullOrWhiteSpace())
+                    {
+                        param = JObject.Parse(rawBody);
+                    }
+                    Request.Body.Position = 0;
+                }
+                catch
+                {
+                    return Ok(new DosResult(0, null, "请求体不是有效的 JSON"));
+                }
+            }
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
             if (!ok) return Ok(new DosResult(0, null, msg));
-            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
             var result = await V8McpLogic.UploadFileBase64(
                 osClient,
-                param["FileName"].Val<string>(),
-                param["FileByteBase64"].Val<string>(),
-                param["Path"].Val<string>(),
+                param["FileName"]?.Val<string>(),
+                param["FileByteBase64"]?.Val<string>(),
+                param["Path"]?.Val<string>(),
                 param["Limit"]?.Val<bool>(),
                 param["Preview"]?.Val<bool>(),
-                param["TargetTable"].Val<string>(),
-                param["TargetId"].Val<string>(),
-                param["TargetField"].Val<string>(),
+                param["TargetTable"]?.Val<string>(),
+                param["TargetId"]?.Val<string>(),
+                param["TargetField"]?.Val<string>(),
                 token);
             return Ok(result);
         }

@@ -52,20 +52,24 @@ axiosInstance.interceptors.response.use(
 
 import { DiyCommon } from "@/utils/diy.common.js";
 
+export const resolveRuntimeUrl = (url) => {
+  if (!url) return url
+  const apiBase = DiyCommon.GetApiBase()
+  const osClient = DiyCommon.GetOsClient()
+  if (apiBase) {
+    url = url.replace('$ApiBase$', apiBase)
+  }
+  if (osClient) {
+    url = url.replace('$OsClient$', osClient)
+  }
+  return url
+}
+
 // 封装 get 请求
 export const get = async (url, params) => {
   try {
     //2025-12-20 Anderson：新增支持$ApiBase$、$OsClient$变量替换
-    if(url){
-      var apiBase = DiyCommon.GetApiBase();//localStorage.getItem('Microi.ApiBase');
-      var osClient = DiyCommon.GetOsClient();//localStorage.getItem('Microi.OsClient');
-      if(apiBase){
-          url = url.replace('$ApiBase$', apiBase);
-      }
-      if(osClient){
-          url = url.replace('$OsClient$', osClient);
-      }
-    }
+    url = resolveRuntimeUrl(url)
     const response = await axiosInstance.get(url, { params });
     return response.data;
   } catch (error) {
@@ -80,16 +84,7 @@ export const post = async (url, data) => {
 
   try {
     //2025-12-20 Anderson：新增支持$ApiBase$、$OsClient$变量替换
-    if(url){
-      var apiBase = DiyCommon.GetApiBase();//localStorage.getItem('Microi.ApiBase');
-      var osClient = DiyCommon.GetOsClient();//localStorage.getItem('Microi.OsClient');
-      if(apiBase){
-          url = url.replace('$ApiBase$', apiBase);
-      }
-      if(osClient){
-          url = url.replace('$OsClient$', osClient);
-      }
-    }
+    url = resolveRuntimeUrl(url)
     const response = await axiosInstance.post(url, data)
     return response.data
   } catch (error) {
@@ -101,6 +96,20 @@ export const post = async (url, data) => {
 }
 
 // 封装 put 请求
+export const getFile = async (url, params) => {
+  try {
+    url = resolveRuntimeUrl(url)
+    const response = await axiosInstance.get(url, {
+      params,
+      responseType: 'blob'
+    })
+    return response
+  } catch (error) {
+    console.error('GET file request error:', error)
+    return null
+  }
+}
+
 export const put = async (url, data) => {
 
   try {

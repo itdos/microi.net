@@ -187,6 +187,16 @@
                     <div class="form-item-tip">开启后保存时Path将存储完整URL（含文件服务器域名），而非相对路径</div>
                 </el-form-item>
 
+                <el-form-item label="Office在线预览">
+                    <el-switch v-model="configForm.EnableOfficePreview" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">开启后，Word、Excel、PPT、PDF等文件优先使用在线预览打开</div>
+                </el-form-item>
+
+                <el-form-item label="允许在线编辑">
+                    <el-switch v-model="configForm.AllowOfficeEdit" active-color="#ff6c04" inactive-color="#ccc" :disabled="!configForm.EnableOfficePreview" />
+                    <div class="form-item-tip">开启后会把允许编辑传给OnlyOffice；保存回调取决于平台OnlyOffice服务配置</div>
+                </el-form-item>
+
                 <el-divider content-position="left">V8引擎代码</el-divider>
 
                 <el-form-item label="上传前V8引擎代码">
@@ -339,6 +349,18 @@ const isImageFile = (fileNameOrUrl) => {
     const ext = clean.toLowerCase().split('.').pop();
     return IMAGE_EXTENSIONS.includes(ext);
 };
+const OFFICE_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+const isOfficeFile = (fileNameOrUrl) => {
+    if (!fileNameOrUrl) return false;
+    const clean = String(fileNameOrUrl).split('?')[0].split('#')[0].toLowerCase();
+    const ext = clean.includes('.') ? clean.split('.').pop() : '';
+    return OFFICE_EXTENSIONS.includes(ext);
+};
+const isOfficePreviewEnabled = () => {
+    const fileUploadConfig = props.field.Config?.FileUpload || {};
+    return fileUploadConfig.EnableOfficePreview !== false && !!(SysConfig.value?.Is_online_office || SysConfig.value?.OnlyOfficeApiBase);
+};
+const isOfficeEditAllowed = () => props.field.Config?.FileUpload?.AllowOfficeEdit === true;
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -349,6 +371,8 @@ const configForm = ref({
     Tips: '',
     MaxSize: 10,
     SaveFullPath: false,
+    EnableOfficePreview: true,
+    AllowOfficeEdit: false,
     BeforeUploadV8: '',
     UploadSuccessV8: ''
 });
@@ -375,6 +399,8 @@ const openConfig = () => {
         Tips: props.field.Config.FileUpload.Tips || '',
         MaxSize: props.field.Config.FileUpload.MaxSize || 10,
         SaveFullPath: props.field.Config.FileUpload.SaveFullPath || false,
+        EnableOfficePreview: props.field.Config.FileUpload.EnableOfficePreview !== false,
+        AllowOfficeEdit: props.field.Config.FileUpload.AllowOfficeEdit === true,
         BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
@@ -393,6 +419,8 @@ const saveConfig = () => {
     props.field.Config.FileUpload.Tips = configForm.value.Tips;
     props.field.Config.FileUpload.MaxSize = configForm.value.MaxSize;
     props.field.Config.FileUpload.SaveFullPath = configForm.value.SaveFullPath;
+    props.field.Config.FileUpload.EnableOfficePreview = configForm.value.EnableOfficePreview;
+    props.field.Config.FileUpload.AllowOfficeEdit = configForm.value.EnableOfficePreview && configForm.value.AllowOfficeEdit;
     
     // 保存Upload V8配置
     if (!props.field.Config.Upload) {
@@ -994,16 +1022,8 @@ const GoUrl = (url, fileMeta = null) => {
         imagePreviewVisible.value = true;
         return;
     }
-    if (
-        SysConfig.value &&
-        (SysConfig.value.Is_online_office || SysConfig.value.OnlyOfficeApiBase) &&
-        (url.indexOf('.doc') != -1 ||
-            url.indexOf('.docx') != -1 ||
-            url.indexOf('.xls') != -1 ||
-            url.indexOf('.xlsx') != -1 ||
-            url.indexOf('.ppt') != -1 ||
-            url.indexOf('.pptx') != -1)
-    ) {
+    const metaName = fileMeta?.Name || fileMeta?.name || '';
+    if (isOfficePreviewEnabled() && (isOfficeFile(url) || isOfficeFile(metaName))) {
         emit('CallbackGoUrl', buildOnlineOfficePayload(url, fileMeta));
     } else {
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -1024,7 +1044,8 @@ const buildOnlineOfficePayload = (url, fileMeta = null) => {
         formDataId: props.TableRowId || '',
         fieldId: props.field.Id || '',
         fileName: meta.Name || meta.name || GetFileName(props.modelValue) || GetFileName(url),
-        fileSize: meta.Size || meta.size || getSingleFileRawSize()
+        fileSize: meta.Size || meta.size || getSingleFileRawSize(),
+        canEdit: isOfficeEditAllowed()
     };
 };
 

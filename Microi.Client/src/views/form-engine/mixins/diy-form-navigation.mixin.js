@@ -76,7 +76,9 @@ export default {
             var formEngineKey = typeof file === "object" && file !== null ? file.formEngineKey || file.FormEngineKey : "";
             var formDataId = typeof file === "object" && file !== null ? file.formDataId || file.FormDataId : "";
             var fieldId = typeof file === "object" && file !== null ? file.fieldId || file.FieldId : "";
+            var canEdit = typeof file === "object" && file !== null ? file.canEdit || file.CanEdit || file.allowEdit || file.AllowEdit : "";
             var isPrivateFile = isPrivate === true || isPrivate === "true" || isPrivate === 1 || isPrivate === "1";
+            var canEditFile = canEdit === true || canEdit === "true" || canEdit === 1 || canEdit === "1";
             var targetUrl = fileName || filePathName || url;
             if (!url && !filePathName) {
                 return;
@@ -84,7 +86,7 @@ export default {
             if (
                 self.SysConfig &&
                 (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase) &&
-                (targetUrl.indexOf(".doc") != -1 || targetUrl.indexOf(".docx") != -1 || targetUrl.indexOf(".xls") != -1 || targetUrl.indexOf(".xlsx") != -1 || targetUrl.indexOf(".ppt") != -1 || targetUrl.indexOf(".pptx") != -1)
+                (targetUrl.indexOf(".pdf") != -1 || targetUrl.indexOf(".doc") != -1 || targetUrl.indexOf(".docx") != -1 || targetUrl.indexOf(".xls") != -1 || targetUrl.indexOf(".xlsx") != -1 || targetUrl.indexOf(".ppt") != -1 || targetUrl.indexOf(".pptx") != -1)
             ) {
                 var params = new URLSearchParams();
                 if (!isPrivateFile || !filePathName) {
@@ -114,6 +116,7 @@ export default {
                 if (fieldId) {
                     params.set("fieldId", fieldId);
                 }
+                params.set("canEdit", canEditFile ? "1" : "0");
                 self.$router.push(`/online-office?${params.toString()}`);
                 self.$emit("CallbackFormClose");
             } else {

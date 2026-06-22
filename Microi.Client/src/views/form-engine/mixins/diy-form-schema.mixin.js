@@ -171,6 +171,14 @@ export default {
                         var fm = field.Config.FileUpload.Multiple;
                         field.Config.FileUpload.Multiple = fm === true || fm === "true" || fm === 1 || fm === "1";
                     }
+                    if (field.Config.FileUpload && field.Config.FileUpload.EnableOfficePreview !== undefined) {
+                        var fop = field.Config.FileUpload.EnableOfficePreview;
+                        field.Config.FileUpload.EnableOfficePreview = fop === true || fop === "true" || fop === 1 || fop === "1";
+                    }
+                    if (field.Config.FileUpload && field.Config.FileUpload.AllowOfficeEdit !== undefined) {
+                        var foe = field.Config.FileUpload.AllowOfficeEdit;
+                        field.Config.FileUpload.AllowOfficeEdit = foe === true || foe === "true" || foe === 1 || foe === "1";
+                    }
                 }
             } catch (e) {}
 

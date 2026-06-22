@@ -250,4 +250,16 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 
 后台配置必须配套维护 `sys_microiservice_page` 路由子表，并在 `sys_microiservice` 表单上用隐藏子模块 + `TableChild` 显示页面/路由。`sys_menu` 选择微服务时要由前端 V8 事件实时加载页面列表，不能完全依赖 SQL 下拉里的表单变量替换。
 
+`sys_menu` 的“选择微服务页面”联动必须允许读取草稿页面，不能在前端 V8 或 SQL 下拉里固定过滤 `sys_microiservice_page.IsEnable=1`。新建微服务后页面子表会先以草稿存在，过滤已启用会导致后台菜单无法选择页面；运行期可用性由菜单发布状态、微服务编译产物和宿主加载结果共同校验。
+
 隐藏的 `TableChild`/子表菜单不得设置 `HasChild=1`。`Display=0` 或 `AppDisplay=0` 的菜单只用于表单子表承载，不应该让左侧菜单把上级业务菜单识别成空文件夹；前端动态路由和侧边栏判断父/子菜单时也必须只统计可见子菜单。
+
+VS Code 插件创建前端微服务时，目录名必须以用户输入的微服务名称为准；除非法定文件名字符需要替换，否则不得自动追加 `{OsClient}~` 前缀。微服务名称可以包含中文、英文、数字和常见符号；`MsKey/appKey` 必须从名称生成可读且稳定的唯一值，同租户下冲突时只追加 `-2`、`-3` 这类序号，禁止因为中文被过滤而退化成租户默认 Key 并覆盖其它微服务。
+
+`MsKey/appKey` 生成遇到中文时必须转成拼音安全串：前两个汉字取完整拼音，后续汉字取拼音首字母；英文和数字保留并转小写；空格、中文标点和常见特殊符号转成 `-` 或 `_`；最终只允许 ASCII 字母、数字、`-`、`_`。例如 `测试微服务六` 应生成类似 `ceshiwfwl`，禁止生成 `/micro-app/%E6%B5%8B...` 这类浏览器编码路由。
+
+创建前端微服务不能只落本地目录。插件必须在 `.microi-micro-app.json` 写入 `osClient/apiBaseUrl/appKey/name` 后立刻刷新左侧树，让目录立即可见，然后再执行远端草稿注册与 `npm install`；远端需注册一条未发布占位记录，并用 `IsEnable=0` 表示尚未推送编译产物。如果目录已存在但远端记录缺失，再次创建同名微服务时必须补注册。左侧树显示微服务项目时，必须优先读取 `.microi-micro-app.json` 的 `osClient/apiBaseUrl` 判断归属，不能再依赖 `{OsClient}` 或 `{OsClient}~` 目录前缀过滤，否则中文或自定义名称目录会被错误隐藏。
+
+推送前端微服务时必须按 `sys_microiservice.MsKey` 定位唯一微服务。如果本地项目的 `appKey` 已被远端其它微服务占用，必须先修正本地 `appKey` 再新增/更新，不得直接覆盖。`sys_microiservice.BuildVersion` 和 `sys_microiservice_page.BuildVersion` 从 `v1.0.0` 开始递增，规则为 `v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`；上传到分布式存储/CDN 的路径必须包含该版本号，禁止继续使用时间戳目录。
+
+VS Code 插件执行前端微服务构建前必须先安全清理当前项目自己的 `distDir`（默认 `dist`），并校验待删除目录位于微服务项目目录内；推送时只能收集本次干净构建产生的文件。禁止把旧 chunk、旧 hash 文件或历史构建残留写入 `AssetManifestJson` / `AssetsJson`，否则会造成数据库附件列表与当前 `index.html` 不一致。

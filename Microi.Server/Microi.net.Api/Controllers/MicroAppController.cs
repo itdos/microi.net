@@ -625,7 +625,7 @@ namespace Microi.net.Api
             {
                 Response.Headers["ETag"] = $"\"{sha256}\"";
             }
-            Response.Headers["X-Microi-MicroApp"] = $"{appKey}@{currentVersion}";
+            Response.Headers["X-Microi-MicroApp"] = $"{Uri.EscapeDataString(appKey ?? "")}@{Uri.EscapeDataString(currentVersion ?? "")}";
             Response.Headers["Cache-Control"] = assetPath.Equals("index.html", StringComparison.OrdinalIgnoreCase)
                 ? "no-cache, no-store, must-revalidate"
                 : "public, max-age=31536000, immutable";

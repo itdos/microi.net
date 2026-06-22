@@ -23,3 +23,6 @@ iTdos
 #   itdos-zhongfu-product — 中服生产环境
 # -----------------------------------------------
 
+# 本地发布项目：dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
+# 本地运行编译后的项目：dotnet Microi.net.Api.dll --urls=http://0.0.0.0:8080
+# 本地运行项目：dotnet run --launch-profile Microi.net.Api
