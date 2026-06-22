@@ -118,3 +118,5 @@ switch-env.ps1
 AI-Project/
 new-water-source-h5/
 Microi-MicroApp/
+logs
+.cache

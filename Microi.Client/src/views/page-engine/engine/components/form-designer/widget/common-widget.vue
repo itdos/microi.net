@@ -26,6 +26,7 @@
     style="position: relative"
   >
     <div
+      class="common-widget-body"
       :style="[{ width: '100%' }, { height: autoHeight }]"
       @dragstart="handleDragStart"
       @drop="handleDrop"
@@ -73,6 +74,13 @@
           :widgetObj="widgetObj"
         ></component>
       </Suspense>
+      <div
+        v-if="isDesignSelectMaskVisible"
+        class="widget-design-select-mask"
+        @click="handleSetCurWidget"
+        @mousedown.stop
+        @mouseup.stop
+      ></div>
       <!-- #####在这里面添加新组件代码 ,代码结束###### -->
 
       <div
@@ -137,6 +145,16 @@ const dynamicMarginTop = computed(() => {
 const selectedWidgetComponent = (type) => {
   return componentRaw[type + '-widget']
 }
+
+const isolatedPreviewWidgetTypes = new Set(['office', 'browser'])
+
+const isDesignSelectMaskVisible = computed(() => {
+  return (
+    formData.value.JsonObj.formConfig?.mask !== false &&
+    isolatedPreviewWidgetTypes.has(props.widgetObj.type) &&
+    curWidget.value !== props.widgetObj
+  )
+})
 
 //显示虚线
 const isShowBorder = computed(() => {
@@ -375,6 +393,22 @@ const startResizeMargin = useResizable(curWidget, 'marginTop').startResize
 </script>
 
 <style lang="scss" scoped>
+.common-widget-body {
+  position: relative;
+}
+
+.widget-design-select-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  cursor: pointer;
+  background: transparent;
+}
+
+.widget-design-select-mask:hover {
+  box-shadow: inset 0 0 0 1px var(--el-color-success-light-3);
+}
+
 .resize-handle {
   position: absolute;
   border-radius: 4px;

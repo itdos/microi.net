@@ -1,6 +1,6 @@
 export const office = {
   type: 'office',
-  label: 'Office',
+  label: 'Office/PDF预览',
   category: 0,
   show: 1,
   icon: '',
@@ -11,7 +11,7 @@ export const office = {
   widgetParams: [
     {
       sort: 0,
-      label: '数据源',
+      label: '接口引擎地址',
       type: 'textarea',
       value: '',
       typeOptions: {
@@ -23,7 +23,7 @@ export const office = {
     },
     {
       sort: 1,
-      label: '文件地址',
+      label: '静态文件地址',
       type: 'input',
       value: '',
       typeOptions: {}
@@ -52,7 +52,7 @@ export const office = {
     },
     {
       sort: 4,
-      label: '轮询秒数',
+      label: '轮询接口秒数',
       type: 'number',
       value: 0,
       typeOptions: { min: 0, max: 3600, step: 5 }

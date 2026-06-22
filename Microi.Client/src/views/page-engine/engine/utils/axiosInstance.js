@@ -6,6 +6,7 @@
 import axios from 'axios'
 import { usePageEngineStore } from '../stores/pageEngine'
 import { ElMessage } from 'element-plus'
+import { DiyCommon } from "@/utils/diy.common.js";
 // 创建 axios 实例
 const axiosInstance = axios.create({
   baseURL: '',
@@ -16,9 +17,14 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     const pageEngineStore = usePageEngineStore()
-    if (pageEngineStore.token) {
+    const token = pageEngineStore.token || DiyCommon.getToken?.() || ''
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${String(token).replace(/^Bearer\s+/i, '')}`
       config.headers['Authorization'] = `Bearer ${pageEngineStore.token}` // 在请求头中添加 token
       console.log('请求头已携带token')
+    }
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${String(token).replace(/^Bearer\s+/i, '')}`
     }
     return config
   },
@@ -49,8 +55,6 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-import { DiyCommon } from "@/utils/diy.common.js";
 
 export const resolveRuntimeUrl = (url) => {
   if (!url) return url

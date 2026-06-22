@@ -119,6 +119,16 @@ Pop-Location
 
 普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
 
+## 本地租户与测试凭据读取约定
+
+AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需要登录的接口前，必须先尝试从本地配置判断租户和测试账号，不要直接以“未登录无法测试”结束：
+
+1. 读取 `Microi.Server/Microi.net.Api/.microi-local`，得到当前环境名，例如 `<Environment>`。
+2. 读取 `Microi.Server/Microi.net.Api/appsettings.<Environment>.json`，或测试脚本传入的 `PW_APPSETTINGS_PATH`。
+3. 从 `DevLoginBypass.Accounts` 中按 `OsClient` 匹配账号密码；没有匹配时使用 `DevLoginBypass.DefaultAccount` / `DefaultPassword`。
+4. 如果环境变量 `MICROI_OSCLIENT`、`PW_OS_CLIENT`、`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD` 已显式设置，以环境变量为准。
+5. `appsettings.*.json`、`.microi-local`、Token、数据库连接串、Redis 密码都视为本地敏感配置。可以读取并用于自动化，但最终回复、日志摘要和测试报告中不得输出真实值，只能写 `<redacted>`、`本地配置账号` 或 `本地配置凭据`。
+
 ## DevLoginBypass 多租户约定
 
 当本地 E2E/API 自动化需要对多个租户免验证码登录时，在当前生效的 `appsettings.{Environment}.json` 中配置 `DevLoginBypass:Accounts`：
@@ -175,3 +185,20 @@ AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V
 - 其他工具（flake8、pytest 等）
 
 AI 执行 Python 脚本时应使用 `.venv\Scripts\python.exe`（Windows）而非系统 Python。
+## 后端代码改动后的重启验收
+
+AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果的后端源码、配置、控制器、服务、依赖项目或接口行为，任务收尾前必须完成一次“编译 + 重启本地后端 + 健康验证”，不要只用隔离输出目录 build 后结束。
+
+强制流程：
+
+1. 先执行后端编译验证。若 7266 正在运行导致 `bin/Debug/net10.0` DLL 被锁，可以先停止当前 `Microi.net.Api` 进程后重新编译；只有用户明确要求不中断正在运行服务时，才允许用临时输出目录作为补充验证，并必须说明运行服务尚未替换。
+2. 查找并停止占用 `https://localhost:7266` 或 `http://localhost:7266` 的本地 `Microi.net.Api` 进程。只停止 Microi 后端相关进程，不要误杀数据库、Redis、Node 前端或其它业务进程。
+3. 必须进入 `Microi.Server/Microi.net.Api` 目录启动：
+   ```powershell
+   dotnet run --launch-profile Microi.net.Api
+   ```
+   后台启动时使用 `Start-Process -WindowStyle Hidden`，并把日志写到 `.tmp/` 或 `.microi-e2e/` 等 gitignored 目录。
+4. 启动后轮询验证 `https://localhost:7266` 或 launch profile 实际地址可访问；至少确认端口已监听、进程存在、最近日志没有立即崩溃。涉及新增 API 时，再调用新增/受影响接口做一次真实请求。
+5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、7266 是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
+
+这条规则优先于“避免打断正在运行服务”的默认谨慎策略；本地开发联调场景下，用户通常需要运行中的 7266 后端加载最新代码。

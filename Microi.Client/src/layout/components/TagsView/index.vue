@@ -47,8 +47,12 @@
             <li @click="toggleFullScreen(selectedTag)">
                 <el-icon><FullScreen /></el-icon> {{ $t("tagsView.fullScreen") }}
             </li>
+            <li v-if="canShowModuleDesign(selectedTag)" @click="openModuleDesign(selectedTag)">
+                <el-icon><QuestionFilled /></el-icon> {{ $t("Msg.ModuleDesign") }}
+            </li>
             <!-- <li @click="closeAllTags(selectedTag)"><el-icon><CircleCloseFilled /></el-icon> {{ $t('tagsView.closeAll') }}</li> -->
         </ul>
+        <DiyFormFull v-if="showModuleDesignDialog" ref="refTagsViewMenuDesignDialog" />
     </div>
 </template>
 
@@ -208,12 +212,17 @@ import { generateTitle } from "@/utils/i18n";
 import path from "@/utils/path";
 import Item from "../Sidebar/Item"; // by itdos
 import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/pinia";
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 
 import { AppMain } from "../../components";
 
 export default {
-    components: { ScrollPane, Item, AppMain },
+    components: {
+        ScrollPane,
+        Item,
+        AppMain,
+        DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"))
+    },
     setup() {
         const diyStore = useDiyStore();
         const tagsViewStore = useTagsViewStore();
@@ -246,7 +255,8 @@ export default {
             tabs: [], //页签集合
             activeTab: "", //当前页签
             fullscreenTipVisible: false,
-            fullscreenTipTimer: null
+            fullscreenTipTimer: null,
+            showModuleDesignDialog: false
         };
     },
     watch: {
@@ -429,13 +439,13 @@ export default {
                 this.emitRefreshEvent();
             }
         },
-        emitRefreshEvent() {
+        emitRefreshEvent(payload = {}) {
             // 通过自定义事件触发刷新，传递 SysMenuId 精确匹配
-            const sysMenuId = this.$route.meta?.Id || this.$route.meta?.id;
+            const sysMenuId = payload.sysMenuId || this.$route.meta?.Id || this.$route.meta?.id;
             const event = new CustomEvent('page-refresh', {
                 detail: { 
                     sysMenuId: sysMenuId,
-                    fullPath: this.$route.fullPath,
+                    fullPath: payload.fullPath || this.$route.fullPath,
                     timestamp: Date.now() 
                 }
             });
@@ -498,7 +508,7 @@ export default {
             if (!tag) return;
 
             const menuMinWidth = 105;
-            const menuHeight = 155; // 预估菜单高度（4项）
+            const menuHeight = this.canShowModuleDesign(tag) ? 195 : 155; // 预估菜单高度
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
             
@@ -518,6 +528,56 @@ export default {
             this.top = top;
             this.visible = true;
             this.selectedTag = tag;
+        },
+        isAdminUser() {
+            const user = this.diyStore && this.diyStore.GetCurrentUser;
+            return !!(user && (user._IsAdmin || user.Level === 999 || user.Level === "999"));
+        },
+        getSysMenuIdFromTag(tag = {}) {
+            const meta = tag.meta || {};
+            const query = tag.query || {};
+            const params = tag.params || {};
+            return meta.Id || meta.id || meta.SysMenuId || meta.sysMenuId || query.SysMenuId || query.Id || params.SysMenuId || params.Id || "";
+        },
+        canShowModuleDesign(tag) {
+            return this.isAdminUser() && !!this.getSysMenuIdFromTag(tag);
+        },
+        openModuleDesign(tag) {
+            const sysMenuId = this.getSysMenuIdFromTag(tag);
+            this.closeMenu();
+            if (!sysMenuId) {
+                this.DiyCommon.Tips("当前标签未绑定模块，无法打开模块设计！", false);
+                return;
+            }
+            this.showModuleDesignDialog = true;
+            let retryCount = 0;
+            const maxRetries = 40;
+            const tryOpen = () => {
+                const dialog = this.$refs.refTagsViewMenuDesignDialog;
+                if (dialog && dialog.Init) {
+                    dialog.Init({
+                        TableName: "sys_menu",
+                        TableRowId: sysMenuId,
+                        DialogType: "Dialog",
+                        FormMode: "Edit",
+                        SubmitEvent: (formData, callback) => {
+                            if (callback) callback();
+                            this.emitRefreshEvent({
+                                sysMenuId,
+                                fullPath: tag.fullPath || this.$route.fullPath
+                            });
+                        }
+                    });
+                    return;
+                }
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(tryOpen, 50);
+                    return;
+                }
+                this.DiyCommon.Tips("模块设计表单加载失败，请稍后重试！", false);
+            };
+            this.$nextTick(tryOpen);
         },
         closeMenu() {
             this.visible = false;
