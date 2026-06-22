@@ -1,25 +1,61 @@
 export const office = {
   type: 'office',
   label: 'Office',
-  category: 0, //0 内置组件,1 自定义组件
-  show: 1, //是否展示 0隐藏,1展示
-  icon: '', // elementplus
-  img: '',  //图片图标 
+  category: 0,
+  show: 1,
+  icon: '',
+  img: '',
   widgetOption: {
-    height: 280, //高度
+    height: 720,
   },
   widgetParams: [
     {
       sort: 0,
-      label: '数据来源', //属性名称
-      type: 'textarea', //表单组件类型(input,textarea,number,color,select,switch,slider)
-      value: '', //表单组件内容
+      label: '数据源',
+      type: 'textarea',
+      value: '',
       typeOptions: {
-        rows: 3, //表单组件设置,多行文本框默认3行
+        rows: 3,
         dataJson: {
           filePath: new URL('../../assets/demo/demo.xlsx', import.meta.url).href
         }
       }
+    },
+    {
+      sort: 1,
+      label: '文件地址',
+      type: 'input',
+      value: '',
+      typeOptions: {}
+    },
+    {
+      sort: 2,
+      label: '文件类型',
+      type: 'select',
+      value: 'auto',
+      typeOptions: {
+        options: [
+          { label: '自动识别', value: 'auto' },
+          { label: 'PDF', value: 'pdf' },
+          { label: 'Word', value: 'docx' },
+          { label: 'Excel', value: 'xlsx' },
+          { label: 'PPT', value: 'pptx' }
+        ]
+      }
+    },
+    {
+      sort: 3,
+      label: '初始页码',
+      type: 'number',
+      value: 1,
+      typeOptions: { min: 1, max: 9999, step: 1 }
+    },
+    {
+      sort: 4,
+      label: '轮询秒数',
+      type: 'number',
+      value: 0,
+      typeOptions: { min: 0, max: 3600, step: 5 }
     }
   ],
 }
