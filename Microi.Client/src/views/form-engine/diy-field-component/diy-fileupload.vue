@@ -197,6 +197,11 @@
                     <div class="form-item-tip">开启后会把允许编辑传给OnlyOffice；保存回调取决于平台OnlyOffice服务配置</div>
                 </el-form-item>
 
+                <el-form-item label="开启Office文件版本号">
+                    <el-switch v-model="configForm.EnableOfficeVersion" active-color="#ff6c04" inactive-color="#ccc" :disabled="!configForm.EnableOfficePreview || !configForm.AllowOfficeEdit" />
+                    <div class="form-item-tip">开启后，上传 Office 文件会先生成初始版本 v1.0.0；在线编辑页手动保存后生成 v1.0.1、v1.0.2 等新版本，字段 JSON 的 Path 指向最新版本，Versions 保存历史版本路径</div>
+                </el-form-item>
+
                 <el-divider content-position="left">V8引擎代码</el-divider>
 
                 <el-form-item label="上传前V8引擎代码">
@@ -350,6 +355,7 @@ const isImageFile = (fileNameOrUrl) => {
     return IMAGE_EXTENSIONS.includes(ext);
 };
 const OFFICE_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+const INITIAL_OFFICE_VERSION = 'v1.0.0';
 const isOfficeFile = (fileNameOrUrl) => {
     if (!fileNameOrUrl) return false;
     const clean = String(fileNameOrUrl).split('?')[0].split('#')[0].toLowerCase();
@@ -361,6 +367,35 @@ const isOfficePreviewEnabled = () => {
     return fileUploadConfig.EnableOfficePreview !== false && !!(SysConfig.value?.Is_online_office || SysConfig.value?.OnlyOfficeApiBase);
 };
 const isOfficeEditAllowed = () => props.field.Config?.FileUpload?.AllowOfficeEdit === true;
+const isOfficeVersionEnabledForFile = (fileNameOrUrl) => {
+    const fileUploadConfig = props.field.Config?.FileUpload || {};
+    return fileUploadConfig.EnableOfficeVersion === true && isOfficeFile(fileNameOrUrl);
+};
+const withInitialOfficeVersion = (fileMeta = {}) => {
+    if (!fileMeta || typeof fileMeta !== 'object') return fileMeta;
+    const name = fileMeta.Name || fileMeta.FileName || fileMeta.name || '';
+    const path = fileMeta.Path || fileMeta.FilePathName || fileMeta.path || '';
+    if (!isOfficeVersionEnabledForFile(name || path)) return fileMeta;
+
+    const versions = Array.isArray(fileMeta.Versions) ? [...fileMeta.Versions] : [];
+    const hasInitialVersion = versions.some((item) => String(item?.Version || '').toLowerCase() === INITIAL_OFFICE_VERSION);
+    if (!hasInitialVersion) {
+        versions.unshift({
+            Version: INITIAL_OFFICE_VERSION,
+            Path: path,
+            Name: name || GetFileName(path),
+            Size: fileMeta.Size || fileMeta.size || '',
+            CreateTime: fileMeta.CreateTime || fileMeta.createTime || '',
+            IsLatest: true
+        });
+    }
+
+    return {
+        ...fileMeta,
+        Version: fileMeta.Version || INITIAL_OFFICE_VERSION,
+        Versions: versions
+    };
+};
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -373,6 +408,7 @@ const configForm = ref({
     SaveFullPath: false,
     EnableOfficePreview: true,
     AllowOfficeEdit: false,
+    EnableOfficeVersion: false,
     BeforeUploadV8: '',
     UploadSuccessV8: ''
 });
@@ -401,6 +437,7 @@ const openConfig = () => {
         SaveFullPath: props.field.Config.FileUpload.SaveFullPath || false,
         EnableOfficePreview: props.field.Config.FileUpload.EnableOfficePreview !== false,
         AllowOfficeEdit: props.field.Config.FileUpload.AllowOfficeEdit === true,
+        EnableOfficeVersion: props.field.Config.FileUpload.EnableOfficeVersion === true,
         BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
@@ -421,6 +458,7 @@ const saveConfig = () => {
     props.field.Config.FileUpload.SaveFullPath = configForm.value.SaveFullPath;
     props.field.Config.FileUpload.EnableOfficePreview = configForm.value.EnableOfficePreview;
     props.field.Config.FileUpload.AllowOfficeEdit = configForm.value.EnableOfficePreview && configForm.value.AllowOfficeEdit;
+    props.field.Config.FileUpload.EnableOfficeVersion = configForm.value.EnableOfficePreview && configForm.value.AllowOfficeEdit && configForm.value.EnableOfficeVersion;
     
     // 保存Upload V8配置
     if (!props.field.Config.Upload) {
@@ -737,6 +775,15 @@ const FileUploadSuccess = (result, file, fileList) => {
         const responseData = file.response?.Data || result.Data;
         const uploadedFileId = responseData.Id || file.uid;
         const uploadedFilePath = responseData.Path;
+        const uploadedFileMeta = withInitialOfficeVersion({
+            ...(responseData || {}),
+            Id: uploadedFileId,
+            Name: responseData.Name || file.name,
+            Size: responseData.Size,
+            CreateTime: responseData.CreateTime,
+            Path: uploadedFilePath,
+            State: 1
+        });
         
         if (getMultipleFlag.value) {
             // 多文件模式：查找并更新占位文件的State（与旧版本一致）
@@ -752,12 +799,7 @@ const FileUploadSuccess = (result, file, fileList) => {
             filesJson.forEach((element) => {
                 if (element.Id == file.uid) {
                     console.log('【多文件】✓ 找到匹配文件，更新State为1');
-                    element.Id = uploadedFileId;
-                    element.Size = responseData.Size;
-                    element.CreateTime = responseData.CreateTime;
-                    element.Path = uploadedFilePath;
-                    element.State = 1;
-                    element.Name = responseData.Name || file.name;
+                    Object.assign(element, uploadedFileMeta);
                     isHave = true;
                 }
             });
@@ -765,10 +807,7 @@ const FileUploadSuccess = (result, file, fileList) => {
             // 如果没找到，则添加新文件
             if (!isHave) {
                 console.log('【多文件】× 未找到匹配文件，添加新文件');
-                const pushed = responseData || {};
-                if (!pushed.Id) pushed.Id = file.uid;
-                pushed.State = 1;
-                filesJson.push(pushed);
+                filesJson.push(uploadedFileMeta);
             }
             
             // 更新FormDiyTableModel和emit
@@ -782,14 +821,14 @@ const FileUploadSuccess = (result, file, fileList) => {
         } else {
             // 单文件模式 - 存储为JSON字符串
             console.log('【单文件】上传成功，Path:', uploadedFilePath);
-            const singleFileObject = {
+            const singleFileObject = withInitialOfficeVersion({
                 Id: uploadedFileId,
                 Name: responseData.Name || file.name,
                 Size: responseData.Size,
                 CreateTime: responseData.CreateTime,
                 Path: uploadedFilePath,
                 State: 1
-            };
+            });
             // 存储为JSON字符串
             const jsonString = JSON.stringify(singleFileObject);
             props.FormDiyTableModel[props.field.Name] = jsonString;
@@ -1031,9 +1070,10 @@ const GoUrl = (url, fileMeta = null) => {
 };
 
 const buildOnlineOfficePayload = (url, fileMeta = null) => {
-    const meta = fileMeta || {};
+    const meta = fileMeta || getSingleFileMeta() || {};
     const sourceFilePath = meta.Path || meta.path || getFileStoragePath(meta);
     const isPrivateFile = props.field.Config?.FileUpload?.Limit === true;
+    const fileUploadConfig = props.field.Config?.FileUpload || {};
     return {
         url,
         filePath: url,
@@ -1045,7 +1085,9 @@ const buildOnlineOfficePayload = (url, fileMeta = null) => {
         fieldId: props.field.Id || '',
         fileName: meta.Name || meta.name || GetFileName(props.modelValue) || GetFileName(url),
         fileSize: meta.Size || meta.size || getSingleFileRawSize(),
-        canEdit: isOfficeEditAllowed()
+        canEdit: isOfficeEditAllowed(),
+        enableOfficeVersion: fileUploadConfig.EnableOfficeVersion === true,
+        fileMeta: meta
     };
 };
 

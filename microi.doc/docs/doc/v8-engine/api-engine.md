@@ -231,6 +231,65 @@ return {
 };
 ```
 
+### 界面引擎 Office/PDF 预览返回参数
+
+界面引擎的 `office` 组件可以把接口引擎作为动态数据源。接口既可以返回真实文件，也可以返回 JSON 文件描述；推荐返回 JSON `DosResult`，这样可以同时携带页码、文件缓存 Key、轮询状态等信息。
+
+常用返回字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `FileName` | 文件名，例如 `report.pdf` |
+| `ContentType` | 文件类型，PDF 使用 `application/pdf` |
+| `FileByteBase64` | 文件字节的 Base64。与 `FileUrl` 二选一 |
+| `FileUrl` | 文件访问地址。与 `FileByteBase64` 二选一 |
+| `PageNumber` / `InitialPage` | 打开 PDF 时要跳转的页码 |
+| `FileKey` / `CacheKey` | 当前文件版本标识。前端轮询时会带回 `CurrentFileKey`，接口可据此判断是否需要刷新 |
+| `NeedRefresh:false` / `NotModified:true` | 文件和页码未变化时返回，前端保持当前预览，不重新下载文件 |
+| `RefreshSeconds` | 建议轮询秒数。具体是否使用取决于界面引擎组件配置 |
+
+界面引擎轮询接口时会传入：
+
+| 参数 | 说明 |
+| --- | --- |
+| `PageNumber` | 组件配置的初始页码 |
+| `CurrentPageNumber` | 前端当前希望停留的页码 |
+| `CurrentFileKey` | 前端当前渲染的文件 Key |
+| `CurrentFileUrl` | 前端当前渲染的文件地址，仅用于诊断或兼容 |
+| `WidgetNumber` | 当前组件编号，便于一个页面多个预览组件时区分缓存 |
+
+示例：
+
+```javascript
+var pageNumber = 2;
+var activeFileKey = 'role-demo-v1:p' + pageNumber;
+
+if (V8.Param.CurrentFileKey == activeFileKey) {
+  return {
+    Code: 1,
+    Data: {
+      NeedRefresh: false,
+      NotModified: true,
+      FileKey: activeFileKey,
+      PageNumber: pageNumber
+    }
+  };
+}
+
+var pdfResp = V8.Http.GetResponse({ Url: 'https://example.com/report.pdf' });
+return {
+  Code: 1,
+  Data: {
+    FileName: 'report.pdf',
+    ContentType: 'application/pdf',
+    FileByteBase64: System.Convert.ToBase64String(pdfResp.RawBytes),
+    PageNumber: pageNumber,
+    InitialPage: pageNumber,
+    FileKey: activeFileKey
+  }
+};
+```
+
 如果返回 `Code: 1` 但 `ContentType` 与真实文件内容不匹配，后端会自动返回类似下面的 JSON 错误：
 
 ```json

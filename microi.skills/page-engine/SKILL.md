@@ -240,6 +240,76 @@ $ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--
 | diytable | 传入模块ID和菜单ID，嵌入低代码表格 |
 | diyform | 传入表ID和记录ID，嵌入低代码表单 |
 
+## Office/PDF 在线预览自然语言生成规则
+
+当用户用自然语言要求“界面引擎预览 PDF/Word/Excel/PPT”“接口引擎返回 PDF 文件”“打开时跳到第 N 页”“按角色显示不同页码”“每 5 秒/10 秒轮询，但只有文件变化才刷新”时，优先生成 `office` 组件，而不是 `iframe/html/browser` 拼接。
+
+`office` 组件图形化参数必须完整：
+
+```json
+{
+  "type": "office",
+  "label": "Office/PDF预览",
+  "widgetOption": { "span": 24, "height": 720 },
+  "widgetParams": [
+    { "sort": 0, "label": "接口引擎地址", "type": "textarea", "value": "$ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--" },
+    { "sort": 1, "label": "静态文件地址", "type": "input", "value": "" },
+    { "sort": 2, "label": "文件类型", "type": "select", "value": "pdf" },
+    { "sort": 3, "label": "初始页码", "type": "number", "value": 1 },
+    { "sort": 4, "label": "轮询接口秒数", "type": "number", "value": 0 }
+  ]
+}
+```
+
+接口引擎返回契约：
+
+```javascript
+return {
+  Code: 1,
+  Data: {
+    FileName: 'report.pdf',
+    ContentType: 'application/pdf',
+    FileByteBase64: base64,
+    PageNumber: 2,
+    InitialPage: 2,
+    FileKey: activeFileKey + ':p2',
+    RefreshSeconds: 5
+  }
+};
+```
+
+轮询但不刷新时，不要重复返回文件内容；返回下面任一写法即可，前端会保持当前预览不重建：
+
+```javascript
+return { Code: 1, Data: { NeedRefresh: false, FileKey: currentFileKey, PageNumber: currentPage } };
+return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
+```
+
+接口引擎应读取前端轮询参数：`V8.Param.CurrentFileKey`、`V8.Param.CurrentPageNumber`、`V8.Param.PageNumber`、`V8.Param.WidgetNumber`。当 Redis/缓存中的活动文件、版本号、角色页码没有变化时返回 `NeedRefresh:false`；当文件或页码变化时返回 `FileByteBase64` 或 `FileUrl`，同时返回新的 `FileKey` 和 `PageNumber/InitialPage`。
+
+角色页码建议在接口引擎中根据 `V8.CurrentUser.Level`、`RoleName`、`RoleIds` 判断，例如管理员第 2 页、财务第 3 页；不要把角色判断写死在前端 Page JSON。缓存 Key 使用 `Microi:${V8.OsClient}:PageEnginePdfPreview:{业务Key}`。
+
+### Office/PDF 接口返回字段细则
+
+- `FileName`：文件名，例如 `report.pdf`。
+- `ContentType`：文件类型，PDF 必须用 `application/pdf`；Word/Excel/PPT 可用对应 Office MIME。
+- `FileByteBase64`：文件字节 Base64；适合接口引擎动态生成或转发 PDF。
+- `FileUrl`：文件 URL；适合文件已在 HDFS/OSS/公网可访问时返回。
+- `PageNumber` / `InitialPage`：PDF 打开后跳转页码。角色控制页码必须在接口引擎中根据 `V8.CurrentUser` 判断，不要写死在页面 JSON。
+- `FileKey` / `CacheKey`：文件版本标识，建议包含业务 Key、缓存版本号、角色页码，例如 `activePdf:v3:page2`。
+- `NeedRefresh:false` / `NotModified:true`：轮询时文件和页码未变化，前端保持当前预览并重新按当前页码定位，不重新下载文件。
+- `RefreshSeconds`：接口可返回建议轮询秒数，但页面图形化配置仍是主要控制项；没有自动刷新需求时配置为 `0`。
+
+接口引擎要显式读取这些前端参数：
+
+- `V8.Param.PageNumber`：组件配置的初始页码。
+- `V8.Param.CurrentPageNumber`：前端当前页码。
+- `V8.Param.CurrentFileKey`：前端当前文件 Key。
+- `V8.Param.CurrentFileUrl`：前端当前文件地址。
+- `V8.Param.WidgetNumber`：当前 office 组件编号。
+
+生成示例接口时必须写清楚中文注释：每个参数的含义、Redis/缓存 Key 的作用、什么情况下返回 `NeedRefresh:false`、什么情况下返回新的 `FileByteBase64/FileUrl` 和 `PageNumber`。
+
 ## searchData 查询条件通用结构
 
 ```json

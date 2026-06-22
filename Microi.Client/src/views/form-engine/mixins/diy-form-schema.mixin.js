@@ -179,6 +179,10 @@ export default {
                         var foe = field.Config.FileUpload.AllowOfficeEdit;
                         field.Config.FileUpload.AllowOfficeEdit = foe === true || foe === "true" || foe === 1 || foe === "1";
                     }
+                    if (field.Config.FileUpload && field.Config.FileUpload.EnableOfficeVersion !== undefined) {
+                        var fov = field.Config.FileUpload.EnableOfficeVersion;
+                        field.Config.FileUpload.EnableOfficeVersion = fov === true || fov === "true" || fov === 1 || fov === "1";
+                    }
                 }
             } catch (e) {}
 

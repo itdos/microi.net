@@ -1,5 +1,19 @@
 <template>
-  <div v-if="curWidgetIdx > -1">
+  <div v-if="curWidgetIdx > -1 && curWidget" class="widget-attr">
+    <div class="selected-widget-card">
+      <div class="selected-widget-title">
+        <span>{{ currentWidgetLabel }}</span>
+        <el-tag size="small" effect="plain">{{ curWidget.type || 'unknown' }}</el-tag>
+      </div>
+      <div class="selected-widget-meta">
+        <span>组件编号：{{ curWidget.widgetOption?.number || '-' }}</span>
+        <span>容器编号：{{ curWidget.widgetOption?.wrapperNumber || '-' }}</span>
+      </div>
+      <div v-if="isOfficeWidget" class="selected-widget-tip">
+        这是 PDF/Office 预览组件，可在下方配置接口引擎、文件地址、文件类型、初始页码和轮询接口秒数。
+      </div>
+    </div>
+
     <el-button
       size="small"
       type="success"
@@ -9,14 +23,14 @@
       >组件JSON</el-button
     >
 
-    <el-collapse v-model="activeName" accordion>
+    <el-collapse v-model="activeName">
       <el-collapse-item title="通用配置" name="1">
         <el-form>
           <el-form-item label="组件类型">
             <el-input
               disabled
               size="small"
-              :model-value="curWidget.label"
+              :model-value="currentWidgetLabel"
             ></el-input>
           </el-form-item>
 
@@ -186,12 +200,12 @@
           </el-form-item>
         </el-form>
       </el-collapse-item>
-      <el-collapse-item title="组件配置" name="2">
-        <el-form label-position="left" label-width="80px">
-          <el-form-item label="组件JSON"> </el-form-item>
-        </el-form>
+      <el-collapse-item :title="componentConfigTitle" name="2">
+        <div v-if="isOfficeWidget" class="widget-config-help">
+          数据源可选择接口引擎。接口返回 `FileByteBase64` / `FileUrl` 和 `PageNumber` 后，PDF 会按页码打开；返回 `Refresh:false`、`Changed:false` 或 `NotModified:true` 时保持当前文件；轮询接口秒数为 0 表示不自动请求。
+        </div>
 
-        <el-form label-position="left" label-width="80px">
+        <el-form label-position="left" label-width="88px" class="widget-param-form">
           <!-- #####在这里面添加新组件代码属性,代码开始##### -->
           <template
             v-for="(item, index) in curWidget.widgetParams"
@@ -202,7 +216,8 @@
                 <!-- 数据来源：接口引擎选择 + 手动输入 -->
                 <template v-if="index === 0">
                   <el-select
-                    style="width: 166px; margin-bottom: 6px"
+                    class="attr-control"
+                    style="margin-bottom: 6px"
                     size="small"
                     :model-value="getApiEngineSelectValue(item.value)"
                     @update:model-value="(val) => handleApiEngineSelect(index, val)"
@@ -227,12 +242,12 @@
                   </el-select>
                 </template>
                 <el-input
-                  style="width: 166px"
+                  class="attr-control"
                   :model-value="getLocalValue(index, item.value)"
                   @input="handleInputChange(index, $event)"
                   type="textarea"
                   :rows="item.typeOptions.rows"
-                  :placeholder="index === 0 ? '选择接口引擎或输入API地址' : '请输入webapi地址'"
+                  :placeholder="getParamPlaceholder(index)"
                 />
                 <template v-if="index === 0">
                   <el-button
@@ -244,6 +259,7 @@
                     >查看数据格式</el-button
                   >
                   <el-button
+                    v-if="curWidget.type === 'html'"
                     style="margin-left: 0 !important"
                     class="seeBtn"
                     size="small"
@@ -257,6 +273,7 @@
 
               <template v-else-if="item.type === 'input'">
                 <el-input
+                  class="attr-control"
                   :disabled="item.typeOptions?.disabled"
                   size="small"
                   :model-value="getLocalValue(index, item.value)"
@@ -266,6 +283,7 @@
 
               <template v-else-if="item.type === 'number'">
                 <el-input-number
+                  class="attr-control"
                   size="small"
                   :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
@@ -306,6 +324,7 @@
 
               <template v-else-if="item.type === 'select'">
                 <el-select
+                  class="attr-control"
                   size="small"
                   :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
@@ -353,7 +372,7 @@
                     style="max-height: 400px; overflow: auto"
                   />
                   <template #reference>
-                    <el-button size="small" style="width: 166px; text-align: left; justify-content: flex-start;">
+                    <el-button size="small" class="attr-control sysmenu-select-btn">
                       {{ sysMenuSelectedName || item.value || '请选择菜单' }}
                     </el-button>
                   </template>
@@ -397,6 +416,7 @@
       />
     </el-drawer>
   </div>
+  <el-empty v-else description="请选择一个组件" :image-size="72" />
 </template>
 
 <script setup name="widget-attr">
@@ -418,7 +438,7 @@ const dataJsonStr = ref('')
 const dataHtmlStr = ref('')
 const drawer = ref(false)
 const drawerjson = ref(false)
-const activeName = ref('1')
+const activeName = ref(['2'])
 const activeName1 = ref('first')
 const updateIndex = ref(0)
 
@@ -445,6 +465,25 @@ const getLocalValue = (index, fallback) => (
     ? localInputValues.value[index]
     : fallback
 )
+
+const isOfficeWidget = computed(() => curWidget.value?.type === 'office')
+
+const currentWidgetLabel = computed(() => {
+  if (isOfficeWidget.value) return 'Office/PDF 预览'
+  return curWidget.value?.label || curWidget.value?.type || '未命名组件'
+})
+
+const componentConfigTitle = computed(() => (
+  isOfficeWidget.value ? 'PDF/Office 配置' : '组件配置'
+))
+
+const getParamPlaceholder = (index) => {
+  if (isOfficeWidget.value && index === 0) {
+    return '选择接口引擎或输入返回文件的 API 地址'
+  }
+  if (index === 0) return '选择接口引擎或输入API地址'
+  return '请输入webapi地址'
+}
 
 const normalizeCurWidgetParams = () => {
   const widget = curWidget.value
@@ -495,6 +534,13 @@ watch(
     })
   },
   { immediate: true }
+)
+
+watch(
+  () => curWidget.value?.widgetOption?.number,
+  () => {
+    activeName.value = ['2']
+  }
 )
 
 // 防抖更新函数 - 用于组件参数
@@ -726,5 +772,61 @@ const handleEditorContent = (content) => {
 .btnJson {
   width: 100%;
   margin: 10px auto;
+}
+
+.selected-widget-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0 10px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.selected-widget-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.selected-widget-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
+}
+
+.selected-widget-tip,
+.widget-config-help {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-regular);
+}
+
+.widget-config-help {
+  margin: 0 0 10px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--el-color-primary-light-9);
+}
+
+.sysmenu-select-btn {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+:deep(.widget-param-form .el-form-item__content) {
+  min-width: 0;
+}
+
+:deep(.widget-param-form .attr-control) {
+  width: 100% !important;
 }
 </style>
