@@ -152,6 +152,13 @@ export default {
          */
         reloadEditor() {
             this.initOnlyOffice();
+        },
+
+        downloadAs(format) {
+            if (!this.docEditor || typeof this.docEditor.downloadAs !== "function") {
+                throw new Error("ONLYOFFICE editor is not ready");
+            }
+            this.docEditor.downloadAs(format);
         }
     }
 };

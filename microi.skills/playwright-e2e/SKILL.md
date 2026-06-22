@@ -81,10 +81,31 @@ PW_BROWSER_CHANNEL=msedge
 
 ```bash
 PW_LOGIN_ENGINE=member_login
-PW_TEST_ACCOUNT=admin
-PW_TEST_PASSWORD=123456
+PW_TEST_ACCOUNT=<从本地配置读取或用环境变量覆盖>
+PW_TEST_PASSWORD=<从本地配置读取或用环境变量覆盖>
 PW_HOME_PATH=/#/pages/index/index
 ```
+
+## 本地测试账号自动发现
+
+当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要先说“未登录无法测试”。必须先尝试读取本地后端配置：
+
+1. 读取 `Microi.Server/Microi.net.Api/.microi-local`，取得当前环境名。
+2. 读取 `Microi.Server/Microi.net.Api/appsettings.{环境名}.json`；若脚本显式传了 `PW_APPSETTINGS_PATH`，以该文件为准。
+3. 优先在 `DevLoginBypass.Accounts` 中按 `OsClient` 匹配当前租户，读取 `Account` / `Password`；没有匹配时再用 `DevLoginBypass.DefaultAccount` / `DefaultPassword`。
+4. 这些值只作为本地自动化登录输入或接口请求参数使用。日志、最终回复、截图说明、报告和异常消息中必须写成 `<redacted>` 或“本地配置凭据”，不要展开真实账号密码、Token、连接串或 Redis 密码。
+5. 如果配置不存在或登录失败，再报告具体阻塞点，例如“未找到 `DevLoginBypass`”“本地后端未启动”“登录接口返回 Code=0”，不要泛泛说无法测试。
+
+## 后端改动后的 E2E 前置动作
+
+如果本轮任务修改过 `Microi.Server/**` 后端源码、配置、控制器、服务、依赖项目或接口行为，跑 Playwright、页面截图、接口验收或前后端联调前，必须先按 `workspace-conventions` 的“后端代码改动后的重启验收”完成：
+
+1. 编译后端。
+2. 停止旧的本地 `Microi.net.Api` 进程。
+3. 在 `Microi.Server/Microi.net.Api` 目录用 `dotnet run --launch-profile Microi.net.Api` 重新启动。
+4. 验证 `https://localhost:7266` 已监听并且进程未立即崩溃。
+
+不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
 ## 全自动登录（免验证码 / 免手填密码）——必读
 
@@ -149,14 +170,14 @@ export async function devLogin(page, {
   "Enabled": true,
   "SkipCaptcha": true,      // 跳过图形验证码
   "OnlyLoopback": true,     // 仅当请求来自 127.0.0.1 / ::1 时生效
-  "DefaultAccount": "admin",
-  "DefaultPassword": "microi#2026"
+  "DefaultAccount": "<default-account>",
+  "DefaultPassword": "<default-password>"
 }
 ```
 
 - 触发条件：`Enabled=true`，且（`OnlyLoopback=false` 或请求来自本机回环地址）。
 - 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`。
-- 与方式 A 区别：**仍会校验真实密码**（这里默认 `microi#2026`），只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登。
+- 与方式 A 区别：**仍会校验真实密码**，只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登。
 - 生产环境务必保持 `Enabled=false` 或删除该块。
 
 `Microi.Client/scripts/run-form-engine-freeze-trace.mjs` 会在跑诊断前自动把 `DevLoginBypass` 写入 `appsettings.{Env}.json`；可用 `PW_CONFIG_DEV_LOGIN=0` 关闭该自动改写。
@@ -175,7 +196,7 @@ export async function devLogin(page, {
 >
 > 在浏览器内做 E2E（点页面、拖拽、截图）时最稳的登录顺序：
 > 1. 跳到 `#/login`；
-> 2. 填 `admin` / `microi#2026`；
+> 2. 填从本地 `DevLoginBypass` 配置或环境变量读取到的账号密码；
 > 3. 验证码框随便填一个数字（`DevLoginBypass.SkipCaptcha=true` 时后端对 loopback 忽略验证码）；
 > 4. 点「登 录」，落到首页；
 > 5. 再 `location.hash = '#/<目标路由>'` 进入目标页。
@@ -238,8 +259,8 @@ $env:PW_ASPNETCORE_ENVIRONMENT='iTdos'
 $env:PW_DOTNET_ENVIRONMENT='iTdos'
 $env:PW_APPSETTINGS_ENV='iTdos'
 $env:MICROI_OSCLIENT='iTdos'
-$env:PW_TEST_ACCOUNT='admin'
-$env:PW_TEST_PASSWORD='microi#2026'
+$env:PW_TEST_ACCOUNT='<从本地配置读取或手工覆盖>'
+$env:PW_TEST_PASSWORD='<从本地配置读取或手工覆盖>'
 $env:MICROI_FREEZE_PATH='/#/diy/diy-design/<TableId>?PageType='
 npm run test:form-freeze:auto
 ```
@@ -390,6 +411,28 @@ $env:PW_BROWSER_CHANNEL='msedge'
 npx playwright test
 ```
 
+如果本机没有可用 Edge，或必须使用 Chromium，优先从吾码 CDN 下载浏览器压缩包，不要反复卡在 Playwright 官方下载通道：
+
+| 系统 | CDN 地址 |
+|------|----------|
+| Windows x64 | `https://static.itdos.com/openclaw/chromium/chrome-win64-137.0.7151.68.zip` |
+| macOS x64 | `https://static.itdos.com/openclaw/chromium/chrome-mac-x64-137.0.7151.68.zip` |
+| macOS arm64 | `https://static.itdos.com/openclaw/chromium/chrome-mac-arm64-137.0.7151.68.zip` |
+
+Windows 示例：
+
+```powershell
+$browserRoot = Join-Path (Resolve-Path '.tmp').Path 'playwright-browsers'
+New-Item -ItemType Directory -Force -Path $browserRoot | Out-Null
+$zipPath = Join-Path $browserRoot 'chrome-win64-137.0.7151.68.zip'
+Invoke-WebRequest 'https://static.itdos.com/openclaw/chromium/chrome-win64-137.0.7151.68.zip' -OutFile $zipPath
+Expand-Archive $zipPath -DestinationPath $browserRoot -Force
+$env:PW_CHROMIUM_EXECUTABLE = (Resolve-Path (Join-Path $browserRoot 'chrome-win64/chrome.exe')).Path
+npx playwright test
+```
+
+手写 Playwright 脚本时读取 `PW_CHROMIUM_EXECUTABLE` / `PW_BROWSER_EXECUTABLE` 并传给 `chromium.launch({ executablePath })`；Playwright Test 配置中通过 `use.launchOptions.executablePath` 读取该环境变量。只有 CDN、系统浏览器和本地缓存都不可用时，才报告浏览器不可用。
+
 ## playwright.config.js 模板
 
 ```js
@@ -399,6 +442,7 @@ const port = process.env.PW_PORT || '5180';
 const baseURL = process.env.PW_BASE_URL || `http://127.0.0.1:${port}`;
 const webServerUrl = process.env.PW_WEB_SERVER_URL || baseURL;
 const channel = process.env.PW_BROWSER_CHANNEL || undefined;
+const executablePath = process.env.PW_CHROMIUM_EXECUTABLE || process.env.PW_BROWSER_EXECUTABLE || undefined;
 const defaultCommand = process.env.PW_APP_TYPE === 'uniapp-h5'
   ? `npm run dev:h5 -- --host 0.0.0.0 --port ${port}`
   : `npm run dev -- --host 0.0.0.0 --port ${port}`;
@@ -413,6 +457,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'tests/e2e/report' }]],
   use: {
     baseURL,
+    ...(executablePath ? { launchOptions: { executablePath } } : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -685,7 +730,7 @@ jobs:
 | 保存接口代码后 MCP 自己报 `string does not contain DosIsNullOrWhiteSpace` | 后端 C# 在动态对象路径上调用扩展方法 | 改用 `string.IsNullOrWhiteSpace`，不要在 MCP 路径新增 `DosIsNullOrWhiteSpace` 调用 |
 | MCP `run_engine` 里 `V8.Db` 为 null | MCP 执行上下文没有注入直连 Db | 维护/测试引擎优先使用 `V8.FormEngine.GetTableData/UptFormData` |
 | H5 静态资源 404 | `vite.config.js` 未配置相对路径 | uni-app H5 设置 `base: './'` |
-| 本地浏览器下载失败 | Playwright 下载 Chromium 受阻 | 使用 `PW_BROWSER_CHANNEL=msedge` |
+| 本地浏览器下载失败 | Playwright 下载 Chromium 受阻 | 先用 `PW_BROWSER_CHANNEL=msedge`，没有 Edge 时从吾码 CDN 下载 Chromium 并设置 `PW_CHROMIUM_EXECUTABLE` |
 | 用例偶发失败 | HMR 或网络请求未稳定 | CI 使用静态构建，断言明确等待关键元素 |
 | 页面有横向滚动 | 组件撑出视口 | 对根容器和列表容器加 `max-width:100vw; overflow-x:hidden` |
 

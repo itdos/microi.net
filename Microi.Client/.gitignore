@@ -40,3 +40,4 @@ src/views/webos/
 !bin/Release/publish-*.sh
 !bin/Release/.gitignore
 test-results
+.microi-e2e

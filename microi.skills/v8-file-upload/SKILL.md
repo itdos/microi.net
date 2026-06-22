@@ -187,6 +187,30 @@ for (var i = 0; i < urls.length; i++) {
 return { Code: 1, Data: savedPaths };
 ```
 
+## Office 文件在线编辑版本号规则
+
+当文件上传控件开启【Office 在线预览】、【允许在线编辑】和【开启 Office 文件版本号】时，前后端必须遵循统一版本规则：
+
+- 新上传的 Office 文件（`pdf/doc/docx/xls/xlsx/ppt/pptx`）要立即写入初始版本 `v1.0.0`，字段 JSON 的 `Path` 指向该原始文件，`Version` 为 `v1.0.0`，`Versions[0]` 保存同一份原始文件路径。
+- 用户进入 OnlyOffice 在线编辑页后，每次手动点击【保存文件】才生成新版本；第一次保存生成 `v1.0.1`，之后依次生成 `v1.0.2`、`v1.0.3`。
+- 未开启版本号时，保存文件直接覆盖当前 `Path` 对应的 HDFS/OSS 源文件。
+- 开启版本号时，保存文件必须生成带版本号后缀的新文件，例如 `contract_v1.0.1.docx`，字段 JSON 的 `Path` 指向最新版本，`Versions` 保留历史版本路径。
+- 在线 Office 路由和文件上传字段都要能读取 `Versions`，用于右上角切换历史版本预览/编辑。
+
+字段 JSON 示例：
+
+```json
+{
+  "Name": "contract.docx",
+  "Path": "/itdos/file/20260622/contract_v1.0.1.docx",
+  "Version": "v1.0.1",
+  "Versions": [
+    { "Version": "v1.0.0", "Name": "contract.docx", "Path": "/itdos/file/20260622/contract.docx", "IsLatest": false },
+    { "Version": "v1.0.1", "Name": "contract_v1.0.1.docx", "Path": "/itdos/file/20260622/contract_v1.0.1.docx", "IsLatest": true }
+  ]
+}
+```
+
 ## ImgUpload / FileUpload 字段值兼容规则
 
 `ImgUpload` 不能假设只是一种值结构。PC 表单、移动端、旧数据、单图/多图、公开/私有桶会混合出现以下格式：

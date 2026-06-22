@@ -77,8 +77,10 @@ export default {
             var formDataId = typeof file === "object" && file !== null ? file.formDataId || file.FormDataId : "";
             var fieldId = typeof file === "object" && file !== null ? file.fieldId || file.FieldId : "";
             var canEdit = typeof file === "object" && file !== null ? file.canEdit || file.CanEdit || file.allowEdit || file.AllowEdit : "";
+            var enableOfficeVersion = typeof file === "object" && file !== null ? file.enableOfficeVersion || file.EnableOfficeVersion : "";
             var isPrivateFile = isPrivate === true || isPrivate === "true" || isPrivate === 1 || isPrivate === "1";
             var canEditFile = canEdit === true || canEdit === "true" || canEdit === 1 || canEdit === "1";
+            var enableVersion = enableOfficeVersion === true || enableOfficeVersion === "true" || enableOfficeVersion === 1 || enableOfficeVersion === "1";
             var targetUrl = fileName || filePathName || url;
             if (!url && !filePathName) {
                 return;
@@ -117,6 +119,16 @@ export default {
                     params.set("fieldId", fieldId);
                 }
                 params.set("canEdit", canEditFile ? "1" : "0");
+                params.set("enableOfficeVersion", enableVersion ? "1" : "0");
+                if (typeof file === "object" && file !== null) {
+                    try {
+                        var officeSessionKey = "microi-office-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+                        window.sessionStorage.setItem(officeSessionKey, JSON.stringify(file));
+                        params.set("officeSessionKey", officeSessionKey);
+                    } catch (error) {
+                        console.warn("保存在线文档会话参数失败", error);
+                    }
+                }
                 self.$router.push(`/online-office?${params.toString()}`);
                 self.$emit("CallbackFormClose");
             } else {
