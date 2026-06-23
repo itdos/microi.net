@@ -29,6 +29,14 @@ const props = defineProps({
   },
 })
 
+const sanitizeChartText = (value) => {
+  if (typeof value !== 'string') return ''
+  const text = value.trim()
+  if (!text) return ''
+  const reservedValues = ['true', 'false', 'axis', 'item', 'none', 'vertical', 'horizontal']
+  return reservedValues.includes(text.toLowerCase()) ? '' : text
+}
+
 const chartRef = ref(null)
 let chartInstance = null
 
@@ -129,8 +137,8 @@ const setData = () => {
   chartSet.value.legend.left = props.widgetObj.widgetParams[7]?.value
   chartSet.value.title.textStyle.color = dark.value ? '#999' : '#333'
   chartSet.value.legend.textStyle.color = dark.value ? '#999' : '#333'
-  chartSet.value.title.text = props.widgetObj.widgetParams[3]?.value
-  chartSet.value.title.subtext = props.widgetObj.widgetParams[4]?.value
+  chartSet.value.title.text = sanitizeChartText(props.widgetObj.widgetParams[3]?.value)
+  chartSet.value.title.subtext = sanitizeChartText(props.widgetObj.widgetParams[4]?.value)
   chartSet.value.legend.show = props.widgetObj.widgetParams[5]?.value
   chartSet.value.tooltip.show = props.widgetObj.widgetParams[8]?.value
   chartSet.value.tooltip.trigger = props.widgetObj.widgetParams[9]?.value

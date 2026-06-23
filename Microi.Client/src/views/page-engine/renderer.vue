@@ -83,7 +83,12 @@ export default {
                 var JsonObj = {};
                 this.pageid = res.Data.Id;
                 if (res.Data.JsonObj) {
-                    JsonObj = typeof res.Data.JsonObj === "string" ? JSON.parse(res.Data.JsonObj) : res.Data.JsonObj;
+                    try {
+                        JsonObj = typeof res.Data.JsonObj === "string" ? JSON.parse(res.Data.JsonObj) : res.Data.JsonObj;
+                    } catch (error) {
+                        console.error("[PageEngine] JsonObj parse failed:", error);
+                        JsonObj = {};
+                    }
                 }
                 this.remoteObj = {
                     Id: this.pageid,
