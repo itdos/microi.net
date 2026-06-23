@@ -542,7 +542,7 @@ namespace Microi.net.Api
                 ["OsClient"] = osClient,
                 ["Id"] = TokenString(param["FormDataId"]),
                 [context.FieldName] = SerializeOfficeFieldValue(context.FieldValue, mergedFieldValue),
-                ["_InvokeType"] = InvokeType.Client.ToString()
+                ["_InvokeType"] = InvokeType.Server.ToString()
             };
             var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(context.TableName, updateParam);
             if (updateResult.Code != 1)

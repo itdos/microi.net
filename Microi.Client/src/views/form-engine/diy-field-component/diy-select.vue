@@ -391,9 +391,7 @@ export default {
         // 对于 SQL/DataSource/ApiEngine 数据源，如果 field.Data 已经加载，
         // 需要从 field.Data 中查找匹配的完整选项对象，否则 el-select 的 value-key 无法匹配
         if (self.field && self.field.Config &&
-            (self.field.Config.DataSource === "Sql" ||
-             self.field.Config.DataSource === "DataSource" ||
-             self.field.Config.DataSource === "ApiEngine") &&
+            self._isObjectDataSource() &&
             self.field.Data && self.field.Data.length > 0 &&
             !self.DiyCommon.IsNull(self.ModelValue)) {
             var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
@@ -421,10 +419,7 @@ export default {
                 self.FieldAllData = [...self.field.Data];
             }
             // SQL/DataSource/ApiEngine数据源处理
-            if (self.field && self.field.Config &&
-                (self.field.Config.DataSource === "Sql" ||
-                 self.field.Config.DataSource === "DataSource" ||
-                 self.field.Config.DataSource === "ApiEngine")) {
+            if (self.field && self.field.Config && self._isObjectDataSource()) {
                 // 如果数据已加载，初始化FieldAllData
                 if (self.field.Data && self.field.Data.length > 0) {
                     self.FieldAllData = [...self.field.Data];
@@ -509,10 +504,17 @@ export default {
             return fieldData;
         },
         // 判断是否为“普通数据源 Data”：宽容老字段（DataSource 可能为空/未设置，但 field.Data 是字符串数组）
+        _hasObjectOptionData() {
+            var self = this;
+            var data = self.field && Array.isArray(self.field.Data) ? self.field.Data : [];
+            return data.some(function (item) {
+                return item && typeof item === "object" && !Array.isArray(item);
+            });
+        },
         _isPlainDataSource() {
             var self = this;
             var ds = self.field && self.field.Config ? self.field.Config.DataSource : "";
-            if (ds === "Data") return true;
+            if (ds === "Data") return !self._hasObjectOptionData();
             // 未设置数据源但 field.Data 是字符串数组 → 视为普通数据源
             if (!ds || ds === "") {
                 if (Array.isArray(self.field.Data) && self.field.Data.length > 0 && typeof self.field.Data[0] === "string") {
@@ -524,7 +526,7 @@ export default {
         _isObjectDataSource() {
             var self = this;
             var ds = self.field && self.field.Config ? self.field.Config.DataSource : "";
-            return ds === "Sql" || ds === "DataSource" || ds === "ApiEngine";
+            return ds === "Sql" || ds === "DataSource" || ds === "ApiEngine" || (ds === "Data" && self._hasObjectOptionData());
         },
         _isMultipleSelect() {
             return this.field && this.field.Component === "MultipleSelect";
@@ -647,7 +649,7 @@ export default {
                     var key = value.Key !== undefined ? value.Key : value.key;
                     return self.DiyCommon.IsNull(key);
                 }
-                if (cfg.DataSource === "Sql" || cfg.DataSource === "DataSource" || cfg.DataSource === "ApiEngine") {
+                if (self._isObjectDataSource()) {
                     var saveField = cfg.SelectSaveField || cfg.SelectLabel;
                     if (!self.DiyCommon.IsNull(saveField) && self.DiyCommon.IsNull(value[saveField])) return true;
                 }
@@ -668,7 +670,7 @@ export default {
             if (self._isPlainDataSource()) {
                 return typeof item === "object" || self.DiyCommon.IsNull(item);
             }
-            if ((cfg.DataSource === "Sql" || cfg.DataSource === "DataSource" || cfg.DataSource === "ApiEngine") && item && typeof item === "object") {
+            if (self._isObjectDataSource() && item && typeof item === "object") {
                 var saveField = cfg.SelectSaveField || cfg.SelectLabel;
                 return !self.DiyCommon.IsNull(saveField) && self.DiyCommon.IsNull(item[saveField]);
             }
@@ -745,9 +747,7 @@ export default {
             // 只处理 SQL/DataSource/ApiEngine 数据源 + 单选 + 存储形式"字段"(Text)
             if (self.field && self.field.Config &&
                 self.field.Config.SelectSaveFormat === "Text" &&
-                (self.field.Config.DataSource === "Sql" ||
-                 self.field.Config.DataSource === "DataSource" ||
-                 self.field.Config.DataSource === "ApiEngine") &&
+                self._isObjectDataSource() &&
                 (!self.DiyCommon.IsNull(self.field.Config.SelectLabel) || !self.DiyCommon.IsNull(self.field.Config.SelectSaveField)) &&
                 typeof val === 'string' && val !== '') {
                 var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
@@ -776,8 +776,7 @@ export default {
         _ensureSelectOption(valObj) {
             var self = this;
             if (!self.field || !self.field.Config) return;
-            var ds = self.field.Config.DataSource;
-            if (ds !== 'Sql' && ds !== 'DataSource' && ds !== 'ApiEngine') return;
+            if (!self._isObjectDataSource()) return;
             var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
             if (!saveField) return;
             if (!self.field.Data) self.field.Data = [];
@@ -1007,7 +1006,7 @@ export default {
             if (self._isPlainDataSource && self._isPlainDataSource()) {
                 return undefined;
             }
-            if (field.Config.DataSource === "Data") {
+            if (field.Config.DataSource === "Data" && !(self._isObjectDataSource && self._isObjectDataSource())) {
                 return undefined;
             }
             // KeyValue 数据源，使用 Key 作为 value-key
@@ -1028,13 +1027,14 @@ export default {
             if (query) {
                 self.NeedResetDataSourse = false;
                 field.Data = _.filter([...self.FieldAllData], function (item) {
-                    if (field.Config.DataSource == "Data") {
+                    if (field.Config.DataSource == "Data" && !self._hasObjectOptionData()) {
                         return item.indexOf(query) > -1;
                     }
                     if (field.Config.DataSource == "KeyValue") {
                         return (item.Value && item.Value.indexOf(query) > -1) || (item.Key && item.Key.indexOf(query) > -1);
                     }
-                    return item[field.Config.SelectLabel].indexOf(query) > -1;
+                    var label = self.GetOptionLabel(item);
+                    return label != null && String(label).indexOf(query) > -1;
                 });
             } else {
                 self.NeedResetDataSourse = false;
