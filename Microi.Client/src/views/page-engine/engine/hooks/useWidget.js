@@ -7,8 +7,92 @@ const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
 export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1), requestPageSize = ref()) {
+  const getCurrentDataJson = () =>
+    widgetObj?.widgetParams?.[0]?.typeOptions?.dataJson || {}
+
+  const normalizeRemotePayload = (response) => {
+    if (response && typeof response === 'object' && !Array.isArray(response)) {
+      if (Object.prototype.hasOwnProperty.call(response, 'Code')) {
+        if (response.Code !== 1) {
+          console.warn('[PageEngine] remote data request failed:', response.Msg || response)
+          return undefined
+        }
+        return normalizeRemotePayload(response.Data)
+      }
+      if (response.Result && response.Result.Code !== undefined) {
+        return normalizeRemotePayload(response.Result)
+      }
+    }
+    return response
+  }
+
+  const normalizeWidgetDataJson = (payload) => {
+    const widgetType = widgetObj?.type
+    const currentDataJson = getCurrentDataJson()
+    const listDataWidgets = ['statistic', 'pie', 'funnel', 'progress']
+
+    if (payload === undefined || payload === null) return undefined
+
+    if (listDataWidgets.includes(widgetType)) {
+      if (Array.isArray(payload)) {
+        return {
+          data: payload,
+          searchData: Array.isArray(currentDataJson.searchData)
+            ? currentDataJson.searchData
+            : [],
+        }
+      }
+      if (payload && typeof payload === 'object') {
+        return {
+          ...payload,
+          data: Array.isArray(payload.data) ? payload.data : [],
+          searchData: Array.isArray(payload.searchData) ? payload.searchData : [],
+        }
+      }
+      return { data: [], searchData: [] }
+    }
+
+    if (['bar', 'line', 'linebar'].includes(widgetType)) {
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return {
+          ...currentDataJson,
+          ...payload,
+          xAxis: Array.isArray(payload.xAxis) ? payload.xAxis : (currentDataJson.xAxis || []),
+          series: Array.isArray(payload.series) ? payload.series : (currentDataJson.series || []),
+          searchData: Array.isArray(payload.searchData) ? payload.searchData : (currentDataJson.searchData || []),
+        }
+      }
+      return undefined
+    }
+
+    if (widgetType === 'tabel') {
+      if (Array.isArray(payload)) {
+        return {
+          ...currentDataJson,
+          bodyData: payload,
+          total: payload.length,
+          searchData: Array.isArray(currentDataJson.searchData) ? currentDataJson.searchData : [],
+        }
+      }
+      if (payload && typeof payload === 'object') {
+        return {
+          ...currentDataJson,
+          ...payload,
+          headerData: Array.isArray(payload.headerData) ? payload.headerData : (currentDataJson.headerData || []),
+          bodyData: Array.isArray(payload.bodyData) ? payload.bodyData : [],
+          total: Number.isFinite(Number(payload.total)) ? Number(payload.total) : (Array.isArray(payload.bodyData) ? payload.bodyData.length : 0),
+          searchData: Array.isArray(payload.searchData) ? payload.searchData : (currentDataJson.searchData || []),
+        }
+      }
+      return undefined
+    }
+
+    return payload
+  }
   //把webapi数据同步到jsonObj
   const setResponse = (response) => {
+    const payload = normalizeWidgetDataJson(normalizeRemotePayload(response))
+    if (payload === undefined) return
     let wrapperNumber = widgetObj.widgetOption.wrapperNumber //当前组件所在容器编号
     let number = widgetObj.widgetOption.number //当前组件编号 
     let wrapperIdx = formData.value.JsonObj.wrapperList.findIndex(
@@ -20,10 +104,10 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
       ].widgetList.findIndex((item) => item.widgetOption.number === number)
       if (widgetIdx !== -1) {
 
-        if (response instanceof Object || response instanceof Array) {
+        if (payload instanceof Object || payload instanceof Array) {
           formData.value.JsonObj.wrapperList[wrapperIdx].widgetList[
             widgetIdx
-          ].widgetParams[0].typeOptions.dataJson = response
+          ].widgetParams[0].typeOptions.dataJson = payload
         }
         else {
           formData.value.JsonObj.wrapperList[wrapperIdx].widgetList[

@@ -28,6 +28,15 @@ const defaultPageFormConfig = {
 function asRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
+const chartTextReservedValues = new Set(['true', 'false', 'axis', 'item', 'none', 'vertical', 'horizontal']);
+function sanitizePageChartText(value) {
+    if (typeof value !== 'string')
+        return '';
+    const text = value.trim();
+    if (!text)
+        return '';
+    return chartTextReservedValues.has(text.toLowerCase()) ? '' : text;
+}
 function parseJsonish(value) {
     if (value === undefined || value === null || value === '')
         return { ok: false, error: 'JSON value is empty.' };
@@ -583,6 +592,78 @@ function unwrapPageCandidate(value) {
     }
     return current;
 }
+function normalizePageWidgetDataJson(widgetRecord, path, warnings) {
+    const widgetType = getString(widgetRecord, 'type');
+    if (!Array.isArray(widgetRecord.widgetParams) || widgetRecord.widgetParams.length === 0)
+        return;
+    const widgetParams = widgetRecord.widgetParams;
+    const titleIndexesByType = {
+        bar: [5, 6],
+        line: [5, 6],
+        linebar: [5, 6],
+        pie: [5, 6],
+        funnel: [3, 4],
+    };
+    for (const index of titleIndexesByType[widgetType] ?? []) {
+        const titleParam = asRecord(widgetParams[index]);
+        if (!Object.keys(titleParam).length || titleParam.value === undefined || titleParam.value === '')
+            continue;
+        const sanitizedValue = sanitizePageChartText(titleParam.value);
+        if (titleParam.value !== sanitizedValue) {
+            titleParam.value = sanitizedValue;
+            widgetParams[index] = titleParam;
+            warnings.push(`${path}.widgetParams[${index}].value was cleared because it looked like a chart option, not display text.`);
+        }
+    }
+    const firstParam = asRecord(widgetParams[0]);
+    const typeOptions = {
+        rows: 3,
+        ...asRecord(firstParam.typeOptions),
+    };
+    const dataJson = typeOptions.dataJson;
+    if (['statistic', 'pie', 'funnel', 'progress'].includes(widgetType)) {
+        if (Array.isArray(dataJson)) {
+            typeOptions.dataJson = { data: dataJson, searchData: [] };
+            warnings.push(`${path}.widgetParams[0].typeOptions.dataJson array was wrapped as {data, searchData}.`);
+        }
+        else {
+            const record = asRecord(dataJson);
+            typeOptions.dataJson = {
+                ...record,
+                data: Array.isArray(record.data) ? record.data : [],
+                searchData: Array.isArray(record.searchData) ? record.searchData : [],
+            };
+        }
+    }
+    if (['bar', 'line', 'linebar'].includes(widgetType)) {
+        const record = asRecord(typeOptions.dataJson);
+        typeOptions.dataJson = {
+            ...record,
+            xAxis: Array.isArray(record.xAxis) ? record.xAxis : [],
+            series: Array.isArray(record.series) ? record.series : [],
+            searchData: Array.isArray(record.searchData) ? record.searchData : [],
+        };
+    }
+    if (widgetType === 'tabel') {
+        if (Array.isArray(dataJson)) {
+            typeOptions.dataJson = { headerData: [], bodyData: dataJson, total: dataJson.length, searchData: [] };
+            warnings.push(`${path}.widgetParams[0].typeOptions.dataJson array was wrapped as table bodyData.`);
+        }
+        else {
+            const record = asRecord(typeOptions.dataJson);
+            typeOptions.dataJson = {
+                ...record,
+                headerData: Array.isArray(record.headerData) ? record.headerData : [],
+                bodyData: Array.isArray(record.bodyData) ? record.bodyData : [],
+                total: typeof record.total === 'number' ? record.total : (Array.isArray(record.bodyData) ? record.bodyData.length : 0),
+                searchData: Array.isArray(record.searchData) ? record.searchData : [],
+            };
+        }
+    }
+    firstParam.typeOptions = typeOptions;
+    widgetParams[0] = firstParam;
+    widgetRecord.widgetParams = widgetParams;
+}
 export function normalizePageJsonObj(value) {
     const candidate = unwrapPageCandidate(value);
     const parsed = parseJsonish(candidate);
@@ -655,6 +736,7 @@ export function normalizePageJsonObj(value) {
                     widgetRecord.widgetParams = [param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: {} })];
                     warnings.push(`wrapperList[${index}].widgetList[${widgetIndex}].widgetParams was missing and a safe data param was added.`);
                 }
+                normalizePageWidgetDataJson(widgetRecord, `wrapperList[${index}].widgetList[${widgetIndex}]`, warnings);
                 return widgetRecord;
             });
         }

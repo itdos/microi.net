@@ -22,12 +22,12 @@
         </div>
         <div v-show="widgetObj.widgetParams[7]?.value" :style="progressPadding">
           <el-progress
-            :percentage="item.percentage"
+            :percentage="normalizeNumber(item.percentage)"
             :type="widgetObj.widgetParams[5]?.value"
-            :strokeWidth="widgetObj.widgetParams[6]?.value"
+            :strokeWidth="normalizeNumber(widgetObj.widgetParams[6]?.value)"
             :showText="widgetObj.widgetParams[7]?.value"
             :textInside="widgetObj.widgetParams[8]?.value"
-            :width="widgetObj.widgetParams[10]?.value"
+            :width="progressWidth"
             :color="item.color == '' ? '#409EFF' : item.color"
           >
           </el-progress>
@@ -89,6 +89,21 @@ const valueStyle = computed(() => {
 
 const progressPadding = computed(() => {
   return { padding: props.widgetObj.widgetParams[11]?.value }
+})
+
+const normalizeNumber = (value, fallback = 0) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value.replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+const progressWidth = computed(() => {
+  const value = props.widgetObj.widgetParams[10]?.value
+  const parsed = normalizeNumber(value, undefined)
+  return Number.isFinite(parsed) ? parsed : undefined
 })
 
 const contentData = computed(() => {

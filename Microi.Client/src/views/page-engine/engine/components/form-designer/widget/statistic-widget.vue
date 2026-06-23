@@ -31,7 +31,8 @@
             },
           ]"
           :value-style="valueStyle"
-          :value="item.value"
+          :value="normalizeStatisticValue(item.value)"
+          :formatter="(value) => formatStatisticValue(item.value, value)"
           :precision="widgetObj.widgetParams[20]?.value"
         >
           <template #title>
@@ -116,6 +117,18 @@ const contentData = computed(() => {
   }
   return props.widgetObj.widgetParams[0].typeOptions.dataJson.data
 })
+
+const normalizeStatisticValue = (value) => {
+  if (typeof value === 'number' || typeof value === 'object') return value
+  if (typeof value !== 'string') return 0
+  const parsed = Number.parseFloat(value.replace(/,/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const formatStatisticValue = (sourceValue, value) => {
+  if (typeof sourceValue === 'string') return sourceValue
+  return value
+}
 
 const handleMoreClick = (linkUrl) => {
   if (formData.value.JsonObj.formConfig.link) {

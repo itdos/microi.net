@@ -4671,10 +4671,29 @@ var DiyCommon = {
                 }
             ];
         } else {
-            var tabs = JSON.parse(data.Tabs);
+            var rawTabs = data.Tabs;
+            var tabs = [];
             //2026-02-05 Anderspn：修复老的错误数据
-            if(typeof tabs == "string"){
-                tabs = JSON.parse(tabs);
+            try {
+                tabs = JSON.parse(rawTabs);
+                if(typeof tabs == "string"){
+                    rawTabs = tabs;
+                    tabs = JSON.parse(tabs);
+                }
+            } catch (error) {
+                tabs = String(rawTabs || "").split(",").map((name, index) => {
+                    var tabName = name.trim();
+                    return {
+                        Id: tabName,
+                        Name: tabName,
+                        EnName: tabName,
+                        Display: true,
+                        Sort: (index + 1) * 10
+                    };
+                }).filter((tab) => tab.Name);
+            }
+            if (!Array.isArray(tabs)) {
+                tabs = [];
             }
             //默认让tabs显示
             tabs.forEach((tab) => {
