@@ -66,6 +66,57 @@ function param(sort, label, type, value, typeOptions) {
         result.typeOptions = typeOptions;
     return result;
 }
+const periodSearchOptions = [
+    { label: '本日', value: 'today' },
+    { label: '本周', value: 'week' },
+    { label: '本月', value: 'month' },
+    { label: '本季', value: 'quarter' },
+    { label: '本年', value: 'year' },
+    { label: '去年', value: 'lastYear' },
+];
+function periodSearchItem() {
+    return {
+        prop: 'period',
+        label: '统计周期',
+        type: 'select',
+        value: 'month',
+        defaultValue: 'month',
+        remote: false,
+        options: periodSearchOptions.map((item) => ({ ...item })),
+    };
+}
+function mergePeriodSearchData(searchData) {
+    const items = Array.isArray(searchData)
+        ? searchData.map((item) => asRecord(item)).filter((item) => Object.keys(item).length)
+        : [];
+    const hasPeriod = items.some((item) => item.prop === 'period' || item.prop === '_period');
+    return hasPeriod ? items : [periodSearchItem(), ...items];
+}
+function withPeriodSearchData(dataJson) {
+    return {
+        ...dataJson,
+        searchData: mergePeriodSearchData(dataJson.searchData),
+    };
+}
+function enableWidgetPeriodParams(widgetType, widgetParams) {
+    const indexesByType = {
+        statistic: [18, 19],
+        progress: [26, 27],
+        bar: [1, 16],
+        line: [1, 16],
+        linebar: [1, 18],
+        pie: [1, 19],
+        funnel: [1, 13],
+        tabel: [1, 13],
+    };
+    for (const index of indexesByType[widgetType] ?? []) {
+        const item = asRecord(widgetParams[index]);
+        if (Object.keys(item).length) {
+            item.value = true;
+            widgetParams[index] = item;
+        }
+    }
+}
 function baseWidgetOption(wrapperNumber, span, height) {
     return {
         number: randomNumber(),
@@ -84,7 +135,7 @@ function baseWidgetOption(wrapperNumber, span, height) {
 }
 function statParams(data, dark) {
     return [
-        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: { data, searchData: [] } }),
+        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: { data, searchData: mergePeriodSearchData([]) } }),
         param(1, 'Grid width', 'slider', 6, { min: 1, max: 24, step: 1 }),
         param(2, 'Background', 'color', ''),
         param(3, 'Gap', 'input', '5px'),
@@ -102,8 +153,8 @@ function statParams(data, dark) {
         param(15, 'Icon color', 'color', '#ffffff'),
         param(16, 'Icon size', 'input', '18px'),
         param(17, 'Background image', 'input', ''),
-        param(18, 'Show search', 'switch', false),
-        param(19, 'Date filter', 'switch', false),
+        param(18, 'Show search', 'switch', true),
+        param(19, 'Date filter', 'switch', true),
         param(20, 'Precision', 'number', 0),
         param(21, 'Value padding', 'input', '0'),
         param(22, 'Value margin', 'input', '0'),
@@ -111,10 +162,11 @@ function statParams(data, dark) {
     ];
 }
 function chartParams(type, dataJson, title, unit = '') {
+    const chartDataJson = withPeriodSearchData(dataJson);
     if (type === 'pie') {
         return [
-            param(0, 'Data source', 'textarea', '', { rows: 3, dataJson }),
-            param(1, 'Show search', 'switch', false),
+            param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: chartDataJson }),
+            param(1, 'Show search', 'switch', true),
             param(2, 'Inner radius', 'number', 36),
             param(3, 'Outer radius', 'number', 92),
             param(4, 'Unit', 'input', unit),
@@ -132,13 +184,13 @@ function chartParams(type, dataJson, title, unit = '') {
             param(16, 'Border width', 'number', 2),
             param(17, 'Pad angle', 'number', 2),
             param(18, 'Nightingale', 'switch', false),
-            param(19, 'Date filter', 'switch', false),
+            param(19, 'Date filter', 'switch', true),
             param(20, 'Label format', 'input', '{d}%'),
         ];
     }
     return [
-        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson }),
-        param(1, 'Show search', 'switch', false),
+        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: chartDataJson }),
+        param(1, 'Show search', 'switch', true),
         param(2, 'Boundary gap', 'switch', type === 'bar'),
         param(3, 'Bar effect', 'select', 'shadow'),
         param(4, 'Unit', 'input', unit),
@@ -153,14 +205,14 @@ function chartParams(type, dataJson, title, unit = '') {
         param(13, 'Show label', 'switch', type === 'bar'),
         param(14, 'Label position', 'select', 'outside'),
         param(15, 'Split line', 'switch', true),
-        param(16, 'Date filter', 'switch', false),
+        param(16, 'Date filter', 'switch', true),
         param(17, 'Rotate', 'switch', false),
     ];
 }
 function tableParams(dataJson) {
     return [
-        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson }),
-        param(1, 'Show search', 'switch', false),
+        param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: withPeriodSearchData(dataJson) }),
+        param(1, 'Show search', 'switch', true),
         param(2, 'Stripe', 'switch', true),
         param(3, 'Border', 'switch', true),
         param(4, 'Size', 'select', 'small'),
@@ -172,7 +224,7 @@ function tableParams(dataJson) {
         param(10, 'Header background', 'color', 'var(--el-fill-color-light)'),
         param(11, 'Header color', 'color', 'var(--el-table-header-text-color)'),
         param(12, 'Text color', 'color', 'var(--el-table-text-color)'),
-        param(13, 'Date filter', 'switch', false),
+        param(13, 'Date filter', 'switch', true),
         param(14, 'Pie width', 'number', 30),
         param(15, 'Pie background', 'color', '#409eff50'),
         param(16, 'Pie border', 'color', '#409eff'),
@@ -623,7 +675,7 @@ function normalizePageWidgetDataJson(widgetRecord, path, warnings) {
     const dataJson = typeOptions.dataJson;
     if (['statistic', 'pie', 'funnel', 'progress'].includes(widgetType)) {
         if (Array.isArray(dataJson)) {
-            typeOptions.dataJson = { data: dataJson, searchData: [] };
+            typeOptions.dataJson = { data: dataJson, searchData: mergePeriodSearchData([]) };
             warnings.push(`${path}.widgetParams[0].typeOptions.dataJson array was wrapped as {data, searchData}.`);
         }
         else {
@@ -631,7 +683,7 @@ function normalizePageWidgetDataJson(widgetRecord, path, warnings) {
             typeOptions.dataJson = {
                 ...record,
                 data: Array.isArray(record.data) ? record.data : [],
-                searchData: Array.isArray(record.searchData) ? record.searchData : [],
+                searchData: mergePeriodSearchData(record.searchData),
             };
         }
     }
@@ -641,12 +693,12 @@ function normalizePageWidgetDataJson(widgetRecord, path, warnings) {
             ...record,
             xAxis: Array.isArray(record.xAxis) ? record.xAxis : [],
             series: Array.isArray(record.series) ? record.series : [],
-            searchData: Array.isArray(record.searchData) ? record.searchData : [],
+            searchData: mergePeriodSearchData(record.searchData),
         };
     }
     if (widgetType === 'tabel') {
         if (Array.isArray(dataJson)) {
-            typeOptions.dataJson = { headerData: [], bodyData: dataJson, total: dataJson.length, searchData: [] };
+            typeOptions.dataJson = { headerData: [], bodyData: dataJson, total: dataJson.length, searchData: mergePeriodSearchData([]) };
             warnings.push(`${path}.widgetParams[0].typeOptions.dataJson array was wrapped as table bodyData.`);
         }
         else {
@@ -656,10 +708,11 @@ function normalizePageWidgetDataJson(widgetRecord, path, warnings) {
                 headerData: Array.isArray(record.headerData) ? record.headerData : [],
                 bodyData: Array.isArray(record.bodyData) ? record.bodyData : [],
                 total: typeof record.total === 'number' ? record.total : (Array.isArray(record.bodyData) ? record.bodyData.length : 0),
-                searchData: Array.isArray(record.searchData) ? record.searchData : [],
+                searchData: mergePeriodSearchData(record.searchData),
             };
         }
     }
+    enableWidgetPeriodParams(widgetType, widgetParams);
     firstParam.typeOptions = typeOptions;
     widgetParams[0] = firstParam;
     widgetRecord.widgetParams = widgetParams;

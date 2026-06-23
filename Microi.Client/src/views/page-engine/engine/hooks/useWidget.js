@@ -6,9 +6,25 @@ import { useDebounceFn } from '@vueuse/core'
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
-export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1), requestPageSize = ref()) {
+export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1), requestPageSize = ref(), activePeriod = ref()) {
+  const readMaybeRef = value =>
+    value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')
+      ? value.value
+      : value
+
   const getCurrentDataJson = () =>
     widgetObj?.widgetParams?.[0]?.typeOptions?.dataJson || {}
+
+  const getSearchData = () => {
+    const searchData = getCurrentDataJson().searchData
+    return Array.isArray(searchData) ? searchData : []
+  }
+
+  const getSearchValue = (...props) => {
+    const searchData = getSearchData()
+    const target = searchData.find(item => props.includes(item?.prop))
+    return target?.value
+  }
 
   const normalizeRemotePayload = (response) => {
     if (response && typeof response === 'object' && !Array.isArray(response)) {
@@ -119,27 +135,52 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
   }
   //加载webapi数据
   const getPageSize = () => {
-    const overrideValue = requestPageSize?.value
-    const rawValue = overrideValue || widgetObj.widgetParams[7]?.value
+    const overrideValue = readMaybeRef(requestPageSize)
+    const rawValue =
+      overrideValue !== undefined && overrideValue !== null && overrideValue !== ''
+        ? overrideValue
+        : widgetObj?.type === 'tabel'
+          ? widgetObj.widgetParams[7]?.value
+          : -1
     const pageSize = Number(rawValue)
     return Number.isFinite(pageSize) ? pageSize : -1
   }
 
   const loadRemoteData = async () => {
     let params = {}
-    if (dateRange.value) {
+    if (
+      Array.isArray(dateRange.value) &&
+      dateRange.value.length >= 2 &&
+      dateRange.value[0] &&
+      dateRange.value[1]
+    ) {
       params.start = dateRange.value[0]
       params.end = dateRange.value[1]
+      params.startDate = dateRange.value[0]
+      params.endDate = dateRange.value[1]
     }
     //添加分页条件
     const activePageSize = getPageSize()
-    if (currentPage.value !== -1 && activePageSize > 0) {
-      params.currentPage = currentPage.value
+    const activeCurrentPage = readMaybeRef(currentPage)
+    if (activeCurrentPage !== undefined && activeCurrentPage !== -1 && activePageSize > 0) {
+      params.currentPage = activeCurrentPage
       params.pageSize = activePageSize
     }
 
-    if (widgetObj.widgetParams[0].typeOptions.dataJson.searchData) {
-      widgetObj.widgetParams[0].typeOptions.dataJson.searchData?.forEach(element => {
+    const hasDateRange =
+      Array.isArray(dateRange.value) &&
+      dateRange.value.length >= 2 &&
+      dateRange.value[0] &&
+      dateRange.value[1]
+    const activePeriodValue =
+      getSearchValue('period', '_period') || (hasDateRange ? activePeriod?.value : '')
+    if (activePeriodValue) {
+      params.period = activePeriodValue
+      params._period = activePeriodValue
+    }
+
+    if (getSearchData().length) {
+      getSearchData().forEach(element => {
         params[element.prop] = element.value
       });
     }

@@ -1,16 +1,32 @@
 <template>
-  <div v-show="widgetObj.widgetParams[1]?.value" class="date-range">
+  <div v-show="showSearchPanel" class="page-engine-search-bar">
     <el-space wrap>
+      <el-radio-group
+        v-if="enableDateFilter"
+        v-model="activePeriod"
+        size="small"
+        class="period-group"
+      >
+        <el-radio-button
+          v-for="item in periodOptions"
+          :key="item.value"
+          :label="item.value"
+          :value="item.value"
+          @click="handlePeriodChange(item.value)"
+        >
+          {{ item.label }}
+        </el-radio-button>
+      </el-radio-group>
+
       <template
-        v-for="(item, index) in widgetObj.widgetParams[0].typeOptions.dataJson
-          ?.searchData"
+        v-for="(item, index) in searchData"
       >
         <el-input
           :key="index"
-          v-if="item.type == 'input'"
+          v-if="item.type == 'input' && !isPeriodSearch(item)"
           v-model="selectedValues[index]"
           size="small"
-          :placeholder="'请输入' + item.label"
+          :placeholder="`请输入${item.label || ''}`"
           clearable
           @keyup.enter="btnSearch"
         />
@@ -18,40 +34,46 @@
         <el-select
           class="pagesearch"
           style="min-width: 120px"
-          v-else-if="item.type == 'select'"
+          v-else-if="item.type == 'select' && !isPeriodSearch(item)"
           :key="index + 'select'"
           v-model="selectedValues[index]"
           @change="btnSearch"
           size="small"
-          :placeholder="'请选择' + item.label"
+          :placeholder="`请选择${item.label || ''}`"
           clearable
           filterable
           :remote="item.remote"
           :remote-method="(query) => remoteMethod(query, item, index)"
           :loading="selLoading"
+          :teleported="false"
           @keyup.enter="btnSearch"
         >
           <el-option
-            v-for="(option, index) in item.options"
+            v-for="option in item.options || []"
             :value="option.value"
             :label="option.label"
-            :key="index + option.value"
+            :key="`${option.value}`"
           />
         </el-select>
       </template>
 
       <el-date-picker
         v-model="dateRange"
-        v-if="widgetObj.widgetParams[13]?.value"
+        v-if="enableDateFilter"
         size="small"
         unlink-panels
-        type="monthrange"
+        type="daterange"
         range-separator="至"
-        start-placeholder="起始年月"
-        end-placeholder="结束年月"
-        format="YYYY-MM"
-        value-format="YYYY-MM"
+        start-placeholder="开始日期"
+        end-placeholder="结束日期"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        :teleported="false"
+        @change="handleDateRangeChange"
       />
+      <el-button :icon="Refresh" size="small" @click="resetSearch">
+        重置
+      </el-button>
       <el-button
         :icon="Search"
         size="small"
@@ -116,10 +138,15 @@
 
 <script setup name="tabel-widget">
 import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Refresh, Search } from '@element-plus/icons-vue'
 import { useWidget } from '../../../hooks/useWidget'
 import RecursiveTableColumn from '../../RecursiveTableColum/RecursiveTableColumn.vue'
 import { get } from '../../../utils/axiosInstance'
+import {
+  defaultPeriod,
+  periodOptions,
+  resolvePeriodRange,
+} from '../../../utils/periodRange'
 
 const props = defineProps({
   widgetObj: {
@@ -131,6 +158,63 @@ const props = defineProps({
 //是否开启搜索
 const selLoading = ref(false)
 const options = ref([])
+const activePeriod = ref(defaultPeriod)
+const selectedValues = ref({})
+const dateRange = ref([])
+const loading = ref(false)
+
+const dataJson = computed(
+  () => props.widgetObj.widgetParams[0]?.typeOptions?.dataJson || {}
+)
+
+const searchData = computed(() =>
+  Array.isArray(dataJson.value.searchData) ? dataJson.value.searchData : []
+)
+
+const hasRemoteDataSource = computed(
+  () => !!props.widgetObj.widgetParams[0]?.value
+)
+
+const enableSearch = computed(
+  () =>
+    props.widgetObj.widgetParams[1]?.value === true ||
+    hasRemoteDataSource.value
+)
+
+const enableDateFilter = computed(
+  () =>
+    props.widgetObj.widgetParams[13]?.value === true ||
+    hasRemoteDataSource.value
+)
+
+const showSearchPanel = computed(
+  () => enableSearch.value || enableDateFilter.value
+)
+
+const isPeriodSearch = item =>
+  item?.prop === 'period' || item?.prop === '_period'
+
+const setSearchDataValue = (prop, value) => {
+  const target = searchData.value.find(item => item.prop === prop)
+  if (target) target.value = value
+}
+
+const getSearchDataValue = prop => {
+  const target = searchData.value.find(item => item.prop === prop)
+  return target?.value
+}
+
+const syncPeriodToSearchData = () => {
+  setSearchDataValue('period', activePeriod.value)
+  setSearchDataValue('_period', activePeriod.value)
+}
+
+const applyPeriod = period => {
+  activePeriod.value = period || defaultPeriod
+  const range = resolvePeriodRange(activePeriod.value)
+  dateRange.value = [range.start, range.end]
+  syncPeriodToSearchData()
+}
 
 //远程加载数据
 const remoteMethod = async (query, item, index) => {
@@ -219,7 +303,7 @@ const showPagination = computed(() => {
 const tableHeight = computed(() => {
   if (!isAutoScroll.value) return undefined
 
-  const searchHeight = props.widgetObj.widgetParams[1]?.value ? 38 : 0
+  const searchHeight = showSearchPanel.value ? 38 : 0
   const widgetHeight = getPositiveNumber(props.widgetObj.widgetOption.height, 310)
   return Math.max(120, widgetHeight - searchHeight) + 'px'
 })
@@ -227,14 +311,13 @@ const tableHeight = computed(() => {
 //当前页
 const currentPage = ref(1)
 
-const selectedValues = ref({})
-
 onMounted(() => {
-  props.widgetObj.widgetParams[0].typeOptions.dataJson.searchData?.forEach(
-    (item, index) => {
-      selectedValues.value[index] = item.value
-    }
-  )
+  searchData.value.forEach((item, index) => {
+    selectedValues.value[index] = item.value
+  })
+  if (enableDateFilter.value) {
+    applyPeriod(getSearchDataValue('period') || getSearchDataValue('_period'))
+  }
 })
 
 const reloadRoadRemoteData = async () => {
@@ -243,12 +326,11 @@ const reloadRoadRemoteData = async () => {
 
   // 恢复选中的值
   for (const [index, value] of Object.entries(savedValues)) {
-    const searchData =
-      props.widgetObj.widgetParams[0].typeOptions.dataJson.searchData || []
-    if (searchData[index]) {
-      searchData[index].value = value
+    if (searchData.value[index]) {
+      searchData.value[index].value = value
     }
   }
+  syncPeriodToSearchData()
 
   await loadRemoteData()
 }
@@ -256,6 +338,33 @@ const reloadRoadRemoteData = async () => {
 const btnSearch = async (val) => {
   currentPage.value = 1
   await restartRuntimeTasks(true)
+}
+
+const handlePeriodChange = async period => {
+  applyPeriod(period)
+  await btnSearch()
+}
+
+const handleDateRangeChange = async value => {
+  if (value && value.length === 2) {
+    activePeriod.value = 'custom'
+    syncPeriodToSearchData()
+    await btnSearch()
+  }
+}
+
+const resetSearch = async () => {
+  searchData.value.forEach((item, index) => {
+    if (isPeriodSearch(item)) {
+      selectedValues.value[index] = defaultPeriod
+      item.value = defaultPeriod
+      return
+    }
+    selectedValues.value[index] = item.defaultValue || ''
+    item.value = item.defaultValue || ''
+  })
+  if (enableDateFilter.value) applyPeriod(defaultPeriod)
+  await btnSearch()
 }
 
 // 每页条数变更事件
@@ -274,18 +383,14 @@ const allData = ref(
   props.widgetObj.widgetParams[0].typeOptions.dataJson.bodyData || []
 )
 
-// 日期区间
-const dateRange = ref()
-// 是否加载中
-const loading = ref(false)
-
 const { loadRemoteData } = useWidget(
   props.widgetObj,
   allData.value,
   dateRange,
   loading,
   currentPage,
-  requestPageSize
+  requestPageSize,
+  activePeriod
 )
 
 const getActivePageSize = () => {
@@ -297,22 +402,28 @@ const getActivePageSize = () => {
 
 const restoreSelectedSearchValues = () => {
   const savedValues = { ...selectedValues.value }
-  const searchData =
-    props.widgetObj.widgetParams[0].typeOptions.dataJson.searchData || []
 
   for (const [index, value] of Object.entries(savedValues)) {
-    if (searchData[index]) {
-      searchData[index].value = value
+    if (searchData.value[index]) {
+      searchData.value[index].value = value
     }
   }
+  syncPeriodToSearchData()
 }
 
 const buildTableRequestParams = (pageIndex, pageSizeValue) => {
   const params = {}
 
-  if (dateRange.value) {
+  if (
+    Array.isArray(dateRange.value) &&
+    dateRange.value.length >= 2 &&
+    dateRange.value[0] &&
+    dateRange.value[1]
+  ) {
     params.start = dateRange.value[0]
     params.end = dateRange.value[1]
+    params.startDate = dateRange.value[0]
+    params.endDate = dateRange.value[1]
   }
 
   if (pageIndex !== -1 && pageSizeValue > 0) {
@@ -320,9 +431,16 @@ const buildTableRequestParams = (pageIndex, pageSizeValue) => {
     params.pageSize = pageSizeValue
   }
 
-  const searchData =
-    props.widgetObj.widgetParams[0].typeOptions.dataJson.searchData || []
-  searchData.forEach((item) => {
+  const activeSearchPeriod =
+    getSearchDataValue('period') ||
+    getSearchDataValue('_period') ||
+    (enableDateFilter.value ? activePeriod.value : '')
+  if (activeSearchPeriod) {
+    params.period = activeSearchPeriod
+    params._period = activeSearchPeriod
+  }
+
+  searchData.value.forEach((item) => {
     params[item.prop] = item.value
   })
 
@@ -978,9 +1096,14 @@ const objectSpanMethod = ({ row, column, rowIndex, columnIndex }) => {
 </script>
 
 <style lang="scss" scoped>
-.date-range {
-  margin-bottom: 5px;
-  text-align: right;
+.page-engine-search-bar {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.period-group {
+  margin-right: 2px;
 }
 .icons {
   width: 13px;

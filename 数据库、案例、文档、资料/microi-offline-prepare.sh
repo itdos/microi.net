@@ -113,6 +113,7 @@ echo '------------------------------------------------------------------'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cp "${SCRIPT_DIR}/install-microi.sh" "${WORK_DIR}/install-microi.sh"
 cp "${SCRIPT_DIR}/install-microi-offline.sh" "${WORK_DIR}/install-microi-offline.sh"
+sed -i 's/\r$//' "${WORK_DIR}/install-microi.sh" "${WORK_DIR}/install-microi-offline.sh"
 chmod +x "${WORK_DIR}/install-microi.sh"
 chmod +x "${WORK_DIR}/install-microi-offline.sh"
 

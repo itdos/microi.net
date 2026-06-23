@@ -71,7 +71,7 @@ export const line =
       sort: 1,
       label: '显示查询',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 2,
@@ -238,7 +238,7 @@ export const line =
       sort: 16,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     }
   ]
 }

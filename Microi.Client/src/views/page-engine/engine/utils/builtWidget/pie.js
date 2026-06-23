@@ -61,7 +61,7 @@ export const pie = {
       sort: 1,
       label: '显示查询',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 2,
@@ -272,7 +272,7 @@ export const pie = {
       sort: 19,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 20,
