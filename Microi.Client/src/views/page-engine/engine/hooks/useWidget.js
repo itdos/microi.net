@@ -46,6 +46,13 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
     const widgetType = widgetObj?.type
     const currentDataJson = getCurrentDataJson()
     const listDataWidgets = ['statistic', 'pie', 'funnel', 'progress']
+    const preservedSearchData = Array.isArray(currentDataJson.searchData)
+      ? currentDataJson.searchData
+      : []
+    const nextSearchData = searchData =>
+      Array.isArray(searchData) && searchData.length
+        ? searchData
+        : preservedSearchData
 
     if (payload === undefined || payload === null) return undefined
 
@@ -53,19 +60,17 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
       if (Array.isArray(payload)) {
         return {
           data: payload,
-          searchData: Array.isArray(currentDataJson.searchData)
-            ? currentDataJson.searchData
-            : [],
+          searchData: preservedSearchData,
         }
       }
       if (payload && typeof payload === 'object') {
         return {
           ...payload,
           data: Array.isArray(payload.data) ? payload.data : [],
-          searchData: Array.isArray(payload.searchData) ? payload.searchData : [],
+          searchData: nextSearchData(payload.searchData),
         }
       }
-      return { data: [], searchData: [] }
+      return { data: [], searchData: preservedSearchData }
     }
 
     if (['bar', 'line', 'linebar'].includes(widgetType)) {
@@ -75,7 +80,7 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
           ...payload,
           xAxis: Array.isArray(payload.xAxis) ? payload.xAxis : (currentDataJson.xAxis || []),
           series: Array.isArray(payload.series) ? payload.series : (currentDataJson.series || []),
-          searchData: Array.isArray(payload.searchData) ? payload.searchData : (currentDataJson.searchData || []),
+          searchData: nextSearchData(payload.searchData),
         }
       }
       return undefined
@@ -87,7 +92,7 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
           ...currentDataJson,
           bodyData: payload,
           total: payload.length,
-          searchData: Array.isArray(currentDataJson.searchData) ? currentDataJson.searchData : [],
+          searchData: preservedSearchData,
         }
       }
       if (payload && typeof payload === 'object') {
@@ -97,7 +102,7 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
           headerData: Array.isArray(payload.headerData) ? payload.headerData : (currentDataJson.headerData || []),
           bodyData: Array.isArray(payload.bodyData) ? payload.bodyData : [],
           total: Number.isFinite(Number(payload.total)) ? Number(payload.total) : (Array.isArray(payload.bodyData) ? payload.bodyData.length : 0),
-          searchData: Array.isArray(payload.searchData) ? payload.searchData : (currentDataJson.searchData || []),
+          searchData: nextSearchData(payload.searchData),
         }
       }
       return undefined

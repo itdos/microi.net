@@ -1,17 +1,17 @@
 <template>
     <div class="home" style="margin-top: 10px;">
-        <formDesigner v-if="remoteObj.Id" :remoteObj="remoteObj" :components="newComponents" :widgets="newWidgets" />
+        <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" :components="newComponents" :widgets="newWidgets" />
     </div>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { formDesigner, EventBus, usePageEngineStore } from "./index.js";
+import { formRenderer, EventBus, usePageEngineStore } from "./index.js";
 import { newComponents, newWidgets } from "@/utils/extendedWidget";
 
 export default {
     components: {
-        formDesigner
+        formRenderer
     },
     data() {
         return {

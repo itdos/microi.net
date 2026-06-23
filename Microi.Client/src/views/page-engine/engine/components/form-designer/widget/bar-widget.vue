@@ -44,7 +44,10 @@ let chartInstance = null
 
 //动态高度
 const autoHeight = computed(() => {
-  let searchHeight = props.widgetObj.widgetParams[1]?.value ? 40 : 0
+  let searchHeight =
+    props.widgetObj.widgetParams[1]?.value || props.widgetObj.widgetParams[0]?.value
+      ? 40
+      : 0
   return props.widgetObj.widgetOption.height - searchHeight + 'px'
 })
 

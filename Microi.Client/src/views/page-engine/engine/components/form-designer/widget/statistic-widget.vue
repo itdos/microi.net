@@ -9,11 +9,12 @@
     <template v-for="(item, index) in contentData" :key="index">
       <el-col
         :xs="24"
-        class="el-col"
+        class="el-col pe-stat-col"
         :span="widgetObj.widgetParams[1]?.value"
         :style="blockStyle"
       >
         <el-statistic
+          class="pe-stat-card"
           :style="[
             {
               backgroundColor: item.bgColor
@@ -37,7 +38,7 @@
         >
           <template #title>
             <div @click="handleMoreClick(item.linkUrl)" :style="titleStyle">
-              <span>{{ item.name }}</span>
+              <span>{{ displayStatisticTitle(item.name) }}</span>
             </div>
           </template>
 
@@ -69,6 +70,10 @@ import { storeToRefs } from 'pinia'
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 import CommonSearch from '../../CommonSearch/CommonSearch.vue'
+import {
+  formatPeriodTitle,
+  getDataJsonPeriod,
+} from '../../../utils/periodDisplay'
 
 const props = defineProps({
   widgetObj: {
@@ -112,11 +117,17 @@ const iconStyle = computed(() => {
 })
 
 const contentData = computed(() => {
-  if (!props.widgetObj.widgetParams[0].typeOptions.dataJson?.data) {
-    return props.widgetObj.widgetParams[0].typeOptions.dataJson
-  }
-  return props.widgetObj.widgetParams[0].typeOptions.dataJson.data
+  const dataJson = props.widgetObj.widgetParams[0].typeOptions.dataJson
+  const rawData = dataJson?.data || dataJson
+  return Array.isArray(rawData) ? rawData : []
 })
+
+const activePeriod = computed(() =>
+  getDataJsonPeriod(props.widgetObj.widgetParams[0].typeOptions.dataJson)
+)
+
+const displayStatisticTitle = title =>
+  formatPeriodTitle(title, activePeriod.value)
 
 const normalizeStatisticValue = (value) => {
   if (typeof value === 'number' || typeof value === 'object') return value
@@ -150,5 +161,36 @@ const handleMoreClick = (linkUrl) => {
 .date-range {
   margin-bottom: 5px;
   text-align: right;
+}
+
+.pe-stat-col {
+  box-sizing: border-box;
+}
+
+.pe-stat-card {
+  min-height: 78px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pe-stat-card :deep(.el-statistic__head) {
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.pe-stat-card :deep(.el-statistic__content) {
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.pe-stat-card :deep(.el-statistic__head span),
+.pe-stat-card :deep(.el-statistic__number) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -124,7 +124,17 @@ const autoHeight = computed(() => {
   if (formData.value.JsonObj.formConfig?.mobile) {
     return 'auto'
   }
+  if (!isDesignMode.value && autoContentWidgetTypes.has(props.widgetObj.type)) {
+    return 'auto'
+  }
   return props.widgetObj.widgetOption.height + 'px'
+})
+
+const autoContentWidgetTypes = new Set(['statistic', 'progress'])
+
+const isDesignMode = computed(() => {
+  const config = formData.value.JsonObj.formConfig || {}
+  return config.drag || config.hover || config.mask
 })
 
 //适配移动端

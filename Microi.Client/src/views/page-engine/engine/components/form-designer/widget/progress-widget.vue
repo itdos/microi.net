@@ -15,7 +15,7 @@
         :style="dynamicStyle"
       >
         <div v-show="widgetObj.widgetParams[12]?.value" :style="titleStyle">
-          {{ item.title }}
+          {{ displayProgressTitle(item.title) }}
         </div>
         <div :style="valueStyle">
           {{ item.value }}
@@ -44,6 +44,10 @@
 import { computed } from 'vue'
 
 import CommonSearch from '../../CommonSearch/CommonSearch.vue'
+import {
+  formatPeriodTitle,
+  getDataJsonPeriod,
+} from '../../../utils/periodDisplay'
 
 const props = defineProps({
   widgetObj: {
@@ -107,11 +111,17 @@ const progressWidth = computed(() => {
 })
 
 const contentData = computed(() => {
-  if (!props.widgetObj.widgetParams[0].typeOptions.dataJson?.data) {
-    return props.widgetObj.widgetParams[0].typeOptions.dataJson
-  }
-  return props.widgetObj.widgetParams[0].typeOptions.dataJson.data
+  const dataJson = props.widgetObj.widgetParams[0].typeOptions.dataJson
+  const rawData = dataJson?.data || dataJson
+  return Array.isArray(rawData) ? rawData : []
 })
+
+const activePeriod = computed(() =>
+  getDataJsonPeriod(props.widgetObj.widgetParams[0].typeOptions.dataJson)
+)
+
+const displayProgressTitle = title =>
+  formatPeriodTitle(title, activePeriod.value)
 </script>
 
 <style lang="scss" scoped>
