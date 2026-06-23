@@ -1079,7 +1079,7 @@
                     background
                     layout="total, sizes, prev, pager, next, jumper"
                     :total="DiyTableRowCount"
-                    :page-sizes="DiyCommon.PageSizes"
+                    :page-sizes="TablePageSizes"
                     :current-page="DiyTableRowPageIndex"
                     :page-size="DiyTableRowPageSize"
                     @size-change="DiyTableRowSizeChange"
@@ -1590,32 +1590,50 @@ export default {
     async created() {
         var self = this;
     },
+    computed: {
+        TablePageSizes() {
+            return this.GetConfiguredPageSizes();
+        }
+    },
     methods: {
       // ========== 移动端FAB拖拽 ==========
               //可传入外键Id值 、父表model
-        GetConfiguredPageSizes() {
+        GetMenuDefaultPageSize(options = {}) {
+            var self = this;
+            var menuDefaultValue = Object.prototype.hasOwnProperty.call(options, "menuDefault")
+                ? options.menuDefault
+                : (self.SysMenuModel && self.SysMenuModel.DefaultPageSize);
+            var menuDefault = Number(menuDefaultValue);
+            return menuDefault > 0 ? menuDefault : 0;
+        },
+        GetConfiguredPageSizes(options = {}) {
             var self = this;
             var pageSizes = [];
             if (self.SysConfig && self.SysConfig.PageSizes) {
                 try {
                     var configPageSizes = typeof self.SysConfig.PageSizes === "string" ? JSON.parse(self.SysConfig.PageSizes) : self.SysConfig.PageSizes;
                     if (Array.isArray(configPageSizes)) {
-                        pageSizes = configPageSizes;
+                        pageSizes = configPageSizes.slice();
                     }
                 } catch (error) {
                     pageSizes = [];
                 }
             }
             if ((!pageSizes || pageSizes.length == 0) && self.DiyCommon && Array.isArray(self.DiyCommon.PageSizes)) {
-                pageSizes = self.DiyCommon.PageSizes;
+                pageSizes = self.DiyCommon.PageSizes.slice();
             }
-            return pageSizes.map(Number).filter((size) => size > 0).sort((a, b) => a - b);
+            pageSizes = pageSizes.map(Number).filter((size) => size > 0);
+            var menuDefault = self.GetMenuDefaultPageSize(options);
+            if (menuDefault > 0 && !pageSizes.includes(menuDefault)) {
+                pageSizes.push(menuDefault);
+            }
+            return Array.from(new Set(pageSizes)).sort((a, b) => a - b);
         },
         GetDefaultTablePageSize(options = {}) {
             var self = this;
-            var pageSizes = self.GetConfiguredPageSizes();
-            var menuDefault = Number(options.menuDefault || (self.SysMenuModel && self.SysMenuModel.DefaultPageSize));
-            if (menuDefault > 0 && (pageSizes.length == 0 || pageSizes.includes(menuDefault))) {
+            var pageSizes = self.GetConfiguredPageSizes(options);
+            var menuDefault = self.GetMenuDefaultPageSize(options);
+            if (menuDefault > 0) {
                 return menuDefault;
             }
             var sysDefault = Number(self.DiyCommon && self.DiyCommon.DefaultPageSize);
@@ -1626,7 +1644,7 @@ export default {
         },
         NormalizeTablePageSize(size, options = {}) {
             var self = this;
-            var pageSizes = self.GetConfiguredPageSizes();
+            var pageSizes = self.GetConfiguredPageSizes(options);
             var pageSize = Number(size);
             if (pageSize > 0 && (pageSizes.length == 0 || pageSizes.includes(pageSize))) {
                 return pageSize;

@@ -14,6 +14,7 @@
                 :key="child.Id || child.path"
                 type="button"
                 class="menu-grid-card"
+                :title="child.meta?.title || child.name"
                 @click="goMenu(child)"
             >
                 <span class="menu-grid-card__icon">
@@ -25,7 +26,9 @@
                     <span class="menu-grid-card__title">{{ child.meta?.title || child.name }}</span>
                     <span v-if="hasVisibleChildren(child)" class="menu-grid-card__count">{{ getVisibleChildren(child).length }} 个子菜单</span>
                 </span>
-                <el-icon class="menu-grid-card__arrow"><ArrowRight /></el-icon>
+                <span class="menu-grid-card__arrow">
+                    <el-icon><ArrowRight /></el-icon>
+                </span>
             </button>
         </div>
 
@@ -113,10 +116,8 @@ function goMenu(menu) {
 <style lang="scss" scoped>
 .menu-grid-page {
     min-height: calc(100vh - 110px);
-    padding: 20px 22px 28px;
-    background:
-        linear-gradient(180deg, rgba(248, 251, 255, 0.96) 0%, rgba(255, 255, 255, 1) 42%),
-        var(--el-bg-color);
+    padding: 24px 28px 32px;
+    background: var(--el-fill-color-extra-light);
 }
 
 .menu-grid-page__header {
@@ -124,7 +125,7 @@ function goMenu(menu) {
     align-items: flex-end;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 
     h2 {
         margin: 4px 0 0;
@@ -143,23 +144,30 @@ function goMenu(menu) {
 
 .menu-grid-page__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, 168px);
+    gap: 18px;
+    max-width: 1488px;
+    align-items: start;
+    justify-content: start;
 }
 
 .menu-grid-card {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    min-height: 76px;
-    padding: 14px;
+    position: relative;
+    display: grid;
+    grid-template-rows: 54px 66px;
+    row-gap: 10px;
+    align-content: center;
+    justify-items: center;
+    width: 168px;
+    height: 168px;
+    padding: 18px 14px 14px;
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 8px;
     background: var(--el-bg-color);
-    box-shadow: 0 8px 22px rgba(31, 45, 61, 0.06);
+    box-shadow: 0 6px 18px rgba(31, 45, 61, 0.05);
     color: var(--el-text-color-primary);
     cursor: pointer;
-    text-align: left;
+    text-align: center;
     transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 
     &:hover {
@@ -173,50 +181,96 @@ function goMenu(menu) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 42px;
-    width: 42px;
-    height: 42px;
-    margin-right: 12px;
+    width: 54px;
+    height: 54px;
     border-radius: 8px;
     background: var(--el-color-primary-light-9);
     color: var(--el-color-primary);
-    font-size: 18px;
+    font-size: 23px;
 }
 
 .menu-grid-card__body {
     display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
+    align-items: center;
+    justify-content: flex-start;
     flex-direction: column;
     gap: 5px;
+    min-width: 0;
+    width: 100%;
+    height: 66px;
 }
 
 .menu-grid-card__title {
+    display: -webkit-box;
     overflow: hidden;
     color: var(--el-text-color-primary);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    max-height: 38px;
+    overflow-wrap: anywhere;
 }
 
 .menu-grid-card__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    max-width: 100%;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: var(--el-fill-color-light);
     color: var(--el-text-color-secondary);
     font-size: 12px;
-    line-height: 1.2;
+    line-height: 20px;
+    white-space: nowrap;
 }
 
 .menu-grid-card__arrow {
-    margin-left: 8px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--el-fill-color-lighter);
     color: var(--el-text-color-placeholder);
+    font-size: 13px;
+    opacity: 0.62;
+    transition: opacity 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+}
+
+.menu-grid-card:hover .menu-grid-card__arrow {
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    opacity: 1;
 }
 
 @media (max-width: 640px) {
     .menu-grid-page {
-        padding: 14px;
+        padding: 16px;
     }
 
+    .menu-grid-page__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        max-width: none;
+    }
+
+    .menu-grid-card {
+        width: 100%;
+        height: auto;
+        min-height: 150px;
+        aspect-ratio: 1 / 1;
+    }
+}
+
+@media (max-width: 360px) {
     .menu-grid-page__grid {
         grid-template-columns: 1fr;
     }

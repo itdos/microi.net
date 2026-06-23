@@ -153,6 +153,17 @@ Page 模式要特别注意：
 
 ---
 
+### 系统子菜单入口页（MenuChildrenGrid）
+
+`Microi.Client/src/views/system/menu-children-grid.vue` 是左侧父级菜单的落地入口页。修改此类页面时必须同时读取 `microi.skills/ui-design/SKILL.md` 的“PC 后台菜单宫格 / 入口页规范”。
+
+- 不要让宽屏通过纯 `auto-fill + 1fr` 一行挤出 10 个以上菜单；常规后台宽度推荐 6-8 个入口/行，并通过固定列宽、`max-width` 和 `justify-content:start` 控制密度。
+- 菜单卡片必须宽高一致，图标、菜单名称、子菜单统计要按固定槽位对齐；有无子菜单统计都不能导致标题位置上下漂移。
+- 子菜单统计应靠近菜单名称，间距约 4-6px；卡片内部必须保留足够 padding，不能让图标、标题或统计贴边。
+- 改完必须截图验收桌面宽屏和移动宽度，重点检查每行数量、图标/标题/统计对齐、文字溢出和横向滚动。
+
+---
+
 ## 6. 修改前必查清单
 
 修改 `Microi.Client` 前，至少搜索：
@@ -250,6 +261,8 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 
 后台配置必须配套维护 `sys_microiservice_page` 路由子表，并在 `sys_microiservice` 表单上用隐藏子模块 + `TableChild` 显示页面/路由。`sys_menu` 选择微服务时要由前端 V8 事件实时加载页面列表，不能完全依赖 SQL 下拉里的表单变量替换。
 
+`sys_menu.MicroServiceId` 的字段值变更 V8 必须把 `V8.ThisValue` 传给页面列表加载函数，例如 `window.LoadMicroServicePages(V8, false, V8.ThisValue || V8.Form.MicroServiceId)`；不要只读取 `V8.Form.MicroServiceId`，因为字段变更触发瞬间表单模型可能仍是旧值或显示文本。页面列表加载函数必须支持从选中对象、保存 Id、`名称（MsKey）` 文本中解析服务，并在按 `MicroServiceId` 查询为空时按 `MicroServiceKey` 兜底查询。
+
 `sys_menu` 的“选择微服务页面”联动必须允许读取草稿页面，不能在前端 V8 或 SQL 下拉里固定过滤 `sys_microiservice_page.IsEnable=1`。新建微服务后页面子表会先以草稿存在，过滤已启用会导致后台菜单无法选择页面；运行期可用性由菜单发布状态、微服务编译产物和宿主加载结果共同校验。
 
 隐藏的 `TableChild`/子表菜单不得设置 `HasChild=1`。`Display=0` 或 `AppDisplay=0` 的菜单只用于表单子表承载，不应该让左侧菜单把上级业务菜单识别成空文件夹；前端动态路由和侧边栏判断父/子菜单时也必须只统计可见子菜单。
@@ -263,3 +276,7 @@ VS Code 插件创建前端微服务时，目录名必须以用户输入的微服
 推送前端微服务时必须按 `sys_microiservice.MsKey` 定位唯一微服务。如果本地项目的 `appKey` 已被远端其它微服务占用，必须先修正本地 `appKey` 再新增/更新，不得直接覆盖。`sys_microiservice.BuildVersion` 和 `sys_microiservice_page.BuildVersion` 从 `v1.0.0` 开始递增，规则为 `v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`；上传到分布式存储/CDN 的路径必须包含该版本号，禁止继续使用时间戳目录。
 
 VS Code 插件执行前端微服务构建前必须先安全清理当前项目自己的 `distDir`（默认 `dist`），并校验待删除目录位于微服务项目目录内；推送时只能收集本次干净构建产生的文件。禁止把旧 chunk、旧 hash 文件或历史构建残留写入 `AssetManifestJson` / `AssetsJson`，否则会造成数据库附件列表与当前 `index.html` 不一致。
+
+### 表单下拉 Data 动态对象选项
+
+表单 V8 通过 `V8.FieldSet('字段名', 'Data', objectRows)` 动态写入下拉数据时，如果 `objectRows` 是对象数组，即使 `diy_field.Config.DataSource='Data'`，前端也必须按对象数据源处理，并使用 `SelectLabel/SelectSaveField` 或常见字段兜底生成 label/value。禁止把对象数组按普通字符串 Data 源过滤，否则会出现接口已有数据但下拉显示“无数据”的回归。
