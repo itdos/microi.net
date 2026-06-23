@@ -9,8 +9,8 @@
 自动安装 **MySQL + Redis + MinIO + MongoDB + Ollama + Qdrant + Watchtower + 低代码平台程序（API + Web）**，基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
 
 ### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
-```cmd
-url=https://static.itdos.com/install/install-microi.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi.sh $url;fi;bash install-microi.sh
+```bash
+url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
 ```
 
 ### ⚠️ 注意事项
@@ -69,6 +69,7 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 curl -sSO https://static.itdos.com/install/microi-offline-prepare.sh
 curl -sSO https://static.itdos.com/install/install-microi-offline.sh
 curl -sSO https://static.itdos.com/install/install-microi.sh
+sed -i 's/\r$//' microi-offline-prepare.sh install-microi-offline.sh install-microi.sh
 
 # 执行制作脚本（会拉取 Docker 镜像并打包，约需 10-30 分钟）
 bash microi-offline-prepare.sh

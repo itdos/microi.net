@@ -62,7 +62,7 @@ export const funnel = {
       sort: 1,
       label: '显示查询',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 2,
@@ -211,7 +211,7 @@ export const funnel = {
       sort: 13,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 14,

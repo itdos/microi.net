@@ -261,13 +261,13 @@ export const progress = {
       sort: 26,
       label: '显示查询',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 27,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     }
   ],
 };
