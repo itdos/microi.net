@@ -314,10 +314,19 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 
 ```json
 [
+  { "prop": "period", "value": "month", "defaultValue": "month", "label": "统计周期", "type": "select", "remote": false, "options": [{ "label": "本日", "value": "today" }, { "label": "本周", "value": "week" }, { "label": "本月", "value": "month" }, { "label": "本季", "value": "quarter" }, { "label": "本年", "value": "year" }, { "label": "去年", "value": "lastYear" }] },
   { "prop": "department", "value": "", "label": "部门", "type": "select", "remote": false, "optionUrl": "", "options": [{ "label": "全部", "value": "" }] },
   { "prop": "keyword", "value": "", "label": "关键词", "type": "input" }
 ]
 ```
+
+### 统计周期与更多筛选
+
+- 统计类组件 `statistic`、`progress`、`bar`、`line`、`linebar`、`pie`、`funnel`、`tabel` 默认必须支持周期筛选。
+- 周期按钮固定包含：本日 `today`、本周 `week`、本月 `month`、本季 `quarter`、本年 `year`、去年 `lastYear`。
+- 同时开启组件的显示查询和日期筛选开关：`statistic` 为 `widgetParams[18]/[19]`，`progress` 为 `[26]/[27]`，`bar/line` 为 `[1]/[16]`，`linebar` 为 `[1]/[18]`，`pie` 为 `[1]/[19]`，`funnel/tabel` 为 `[1]/[13]`。
+- 接口引擎会收到 `period`、`_period`、`start`、`end`、`startDate`、`endDate`，必须优先按 `start/end` 做时间范围过滤；没有传日期时默认按 `period` 或本月兜底。
+- “更多”筛选里放业务条件，例如 `keyword`、`ownerId`、`customerType`、`status`、`department` 等；日期范围作为自定义时间范围保留在更多筛选中。
 
 ## 生成 JSON 注意事项
 

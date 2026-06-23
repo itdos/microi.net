@@ -265,13 +265,13 @@ export const statistic = {
       sort: 18,
       label: '显示查询',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 19,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 20,

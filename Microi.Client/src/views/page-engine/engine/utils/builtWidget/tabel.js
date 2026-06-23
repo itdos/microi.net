@@ -219,7 +219,7 @@ export const tabel = {
       sort: 13,
       label: '日期筛选',
       type: 'switch',
-      value: false,
+      value: true,
     },
     {
       sort: 14,
