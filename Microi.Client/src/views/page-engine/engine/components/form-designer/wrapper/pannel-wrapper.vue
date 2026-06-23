@@ -164,6 +164,21 @@
             </template>
           </el-row>
         </div>
+        <div
+          v-else-if="!isDesignMode"
+          :style="{ minHeight: autoHeight }"
+          class="scroll-area runtime-scroll-area"
+        >
+          <el-row :gutter="wrapperObj.wrapperOption.gutter">
+            <!-- 娓叉煋椤甸潰缁勪欢 -->
+            <template
+              v-for="widget in wrapperObj.widgetList"
+              :key="widget.widgetOption.number"
+            >
+              <commonWidget :widgetObj="widget"></commonWidget>
+            </template>
+          </el-row>
+        </div>
         <vue-custom-scrollbar
           v-else
           :style="{ height: props.wrapperObj.wrapperOption.height + 'px' }"
@@ -298,6 +313,11 @@ const dynamicMarginTop = computed(() => {
     return 0
   }
   return props.wrapperObj.wrapperOption.marginTop
+})
+
+const isDesignMode = computed(() => {
+  const config = formData.value.JsonObj.formConfig || {}
+  return config.drag || config.hover || config.mask
 })
 
 const callGrandchildMethod = () => {
@@ -635,5 +655,9 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
   position: relative;
   margin: auto;
   width: 100%;
+}
+
+.runtime-scroll-area {
+  overflow: visible;
 }
 </style>
