@@ -6,6 +6,7 @@
         v-model="activePeriod"
         size="small"
         class="period-group"
+        @change="handlePeriodChange"
       >
         <el-radio-button
           v-for="item in periodOptions"
@@ -112,7 +113,7 @@
 </template>
 
 <script setup name="common-search">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Filter, Refresh, Search } from '@element-plus/icons-vue'
 import { useWidget } from '../../hooks/useWidget'
 import { get } from '../../utils/axiosInstance'
@@ -148,6 +149,7 @@ const selectedValues = ref({})
 const dateRange = ref([])
 const loading = ref(false)
 const activePeriod = ref(defaultPeriod)
+let periodSearchTimer = null
 
 const dataJson = computed(
   () => props.widgetObj.widgetParams[0]?.typeOptions?.dataJson || {}
@@ -190,9 +192,31 @@ const hasMoreSearch = computed(
 const isPeriodSearch = item =>
   item?.prop === 'period' || item?.prop === '_period'
 
+const ensureSearchData = () => {
+  if (!Array.isArray(dataJson.value.searchData)) {
+    dataJson.value.searchData = []
+  }
+  return dataJson.value.searchData
+}
+
 const setSearchDataValue = (prop, value) => {
-  const target = searchData.value.find(item => item.prop === prop)
-  if (target) target.value = value
+  const items = ensureSearchData()
+  const target = items.find(item => item.prop === prop)
+  if (target) {
+    target.value = value
+    return
+  }
+  if (isPeriodSearch({ prop })) {
+    items.push({
+      prop,
+      value,
+      defaultValue: defaultPeriod,
+      label: prop === 'period' ? '统计周期' : '_period',
+      type: 'select',
+      remote: false,
+      options: periodOptions.map(item => ({ ...item })),
+    })
+  }
 }
 
 const getSearchDataValue = prop => {
@@ -266,9 +290,13 @@ const btnSearch = async () => {
   emit('setData', '')
 }
 
-const handlePeriodChange = async period => {
+const handlePeriodChange = period => {
   applyPeriod(period)
-  await btnSearch()
+  if (periodSearchTimer) clearTimeout(periodSearchTimer)
+  periodSearchTimer = setTimeout(async () => {
+    await btnSearch()
+    periodSearchTimer = null
+  }, 0)
 }
 
 const handleDateRangeChange = async value => {
@@ -300,6 +328,10 @@ onMounted(async () => {
   }
   await loadRemoteData()
   emit('resetData', '')
+})
+
+onBeforeUnmount(() => {
+  if (periodSearchTimer) clearTimeout(periodSearchTimer)
 })
 </script>
 

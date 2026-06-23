@@ -117,6 +117,68 @@ function enableWidgetPeriodParams(widgetType, widgetParams) {
         }
     }
 }
+function numberValue(value, fallback) {
+    if (typeof value === 'number' && Number.isFinite(value))
+        return value;
+    if (typeof value === 'string') {
+        const parsed = Number.parseFloat(value);
+        if (Number.isFinite(parsed))
+            return parsed;
+    }
+    return fallback;
+}
+function paramNumber(widgetParams, index, fallback) {
+    return numberValue(asRecord(widgetParams[index]).value, fallback);
+}
+function paramEnabled(widgetParams, index) {
+    return asRecord(widgetParams[index]).value === true;
+}
+function widgetDataLength(widgetRecord) {
+    const widgetParams = Array.isArray(widgetRecord.widgetParams) ? widgetRecord.widgetParams : [];
+    const firstParam = asRecord(widgetParams[0]);
+    const dataJson = asRecord(firstParam.typeOptions).dataJson;
+    if (Array.isArray(dataJson))
+        return dataJson.length;
+    const record = asRecord(dataJson);
+    if (Array.isArray(record.data))
+        return record.data.length;
+    if (Array.isArray(record.bodyData))
+        return record.bodyData.length;
+    return 0;
+}
+function suggestedContentWidgetHeight(widgetRecord) {
+    const widgetType = getString(widgetRecord, 'type');
+    const widgetParams = Array.isArray(widgetRecord.widgetParams) ? widgetRecord.widgetParams : [];
+    const dataLength = widgetDataLength(widgetRecord);
+    if (widgetType === 'statistic') {
+        const gridSpan = Math.min(24, Math.max(1, paramNumber(widgetParams, 1, 6)));
+        const columns = Math.max(1, Math.floor(24 / gridSpan));
+        const rows = Math.max(1, Math.ceil(Math.max(dataLength, 1) / columns));
+        const searchHeight = paramEnabled(widgetParams, 18) || paramEnabled(widgetParams, 19) ? 44 : 0;
+        return Math.max(190, searchHeight + rows * 88 + 18);
+    }
+    if (widgetType === 'progress') {
+        const gridSpan = Math.min(24, Math.max(1, paramNumber(widgetParams, 1, 12)));
+        const columns = Math.max(1, Math.floor(24 / gridSpan));
+        const rows = Math.max(1, Math.ceil(Math.max(dataLength, 1) / columns));
+        const searchHeight = paramEnabled(widgetParams, 26) || paramEnabled(widgetParams, 27) ? 44 : 0;
+        return Math.max(180, searchHeight + rows * 108 + 24);
+    }
+    return 0;
+}
+function normalizeContentWidgetHeight(widgetRecord, path, warnings) {
+    const minHeight = suggestedContentWidgetHeight(widgetRecord);
+    if (!minHeight)
+        return 0;
+    const widgetOption = asRecord(widgetRecord.widgetOption);
+    const currentHeight = numberValue(widgetOption.height, 0);
+    if (currentHeight < minHeight) {
+        widgetOption.height = minHeight;
+        widgetRecord.widgetOption = widgetOption;
+        warnings.push(`${path}.widgetOption.height was raised to ${minHeight} so content widgets do not clip when rendered.`);
+    }
+    return minHeight;
+}
 function baseWidgetOption(wrapperNumber, span, height) {
     return {
         number: randomNumber(),
@@ -456,8 +518,8 @@ export function buildPageDesign(input) {
                     }),
                 ]),
             ], dark),
-            makeWrapper('核心指标', 24, 160, (wrapperNumber) => [
-                makeWidget('statistic', 'Statistic', wrapperNumber, 24, 130, statParams(data.stats, dark)),
+            makeWrapper('核心指标', 24, 220, (wrapperNumber) => [
+                makeWidget('statistic', 'Statistic', wrapperNumber, 24, 190, statParams(data.stats, dark)),
             ], dark),
             makeWrapper('趋势分析', 12, 340, (wrapperNumber) => [
                 makeWidget('bar', 'Bar Chart', wrapperNumber, 24, 300, chartParams('bar', {
@@ -760,6 +822,7 @@ export function normalizePageJsonObj(value) {
                 moreOption: { hidden: false, icon: 'More', iconShow: false, text: 'More', linkurl: '/', linktype: 'router', refresh: '0', datetime: '0', autotime: false, autotimeval: 1, dynamicStyle: { color: '', fontSize: '12px' } },
             },
         }, wrapper.wrapperOption);
+        let minContentWidgetHeight = 0;
         if (!Array.isArray(wrapper.widgetList)) {
             wrapper.widgetList = [];
             warnings.push(`wrapperList[${index}].widgetList was missing and was set to an empty array.`);
@@ -789,9 +852,20 @@ export function normalizePageJsonObj(value) {
                     widgetRecord.widgetParams = [param(0, 'Data source', 'textarea', '', { rows: 3, dataJson: {} })];
                     warnings.push(`wrapperList[${index}].widgetList[${widgetIndex}].widgetParams was missing and a safe data param was added.`);
                 }
-                normalizePageWidgetDataJson(widgetRecord, `wrapperList[${index}].widgetList[${widgetIndex}]`, warnings);
+                const widgetPath = `wrapperList[${index}].widgetList[${widgetIndex}]`;
+                normalizePageWidgetDataJson(widgetRecord, widgetPath, warnings);
+                minContentWidgetHeight = Math.max(minContentWidgetHeight, normalizeContentWidgetHeight(widgetRecord, widgetPath, warnings));
                 return widgetRecord;
             });
+        }
+        if (minContentWidgetHeight > 0) {
+            const wrapperOption = asRecord(wrapper.wrapperOption);
+            const minWrapperHeight = minContentWidgetHeight + 16;
+            if (numberValue(wrapperOption.height, 0) < minWrapperHeight) {
+                wrapperOption.height = minWrapperHeight;
+                wrapper.wrapperOption = wrapperOption;
+                warnings.push(`wrapperList[${index}].wrapperOption.height was raised to ${minWrapperHeight} to fit content widgets.`);
+            }
         }
         return wrapper;
     }) : [];
