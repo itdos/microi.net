@@ -1,21 +1,25 @@
 <template>
-    <div class="forklift-management">
-        <el-row :gutter="10" class="main-container" v-if="ShowRowView">
-            <el-col :span="colData.Left">
-                <el-card class="box-card" style="height: 85vh">
+    <div class="forklift-management left-right-page">
+        <el-row :gutter="10" class="main-container left-right-layout" v-if="ShowRowView">
+            <el-col :span="colData.Left" class="left-right-col">
+                <el-card class="box-card left-tree-card">
                     <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick"></LeftView>
                 </el-card>
             </el-col>
-            <el-col :span="colData.Right">
-                <el-card class="products-card" style="height: 85vh; overflow-y: auto; padding:0px;">
-                    <RightView ref="ref_RightView" style="height: 200px" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
-                    <DiyTableRowlist
-                        ref="ref_RightDiyTable"
-                        :PropsWhere="whereList"
-                        :ParentV8="clickData"
-                        :DataAppend="rightTableDataAppend"
-                        v-if="(RightViewType === '表格' || RightViewType === '表单/表格') && ShowRightView"
-                    ></DiyTableRowlist>
+            <el-col :span="colData.Right" class="left-right-col">
+                <el-card class="products-card right-content-card">
+                    <div class="right-content-body">
+                        <RightView ref="ref_RightView" class="right-form-panel" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
+                        <div class="left-right-table-host" v-if="(RightViewType === '表格' || RightViewType === '表单/表格') && ShowRightView">
+                            <DiyTableRowlist
+                                ref="ref_RightDiyTable"
+                                ContainerClass="left-right-diy-table"
+                                :PropsWhere="whereList"
+                                :ParentV8="clickData"
+                                :DataAppend="rightTableDataAppend"
+                            ></DiyTableRowlist>
+                        </div>
+                    </div>
                 </el-card>
             </el-col>
         </el-row>
@@ -237,34 +241,45 @@ export default {
 
 <style scoped>
 .forklift-management {
-    padding: 0px;
-    margin-top: 10px;
-    :deep(.el-card__body){
-        padding: 10px;
-    }
+    height: calc(100vh - 128px);
+    min-height: 520px;
+    padding: 10px 10px 0;
+    margin-top: 0;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .main-container {
-    height: calc(100vh - 40px);
+    height: 100%;
+    min-height: 0;
+}
+
+.left-right-layout {
+    align-items: stretch;
+}
+
+.left-right-col {
+    height: 100%;
+    min-height: 0;
 }
 
 /* 左侧分类卡片 */
 .box-card {
-    height: 87vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    /* 添加以下两行确保卡片本身不会溢出 */
     overflow: hidden;
     position: relative;
 }
 
-/* 卡片内容区域 - 关键修改 */
-.box-card :deep(.el-card__body) {
+.left-tree-card :deep(.el-card__body),
+.right-content-card :deep(.el-card__body) {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* 保持隐藏溢出 */
     padding: 10px;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* 搜索框 */
@@ -303,6 +318,59 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.right-content-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.right-form-panel {
+    flex: 0 0 auto;
+    max-height: 38%;
+    overflow: auto;
+    margin-bottom: 8px;
+}
+
+.left-right-table-host {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+:deep(.left-right-diy-table) {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+:deep(.left-right-diy-table .table-rowlist-tabs),
+:deep(.left-right-diy-table .el-tabs__content),
+:deep(.left-right-diy-table .el-tab-pane),
+:deep(.left-right-diy-table .box-card-table-row-list) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+:deep(.left-right-diy-table .box-card-table-row-list > .el-card__body) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden !important;
+}
+
+:deep(.left-right-diy-table .el-pagination) {
+    flex: 0 0 auto;
 }
 
 /* 其他样式保持不变 */

@@ -73,6 +73,54 @@
           :is="selectedWidgetComponent(widgetObj.type)"
           :widgetObj="widgetObj"
         ></component>
+        <template #fallback>
+          <div
+            class="pe-widget-skeleton"
+            :class="'pe-widget-skeleton--' + widgetSkeletonType"
+            :style="{ minHeight: skeletonMinHeight }"
+          >
+            <template v-if="widgetSkeletonType === 'statistic'">
+              <div
+                v-for="item in 4"
+                :key="'stat-' + item"
+                class="pe-skeleton-metric"
+              >
+                <span class="pe-skeleton-line pe-skeleton-line--short"></span>
+                <span class="pe-skeleton-line pe-skeleton-line--value"></span>
+              </div>
+            </template>
+            <template v-else-if="widgetSkeletonType === 'table'">
+              <div class="pe-skeleton-table-head"></div>
+              <div
+                v-for="row in 5"
+                :key="'table-' + row"
+                class="pe-skeleton-table-row"
+              >
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </template>
+            <template v-else-if="widgetSkeletonType === 'chart'">
+              <div class="pe-skeleton-chart-title"></div>
+              <div class="pe-skeleton-chart-body">
+                <span v-for="bar in 7" :key="'chart-' + bar"></span>
+              </div>
+            </template>
+            <template v-else-if="widgetSkeletonType === 'media'">
+              <div class="pe-skeleton-media-icon"></div>
+              <div class="pe-skeleton-line"></div>
+            </template>
+            <template v-else>
+              <div
+                v-for="line in 4"
+                :key="'line-' + line"
+                class="pe-skeleton-line"
+                :class="{ 'pe-skeleton-line--short': line === 4 }"
+              ></div>
+            </template>
+          </div>
+        </template>
       </Suspense>
       <div
         v-if="isDesignSelectMaskVisible"
@@ -131,6 +179,27 @@ const autoHeight = computed(() => {
 })
 
 const autoContentWidgetTypes = new Set(['statistic', 'progress'])
+
+const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap'])
+const tableWidgetTypes = new Set(['tabel', 'gantt', 'diytable'])
+const mediaWidgetTypes = new Set(['image', 'video', 'browser', 'office', 'webgl', 'carousel'])
+
+const widgetSkeletonType = computed(() => {
+  const type = props.widgetObj.type
+  if (type === 'statistic' || type === 'progress') return 'statistic'
+  if (tableWidgetTypes.has(type)) return 'table'
+  if (chartWidgetTypes.has(type)) return 'chart'
+  if (mediaWidgetTypes.has(type)) return 'media'
+  return 'list'
+})
+
+const skeletonMinHeight = computed(() => {
+  if (formData.value.JsonObj.formConfig?.mobile) {
+    return widgetSkeletonType.value === 'statistic' ? '96px' : '140px'
+  }
+  const height = Number(props.widgetObj.widgetOption.height)
+  return Number.isFinite(height) && height > 0 ? height + 'px' : '160px'
+})
 
 const isDesignMode = computed(() => {
   const config = formData.value.JsonObj.formConfig || {}
@@ -405,6 +474,146 @@ const startResizeMargin = useResizable(curWidget, 'marginTop').startResize
 <style lang="scss" scoped>
 .common-widget-body {
   position: relative;
+}
+
+.pe-widget-skeleton {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 14px;
+  background: var(--el-bg-color, #fff);
+  overflow: hidden;
+}
+
+.pe-widget-skeleton,
+.pe-widget-skeleton * {
+  position: relative;
+}
+
+.pe-widget-skeleton::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.68), transparent);
+  animation: pe-skeleton-shimmer 1.2s infinite;
+}
+
+.pe-skeleton-line,
+.pe-skeleton-chart-title,
+.pe-skeleton-table-head,
+.pe-skeleton-media-icon,
+.pe-skeleton-table-row span,
+.pe-skeleton-chart-body span {
+  display: block;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--el-fill-color-light), var(--el-fill-color), var(--el-fill-color-light));
+  background-size: 220% 100%;
+  animation: pe-skeleton-pulse 1.3s ease-in-out infinite;
+}
+
+.pe-skeleton-line {
+  height: 12px;
+  margin-bottom: 12px;
+}
+
+.pe-skeleton-line--short {
+  width: 58%;
+}
+
+.pe-skeleton-line--value {
+  width: 46%;
+  height: 22px;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.pe-widget-skeleton--statistic {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pe-skeleton-metric {
+  min-height: 74px;
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.pe-skeleton-chart-title {
+  width: 34%;
+  height: 14px;
+  margin-bottom: 22px;
+}
+
+.pe-skeleton-chart-body {
+  height: calc(100% - 40px);
+  min-height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.pe-skeleton-chart-body span {
+  flex: 1;
+  min-width: 10px;
+}
+
+.pe-skeleton-chart-body span:nth-child(1) { height: 36%; }
+.pe-skeleton-chart-body span:nth-child(2) { height: 58%; }
+.pe-skeleton-chart-body span:nth-child(3) { height: 44%; }
+.pe-skeleton-chart-body span:nth-child(4) { height: 76%; }
+.pe-skeleton-chart-body span:nth-child(5) { height: 62%; }
+.pe-skeleton-chart-body span:nth-child(6) { height: 48%; }
+.pe-skeleton-chart-body span:nth-child(7) { height: 68%; }
+
+.pe-skeleton-table-head {
+  height: 32px;
+  margin-bottom: 10px;
+}
+
+.pe-skeleton-table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pe-skeleton-table-row span {
+  height: 24px;
+}
+
+.pe-widget-skeleton--media {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.pe-skeleton-media-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+}
+
+@keyframes pe-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pe-skeleton-pulse {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
 }
 
 .widget-design-select-mask {
