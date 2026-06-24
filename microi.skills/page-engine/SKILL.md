@@ -325,7 +325,7 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 - 统计类组件 `statistic`、`progress`、`bar`、`line`、`linebar`、`pie`、`funnel`、`tabel` 默认必须支持周期筛选。
 - 周期按钮固定包含：本日 `today`、本周 `week`、本月 `month`、本季 `quarter`、本年 `year`、去年 `lastYear`。
 - 同时开启组件的显示查询和日期筛选开关：`statistic` 为 `widgetParams[18]/[19]`，`progress` 为 `[26]/[27]`，`bar/line` 为 `[1]/[16]`，`linebar` 为 `[1]/[18]`，`pie` 为 `[1]/[19]`，`funnel/tabel` 为 `[1]/[13]`。
-- 接口引擎会收到 `period`、`_period`、`start`、`end`、`startDate`、`endDate`，必须优先按 `start/end` 做时间范围过滤；没有传日期时默认按 `period` 或本月兜底。
+- 接口引擎会收到 `period`、`_period`、`start`、`end`、`startDate`、`endDate`。当 `period` 是 `today/week/month/quarter/year/lastYear` 时，必须优先按 `period` 计算时间范围、标题前缀和图表粒度；只有 `period=custom` 或没有 `period` 但有 `start/end` 时，才按自定义时间范围处理。
 - “更多”筛选里放业务条件，例如 `keyword`、`ownerId`、`customerType`、`status`、`department` 等；日期范围作为自定义时间范围保留在更多筛选中。
 
 ## 生成 JSON 注意事项
@@ -344,4 +344,5 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 - 指标名称不要写死为“月订单金额、月新增客户、月跟进活跃”等固定月份口径。优先使用“订单金额、新增客户、跟进活跃”等中性名称；如业务需要展示周期前缀，运行态会根据当前 `period` 自动显示为“本日/本周/本月/本季/本年/去年”。
 - `statistic`、`progress` 这类内容型组件在运行态必须允许按内容自适应高度。生成 JSON 时也要按数据条数预留高度：统计卡片按每行列数计算行数，避免首次打开时出现卡片底部被遮挡或容器内部滚动条。
 - 有远程数据源的图表/表格/统计组件，点击周期按钮必须真实触发接口请求，并把 `period`、`_period`、`startDate`、`endDate` 等查询条件传给接口。接口返回数据时不要清空组件已有的 `searchData`，除非明确返回新的完整筛选配置。
+- 接口返回的指标名、图例名、表格列名禁止固定写成“月新增客户、月订单金额”等，必须根据最终生效周期输出“本日/本周/本月/本季/本年/去年/自定义”或保持中性名称；否则切换周期后文案会和数据口径冲突。
 - `/mic/autopage/:Id` 面向最终用户运行态展示，应渲染 `formRenderer`；设计器入口才渲染 `formDesigner`，避免导航、组件面板、引导遮罩干扰看板访问和自动化截图。
