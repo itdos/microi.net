@@ -32,7 +32,7 @@ import { useDiyStore } from "@/pinia";
 export default {
     name: "diy-autocomplete",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     setup(props) {
         const diyStore = useDiyStore();
         return {
@@ -203,6 +203,11 @@ export default {
                 self.$emit("CallbackRunV8Code", { field: self.field, thisValue: item });
             }
             self.$emit("CallbackFormValueChange", self.field, item);
+            if (self.TableInEdit && self.FormDiyTableModel._IsInTableAdd !== true) {
+                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                self.$emit("CallbackInTableEditSave", __interceptPayload);
+                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
+            }
             let dataLog = [
                 {
                     Name: self.field.Name,
