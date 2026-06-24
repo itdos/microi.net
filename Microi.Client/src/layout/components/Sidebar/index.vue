@@ -197,12 +197,34 @@ export default {
 
     // 子菜单样式
     .el-sub-menu {
-        .el-menu {
-            background: rgba(0, 0, 0, 0.05) !important;
+        &.is-opened {
+            > .el-sub-menu__title {
+                background: var(--sidebar-opened-title-bg, rgba(255, 255, 255, 0.16)) !important;
+                box-shadow: none;
+            }
         }
 
-        .el-menu-item {
+        .el-menu {
+            margin: 2px 0 4px 14px;
+            padding: 2px 0;
+            border-radius: 0;
+            background: transparent !important;
+            box-shadow: none;
+        }
+
+        .el-menu-item,
+        .el-sub-menu__title {
+            margin: 3px 8px 3px 0;
+            background: var(--sidebar-submenu-item-bg, rgba(0, 0, 0, 0.06)) !important;
             // padding-left: 50px !important;
+
+            &:hover {
+                background: var(--sidebar-submenu-hover-bg, rgba(255, 255, 255, 0.14)) !important;
+            }
+
+            &.is-active {
+                background: var(--sidebar-submenu-active-bg, rgba(255, 255, 255, 0.24)) !important;
+            }
 
             &::before {
                 left: 25px;
@@ -223,6 +245,13 @@ export default {
         margin: 0px 0px;
         .menu-title{
             display: none;
+        }
+    }
+    .el-sub-menu {
+        .el-menu {
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
         }
     }
     .el-menu-item,
