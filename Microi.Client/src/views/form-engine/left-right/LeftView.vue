@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="left-tree-view">
         <!-- 头部区域 -->
         <!-- 表单对话框组件 -->
         <DiyFormDialog ref="refDiyTable_DiyFormDialog" @CallbackGetDiyTableRow="handleFormClosed"></DiyFormDialog>
@@ -54,18 +54,20 @@
         </el-dialog>
 
         <!-- 分类标题和操作按钮 -->
-        <div style="font-size:14px;height: 32px;float: left;line-height: 32px;display: flex;align-items: center;">
-            <el-icon class="mr-2"><Operation /></el-icon>
-            {{ LeftTreeData.ShubiaoT || "分类" }}
-        </div>
-        <div style="float: right">
+        <div class="left-tree-toolbar">
+            <div class="left-tree-title">
+                <el-icon class="mr-2"><Operation /></el-icon>
+                {{ LeftTreeData.ShubiaoT || "分类" }}
+            </div>
+            <div class="left-tree-actions">
             <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level >= 9999">页面配置 </el-button>
             <el-button type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
             <el-button style="margin-left: 5px" @click="refreshTree" v-if="LeftTreeData.ShushuaX === 1">刷新 </el-button>
+            </div>
         </div>
 
         <!-- 树形控件容器 -->
-        <div class="tree-container" style="margin-top: 10px">
+        <div class="tree-container">
             <!-- 搜索区域 -->
             <div style="margin-top: 15px">
                 <el-input
@@ -559,12 +561,52 @@ export default {
     height: calc(100vh - 40px);
 }
 
+.left-tree-view {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.left-tree-toolbar {
+    flex: 0 0 auto;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.left-tree-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    line-height: 32px;
+    color: var(--el-text-color-primary);
+    white-space: nowrap;
+}
+
+.left-tree-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.left-tree-actions .el-button + .el-button {
+    margin-left: 0;
+}
+
 /* 树形容器样式 - 添加滚动条 */
 .tree-container {
-    height: calc(100vh - 150px);
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     width: 100%;
+    margin-top: 10px;
 }
 
 /* 自定义树形控件包装器 */
@@ -576,7 +618,7 @@ export default {
     border: 1px solid #ebeef5;
     border-radius: 4px;
     margin-top: 10px;
-    margin-bottom: 30px;
+    margin-bottom: 0;
 }
 
 /* 树形控件滚动区域 */

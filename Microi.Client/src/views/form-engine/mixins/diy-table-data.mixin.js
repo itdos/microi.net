@@ -205,7 +205,9 @@ export default {
                 if (offset) {
                     var top = offset.top;
                     // var height = $('#diy-table-' + self.TableId).height();
-                    var result = `calc(100vh - ${top}px - 55px)`;
+                    var isLeftRightTable = typeof self.ContainerClass === "string" && self.ContainerClass.indexOf("left-right-diy-table") > -1;
+                    var bottomReserved = isLeftRightTable ? 115 : 55;
+                    var result = `calc(100vh - ${top}px - ${bottomReserved}px)`;
                     // $('#diy-table-' + self.TableId).height(result);
                     return result;
                 }

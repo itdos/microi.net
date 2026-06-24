@@ -1,6 +1,19 @@
 <template>
     <div class="home">
         <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
+        <div v-else class="pe-page-skeleton">
+            <div class="pe-page-skeleton__header"></div>
+            <div class="pe-page-skeleton__stats">
+                <span v-for="item in 4" :key="'stat-' + item"></span>
+            </div>
+            <div class="pe-page-skeleton__grid">
+                <div v-for="item in 4" :key="'panel-' + item" class="pe-page-skeleton__panel">
+                    <i></i>
+                    <b></b>
+                    <em></em>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -199,5 +212,88 @@ export default {
     width: 100%;
     height: 100%;
     // background-color: #fff;
+}
+
+.pe-page-skeleton {
+    width: 100%;
+    min-height: calc(100vh - 130px);
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.pe-page-skeleton__header,
+.pe-page-skeleton__stats span,
+.pe-page-skeleton__panel,
+.pe-page-skeleton__panel i,
+.pe-page-skeleton__panel b,
+.pe-page-skeleton__panel em {
+    display: block;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--el-fill-color-light), var(--el-fill-color), var(--el-fill-color-light));
+    background-size: 220% 100%;
+    animation: pe-page-skeleton-pulse 1.3s ease-in-out infinite;
+}
+
+.pe-page-skeleton__header {
+    width: 180px;
+    height: 18px;
+    margin-bottom: 16px;
+}
+
+.pe-page-skeleton__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.pe-page-skeleton__stats span {
+    height: 88px;
+}
+
+.pe-page-skeleton__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.pe-page-skeleton__panel {
+    min-height: 240px;
+    padding: 16px;
+    box-sizing: border-box;
+    background: var(--el-bg-color, #fff);
+    border: 1px solid var(--el-border-color-lighter);
+}
+
+.pe-page-skeleton__panel i {
+    width: 32%;
+    height: 14px;
+    margin-bottom: 24px;
+}
+
+.pe-page-skeleton__panel b {
+    height: 120px;
+    margin-bottom: 16px;
+}
+
+.pe-page-skeleton__panel em {
+    width: 72%;
+    height: 12px;
+}
+
+@keyframes pe-page-skeleton-pulse {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 100% 50%;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .pe-page-skeleton__stats,
+    .pe-page-skeleton__grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
