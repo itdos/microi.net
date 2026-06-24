@@ -17,6 +17,28 @@ function readTokenFromFile(filePath, apiUrl, osClient) {
         return undefined;
     }
 }
+function normalizeSsePostBody(req) {
+    const body = req.body;
+    const currentType = String(req.headers['content-type'] || '');
+    if (typeof body === 'string') {
+        if (!/^application\/json\b/i.test(currentType)) {
+            req.headers['content-type'] = 'application/json';
+        }
+        try {
+            return JSON.parse(body);
+        }
+        catch {
+            return body;
+        }
+    }
+    if (body && typeof body === 'object') {
+        if (!/^application\/json\b/i.test(currentType)) {
+            req.headers['content-type'] = 'application/json';
+        }
+        return body;
+    }
+    return undefined;
+}
 async function main() {
     const config = {
         apiBaseUrl: (process.env.MICROI_API_URL || '').replace(/\/+$/, ''),
@@ -108,7 +130,8 @@ async function startStdio(server) {
  */
 async function startSSE(port, defaultConfig) {
     const app = express();
-    app.use(express.json());
+    app.use(express.json({ type: ['application/json', 'application/*+json'], limit: '4mb' }));
+    app.use(express.text({ type: ['text/plain', 'application/json-rpc'], limit: '4mb' }));
     const sessions = new Map();
     app.get('/sse', async (req, res) => {
         const username = req.headers['x-microi-username'] || defaultConfig.username;
@@ -161,7 +184,7 @@ async function startSSE(port, defaultConfig) {
             res.status(404).json({ error: 'Session not found' });
             return;
         }
-        await session.transport.handlePostMessage(req, res);
+        await session.transport.handlePostMessage(req, res, normalizeSsePostBody(req));
     });
     app.get('/health', (_req, res) => {
         res.json({ status: 'ok', server: 'microi-mcp-server', version: '1.0.0', activeSessions: sessions.size });
