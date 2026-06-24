@@ -90,6 +90,12 @@ namespace Microi.net
             }
             #endregion
 
+            var excelSheets = GetExcelSheets(param);
+            if (excelSheets.Any())
+            {
+                return await ExportExcelSheetsAsync(param, excelSheets);
+            }
+
             List<dynamic> result;
             SysMenu sysMenuModel = null;
             try
@@ -608,6 +614,564 @@ namespace Microi.net
                 return new DosResult<byte[]>(0, null, ex.Message);
             }
         }
+
+        private List<ExcelSheetParam> GetExcelSheets(DiyTableRowParam param)
+        {
+            if (param?.ExcelSheets != null && param.ExcelSheets.Any())
+            {
+                return param.ExcelSheets;
+            }
+            if (param?.Sheets != null && param.Sheets.Any())
+            {
+                return param.Sheets;
+            }
+            return new List<ExcelSheetParam>();
+        }
+
+        private async Task<DosResult<byte[]>> ExportExcelSheetsAsync(DiyTableRowParam parentParam, List<ExcelSheetParam> sheets)
+        {
+            try
+            {
+                IWorkbook workbook = new XSSFWorkbook();
+                var sysConfig = (await MicroiEngine.FormEngine.GetSysConfig(parentParam.OsClient)).Data;
+                var sheetIndex = 1;
+                foreach (var sheet in sheets)
+                {
+                    ApplyExcelSheetDefaults(parentParam, sheet);
+                    var sheetDataResult = await GetExportExcelSheetDataAsync(sheet);
+                    if (sheetDataResult.Code != 1)
+                    {
+                        return new DosResult<byte[]>(0, null, sheetDataResult.Msg);
+                    }
+                    var sheetName = GetSafeExcelSheetName(workbook, sheet.SheetName, sheetIndex);
+                    await WriteExportExcelSheetAsync(
+                        workbook,
+                        sheetName,
+                        sheetDataResult.Data.ExcelData,
+                        sheetDataResult.Data.ExcelHeader,
+                        sheet.ExcelHeader == null,
+                        sysConfig
+                    );
+                    sheetIndex++;
+                }
+                using (var stream = new MemoryStream())
+                {
+                    workbook.Write(stream);
+                    return new DosResult<byte[]>(1, stream.ToArray());
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<byte[]>(0, null, ex.Message);
+            }
+        }
+
+        private void ApplyExcelSheetDefaults(DiyTableRowParam parentParam, ExcelSheetParam sheet)
+        {
+            if (sheet.OsClient.DosIsNullOrWhiteSpace())
+            {
+                sheet.OsClient = parentParam.OsClient;
+            }
+            if (sheet.TableId.DosIsNullOrWhiteSpace())
+            {
+                sheet.TableId = parentParam.TableId;
+            }
+            if (sheet._SysMenuId.DosIsNullOrWhiteSpace())
+            {
+                sheet._SysMenuId = parentParam._SysMenuId;
+            }
+            if (sheet.ModuleEngineKey.DosIsNullOrWhiteSpace())
+            {
+                sheet.ModuleEngineKey = parentParam.ModuleEngineKey;
+            }
+            if (sheet.FormEngineKey.DosIsNullOrWhiteSpace())
+            {
+                sheet.FormEngineKey = parentParam.FormEngineKey;
+            }
+            if (sheet._Lang.DosIsNullOrWhiteSpace())
+            {
+                sheet._Lang = parentParam._Lang;
+            }
+            if (sheet.ExcelHeader == null && parentParam.ExcelHeader != null)
+            {
+                sheet.ExcelHeader = parentParam.ExcelHeader;
+            }
+        }
+
+        private string GetSafeExcelSheetName(IWorkbook workbook, string sheetName, int index)
+        {
+            var name = sheetName.DosIsNullOrWhiteSpace() ? $"Sheet{index}" : sheetName.Trim();
+            name = Regex.Replace(name, @"[\[\]\:\*\?\/\\]", "_");
+            if (name.Length > 31)
+            {
+                name = name.Substring(0, 31);
+            }
+            if (name.DosIsNullOrWhiteSpace())
+            {
+                name = $"Sheet{index}";
+            }
+            var baseName = name;
+            var suffixIndex = 2;
+            while (workbook.GetSheet(name) != null)
+            {
+                var suffix = $"_{suffixIndex}";
+                var maxBaseLength = 31 - suffix.Length;
+                name = (baseName.Length > maxBaseLength ? baseName.Substring(0, maxBaseLength) : baseName) + suffix;
+                suffixIndex++;
+            }
+            return name;
+        }
+
+        private class ExportExcelSheetData
+        {
+            public List<dynamic> ExcelData { get; set; }
+            public List<JObject> ExcelHeader { get; set; }
+        }
+
+        private async Task<DosResult<ExportExcelSheetData>> GetExportExcelSheetDataAsync(DiyTableRowParam param)
+        {
+            List<dynamic> result;
+            SysMenu sysMenuModel = null;
+            if (param.ExcelData != null)
+            {
+                result = param.ExcelData;
+            }
+            else
+            {
+                var tmpResult = await MicroiEngine.FormEngine.GetTableDataAsync(param);
+                if (tmpResult.Code != 1)
+                {
+                    return new DosResult<ExportExcelSheetData>(0, null, tmpResult.Msg);
+                }
+                result = tmpResult.Data;
+            }
+            var fieldList = new List<JObject>();
+            if (param.ExcelHeader == null)
+            {
+                var fieldListResult = await MicroiEngine.FormEngine.GetDiyFieldByDiyTables(new DiyFieldParam()
+                {
+                    OsClient = param.OsClient,
+                    TableIds = new List<string>() { param.TableId },
+                    _SysMenuId = param._SysMenuId,
+                    _ModuleEngineKey = param.ModuleEngineKey,
+                    IsDeleted = 0,
+                    _OnlyRealField = true
+                });
+                if (fieldListResult.Code != 1)
+                {
+                    return new DosResult<ExportExcelSheetData>(0, null, fieldListResult.Msg);
+                }
+                fieldList = fieldListResult.Data;
+            }
+            else
+            {
+                fieldList = param.ExcelHeader;
+            }
+
+            if (!param._SysMenuId.DosIsNullOrWhiteSpace() || !param.ModuleEngineKey.DosIsNullOrWhiteSpace())
+            {
+                var _where = new List<DiyWhere>();
+                if (!param.ModuleEngineKey.DosIsNullOrWhiteSpace())
+                {
+                    _where.Add(new DiyWhere()
+                    {
+                        Name = "ModuleEngineKey",
+                        Value = param.ModuleEngineKey,
+                        Type = "="
+                    });
+                }
+                if (!param._SysMenuId.DosIsNullOrWhiteSpace())
+                {
+                    _where.Add(new DiyWhere()
+                    {
+                        Name = "Id",
+                        Value = param._SysMenuId,
+                        Type = "="
+                    });
+                }
+                var sysMenuModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<SysMenu>(new
+                {
+                    FormEngineKey = "sys_menu",
+                    _Where = _where,
+                    OsClient = param.OsClient,
+                });
+                sysMenuModel = sysMenuModelResult.Data;
+                if (sysMenuModel != null && !sysMenuModel.SelectFields.DosIsNullOrWhiteSpace())
+                {
+                    try
+                    {
+                        var selectFields = JsonHelper.Deserialize<List<SearchFieldIdsModel>>(sysMenuModel.SelectFields);
+                        if (selectFields.Any() && !sysMenuModel.NotShowFields.DosIsNullOrWhiteSpace())
+                        {
+                            var notShowFields = JsonHelper.Deserialize<List<string>>(sysMenuModel.NotShowFields);
+                            notShowFields = notShowFields ?? new List<string>();
+                            foreach (var fieldId in notShowFields)
+                            {
+                                selectFields.RemoveAll(d => d.Id == fieldId);
+                            }
+                            fieldList = fieldList.Where(d => selectFields.Select(o => o.Id).Contains(d["Id"].Val<string>())).ToList();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+            }
+            return new DosResult<ExportExcelSheetData>(1, new ExportExcelSheetData()
+            {
+                ExcelData = result,
+                ExcelHeader = fieldList
+            });
+        }
+
+        private async Task WriteExportExcelSheetAsync(IWorkbook workbook, string sheetName, List<dynamic> result, List<JObject> fieldList, bool appendDefaultFields, dynamic sysConfig)
+        {
+            ISheet sheet = workbook.CreateSheet(sheetName);
+            sheet.SetColumnWidth(0, 20 * 256);
+            var row = sheet.CreateRow(0);
+            var dicFieldImgs = new Dictionary<string, int>();
+            foreach (var item in result)
+            {
+                JObject itemValue = JObject.FromObject(item);
+                foreach (var field in fieldList)
+                {
+                    var fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>().ToLower() == field["Name"].Val<string>().ToLower());
+                    if (fieldModel != null && !fieldModel["Config"].Val<string>().DosIsNullOrWhiteSpace())
+                    {
+                        if (fieldModel["Component"].Val<string>() == "ImgUpload")
+                        {
+                            var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
+                            var configs = configObj.Properties();
+                            var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
+                            if (selectLabelObj != null)
+                            {
+                                var multiple = selectLabelObj?.Value["Multiple"]?.ToString();
+                                if (multiple == "1" || multiple == "True")
+                                {
+                                    var imgCount = 0;
+                                    try
+                                    {
+                                        imgCount = JArray.Parse(itemValue[fieldModel["Name"].Val<string>()].Val<string>()).Count;
+                                    }
+                                    catch (System.Exception)
+                                    {
+                                        imgCount = 0;
+                                    }
+                                    if (imgCount > 0)
+                                    {
+                                        if (!dicFieldImgs.ContainsKey(fieldModel["Name"].Val<string>()))
+                                        {
+                                            dicFieldImgs.Add(fieldModel["Name"].Val<string>(), imgCount);
+                                        }
+                                        else if (dicFieldImgs[fieldModel["Name"].Val<string>()] < imgCount)
+                                        {
+                                            dicFieldImgs[fieldModel["Name"].Val<string>()] = imgCount;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            var index = 0;
+            foreach (var field in fieldList)
+            {
+                if (dicFieldImgs.ContainsKey(field["Name"].Val<string>()))
+                {
+                    for (int j = 0; j < dicFieldImgs[field["Name"].Val<string>()]; j++)
+                    {
+                        row.CreateCell(index, CellType.String).SetCellValue(field["Label"].Val<string>());
+                        index++;
+                    }
+                    if (index - dicFieldImgs[field["Name"].Val<string>()] > index - 1)
+                    {
+                        CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field["Name"].Val<string>()], index - 1);
+                        sheet.AddMergedRegion(cellRangeAddress);
+                    }
+                }
+                else
+                {
+                    row.CreateCell(index, CellType.String).SetCellValue(field["Label"].Val<string>());
+                    index++;
+                }
+            }
+            if (appendDefaultFields)
+            {
+                foreach (var field in CommonModel.DefaultExportFields)
+                {
+                    row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                    index++;
+                }
+            }
+
+            var i = 0;
+            foreach (var item in result)
+            {
+                JObject itemValue = JObject.FromObject(item);
+                var tRow = sheet.CreateRow(i + 1);
+                tRow.Height = 8 * 256;
+                var fieldIndex = 0;
+                var hasImg = false;
+                foreach (var field in fieldList)
+                {
+                    try
+                    {
+                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                        dynamic value = null;
+                        var cellType = CellType.String;
+                        if (
+                            field["Type"].Val<string>()?.ToLower()?.Contains("int") == true
+                            || field["Type"].Val<string>()?.ToLower()?.Contains("decimal") == true
+                            || itemValue[field["Name"].Val<string>()].Type == JTokenType.Float
+                            || itemValue[field["Name"].Val<string>()].Type == JTokenType.Integer
+                        )
+                        {
+                            cellType = CellType.Numeric;
+                            value = itemValue[field["Name"].Val<string>()].Val<double?>();
+                        }
+                        else
+                        {
+                            value = itemValue[field["Name"].Val<string>()].Val<string>();
+                        }
+
+                        var fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>().ToLower() == field["Name"].Val<string>().ToLower());
+                        if (fieldModel != null && !fieldModel["Config"].Val<string>().DosIsNullOrWhiteSpace())
+                        {
+                            if (fieldModel["Component"].Val<string>() == "ImgUpload")
+                            {
+                                var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
+                                var configs = configObj.Properties();
+                                var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
+                                if (selectLabelObj != null)
+                                {
+                                    var multiple = selectLabelObj?.Value["Multiple"]?.ToString();
+                                    var limit = selectLabelObj?.Value["Limit"]?.ToString();
+                                    if (multiple == "1" || multiple == "True")
+                                    {
+                                        var imgsList = new JArray();
+                                        try
+                                        {
+                                            imgsList = JArray.Parse(itemValue[fieldModel["Name"].Val<string>()].Val<string>());
+                                        }
+                                        catch (System.Exception)
+                                        { }
+                                        var imgsCount = dicFieldImgs[fieldModel["Name"].Val<string>()];
+                                        var tempIndex2 = 0;
+                                        for (var n = 0; n < imgsCount; n++)
+                                        {
+                                            if (imgsList.Count < n + 1)
+                                            {
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                tRow.CreateCell(fieldIndex, CellType.String);
+                                                if (n + 1 != imgsCount)
+                                                {
+                                                    fieldIndex++;
+                                                }
+                                                continue;
+                                            }
+                                            var img = imgsList[n];
+                                            if (limit == "1" || limit == "True")
+                                            {
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                cell.SetCellValue(value);
+                                            }
+                                            else
+                                            {
+                                                byte[] bytes = await MicroiEngine.Http.GetByte((string)sysConfig.FileServer + img["Path"]);
+                                                if (bytes == null)
+                                                {
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                    ICellStyle cellStyle = workbook.CreateCellStyle();
+                                                    cellStyle.WrapText = true;
+                                                    cell.CellStyle = cellStyle;
+                                                    cell.SetCellValue(value);
+                                                }
+                                                else
+                                                {
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    tRow.CreateCell(fieldIndex, CellType.String);
+                                                    hasImg = true;
+                                                    int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                    var drawing = sheet.CreateDrawingPatriarch() as XSSFDrawing;
+                                                    int row1 = i + 1;
+                                                    int col1 = fieldIndex;
+                                                    int row2 = i + 2;
+                                                    int col2 = fieldIndex + 1;
+                                                    IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                    drawing.CreatePicture(anchor, pictureIdx);
+                                                }
+                                            }
+                                            if (tempIndex2 + 1 != imgsCount)
+                                            {
+                                                fieldIndex++;
+                                            }
+                                            tempIndex2++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var imgPath = itemValue[field["Name"].Val<string>()].Val<string>();
+                                        if (imgPath.DosIsNullOrWhiteSpace())
+                                        {
+                                            sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                            var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                            ICellStyle cellStyle = workbook.CreateCellStyle();
+                                            cellStyle.WrapText = true;
+                                            cell.CellStyle = cellStyle;
+                                            cell.SetCellValue(value);
+                                        }
+                                        else if (!(limit == "1" || limit == "True"))
+                                        {
+                                            byte[] bytes = await MicroiEngine.Http.GetByte((string)sysConfig.FileServer + imgPath);
+                                            if (bytes == null)
+                                            {
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                ICellStyle cellStyle = workbook.CreateCellStyle();
+                                                cellStyle.WrapText = true;
+                                                cell.CellStyle = cellStyle;
+                                                cell.SetCellValue(value);
+                                            }
+                                            else
+                                            {
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                tRow.CreateCell(fieldIndex, CellType.String);
+                                                hasImg = true;
+                                                int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                var drawing = sheet.CreateDrawingPatriarch() as XSSFDrawing;
+                                                int row1 = i + 1;
+                                                int col1 = fieldIndex;
+                                                int row2 = i + 2;
+                                                int col2 = fieldIndex + 1;
+                                                IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                drawing.CreatePicture(anchor, pictureIdx);
+                                            }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                    ICellStyle cellStyle = workbook.CreateCellStyle();
+                                    cellStyle.WrapText = true;
+                                    cell.CellStyle = cellStyle;
+                                    cell.SetCellValue(value);
+                                }
+                            }
+                            else
+                            {
+                                var setSelectLabel = false;
+                                try
+                                {
+                                    var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
+                                    var configs = configObj.Properties();
+                                    var selectLabelObj = configs.FirstOrDefault(d => d.Name == "SelectLabel");
+                                    var selectSaveFormatObj = configs.FirstOrDefault(d => d.Name == "SelectSaveFormat");
+                                    var selectSaveFormatValue = "";
+                                    if (selectSaveFormatObj != null && selectSaveFormatObj.Value.Type != JTokenType.Null && !selectSaveFormatObj.Value.ToString().DosIsNullOrWhiteSpace())
+                                    {
+                                        selectSaveFormatValue = selectSaveFormatObj.Value.ToString();
+                                    }
+                                    if (selectLabelObj != null)
+                                    {
+                                        var val = selectLabelObj.Value;
+                                        if (val.Type != JTokenType.Null && !val.ToString().DosIsNullOrWhiteSpace())
+                                        {
+                                            var fieldName = fieldModel["Name"].Val<string>();
+                                            var valueStr = itemValue[fieldName].Val<string>();
+                                            if (fieldModel["Component"].Val<string>() == "MultipleSelect")
+                                            {
+                                                var valueArray = JArray.Parse(valueStr);
+                                                var labelValues = "";
+                                                foreach (var item2 in valueArray)
+                                                {
+                                                    var valueObj = item2 as JObject;
+                                                    if (valueObj == null) continue;
+                                                    var valueProsLabel = valueObj.Properties().FirstOrDefault(d => d.Name == val.ToString());
+                                                    if (valueProsLabel != null)
+                                                    {
+                                                        var labelVal = valueProsLabel.Value;
+                                                        if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                        {
+                                                            setSelectLabel = true;
+                                                            labelValues += labelVal.ToString() + ",";
+                                                        }
+                                                    }
+                                                }
+                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                cell.SetCellValue(labelValues.TrimEnd(','));
+                                            }
+                                            else if (selectSaveFormatValue != "Text")
+                                            {
+                                                var valueObj = JObject.Parse(valueStr);
+                                                var valueProsLabel = valueObj.Properties().FirstOrDefault(d => d.Name == val.ToString());
+                                                if (valueProsLabel != null)
+                                                {
+                                                    var labelVal = valueProsLabel.Value;
+                                                    if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                    {
+                                                        setSelectLabel = true;
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                        cell.SetCellValue(labelVal.ToString());
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                        tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
+                                    }
+                                }
+                                catch (Exception)
+                                {
+                                    tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
+                                }
+                                if (!setSelectLabel)
+                                {
+                                    tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                            tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    fieldIndex++;
+                }
+                if (appendDefaultFields)
+                {
+                    foreach (var field in CommonModel.DefaultExportFields)
+                    {
+                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                        var value = itemValue[field.Name].Val<string>();
+                        tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                        fieldIndex++;
+                    }
+                }
+                if (!hasImg)
+                {
+                    tRow.Height = 1 * 256;
+                }
+                i++;
+            }
+        }
+
         /// <summary>
         /// 2023-11 第二版导入功能
         /// </summary>

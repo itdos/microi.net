@@ -79,7 +79,7 @@ import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
 export default {
     name: "diy-autocomplete",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     components: {
         DiyDataSourceConfig
     },

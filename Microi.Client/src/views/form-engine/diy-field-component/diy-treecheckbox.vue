@@ -203,7 +203,7 @@ export default {
             default: () => ({})
         }
     },
-    emits: ['update:modelValue', 'ModelChange', 'CallbackFormValueChange'],
+    emits: ['update:modelValue', 'ModelChange', 'CallbackRunV8Code', 'CallbackFormValueChange', 'CallbackInTableEditSave'],
     setup(props, { emit }) {
         const { proxy } = getCurrentInstance();
         const DiyCommon = proxy.DiyCommon;
@@ -548,9 +548,17 @@ export default {
         const syncToParent = () => {
             const checkedData = getCheckedData(treeData.value);
             const serialized = JSON.stringify(checkedData);
+            const oldValue = props.modelValue;
             emit('update:modelValue', serialized);
             emit('ModelChange', serialized);
+            if (!props.TableInEdit && (props.field?.V8Code || props.field?.Config?.V8Code)) {
+                emit('CallbackRunV8Code', { field: props.field, thisValue: serialized });
+            }
             emit('CallbackFormValueChange', props.field, serialized);
+            if (props.TableInEdit && props.FormDiyTableModel?._IsInTableAdd !== true && oldValue !== serialized) {
+                const interceptPayload = { row: props.FormDiyTableModel, field: props.field, oldValue, newValue: serialized, handled: false };
+                emit('CallbackInTableEditSave', interceptPayload);
+            }
         };
 
         // 加载数据

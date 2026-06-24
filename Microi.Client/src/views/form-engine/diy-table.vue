@@ -591,8 +591,8 @@
                                             :DiyFieldList="DiyFieldList"
                                             :LoadType="'Table'"
                                             @CallbackRunV8Code="
-                                                ({ field, thisValue, callback }) => {
-                                                    return RunV8Code({ field: field, thisValue: thisValue, row: scope.row, callback: callback });
+                                                ({ field, thisValue, v8codeKey, callback }) => {
+                                                    return RunV8Code({ field: field, thisValue: thisValue, v8codeKey: v8codeKey, row: scope.row, callback: callback });
                                                 }
                                             "
                                             @CallbakOnKeyup="
@@ -873,7 +873,7 @@
                                                                 :DiyTableModel="CurrentDiyTableModel"
                                                                 :DiyFieldList="DiyFieldList"
                                                                 :LoadType="'Table'"
-                                                                @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
+                                                                @CallbackRunV8Code="({ field, thisValue, v8codeKey, callback }) => RunV8Code({ field, thisValue, v8codeKey, row: item, callback })"
                                                                 @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
                                                                 @CallbackInTableEditSave="OnInTableEditSave"
                                                                 :is="'Diy' + CardShowDiyFieldList[0].Component"
@@ -923,7 +923,7 @@
                                                             :DiyTableModel="CurrentDiyTableModel"
                                                             :DiyFieldList="DiyFieldList"
                                                             :LoadType="'Table'"
-                                                            @CallbackRunV8Code="({ field, thisValue, callback }) => RunV8Code({ field, thisValue, row: item, callback })"
+                                                            @CallbackRunV8Code="({ field, thisValue, v8codeKey, callback }) => RunV8Code({ field, thisValue, v8codeKey, row: item, callback })"
                                                             @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
                                                             @CallbackInTableEditSave="OnInTableEditSave"
                                                             :is="'Diy' + field.Component"
@@ -1883,13 +1883,75 @@ export default {
             // 为了卡片而实现，因为<el-table>有 @current-change="DiyTableCurrentChange"
             self.DiyTableCurrentChange(row);
         },
-        async RunV8Code({ field, thisValue, row, callback }) {
+        GetFieldValueChangeRunCacheKey({ field, thisValue, oldValue, row, v8codeKey }) {
+            if (!field || !(field.V8Code || (field.Config && (field.Config.V8Code || (v8codeKey && field.Config[v8codeKey]))))) return "";
+            var rowKey = row && row.Id ? row.Id : "";
+            var fieldName = this.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+            var valueKey = "";
+            var oldValueKey = "";
+            try {
+                valueKey = JSON.stringify(thisValue);
+            } catch (e) {
+                valueKey = String(thisValue);
+            }
+            try {
+                oldValueKey = JSON.stringify(oldValue);
+            } catch (e) {
+                oldValueKey = String(oldValue);
+            }
+            return [rowKey, fieldName, v8codeKey || "V8Code", valueKey, oldValueKey].join("|");
+        },
+        async RunV8Code({ field, thisValue, oldValue, v8codeKey, row, callback }) {
+            var self = this;
+            var cacheKey = self.GetFieldValueChangeRunCacheKey({ field, thisValue, oldValue, v8codeKey, row });
+            if (!cacheKey) {
+                return await self._RunV8CodeCore({ field, thisValue, oldValue, v8codeKey, row, callback });
+            }
+            self._FieldValueChangeRunCache = self._FieldValueChangeRunCache || {};
+            var now = Date.now();
+            var cached = self._FieldValueChangeRunCache[cacheKey];
+            if (cached && cached.promise && now - cached.time < 800) {
+                var cachedResult = await cached.promise;
+                callback && callback(cachedResult);
+                return cachedResult;
+            }
+            if (cached && Object.prototype.hasOwnProperty.call(cached, "result") && now - cached.time < 800) {
+                callback && callback(cached.result);
+                return cached.result;
+            }
+            var runPromise = self._RunV8CodeCore({ field, thisValue, oldValue, v8codeKey, row, callback });
+            self._FieldValueChangeRunCache[cacheKey] = { time: now, promise: runPromise };
+            var result = await runPromise;
+            self._FieldValueChangeRunCache[cacheKey] = { time: Date.now(), result: result };
+            return result;
+        },
+        async _RunV8CodeCore({ field, thisValue, oldValue, v8codeKey, row, callback }) {
             var self = this;
             var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
                 if (field
-                    && (field.V8Code || (field.Config && field.Config.V8Code))) {
+                    && (field.V8Code || (field.Config && (field.Config.V8Code || (v8codeKey && field.Config[v8codeKey]))))) {
+                    if (!v8codeKey) {
+                        v8codeKey = "V8Code";
+                    }
+                    var v8Code = v8codeKey == "V8Code" ? (field.V8Code || (field.Config && field.Config.V8Code)) : field.Config[v8codeKey];
                     var fieldModelName = self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+                    var oldForm = {};
+                    if (Array.isArray(self.OldDiyTableRowList) && row && row.Id) {
+                        oldForm = self.OldDiyTableRowList.find((item) => item && item.Id == row.Id) || {};
+                    }
+                    if (typeof self.CloneDiyTableRowForOldForm === 'function') {
+                        oldForm = self.CloneDiyTableRowForOldForm(oldForm);
+                    } else {
+                        oldForm = Object.assign({}, oldForm || {});
+                    }
+                    var fieldOldValue = oldValue;
+                    if (fieldOldValue === undefined) {
+                        fieldOldValue = oldForm[field.Name];
+                        if (fieldOldValue === undefined) {
+                            fieldOldValue = oldForm[fieldModelName];
+                        }
+                    }
                     var hasNewValue = thisValue && typeof thisValue == "object" && Object.prototype.hasOwnProperty.call(thisValue, "New");
                     var currentValue = hasNewValue ? thisValue.New : undefined;
                     if (row && currentValue !== undefined && field.Name) {
@@ -1903,9 +1965,10 @@ export default {
                     }
                     // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
                     V8.Form = form; // 当前Form表单所有字段值
-                    V8.OldForm = self.OldDiyTableRowList.find((item) => item.Id == row.Id);
+                    V8.OldForm = oldForm;
                     // V8.Form = row;
                     V8.ThisValue = thisValue;
+                    V8.OldValue = fieldOldValue;
                     V8.FormSet = (fieldName, value) => {
                         var result = self.FormSet(fieldName, value, row);
                         if (fieldName) {
@@ -1936,13 +1999,13 @@ export default {
                     };
 
                     // eval(btn.V8Code)
-                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + (field.V8Code || (field.Config && field.Config.V8Code)) + " \n})()");
-                    if (V8Result !== undefined) {
-                        callback && callback(V8.Result || V8Result);
-                        return V8Result;
+                    var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
+                    if (typeof self.SyncV8FormToRow === 'function') {
+                        self.SyncV8FormToRow(form, row);
                     }
-                    callback && callback(V8.Result);
-                    return null;
+                    var finalResult = typeof V8.Result !== "undefined" ? V8.Result : (V8Result !== undefined ? V8Result : null);
+                    callback && callback(finalResult);
+                    return finalResult;
                 } else {
                     //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
                 }

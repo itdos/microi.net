@@ -71,7 +71,7 @@ import _ from "underscore";
 export default {
     name: "diy-department",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",

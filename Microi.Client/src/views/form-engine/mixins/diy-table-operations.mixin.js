@@ -119,17 +119,18 @@ export default {
                 });
             }
             var rowFieldName = targetField && !self.DiyCommon.IsNull(targetField.AsName) ? targetField.AsName : fieldName;
+            var saveFieldName = targetField && targetField.Name ? targetField.Name : fieldName;
             var targetRow = row || self.CurrentSelectedRowModel;
             if (!targetRow) return;
 
-            targetRow[fieldName] = value;
+            targetRow[saveFieldName] = value;
             targetRow[rowFieldName] = value;
 
             var renderRow = targetRow;
             var rowIndex = self.FindDiyTableRowIndexByRow(targetRow);
             if (rowIndex > -1) {
                 renderRow = Object.assign({}, self.DiyTableRowList[rowIndex] || targetRow);
-                renderRow[fieldName] = value;
+                renderRow[saveFieldName] = value;
                 renderRow[rowFieldName] = value;
             }
 
@@ -141,6 +142,55 @@ export default {
                 self.$forceUpdate();
             }
             return value;
+        },
+        CloneDiyTableRowForOldForm(row) {
+            if (!row || typeof row !== 'object') return row;
+            try {
+                return JSON.parse(JSON.stringify(row));
+            } catch (e) {
+                return Object.assign({}, row);
+            }
+        },
+        UpdateOldDiyTableRowSnapshot(row) {
+            var self = this;
+            if (!row || self.DiyCommon.IsNull(row.Id)) return;
+            if (!Array.isArray(self.OldDiyTableRowList)) {
+                self.OldDiyTableRowList = [];
+            }
+            var snapshot = self.CloneDiyTableRowForOldForm(row);
+            var oldIndex = self.OldDiyTableRowList.findIndex(function (item) {
+                return item && item.Id == row.Id;
+            });
+            if (oldIndex > -1) {
+                self.OldDiyTableRowList.splice(oldIndex, 1, snapshot);
+            } else {
+                self.OldDiyTableRowList.push(snapshot);
+            }
+        },
+        GetDiyTableFieldModelName(fieldName) {
+            var self = this;
+            var targetField = null;
+            if (Array.isArray(self.DiyFieldList)) {
+                targetField = self.DiyFieldList.find(function (field) {
+                    return field && (field.Name == fieldName || field.AsName == fieldName);
+                });
+            }
+            return targetField && !self.DiyCommon.IsNull(targetField.AsName) ? targetField.AsName : fieldName;
+        },
+        SyncV8FormToRow(form, row) {
+            var self = this;
+            if (!form || !row) return;
+            for (var key in form) {
+                if (!Object.prototype.hasOwnProperty.call(form, key)) continue;
+                if (!key || key.charAt(0) === '_') continue;
+                if (key === 'IsVisibleDetail' || key === 'IsVisibleEdit' || key === 'IsVisibleDel') continue;
+                if (key.length > '_TmpEngineResult'.length && key.lastIndexOf('_TmpEngineResult') === key.length - '_TmpEngineResult'.length) continue;
+                var value = form[key];
+                if (typeof value === 'function') continue;
+                var rowFieldName = self.GetDiyTableFieldModelName(key);
+                if (row[key] === value && row[rowFieldName] === value) continue;
+                self.FormSet(key, value, row);
+            }
         },
         FindDiyTableRowIndexByRow(row) {
             var self = this;

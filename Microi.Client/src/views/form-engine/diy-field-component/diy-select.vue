@@ -95,7 +95,7 @@ import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
 export default {
     name: "diy-select",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     components: {
         DiyDataSourceConfig
     },

@@ -825,7 +825,11 @@ export default {
                             });
                         }
                         // 内存优化：只保存ID
-                        self.OldDiyTableRowList = result.Data.map((row) => ({ Id: row.Id }));
+                        self.OldDiyTableRowList = result.Data.map((row) => {
+                            return typeof self.CloneDiyTableRowForOldForm === 'function'
+                                ? self.CloneDiyTableRowForOldForm(row)
+                                : Object.assign({}, row || {});
+                        });
 
                         if (result.DataAppend && result.DataAppend.NotSaveField) {
                             self.NotSaveField = result.DataAppend.NotSaveField;
