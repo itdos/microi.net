@@ -50,10 +50,21 @@ pause
 exit /b !EC!
 WIN
 #!/usr/bin/env bash
+# 如果用户在 macOS/Linux 上用 `sh Microi一键编译发布.sh` 启动，
+# 这里先切回 bash；脚本后续依赖数组、[[ ]]、process substitution 等 bash 语法。
+if [ -z "${BASH_VERSION:-}" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+    printf '%s\n' "ERROR: 未找到 bash，请安装 bash 后执行：bash $0" >&2
+    exit 1
+fi
+set +o posix 2>/dev/null || true
+
 # ════════════════════════════════════════════════════════════════
 #  Microi 一键编译发布助手
 #  适用于 Microi 低代码平台的后端 (.NET) 和前端 (Vue3) 一键编译发布
-#  macOS / Linux:  bash Microi一键编译发布.sh
+#  macOS / Linux:  bash Microi一键编译发布.sh（也兼容 sh Microi一键编译发布.sh）
 #  Windows:        在 Git Bash 终端中运行同样的命令即可
 #                  bash Microi一键编译发布.sh
 #  开源地址: https://gitee.com/ITdos/microi.net
