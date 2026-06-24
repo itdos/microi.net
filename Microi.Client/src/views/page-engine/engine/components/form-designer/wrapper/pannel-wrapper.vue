@@ -68,12 +68,12 @@
         </el-text>
       </div>
 
-      <template #header v-if="wrapperObj.wrapperOption.titleOption.hidden">
+      <template #header v-if="showWrapperTitle">
         <div
           :style="wrapperObj.wrapperOption.titleOption.dynamicStyle"
           class="clearfix"
         >
-          <span>{{ wrapperObj.wrapperOption.titleOption.title }}</span>
+          <span>{{ displayWrapperTitle }}</span>
 
           <el-link
             v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden"
@@ -221,6 +221,10 @@ import { usePageEngineStore } from '../../../stores/pageEngine'
 import useResizable from '../../../hooks/useResizable'
 import vueCustomScrollbar from 'vue-custom-scrollbar/src/vue-scrollbar.vue'
 import 'vue-custom-scrollbar/dist/vueScrollbar.css'
+import {
+  formatPeriodTitle,
+  getDataJsonPeriod,
+} from '../../../utils/periodDisplay'
 
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
@@ -251,6 +255,28 @@ const autoHeight = computed(() => {
     return 'auto'
   }
   return props.wrapperObj.wrapperOption.height + 'px'
+})
+
+const wrapperTitleOption = computed(() => props.wrapperObj.wrapperOption.titleOption || {})
+
+const wrapperPeriod = computed(() => {
+  const widgets = Array.isArray(props.wrapperObj.widgetList) ? props.wrapperObj.widgetList : []
+  for (const widget of widgets) {
+    const dataJson = widget?.widgetParams?.[0]?.typeOptions?.dataJson
+    const period = getDataJsonPeriod(dataJson)
+    if (period) return period
+  }
+  return 'month'
+})
+
+const displayWrapperTitle = computed(() =>
+  formatPeriodTitle(wrapperTitleOption.value.title || '', wrapperPeriod.value)
+)
+
+const showWrapperTitle = computed(() => {
+  if (!wrapperTitleOption.value.title) return false
+  if (wrapperTitleOption.value.hidden === true) return true
+  return !isDesignMode.value && wrapperTitleOption.value.hidden === false
 })
 
 // 组件挂载时启动定时器

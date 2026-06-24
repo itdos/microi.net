@@ -150,6 +150,7 @@ const dateRange = ref([])
 const loading = ref(false)
 const activePeriod = ref(defaultPeriod)
 let periodSearchTimer = null
+let syncingPeriodRange = false
 
 const dataJson = computed(
   () => props.widgetObj.widgetParams[0]?.typeOptions?.dataJson || {}
@@ -232,8 +233,12 @@ const syncPeriodToSearchData = () => {
 const applyPeriod = period => {
   activePeriod.value = period || defaultPeriod
   const range = resolvePeriodRange(activePeriod.value)
+  syncingPeriodRange = true
   dateRange.value = [range.start, range.end]
   syncPeriodToSearchData()
+  setTimeout(() => {
+    syncingPeriodRange = false
+  }, 0)
 }
 
 const initializeSelectedValues = () => {
@@ -300,6 +305,7 @@ const handlePeriodChange = period => {
 }
 
 const handleDateRangeChange = async value => {
+  if (syncingPeriodRange) return
   if (value && value.length === 2) {
     activePeriod.value = 'custom'
     syncPeriodToSearchData()
