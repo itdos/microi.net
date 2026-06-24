@@ -152,13 +152,69 @@ LoadFabPosition() {
         OnInTableEditSave(payload) {
             var self = this;
             if (!payload || !payload.row || !payload.field) return;
-            var saveType = self.SysMenuModel && self.SysMenuModel.SaveType;
             payload.handled = true;
-            if (saveType === 'Submit') {
+            payload.promise = self._HandleInTableEditSave(payload);
+        },
+        async _HandleInTableEditSave(payload) {
+            var self = this;
+            var v8Result = await self._RunInTableEditValueChange(payload);
+            if (v8Result === false) {
+                self.RestoreInTableEditFieldValue(payload);
+                self._PendingFieldValueChangeRefreshParam = null;
+                return false;
+            }
+            if (self.IsBatchSubmitMode()) {
                 self._RecordPendingChange(payload);
-                return;
+                return true;
             }
             self._SaveRowAuto(payload);
+            return true;
+        },
+        async _RunInTableEditValueChange(payload) {
+            var self = this;
+            var field = payload && payload.field;
+            if (!field || !(field.V8Code || (field.Config && field.Config.V8Code))) {
+                return true;
+            }
+            var thisValue = payload.newValue;
+            if (field.Component === 'NumberText') {
+                thisValue = { New: payload.newValue, Old: payload.oldValue };
+            }
+            if (typeof self.RunV8Code !== 'function') return true;
+            return await self.RunV8Code({
+                field: field,
+                thisValue: thisValue,
+                oldValue: payload.oldValue,
+                row: payload.row
+            });
+        },
+        RestoreInTableEditFieldValue(payload) {
+            var self = this;
+            if (!payload || !payload.row || !payload.field) return;
+            var field = payload.field;
+            var oldValue = payload.oldValue;
+            if (oldValue === undefined && Array.isArray(self.OldDiyTableRowList) && payload.row.Id) {
+                var oldForm = self.OldDiyTableRowList.find(function (item) {
+                    return item && item.Id == payload.row.Id;
+                });
+                if (oldForm) {
+                    var oldFieldName = !self.DiyCommon.IsNull(field.AsName) ? field.AsName : field.Name;
+                    oldValue = oldForm[field.Name];
+                    if (oldValue === undefined) {
+                        oldValue = oldForm[oldFieldName];
+                    }
+                }
+            }
+            if (typeof self.FormSet === 'function') {
+                self.FormSet(field.Name, oldValue, payload.row);
+            } else {
+                payload.row[field.Name] = oldValue;
+                if (!self.DiyCommon.IsNull(field.AsName)) {
+                    payload.row[field.AsName] = oldValue;
+                }
+            }
+            payload.newValue = oldValue;
+            return oldValue;
         },
         /** 提取整行可提交的 _FormData（剔除框架内部字段、模板渲染缓存等）。 */
         _BuildFullRowFormData(row) {
@@ -237,6 +293,9 @@ LoadFabPosition() {
                 self.RefreshRowTemplateEngineResult(renderRow);
             }
             self.DiyTableRowList.splice(rowIndex, 1, renderRow);
+            if (typeof self.UpdateOldDiyTableRowSnapshot === 'function') {
+                self.UpdateOldDiyTableRowSnapshot(renderRow);
+            }
         },
         /** Submit 模式：登记待提交。 */
         _RecordPendingChange(payload) {
@@ -262,7 +321,8 @@ LoadFabPosition() {
             row._DataStatus = 'Edit';
         },
         IsBatchSubmitMode() {
-            return this.SysMenuModel && this.SysMenuModel.SaveType === 'Submit';
+            var saveType = this.SysMenuModel && this.SysMenuModel.SaveType;
+            return saveType === 'Submit' || saveType === '提交一起保存';
         },
         HasPendingBatchChanges() {
             var s = this._PendingSaveChanges;

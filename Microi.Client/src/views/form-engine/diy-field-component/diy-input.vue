@@ -10,7 +10,7 @@
         @focus="SelectField(field)"
         @change="
             (item) => {
-                return CommonV8CodeChange(item, field);
+                return HandleInputChange(item, field);
             }
         "
         @blur="
@@ -183,7 +183,7 @@ import { Edit } from '@element-plus/icons-vue';
 export default {
     name: "diy-input",
     inheritAttrs: false,
-    emits: ['ModelChange', 'OpenTableEventByInput', 'CallbakOnKeyup', 'CallbackRunV8Code', 'CallbackFormValueChange', 'CallbackSelectField', 'update:modelValue'],
+    emits: ['ModelChange', 'OpenTableEventByInput', 'CallbakOnKeyup', 'CallbackRunV8Code', 'CallbackFormValueChange', 'CallbackSelectField', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
@@ -320,6 +320,13 @@ export default {
             self.ModelChangeMethods(item);
             //self.CommonV8CodeChange(item, field);
         },
+        HandleInputChange(item, field) {
+            var self = this;
+            if (self.TableInEdit) {
+                return true;
+            }
+            return self.CommonV8CodeChange(item, field);
+        },
         FieldOnKeyup(event, field) {
             var self = this;
             var keyCode = event.keyCode;
@@ -335,7 +342,10 @@ export default {
          */
         async InputOnBlur(item, field) {
             var self = this;
-            let res = await self.CommonV8CodeChange(self.ModelValue, field, "V8CodeBlur"); //item
+            let res = true;
+            if (!self.TableInEdit) {
+                res = await self.CommonV8CodeChange(self.ModelValue, field, "V8CodeBlur"); //item
+            }
             if (res === false) return;
             //如果是表内编辑，失去焦点要自动保存
             //2021-11-02  但如果是行内新增的行，不需要自动保存，最后提交的时候再新增
@@ -343,7 +353,19 @@ export default {
                 // 让父组件（diy-table）中央接管：实现 SysMenuModel.SaveType 的 Auto(全行保存) / Submit(批量提交)
                 var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
                 self.$emit("CallbackInTableEditSave", __interceptPayload);
-                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
+                if (__interceptPayload.handled === true) {
+                    var parentResult = __interceptPayload.promise && typeof __interceptPayload.promise.then === "function"
+                        ? await __interceptPayload.promise
+                        : true;
+                    if (parentResult === false) {
+                        await self.$nextTick();
+                        self.ModelValue = self.GetFieldValue(field, self.FormDiyTableModel);
+                        self.$emit("ModelChange", self.ModelValue);
+                        self.$emit("update:modelValue", self.ModelValue);
+                    }
+                    self.LastModelValue = self.ModelValue;
+                    return;
+                }
                 var param = {
                     TableId: self.TableId,
                     // _TableRowId : self.FormDiyTableModel.Id,
@@ -398,6 +420,7 @@ export default {
                     self.$emit("CallbackRunV8Code", {
                         field: field,
                         thisValue: value,
+                        v8codeKey: v8codeKey,
                         callback: (res) => {
                             resolve(res);
                         }

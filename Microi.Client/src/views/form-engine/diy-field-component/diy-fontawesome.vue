@@ -11,7 +11,7 @@
 export default {
     name: "diy-input",
     inheritAttrs: false,
-    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
@@ -136,6 +136,11 @@ export default {
             // 立即触发更新事件，确保父组件能接收到新值
             self.$emit("ModelChange", newIcon);
             self.$emit("update:modelValue", newIcon);
+            if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
+                var __interceptPayload = { row: self.FormDiyTableModel, field: self.field, oldValue: self.LastModelValue, newValue: self.ModelValue, handled: false };
+                self.$emit("CallbackInTableEditSave", __interceptPayload);
+                if (__interceptPayload.handled === true) { self.LastModelValue = self.ModelValue; return; }
+            }
         },
         CommonV8CodeChange(item, field) {
             var self = this;

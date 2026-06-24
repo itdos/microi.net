@@ -263,6 +263,8 @@ namespace Microi.net
     {
         public List<dynamic> ExcelData { get; set; }
         public List<JObject> ExcelHeader { get; set; }
+        public List<ExcelSheetParam> ExcelSheets { get; set; }
+        public List<ExcelSheetParam> Sheets { get; set; }
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 动态加载时传入的父级值，用于加载指定父节点的子级数据
@@ -525,6 +527,12 @@ namespace Microi.net
         public string FormEngineFieldKey { get; set; }
         public List<string> FormEngineFieldKeys { get; set; }
         public List<string> FieldIds { get; set; }
+    }
+
+    public class ExcelSheetParam : DiyTableRowParam
+    {
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string SheetName { get; set; }
     }
     public partial class DiyFieldParam : BaseParam
     {

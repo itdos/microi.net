@@ -1365,12 +1365,8 @@ export default {
                 try {
                     //eval(field.Config.V8Code)
                     var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
-                    if (V8Result !== undefined) {
-                        result = V8Result;
-                        callback && callback(V8.Result || V8Result);
-                    } else {
-                        callback && callback(V8.Result);
-                    }
+                    result = typeof V8.Result !== "undefined" ? V8.Result : (V8Result !== undefined ? V8Result : null);
+                    callback && callback(result);
                     formTrace("diy-form:field-v8-end", {
                         table: self.DiyTableModel && self.DiyTableModel.Name,
                         field: field && field.Name

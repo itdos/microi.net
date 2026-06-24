@@ -178,6 +178,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 ## 自定义导出Excel
 >* 目前平台的通用导出功能是直接导出表格展现的字段以及内容，某些情况下并不满足复杂业务逻辑导出的需求，因此提供了两种自定义导出方式
 >* 2024-11-04开始支持导出单图、多图，且多图会自动生成列、合并列，通过计算定位自动浮在表格上对应的单元格
+>* 2026-06-24开始支持一次导出多个页签：传入 `ExcelSheets` 或 `Sheets` 数组即可。老的 `ExcelData + ExcelHeader` 写法保持单页签导出不变。
 >* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
 
 ### 效果图
@@ -236,6 +237,55 @@ return {
     FileByteBase64 : System.Convert.ToBase64String(excelByte)
   }
 };
+```
+:::
+
+### 导出多页签
+::: details 展开查看 JavaScript 代码
+```javascript
+// 每个页签都可以有独立的数据源和表头。
+// ExcelSheets 也可以写成 Sheets。
+var excelResult = V8.Office.ExportExcel({
+  OsClient : V8.OsClient,
+  ExcelSheets : [{
+    SheetName : '五金计划',
+    ExcelData : wujinList,
+    ExcelHeader : wujinHeader
+  },{
+    SheetName : '喷塑计划',
+    ExcelData : pensuList,
+    ExcelHeader : pensuHeader
+  }]
+});
+if(excelResult.Code != 1){
+  return excelResult;
+}
+return {
+  Code : 1,
+  Data : {
+    FileName : '生产计划_' + DateNow('yyyyMMddHHmmss') + '.xlsx',
+    ContentType : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    FileByteBase64 : System.Convert.ToBase64String(excelResult.Data)
+  }
+};
+```
+
+如果某个页签不传 `ExcelHeader`，可以传入 `TableId` / `_SysMenuId` / `ModuleEngineKey`，导出引擎会按表单字段和菜单显示列自动生成表头，并追加默认导出字段：
+```javascript
+var excelResult = V8.Office.ExportExcel({
+  OsClient : V8.OsClient,
+  ExcelSheets : [{
+    SheetName : '客户',
+    TableId : '客户表Id',
+    _SysMenuId : '客户菜单Id',
+    ExcelData : customerList
+  },{
+    SheetName : '订单',
+    TableId : '订单表Id',
+    _SysMenuId : '订单菜单Id',
+    ExcelData : orderList
+  }]
+});
 ```
 :::
 
