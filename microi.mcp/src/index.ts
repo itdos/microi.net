@@ -23,6 +23,31 @@ function readTokenFromFile(filePath: string, apiUrl: string, osClient: string): 
   }
 }
 
+function normalizeSsePostBody(req: express.Request): unknown | undefined {
+  const body = req.body as unknown;
+  const currentType = String(req.headers['content-type'] || '');
+
+  if (typeof body === 'string') {
+    if (!/^application\/json\b/i.test(currentType)) {
+      req.headers['content-type'] = 'application/json';
+    }
+    try {
+      return JSON.parse(body);
+    } catch {
+      return body;
+    }
+  }
+
+  if (body && typeof body === 'object') {
+    if (!/^application\/json\b/i.test(currentType)) {
+      req.headers['content-type'] = 'application/json';
+    }
+    return body;
+  }
+
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const config: MicroiConfig = {
     apiBaseUrl: (process.env.MICROI_API_URL || '').replace(/\/+$/, ''),
@@ -119,7 +144,8 @@ async function startStdio(server: ReturnType<typeof createMcpServer>): Promise<v
  */
 async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void> {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ type: ['application/json', 'application/*+json'], limit: '4mb' }));
+  app.use(express.text({ type: ['text/plain', 'application/json-rpc'], limit: '4mb' }));
 
   const sessions = new Map<string, SseSession>();
 
@@ -180,7 +206,7 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    await session.transport.handlePostMessage(req, res);
+    await session.transport.handlePostMessage(req, res, normalizeSsePostBody(req));
   });
 
   app.get('/health', (_req, res) => {
