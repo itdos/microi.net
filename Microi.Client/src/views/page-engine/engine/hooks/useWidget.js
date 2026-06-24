@@ -178,7 +178,7 @@ export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = r
       dateRange.value[0] &&
       dateRange.value[1]
     const activePeriodValue =
-      getSearchValue('period', '_period') || (hasDateRange ? activePeriod?.value : '')
+      getSearchValue('period', '_period') || readMaybeRef(activePeriod) || (hasDateRange ? activePeriod?.value : '')
     if (activePeriodValue) {
       params.period = activePeriodValue
       params._period = activePeriodValue
