@@ -3,6 +3,7 @@
         <logo v-if="showLogo" :collapse="isCollapse" />
         <el-scrollbar wrap-class="scrollbar-wrapper-microi">
             <el-menu
+                :key="sidebarRenderKey"
                 :default-active="activeMenu"
                 :collapse="isCollapse"
                 :background-color="variables.menuBg"
@@ -15,8 +16,8 @@
                 :hide-timeout="100"
                 :class="isCollapse ? 'el-menu--collapse' : ''"
             >
-                <template v-for="route in permission_routes" :key="route.path">
-                    <sidebar-item v-if="route.Display !== 0" :key="route.path" :item="route" :base-path="route.path" />
+                <template v-for="route in permission_routes" :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')">
+                    <sidebar-item v-if="route.Display !== 0" :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')" :item="route" :base-path="route.path" />
                 </template>
             </el-menu>
             <div style="height: 120px; width: 100%"></div>
@@ -33,7 +34,7 @@ import variables from "@/styles/variables.js";
 import MenuBottom from "@/layout/components/menu-bottom.vue";
 import { AnimateStar } from "@/utils/animate-star";
 import { useDiyStore, usePermissionStore, useAppStore, useSettingsStore } from "@/pinia";
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 export default {
     components: { SidebarItem, Logo, MenuBottom },
@@ -49,6 +50,17 @@ export default {
         const SysConfig = computed(() => diyStore.SysConfig);
         const showLogo = computed(() => settingsStore.sidebarLogo);
         const isCollapse = computed(() => !sidebar.value.opened);
+        const sidebarRenderKey = ref(0);
+        const refreshSidebar = () => {
+            sidebarRenderKey.value += 1;
+        };
+
+        onMounted(() => {
+            window.addEventListener("microi:lang-routes-reloaded", refreshSidebar);
+        });
+        onUnmounted(() => {
+            window.removeEventListener("microi:lang-routes-reloaded", refreshSidebar);
+        });
 
         return {
             permission_routes,
@@ -57,6 +69,7 @@ export default {
             SysConfig,
             showLogo,
             isCollapse,
+            sidebarRenderKey,
             variables
         };
     },

@@ -293,8 +293,22 @@ namespace Microi.net.Api
                 {
                     #region 用户不存在，自动注册
                     isNewUser = true;
-                    var defaultPwd = phone.Substring(phone.Length - 6);
-                    var encryptedPwd = EncryptHelper.DESEncode(defaultPwd);
+                    var registerPwd = param.Pwd.DosIsNullOrWhiteSpace()
+                        ? phone.Substring(phone.Length - 6)
+                        : param.Pwd.Trim();
+                    if (!param.Pwd.DosIsNullOrWhiteSpace())
+                    {
+                        if (registerPwd.Length < 6)
+                        {
+                            return Json(new DosResult(0, null, "密码长度不能少于6位！"));
+                        }
+                        var checkPwdResult = await _sysUserLogic.CheckPwd(registerPwd, param._Lang);
+                        if (!checkPwdResult.DosIsNullOrWhiteSpace())
+                        {
+                            return Json(new DosResult(0, null, checkPwdResult));
+                        }
+                    }
+                    var encryptedPwd = EncryptHelper.DESEncode(registerPwd);
 
                     var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_user", new
                     {

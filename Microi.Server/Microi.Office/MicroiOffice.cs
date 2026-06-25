@@ -22,6 +22,7 @@ using System.Net;
 using NPOI.OpenXmlFormats.Dml.WordProcessing;
 using NPOI.OpenXmlFormats.Dml;
 using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace Microi.net
 {
@@ -1178,6 +1179,308 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_httpContext"></param>
         /// <returns></returns>
+        private static bool ImportIsIgnoredComponent(string component)
+        {
+            if (component.DosIsNullOrWhiteSpace()) return false;
+            var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Button", "TableChild", "Tabs", "CollapseGroup", "Divider",
+                "Description", "Alert", "Html", "FormTab", "Layout"
+            };
+            return ignored.Contains(component);
+        }
+
+        private static bool ImportIsNumericType(string type)
+        {
+            if (type.DosIsNullOrWhiteSpace()) return false;
+            var lower = type.ToLowerInvariant();
+            return lower.StartsWith("int") || lower.StartsWith("bigint") || lower.StartsWith("decimal");
+        }
+
+        private static string ImportEscapeSql(object value)
+        {
+            return value == null ? "" : value.ToString().Replace("'", "''");
+        }
+
+        private static IDictionary<string, object> ImportGetRowDictionary(object item)
+        {
+            return item as IDictionary<string, object>;
+        }
+
+        private static List<JObject> ImportBuildFieldList(IEnumerable<JObject> fieldList, List<string> importStepList, string dateTimeFormat)
+        {
+            var result = new List<JObject>();
+            var labelSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ignoredCount = 0;
+            var duplicateCount = 0;
+            foreach (var field in fieldList
+                .Where(d => d != null)
+                .OrderByDescending(d => d["Visible"].Val<int>())
+                .ThenBy(d => d["Sort"].Val<int>()))
+            {
+                var name = field["Name"].Val<string>();
+                var label = field["Label"].Val<string>();
+                var component = field["Component"].Val<string>();
+                if (name.DosIsNullOrWhiteSpace() || label.DosIsNullOrWhiteSpace())
+                {
+                    ignoredCount++;
+                    continue;
+                }
+                if (ImportIsIgnoredComponent(component))
+                {
+                    ignoredCount++;
+                    continue;
+                }
+                if (!labelSet.Add(label))
+                {
+                    duplicateCount++;
+                    continue;
+                }
+                result.Add(field);
+            }
+            if (ignoredCount > 0)
+            {
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已跳过【{ignoredCount}】个布局/子表/按钮/无效字段。");
+            }
+            if (duplicateCount > 0)
+            {
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已跳过【{duplicateCount}】个重复表头字段，优先使用可见字段。");
+            }
+            return result.OrderBy(d => d["Sort"].Val<int>()).ToList();
+        }
+
+        private static bool ImportTryGetFieldValue(IDictionary<string, object> row, JObject fixedField, JObject field, out object value)
+        {
+            value = null;
+            if (field == null) return false;
+            var name = field["Name"].Val<string>();
+            var label = field["Label"].Val<string>();
+            if (fixedField != null && !name.DosIsNullOrWhiteSpace() && fixedField.ContainsKey(name))
+            {
+                value = fixedField[name]?.ToString();
+                return true;
+            }
+            if (row == null) return false;
+            if (!label.DosIsNullOrWhiteSpace() && row.TryGetValue(label, out value)) return true;
+            if (!name.DosIsNullOrWhiteSpace() && row.TryGetValue(name, out value)) return true;
+            return false;
+        }
+
+        private static bool ImportHasFieldValue(IDictionary<string, object> row, JObject fixedField, JObject field)
+        {
+            if (!ImportTryGetFieldValue(row, fixedField, field, out var value)) return false;
+            return value != null && !value.ToString().DosIsNullOrWhiteSpace();
+        }
+
+        private static string ImportNormalizeSwitch(object value)
+        {
+            if (value == null) return "0";
+            if (value is bool boolValue) return boolValue ? "1" : "0";
+            var text = value.ToString().Trim();
+            if (text.DosIsNullOrWhiteSpace()) return "0";
+            if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var decimalValue))
+            {
+                return decimalValue == 0 ? "0" : "1";
+            }
+            if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, out decimalValue))
+            {
+                return decimalValue == 0 ? "0" : "1";
+            }
+            var yesValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "是", "有", "真", "true", "yes", "y", "on", "启用" };
+            var noValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "否", "无", "假", "false", "no", "n", "off", "禁用" };
+            if (yesValues.Contains(text)) return "1";
+            if (noValues.Contains(text)) return "0";
+            return "0";
+        }
+
+        private static string ImportNormalizeValue(object value, JObject field)
+        {
+            if (value == null) return "";
+            if (value is DateTime dateTime)
+            {
+                return dateTime.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+
+            var text = value.ToString().Trim();
+            if (text.DosIsNullOrWhiteSpace()) return "";
+            var component = field?["Component"].Val<string>();
+            if (component == "DateTime")
+            {
+                if (DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dateTimeOffset))
+                {
+                    return dateTimeOffset.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+                }
+                if (DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out var parsedDateTime))
+                {
+                    return parsedDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+                }
+            }
+            return text;
+        }
+
+        private static string ImportBuildSqlValue(object value, JObject field)
+        {
+            var component = field?["Component"].Val<string>();
+            var type = field?["Type"].Val<string>() ?? "";
+            if (component == "Switch")
+            {
+                return ImportNormalizeSwitch(value);
+            }
+            var normalized = ImportNormalizeValue(value, field);
+            if (normalized.DosIsNullOrWhiteSpace())
+            {
+                return ImportIsNumericType(type) ? "NULL" : "''";
+            }
+            if (ImportIsNumericType(type) && component != "Text" && component != "Textarea")
+            {
+                if (!decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out var number)
+                    && !decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.CurrentCulture, out number))
+                {
+                    throw new Exception($"字段[{field?["Label"].Val<string>()}]需要数字，当前值为[{normalized}]。");
+                }
+                if (type.ToLowerInvariant().StartsWith("int") || type.ToLowerInvariant().StartsWith("bigint"))
+                {
+                    return decimal.Truncate(number).ToString(CultureInfo.InvariantCulture);
+                }
+                return number.ToString(CultureInfo.InvariantCulture);
+            }
+            return $"'{ImportEscapeSql(normalized)}'";
+        }
+
+        private static string ImportGetUniqueType(JObject field)
+        {
+            var fieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(field["Config"].Val<string>() ?? "") ?? new DiyFieldConfig();
+            return fieldConfig.Unique?.Type.DosIsNullOrWhiteSpace("Alone") ?? "Alone";
+        }
+
+        private static JObject ImportFindField(IEnumerable<JObject> fields, IEnumerable<string> names, IEnumerable<string> labels)
+        {
+            var nameSet = new HashSet<string>(names ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var labelSet = new HashSet<string>(labels ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            return fields
+                .Where(d => d != null)
+                .OrderByDescending(d => d["Unique"].Val<int>())
+                .ThenByDescending(d => string.Equals(d["Name"].Val<string>(), "Code", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(d => string.Equals(d["Label"].Val<string>(), "项目编号", StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(d => nameSet.Contains(d["Name"].Val<string>()) || labelSet.Contains(d["Label"].Val<string>()));
+        }
+
+        private int ImportAutoFillChildFkByParentCode(
+            List<dynamic> fileDataList,
+            List<JObject> currentFieldList,
+            JObject fixedField,
+            DiyTable currentTable,
+            DbSession dbSession,
+            DbInfo dbInfo,
+            dynamic osClientModel,
+            List<string> importStepList,
+            string dateTimeFormat)
+        {
+            if (fileDataList == null || fileDataList.Count == 0 || currentTable == null) return 0;
+            var filledCount = 0;
+            var tableChildFields = dbSession.From<DiyField>()
+                .Where(d => d.Component == "TableChild" && d.IsDeleted == 0)
+                .ToList();
+
+            foreach (var relationField in tableChildFields)
+            {
+                DiyFieldConfig relationConfig = null;
+                try
+                {
+                    relationConfig = JsonHelper.Deserialize<DiyFieldConfig>(relationField.Config ?? "") ?? new DiyFieldConfig();
+                }
+                catch
+                {
+                    continue;
+                }
+                if (!string.Equals(relationConfig.TableChildTableId, currentTable.Id, StringComparison.OrdinalIgnoreCase)
+                    || relationConfig.TableChildFkFieldName.DosIsNullOrWhiteSpace())
+                {
+                    continue;
+                }
+
+                var fkField = currentFieldList.FirstOrDefault(d => string.Equals(d["Name"].Val<string>(), relationConfig.TableChildFkFieldName, StringComparison.OrdinalIgnoreCase));
+                if (fkField == null) continue;
+
+                var childCodeField = ImportFindField(
+                    currentFieldList,
+                    new[] { "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH", "Code" },
+                    new[] { "项目编号", "项目编码", "项目号" });
+                if (childCodeField == null) continue;
+
+                var projectCodes = fileDataList
+                    .Select(ImportGetRowDictionary)
+                    .Where(row => row != null && !ImportHasFieldValue(row, fixedField, fkField))
+                    .Select(row =>
+                    {
+                        ImportTryGetFieldValue(row, null, childCodeField, out var codeValue);
+                        return ImportNormalizeValue(codeValue, childCodeField);
+                    })
+                    .Where(code => !code.DosIsNullOrWhiteSpace())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (!projectCodes.Any()) continue;
+
+                var parentTable = dbSession.From<DiyTable>()
+                    .Where(d => d.Id == relationField.TableId && d.IsDeleted == 0)
+                    .First();
+                if (parentTable == null) continue;
+
+                var parentFieldEntities = dbSession.From<DiyField>()
+                    .Where(d => d.TableId == parentTable.Id && d.IsDeleted == 0)
+                    .ToList();
+                var parentFields = parentFieldEntities.Select(d => JObject.FromObject(d)).ToList();
+                var parentCodeField = ImportFindField(
+                    parentFields,
+                    new[] { "Code", "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH" },
+                    new[] { "项目编号", "项目编码", "项目号" });
+                if (parentCodeField == null) continue;
+
+                var primaryFieldName = relationConfig.TableChild?.PrimaryTableFieldName;
+                if (primaryFieldName.DosIsNullOrWhiteSpace()) primaryFieldName = "Id";
+
+                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(parentTable.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
+                var sqlPkFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(primaryFieldName);
+                var sqlCodeFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(parentCodeField["Name"].Val<string>());
+                var codeToId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var chunk in projectCodes.Select((code, index) => new { code, index }).GroupBy(d => d.index / 500))
+                {
+                    var inValues = string.Join(",", chunk.Select(d => $"'{ImportEscapeSql(d.code)}'"));
+                    var sql = $"SELECT {sqlPkFieldName} Id,{sqlCodeFieldName} Code FROM {sqlTableName} WHERE IsDeleted = 0 AND {sqlCodeFieldName} IN ({inValues})";
+                    var parentRows = dbSession.FromSql(sql).ToArray();
+                    foreach (var row in parentRows)
+                    {
+                        var rowObj = JObject.FromObject(row);
+                        var code = rowObj["Code"].Val<string>();
+                        var id = rowObj["Id"].Val<string>();
+                        if (!code.DosIsNullOrWhiteSpace() && !id.DosIsNullOrWhiteSpace() && !codeToId.ContainsKey(code))
+                        {
+                            codeToId.Add(code, id);
+                        }
+                    }
+                }
+
+                foreach (var item in fileDataList)
+                {
+                    IDictionary<string, object> row = ImportGetRowDictionary((object)item);
+                    if (row == null || ImportHasFieldValue(row, fixedField, fkField)) continue;
+                    object codeValue;
+                    ImportTryGetFieldValue(row, null, childCodeField, out codeValue);
+                    var code = ImportNormalizeValue(codeValue, childCodeField);
+                    if (code.DosIsNullOrWhiteSpace() || !codeToId.TryGetValue(code, out var parentId)) continue;
+                    row[fkField["Label"].Val<string>()] = parentId;
+                    row[fkField["Name"].Val<string>()] = parentId;
+                    filledCount++;
+                }
+                if (filledCount > 0)
+                {
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据[{parentTable.Name}.{parentCodeField["Name"].Val<string>()}]批量补齐子表字段[{currentTable.Name}.{fkField["Name"].Val<string>()}]【{filledCount}】条。");
+                }
+            }
+            return filledCount;
+        }
+
         public async Task<DosResult> ImportExcel(DiyTableRowParam param, HttpContext _httpContext = null)
         {
             if (param.OsClient.DosIsNullOrWhiteSpace()
@@ -1289,12 +1592,34 @@ namespace Microi.net
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在导入数据...");
                     await diyCacheBase.SetAsync(stepSign, importStepList);
 
+                    //应该使用param._RowModel，但由于element upload组件暂不支持传入object，只能string，所以临时使用param._FieldId
+                    JObject guanlianField = new JObject();
+                    if (!param._FieldId.DosIsNullOrWhiteSpace())
+                    {
+                        try
+                        {
+                            guanlianField = JObject.Parse(param._FieldId);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"关联字段参数解析失败：{ex.Message}");
+                        }
+                    }
+
+                    var importFieldList = ImportBuildFieldList(fieldList, importStepList, dateTimeFormat);
+                    if (!importFieldList.Any())
+                    {
+                        throw new Exception("未找到可导入字段，请检查Excel表头是否与字段名称一致。");
+                    }
+                    ImportAutoFillChildFkByParentCode(fileDataList, importFieldList, guanlianField, diyTableModel, dbSession, dbInfo, osClientModel, importStepList, dateTimeFormat);
+                    await diyCacheBase.SetAsync(stepSign, importStepList);
 
                     //取唯一字段
-                    var uniqueFieldList = fieldList.Where(d => d["Unique"].Val<int>() == 1).ToList();
+                    var uniqueFieldList = importFieldList.Where(d => d["Unique"].Val<int>() == 1).ToList();
 
                     var tIndex1 = 0;
                     var tUptIndex1 = 0;
+                    var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
                     using (var trans = dbSession.BeginTransaction())
                     {
                         var count2 = 0;
@@ -1302,74 +1627,64 @@ namespace Microi.net
                         importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已导入【0】条数据...");
                         await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                        bool? isHaveUnique = null;
-                        var uniqueField = "";
-                        var uniqueFieldLabel = "";
-                        var uniqueFieldValue = "";
-
-                        var uniqueFieldLabelAll = new List<UniqueFieldModel>();
-
-
-                        //应该使用param._RowModel，但由于element upload组件暂不支持传入object，只能string，所以临时使用param._FieldId
-                        JObject guanlianField = new JObject();
-                        if (!param._FieldId.DosIsNullOrWhiteSpace())
-                        {
-                            guanlianField = JObject.Parse(param._FieldId);
-                        }
-
                         foreach (var item in fileDataList)
                         {
-                            var itemEObj = (item as ExpandoObject);
+                            IDictionary<string, object> itemEObj = ImportGetRowDictionary((object)item);
+                            if (itemEObj == null)
+                            {
+                                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：第【{tIndex1 + 1}】行不是可识别的Excel数据，已跳过。");
+                                continue;
+                            }
 
                             var itemEObjKeys = itemEObj.Select(d => d.Key).ToList();
-                            //if (isHaveUnique == null)
-                            {
-                                foreach (var field in uniqueFieldList)
-                                {
-                                    if (itemEObjKeys.Contains(field["Label"].Val<string>()))
-                                    {
-                                        isHaveUnique = true;
+                            bool? isHaveUnique = false;
+                            var uniqueField = "";
+                            var uniqueFieldLabel = "";
+                            var uniqueFieldValue = "";
+                            var uniqueFieldLabelAll = new List<UniqueFieldModel>();
 
-                                        //判断同时唯一、还是单独唯一
-                                        var diyFieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(field["Config"].Val<string>());
-                                        if (diyFieldConfig.Unique.Type == "All")
+                            foreach (var field in uniqueFieldList)
+                            {
+                                object valueObj;
+                                if (ImportTryGetFieldValue(itemEObj, null, field, out valueObj))
+                                {
+                                    isHaveUnique = true;
+                                    var value = ImportNormalizeValue(valueObj, field);
+                                    var uniqueType = ImportGetUniqueType(field);
+                                    if (string.Equals(uniqueType, "All", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        uniqueFieldLabelAll.Add(new UniqueFieldModel()
                                         {
-                                            var valueObj = itemEObj.First(d => d.Key == field["Label"].Val<string>()).Value;
-                                            //这里要判断日期类型
-                                            var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
-                                                            ? "" : valueObj.ToString();
-                                            uniqueFieldLabelAll.Add(new UniqueFieldModel()
-                                            {
-                                                Name = field["Name"].Val<string>(),
-                                                Label = field["Label"].Val<string>(),
-                                                Value = value
-                                            });
-                                        }
-                                        else
-                                        {
-                                            uniqueField = field["Name"].Val<string>();
-                                            uniqueFieldLabel = field["Label"].Val<string>();
-                                            var valueObj = itemEObj.First(d => d.Key == field["Label"].Val<string>()).Value;
-                                            //这里要判断日期类型
-                                            var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
-                                                            ? "" : valueObj.ToString();
-                                            uniqueFieldValue = value;
-                                            //break;
-                                        }
+                                            Name = field["Name"].Val<string>(),
+                                            Label = field["Label"].Val<string>(),
+                                            Value = value
+                                        });
+                                    }
+                                    else
+                                    {
+                                        uniqueField = field["Name"].Val<string>();
+                                        uniqueFieldLabel = field["Label"].Val<string>();
+                                        uniqueFieldValue = value;
                                     }
                                 }
-                                if (isHaveUnique != true)
+                            }
+                            if (isHaveUnique != true)
+                            {
+                                isHaveUnique = false;
+                            }
+
+                            if (!uniqueField.DosIsNullOrWhiteSpace() && uniqueFieldValue.DosIsNullOrWhiteSpace())
+                            {
+                                isHaveUnique = false;
+                            }
+                            if (uniqueFieldLabelAll.Any(d => d.Value.DosIsNullOrWhiteSpace()))
+                            {
+                                uniqueFieldLabelAll.Clear();
+                                if (uniqueField.DosIsNullOrWhiteSpace())
                                 {
                                     isHaveUnique = false;
                                 }
                             }
-                            //else if (isHaveUnique == true)
-                            //{
-                            //    var valueObj = itemEObj.First(d => d.Key == uniqueFieldLabel).Value;
-                            //    var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
-                            //                    ? "" : valueObj.ToString();
-                            //    uniqueFieldValue = value;
-                            //}
 
 
                             //判断是否存在，如果存在才执行下面的这些，不存在的话还是走新增
@@ -1379,8 +1694,6 @@ namespace Microi.net
                                 || (uniqueFieldLabelAll.Any())
                             )
                             {
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
-
                                 var haveDataSql = $@"SELECT COUNT(Id) FROM {sqlTableName}
                                                             WHERE IsDeleted = 0 ";
 
@@ -1388,14 +1701,17 @@ namespace Microi.net
                                 {
                                     //{(dbInfo.DbType == "SqlServer" ? "TOP 1" : "")} 
                                     var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
-                                    haveDataSql += $" AND {sqlFieldName}='{uniqueFieldValue}' ";
+                                    var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueField);
+                                    haveDataSql += $" AND {sqlFieldName}={ImportBuildSqlValue(uniqueFieldValue, uniqueFieldModel)} ";
                                 }
 
                                 if (uniqueFieldLabelAll.Any())
                                 {
                                     foreach (var uniqueFieldItem in uniqueFieldLabelAll)
                                     {
-                                        haveDataSql += $" AND {uniqueFieldItem.Name}='{uniqueFieldItem.Value}' ";
+                                        var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueFieldItem.Name);
+                                        var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueFieldItem.Name);
+                                        haveDataSql += $" AND {sqlFieldName}={ImportBuildSqlValue(uniqueFieldItem.Value, uniqueFieldModel)} ";
                                     }
                                 }
 
@@ -1417,34 +1733,39 @@ namespace Microi.net
                             {
                                 var colsSetBuilder = new System.Text.StringBuilder();
 
-                                foreach (var colModel in fieldList)
+                                foreach (var colModel in importFieldList)
                                 {
-                                    if (itemEObj.Any(d => d.Key == colModel["Label"].Val<string>()) && colModel["Name"].Val<string>() != uniqueField)
+                                    object valueObj;
+                                    if (ImportTryGetFieldValue(itemEObj, guanlianField, colModel, out valueObj) && colModel["Name"].Val<string>() != uniqueField)
                                     {
-                                        var valueObj = itemEObj.First(d => d.Key == colModel["Label"].Val<string>()).Value;
-                                        var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
-                                                        ? "" : valueObj.ToString();
-
-                                        var joinVal = (colModel["Component"].Val<string>() == "Switch" || colModel["Component"].Val<string>() == "ImgUpload")
-                                            ? value.ToString()
-                                            : $"'{value}'";
-
+                                        //只有超级管理员才有权限导入Tenant数据
+                                        if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true && colModel["Name"].Val<string>() == "TenantId")
+                                        {
+                                            continue;
+                                        }
+                                        var joinVal = ImportBuildSqlValue(valueObj, colModel);
                                         var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel["Name"].Val<string>());
                                         colsSetBuilder.Append($"{sqlFieldName2}={joinVal},");
                                     }
                                 }
 
                                 var colsSet = colsSetBuilder.ToString().TrimEnd(',');
+                                if (colsSet.DosIsNullOrWhiteSpace())
+                                {
+                                    tIndex1++;
+                                    importStepList[importStepList.Count - 1] = $"{DateTime.Now.ToString(dateTimeFormat)}：已导入【{tIndex1}】条数据！";
+                                    await diyCacheBase.SetAsync(stepSign, importStepList);
+                                    continue;
+                                }
 
                                 //在客户数据库修改数据
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
-
                                 var uptSql = $@"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0   ";
 
                                 if (!uniqueField.DosIsNullOrWhiteSpace())
                                 {
                                     var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
-                                    uptSql += $" AND {sqlFieldName} = '{uniqueFieldValue}' ";
+                                    var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueField);
+                                    uptSql += $" AND {sqlFieldName} = {ImportBuildSqlValue(uniqueFieldValue, uniqueFieldModel)} ";
                                 }
                                 if (uniqueFieldLabelAll.Any())
                                 {
@@ -1452,7 +1773,8 @@ namespace Microi.net
                                     {
                                         var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueFieldItem.Name);
 
-                                        uptSql += $" AND {sqlFieldName} = '{uniqueFieldItem.Value}' ";
+                                        var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueFieldItem.Name);
+                                        uptSql += $" AND {sqlFieldName} = {ImportBuildSqlValue(uniqueFieldItem.Value, uniqueFieldModel)} ";
                                     }
                                 }
                                 sqlLog.Add(uptSql);
@@ -1466,28 +1788,18 @@ namespace Microi.net
                                 var colNamesBuilder = new System.Text.StringBuilder();
                                 var colValuesBuilder = new System.Text.StringBuilder();
 
-                                foreach (var colModel in fieldList)
+                                foreach (var colModel in importFieldList)
                                 {
-                                    if (itemEObj.Any(d => d.Key == colModel["Label"].Val<string>()) || guanlianField.ContainsKey(colModel["Name"].Val<string>()))
+                                    object value;
+                                    if (ImportTryGetFieldValue(itemEObj, guanlianField, colModel, out value))
                                     {
                                         //只有超级管理员才有权限导入Tenant数据
                                         if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true && colModel["Name"].Val<string>() == "TenantId")
                                         {
                                             continue;
                                         }
-                                        colNamesBuilder.Append(colModel["Name"].Val<string>()).Append(',');
-                                        object value = guanlianField.ContainsKey(colModel["Name"].Val<string>())
-                                            ? guanlianField[colModel["Name"].Val<string>()].ToString()
-                                            : itemEObj.FirstOrDefault(d => d.Key == colModel["Label"].Val<string>()).Value;
-
-                                        if (colModel["Component"].Val<string>() == "Switch")
-                                        {
-                                            colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "0," : $"{value},");
-                                        }
-                                        else
-                                        {
-                                            colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "''," : $"'{value}',");
-                                        }
+                                        colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel["Name"].Val<string>())).Append(',');
+                                        colValuesBuilder.Append(ImportBuildSqlValue(value, colModel)).Append(',');
 
                                         keyValues.Add(colModel["Name"].Val<string>(), value);
                                     }
@@ -1496,17 +1808,21 @@ namespace Microi.net
                                     && !keyValues.Any(d => d.Key == "TenantId") 
                                     && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
                                 {
-                                    colNamesBuilder.Append("TenantId,TenantName");
-                                    colValuesBuilder.Append($"'{param._CurrentUser?["TenantId"].Val<string>()}','{param._CurrentUser?["TenantName"].Val<string>()}',");
+                                    colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantId")).Append(',');
+                                    colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantName")).Append(',');
+                                    colValuesBuilder.Append($"'{ImportEscapeSql(param._CurrentUser?["TenantId"].Val<string>())}','{ImportEscapeSql(param._CurrentUser?["TenantName"].Val<string>())}',");
                                 }
                                 var colNames = colNamesBuilder.ToString();
                                 var colValues = colValuesBuilder.ToString();
+                                if (colNames.TrimEnd(',').DosIsNullOrWhiteSpace())
+                                {
+                                    throw new Exception($"第【{tIndex1 + 1}】行未匹配到可导入字段，请检查Excel表头。表头：{string.Join(",", itemEObjKeys)}");
+                                }
 
 
                                 //在客户数据库中插入数据
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
                                 var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentUser?["Id"].Val<string>()}',0,{colValues.TrimEnd(',')})";
+                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{ImportEscapeSql(param._CurrentUser?["Id"].Val<string>())}',0,{colValues.TrimEnd(',')})";
                                 sqlLog.Add(insertSql);
                                 lastSqlLog = insertSql;
                                 count2 += trans.FromSql(insertSql).ExecuteNonQuery();
@@ -1528,8 +1844,12 @@ namespace Microi.net
                 catch (Exception ex)
                 {
                     await diyCacheBase.SetAsync(startSign, "0");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]失败：{ex.Message}");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]lastSql：{lastSqlLog}");
+                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]StackTrace：{ex}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：lastSql：{lastSqlLog}");
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ex.GetType().Name}，详见后端Console日志。");
                     await diyCacheBase.SetAsync(stepSign, importStepList);
                 }
             });
@@ -1538,7 +1858,9 @@ namespace Microi.net
         catch (Exception ex)
         {
             await diyCacheBase.SetAsync(startSign, "0");
+            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{param.TableId}]初始化失败：{ex}");
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
+            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ex.GetType().Name}，详见后端Console日志。");
             await diyCacheBase.SetAsync(stepSign, importStepList);
             result = new DosResult(0, null, $"已失败！请查看导入进度。{ex.Message}");
         }
