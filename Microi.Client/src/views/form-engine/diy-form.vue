@@ -466,10 +466,38 @@ export default {
             default() {
                 return {};
             }
+        },
+        RawMetadata: {
+            type: Boolean,
+            default: false
         }
     },
     // Vue 3: 使用 unmounted 替代 destroyed
     // Vue 3: 使用 beforeUnmount 替代 beforeDestroy（这是最关键的修复！）
+    created() {
+        var self = this;
+        self._handleLangChange = function () {
+            if (self._isDestroyed) {
+                return;
+            }
+            if (self._langReloadTimer) {
+                clearTimeout(self._langReloadTimer);
+            }
+            self._langReloadTimer = setTimeout(function () {
+                if (self._isDestroyed || (!self.TableId && !self.TableName)) {
+                    return;
+                }
+                self.LoadDiyFieldList = false;
+                self.FormTabs = [];
+                self.FieldTabsState = {};
+                if (self.renderedTabs) {
+                    self.renderedTabs.clear();
+                }
+                self.GetAllData({ IsLangChange: true });
+            }, 80);
+        };
+        window.addEventListener("microi:lang-change", self._handleLangChange);
+    },
     methods: {
                 /**
          * 安全获取组件 ref 实例（兼容 Vue 2/3）
@@ -905,13 +933,15 @@ export default {
             }
 
             var param = [];
+            var rawMetadata = self.RawMetadata === true || self.LoadMode === "Design";
             if (self.TableId) {
                 //注意：也可能不是取表单属性，而是取报表配置
                 param.push({
                     Url: apiGetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        FormEngineKey: "Diy_Table"
+                        FormEngineKey: "Diy_Table",
+                        _RawMetadata: rawMetadata
                     }
                 });
             } else if (self.TableName) {
@@ -919,7 +949,8 @@ export default {
                     Url: apiGetDiyTableModel,
                     Param: {
                         Name: self.TableName,
-                        FormEngineKey: "Diy_Table"
+                        FormEngineKey: "Diy_Table",
+                        _RawMetadata: rawMetadata
                     }
                 });
             }
@@ -927,7 +958,8 @@ export default {
 
             if (self.PageType == "Report") {
                 var getFieldListParam = {
-                    FormEngineKey: "diy_field"
+                    FormEngineKey: "diy_field",
+                    _RawMetadata: rawMetadata
                 };
                 if (self.TableId) {
                     // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
@@ -947,7 +979,8 @@ export default {
                         TableId: self.TableId,
                         TableName: self.TableName,
                         // OsClient: self.OsClient,
-                        _SelectFields: self.SelectFields
+                        _SelectFields: self.SelectFields,
+                        _RawMetadata: rawMetadata
                     }
                 });
             }

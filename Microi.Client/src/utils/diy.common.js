@@ -96,6 +96,7 @@ var DiyCommon = {
     TokenExpiresKey: "Microi.Token.Expires",
     // 401 重登录節流标志：避免并发请求 Token 同时失效时弹出 N 个登录框
     _LoginPending: false,
+    _LangBundleStatus: {},
     /**
      * 安全解析 JSON，避免裸 JSON.parse 抛错导致页面崩溃
      * @param {*} str 待解析内容
@@ -607,14 +608,81 @@ var DiyCommon = {
     // - 规范化 locale（兼容旧值如 cn / zh / en-US / ja-JP / zh-tw 等）
     // - 同步 i18n、localStorage、Pinia diyStore.Lang、Pinia appStore.language
     // - 触发 microi:lang-change 事件供 ElConfigProvider 等响应式组件监听
+    GetCurrentLang: function () {
+        try {
+            var locale = i18n.global.locale;
+            var current = locale && typeof locale === "object" && "value" in locale ? locale.value : locale;
+            var normalized = normalizeLocale(current);
+            if (normalized) return normalized;
+        } catch (e) {}
+        try {
+            var stored = localStorage.getItem("Microi.Lang") || localStorage.getItem("lang") || localStorage.getItem("language") || LocalStorageManager.get("Lang") || store.state.DiyStore.Lang;
+            var normalizedStored = normalizeLocale(stored);
+            if (normalizedStored) return normalizedStored;
+        } catch (e) {}
+        return "zh-CN";
+    },
+    ApplyLangBundle: function (lang, data) {
+        try {
+            var n = normalizeLocale(lang) || "zh-CN";
+            var bundle = data || {};
+            var msgPatch = {};
+            Object.keys(bundle).forEach(function (key) {
+                if (key.indexOf("Msg.") === 0) {
+                    msgPatch[key.substring(4)] = bundle[key];
+                }
+            });
+            if (Object.keys(msgPatch).length === 0) {
+                return;
+            }
+            var current = i18n.global.getLocaleMessage ? i18n.global.getLocaleMessage(n) : i18n.global.messages[n] || {};
+            var merged = Object.assign({}, current, {
+                Msg: Object.assign({}, current.Msg || {}, msgPatch)
+            });
+            if (i18n.global.setLocaleMessage) {
+                i18n.global.setLocaleMessage(n, merged);
+            } else {
+                i18n.global.messages[n] = merged;
+            }
+        } catch (e) {
+            console.warn("[DiyCommon.ApplyLangBundle] failed:", e && e.message);
+        }
+    },
+    LoadLangBundle: function (lang) {
+        try {
+            var n = normalizeLocale(lang) || DiyCommon.GetCurrentLang();
+            var osClient = DiyCommon.GetOsClient();
+            var cacheKey = osClient + ":" + n;
+            if (DiyCommon._LangBundleStatus[cacheKey] === "loaded" || DiyCommon._LangBundleStatus[cacheKey] === "loading") {
+                return;
+            }
+            DiyCommon._LangBundleStatus[cacheKey] = "loading";
+            DiyCommon.PostAsync("/api/FormEngine/GetLangBundle", {
+                OsClient: osClient,
+                _Lang: n,
+                Prefix: "Msg."
+            }).then(function (result) {
+                if (result && result.Code == 1 && result.Data) {
+                    DiyCommon.ApplyLangBundle(n, result.Data);
+                    DiyCommon._LangBundleStatus[cacheKey] = "loaded";
+                } else {
+                    DiyCommon._LangBundleStatus[cacheKey] = "failed";
+                }
+            }).catch(function () {
+                DiyCommon._LangBundleStatus[cacheKey] = "failed";
+            });
+        } catch (e) {}
+    },
     ChangeLang: function (lang, notTips) {
         try {
             var n = setI18nLocale ? setI18nLocale(lang) : lang;
+            try { LocalStorageManager.set("Lang", n); } catch {}
             try { useDiyStore(pinia).setLang(n); } catch {}
             try { useAppStore(pinia).setLanguage(n); } catch {}
             DiyCommon.InitLangData();
+            DiyCommon.LoadLangBundle(n);
             if (notTips !== true) {
-                DiyCommon.Tips(i18n.global.messages[i18n.global.locale]?.Msg?.Success || "Success");
+                DiyCommon.Tips(getI18nMsg("Success", "Success"));
             }
         } catch (e) {
             console.error("[ChangeLang] failed:", e);
@@ -622,8 +690,9 @@ var DiyCommon = {
     },
     InitLangData: function () {
         var self = this;
-        const locale = i18n.global.locale;
+        const locale = DiyCommon.GetCurrentLang();
         const messages = i18n.global.messages[locale]?.Msg || {};
+        DiyCommon.LoadLangBundle(locale);
         DiyCommon.Weeks = [messages.Sun || "Sun", messages.Mon || "Mon", messages.Tues || "Tues", messages.Wed || "Wed", messages.Thurs || "Thurs", messages.Fri || "Fri", messages.Sat || "Sat"];
         DiyCommon.Months = [
             messages.Jan || "Jan",
@@ -1562,6 +1631,20 @@ var DiyCommon = {
             });
         });
     },
+    AttachLangParam: function (param, lang) {
+        try {
+            if (
+                param &&
+                typeof param === "object" &&
+                !Array.isArray(param) &&
+                !(typeof FormData !== "undefined" && param instanceof FormData) &&
+                DiyCommon.IsNull(param._Lang)
+            ) {
+                param._Lang = normalizeLocale(lang) || DiyCommon.GetCurrentLang();
+            }
+        } catch (e) {}
+        return param;
+    },
     UseAxios: function (params) {
         var self = this;
         var { url, param, callback, errorCallback, method, sync, other, resolve, paramType, header } = params;
@@ -1573,7 +1656,9 @@ var DiyCommon = {
             header.authorization = "Bearer " + DiyCommon.getToken();
         }
         header.macaddress = LocalStorageManager.get("MacAddress") || "";
-        header.lang = LocalStorageManager.get("Lang") || "zh-CN";
+        var currentLang = DiyCommon.GetCurrentLang();
+        header.lang = currentLang;
+        DiyCommon.AttachLangParam(param, currentLang);
         var axiosOption = {
             url: url,
             method: method, //'post',
@@ -1661,11 +1746,13 @@ var DiyCommon = {
             headers.authorization = "Bearer " + DiyCommon.getToken();
         }
         headers.macaddress = LocalStorageManager.get("MacAddress") || "";
-        headers.lang = LocalStorageManager.get("Lang") || "zh-CN";
+        var currentLang = DiyCommon.GetCurrentLang();
+        headers.lang = currentLang;
 
         var requests = [];
         allParams.forEach((param) => {
             var url = param.Url;
+            DiyCommon.AttachLangParam(param.Param, currentLang);
             var axiosOption = {
                 url: param.Url,
                 method: method,
