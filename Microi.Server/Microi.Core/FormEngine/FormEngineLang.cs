@@ -21,7 +21,9 @@ namespace Microi.net
             "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns"
         };
         private static readonly ConcurrentDictionary<string, byte> DiyLangFullSyncRunning = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
-        private static readonly ConcurrentDictionary<string, string> DiyLangTranslateUnavailable = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, DateTime> DiyLangTranslateUnavailable = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, DateTime> DiyLangTranslateUnsupportedTarget = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, byte> DiyLangMetadataSyncQueued = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         private static readonly object DiyLangCacheLock = new object();
 
         private sealed class DiyLangSeed
@@ -109,72 +111,6 @@ namespace Microi.net
             new DiyLangSeed { Key = "Data.SysApiExportMicroiStorePackage", ZhCN = "[系统]应用商城导出数据包", En = "[System] Export App Store Package", ZhTW = "[系統]應用商城匯出資料包" }
         };
 
-        private static readonly Dictionary<string, DiyLangSeed> FixedMetadataTranslations =
-            new Dictionary<string, DiyLangSeed>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["名称"] = new DiyLangSeed { En = "Name", ZhTW = "名稱" },
-                ["编号"] = new DiyLangSeed { En = "Code", ZhTW = "編號" },
-                ["标题"] = new DiyLangSeed { En = "Title", ZhTW = "標題" },
-                ["内容"] = new DiyLangSeed { En = "Content", ZhTW = "內容" },
-                ["备注"] = new DiyLangSeed { En = "Remark", ZhTW = "備註" },
-                ["状态"] = new DiyLangSeed { En = "Status", ZhTW = "狀態" },
-                ["类型"] = new DiyLangSeed { En = "Type", ZhTW = "類型" },
-                ["分类"] = new DiyLangSeed { En = "Category", ZhTW = "分類" },
-                ["排序"] = new DiyLangSeed { En = "Sort", ZhTW = "排序" },
-                ["操作"] = new DiyLangSeed { En = "Action", ZhTW = "操作" },
-                ["创建时间"] = new DiyLangSeed { En = "Create Time", ZhTW = "建立時間" },
-                ["创建人"] = new DiyLangSeed { En = "Creator", ZhTW = "建立人" },
-                ["修改时间"] = new DiyLangSeed { En = "Update Time", ZhTW = "修改時間" },
-                ["接口引擎"] = new DiyLangSeed { En = "API Engine", ZhTW = "接口引擎" },
-                ["接口分类"] = new DiyLangSeed { En = "API Category", ZhTW = "接口分類" },
-                ["接口说明"] = new DiyLangSeed { En = "API Description", ZhTW = "接口說明" },
-                ["接口V8代码"] = new DiyLangSeed { En = "API V8 Code", ZhTW = "接口 V8 代碼" },
-                ["自定义接口地址"] = new DiyLangSeed { En = "Custom API URL", ZhTW = "自定義接口地址" },
-                ["启用"] = new DiyLangSeed { En = "Enabled", ZhTW = "啟用" },
-                ["是否启用"] = new DiyLangSeed { En = "Enabled", ZhTW = "是否啟用" },
-                ["分布式锁"] = new DiyLangSeed { En = "Distributed Lock", ZhTW = "分散式鎖" },
-                ["允许匿名调用"] = new DiyLangSeed { En = "Allow Anonymous", ZhTW = "允許匿名調用" },
-                ["响应文件"] = new DiyLangSeed { En = "Response File", ZhTW = "響應文件" },
-                ["可访问角色"] = new DiyLangSeed { En = "Available Roles", ZhTW = "可訪問角色" },
-                ["版本号"] = new DiyLangSeed { En = "Version", ZhTW = "版本號" },
-                ["测试结果"] = new DiyLangSeed { En = "Test Result", ZhTW = "測試結果" },
-                ["测试参数"] = new DiyLangSeed { En = "Test Parameters", ZhTW = "測試參數" },
-                ["超时时间"] = new DiyLangSeed { En = "Timeout", ZhTW = "逾時時間" },
-                ["最大语句数"] = new DiyLangSeed { En = "Max Statements", ZhTW = "最大語句數" },
-                ["限制内存"] = new DiyLangSeed { En = "Memory Limit", ZhTW = "限制記憶體" },
-                ["限制递归"] = new DiyLangSeed { En = "Recursion Limit", ZhTW = "限制遞歸" },
-                ["系统引擎"] = new DiyLangSeed { En = "System Engine", ZhTW = "系統引擎" },
-                ["应用商城"] = new DiyLangSeed { En = "App Store", ZhTW = "應用商城" },
-                ["AI引擎"] = new DiyLangSeed { En = "AI Engine", ZhTW = "AI 引擎" },
-                ["表单引擎"] = new DiyLangSeed { En = "Form Engine", ZhTW = "表單引擎" },
-                ["模块引擎"] = new DiyLangSeed { En = "Module Engine", ZhTW = "模塊引擎" },
-                ["数据源扩展"] = new DiyLangSeed { En = "Data Source Extension", ZhTW = "資料源擴展" },
-                ["工作/日历/公告"] = new DiyLangSeed { En = "Work / Calendar / Announcements", ZhTW = "工作 / 日曆 / 公告" },
-                ["OA办公系统"] = new DiyLangSeed { En = "OA Office System", ZhTW = "OA 辦公系統" },
-                ["系统管理"] = new DiyLangSeed { En = "System Management", ZhTW = "系統管理" },
-                ["第三方平台"] = new DiyLangSeed { En = "Third-Party Platform", ZhTW = "第三方平台" },
-                ["平台授权"] = new DiyLangSeed { En = "Platform Authorization", ZhTW = "平台授權" },
-                ["授权管理"] = new DiyLangSeed { En = "Authorization Management", ZhTW = "授權管理" },
-                ["基础数据"] = new DiyLangSeed { En = "Master Data", ZhTW = "基礎資料" },
-                ["系统帐号"] = new DiyLangSeed { En = "System Accounts", ZhTW = "系統帳號" },
-                ["岗位角色"] = new DiyLangSeed { En = "Positions / Roles", ZhTW = "崗位角色" },
-                ["部门机构"] = new DiyLangSeed { En = "Departments", ZhTW = "部門機構" },
-                ["系统设置"] = new DiyLangSeed { En = "System Settings", ZhTW = "系統設定" },
-                ["树形/表格配置"] = new DiyLangSeed { En = "Tree / Table Config", ZhTW = "樹形 / 表格配置" },
-                ["微服务"] = new DiyLangSeed { En = "Microservices", ZhTW = "微服務" },
-                ["界面引擎"] = new DiyLangSeed { En = "Page Engine", ZhTW = "界面引擎" },
-                ["数据大屏"] = new DiyLangSeed { En = "Data Screen", ZhTW = "數據大屏" },
-                ["多语言管理"] = new DiyLangSeed { En = "Language Management", ZhTW = "多語言管理" },
-                ["流程引擎"] = new DiyLangSeed { En = "Workflow Engine", ZhTW = "流程引擎" },
-                ["文件柜"] = new DiyLangSeed { En = "File Cabinet", ZhTW = "文件櫃" },
-                ["SaaS引擎"] = new DiyLangSeed { En = "SaaS Engine", ZhTW = "SaaS 引擎" },
-                ["报表引擎"] = new DiyLangSeed { En = "Report Engine", ZhTW = "報表引擎" },
-                ["任务调度"] = new DiyLangSeed { En = "Job Scheduler", ZhTW = "任務調度" },
-                ["系统日志"] = new DiyLangSeed { En = "System Logs", ZhTW = "系統日誌" },
-                ["消息队列"] = new DiyLangSeed { En = "Message Queue", ZhTW = "消息隊列" },
-                ["打印引擎"] = new DiyLangSeed { En = "Print Engine", ZhTW = "打印引擎" }
-            };
-
         protected static string LangKeyDiyTable(string tableName)
         {
             return $"diy_table:{(tableName ?? "").DosToLower()}:Description";
@@ -204,6 +140,11 @@ namespace Microi.net
         {
             return $"sys_menu:{menuId}:{buttonField}:{(buttonKey ?? "").DosToLower()}:Name";
         }
+
+        // Metadata translations must come from diy_lang and its in-memory cache.
+        // Keep this dictionary empty; it only exists so older seed code paths can remain compatible.
+        private static readonly Dictionary<string, DiyLangSeed> FixedMetadataTranslations =
+            new Dictionary<string, DiyLangSeed>(StringComparer.OrdinalIgnoreCase);
 
         private static void IncJObjectInt(JObject obj, string key)
         {
@@ -663,7 +604,7 @@ namespace Microi.net
             });
         }
 
-        protected void UpsertLangCache(string osClient, JObject row)
+        protected static void UpsertLangCache(string osClient, JObject row)
         {
             if (IsBlank(osClient) || row == null)
             {
@@ -835,33 +776,49 @@ namespace Microi.net
             {
                 return sourceText;
             }
-            if (DiyMessage.TryGetLang(osClient, stableKey, lang, out var value))
+            if (DiyMessage.TryGetLang(osClient, stableKey, lang, out var value) && IsUsableMetadataTranslation(value, sourceText))
             {
                 return value;
             }
-            if (!IsBlank(stableKey) && DiyMessage.TryGetLang(osClient, stableKey.DosToLower(), lang, out value))
+            if (!IsBlank(stableKey) && DiyMessage.TryGetLang(osClient, stableKey.DosToLower(), lang, out value) && IsUsableMetadataTranslation(value, sourceText))
             {
                 return value;
             }
-            if (DiyMessage.TryGetLang(osClient, sourceText, lang, out value))
+            if (DiyMessage.TryGetLang(osClient, sourceText, lang, out value) && IsUsableMetadataTranslation(value, sourceText))
             {
                 return value;
             }
-            if (DiyMessage.TryGetLangBySourceText(osClient, sourceText, lang, out value))
+            if (DiyMessage.TryGetLangBySourceText(osClient, sourceText, lang, out value) && IsUsableMetadataTranslation(value, sourceText))
             {
                 return value;
             }
-            value = GetFixedTranslation(sourceText, DiyMessage.NormalizeLangField(lang));
-            if (!IsBlank(value))
-            {
-                return value;
-            }
+            QueueDiyLangMetadataSyncStatic(osClient, stableKey, sourceText);
             return sourceText;
         }
 
-        private void QueueDiyLangMetadataSync(string osClient, string key, string sourceText)
+        private static bool IsUsableMetadataTranslation(string value, string sourceText)
+        {
+            if (IsBlank(value))
+            {
+                return false;
+            }
+            if (IsBlank(sourceText))
+            {
+                return true;
+            }
+            var normalizedValue = value.Trim().Replace(" ", "");
+            var normalizedSource = sourceText.Trim().Replace(" ", "");
+            return !string.Equals(normalizedValue, normalizedSource, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void QueueDiyLangMetadataSyncStatic(string osClient, string key, string sourceText)
         {
             if (IsBlank(osClient) || IsBlank(key) || IsBlank(sourceText))
+            {
+                return;
+            }
+            var queueKey = $"{osClient}|{key}|{sourceText}";
+            if (!DiyLangMetadataSyncQueued.TryAdd(queueKey, 1))
             {
                 return;
             }
@@ -875,10 +832,19 @@ namespace Microi.net
                 {
                     LogDiyLangSyncException(osClient, "DiyLang metadata sync failed", ex, key);
                 }
+                finally
+                {
+                    DiyLangMetadataSyncQueued.TryRemove(queueKey, out _);
+                }
             });
         }
 
-        private async Task<DosResult> EnsureDiyLangMetadataAsync(string osClient, string key, string sourceText, IDictionary<string, string> fixedTranslations = null, bool autoTranslate = true)
+        private void QueueDiyLangMetadataSync(string osClient, string key, string sourceText)
+        {
+            QueueDiyLangMetadataSyncStatic(osClient, key, sourceText);
+        }
+
+        private static async Task<DosResult> EnsureDiyLangMetadataAsync(string osClient, string key, string sourceText, IDictionary<string, string> fixedTranslations = null, bool autoTranslate = true)
         {
             var queryResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_lang", new
             {
@@ -894,6 +860,10 @@ namespace Microi.net
             var isNew = IsBlank(TokenString(row, "Id"));
             var changed = isNew;
             row["Key"] = key;
+            row["OsClient"] = osClient;
+            row["FormEngineKey"] = "diy_lang";
+            row["_InvokeType"] = "Server";
+            row["_Lang"] = "cn";
             if (IsBlank(TokenString(row, "Code")))
             {
                 row["Code"] = key;
@@ -944,7 +914,6 @@ namespace Microi.net
             DosResult saveResult;
             if (isNew)
             {
-                row["FormEngineKey"] = "diy_lang";
                 saveResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_lang", row);
             }
             else
@@ -962,7 +931,7 @@ namespace Microi.net
 
         private static IEnumerable<string> GetDiyLangFields(string osClient)
         {
-            var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ZhCN", "En", "ZhTW" };
+            var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ZhCN", "En", "ZhTW", "My" };
             try
             {
                 if (!IsBlank(osClient)
@@ -1031,9 +1000,27 @@ namespace Microi.net
                 return sourceText;
             }
             var providerKey = GetTranslateProviderKey(osClient);
-            if (IsBlank(providerKey) || DiyLangTranslateUnavailable.TryGetValue(osClient, out var unavailableKey) && unavailableKey == providerKey)
+            if (IsBlank(providerKey))
             {
                 return "";
+            }
+            var unsupportedTargetKey = $"{providerKey}|{targetLang}";
+            if (DiyLangTranslateUnsupportedTarget.TryGetValue(unsupportedTargetKey, out var unsupportedAt))
+            {
+                if ((DateTime.UtcNow - unsupportedAt).TotalHours < 12)
+                {
+                    return "";
+                }
+                DiyLangTranslateUnsupportedTarget.TryRemove(unsupportedTargetKey, out _);
+            }
+            var unavailableCacheKey = $"{osClient}|{providerKey}";
+            if (DiyLangTranslateUnavailable.TryGetValue(unavailableCacheKey, out var unavailableAt))
+            {
+                if ((DateTime.UtcNow - unavailableAt).TotalMinutes < 10)
+                {
+                    return "";
+                }
+                DiyLangTranslateUnavailable.TryRemove(unavailableCacheKey, out _);
             }
             try
             {
@@ -1048,6 +1035,11 @@ namespace Microi.net
                 {
                     return result.Data?.ToString();
                 }
+                if (result.Code == 2 && IsUnsupportedTranslateTarget(result.Msg))
+                {
+                    DiyLangTranslateUnsupportedTarget[unsupportedTargetKey] = DateTime.UtcNow;
+                    return "";
+                }
                 MarkTranslateUnavailable(osClient, providerKey, result.Msg);
                 return "";
             }
@@ -1056,6 +1048,16 @@ namespace Microi.net
                 MarkTranslateUnavailable(osClient, providerKey, ex.Message);
                 return "";
             }
+        }
+
+        private static bool IsUnsupportedTranslateTarget(string message)
+        {
+            if (IsBlank(message))
+            {
+                return false;
+            }
+            return message.IndexOf("unsupported", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("bad request", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static string ResolveLangSyncOsClient(string osClient)
@@ -1077,50 +1079,91 @@ namespace Microi.net
 
         private static string GetTranslateProviderKey(string osClient)
         {
+            var keys = new List<string>();
+            var currentKey = GetTranslateProviderKeyFromClient(osClient);
+            if (!IsBlank(currentKey))
+            {
+                keys.Add(currentKey);
+            }
+
+            var configOsClient = OsClientExtend.GetConfigOsClient();
+            if (!IsBlank(configOsClient) && !string.Equals(configOsClient, osClient, StringComparison.OrdinalIgnoreCase))
+            {
+                var configKey = GetTranslateProviderKeyFromClient(configOsClient);
+                if (!IsBlank(configKey))
+                {
+                    keys.Add(configKey);
+                }
+            }
+
+            var envUrl = Environment.GetEnvironmentVariable("MICROI_TRANSLATE_URL");
+            if (!IsBlank(envUrl))
+            {
+                var envProvider = Environment.GetEnvironmentVariable("MICROI_TRANSLATE_PROVIDER");
+                if (IsBlank(envProvider))
+                {
+                    envProvider = "libretranslate";
+                }
+                keys.Add($"{envProvider.Trim().ToLower()}:{envUrl}");
+            }
+
+            return string.Join("|", keys.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+
+        private static string GetTranslateProviderKeyFromClient(string osClient)
+        {
             try
             {
+                if (IsBlank(osClient))
+                {
+                    return "";
+                }
                 var clientModel = OsClientExtend.GetClient(osClient);
-                var config = clientModel?.OsClientModel;
-                if (config == null)
-                {
-                    return "";
-                }
-                var endpoint = TokenString(config["TranslateEndpoint"]);
-                var key = TokenString(config["TranslateKey"]);
-                var secret = TokenString(config["TranslateSecret"]);
-                var provider = TokenString(config["TranslateProvider"]);
-                if (IsBlank(provider))
-                {
-                    provider = (!IsBlank(endpoint)
-                        && !IsBlank(key)
-                        && !IsBlank(secret)) ? "Aliyun" : "None";
-                }
-                provider = provider.Trim().ToLower();
-                if (provider == "none" || provider == "manual" || provider == "off" || provider == "disabled")
-                {
-                    return "";
-                }
-                if (provider == "libretranslate" || provider == "http")
-                {
-                    var url = TokenString(config["TranslateUrl"]);
-                    if (IsBlank(url))
-                    {
-                        url = TokenString(config["TranslateApiUrl"]);
-                    }
-                    if (IsBlank(url))
-                    {
-                        url = TokenString(config["LibreTranslateUrl"]);
-                    }
-                    return IsBlank(url) ? "" : $"{provider}:{url}";
-                }
-                return IsBlank(endpoint) || IsBlank(key) || IsBlank(secret)
-                    ? ""
-                    : $"{provider}:{endpoint}:{key}";
+                return GetTranslateProviderKeyFromConfig(clientModel?.OsClientModel);
             }
             catch
             {
                 return "";
             }
+        }
+
+        private static string GetTranslateProviderKeyFromConfig(JObject config)
+        {
+            if (config == null)
+            {
+                return "";
+            }
+            var endpoint = TokenString(config["TranslateEndpoint"]);
+            var key = TokenString(config["TranslateKey"]);
+            var secret = TokenString(config["TranslateSecret"]);
+            var provider = TokenString(config["TranslateProvider"]);
+            var url = TokenString(config["TranslateUrl"]);
+            if (IsBlank(url))
+            {
+                url = TokenString(config["TranslateApiUrl"]);
+            }
+            if (IsBlank(url))
+            {
+                url = TokenString(config["LibreTranslateUrl"]);
+            }
+            if (IsBlank(provider))
+            {
+                provider = !IsBlank(url)
+                    ? "LibreTranslate"
+                    : (!IsBlank(endpoint) && !IsBlank(key) && !IsBlank(secret) ? "Aliyun" : "None");
+            }
+            provider = provider.Trim().ToLower();
+            if (provider == "none" || provider == "manual" || provider == "off" || provider == "disabled")
+            {
+                return "";
+            }
+            if (provider == "libretranslate" || provider == "http")
+            {
+                return IsBlank(url) ? "" : $"{provider}:{url}";
+            }
+            return IsBlank(endpoint) || IsBlank(key) || IsBlank(secret)
+                ? ""
+                : $"{provider}:{endpoint}:{key}";
         }
 
         private static void MarkTranslateUnavailable(string osClient, string providerKey, string message)
@@ -1129,9 +1172,12 @@ namespace Microi.net
             {
                 return;
             }
-            if (DiyLangTranslateUnavailable.TryAdd(osClient, providerKey))
+            var unavailableCacheKey = $"{osClient}|{providerKey}";
+            var isFirstMark = !DiyLangTranslateUnavailable.ContainsKey(unavailableCacheKey);
+            DiyLangTranslateUnavailable[unavailableCacheKey] = DateTime.UtcNow;
+            if (isFirstMark)
             {
-                Console.WriteLine($"Microi：【多语言】租户[{osClient}]自动翻译不可用，本轮改为仅同步词条，原因：{message}");
+                Console.WriteLine($"Microi：【多语言】租户[{osClient}]自动翻译不可用，10分钟内改为仅同步词条，原因：{message}");
             }
         }
 
@@ -1527,3 +1573,4 @@ namespace Microi.net
         }
     }
 }
+

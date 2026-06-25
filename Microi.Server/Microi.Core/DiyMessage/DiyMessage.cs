@@ -257,6 +257,10 @@ namespace Microi.net
             {
                 return "ZhTW";
             }
+            if (lang == "my" || lang == "my-mm" || lang == "burmese" || lang == "myanmar" || lang == "缅甸语")
+            {
+                return "My";
+            }
             return lang;
         }
 
@@ -270,6 +274,10 @@ namespace Microi.net
             if (lang == "zhtw" || lang == "zh-tw" || lang == "zh-hk" || lang == "tw")
             {
                 return "zh-tw";
+            }
+            if (lang == "my" || lang == "my-mm" || lang == "burmese" || lang == "myanmar" || lang == "缅甸语")
+            {
+                return "my";
             }
             return lang;
         }
