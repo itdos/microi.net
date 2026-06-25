@@ -265,6 +265,10 @@ namespace Microi.net
                 _Where = where,
                 _OrderBy = "Sort",
                 _OrderByType = "ASC",
+                OsClient = param.OsClient,
+                _Lang = param._Lang,
+                _CurrentUser = param._CurrentUser,
+                _InvokeType = "Client",
             });
             var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
 
@@ -330,10 +334,34 @@ namespace Microi.net
                 string id = item.Id?.ToString();
                 if (id != null && childrenMap.TryGetValue(id, out var children))
                 {
-                    item._Child = children;
                     BuildChildrenFromMap(childrenMap, children);
+                    if (item is JObject jObject)
+                    {
+                        jObject["_Child"] = ToMenuChildArray(children);
+                    }
+                    else
+                    {
+                        item._Child = children;
+                    }
                 }
             }
+        }
+
+        private JArray ToMenuChildArray(List<dynamic> children)
+        {
+            var result = new JArray();
+            foreach (var child in children)
+            {
+                if (child is JToken token)
+                {
+                    result.Add(token.DeepClone());
+                }
+                else
+                {
+                    result.Add(JToken.FromObject(child));
+                }
+            }
+            return result;
         }
 
         /// <summary>

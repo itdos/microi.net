@@ -40,6 +40,8 @@ export const useAppStore = defineStore("app", {
             this.language = n;
             try { Cookies.set("language", n); } catch {}
             try { localStorage.setItem(LANG_STORAGE_KEY, n); } catch {}
+            try { localStorage.setItem("language", n); } catch {}
+            try { localStorage.setItem("lang", n); } catch {}
         },
 
         setSize(size) {

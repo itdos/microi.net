@@ -74,6 +74,29 @@ function normalizeIframeRouteUrl(url) {
     return "/iframe/" + encodeURIComponent(rawUrl);
 }
 
+function isExternalRoutePath(routePath) {
+    return /^(https?:)?\/\//i.test(routePath) || /^[a-z][a-z0-9+.-]*:/i.test(routePath);
+}
+
+export function normalizeMenuRoutePath(url, fallback = "/") {
+    let routePath = DiyCommon.IsNull(url) ? fallback : String(url).trim();
+    if (DiyCommon.IsNull(routePath)) routePath = fallback;
+    routePath = String(routePath || "").trim();
+    if (!routePath) return "/";
+
+    if (routePath.startsWith("/#/")) {
+        routePath = routePath.substring(2);
+    } else if (routePath.startsWith("#/")) {
+        routePath = routePath.substring(1);
+    } else if (routePath.startsWith("#")) {
+        routePath = routePath.substring(1);
+    }
+
+    if (!routePath) return "/";
+    if (isExternalRoutePath(routePath)) return routePath;
+    return routePath.startsWith("/") ? routePath : "/" + routePath;
+}
+
 function isIframeMenu(item) {
     return item && (item.OpenType === "Iframe" || item.OpenType === "iframe" || (item.Url && item.Url.startsWith("/iframe/")));
 }
@@ -289,7 +312,7 @@ function buildLeafRoute(item) {
         AppDisplay : item.AppDisplay,
         UrlParam: item.UrlParam,
         Link: item.Link,
-        path: item.Url,
+        path: normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id)),
         name: "menu_" + DiyCommon.GuidRemoveSing(item.Id),
         meta: buildMeta(item)
     };
@@ -305,7 +328,7 @@ function buildHiddenMenuGridRoute(item) {
         Display: 0,
         AppDisplay: 0,
         hidden: true,
-        path: item.Url,
+        path: normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id)),
         component: GetMenuGridComponent(),
         name: "menu_grid_" + DiyCommon.GuidRemoveSing(item.Id),
         meta: buildMeta(item, {
@@ -328,10 +351,10 @@ function MenuBuild(result, data, isFater) {
 
             // 如果有 Url，处理 Url
             if (!DiyCommon.IsNull(item.Url)) {
-                item.Url = item.Url.trim();
+                item.Url = String(item.Url || "").trim();
 
                 // 跳过外部链接（http/https 开头的 URL 不应该添加为路由）
-                if (!isIframeMenu(item) && (item.Url.startsWith("http://") || item.Url.startsWith("https://"))) {
+                if (!isIframeMenu(item) && isExternalRoutePath(item.Url)) {
                     // 外部链接不需要添加为路由，直接跳过
                     return;
                 }
@@ -341,7 +364,7 @@ function MenuBuild(result, data, isFater) {
             }
 
             if (item.ComponentPath) {
-                item.ComponentPath = item.ComponentPath.trim();
+                item.ComponentPath = String(item.ComponentPath || "").trim();
                 if (item.ComponentPath.indexOf("?") > -1) {
                     item.UrlParam = item.ComponentPath.split("?")[1];
                     item.ComponentPath = item.ComponentPath.replace(/\?.*/, "");
@@ -368,6 +391,8 @@ function MenuBuild(result, data, isFater) {
                 }
             }
 
+            item.Url = normalizeMenuRoutePath(item.Url, "/folder-" + DiyCommon.GuidRemoveSing(item.Id));
+
             // 将 _Child 下为空的 Url 干掉
             if (item._Child && item._Child.length > 0) {
                 item._Child = _.filter(item._Child, function (child) {
@@ -389,7 +414,7 @@ function MenuBuild(result, data, isFater) {
                     UrlParam: item.UrlParam,
                     Link: item.Link,
                     name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
-                    path: item.Url,
+                    path: normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id)),
                     component: component,
                     meta: buildMeta(item),
                     children: []
@@ -430,7 +455,7 @@ function MenuBuild(result, data, isFater) {
                         UrlParam: item.UrlParam,
                         Link: item.Link,
                         alwaysShow: true,
-                        path: item.Url,
+                        path: normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id)),
                         component: component,
                         name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
                         meta: buildMeta(item, { SourceMenuId: item.Id }),
@@ -445,6 +470,31 @@ function MenuBuild(result, data, isFater) {
             console.log(error);
         }
     });
+}
+
+function isUsableMenuRoute(route) {
+    if (!route) return false;
+    const name = String(route.name || "");
+    if (!name.startsWith("parent_menu_") && !name.startsWith("menu_")) return false;
+    if (name.startsWith("menu_grid_")) return false;
+    if (route.hidden || route.Display === 0 || route.Display === "0") return false;
+
+    const routePath = normalizeMenuRoutePath(route.path);
+    if (!routePath || routePath === "/" || isExternalRoutePath(routePath)) return false;
+    if (routePath.indexOf(":") > -1 || routePath.indexOf("*") > -1) return false;
+    return true;
+}
+
+export function getFirstValidRoutePath(routes) {
+    if (!Array.isArray(routes)) return "";
+    for (const route of routes) {
+        if (isUsableMenuRoute(route)) {
+            return normalizeMenuRoutePath(route.path);
+        }
+        const childRoutePath = getFirstValidRoutePath(route && route.children);
+        if (childRoutePath) return childRoutePath;
+    }
+    return "";
 }
 
 /**

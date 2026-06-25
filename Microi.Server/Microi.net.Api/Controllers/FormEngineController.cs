@@ -3,10 +3,13 @@ using Dos.ORM;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 
 namespace Microi.net.Api
 {
@@ -18,15 +21,131 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class FormEngineController : Controller
     {
+        private string GetRequestLang()
+        {
+            try
+            {
+                var lang = Request?.Headers?["lang"].ToString();
+                return lang.DosIsNullOrWhiteSpace() ? DiyMessage.Lang : lang;
+            }
+            catch
+            {
+                return DiyMessage.Lang;
+            }
+        }
+
+        private void EnsureLang(JObject param)
+        {
+            if (param != null && (param["_Lang"] == null || param["_Lang"].Val<string>().DosIsNullOrWhiteSpace()))
+            {
+                param["_Lang"] = GetRequestLang();
+            }
+        }
+
+        private void SetCurrentUserParam(JObject param, object currentUser)
+        {
+            if (param == null || currentUser == null)
+            {
+                return;
+            }
+            try
+            {
+                param["_CurrentUser"] = currentUser is JToken token ? token.DeepClone() : JToken.FromObject(currentUser);
+            }
+            catch
+            {
+                // Current user context is optional metadata for auth/V8 helpers.
+            }
+        }
+
+        private async Task<JObject> BuildRequestParam()
+        {
+            var result = new JObject();
+            try
+            {
+                if (Request?.Body != null && (Request.ContentLength ?? 0) > 0)
+                {
+                    Request.EnableBuffering();
+                    Request.Body.Position = 0;
+                    using (var reader = new StreamReader(Request.Body, Encoding.UTF8, false, 1024, true))
+                    {
+                        var body = await reader.ReadToEndAsync();
+                        if (!body.DosIsNullOrWhiteSpace())
+                        {
+                            var bodyObj = JObject.Parse(body);
+                            foreach (var prop in bodyObj.Properties())
+                            {
+                                result[prop.Name] = prop.Value;
+                            }
+                        }
+                    }
+                    Request.Body.Position = 0;
+                }
+                if (Request?.HasFormContentType == true)
+                {
+                    foreach (var item in Request.Form)
+                    {
+                        result[item.Key] = item.Value.ToString();
+                    }
+                }
+                if (Request?.Query != null)
+                {
+                    foreach (var item in Request.Query)
+                    {
+                        if (result[item.Key] == null)
+                        {
+                            result[item.Key] = item.Value.ToString();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return result;
+        }
+
         /// <summary>
         /// 设置默认参数（单个对象）
         /// </summary>
-        private async Task DefaultParam(JObject param)
+        private async Task<JObject> MergeRequestParam(JObject param)
         {
+            var requestParam = await BuildRequestParam();
+            if (param == null || !param.HasValues)
+            {
+                return requestParam;
+            }
+            foreach (var prop in requestParam.Properties())
+            {
+                if (param[prop.Name] == null)
+                {
+                    param[prop.Name] = prop.Value;
+                }
+            }
+            return param;
+        }
+
+        private async Task<JObject> DefaultParam(JObject param)
+        {
+            param = await MergeRequestParam(param);
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
-            param["OsClient"] = currentTokenDynamic?.OsClient;
+            if (currentTokenDynamic != null)
+            {
+                SetCurrentUserParam(param, currentTokenDynamic.CurrentUser);
+                var tokenOsClient = currentTokenDynamic.OsClient?.ToString();
+                if (!tokenOsClient.DosIsNullOrWhiteSpace())
+                {
+                    param["OsClient"] = tokenOsClient;
+                }
+            }
+            if (param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                var currentOsClient = DiyToken.GetCurrentOsClient();
+                param["OsClient"] = currentOsClient.DosIsNullOrWhiteSpace() ? OsClient.GetConfigOsClient() : currentOsClient;
+            }
             param["_InvokeType"] = "Client";
+            EnsureLang(param);
+            return param;
         }
 
         /// <summary>
@@ -40,9 +159,10 @@ namespace Microi.net.Api
             {
                 foreach (var param in paramList)
                 {
-                    param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
+                    SetCurrentUserParam(param, currentTokenDynamic.CurrentUser);
                     param["OsClient"] = currentTokenDynamic?.OsClient;
                     param["_InvokeType"] = "Client";
+                    EnsureLang(param);
                 }
             }
         }
@@ -57,8 +177,44 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
-            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
+            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
             return Json(result);
+        }
+
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
+        {
+            param = await DefaultParam(param);
+            var includeRaw = param["IncludeClientText"].Val<string>();
+            var includeClientText = includeRaw.DosIsNullOrWhiteSpace()
+                || (!string.Equals(includeRaw, "0", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(includeRaw, "false", StringComparison.OrdinalIgnoreCase));
+            var waitRaw = param["Wait"].Val<string>();
+            var wait = string.Equals(waitRaw, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(waitRaw, "true", StringComparison.OrdinalIgnoreCase);
+            var result = wait
+                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(param["OsClient"].Val<string>(), includeClientText)
+                : MicroiEngine.FormEngine.QueueDiyLangFullSync(param["OsClient"].Val<string>(), includeClientText);
+            return Json(result);
+        }
+
+        [HttpPost, HttpGet]
+        [AllowAnonymous]
+        public async Task<JsonResult> GetLangBundle([FromBody] JObject param = null)
+        {
+            param = await MergeRequestParam(param);
+            if (param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                param["OsClient"] = OsClient.GetConfigOsClient();
+            }
+            EnsureLang(param);
+            var prefix = param["Prefix"].Val<string>();
+            if (prefix == null)
+            {
+                prefix = "Msg.";
+            }
+            var data = DiyMessage.GetLangBundle(param["OsClient"].Val<string>(), param["_Lang"].Val<string>(), prefix);
+            return Json(new DosResult(1, data));
         }
 
         /// <summary>
@@ -70,7 +226,7 @@ namespace Microi.net.Api
         //[Route("/api/[controller]/GetFormData.{FormEngineKey}")]//使用Microi.net DynamicRoute实现
         public async Task<JsonResult> GetFormData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             return Json(result);
         }
@@ -87,6 +243,7 @@ namespace Microi.net.Api
             //{
             //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
+            EnsureLang(param);
             param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
@@ -103,6 +260,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFormDataAnonymousDefault([FromBody] JObject param)
         {
             param["OsClient"] = OsClient.GetConfigOsClient();
+            EnsureLang(param);
             param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
@@ -117,7 +275,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UptFormData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.UptFormDataAsync(param);
             return Json(result);
         }
@@ -129,7 +287,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UptFormDataByWhere([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync(param);
             return Json(result);
         }
@@ -161,7 +319,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> AddFormData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.AddFormDataAsync(param);
             return Json(result);
         }
@@ -224,9 +382,10 @@ namespace Microi.net.Api
                 {
                     row["FormEngineKey"] = formEngineKey;
                 }
-                row["_CurrentUser"] = JTokenEx.FromObject(currentUser);
+                SetCurrentUserParam(row, currentUser);
                 row["OsClient"] = osClient;
                 row["_InvokeType"] = "Client";
+                EnsureLang(row);
             }
 
             // 取主库会话开启事务
@@ -304,7 +463,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DelFormData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.DelFormDataAsync(param);
             return Json(result);
         }
@@ -335,7 +494,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DelFormDataByWhere([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.DelFormDataByWhereAsync(param);
             return Json(result);
         }
@@ -347,7 +506,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetTableData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
@@ -382,7 +541,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetTableDataCount([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetTableDataCountAsync(param);
             return Json(result);
         }
@@ -395,7 +554,7 @@ namespace Microi.net.Api
         [Obsolete("同GetTableDataTree")]
         public async Task<JsonResult> GetTableTree([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetTableTreeAsync(param);
             return Json(result);
         }
@@ -407,7 +566,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetTableDataTree([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }
@@ -434,7 +593,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetFieldData([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetFieldDataAsync(param);
             return Json(result);
         }
@@ -447,7 +606,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> LoadNotDiyTable([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.LoadNotDiyTableAsync(param);
             return Json(result);
         }
@@ -471,13 +630,14 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetSysMenuModel([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var idOrKey = param["ModuleEngineKey"].Val<string>();
             if(idOrKey.DosIsNullOrWhiteSpace())
             {
                 idOrKey = param["Id"].Val<string>();
             }
-            var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>());
+            var lang = param["_RawMetadata"].Val<bool>() ? DiyMessage.Lang : param["_Lang"].Val<string>();
+            var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>(), lang);
             return Json(result);
         }
         /// <summary>
@@ -500,13 +660,14 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetDiyTableModel([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var idOrKey = param["Name"].Val<string>();
             if(idOrKey.DosIsNullOrWhiteSpace())
             {
                 idOrKey = param["Id"].Val<string>();
             }
-            var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>());
+            var lang = param["_RawMetadata"].Val<bool>() ? DiyMessage.Lang : param["_Lang"].Val<string>();
+            var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>(), lang);
             return Json(result);
         }
 

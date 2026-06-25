@@ -1589,6 +1589,27 @@ export default {
     // 🔥 deactivated 钩子：组件被 keep-alive 停用时触发
     async created() {
         var self = this;
+        self._handleLangChange = function () {
+            if (self._isDestroyed) {
+                return;
+            }
+            if (self._langReloadTimer) {
+                clearTimeout(self._langReloadTimer);
+            }
+            self._langReloadTimer = setTimeout(function () {
+                if (self._isDestroyed || !self.SysMenuId) {
+                    return;
+                }
+                self._cachedDiyFieldList = null;
+                self._cachedDiyFieldListVersion = 0;
+                self.ShowDiyFieldList = null;
+                self.CardShowDiyFieldList = [];
+                self.SearchFieldIds = [];
+                self.SortFieldIds = [];
+                self.GetAllData({ IsInit: false, IsLangChange: true });
+            }, 80);
+        };
+        window.addEventListener("microi:lang-change", self._handleLangChange);
     },
     computed: {
         TablePageSizes() {

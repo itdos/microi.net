@@ -68,11 +68,11 @@
                                 <el-dropdown-menu class="form-submit-btns">
                                     <el-dropdown-item v-if="FormMode != 'View'" :disabled="SaveDiyTableCommonLoding || BtnLoading" @click="SaveToDraftBox">
                                         <fa-icon icon="far fa-save" class="mr-1" />
-                                        保存至草稿箱
+                                        {{ $t('Msg.SaveToDraftBox') }}
                                     </el-dropdown-item>
                                     <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
                                         <fa-icon icon="far fa-folder-open" class="mr-1" />
-                                        从草稿箱加载
+                                        {{ $t('Msg.LoadFromDraftBox') }}
                                     </el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
@@ -216,11 +216,11 @@
                             </div>
                             <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
                                 <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
-                                <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                             </div>
                             <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
                                 <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
-                                <span class="mobile-fab-menu-label">从草稿箱加载</span>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                             </div>
                             <!--表单更多按钮 FormBtns-->
                             <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -340,11 +340,11 @@
                             <el-dropdown-menu class="form-submit-btns">
                                 <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
                                     <fa-icon icon="far fa-save" class="mr-1" />
-                                    保存至草稿箱
+                                    {{ $t('Msg.SaveToDraftBox') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
-                                    从草稿箱加载
+                                    {{ $t('Msg.LoadFromDraftBox') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
@@ -494,11 +494,11 @@
                         </div>
                         <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
                             <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
-                            <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                         </div>
                         <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
                             <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
-                            <span class="mobile-fab-menu-label">从草稿箱加载</span>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
                         <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -633,11 +633,11 @@
                             <el-dropdown-menu class="form-submit-btns">
                                 <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
                                     <fa-icon icon="far fa-save" class="mr-1" />
-                                    保存至草稿箱
+                                    {{ $t('Msg.SaveToDraftBox') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
-                                    从草稿箱加载
+                                    {{ $t('Msg.LoadFromDraftBox') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
@@ -788,11 +788,11 @@
                         </div>
                         <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
                             <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
-                            <span class="mobile-fab-menu-label">保存至草稿箱</span>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                         </div>
                         <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
                             <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
-                            <span class="mobile-fab-menu-label">从草稿箱加载</span>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
                         <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -874,7 +874,7 @@
         <el-dialog
             v-model="ShowDataVersionPreviewDialog"
             class="data-version-preview-dialog"
-            :title="'数据版本预览 ' + ((PreviewDataVersionItem && PreviewDataVersionItem.Version) || '')"
+            :title="$t('Msg.DataVersionPreview') + ' ' + ((PreviewDataVersionItem && PreviewDataVersionItem.Version) || '')"
             :width="diyStore.IsPhoneView ? '94%' : '920px'"
             append-to-body
             destroy-on-close
@@ -908,20 +908,20 @@
         <el-dialog
             v-model="ShowDraftDialog"
             class="draft-box-dialog"
-            title="草稿箱"
+            :title="$t('Msg.DraftBox')"
             :width="diyStore.IsPhoneView ? '92%' : '760px'"
             append-to-body
             destroy-on-close
         >
             <div class="draft-box-toolbar">
                 <div class="draft-box-heading">
-                    <div class="draft-box-title">当前表单草稿</div>
+                    <div class="draft-box-title">{{ $t('Msg.CurrentFormDraft') }}</div>
                     <div class="draft-box-subtitle">{{ (CurrentDiyTableModel && (CurrentDiyTableModel.Description || CurrentDiyTableModel.Name)) || TableName }}</div>
                 </div>
-                <el-button size="small" :loading="DraftListLoading" @click="LoadDraftList(false)">刷新</el-button>
+                <el-button size="small" :loading="DraftListLoading" @click="LoadDraftList(false)">{{ $t('Msg.Refresh') }}</el-button>
             </div>
             <el-skeleton v-if="DraftListLoading" :rows="4" animated />
-            <el-empty v-else-if="!DraftList || DraftList.length == 0" description="暂无草稿" />
+            <el-empty v-else-if="!DraftList || DraftList.length == 0" :description="$t('Msg.NoDraft')" />
             <div v-else class="draft-box-list">
                 <div
                     v-for="draft in DraftList"
@@ -931,8 +931,8 @@
                 >
                     <div class="draft-box-main">
                         <div class="draft-box-name">
-                            {{ draft.DraftName || '未命名草稿' }}
-                            <el-tag v-if="CurrentDraftId == draft.Id" size="small" type="success" effect="plain">当前</el-tag>
+                            {{ draft.DraftName || $t('Msg.UnnamedDraft') }}
+                            <el-tag v-if="CurrentDraftId == draft.Id" size="small" type="success" effect="plain">{{ $t('Msg.Current') }}</el-tag>
                         </div>
                         <div class="draft-box-meta">
                             <span>{{ draft.CreateTime }}</span>
@@ -941,8 +941,8 @@
                         </div>
                     </div>
                     <div class="draft-box-actions">
-                        <el-button size="small" type="primary" @click="LoadDraftToForm(draft)">加载</el-button>
-                        <el-button size="small" type="danger" text @click="DeleteDraft(draft)">删除</el-button>
+                        <el-button size="small" type="primary" @click="LoadDraftToForm(draft)">{{ $t('Msg.Load') }}</el-button>
+                        <el-button size="small" type="danger" text @click="DeleteDraft(draft)">{{ $t('Msg.Delete') }}</el-button>
                     </div>
                 </div>
             </div>

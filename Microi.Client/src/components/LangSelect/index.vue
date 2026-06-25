@@ -20,22 +20,34 @@
 
 <script>
 import { computed } from "vue";
-import { useAppStore } from "@/pinia";
-import { SUPPORTED_LOCALES, setI18nLocale, normalizeLocale } from "@/lang";
+import { useAppStore, useDiyStore } from "@/pinia";
+import { SUPPORTED_LOCALES, setI18nLocale, normalizeLocale, getLanguage } from "@/lang";
 
 export default {
     name: "LangSelect",
     setup() {
         const appStore = useAppStore();
-        const currentLocale = computed(
-            () => normalizeLocale(appStore.language) || "zh-CN"
-        );
+        const diyStore = useDiyStore();
+        const persistedLocale = normalizeLocale(getLanguage()) || "zh-CN";
+        if (normalizeLocale(diyStore.Lang) !== persistedLocale) {
+            diyStore.setLang(persistedLocale);
+        }
+        if (normalizeLocale(appStore.language) !== persistedLocale) {
+            appStore.setLanguage(persistedLocale);
+        }
+        setI18nLocale(persistedLocale);
+        const currentLocale = computed(() => {
+            const storeLocale = normalizeLocale(diyStore.Lang || appStore.language);
+            const persistedLocale = normalizeLocale(getLanguage());
+            return persistedLocale || storeLocale || "zh-CN";
+        });
         const currentLabel = computed(() => {
             const found = SUPPORTED_LOCALES.find((l) => l.value === currentLocale.value);
             return found ? found.label : "简体中文";
         });
         return {
             appStore,
+            diyStore,
             supportedLocales: SUPPORTED_LOCALES,
             currentLocale,
             currentLabel
@@ -46,6 +58,7 @@ export default {
             const n = setI18nLocale(lang); // 切換 i18n、寫入 localStorage、廣播事件
             this.appStore.setLanguage(n); // 同步 Pinia，使下拉禁用態實時更新
             // 兼容舊代碼：若 DiyCommon.ChangeLang 存在則調用（用於可能殘留的全局副作用）
+            this.diyStore.setLang(n);
             try {
                 if (this.DiyCommon && typeof this.DiyCommon.ChangeLang === "function") {
                     this.DiyCommon.ChangeLang(n, true);

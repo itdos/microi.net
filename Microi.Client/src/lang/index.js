@@ -115,6 +115,13 @@ export function setI18nLocale(locale) {
         i18n.global.locale = n;
     }
     try { localStorage.setItem(LANG_STORAGE_KEY, n); } catch {}
+    try { localStorage.setItem("language", n); } catch {}
+    try { localStorage.setItem("lang", n); } catch {}
+    try {
+        const storage = JSON.parse(localStorage.getItem("microi.net") || "{}");
+        storage.Lang = n;
+        localStorage.setItem("microi.net", JSON.stringify(storage));
+    } catch {}
     try { document.documentElement.setAttribute("lang", n); } catch {}
     try { window.dispatchEvent(new CustomEvent("microi:lang-change", { detail: { locale: n } })); } catch {}
     return n;

@@ -3,6 +3,14 @@ beforeUnmount() {
         var self = this;
         // 标记组件已销毁
         self._isDestroyed = true;
+        if (self._handleLangChange) {
+            window.removeEventListener('microi:lang-change', self._handleLangChange);
+            self._handleLangChange = null;
+        }
+        if (self._langReloadTimer) {
+            clearTimeout(self._langReloadTimer);
+            self._langReloadTimer = null;
+        }
 
         // ========== 0. 清理所有待执行的定时器 ==========
         if (self.DiyFieldList && self.DiyFieldList.length > 0) {

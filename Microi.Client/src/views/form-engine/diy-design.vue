@@ -117,6 +117,7 @@
                     v-if="TableId"
                     ref="fieldForm"
                     :LoadMode="'Design'"
+                    :RawMetadata="true"
                     :TableId="TableId"
                     :TableRowId="TableRowId"
                     :ColSpan="FormClient == 'Mobile' ? 24 : 0"
@@ -155,6 +156,7 @@
                                     <DiyForm
                                         ref="diyform_diy_field"
                                         :LoadMode="''"
+                                        :RawMetadata="true"
                                         :FormMode="'Edit'"
                                         :TableName="'diy_field'"
                                         :TableRowId="CurrentDiyFieldModel.Id"
@@ -187,6 +189,7 @@
                                     <DiyForm
                                         ref="diyform_diy_table"
                                         :LoadMode="''"
+                                        :RawMetadata="true"
                                         :FormMode="'Edit'"
                                         :TableName="'diy_table'"
                                         :TableRowId="TableId"

@@ -25,7 +25,7 @@ namespace Microi.net
         /// </summary>
         private static string BuildCacheKey(string osClient, string prefix, string key)
         {
-            return string.Concat("Microi:", osClient, prefix, key.ToLowerInvariant());
+            return string.Concat("Microi:", osClient ?? "", prefix ?? "", (key ?? "").ToLowerInvariant());
         }
         private static int IntOrDefaultWhenMissing(JObject param, string name, int defaultValue)
         {
@@ -324,6 +324,7 @@ namespace Microi.net
                         }
                         if (_trans == null)
                             trans.Commit();
+                        QueueDiyTableLangSync(osClient, tableName, param["Description"].Val<string>());
                         return new DosResult(1);
                     }
                     //外部一般会处理，所以这里不需要rollback
@@ -507,6 +508,9 @@ namespace Microi.net
                         var count = trans.Update(model);
                         //DiyTableCache.DelDiyTableModel(model, param.OsClient);
                         trans.Commit();
+                        await MicroiEngine.CacheTenant.Cache(param.OsClient).RemoveAsync(BuildCacheKey(param.OsClient, ":FormData:diy_table:", model.Id));
+                        await MicroiEngine.CacheTenant.Cache(param.OsClient).RemoveAsync(BuildCacheKey(param.OsClient, ":FormData:diy_table:", model.Name));
+                        QueueDiyTableLangSync(param.OsClient, model.Name, model.Description);
                         return new DosResult(1, model, "");
                     }
                 }
@@ -636,7 +640,7 @@ namespace Microi.net
                         fs.SetCacheTimeOut(param._Cache.Value);
                     }
                     var list = fs.ToList<dynamic>();
-                    return new DosResultList<dynamic>(1, list, "", dataCount);
+                    return new DosResultList<dynamic>(1, TranslateDiyTableListForReturn(list, param.OsClient, ResolveReturnLang(param)), "", dataCount);
                 }
                 return new DosResultList<dynamic>(0, null, "数据库参数错误！" + "[GetTableTable]", null, new
                 {
@@ -906,6 +910,7 @@ namespace Microi.net
                                 {
                                     ["TableId"] = tableId,
                                 });
+                    QueueDiyFieldLangSync(osClient, tableName, fieldName, fieldLabel);
                     
                     return new DosResult(1, addResult.Data);//这里必须要返回新增后的model，前端要用到
                 }
@@ -1154,6 +1159,7 @@ namespace Microi.net
                                 {
                                     ["TableId"] = fieldModel.TableId,
                                 });
+                        QueueDiyFieldLangSync(param.OsClient, diyTableModel.Name, fieldModel.Name, fieldModel.Label);
                         return new DosResult(1, fieldModel, "");
                     }
                 }
@@ -1360,6 +1366,10 @@ namespace Microi.net
                                 {
                                     ["TableId"] = diyTableModel.Id,
                                 });
+                        foreach (var newField in newFieldList)
+                        {
+                            QueueDiyFieldLangSync(param.OsClient, diyTableModel.Name, newField["Name"].Val<string>(), newField["Label"].Val<string>());
+                        }
                         return new DosResult(1);
                     }
                 }
@@ -1602,7 +1612,7 @@ namespace Microi.net
                     {
                         diyTableCache = diyTableCache.Where(d => param._SelectFields.Contains(d["Name"].Val<string>())).ToList();
                     }
-                    return new DosResultList<JObject>(1, diyTableCache);
+                    return new DosResultList<JObject>(1, TranslateDiyFieldListForReturn(diyTableCache, param.OsClient, ResolveReturnLang(param)));
                 }
 
                 var osClientModel = OsClientExtend.GetClient(param.OsClient);
@@ -1692,7 +1702,7 @@ namespace Microi.net
                     }
 
                     
-                    return new DosResultList<JObject>(1, result);
+                    return new DosResultList<JObject>(1, TranslateDiyFieldListForReturn(result, param.OsClient, ResolveReturnLang(param)));
                 }
                 return new DosResultList<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
@@ -1943,7 +1953,7 @@ namespace Microi.net
                 model = JObject.FromObject(tempResult);
             }
 
-            return new DosResult<JObject>(1, model);
+            return new DosResult<JObject>(1, TranslateDiyFieldForReturn(model, param.OsClient, ResolveReturnLang(param)));
         }
         /// <summary>
         /// 
@@ -1990,7 +2000,7 @@ namespace Microi.net
                 var sysMenuCache = await cache.GetAsync<JObject>(cacheKey);
                 if (sysMenuCache != null)
                 {
-                    return new DosResult<dynamic>(1, sysMenuCache);
+                    return new DosResult<dynamic>(1, TranslateSysMenuForReturn(sysMenuCache, osClient, _Lang));
                 }
 
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
@@ -2014,6 +2024,7 @@ namespace Microi.net
                     // 转换为 JObject 后再存入缓存，确保序列化后类型一致
                     var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
                     await cache.SetAsync<JObject>(cacheKey, jObjectData);
+                    result.Data = TranslateSysMenuForReturn(jObjectData, osClient, _Lang);
                 }
                 return result;
             }
@@ -2052,7 +2063,7 @@ namespace Microi.net
             var diyTableCache = await cache.GetAsync<JObject>(cacheKey);
             if (diyTableCache != null)
             {
-                return new DosResult<dynamic>(1, diyTableCache);
+                return new DosResult<dynamic>(1, TranslateDiyTableForReturn(diyTableCache, osClient, _Lang));
             }
 
             var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
@@ -2076,6 +2087,7 @@ namespace Microi.net
                 // 转换为 JObject 后再存入缓存，确保序列化后类型一致
                 var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
                 await cache.SetAsync<JObject>(cacheKey, jObjectData);
+                result.Data = TranslateDiyTableForReturn(jObjectData, osClient, _Lang);
             }
             return result;
         }

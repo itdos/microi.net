@@ -21,13 +21,25 @@ namespace Microi.net.Api
     {
         private static SysMenuLogic _sysMenuLogic = new SysMenuLogic();
 
-        private static async Task DefaultParam(SysMenuParam param)
+        private async Task DefaultParam(SysMenuParam param)
         {
             try
             {
                 var currentTokenDynamic = await DiyToken.GetCurrentToken();
                 param._CurrentUser = currentTokenDynamic?.CurrentUser;
-                param.OsClient = currentTokenDynamic?.OsClient;
+                var tokenOsClient = currentTokenDynamic?.OsClient?.ToString();
+                if (!tokenOsClient.DosIsNullOrWhiteSpace())
+                {
+                    param.OsClient = tokenOsClient;
+                }
+                if (param._Lang.DosIsNullOrWhiteSpace())
+                {
+                    var headerLang = Request?.Headers["lang"].ToString();
+                    var queryLang = Request?.Query["_Lang"].ToString();
+                    param._Lang = !headerLang.DosIsNullOrWhiteSpace()
+                        ? headerLang
+                        : (!queryLang.DosIsNullOrWhiteSpace() ? queryLang : DiyMessage.Lang);
+                }
             }
             catch (Exception ex)
             {

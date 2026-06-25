@@ -44,6 +44,13 @@ namespace Microi.net
         Task<DosResult<dynamic>> GetSysMenu(string idOrKey, string osClient, string _Lang = "cn");
         Task<DosResult<dynamic>> GetSysMenuModel(string idOrKey, string osClient, string _Lang = "cn");
 
+        /// <summary>
+        /// 异步排队同步 diy_lang 元数据词条。
+        /// </summary>
+        DosResult QueueDiyLangFullSync(string osClient = "", bool includeClientText = true);
+        DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true);
+        Task<DosResult> SyncDiyLangFullAsync(string osClient = "", bool includeClientText = true);
+
         #endregion
 
         #region 获取单条数据

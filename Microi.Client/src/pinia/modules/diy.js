@@ -2,6 +2,7 @@
 import { defineStore } from "pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
 import LocalStorageManager from "@/utils/localStorage-manager.js";
+import { getLanguage, normalizeLocale, LANG_STORAGE_KEY } from "@/lang/index";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 const getLocalThemeColor = () => {
@@ -60,7 +61,7 @@ export const useDiyStore = defineStore("diy", {
 
         ClientCompany: "Loading...",
         ClientCompanyUrl: "",
-        Lang: "zh-CN",
+        Lang: getLanguage(),
         CaptchaSendedSec: 0,
         ShowGotoWebOS: false,
         ThemeBodyClass: "bg-img-white",
@@ -216,7 +217,12 @@ export const useDiyStore = defineStore("diy", {
         },
 
         setLang(val) {
-            this.Lang = val;
+            const lang = normalizeLocale(val) || "zh-CN";
+            this.Lang = lang;
+            try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch {}
+            try { localStorage.setItem("language", lang); } catch {}
+            try { localStorage.setItem("lang", lang); } catch {}
+            try { LocalStorageManager.set("Lang", lang); } catch {}
         },
 
         setOsClient(val) {

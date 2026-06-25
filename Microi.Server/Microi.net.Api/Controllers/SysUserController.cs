@@ -27,6 +27,12 @@ namespace Microi.net.Api
             _captcha = captcha;
         }
 
+        public class CreateTenantRequest
+        {
+            public string TenantKey { get; set; }
+            public string SystemName { get; set; }
+        }
+
         private static async Task DefaultParam(SysUserParam param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
@@ -359,34 +365,8 @@ namespace Microi.net.Api
                 sysUser["Pwd"] = "";
                 #endregion
 
-                #region 异步自动开通SaaS租户（仅新用户）
-                if (isNewUser)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var encryptedPwd = EncryptHelper.DESEncode(phone.Substring(phone.Length - 6));
-                            var provisioningService = new TenantProvisioningService();
-                            var provisionResult = await provisioningService.ProvisionTenantAsync(
-                                phone, userId, phone, encryptedPwd);
-
-                            if (provisionResult.Code == 1)
-                            {
-                                Console.WriteLine($"Microi：【成功】用户[{phone}]的SaaS租户自动开通完成！");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Microi：【警告】用户[{phone}]的SaaS租户开通失败：{provisionResult.Msg}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Microi：【Error异常】SaaS租户自动开通异常：{ex.Message}");
-                        }
-                    });
-                }
-                #endregion
+                var tenantResult = new TenantProvisioningService().GetUserTenant(userId);
+                dynamic tenantData = tenantResult.Code == 1 ? tenantResult.Data : null;
 
                 #region 获取系统配置
                 var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
@@ -415,7 +395,8 @@ namespace Microi.net.Api
                     SysMenuHomePage = SysMenuHomePage,
                     SysConfig = sysConfig,
                     IsNewUser = isNewUser,
-                    TenantOsClient = isNewUser ? "u" + phone : (string)null
+                    TenantOsClient = tenantData == null ? null : tenantData.OsClient,
+                    TenantName = tenantData == null ? null : tenantData.ClientName
                 };
 
                 MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
@@ -477,6 +458,78 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 return Json(new DosResult(0, null, $"设置密码异常：{ex.Message}"));
+            }
+        }
+
+        /// <summary>
+        /// Create one SaaS tenant for the current website user.
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> CreateTenant(CreateTenantRequest param)
+        {
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken();
+                if (currentToken == null)
+                {
+                    return Json(new DosResult(1001, null, "请先登录！"));
+                }
+
+                var currentUser = currentToken.CurrentUser;
+                var userId = currentUser?["Id"]?.ToString();
+                if (userId.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(1002, null, "登录用户无效！"));
+                }
+
+                var phone = currentUser?["Phone"]?.ToString();
+                var userName = currentUser?["Name"]?.ToString();
+                string encryptedPwd = null;
+                try
+                {
+                    var userResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
+                    {
+                        Id = userId,
+                        OsClient = currentToken.OsClient
+                    });
+                    if (userResult.Code == 1 && userResult.Data != null)
+                    {
+                        var userObj = JObject.FromObject(userResult.Data);
+                        encryptedPwd = userObj["Pwd"]?.ToString();
+                        if (phone.DosIsNullOrWhiteSpace())
+                        {
+                            phone = userObj["Phone"]?.ToString();
+                        }
+                        if (userName.DosIsNullOrWhiteSpace())
+                        {
+                            userName = userObj["Name"]?.ToString();
+                        }
+                    }
+                }
+                catch { }
+
+                if (encryptedPwd.DosIsNullOrWhiteSpace())
+                {
+                    var seed = !phone.DosIsNullOrWhiteSpace() && phone.Length >= 6
+                        ? phone.Substring(phone.Length - 6)
+                        : Guid.NewGuid().ToString("N").Substring(0, 8);
+                    encryptedPwd = EncryptHelper.DESEncode(seed);
+                }
+
+                var service = new TenantProvisioningService();
+                var result = await service.ProvisionTenantAsync(
+                    param?.TenantKey,
+                    param?.SystemName,
+                    userId,
+                    phone,
+                    userName,
+                    encryptedPwd);
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, $"创建租户异常：{ex.Message}"));
             }
         }
 

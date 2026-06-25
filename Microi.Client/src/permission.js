@@ -2,6 +2,7 @@ import router from "./router";
 // 使用 Pinia stores
 import { useUserStore, usePermissionStore, useDiyStore } from "./pinia";
 import pinia from "./pinia";
+import { normalizeMenuRoutePath } from "./pinia/modules/permission";
 // Element Plus 消息组件
 import { ElMessage } from "element-plus";
 import { getToken } from "@/utils/auth.js"; // get token from cookie
@@ -86,7 +87,7 @@ router.beforeEach(async (to, from, next) => {
             if (redirectPath) {
                 redirectPath = redirectPath.split('?')[0];
                 if (redirectPath && redirectPath !== '/login' && redirectPath !== '/') {
-                    next({ path: redirectPath, replace: true });
+                    next({ path: normalizeMenuRoutePath(redirectPath), replace: true });
                     return;
                 }
             }
@@ -99,7 +100,7 @@ router.beforeEach(async (to, from, next) => {
             if (sysConfigResult.Code == 1) {
                 var sysConfig = sysConfigResult.Data;
                 if (sysConfig && sysConfig.DefaultIndexUrl) {
-                    var url = sysConfig.DefaultIndexUrl;
+                    var url = String(sysConfig.DefaultIndexUrl || "");
                     url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
                         url = normalizeIframeRouteUrl(url);
@@ -107,7 +108,7 @@ router.beforeEach(async (to, from, next) => {
                         window.location.href = url;
                         return;
                     }
-                    next({ path: url });
+                    next({ path: normalizeMenuRoutePath(url) });
                     return;
                 }
             }
@@ -159,7 +160,7 @@ router.beforeEach(async (to, from, next) => {
                 if (sysConfigResult.Code == 1) {
                     var sysConfig = sysConfigResult.Data;
                     if (sysConfig && sysConfig.DefaultIndexUrl) {
-                        var url = sysConfig.DefaultIndexUrl;
+                        var url = String(sysConfig.DefaultIndexUrl || "");
                         url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
                         console.log("-------> SsoAutoLogin DefaultIndexUrl：" + url);
                         if (url.startsWith("/iframe/")) {
@@ -168,7 +169,7 @@ router.beforeEach(async (to, from, next) => {
                             window.location.href = url;
                             return;
                         }
-                        next({ path: url });
+                        next({ path: normalizeMenuRoutePath(url) });
                         return;
                     }
                 }
@@ -196,7 +197,11 @@ router.beforeEach(async (to, from, next) => {
                     const accessRoutes = await permissionStore.generateRoutes(["admin"]);
                     // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加
                     accessRoutes.forEach((route) => {
-                        router.addRoute(route);
+                        try {
+                            router.addRoute(route);
+                        } catch (routeError) {
+                            console.warn("[permission] addRoute failed:", route && route.path, routeError);
+                        }
                     });
                     next({ ...to, replace: true });
                 } catch (error) {

@@ -77,7 +77,7 @@
                                                 </div>
                                             </div>
                                             <el-button size="small" text type="primary" @click="OpenLogDiff(log, item)">
-                                                查看差异
+                                                {{ $t ? $t('Msg.ViewDiff') : '查看差异' }}
                                             </el-button>
                                         </template>
                                         <template v-else>
@@ -127,9 +127,9 @@
                     <div class="comment-input-wrapper">
                         <div v-if="replyComment" class="comment-reply-target">
                             <div class="comment-reply-head">
-                                <span>正在回复</span>
+                                <span>{{ $t ? $t('Msg.Replying') : '正在回复' }}</span>
                                 <strong>{{ GetCommentAuthor(replyComment) }}</strong>
-                                <el-button size="small" text type="primary" @click="$emit('cancel-reply-comment')">取消</el-button>
+                                <el-button size="small" text type="primary" @click="$emit('cancel-reply-comment')">{{ $t ? $t('Msg.Cancel') : '取消' }}</el-button>
                             </div>
                             <div class="comment-reply-preview">
                                 {{ IsCommentQuoteExpanded(replyComment) ? GetCommentPlainText(replyComment.Content) : GetCommentBrief(replyComment.Content, 96) }}
@@ -142,13 +142,13 @@
                                 type="primary"
                                 @click="ToggleCommentQuote(replyComment)"
                             >
-                                {{ IsCommentQuoteExpanded(replyComment) ? '收起原文' : '展开原文' }}
+                                {{ IsCommentQuoteExpanded(replyComment) ? ($t ? $t('Msg.CollapseOriginal') : '收起原文') : ($t ? $t('Msg.ExpandOriginal') : '展开原文') }}
                             </el-button>
                         </div>
                         <el-input
                             type="textarea"
                             :rows="3"
-                            :placeholder="replyComment ? '请输入回复内容' : ($t ? $t('Msg.EnterCommentContent') : '请输入评论内容')"
+                            :placeholder="replyComment ? ($t ? $t('Msg.EnterReplyContent') : '请输入回复内容') : ($t ? $t('Msg.EnterCommentContent') : '请输入评论内容')"
                             :model-value="commentContent"
                             @update:model-value="$emit('update:commentContent', $event)"
                         ></el-input>
@@ -181,7 +181,7 @@
                                 <div class="log-card">
                                     <div class="log-title">{{ GetCommentAuthor(item) }}</div>
                                     <div v-if="HasCommentQuote(item)" class="comment-quote">
-                                        <div class="comment-quote-title">回复 {{ item.ReplyToUserName || '上一条评论' }}</div>
+                                        <div class="comment-quote-title">{{ $t ? $t('Msg.Reply') : '回复' }} {{ item.ReplyToUserName || ($t ? $t('Msg.PreviousComment') : '上一条评论') }}</div>
                                         <div class="comment-quote-content">
                                             {{ IsCommentQuoteExpanded(item) ? GetCommentPlainText(item.ReplyToContent) : GetCommentBrief(item.ReplyToContent, 90) }}
                                         </div>
@@ -193,14 +193,14 @@
                                             type="primary"
                                             @click="ToggleCommentQuote(item)"
                                         >
-                                            {{ IsCommentQuoteExpanded(item) ? '收起原文' : '展开原文' }}
+                                            {{ IsCommentQuoteExpanded(item) ? ($t ? $t('Msg.CollapseOriginal') : '收起原文') : ($t ? $t('Msg.ExpandOriginal') : '展开原文') }}
                                         </el-button>
                                     </div>
                                     <div class="log-comment-content" v-safe-html="item.Content"></div>
                                     <div class="comment-item-actions">
                                         <el-button size="small" text type="primary" @click="$emit('reply-comment', item)">
                                             <el-icon><ChatDotRound /></el-icon>
-                                            回复
+                                            {{ $t ? $t('Msg.Reply') : '回复' }}
                                         </el-button>
                                     </div>
                                 </div>
@@ -218,14 +218,14 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><Clock /></el-icon>
-                        <span>数据版本</span>
+                        <span>{{ $t ? $t('Msg.DataVersion') : '数据版本' }}</span>
                     </span>
                 </template>
                 <div class="panel-card">
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><Clock /></el-icon>
-                            <span>数据版本</span>
+                            <span>{{ $t ? $t('Msg.DataVersion') : '数据版本' }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -254,18 +254,18 @@
                                 <div class="version-actions">
                                     <el-button size="small" type="primary" plain @click="$emit('preview-data-version', item)">
                                         <el-icon><View /></el-icon>
-                                        预览
+                                        {{ $t ? $t('Msg.Preview') : '预览' }}
                                     </el-button>
                                     <el-button size="small" type="warning" plain @click="$emit('load-data-version', item)">
                                         <el-icon><RefreshLeft /></el-icon>
-                                        加载
+                                        {{ $t ? $t('Msg.Load') : '加载' }}
                                     </el-button>
                                 </div>
                             </div>
                         </div>
                         <div v-else class="panel-empty">
                             <el-icon><Clock /></el-icon>
-                            <span>{{ dataVersionListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoData') : '暂无版本') }}</span>
+                            <span>{{ dataVersionListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoVersion') : '暂无版本') }}</span>
                         </div>
                     </div>
                 </div>

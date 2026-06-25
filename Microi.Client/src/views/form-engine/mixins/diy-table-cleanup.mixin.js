@@ -10,6 +10,14 @@ beforeUnmount() {
 
         // 标记组件已销毁
         self._isDestroyed = true;
+        if (self._handleLangChange) {
+            window.removeEventListener('microi:lang-change', self._handleLangChange);
+            self._handleLangChange = null;
+        }
+        if (self._langReloadTimer) {
+            clearTimeout(self._langReloadTimer);
+            self._langReloadTimer = null;
+        }
 
         // 🔥 移除全局刷新事件监听
         if (self._handlePageRefresh) {
