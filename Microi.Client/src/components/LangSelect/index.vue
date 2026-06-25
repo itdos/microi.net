@@ -20,7 +20,7 @@
 
 <script>
 import { computed } from "vue";
-import { useAppStore, useDiyStore } from "@/pinia";
+import { useAppStore, useDiyStore, usePermissionStore } from "@/pinia";
 import { SUPPORTED_LOCALES, setI18nLocale, normalizeLocale, getLanguage } from "@/lang";
 
 export default {
@@ -28,6 +28,7 @@ export default {
     setup() {
         const appStore = useAppStore();
         const diyStore = useDiyStore();
+        const permissionStore = usePermissionStore();
         const persistedLocale = normalizeLocale(getLanguage()) || "zh-CN";
         if (normalizeLocale(diyStore.Lang) !== persistedLocale) {
             diyStore.setLang(persistedLocale);
@@ -48,13 +49,14 @@ export default {
         return {
             appStore,
             diyStore,
+            permissionStore,
             supportedLocales: SUPPORTED_LOCALES,
             currentLocale,
             currentLabel
         };
     },
     methods: {
-        handleSetLanguage(lang) {
+        async handleSetLanguage(lang) {
             const n = setI18nLocale(lang); // 切換 i18n、寫入 localStorage、廣播事件
             this.appStore.setLanguage(n); // 同步 Pinia，使下拉禁用態實時更新
             // 兼容舊代碼：若 DiyCommon.ChangeLang 存在則調用（用於可能殘留的全局副作用）
@@ -64,6 +66,44 @@ export default {
                     this.DiyCommon.ChangeLang(n, true);
                 }
             } catch {}
+            await this.reloadMenuRoutesForLang(n);
+        },
+        async reloadMenuRoutesForLang(locale) {
+            try {
+                const routes = await this.permissionStore.generateRoutes(["admin"]);
+                const router = this.$router;
+                if (!router || !Array.isArray(routes)) {
+                    return;
+                }
+                const isGenerated = (route) => {
+                    const name = String(route && route.name || "");
+                    return name.startsWith("parent_menu_") || name.startsWith("menu_") || name.startsWith("menu_grid_");
+                };
+                router.getRoutes().forEach((route) => {
+                    if (route && route.name && isGenerated(route) && router.hasRoute(route.name)) {
+                        try { router.removeRoute(route.name); } catch {}
+                    }
+                });
+                routes.forEach((route) => {
+                    if (!route || !route.name || !isGenerated(route)) {
+                        return;
+                    }
+                    try {
+                        router.addRoute(route);
+                    } catch (routeError) {
+                        console.warn("[LangSelect] reload route failed:", route && route.path, routeError);
+                    }
+                });
+                const current = router.currentRoute && router.currentRoute.value;
+                if (current && current.fullPath) {
+                    await router.replace(current.fullPath).catch(() => {});
+                }
+                try {
+                    window.dispatchEvent(new CustomEvent("microi:lang-routes-reloaded", { detail: { locale } }));
+                } catch {}
+            } catch (error) {
+                console.warn("[LangSelect] reload menu routes failed:", error);
+            }
         }
     }
 };

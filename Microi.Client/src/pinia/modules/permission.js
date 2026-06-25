@@ -485,6 +485,16 @@ function isUsableMenuRoute(route) {
     return true;
 }
 
+function isGeneratedMicroiRoute(route) {
+    if (!route) return false;
+    const name = String(route.name || "");
+    if (name.startsWith("parent_menu_") || name.startsWith("menu_") || name.startsWith("menu_grid_")) {
+        return true;
+    }
+    const id = String(route.Id || route.meta?.Id || "");
+    return id.startsWith("grid_");
+}
+
 export function getFirstValidRoutePath(routes) {
     if (!Array.isArray(routes)) return "";
     for (const route of routes) {
@@ -556,22 +566,26 @@ export const usePermissionStore = defineStore("permission", {
                             var menuArr = [];
                             MenuBuild(menuArr, result.Data, true);
 
+                            var fixedComponents = [];
+                            var mergedAsyncRoutes = (asyncRoutes || []).filter((route) => !isGeneratedMicroiRoute(route));
+                            var insertIndex = Math.max(mergedAsyncRoutes.length - 1, 0);
+
                             menuArr.forEach((element) => {
-                                asyncRoutes.splice(asyncRoutes.length - 1, 0, element);
+                                mergedAsyncRoutes.splice(insertIndex, 0, element);
+                                insertIndex += 1;
                             });
 
-                            var fixedComponents = [];
-
                             fixedComponents.forEach((element) => {
-                                asyncRoutes.splice(asyncRoutes.length - 1, 0, element);
+                                mergedAsyncRoutes.splice(insertIndex, 0, element);
+                                insertIndex += 1;
                             });
 
                             // 以下为默认代码
                             let accessedRoutes;
                             if (roles.includes("admin")) {
-                                accessedRoutes = asyncRoutes || [];
+                                accessedRoutes = mergedAsyncRoutes || [];
                             } else {
-                                accessedRoutes = filterAsyncRoutes(asyncRoutes, roles);
+                                accessedRoutes = filterAsyncRoutes(mergedAsyncRoutes, roles);
                             }
                             this.setRoutes(accessedRoutes);
                             resolve(accessedRoutes);

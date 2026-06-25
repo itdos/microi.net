@@ -184,7 +184,12 @@ namespace Microi.net.Api
         [HttpPost, HttpGet]
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
         {
+            var requestedOsClient = param?["OsClient"].Val<string>();
             param = await DefaultParam(param);
+            if (!requestedOsClient.DosIsNullOrWhiteSpace())
+            {
+                param["OsClient"] = requestedOsClient;
+            }
             var includeRaw = param["IncludeClientText"].Val<string>();
             var includeClientText = includeRaw.DosIsNullOrWhiteSpace()
                 || (!string.Equals(includeRaw, "0", StringComparison.OrdinalIgnoreCase)
@@ -692,8 +697,15 @@ namespace Microi.net.Api
         private static async Task DefaultDiyFieldParam(DiyFieldParam param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            param._CurrentUser = currentTokenDynamic?.CurrentUser;
-            param.OsClient = currentTokenDynamic?.OsClient;
+            if (currentTokenDynamic != null)
+            {
+                param._CurrentUser = currentTokenDynamic.CurrentUser;
+                param.OsClient = currentTokenDynamic.OsClient;
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient(false);
+            }
             param._InvokeType = InvokeType.Client.ToString();
         }
 
@@ -1525,10 +1537,10 @@ namespace Microi.net.Api
 
         [HttpPost]
         [HttpPost("~/api/DiyField/AddDiyFieldFromBody")]
-        public async Task<JsonResult> AddDiyFieldFromBody([FromBody] DiyFieldParam param)
+        public async Task<JsonResult> AddDiyFieldFromBody([FromBody] JObject body)
         {
-            await DefaultDiyFieldParam(param);
-            var result = await MicroiEngine.FormEngine.AddDiyField(param);
+            body = await DefaultParam(body ?? new JObject());
+            var result = await MicroiEngine.FormEngine.AddDiyField(body);
             return Json(result);
         }
 

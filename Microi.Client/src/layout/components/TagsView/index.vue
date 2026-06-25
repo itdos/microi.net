@@ -307,10 +307,19 @@ export default {
             }
         };
         document.addEventListener('keydown', this._keyHandler);
+        this._langRoutesHandler = () => {
+            this.$nextTick(() => {
+                this.refreshCurrentTagTitle();
+            });
+        };
+        window.addEventListener("microi:lang-routes-reloaded", this._langRoutesHandler);
     },
     beforeUnmount() {
         if (this._keyHandler) {
             document.removeEventListener('keydown', this._keyHandler);
+        }
+        if (this._langRoutesHandler) {
+            window.removeEventListener("microi:lang-routes-reloaded", this._langRoutesHandler);
         }
         if (this.fullscreenTipTimer) {
             clearTimeout(this.fullscreenTipTimer);
@@ -405,6 +414,22 @@ export default {
                 this.tagsViewStore.addView(this.$route);
             }
             return false;
+        },
+        refreshCurrentTagTitle() {
+            try {
+                var resolved = this.$router.resolve(this.$route.fullPath);
+                var matched = resolved && resolved.matched && resolved.matched.length
+                    ? resolved.matched[resolved.matched.length - 1]
+                    : null;
+                var meta = Object.assign({}, this.$route.meta || {}, matched && matched.meta || {});
+                this.tagsViewStore.updateVisitedView(Object.assign({}, this.$route, {
+                    meta: meta,
+                    title: meta.title || this.$route.name || ""
+                }));
+                this.activeTab = this.$route.fullPath;
+            } catch (error) {
+                console.warn("[TagsView] refresh tag title failed:", error);
+            }
         },
         moveToCurrentTag() {
             this.$nextTick(() => {
