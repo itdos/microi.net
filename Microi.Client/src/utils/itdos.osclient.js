@@ -4,6 +4,7 @@ import { useDiyStore } from "@/pinia";
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import _, { any } from "underscore";
 import config from "@/config.json";
+import { LANG_STORAGE_KEY, normalizeLocale } from "@/lang";
 
 // 辅助函数：获取 DiyStore
 const getDiyStore = () => useDiyStore(pinia);
@@ -168,11 +169,17 @@ var DiyOsClient = {
                 init = true;
             }
 
-            if (DiyCommon.IsNull(localStorage.lang)) {
-                DiyCommon.ChangeLang(DiyCommon.IsNull(sysConfig.SysLang) ? "zh-CN" : sysConfig.SysLang, true);
-            } else {
-                DiyCommon.ChangeLang(localStorage.lang, true);
-            }
+            var storedLang = "";
+            try {
+                var microiStorage = JSON.parse(localStorage.getItem("microi.net") || "{}");
+                storedLang = normalizeLocale(
+                    localStorage.getItem(LANG_STORAGE_KEY) ||
+                    localStorage.lang ||
+                    localStorage.getItem("language") ||
+                    (microiStorage && microiStorage.Lang)
+                );
+            } catch (error) {}
+            DiyCommon.ChangeLang(storedLang || (DiyCommon.IsNull(sysConfig.SysLang) ? "zh-CN" : sysConfig.SysLang), true);
             DiyCommon.SetWebTitle(DiyCommon.IsNull(sysConfig.SysTitle) ? "Loading..." : sysConfig.SysTitle);
             DiyCommon.SetShortTitle(DiyCommon.IsNull(sysConfig.SysShortTitle) ? "Loading..." : sysConfig.SysShortTitle);
             DiyCommon.SetClientCompany(DiyCommon.IsNull(sysConfig.CompanyName) ? "Loading..." : sysConfig.CompanyName);

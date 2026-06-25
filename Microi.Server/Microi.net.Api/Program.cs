@@ -15,6 +15,7 @@ using Senparc.CO2NET;
 using Senparc.Weixin.AspNet;
 using Senparc.Weixin.RegisterServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Options;
@@ -254,6 +255,18 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseHttpsRedirection();
 app.MapStaticAssets();
+app.Use(async (context, next) =>
+{
+    var method = context.Request.Method;
+    var contentType = context.Request.ContentType ?? "";
+    if ((HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsPatch(method))
+        && !contentType.Contains("multipart/form-data", StringComparison.OrdinalIgnoreCase)
+        && (context.Request.ContentLength ?? 0) <= 10 * 1024 * 1024)
+    {
+        context.Request.EnableBuffering();
+    }
+    await next();
+});
 app.UseRouting();
 //-------注意以下两者的顺序-------
 app.UseAuthentication();
@@ -396,6 +409,16 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             }
 
             // AI 引擎 Schema 缓存初始化
+            try
+            {
+                MicroiEngine.FormEngine.QueueDiyLangFullSyncForAllClients(true);
+                Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已排队同步 diy_lang 元数据与前端固定文案。");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 排队同步 diy_lang 失败：{ex.Message}");
+            }
+
             try
             {
                 using var scope = app.Services.CreateScope();

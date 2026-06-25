@@ -119,7 +119,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-const API_BASE = 'https://api.microi.net'
+const API_BASE = import.meta.env.VITE_MICROI_API_BASE || 'https://api.microi.net'
 
 const user = ref(null)
 const showMenu = ref(false)
@@ -129,12 +129,16 @@ const confirmPwd = ref('')
 const isSettingPwd = ref(false)
 
 const backendUrl = computed(() => {
-  const storedPhone = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_phone') : null
-  if (storedPhone) {
-    return `https://microi.net/${storedPhone}`
+  const tenant = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant') : null
+  if (tenant) {
+    return `https://microi.net/?OsClient=${encodeURIComponent(tenant)}`
   }
   return 'https://microi.net'
 })
+
+function normalizeToken(raw) {
+  return (raw || '').replace(/^Bearer\s+/i, '').trim()
+}
 
 function loadUser() {
   try {
@@ -180,7 +184,7 @@ async function submitSetPwd() {
   }
   isSettingPwd.value = true
   try {
-    const token = localStorage.getItem('microi_doc_token')
+    const token = normalizeToken(localStorage.getItem('microi_doc_token'))
     const resp = await fetch(API_BASE + '/api/SysUser/SetPassword', {
       method: 'POST',
       headers: {
@@ -214,7 +218,7 @@ function closeMenu(e) {
 
 // Token以旧换新：如果有旧token，尝试刷新获取新token
 async function refreshToken() {
-  const token = localStorage.getItem('microi_doc_token')
+  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
   if (!token) return
   try {
     const resp = await fetch(API_BASE + '/api/SysUser/refreshToken', {
@@ -230,7 +234,7 @@ async function refreshToken() {
       // 更新token
       const newToken = resp.headers.get('authorization') || ''
       if (newToken) {
-        localStorage.setItem('microi_doc_token', newToken)
+        localStorage.setItem('microi_doc_token', normalizeToken(newToken))
       }
       // 更新用户信息
       if (result.Data) {

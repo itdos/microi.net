@@ -65,6 +65,14 @@ namespace Microi.net
             set { _lang = value; }
         }
         /// <summary>
+        /// Return metadata exactly as stored. Used by form designer to avoid saving translated Labels/Names.
+        /// </summary>
+        public bool? _RawMetadata { get; set; }
+        /// <summary>
+        /// Field names whose display values can be translated in table list responses.
+        /// </summary>
+        public List<string> _TranslateFields { get; set; }
+        /// <summary>
         /// .net9开始，如果这样写无法在OnActionExecuting中通过type.GetProperty("_Lang")获取到此属性
         /// </summary>
         /// <value></value>

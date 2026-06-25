@@ -590,6 +590,21 @@ export default {
                 }
             }
             //判断模块引擎是否配置了查询接口替换
+            try {
+                var translateTextComponents = ["Text", "Textarea", "RichText", "AutoNumber", "Radio", "Select"];
+                var translateFields = (self.GetShowDiyFieldList ? self.GetShowDiyFieldList() : [])
+                    .filter(function (field) {
+                        if (!field || self.DiyCommon.IsNull(field.Name)) return false;
+                        if (["Id", "Key", "Code", "CreateTime", "UpdateTime", "OsClient"].indexOf(field.Name) > -1) return false;
+                        return translateTextComponents.indexOf(field.Component) > -1 || ["Name", "Title", "Description", "Remark", "ApiDescription"].indexOf(field.Name) > -1;
+                    })
+                    .map(function (field) {
+                        return self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
+                    });
+                if (translateFields.length > 0) {
+                    param._TranslateFields = Array.from(new Set(translateFields));
+                }
+            } catch (e) {}
             var url = self.DiyApi.GetDiyTableRow;
             var paramType = "";
             if (self.CurrentDiyTableModel.IsTree) {

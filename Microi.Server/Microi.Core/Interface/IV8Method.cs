@@ -21,6 +21,11 @@ namespace Microi.net
         DosResult ReloadOsClient(string osClient, DbTrans _trans = null);
 
         /// <summary>
+        /// Clear all Redis cache keys for a tenant and remove its SaaS config cache.
+        /// </summary>
+        DosResult ClearTenantCache(string osClient);
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);

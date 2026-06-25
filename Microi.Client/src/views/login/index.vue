@@ -289,6 +289,7 @@ import { User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from 
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
+import { getFirstValidRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 
 export default {
     name: "Login",
@@ -873,6 +874,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.$parent.GetDesktop();
             } catch (error) {}
             self.DiyCommon.Tips((!self.DiyCommon.IsNull(self.LoginResult.Data.Name) ? self.LoginResult.Data.Name : self.LoginResult.Data.Account) + self.$t("Msg.WelcomeBack"));
+            let accessRoutes = [];
             try {
                 // 设置用户身份之前销毁登录页面视频
                 self.DiyCommon.DisposeVideoLogin();
@@ -888,10 +890,14 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 // 立即生成动态路由（修复：登录后无法跳转的问题）
                 console.log('[Login] 开始加载动态路由...');
                 const permissionStore = self.permissionStore;
-                const accessRoutes = await permissionStore.generateRoutes(roles);
+                accessRoutes = await permissionStore.generateRoutes(roles);
                 // 动态添加路由
                 accessRoutes.forEach((route) => {
-                    self.$router.addRoute(route);
+                    try {
+                        self.$router.addRoute(route);
+                    } catch (routeError) {
+                        console.warn("[Login] addRoute failed:", route && route.path, routeError);
+                    }
                 });
                 console.log('[Login] 动态路由已加载，数量:', accessRoutes.length);
                 // 然后调用桌面视频
@@ -914,10 +920,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 });
             } else {
                 var url = "/";
+                var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
                 //这里需要跳转到sys_menu的第一个路由
                 //2022-07-05新增：以系统设置的默认首页路由为优先
                 if (self.SysConfig && self.SysConfig.DefaultIndexUrl) {
-                    url = self.SysConfig.DefaultIndexUrl;
+                    url = String(self.SysConfig.DefaultIndexUrl || "");
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
                         url = self.normalizeIframeRouteUrl(url);
@@ -926,7 +933,15 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         return;
                     }
                 } else if (self.LoginResult.DataAppend && self.LoginResult.DataAppend.SysMenuHomePage && self.LoginResult.DataAppend.SysMenuHomePage.Url) {
-                    url = self.LoginResult.DataAppend.SysMenuHomePage.Url;
+                    url = String(self.LoginResult.DataAppend.SysMenuHomePage.Url || "");
+                }
+                if (url && url.startsWith("http") && !self.diyStore.IsPhoneView) {
+                    window.location.href = url;
+                    return;
+                }
+                url = normalizeMenuRoutePath(url || fallbackUrl || "/");
+                if ((url === "/" || self.$router.resolve(url).matched.length === 0) && fallbackUrl) {
+                    url = fallbackUrl;
                 }
                 
                 // 检查是否是移动端设备，且没有指定redirect参数
@@ -936,8 +951,12 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 //     console.log('[Login] 检测到移动端设备，跳转到移动端首页:', url);
                 // }
                 
+                var targetPath = self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : normalizeMenuRoutePath(self.redirect);
+                if ((targetPath === "/" || self.$router.resolve(targetPath).matched.length === 0) && fallbackUrl) {
+                    targetPath = fallbackUrl;
+                }
                 self.$router.push({
-                    path: self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : self.redirect,
+                    path: targetPath,
                     query: self.otherQuery,
                     replace: true
                 });
