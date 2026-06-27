@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -16,6 +17,9 @@ namespace Microi.net
 {
     public partial class V8MongoDB : IMongoDB
     {
+        private static readonly ConcurrentDictionary<string, DateTime> _sysLogCircuitOpenUntil = new ConcurrentDictionary<string, DateTime>();
+        private static readonly TimeSpan SysLogCircuitBreakDuration = TimeSpan.FromMinutes(1);
+
         public V8MongoDBParam DynamicToV8MongoDBParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
@@ -311,7 +315,22 @@ namespace Microi.net
                     DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
                     Table = "log_" + DateTime.Now.ToString("yyyyMM")//表名
                 };
+
+                var circuitKey = host.Connection + "|" + host.DataBase;
+                if (_sysLogCircuitOpenUntil.TryGetValue(circuitKey, out var openUntil) && openUntil > DateTime.UtcNow)
+                {
+                    return new DosResult(0, null, "MongoDB sys log is temporarily unavailable.");
+                }
+
                 var result = await TMongodbHelper<SysLog>.InsertAsync(host, model);
+                if (result.Code != 1)
+                {
+                    _sysLogCircuitOpenUntil[circuitKey] = DateTime.UtcNow.Add(SysLogCircuitBreakDuration);
+                }
+                else
+                {
+                    _sysLogCircuitOpenUntil.TryRemove(circuitKey, out _);
+                }
 
                 return result;
             }

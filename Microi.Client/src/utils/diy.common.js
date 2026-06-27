@@ -8,7 +8,7 @@ import { Base64 } from "js-base64";
 import qs from "qs";
 import axios from "axios";
 import { DosCommon } from "./dos.common.js";
-import i18n, { setI18nLocale, normalizeLocale } from "@/lang";
+import i18n, { setI18nLocale, normalizeLocale, ensureLocaleMessage } from "@/lang";
 import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "./api.itdos";
@@ -97,6 +97,8 @@ var DiyCommon = {
     // 401 重登录節流标志：避免并发请求 Token 同时失效时弹出 N 个登录框
     _LoginPending: false,
     _LangBundleStatus: {},
+    _LangBundlePromises: {},
+    _LangBundleCacheMinutes: 30,
     /**
      * 安全解析 JSON，避免裸 JSON.parse 抛错导致页面崩溃
      * @param {*} str 待解析内容
@@ -625,15 +627,19 @@ var DiyCommon = {
     ApplyLangBundle: function (lang, data) {
         try {
             var n = normalizeLocale(lang) || "zh-CN";
+            ensureLocaleMessage(n);
             var bundle = data || {};
             var msgPatch = {};
+            if (bundle.Msg && typeof bundle.Msg === "object") {
+                Object.assign(msgPatch, bundle.Msg);
+            }
             Object.keys(bundle).forEach(function (key) {
                 if (key.indexOf("Msg.") === 0) {
                     msgPatch[key.substring(4)] = bundle[key];
                 }
             });
             if (Object.keys(msgPatch).length === 0) {
-                return;
+                return false;
             }
             var current = i18n.global.getLocaleMessage ? i18n.global.getLocaleMessage(n) : i18n.global.messages[n] || {};
             var merged = Object.assign({}, current, {
@@ -644,55 +650,95 @@ var DiyCommon = {
             } else {
                 i18n.global.messages[n] = merged;
             }
+            return true;
         } catch (e) {
             console.warn("[DiyCommon.ApplyLangBundle] failed:", e && e.message);
         }
+        return false;
     },
-    LoadLangBundle: function (lang) {
+    LoadLangBundle: function (lang, options) {
+        options = options || {};
         try {
             var n = normalizeLocale(lang) || DiyCommon.GetCurrentLang();
             var osClient = DiyCommon.GetOsClient();
             var cacheKey = osClient + ":" + n;
-            if (DiyCommon._LangBundleStatus[cacheKey] === "loaded" || DiyCommon._LangBundleStatus[cacheKey] === "loading") {
-                return;
+            var storageKey = "Microi.LangBundle:" + cacheKey;
+            var cachedData = null;
+            try {
+                var cachedText = localStorage.getItem(storageKey);
+                if (cachedText) {
+                    var cached = JSON.parse(cachedText);
+                    if (cached && cached.Data) {
+                        cachedData = cached.Data;
+                        DiyCommon.ApplyLangBundle(n, cachedData);
+                        if (!options.force && cached.Time && (Date.now() - cached.Time) < DiyCommon._LangBundleCacheMinutes * 60 * 1000) {
+                            DiyCommon._LangBundleStatus[cacheKey] = "loaded";
+                            return Promise.resolve(cachedData);
+                        }
+                    }
+                }
+            } catch {}
+            if (!options.force && DiyCommon._LangBundleStatus[cacheKey] === "loaded") {
+                return Promise.resolve(cachedData);
+            }
+            if (!options.force && DiyCommon._LangBundlePromises[cacheKey]) {
+                return DiyCommon._LangBundlePromises[cacheKey];
             }
             DiyCommon._LangBundleStatus[cacheKey] = "loading";
-            DiyCommon.PostAsync("/api/FormEngine/GetLangBundle", {
+            var promise = DiyCommon.PostAsync("/api/FormEngine/GetLangBundle", {
                 OsClient: osClient,
                 _Lang: n,
                 Prefix: "Msg."
             }).then(function (result) {
                 if (result && result.Code == 1 && result.Data) {
                     DiyCommon.ApplyLangBundle(n, result.Data);
+                    try {
+                        localStorage.setItem(storageKey, JSON.stringify({ Time: Date.now(), Data: result.Data }));
+                    } catch {}
                     DiyCommon._LangBundleStatus[cacheKey] = "loaded";
+                    return result.Data;
                 } else {
                     DiyCommon._LangBundleStatus[cacheKey] = "failed";
+                    return cachedData;
                 }
             }).catch(function () {
                 DiyCommon._LangBundleStatus[cacheKey] = "failed";
+                return cachedData;
+            }).finally(function () {
+                delete DiyCommon._LangBundlePromises[cacheKey];
             });
-        } catch (e) {}
+            DiyCommon._LangBundlePromises[cacheKey] = promise;
+            return promise;
+        } catch (e) {
+            return Promise.resolve(null);
+        }
     },
-    ChangeLang: function (lang, notTips) {
+    ChangeLang: async function (lang, notTips) {
         try {
-            var n = setI18nLocale ? setI18nLocale(lang) : lang;
+            var nextLang = normalizeLocale(lang) || "zh-CN";
+            await DiyCommon.LoadLangBundle(nextLang);
+            var n = setI18nLocale ? setI18nLocale(nextLang) : nextLang;
             try { LocalStorageManager.set("Lang", n); } catch {}
             try { useDiyStore(pinia).setLang(n); } catch {}
             try { useAppStore(pinia).setLanguage(n); } catch {}
-            DiyCommon.InitLangData();
-            DiyCommon.LoadLangBundle(n);
+            DiyCommon.InitLangData({ skipLoad: true });
             if (notTips !== true) {
                 DiyCommon.Tips(getI18nMsg("Success", "Success"));
             }
+            return n;
         } catch (e) {
             console.error("[ChangeLang] failed:", e);
         }
+        return normalizeLocale(lang) || "zh-CN";
     },
-    InitLangData: function () {
+    InitLangData: function (options) {
+        options = options || {};
         var self = this;
         const locale = DiyCommon.GetCurrentLang();
         const messages = i18n.global.messages[locale]?.Msg || {};
-        DiyCommon.LoadLangBundle(locale);
+        if (!options.skipLoad) {
+            DiyCommon.LoadLangBundle(locale);
+        }
         DiyCommon.Weeks = [messages.Sun || "Sun", messages.Mon || "Mon", messages.Tues || "Tues", messages.Wed || "Wed", messages.Thurs || "Thurs", messages.Fri || "Fri", messages.Sat || "Sat"];
         DiyCommon.Months = [
             messages.Jan || "Jan",

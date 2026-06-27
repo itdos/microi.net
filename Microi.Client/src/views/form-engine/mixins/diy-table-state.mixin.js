@@ -528,6 +528,7 @@ export default {
             FieldFormDefaultValues: {},
             StatisticsFields: null,
             BtnLoading: false,
+            BusinessDataTranslateLoading: false,
             tableLoading: true,
             SearchModel: {},
             SearchEqual: {},

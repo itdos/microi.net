@@ -239,7 +239,7 @@ export default {
                     ]
                 });
                 if (!workRes || workRes.Code !== 1 || self.DiyCommon.IsNull(workRes.Data)) {
-                    self.DiyCommon.Tips("未找到您可处理的待办，可能已被处理或非接收人。", false);
+                    self.DiyCommon.Tips(self.$t("Msg.NoPendingWork"), false);
                     self.BtnLoading = false;
                     return;
                 }
@@ -253,7 +253,7 @@ export default {
                     CurrentNodeId: workModel.NodeId
                 });
             } catch (error) {
-                self.DiyCommon.Tips("打开处理工作页面失败：" + (error && error.message ? error.message : error), false);
+                self.DiyCommon.Tips(self.$t("Msg.OpenDoWorkFailed") + ": " + (error && error.message ? error.message : error), false);
                 self.BtnLoading = false;
             }
         },

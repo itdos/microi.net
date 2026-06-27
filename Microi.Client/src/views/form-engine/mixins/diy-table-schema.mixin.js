@@ -551,6 +551,10 @@ export default {
             var fuheWZ = "";
             var result = "";
             var rawValue = self._GetTableFieldRawValue(scope, field);
+            var businessTranslateField = field.AsName || field.Name;
+            if (scope && scope.row && scope.row._BusinessTranslations && !self.DiyCommon.IsNull(scope.row._BusinessTranslations[businessTranslateField])) {
+                return scope.row._BusinessTranslations[businessTranslateField];
+            }
             var displayValue = self.DiyCommon.IsNull(rawValue) ? "" : rawValue;
             //如果是地址控件
             if (field.Component == "Address" && displayValue) {

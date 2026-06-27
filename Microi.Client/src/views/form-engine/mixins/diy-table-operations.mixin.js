@@ -564,7 +564,7 @@ export default {
             if (!rowModel || self.DiyCommon.IsNull(rowModel.Id)) {
                 return;
             }
-            self.DiyCommon.OsConfirm("确认恢复该回收站数据？", function () {
+            self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmRestoreTrashData"), function () {
                 self.BtnLoading = true;
                 self.DiyCommon.Post(
                     self.DiyApi.UptDiyTableRow,

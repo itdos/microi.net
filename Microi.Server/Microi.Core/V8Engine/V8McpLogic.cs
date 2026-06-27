@@ -693,22 +693,37 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
-                var setParts = new List<string> { "ApiV8Code=?code", "UpdateTime=?now" };
-                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace()) setParts.Add("`Version`=?version");
-                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) setParts.Add("`ChangeHistory`=CONCAT(?history, IFNULL(`ChangeHistory`,''))");
-
-                var updateSection = client.Db.FromSql($"UPDATE sys_apiengine SET {string.Join(", ", setParts)} WHERE Id=?id")
-                    .AddInParameter("?code", plainCode)
-                    .AddInParameter("?now", now);
-                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace()) updateSection.AddInParameter("?version", resolvedVersion);
-                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) updateSection.AddInParameter("?history", changeHistoryEntry);
-                updateSection.AddInParameter("?id", id);
-                updateSection.SetCommandTimeout(10);
-                var affected = updateSection.ExecuteNonQuery();
-
-                if (affected <= 0)
+                var updateParam = new JObject
                 {
+                    ["Id"] = id,
+                    ["OsClient"] = osClient,
+                    ["ApiV8Code"] = plainCode,
+                    ["UpdateTime"] = now,
+                    ["_InvokeType"] = "Client"
+                };
+                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace())
+                {
+                    updateParam["Version"] = resolvedVersion;
+                }
+                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace())
+                {
+                    var historyResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                    {
+                        OsClient = osClient,
+                        Id = id,
+                        _SelectFields = new[] { "Id", "ChangeHistory" }
+                    });
+                    updateParam["ChangeHistory"] = changeHistoryEntry + (historyResult.Code == 1 ? SafeString(historyResult.Data?.ChangeHistory) : "");
+                }
+
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", updateParam);
+
+                if (updateResult.Code != 1)
+                {
+                    return new DosResult<object>(updateResult.Code, updateResult.Data, updateResult.Msg);
+#if false
                     return new DosResult<object>(0, null, $"接口引擎 [{apiEngineKey}] 代码未更新");
+#endif
                 }
 
                 var cacheRefreshStatus = "OK";

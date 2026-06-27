@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using Acornima;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
@@ -236,8 +237,13 @@ namespace Microi.net
                 {
                     continue;
                 }
-                value = GetJObjectLang(row, item.Key, lang);
-                return !value.DosIsNullOrWhiteSpace() && !string.Equals(value, sourceText, StringComparison.OrdinalIgnoreCase);
+                var candidate = GetJObjectLang(row, item.Key, lang);
+                if (!candidate.DosIsNullOrWhiteSpace()
+                    && !string.Equals(candidate, sourceText, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = candidate;
+                    return true;
+                }
             }
             return false;
         }
@@ -253,15 +259,40 @@ namespace Microi.net
             {
                 return "En";
             }
-            if (lang == "zh-tw" || lang == "zh-hk" || lang == "tw")
+            if (lang == "zh-tw" || lang == "zh-hk" || lang == "zh-hant" || lang == "zt" || lang == "tw")
             {
                 return "ZhTW";
+            }
+            if (lang == "ja" || lang == "ja-jp" || lang == "jp")
+            {
+                return "Ja";
+            }
+            if (lang == "id" || lang == "id-id" || lang == "indonesian" || lang == "bahasa-indonesia")
+            {
+                return "Idn";
+            }
+            if (lang == "tl" || lang == "fil" || lang == "fil-ph" || lang == "filipino" || lang == "tagalog")
+            {
+                return "Tl";
+            }
+            if (lang == "pt-br" || lang == "pt-pt")
+            {
+                return "Pt";
             }
             if (lang == "my" || lang == "my-mm" || lang == "burmese" || lang == "myanmar" || lang == "缅甸语")
             {
                 return "My";
             }
-            return lang;
+            if (lang.Length <= 1)
+            {
+                return lang;
+            }
+            var parts = lang.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                return string.Concat(parts.Select(part => part.Length <= 1 ? part.ToUpperInvariant() : char.ToUpperInvariant(part[0]) + part.Substring(1)));
+            }
+            return char.ToUpperInvariant(lang[0]) + lang.Substring(1);
         }
 
         public static string NormalizeTranslateLang(string lang)
@@ -271,13 +302,29 @@ namespace Microi.net
             {
                 return "zh";
             }
-            if (lang == "zhtw" || lang == "zh-tw" || lang == "zh-hk" || lang == "tw")
+            if (lang == "zhtw" || lang == "zh-tw" || lang == "zh-hk" || lang == "zh-hant" || lang == "zt" || lang == "tw")
             {
                 return "zh-tw";
+            }
+            if (lang == "id-id" || lang == "indonesian" || lang == "bahasa-indonesia")
+            {
+                return "id";
+            }
+            if (lang == "fil" || lang == "fil-ph" || lang == "filipino" || lang == "tagalog")
+            {
+                return "tl";
+            }
+            if (lang == "pt-br" || lang == "pt-pt")
+            {
+                return "pt";
             }
             if (lang == "my" || lang == "my-mm" || lang == "burmese" || lang == "myanmar" || lang == "缅甸语")
             {
                 return "my";
+            }
+            if (lang == "jp")
+            {
+                return "ja";
             }
             return lang;
         }

@@ -40,12 +40,14 @@ AI 在工作区内生成的**一次性临时脚本、诊断文件、截图、测
 | 一次性 Python/JS/PS1 脚本 | `<workspace-root>/.tmp/` |
 | 诊断截图、调试输出 | `<workspace-root>/.tmp/screenshots/` 或子目录 |
 | E2E 测试产物（Microi.VSCode 插件生成） | `<workspace-root>/.microi-e2e/` |
-| 前端项目 E2E 截图/报告 | `<frontend-project>/tests/e2e/screenshots/` 和 `/report/` |
+| AI 一次性 Playwright 脚本、截图、日志、报告 | `<workspace-root>/.tmp/`、`<workspace-root>/.tmp/screenshots/`、`<workspace-root>/.tmp/reports/` |
 | 性能测试报告 | `<workspace-root>/.microi-performance/`（仅限此目录） |
 
 **禁止在根目录创建的文件类型**：`*.mjs`、`*.py`、`*.ps1`、`*.sh`（一次性脚本）、`*.png`、`screenshots/`、`node_modules/`（无 package.json 时）、`obj/`（非 .NET 项目文件）、`dark-mode-*/`、`test-*/` 等临时目录。
 
 `.tmp/` 目录已在 `.gitignore` 中排除，AI 可以在此自由创建临时文件。任务完成后如无价值可以不清理，也可以整体删除该目录。
+
+**2026-06 强制补充**：AI 手写的一次性 Playwright 验证脚本、运行日志、截图和报告只能写到工作区根目录 `.tmp/`。不要写到 `Microi.Client/`、`Microi.Server/`、`microi.doc/` 或其它子项目目录，即使这些目录已有 `tests/` 目录也不例外。只有 Microi.VSCode 插件正式初始化的可复用 E2E 工程，才使用 `.microi-e2e/`。
 
 ## 标准目录
 

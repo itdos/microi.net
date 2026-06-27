@@ -1,7 +1,23 @@
 // 登录页面：隐藏导航栏、侧边栏、页脚，内容全屏
 body:has(.ai-login-page) {
+  overflow: hidden;
+  background: #0a0a14 !important;
+
   .VPNav, .VPNavBar, .VPSidebar, .VPFooter, .VPLocalNav {
     display: none !important;
+  }
+  .Layout,
+  .VPContent,
+  .VPDoc,
+  .VPDoc .container,
+  .VPDoc .content,
+  .VPDoc .content-container,
+  .vp-doc {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100dvh !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
   .VPContent {
     padding-top: 0 !important;
