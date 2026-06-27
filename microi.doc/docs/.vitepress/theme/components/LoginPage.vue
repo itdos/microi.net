@@ -113,7 +113,7 @@
                 <input v-model.trim="phone" type="tel" placeholder="请输入手机号" maxlength="11" class="login-input" autocomplete="tel" />
               </div>
 
-              <div class="input-group captcha-group">
+              <div v-if="!devSmsBypass" class="input-group captcha-group">
                 <div class="input-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -127,7 +127,7 @@
                 </button>
               </div>
 
-              <div class="input-group">
+              <div v-if="!devSmsBypass" class="input-group">
                 <div class="input-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -181,7 +181,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || 'https://api.microi.net'
-const OS_CLIENT = 'MicroiDoc'
+const OS_CLIENT = 'iTdos'
 
 const phone = ref('')
 const captchaValue = ref('')
@@ -218,6 +218,11 @@ const brandFeatures = [
 
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
 const tenantReady = computed(() => !!tenantOsClient.value)
+const devSmsBypass = computed(() => {
+  if (import.meta.env.VITE_MICROI_DEV_SMS_BYPASS === 'true') return true
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('devSmsBypass') === '1'
+})
 const adminUrl = computed(() => `https://microi.net/?OsClient=${encodeURIComponent(tenantOsClient.value)}`)
 const titleText = computed(() => tenantReady.value ? '租户已就绪' : isAuthed.value ? '创建 SaaS 租户' : '手机号登录 / 注册')
 const descText = computed(() => tenantReady.value ? '你的独立低代码工作台已经准备好' : isAuthed.value ? '填写系统信息，一键生成全新租户数据库' : '输入手机号，获取验证码快捷登录')
@@ -273,7 +278,7 @@ async function sendSmsCode() {
     const result = await resp.json()
     if (result.Code !== 1) {
       showToast(result.Msg || '短信验证码发送失败。', 'error')
-      refreshCaptcha()
+      if (!devSmsBypass.value) refreshCaptcha()
       return
     }
     showToast('验证码已发送。', 'success')
@@ -309,7 +314,7 @@ async function handleLogin() {
     showToast('请输入正确的11位手机号。', 'error')
     return
   }
-  if (!smsCode.value) {
+  if (!devSmsBypass.value && !smsCode.value) {
     showToast('请输入短信验证码。', 'error')
     return
   }
@@ -319,7 +324,7 @@ async function handleLogin() {
   try {
     const payload = {
       Phone: phone.value,
-      _CaptchaValue: smsCode.value,
+      _CaptchaValue: devSmsBypass.value ? '' : smsCode.value,
       OsClient: OS_CLIENT
     }
     if (registerPassword.value) {
@@ -345,7 +350,7 @@ async function handleLogin() {
 }
 
 function handleLoginSuccess(resp, result) {
-  const token = normalizeToken(resp.headers.get('authorization') || result.DataAppend?.Token)
+  const token = normalizeToken(resp.headers.get('authorization') || result.Data?.Authorization || result.DataAppend?.Token)
   authToken.value = token
   currentUser.value = result.Data || {}
   tenantOsClient.value = result.DataAppend?.TenantOsClient || ''
@@ -442,8 +447,14 @@ function initParticles() {
   let height = 0
 
   function resize() {
-    width = canvas.width = canvas.offsetWidth
-    height = canvas.height = canvas.offsetHeight
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    width = window.innerWidth || document.documentElement.clientWidth || 1440
+    height = window.innerHeight || document.documentElement.clientHeight || 900
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+    canvas.width = Math.floor(width * dpr)
+    canvas.height = Math.floor(height * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
   function createParticle() {
@@ -498,7 +509,9 @@ onMounted(() => {
   restoreSession()
   nextTick(() => {
     initParticles()
-    refreshCaptcha()
+    if (!devSmsBypass.value) {
+      refreshCaptcha()
+    }
   })
 })
 
@@ -512,9 +525,10 @@ onUnmounted(() => {
 
 <style scoped>
 .ai-login-page {
-  position: relative;
-  min-height: 100vh;
-  width: 100%;
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  width: 100vw;
   background: linear-gradient(135deg, #0a0a14 0%, #0d0d1a 40%, #1a0a2e 70%, #0a0a14 100%);
   display: flex;
   align-items: center;
@@ -528,9 +542,12 @@ onUnmounted(() => {
 .ai-orbs {
   position: absolute;
   inset: 0;
+  width: 100vw;
+  height: 100dvh;
 }
 
 .particle-bg {
+  display: block;
   z-index: 1;
 }
 
@@ -999,6 +1016,7 @@ onUnmounted(() => {
   .ai-login-page {
     padding: 24px 0;
     align-items: flex-start;
+    overflow-y: auto;
   }
 
   .login-container {

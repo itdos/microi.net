@@ -19,9 +19,15 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useAppStore, useDiyStore, usePermissionStore } from "@/pinia";
-import { SUPPORTED_LOCALES, setI18nLocale, normalizeLocale, getLanguage } from "@/lang";
+import {
+    setI18nLocale,
+    normalizeLocale,
+    getStoredLanguage,
+    getSupportedLocalesBySysLangs,
+    resolveSysLocale
+} from "@/lang";
 
 export default {
     name: "LangSelect",
@@ -29,41 +35,51 @@ export default {
         const appStore = useAppStore();
         const diyStore = useDiyStore();
         const permissionStore = usePermissionStore();
-        const persistedLocale = normalizeLocale(getLanguage()) || "zh-CN";
-        if (normalizeLocale(diyStore.Lang) !== persistedLocale) {
-            diyStore.setLang(persistedLocale);
-        }
-        if (normalizeLocale(appStore.language) !== persistedLocale) {
-            appStore.setLanguage(persistedLocale);
-        }
-        setI18nLocale(persistedLocale);
+        const supportedLocales = computed(() => getSupportedLocalesBySysLangs(diyStore.SysConfig && diyStore.SysConfig.SysLangs));
+        const applyLocale = (locale) => {
+            const nextLocale = resolveSysLocale(diyStore.SysConfig, locale);
+            if (normalizeLocale(diyStore.Lang) !== nextLocale) {
+                diyStore.setLang(nextLocale);
+            }
+            if (normalizeLocale(appStore.language) !== nextLocale) {
+                appStore.setLanguage(nextLocale);
+            }
+            setI18nLocale(nextLocale);
+            return nextLocale;
+        };
+        watch(
+            () => [diyStore.SysConfig && diyStore.SysConfig.SysLangs, diyStore.SysConfig && diyStore.SysConfig.SysLang],
+            () => {
+                applyLocale(getStoredLanguage() || diyStore.Lang || appStore.language);
+            },
+            { immediate: true }
+        );
         const currentLocale = computed(() => {
-            const storeLocale = normalizeLocale(diyStore.Lang || appStore.language);
-            const persistedLocale = normalizeLocale(getLanguage());
-            return persistedLocale || storeLocale || "zh-CN";
+            return resolveSysLocale(diyStore.SysConfig, diyStore.Lang || appStore.language || getStoredLanguage());
         });
         const currentLabel = computed(() => {
-            const found = SUPPORTED_LOCALES.find((l) => l.value === currentLocale.value);
-            return found ? found.label : "简体中文";
+            const found = supportedLocales.value.find((l) => l.value === currentLocale.value);
+            return found ? found.label : (supportedLocales.value[0] && supportedLocales.value[0].label) || "English";
         });
         return {
             appStore,
             diyStore,
             permissionStore,
-            supportedLocales: SUPPORTED_LOCALES,
+            supportedLocales,
             currentLocale,
             currentLabel
         };
     },
     methods: {
         async handleSetLanguage(lang) {
-            const n = setI18nLocale(lang); // 切換 i18n、寫入 localStorage、廣播事件
-            this.appStore.setLanguage(n); // 同步 Pinia，使下拉禁用態實時更新
-            // 兼容舊代碼：若 DiyCommon.ChangeLang 存在則調用（用於可能殘留的全局副作用）
-            this.diyStore.setLang(n);
+            const n = resolveSysLocale(this.diyStore.SysConfig, lang);
             try {
                 if (this.DiyCommon && typeof this.DiyCommon.ChangeLang === "function") {
-                    this.DiyCommon.ChangeLang(n, true);
+                    await this.DiyCommon.ChangeLang(n, true);
+                } else {
+                    setI18nLocale(n);
+                    this.appStore.setLanguage(n);
+                    this.diyStore.setLang(n);
                 }
             } catch {}
             await this.reloadMenuRoutesForLang(n);

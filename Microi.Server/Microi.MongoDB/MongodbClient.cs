@@ -24,9 +24,18 @@ namespace Microi.net
         /// <returns></returns>
         public static IMongoCollection<T> MongodbInfoClient(MongodbHost host)
         {
-            var client = _clientCache.GetOrAdd(host.Connection, conn => new MongoClient(conn));
+            var client = _clientCache.GetOrAdd(host.Connection, CreateClient);
             var dataBase = client.GetDatabase(host.DataBase);
             return dataBase.GetCollection<T>(host.Table);
+        }
+
+        private static MongoClient CreateClient(string connection)
+        {
+            var settings = MongoClientSettings.FromConnectionString(connection);
+            settings.ServerSelectionTimeout = TimeSpan.FromSeconds(2);
+            settings.ConnectTimeout = TimeSpan.FromSeconds(2);
+            settings.SocketTimeout = TimeSpan.FromSeconds(2);
+            return new MongoClient(settings);
         }
         #endregion
     }

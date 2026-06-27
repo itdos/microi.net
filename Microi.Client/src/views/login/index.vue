@@ -290,6 +290,7 @@ import { User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from 
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { getFirstValidRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
+import { getStoredLanguage, resolveSysLocale } from "@/lang";
 
 export default {
     name: "Login",
@@ -546,11 +547,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             }
         },
         loadLang() {
-            //兼容旧版本语言配置
-            let currentLang = this.SysConfig?.SysLang;
-            if (!currentLang) {
-                currentLang = "zh-CN";
-            }
+            let currentLang = resolveSysLocale(this.SysConfig, getStoredLanguage());
             if (currentLang != "en" && currentLang != "zh-CN" && currentLang != "none" && typeof window.translate !== "undefined") {
                 let lang = translate.language.getCurrent();
                 if (lang != currentLang) {

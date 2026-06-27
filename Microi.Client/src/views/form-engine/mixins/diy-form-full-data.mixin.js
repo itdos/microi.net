@@ -427,7 +427,7 @@ export default {
                     if (self.CurrentDraftId == draft.Id) {
                         self.CurrentDraftId = "";
                     }
-                    self.DiyCommon.Tips("草稿已删除。");
+                    self.DiyCommon.Tips(self.$t("Msg.DraftDeleted"));
                     self.LoadDraftList(false);
                 }
             });

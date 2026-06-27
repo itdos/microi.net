@@ -1815,6 +1815,7 @@ export default {
                 // var formDiyTableModel = {
                 //     ...self.$refs.fieldForm.FormDiyTableModel
                 // }
+                self.RestoreBusinessDataTranslations();
                 self.GetFormDataAndCheck(async function (formData) {
                     if (self.DiyCommon.IsNull(formData)) {
                         formParam.SaveLoading = false;
@@ -2043,6 +2044,75 @@ export default {
                 }
             } catch (e) {
                 // ignore
+            }
+        },
+        GetBusinessTranslateFields() {
+            var self = this;
+            var components = ["Text", "Textarea", "RichText", "AutoNumber"];
+            var preferredNames = ["Name", "Title", "Description", "Remark", "ApiDescription", "SubTitle", "Summary"];
+            return (self.DiyFieldList || []).filter(function (field) {
+                if (!field || self.DiyCommon.IsNull(field.Name)) return false;
+                if (["Id", "Key", "Code", "CreateTime", "UpdateTime", "CreateUser", "UpdateUser", "OsClient"].indexOf(field.Name) > -1) return false;
+                return components.indexOf(field.Component) > -1 || preferredNames.indexOf(field.Name) > -1;
+            });
+        },
+        RestoreBusinessDataTranslations() {
+            var self = this;
+            var raw = self.BusinessDataTranslateRaw || {};
+            Object.keys(raw).forEach(function (fieldName) {
+                self.FormDiyTableModel[fieldName] = raw[fieldName];
+            });
+            self.BusinessDataTranslateRaw = {};
+        },
+        async TranslateBusinessData() {
+            var self = this;
+            if (self.BusinessDataTranslateLoading) return;
+            var lang = (self.DiyCommon.GetCurrentLang ? self.DiyCommon.GetCurrentLang() : "").trim();
+            if (!lang || lang === "zh-CN" || lang === "cn" || lang === "zh" || lang === "zh-Hans") {
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.SelectTargetLangFirst") : "Please switch language first.", false);
+                return;
+            }
+            var fields = self.GetBusinessTranslateFields();
+            var textMap = {};
+            fields.forEach(function (field) {
+                var value = self.FormDiyTableModel[field.Name];
+                if (typeof value !== "string") value = value == null ? "" : String(value);
+                value = value.trim();
+                if (!value || value.length > 500 || value.indexOf("<") >= 0) return;
+                textMap[value] = true;
+            });
+            var texts = Object.keys(textMap);
+            if (texts.length === 0) {
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.NoTranslatableBusinessData") : "No translatable data.", false);
+                return;
+            }
+            self.BusinessDataTranslateLoading = true;
+            try {
+                var result = await self.DiyCommon.ApiEngine.Run("translate-business-data", {
+                    TargetLang: lang,
+                    Texts: texts
+                });
+                if (!self.DiyCommon.Result(result)) {
+                    return;
+                }
+                var translations = (result.Data && (result.Data.Translations || result.Data.translations)) || {};
+                var raw = self.BusinessDataTranslateRaw || {};
+                fields.forEach(function (field) {
+                    var value = self.FormDiyTableModel[field.Name];
+                    if (typeof value !== "string") value = value == null ? "" : String(value);
+                    var text = value.trim();
+                    if (translations[text] && translations[text] !== text) {
+                        if (!Object.prototype.hasOwnProperty.call(raw, field.Name)) {
+                            raw[field.Name] = self.FormDiyTableModel[field.Name];
+                        }
+                        self.FormDiyTableModel[field.Name] = translations[text];
+                    }
+                });
+                self.BusinessDataTranslateRaw = raw;
+                self.$emit("CallbackSetFormData", self.FormDiyTableModel);
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.TranslateBusinessDataDone") : "Translated.", true);
+            } finally {
+                self.BusinessDataTranslateLoading = false;
             }
         },
         async ComponentQrcodeButtonClick(field, action) {

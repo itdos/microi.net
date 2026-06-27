@@ -78,7 +78,7 @@
                         >
                             {{ SysMenuModel && SysMenuModel.AddBtnText
                                 ? SysMenuModel.AddBtnText
-                                : '发起流程' }}
+                                : $t('Msg.StartWorkflow') }}
                         </el-button>
                         <!-- 普通新增按钮（OpenType!=WorkFlow 或未配置 FlowDesignId 时显示） -->
                         <el-button
@@ -107,7 +107,7 @@
                                 @click="SubmitBatchSave"
                             >
                                 <fa-icon icon="far fa-save mr-1" />
-                                提交保存<template v-if="HasPendingBatchChanges()">（{{ GetPendingBatchSummary().total }}）</template>
+                                {{ $t('Msg.SubmitSave') }}<template v-if="HasPendingBatchChanges()">（{{ GetPendingBatchSummary().total }}）</template>
                             </el-button>
                             <el-button
                                 v-if="HasPendingBatchChanges()"
@@ -115,7 +115,7 @@
                                 plain
                                 @click="CancelBatchSave"
                             >
-                                取消变更
+                                {{ $t('Msg.CancelChanges') }}
                             </el-button>
                         </template>
                         <!-- 更多页面按钮 PageBtns -->
@@ -205,7 +205,7 @@
                             :icon="RefreshLeft"
                             @click="ToggleTrashMode"
                         >
-                            {{ IsTrashMode ? '返回数据表' : '回收站' }}
+                            {{ IsTrashMode ? $t('Msg.ReturnDataTable') : $t('Msg.RecycleBin') }}
                         </el-button>
                     </div>
                     <!-- 通用搜索 -->
@@ -277,10 +277,21 @@
                             >
                         </el-popover>
                     </div>
-                    <el-button v-if="!diyStore.IsPhoneView" type="primary" :icon="List"
-                        @click="ShiftTableDisplayMode()">{{
-                        $t('Msg.SwitchTableDisplay')
-                    }}</el-button>
+                    <el-dropdown v-if="!diyStore.IsPhoneView" trigger="click">
+                        <el-button type="primary" :loading="BusinessDataTranslateLoading">
+                            <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        </el-button>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item @click="ShiftTableDisplayMode()">
+                                    <el-icon><List /></el-icon>{{ $t('Msg.SwitchTableDisplay') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item @click="TranslateBusinessData()">
+                                    <fa-icon icon="fas fa-language" class="mr-1" />{{ $t('Msg.TranslateBusinessData') }}
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
                     <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
                         <el-dropdown trigger="click">
                             <el-button type="primary">
@@ -298,7 +309,7 @@
                                         <el-icon><CircleCheck /></el-icon>{{ $t('Msg.MenuPermission') }}
                                     </el-dropdown-item>
                                     <el-dropdown-item divided @click="ShowIndexManager = true">
-                                        <el-icon><Grid /></el-icon>索引管理
+                                        <el-icon><Grid /></el-icon>{{ $t('Msg.IndexManager') }}
                                     </el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
@@ -336,7 +347,7 @@
                             <!--工作流-发起申请按钮-->
                             <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
                                 <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>
-                                <span class="mobile-fab-menu-label">{{ SysMenuModel && SysMenuModel.AddBtnText ? SysMenuModel.AddBtnText : '发起流程' }}</span>
+                                <span class="mobile-fab-menu-label">{{ SysMenuModel && SysMenuModel.AddBtnText ? SysMenuModel.AddBtnText : $t('Msg.StartWorkflow') }}</span>
                             </div>
                             <!--新增按钮-->
                             <div class="mobile-fab-menu-item" v-if="!IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; OpenDetail(null, 'Add')">
@@ -401,7 +412,7 @@
                                   InitSearch();
                                   GetDiyTableRow({ _PageIndex: 1 });
                               ">
-                            {{ $t("重置搜索") }}
+                            {{ $t("Msg.ResetSearch") }}
                           </div>
                   </div>
                 </div>
@@ -448,7 +459,7 @@
                     stripe
                     border
                     @row-click="DiyTableRowClick"
-                    :lazy="CurrentDiyTableModel.TreeLazy === true || CurrentDiyTableModel.TreeLazy === 1"
+                    :lazy="IsDiyTableTreeLazy()"
                     :load="DiyTableLoad"
                     row-key="Id"
                     :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
@@ -1092,10 +1103,10 @@
                     @click="!mobileLoadingMore && loadMoreMobileData()">
                     <div v-if="mobileLoadingMore" class="loading-text">
                         <el-icon class="is-loading"><Loading /></el-icon>
-                        <span>正在加载更多数据... ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
+                        <span>{{ $t('Msg.LoadingMoreData') }} ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                     <div v-else class="load-more-text">
-                        <span>上拉或点击加载更多 (已加载 {{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
+                        <span>{{ $t('Msg.PullOrClickLoadMore') }} ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                 </div>
                 <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) >= DiyTableRowCount && DiyTableRowCount > 0" class="mobile-no-more">

@@ -65,6 +65,113 @@ export default {
                 }
             }
         },
+
+        IsBusinessTranslateField(field) {
+            var self = this;
+            if (!field || self.DiyCommon.IsNull(field.Name)) return false;
+            var fieldName = field.AsName || field.Name;
+            var systemFields = ["Id", "Key", "Code", "CreateTime", "UpdateTime", "CreateUser", "UpdateUser", "OsClient", "FormEngineKey"];
+            if (systemFields.indexOf(fieldName) > -1 || systemFields.indexOf(field.Name) > -1) return false;
+            if (/Id$/i.test(fieldName) || /Id$/i.test(field.Name)) return false;
+            if (/(Key|Code|No|Url|URL|Address|Path)$/i.test(fieldName) || /(Key|Code|No|Url|URL|Address|Path)$/i.test(field.Name)) return false;
+
+            var skipComponents = [
+                "ImgUpload", "FileUpload", "Map", "CodeEditor", "TableChild", "Divider",
+                "Html", "Button", "ColorPicker", "Qrcode", "JsonTable", "NumberText",
+                "Rate", "Progress", "Switch", "DateTime"
+            ];
+            if (skipComponents.indexOf(field.Component) > -1) return false;
+            return true;
+        },
+
+        NormalizeBusinessTranslateText(value) {
+            if (value === undefined || value === null) return "";
+            var text = typeof value === "string" ? value : String(value);
+            text = text.replace(/\s+/g, " ").trim();
+            if (!text || text.length > 500 || text.indexOf("<") >= 0) return "";
+            if (/^https?:\/\//i.test(text) || /^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(text)) return "";
+            if (/^[+-]?\d+(\.\d+)?$/.test(text)) return "";
+            if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}(\s+\d{1,2}:\d{1,2}(:\d{1,2})?)?$/.test(text)) return "";
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return "";
+            if (/^01[0-9A-HJKMNP-TV-Z]{24}$/i.test(text)) return "";
+            if (/^[\[\{].*[\]\}]$/.test(text)) return "";
+            return text;
+        },
+
+        GetBusinessDisplayText(row, field) {
+            var self = this;
+            if (!row) return "";
+            var translations = row._BusinessTranslations;
+            var hadTranslations = Object.prototype.hasOwnProperty.call(row, "_BusinessTranslations");
+            try {
+                if (hadTranslations) {
+                    row._BusinessTranslations = null;
+                }
+                var fieldName = field.AsName || field.Name;
+                return self.GetColValue ? self.GetColValue({ row: row }, field) : row[fieldName];
+            } finally {
+                if (hadTranslations) {
+                    row._BusinessTranslations = translations;
+                }
+            }
+        },
+
+        GetBusinessTranslateFields() {
+            var self = this;
+            return (self.GetShowDiyFieldList ? self.GetShowDiyFieldList() : [])
+                .filter(function (field) { return self.IsBusinessTranslateField(field); });
+        },
+
+        async TranslateBusinessData() {
+            var self = this;
+            if (self.BusinessDataTranslateLoading) return;
+            var lang = (self.DiyCommon.GetCurrentLang ? self.DiyCommon.GetCurrentLang() : "").trim();
+            if (!lang || lang === "zh-CN" || lang === "cn" || lang === "zh" || lang === "zh-Hans") {
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.SelectTargetLangFirst") : "Please switch language first.", false);
+                return;
+            }
+            var rows = self.DiyTableRowList || [];
+            var fields = self.GetBusinessTranslateFields();
+            var textMap = {};
+            rows.forEach(function (row) {
+                fields.forEach(function (field) {
+                    var text = self.NormalizeBusinessTranslateText(self.GetBusinessDisplayText(row, field));
+                    if (!text) return;
+                    textMap[text] = true;
+                });
+            });
+            var texts = Object.keys(textMap);
+            if (texts.length === 0) {
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.NoTranslatableBusinessData") : "No translatable data.", false);
+                return;
+            }
+            self.BusinessDataTranslateLoading = true;
+            try {
+                var result = await self.DiyCommon.ApiEngine.Run("translate-business-data", {
+                    TargetLang: lang,
+                    Texts: texts
+                });
+                if (!self.DiyCommon.Result(result)) {
+                    return;
+                }
+                var translations = (result.Data && (result.Data.Translations || result.Data.translations)) || {};
+                rows.forEach(function (row) {
+                    var overlay = row._BusinessTranslations || {};
+                    fields.forEach(function (field) {
+                        var fieldName = field.AsName || field.Name;
+                        var text = self.NormalizeBusinessTranslateText(self.GetBusinessDisplayText(row, field));
+                        if (translations[text] && translations[text] !== text) {
+                            overlay[fieldName] = translations[text];
+                        }
+                    });
+                    row._BusinessTranslations = overlay;
+                });
+                self.DiyTableRowList = rows.slice();
+                self.DiyCommon.Tips(self.$t ? self.$t("Msg.TranslateBusinessDataDone") : "Translated.", true);
+            } finally {
+                self.BusinessDataTranslateLoading = false;
+            }
+        },
         
         /**
          * 表格索引方法

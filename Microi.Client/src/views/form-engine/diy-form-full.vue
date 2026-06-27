@@ -74,6 +74,10 @@
                                         <fa-icon icon="far fa-folder-open" class="mr-1" />
                                         {{ $t('Msg.LoadFromDraftBox') }}
                                     </el-dropdown-item>
+                                    <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                        <fa-icon icon="fas fa-language" class="mr-1" />
+                                        {{ $t('Msg.TranslateBusinessData') }}
+                                    </el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
@@ -345,6 +349,10 @@
                                 <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
                                     {{ $t('Msg.LoadFromDraftBox') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                    <fa-icon icon="fas fa-language" class="mr-1" />
+                                    {{ $t('Msg.TranslateBusinessData') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
@@ -638,6 +646,10 @@
                                 <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
                                     {{ $t('Msg.LoadFromDraftBox') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                    <fa-icon icon="fas fa-language" class="mr-1" />
+                                    {{ $t('Msg.TranslateBusinessData') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
@@ -1522,6 +1534,21 @@ export default {
                 ...buttonRow
             };
             return buttonRow;
+        },
+        async TranslateBusinessData() {
+            var self = this;
+            var activeForm = typeof self.GetActiveFieldForm === "function" ? self.GetActiveFieldForm() : null;
+            if (!activeForm && self.$refs) {
+                activeForm = self.$refs.fieldForm || self.$refs.fieldFormPage;
+                if (Array.isArray(activeForm)) {
+                    activeForm = activeForm[0];
+                }
+            }
+            if (activeForm && typeof activeForm.TranslateBusinessData === "function") {
+                await activeForm.TranslateBusinessData();
+                return;
+            }
+            self.DiyCommon.Tips(self.$t ? self.$t("Msg.NoTranslatableBusinessData") : "No translatable data.", false);
         },
         DeleteFormProperty(form) {
             var cleanForm = {

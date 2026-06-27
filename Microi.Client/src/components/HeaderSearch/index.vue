@@ -8,7 +8,7 @@
             filterable 
             default-first-option 
             remote 
-            placeholder="Search" 
+            :placeholder="$t('Msg.Search')" 
             class="header-search-select" 
             @change="change">
             <el-option v-for="item in options" :key="item.path" :value="item" :label="item.title && Array.isArray(item.title) ? item.title.join(' > ') : item.title || item.path" />

@@ -898,6 +898,8 @@ export default {
             FormDiyTableModel: {},
             OldForm: {},
             OldFormData: {},
+            BusinessDataTranslateLoading: false,
+            BusinessDataTranslateRaw: {},
             DiyTableModel: {
                 Tabs: []
             },

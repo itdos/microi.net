@@ -24,7 +24,7 @@
                 </span>
                 <span class="menu-grid-card__body">
                     <span class="menu-grid-card__title">{{ child.meta?.title || child.name }}</span>
-                    <span v-if="hasVisibleChildren(child)" class="menu-grid-card__count">{{ getVisibleChildren(child).length }} 个子菜单</span>
+                    <span v-if="hasVisibleChildren(child)" class="menu-grid-card__count">{{ $t("Msg.SubMenuCount", { count: getVisibleChildren(child).length }) }}</span>
                 </span>
                 <span class="menu-grid-card__arrow">
                     <el-icon><ArrowRight /></el-icon>
@@ -32,7 +32,7 @@
             </button>
         </div>
 
-        <el-empty v-else description="暂无可显示菜单" />
+        <el-empty v-else :description="$t('Msg.NoVisibleMenu')" />
     </div>
 </template>
 

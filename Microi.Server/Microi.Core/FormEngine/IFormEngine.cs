@@ -47,9 +47,9 @@ namespace Microi.net
         /// <summary>
         /// 异步排队同步 diy_lang 元数据词条。
         /// </summary>
-        DosResult QueueDiyLangFullSync(string osClient = "", bool includeClientText = true);
-        DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true);
-        Task<DosResult> SyncDiyLangFullAsync(string osClient = "", bool includeClientText = true);
+        DosResult QueueDiyLangFullSync(string osClient = "", bool includeClientText = true, string source = "api");
+        DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true, string source = "startup");
+        Task<DosResult> SyncDiyLangFullAsync(string osClient = "", bool includeClientText = true, string source = "api");
 
         #endregion
 

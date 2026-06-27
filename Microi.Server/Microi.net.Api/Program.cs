@@ -411,7 +411,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             // AI 引擎 Schema 缓存初始化
             try
             {
-                MicroiEngine.FormEngine.QueueDiyLangFullSyncForAllClients(true);
+                MicroiEngine.FormEngine.QueueDiyLangFullSyncForAllClients(true, "startup");
                 Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已排队同步 diy_lang 元数据与前端固定文案。");
             }
             catch (Exception ex)

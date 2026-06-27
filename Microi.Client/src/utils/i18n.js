@@ -1,5 +1,8 @@
 // translate router.meta.title, be used in breadcrumb sidebar tagsview
 export function generateTitle(title) {
+    if (title === "首页" || title === "Home") {
+        return this.$t("Msg.Home");
+    }
     const hasKey = this.$te("route." + title);
 
     if (hasKey) {

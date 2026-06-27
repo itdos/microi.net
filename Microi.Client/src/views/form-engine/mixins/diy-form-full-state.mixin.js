@@ -55,7 +55,9 @@ export default {
         WfTopSubmitBtnText() {
             var self = this;
             var wt = self.OpenDiyFormWorkFlowType && self.OpenDiyFormWorkFlowType.WorkType;
-            return wt === 'StartWork' ? '发起流程' : '处理工作';
+            return wt === 'StartWork'
+                ? (self.$t ? self.$t('Msg.StartWorkflow') : 'Start Workflow')
+                : (self.$t ? self.$t('Msg.DoWorkflow') : 'Process Work');
         },
         // 判断当前表单FormBtns是否有可见按钮（用于FAB菜单是否显示）
         HasVisibleFormBtns() {

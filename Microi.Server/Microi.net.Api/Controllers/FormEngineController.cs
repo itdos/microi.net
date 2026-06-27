@@ -173,6 +173,23 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> GetSysConfig([FromBody]DiyTableRowParam param)
         {
+            if (param == null)
+            {
+                var requestParam = await BuildRequestParam();
+                param = new DiyTableRowParam
+                {
+                    OsClient = requestParam["OsClient"].Val<string>(),
+                    _Lang = requestParam["_Lang"].Val<string>()
+                };
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace() && Request?.Query != null)
+            {
+                param.OsClient = Request.Query["OsClient"].ToString();
+            }
+            if (param._Lang.DosIsNullOrWhiteSpace())
+            {
+                param._Lang = GetRequestLang();
+            }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
@@ -185,10 +202,23 @@ namespace Microi.net.Api
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
         {
             var requestedOsClient = param?["OsClient"].Val<string>();
+            var requestedSource = param?["Source"].Val<string>();
+            if (requestedSource.DosIsNullOrWhiteSpace() && Request?.HasFormContentType == true)
+            {
+                requestedSource = Request.Form["Source"].ToString();
+            }
+            if (requestedSource.DosIsNullOrWhiteSpace() && Request?.Query != null)
+            {
+                requestedSource = Request.Query["Source"].ToString();
+            }
             param = await DefaultParam(param);
             if (!requestedOsClient.DosIsNullOrWhiteSpace())
             {
                 param["OsClient"] = requestedOsClient;
+            }
+            if (!requestedSource.DosIsNullOrWhiteSpace())
+            {
+                param["Source"] = requestedSource;
             }
             var includeRaw = param["IncludeClientText"].Val<string>();
             var includeClientText = includeRaw.DosIsNullOrWhiteSpace()
@@ -197,9 +227,14 @@ namespace Microi.net.Api
             var waitRaw = param["Wait"].Val<string>();
             var wait = string.Equals(waitRaw, "1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(waitRaw, "true", StringComparison.OrdinalIgnoreCase);
+            var source = param["Source"].Val<string>();
+            if (source.DosIsNullOrWhiteSpace())
+            {
+                source = "api";
+            }
             var result = wait
-                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(param["OsClient"].Val<string>(), includeClientText)
-                : MicroiEngine.FormEngine.QueueDiyLangFullSync(param["OsClient"].Val<string>(), includeClientText);
+                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(param["OsClient"].Val<string>(), includeClientText, source)
+                : MicroiEngine.FormEngine.QueueDiyLangFullSync(param["OsClient"].Val<string>(), includeClientText, source);
             return Json(result);
         }
 

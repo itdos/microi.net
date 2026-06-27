@@ -15,7 +15,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 一次性脚本（.py / .mjs / .ps1 / .sh） | `.tmp/` |
 | 诊断截图、调试图片 | `.tmp/screenshots/` |
 | E2E 测试产物（Microi.VSCode 插件生成） | `.microi-e2e/` |
-| 前端项目 E2E 截图/报告 | `<前端项目>/tests/e2e/screenshots/` 和 `/report/` |
+| AI 一次性 E2E 脚本、截图、日志、报告 | `.tmp/`、`.tmp/screenshots/`、`.tmp/reports/` |
 | 性能测试 HTML 报告 | `.microi-performance/` |
 | 项目专属临时文件 | `<对应子项目目录>/` 内，不要写到根目录 |
 
@@ -26,6 +26,8 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 孤立的 `obj/`、`dist/`、`build/`（非对应项目文件）
 
 `.tmp/` 已在 `.gitignore` 中排除，可以随意创建临时文件。任务完成后如无保留价值可以不清理。
+
+**2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.VSCode 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 ## Skills 通用化原则
 
@@ -119,6 +121,8 @@ Pop-Location
 
 普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
 
+**可见终端要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，AI 必须优先使用用户可见的 VS Code 集成终端，在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。如果当前工具环境没有可见终端能力，必须明确说明限制并请用户在 VS Code 终端执行，不能擅自用隐藏窗口或后台服务启动。若 7266 已被本项目后端占用，可先定位并停止该 `Microi.net.Api` 进程，再在可见终端重启；不要误杀数据库、Redis、Node 前端或其它业务进程。
+
 ## 本地租户与测试凭据读取约定
 
 AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需要登录的接口前，必须先尝试从本地配置判断租户和测试账号，不要直接以“未登录无法测试”结束：
@@ -176,6 +180,14 @@ AI 通过 MCP、接口引擎、数据库脚本或平台 API 修改任何远端 V
 
 如果 AI 绕过平台表单提交事件，直接通过 MCP、数据库脚本或自写同步工具更新 `sys_apiengine`、`diy_table`、`diy_field`、`sys_menu`、`wf_node` 等远端 V8 代码，收尾时除了同步本地文件，还必须刷新运行中服务的缓存。至少清理当前 `<OsClient>` 下对应资源的 `Microi:<OsClient>:FormData:<table>:<key>`、`Id` 和地址形式缓存；若可用，优先调用平台缓存接口或插件内置同步流程。清缓存后要重新调用受影响接口做一次真实验证，避免本地/远端代码已一致但 API 仍执行旧缓存代码。
 
+## MCP 元数据更新验收约定
+
+AI 通过 MCP 修改 `diy_field`、`diy_table`、`sys_menu`、`sys_osclients`、`sys_config` 等平台元数据后，不能只看写入返回成功，必须按前端真实消费方式回读验证：
+
+1. 修改 `Select`、`Radio`、`Checkbox`、`MultipleSelect` 等选项组件时，必须回读字段的 `Component`、`Data`、`Config`。已有字段更新时不要假设 `"key|label"` 字符串会被 `microi_update_field` 自动解析；KeyValue 数据源推荐直接把 `Data` 写成 JSON 数组 `[{"Key":"Aliyun","Value":"阿里云机器翻译"}]`，并确保 `Config.DataSource=KeyValue`、`SelectLabel=Value`、`SelectSaveField=Key`。
+2. 修改字段、表、菜单后，必须调用 `microi_get_field_list` / `microi_get_table_data` 回读关键字段，并调用 `microi_refresh_schema_cache` 或对应清缓存接口刷新 Redis。涉及 SaaS 引擎、系统设置、菜单按钮、接口引擎等运行态缓存时，还要调用对应租户清缓存接口并重新请求受影响页面/API。
+3. 最终交付说明必须写清楚：改了哪个表/字段，回读值是什么，刷新了哪些缓存，验证入口是什么。若某个缓存刷新接口失败或只能部分成功，需要把失败消息原样摘要出来，不能把“写入成功”当作“页面一定生效”。
+
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：
@@ -197,7 +209,7 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
    ```powershell
    dotnet run --launch-profile Microi.net.Api
    ```
-   后台启动时使用 `Start-Process -WindowStyle Hidden`，并把日志写到 `.tmp/` 或 `.microi-e2e/` 等 gitignored 目录。
+   启动必须发生在用户可见的 VS Code 集成终端中，方便用户肉眼看到日志并手动停止。当前工具环境没有可见终端能力时，AI 只能编译验证并提示用户执行上述命令；除非用户明确同意临时后台启动，否则禁止使用 `Start-Process -WindowStyle Hidden` 这类隐藏窗口方式。
 4. 启动后轮询验证 `https://localhost:7266` 或 launch profile 实际地址可访问；至少确认端口已监听、进程存在、最近日志没有立即崩溃。涉及新增 API 时，再调用新增/受影响接口做一次真实请求。
 5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、7266 是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
 

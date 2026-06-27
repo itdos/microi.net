@@ -27,6 +27,33 @@ namespace Microi.net.Api
             _captcha = captcha;
         }
 
+        private bool IsDevLoginBypassEnabled(string configKey, bool defaultValue = false)
+        {
+            var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
+            if (!string.IsNullOrWhiteSpace(devKey)
+                && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var cfg = HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
+                as Microsoft.Extensions.Configuration.IConfiguration;
+            if (cfg == null || !cfg.GetValue<bool>("DevLoginBypass:Enabled"))
+            {
+                return false;
+            }
+
+            var onlyLoopback = cfg.GetValue<bool>("DevLoginBypass:OnlyLoopback", true);
+            var remoteIp = HttpContext.Connection.RemoteIpAddress;
+            var isLoopback = remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
+            if (onlyLoopback && !isLoopback)
+            {
+                return false;
+            }
+
+            return cfg.GetValue<bool>(configKey, defaultValue);
+        }
+
         public class CreateTenantRequest
         {
             public string TenantKey { get; set; }
@@ -240,10 +267,11 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public async Task<JsonResult> SmsLogin(SysUserParam param)
+        public async Task<JsonResult> SmsLogin([FromBody] SysUserParam param)
         {
             try
             {
+                param = await EnsureSmsLoginParam(param);
                 #region 参数校验
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -253,7 +281,8 @@ namespace Microi.net.Api
                 {
                     return Json(new DosResult(0, null, "请输入正确的11位手机号！"));
                 }
-                if (param._CaptchaValue.DosIsNullOrWhiteSpace())
+                var skipSmsCaptcha = IsDevLoginBypassEnabled("DevLoginBypass:SkipSmsCaptcha");
+                if (!skipSmsCaptcha && param._CaptchaValue.DosIsNullOrWhiteSpace())
                 {
                     return Json(new DosResult(0, null, "请输入短信验证码！"));
                 }
@@ -263,15 +292,18 @@ namespace Microi.net.Api
                 #region 验证短信验证码（从Redis缓存中获取）
                 var cacheKey = $"Microi:{param.OsClient}:SmsCaptcha:{phone}";
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
-                var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
+                if (!skipSmsCaptcha)
+                {
+                    var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
 
-                if (cachedCode.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
-                }
-                if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
-                {
-                    return Json(new DosResult(0, null, "短信验证码错误！"));
+                    if (cachedCode.DosIsNullOrWhiteSpace())
+                    {
+                        return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
+                    }
+                    if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
+                    {
+                        return Json(new DosResult(0, null, "短信验证码错误！"));
+                    }
                 }
                 #endregion
 
@@ -288,6 +320,7 @@ namespace Microi.net.Api
 
                 bool isNewUser = false;
                 string userId = null;
+                string loginAccount = phone;
 
                 if (userResult.Code == 2 || (userResult.Code == 1 && userResult.Data == null))
                 {
@@ -328,6 +361,7 @@ namespace Microi.net.Api
                     }
 
                     userId = addResult.Data?.ToString();
+                    loginAccount = phone;
                     #endregion
                 }
                 else if (userResult.Code == 1)
@@ -339,6 +373,25 @@ namespace Microi.net.Api
                         return Json(new DosResult(0, null, "账号已被禁用！"));
                     }
                     userId = userResult.Data.Id?.ToString();
+                    var existingAccount = DynamicHelper.GetDynamicStringValue(userResult.Data, "Account", "");
+                    if (string.IsNullOrWhiteSpace(existingAccount))
+                    {
+                        var uptAccountResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                        {
+                            Id = userId,
+                            Account = phone,
+                            OsClient = param.OsClient
+                        });
+                        if (uptAccountResult.Code != 1)
+                        {
+                            return Json(new DosResult(0, null, $"补全登录账号失败：{uptAccountResult.Msg}"));
+                        }
+                        loginAccount = phone;
+                    }
+                    else
+                    {
+                        loginAccount = existingAccount;
+                    }
                     #endregion
                 }
                 else
@@ -347,15 +400,30 @@ namespace Microi.net.Api
                 }
 
                 #region 销毁验证码缓存
-                try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
+                if (!skipSmsCaptcha)
+                {
+                    try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
+                }
                 #endregion
 
                 #region 获取完整用户信息用于登录
                 var loginResult = await _sysUserLogic.LoginByAccount(new SysUserParam()
                 {
-                    Account = phone,
+                    Account = loginAccount,
                     OsClient = param.OsClient,
                 });
+                if (loginResult.Code != 1 && isNewUser)
+                {
+                    for (var retryIndex = 0; retryIndex < 3 && loginResult.Code != 1; retryIndex++)
+                    {
+                        await Task.Delay(300);
+                        loginResult = await _sysUserLogic.LoginByAccount(new SysUserParam()
+                        {
+                            Account = loginAccount,
+                            OsClient = param.OsClient,
+                        });
+                    }
+                }
 
                 if (loginResult.Code != 1)
                 {
@@ -376,6 +444,8 @@ namespace Microi.net.Api
                     return Json(getTokenResult);
                 }
 
+                var accessToken = getTokenResult.Data?.Token ?? "";
+                sysUser["Authorization"] = accessToken;
                 sysUser["Pwd"] = "";
                 #endregion
 
@@ -409,6 +479,7 @@ namespace Microi.net.Api
                     SysMenuHomePage = SysMenuHomePage,
                     SysConfig = sysConfig,
                     IsNewUser = isNewUser,
+                    Token = accessToken,
                     TenantOsClient = tenantData == null ? null : tenantData.OsClient,
                     TenantName = tenantData == null ? null : tenantData.ClientName
                 };
@@ -426,6 +497,64 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, $"登录异常：{ex.Message}"));
             }
+        }
+
+        private async Task<SysUserParam> EnsureSmsLoginParam(SysUserParam param)
+        {
+            param ??= new SysUserParam();
+            if (Request?.HasFormContentType == true)
+            {
+                if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = Request.Form["OsClient"].ToString();
+                if (param.Phone.DosIsNullOrWhiteSpace()) param.Phone = Request.Form["Phone"].ToString();
+                if (param.Pwd.DosIsNullOrWhiteSpace()) param.Pwd = Request.Form["Pwd"].ToString();
+                if (param._CaptchaValue.DosIsNullOrWhiteSpace()) param._CaptchaValue = Request.Form["_CaptchaValue"].ToString();
+                if (param._CaptchaId.DosIsNullOrWhiteSpace()) param._CaptchaId = Request.Form["_CaptchaId"].ToString();
+                if (param._Lang.DosIsNullOrWhiteSpace()) param._Lang = Request.Form["_Lang"].ToString();
+                if (param._ClientType.DosIsNullOrWhiteSpace()) param._ClientType = Request.Form["_ClientType"].ToString();
+            }
+            if (Request?.Query != null)
+            {
+                if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = Request.Query["OsClient"].ToString();
+                if (param.Phone.DosIsNullOrWhiteSpace()) param.Phone = Request.Query["Phone"].ToString();
+                if (param.Pwd.DosIsNullOrWhiteSpace()) param.Pwd = Request.Query["Pwd"].ToString();
+                if (param._CaptchaValue.DosIsNullOrWhiteSpace()) param._CaptchaValue = Request.Query["_CaptchaValue"].ToString();
+                if (param._CaptchaId.DosIsNullOrWhiteSpace()) param._CaptchaId = Request.Query["_CaptchaId"].ToString();
+                if (param._Lang.DosIsNullOrWhiteSpace()) param._Lang = Request.Query["_Lang"].ToString();
+                if (param._ClientType.DosIsNullOrWhiteSpace()) param._ClientType = Request.Query["_ClientType"].ToString();
+            }
+            var contentType = Request?.ContentType ?? "";
+            if (!contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                return param;
+            }
+
+            try
+            {
+                Request.EnableBuffering();
+                if (Request.Body.CanSeek)
+                {
+                    Request.Body.Position = 0;
+                }
+                using var reader = new StreamReader(Request.Body, Encoding.UTF8, false, 1024, true);
+                var body = await reader.ReadToEndAsync();
+                if (body.DosIsNullOrWhiteSpace())
+                {
+                    return param;
+                }
+                var json = JObject.Parse(body);
+                if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = json["OsClient"].Val<string>();
+                if (param.Phone.DosIsNullOrWhiteSpace()) param.Phone = json["Phone"].Val<string>();
+                if (param.Pwd.DosIsNullOrWhiteSpace()) param.Pwd = json["Pwd"].Val<string>();
+                if (param._CaptchaValue.DosIsNullOrWhiteSpace()) param._CaptchaValue = json["_CaptchaValue"].Val<string>();
+                if (param._CaptchaId.DosIsNullOrWhiteSpace()) param._CaptchaId = json["_CaptchaId"].Val<string>();
+                if (param._Lang.DosIsNullOrWhiteSpace()) param._Lang = json["_Lang"].Val<string>();
+                if (param._ClientType.DosIsNullOrWhiteSpace()) param._ClientType = json["_ClientType"].Val<string>();
+            }
+            catch
+            {
+                // Fall back to the model-bound values so malformed JSON still returns the normal parameter errors.
+            }
+            return param;
         }
 
         /// <summary>

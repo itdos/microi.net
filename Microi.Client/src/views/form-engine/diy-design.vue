@@ -51,23 +51,23 @@
             <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="CallbackDeleteField(CurrentDiyFieldModel)">
                 {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
             </el-button>
-            <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段修复">
+            <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" :placeholder="$t('Msg.AbnormalFieldRepair')">
                 <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
                     <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
-                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? $t('Msg.DiyMissing') : $t('Msg.DbMissing') }}</span>
                 </el-option>
             </el-select>
             <el-button v-if="CurrentErrorFieldModel && !DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
-                {{ "修复" }}
+                {{ $t('Msg.Repair') }}
             </el-button>
-            <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站恢复">
+            <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" :placeholder="$t('Msg.FieldRecycleBinRestore')">
                 <el-option v-for="(item, index) in DeletedDiyField" :key="'DeletedDiyField_' + index" :label="item.Name" :value="item">
                     <span style="float: left">{{ item.Label + `(${item.Name})` }}</span>
-                    <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 14px">{{ $t('Msg.Deleted') }}</span>
                 </el-option>
             </el-select>
             <el-button v-if="CurrentDeletedFieldModel && !DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
-                {{ "恢复" }}
+                {{ $t('Msg.Recover') }}
             </el-button>
             
         </div>
@@ -971,8 +971,58 @@ export default {
                 return restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
             };
         },
+        IsGuidOrUlid(value) {
+            if (!value || typeof value !== "string") {
+                return false;
+            }
+            var text = value.trim();
+            var guidReg = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            var ulidReg = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
+            return guidReg.test(text) || ulidReg.test(text);
+        },
+        GetCurrentDiyTableTabs() {
+            var self = this;
+            var tabs = self.CurrentDiyTableModel && self.CurrentDiyTableModel.Tabs ? self.CurrentDiyTableModel.Tabs : [];
+            if (typeof tabs === "string") {
+                try {
+                    tabs = JSON.parse(tabs || "[]");
+                } catch (error) {
+                    tabs = [];
+                }
+            }
+            return Array.isArray(tabs) ? tabs : [];
+        },
+        NormalizeLegacyFieldTab(field) {
+            var self = this;
+            if (!field || !field.Tab || self.IsGuidOrUlid(field.Tab)) {
+                return field;
+            }
+            var oldTabName = String(field.Tab).trim();
+            if (!oldTabName) {
+                return field;
+            }
+            var matchedTab = self.GetCurrentDiyTableTabs().find(function (tab) {
+                var tabName = tab && (tab.Name || tab.Label || tab.Title);
+                return tab && tab.Id && tabName === oldTabName;
+            });
+            if (matchedTab) {
+                field.Tab = matchedTab.Id;
+            }
+            return field;
+        },
+        NormalizeLegacyFieldTabs(fields) {
+            var self = this;
+            if (!Array.isArray(fields)) {
+                return fields;
+            }
+            fields.forEach(function (field) {
+                self.NormalizeLegacyFieldTab(field);
+            });
+            return fields;
+        },
         CallbackGetDiyField(diyFieldList) {
             var self = this;
+            self.NormalizeLegacyFieldTabs(diyFieldList);
             self.DiyFieldList = diyFieldList;
             self.DiyFieldListClone = lodash.cloneDeep(self.DiyFieldList);
         },
@@ -1186,6 +1236,7 @@ export default {
         CallbackSelectField(field) {
             var self = this;
             //console.log('CallbackSelectField:', field);
+            self.NormalizeLegacyFieldTab(field);
             //2024-10-31:无意义的代码，注释。 --by anderson
             // if (!self.DiyCommon.IsNull(field.Config) && self.DiyCommon.IsNull(field.Config)) {
             //     field.Config = ''
@@ -1391,6 +1442,7 @@ export default {
                 //     fieldList.push(copyField);
                 // });
                 //2022-07-13这种方式copy，不会引用
+                self.NormalizeLegacyFieldTabs(self.DiyFieldList);
                 var fieldList = lodash.cloneDeep(self.DiyFieldList);
 
                 // 这里copy过来被引用了
@@ -1624,6 +1676,10 @@ export default {
             model.TreeLazy = model.TreeLazy ? 1 : 0;
             console.log('传入前的表数据 - CallbackSetDiyTableModel:', model );
             self.CurrentDiyTableModel = model;
+            self.NormalizeLegacyFieldTabs(self.DiyFieldList);
+            if (self.$refs.fieldForm && Array.isArray(self.$refs.fieldForm.DiyFieldList)) {
+                self.NormalizeLegacyFieldTabs(self.$refs.fieldForm.DiyFieldList);
+            }
             console.log('传入的表数据 - CallbackSetDiyTableModel:', self.CurrentDiyTableModel );
             self.$emit("CallbackSetDiyTableModel", model);
             // self.DiyCommon.ChangePageTabName('diy_field', self.$t('Msg.Design') + ' ' + model.Name.replace('Diy_', ''))
