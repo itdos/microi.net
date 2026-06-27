@@ -256,6 +256,10 @@
                                         <el-icon><View /></el-icon>
                                         {{ $t ? $t('Msg.Preview') : '预览' }}
                                     </el-button>
+                                    <el-button size="small" plain @click="$emit('diff-data-version', item)">
+                                        <el-icon><Document /></el-icon>
+                                        {{ $t ? $t('Msg.ViewDiff') : '查看差异' }}
+                                    </el-button>
                                     <el-button size="small" type="warning" plain @click="$emit('load-data-version', item)">
                                         <el-icon><RefreshLeft /></el-icon>
                                         {{ $t ? $t('Msg.Load') : '加载' }}
@@ -332,6 +336,7 @@ export default {
         "refresh-data-comment",
         "refresh-data-version",
         "preview-data-version",
+        "diff-data-version",
         "load-data-version",
         "reply-comment",
         "cancel-reply-comment"

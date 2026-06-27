@@ -545,6 +545,94 @@ export default {
                 self.ApplyDataVersionPreviewData();
             });
         },
+        GetCurrentDataVersionFormData() {
+            var self = this;
+            var fieldForm = self._getFieldFormRef ? self._getFieldFormRef() : null;
+            if (fieldForm && fieldForm.FormDiyTableModel) {
+                return JSON.parse(JSON.stringify(fieldForm.FormDiyTableModel));
+            }
+            if (self.WfFormData) {
+                return JSON.parse(JSON.stringify(self.WfFormData));
+            }
+            return {};
+        },
+        StableDataVersionStringify(value) {
+            var self = this;
+            if (value === null || value === undefined) {
+                return "";
+            }
+            if (typeof value !== "object") {
+                return String(value);
+            }
+            if (Array.isArray(value)) {
+                return "[" + value.map(function (item) {
+                    return self.StableDataVersionStringify(item);
+                }).join(",") + "]";
+            }
+            return "{" + Object.keys(value).sort().map(function (key) {
+                return key + ":" + self.StableDataVersionStringify(value[key]);
+            }).join(",") + "}";
+        },
+        FormatDataVersionValue(value) {
+            if (value === null || value === undefined || value === "") {
+                return "";
+            }
+            if (typeof value === "object") {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch (error) {
+                    return String(value);
+                }
+            }
+            return String(value);
+        },
+        BuildDataVersionDiffRows(currentData, versionData) {
+            var self = this;
+            var fieldMap = {};
+            var fieldNames = [];
+            (self.DiyFieldList || []).forEach(function (field) {
+                if (!field || !field.Name) return;
+                fieldMap[field.Name] = field;
+                fieldNames.push(field.Name);
+            });
+
+            Object.keys(versionData || {}).forEach(function (key) {
+                if (key.indexOf("__") === 0) return;
+                if (fieldNames.indexOf(key) === -1 && key !== "Id") {
+                    fieldNames.push(key);
+                }
+            });
+            Object.keys(currentData || {}).forEach(function (key) {
+                if (key.indexOf("__") === 0 || key.endsWith("_TmpEngineResult") || key.endsWith("_RealPath")) return;
+                if (fieldNames.indexOf(key) === -1 && key !== "Id") {
+                    fieldNames.push(key);
+                }
+            });
+
+            return fieldNames.map(function (fieldName) {
+                var currentValue = currentData ? currentData[fieldName] : undefined;
+                var versionValue = versionData ? versionData[fieldName] : undefined;
+                var same = self.StableDataVersionStringify(currentValue) === self.StableDataVersionStringify(versionValue);
+                if (same) return null;
+                var field = fieldMap[fieldName] || {};
+                return {
+                    Name: fieldName,
+                    Label: field.Label || fieldName,
+                    Component: field.Component || "",
+                    CurrentDisplay: self.FormatDataVersionValue(currentValue),
+                    VersionDisplay: self.FormatDataVersionValue(versionValue)
+                };
+            }).filter(Boolean);
+        },
+        DiffDataVersion(versionItem) {
+            var self = this;
+            var versionData = self.ParseDataVersionData(versionItem);
+            if (!versionData) return;
+            var currentData = self.GetCurrentDataVersionFormData();
+            self.DataVersionDiffItem = versionItem;
+            self.DataVersionDiffRows = self.BuildDataVersionDiffRows(currentData, versionData);
+            self.ShowDataVersionDiffDialog = true;
+        },
         LoadDataVersionToForm(versionItem) {
             var self = this;
             var data = self.ParseDataVersionData(versionItem);

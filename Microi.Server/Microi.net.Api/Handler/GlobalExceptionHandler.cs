@@ -88,6 +88,16 @@ namespace Microi.net.Api
         /// </summary>
         private (HttpStatusCode statusCode, string message) GetErrorResponse(Exception ex)
         {
+            if (IsPressureException(ex))
+            {
+                return (HttpStatusCode.OK, "系统繁忙，当前请求较多或数据库连接压力较高，请稍后重试。");
+            }
+
+            if (ex is TimeoutException)
+            {
+                return (HttpStatusCode.OK, "系统处理超时，请稍后重试。");
+            }
+
             return ex switch
             {
                 // // MySQL 异常
@@ -135,6 +145,29 @@ namespace Microi.net.Api
             };
         }
 
+        private bool IsPressureException(Exception ex)
+        {
+            while (ex != null)
+            {
+                var msg = ex.Message ?? "";
+                if (msg.IndexOf("Database connection pressure protection is active", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("Database connection open is throttled", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("V8 引擎执行队列已满", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("blocked because of many connection errors", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("mysqladmin flush-hosts", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("too many connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("max_user_connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("connection pool", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+
+                ex = ex.InnerException;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// 获取友好的 MySQL 错误信息
         /// </summary>
@@ -162,9 +195,8 @@ namespace Microi.net.Api
         /// </summary>
         private bool IsDevelopment()
         {
-            return true;
-            // TODO：这个判断不对
             return Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+            // TODO：这个判断不对
         }
     }
 
