@@ -39,12 +39,211 @@ export default {
             return tableName === "diy_lang" || routePath === "/lang";
         },
         GetTreeLazyChildPageSize() {
+            var pageSize = Number(this.DiyTableRowPageSize);
+            if (!Number.isNaN(pageSize) && pageSize > 0) {
+                return Math.min(Math.max(Math.floor(pageSize), 1), 500);
+            }
             var model = this.CurrentDiyTableModel || {};
             var configured = Number(model.TreeLazyChildPageSize || model.TreeChildPageSize || model.LazyChildPageSize);
             if (!Number.isNaN(configured) && configured > 0) {
-                return Math.min(Math.max(Math.floor(configured), 20), 500);
+                return Math.min(Math.max(Math.floor(configured), 1), 500);
             }
-            return 100;
+            return 15;
+        },
+        GetTreeLazyParentField() {
+            var treeParentField = this.CurrentDiyTableModel && this.CurrentDiyTableModel.TreeParentField;
+            return this.DiyCommon.IsNull(treeParentField) ? "ParentId" : treeParentField;
+        },
+        GetDiyTableElTableRef() {
+            var refName = "diy-table-" + this.TableId;
+            var tableRef = this.$refs ? this.$refs[refName] : null;
+            return Array.isArray(tableRef) ? tableRef[0] : tableRef;
+        },
+        GetTreeLazyChildren(parentId) {
+            var tableRef = this.GetDiyTableElTableRef();
+            var states = tableRef && tableRef.store ? tableRef.store.states : null;
+            var lazyTreeNodeMap = states ? states.lazyTreeNodeMap : null;
+            var map = lazyTreeNodeMap && lazyTreeNodeMap.value ? lazyTreeNodeMap.value : lazyTreeNodeMap;
+            return map && map[parentId] ? map[parentId] : [];
+        },
+        SetTreeLazyChildren(parentId, children) {
+            var tableRef = this.GetDiyTableElTableRef();
+            if (tableRef && typeof tableRef.updateKeyChildren === "function") {
+                tableRef.updateKeyChildren(parentId, children);
+                return;
+            }
+            var states = tableRef && tableRef.store ? tableRef.store.states : null;
+            var lazyTreeNodeMap = states ? states.lazyTreeNodeMap : null;
+            var map = lazyTreeNodeMap && lazyTreeNodeMap.value ? lazyTreeNodeMap.value : lazyTreeNodeMap;
+            if (map) {
+                map[parentId] = children;
+            }
+        },
+        BuildTreeLazyChildParam(tree, pageIndex, pageSize) {
+            var self = this;
+            var treeParentField = self.GetTreeLazyParentField();
+            var param = {
+                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
+                _Where: [[treeParentField, "=", tree.Id]],
+                _TreeLazy: 1,
+                _PageIndex: pageIndex || 1,
+                _PageSize: pageSize || self.GetTreeLazyChildPageSize()
+            };
+            if (!param.ModuleEngineKey) {
+                param.ModuleEngineKey = self.SysMenuId;
+            }
+            if (!param.ModuleEngineKey) {
+                param.FormEngineKey = self.CurrentDiyTableModel.Name;
+            }
+            if (!param.ModuleEngineKey && !param.FormEngineKey) {
+                param.FormEngineKey = self.TableId;
+            }
+            return param;
+        },
+        FilterTreeLazyDirectChildren(rows, tree, treeParentField) {
+            if (!treeParentField || !rows || rows.length === 0) {
+                return rows || [];
+            }
+            var expandId = tree && tree.Id;
+            var originalLen = rows.length;
+            var result = rows.filter(function (row) {
+                return row && row.Id !== expandId && String(row[treeParentField] || "") === String(expandId || "");
+            });
+            if (result.length !== originalLen) {
+                console.warn("Microi: tree lazy response contains non-direct children, filtered automatically.", {
+                    expandId: expandId,
+                    before: originalLen,
+                    after: result.length
+                });
+            }
+            return result;
+        },
+        ProcessTreeLazyRows(rows) {
+            var self = this;
+            rows = rows || [];
+            var tempShowDiyFieldList = self.GetShowDiyFieldList();
+            var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
+
+            if (templateEngineFields.length > 0) {
+                for (let i = 0; i < rows.length; i++) {
+                    let row = rows[i];
+                    for (let j = 0; j < templateEngineFields.length; j++) {
+                        let field = templateEngineFields[j];
+                        var tmpResult = self.RunFieldTemplateEngine(field, row);
+                        row[field.Name + "_TmpEngineResult"] = tmpResult;
+                    }
+                }
+            }
+
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
+                if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
+                    row.IsVisibleDetail = self.LimitMoreBtn1Sync(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
+                } else {
+                    row.IsVisibleDetail = true;
+                }
+
+                if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+                    row.IsVisibleEdit = self.LimitMoreBtn1Sync(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
+                } else {
+                    row.IsVisibleEdit = true;
+                }
+
+                if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+                    row.IsVisibleDel = self.LimitMoreBtn1Sync(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
+                } else {
+                    row.IsVisibleDel = true;
+                }
+            }
+            self.DiguiDiyTableRowDataList(rows, undefined);
+            return rows;
+        },
+        BuildTreeLazyLoadMoreRow(tree, nextPageIndex, pageSize, loadedCount, totalCount) {
+            var parentId = tree && tree.Id ? tree.Id : "";
+            var text = "加载更多（" + loadedCount + "/" + totalCount + "）";
+            var row = {
+                Id: "__TreeLazyLoadMore_" + parentId + "_" + nextPageIndex,
+                __TreeLazyLoadMore: true,
+                __TreeLazyParentId: parentId,
+                __TreeLazyNextPageIndex: nextPageIndex,
+                __TreeLazyPageSize: pageSize,
+                __TreeLazyLoadedCount: loadedCount,
+                __TreeLazyTotalCount: totalCount,
+                __TreeLazyLoadMoreText: text,
+                _HasChild: false,
+                IsVisibleDetail: false,
+                IsVisibleEdit: false,
+                IsVisibleDel: false
+            };
+            var fields = this.GetShowDiyFieldList() || [];
+            var displayTextSet = false;
+            fields.forEach(function (field) {
+                if (displayTextSet || !field) return;
+                var name = field.AsName || field.Name;
+                if (name) {
+                    row[name] = text;
+                    displayTextSet = true;
+                }
+            });
+            row.Key = row.Key || text;
+            return row;
+        },
+        AppendTreeLazyLoadMoreRow(rows, tree, pageIndex, pageSize, totalCount) {
+            rows = (rows || []).filter(function (row) {
+                return row && row.__TreeLazyLoadMore !== true;
+            });
+            var total = Number(totalCount || 0);
+            if (total > rows.length) {
+                rows.push(this.BuildTreeLazyLoadMoreRow(tree, Number(pageIndex || 1) + 1, pageSize, rows.length, total));
+            }
+            return rows;
+        },
+        LoadMoreTreeLazyChildren(loadMoreRow) {
+            var self = this;
+            if (!loadMoreRow || loadMoreRow.__TreeLazyLoadMore !== true || loadMoreRow.__TreeLazyLoadingMore === true) {
+                return;
+            }
+            var parentId = loadMoreRow.__TreeLazyParentId;
+            var pageIndex = Number(loadMoreRow.__TreeLazyNextPageIndex || 2);
+            var pageSize = Number(loadMoreRow.__TreeLazyPageSize || self.GetTreeLazyChildPageSize());
+            var tree = { Id: parentId };
+            var treeParentField = self.GetTreeLazyParentField();
+            var param = self.BuildTreeLazyChildParam(tree, pageIndex, pageSize);
+            loadMoreRow.__TreeLazyLoadingMore = true;
+            self.$forceUpdate();
+            self.DiyCommon.Post(
+                self.DiyApi.GetTableDataTree,
+                param,
+                function (result) {
+                    loadMoreRow.__TreeLazyLoadingMore = false;
+                    if (!self.DiyCommon.Result(result)) {
+                        self.$forceUpdate();
+                        return;
+                    }
+                    var newRows = self.FilterTreeLazyDirectChildren(result.Data || [], tree, treeParentField);
+                    newRows = self.ProcessTreeLazyRows(newRows);
+                    var existingRows = (self.GetTreeLazyChildren(parentId) || []).filter(function (row) {
+                        return row && row.__TreeLazyLoadMore !== true;
+                    });
+                    var existingIds = {};
+                    existingRows.forEach(function (row) {
+                        if (row && row.Id) existingIds[row.Id] = true;
+                    });
+                    newRows.forEach(function (row) {
+                        if (row && row.Id && !existingIds[row.Id]) {
+                            existingRows.push(row);
+                            existingIds[row.Id] = true;
+                        }
+                    });
+                    var total = Number(result.DataCount || loadMoreRow.__TreeLazyTotalCount || existingRows.length);
+                    var mergedRows = self.AppendTreeLazyLoadMoreRow(existingRows, tree, pageIndex, pageSize, total);
+                    self.SetTreeLazyChildren(parentId, mergedRows);
+                    self.$forceUpdate();
+                },
+                null,
+                null,
+                "json"
+            );
         },
         DiyTableLoad(tree, treeNode, resolve) {
             var self = this;
@@ -55,19 +254,9 @@ export default {
                 if (typeof resolve === "function") resolve([]);
                 return;
             }
-            var treeParentField = self.CurrentDiyTableModel.TreeParentField;
-            if (self.DiyCommon.IsNull(treeParentField)) {
-                treeParentField = "ParentId";
-            }
-            var param = {
-                ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-                // _Where: [{ Name: treeParentField, Value: tree.Id, Type: "=" }]
-                _Where: [[treeParentField, "=", tree.Id]],
-                // 懒加载展开子节点时显式声明：返回平铺子节点，不要走"根节点过滤+递归"逻辑
-                _TreeLazy: 1,
-                _PageIndex: 1,
-                _PageSize: self.GetTreeLazyChildPageSize()
-            };
+            var treeParentField = self.GetTreeLazyParentField();
+            var pageSize = self.GetTreeLazyChildPageSize();
+            var param = self.BuildTreeLazyChildParam(tree, 1, pageSize);
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
             }
@@ -157,6 +346,7 @@ export default {
                         console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开处理数据列表总耗时`);
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开渲染数据列表总耗时`);
 
+                        result.Data = self.AppendTreeLazyLoadMoreRow(result.Data, tree, 1, pageSize, Number(result.DataCount || 0));
                         // self.DiyTableRowList = result.Data
                         resolve(result.Data);
 

@@ -211,6 +211,9 @@ export default {
         },
         TableRowDblClick(row, column, event) {
             var self = this;
+            if (row && row.__TreeLazyLoadMore) {
+                return;
+            }
             //liucheng2025-4-4 无详情则双击不能都点开详情
             var detail = self.IsPermission("NoDetail");
             if (!detail) {

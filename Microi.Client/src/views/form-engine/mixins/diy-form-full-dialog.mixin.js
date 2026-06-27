@@ -190,7 +190,7 @@ export default {
         },
         _getFieldFormRef() {
             var self = this;
-            var fieldForm = self.$refs && self.$refs.fieldForm;
+            var fieldForm = self.$refs && (self.$refs.fieldForm || self.$refs.fieldFormPage);
             if (Array.isArray(fieldForm)) {
                 fieldForm = fieldForm[0];
             }

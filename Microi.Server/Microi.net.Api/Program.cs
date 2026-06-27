@@ -267,6 +267,7 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseRequestPressureGuard();
 app.UseRouting();
 //-------注意以下两者的顺序-------
 app.UseAuthentication();

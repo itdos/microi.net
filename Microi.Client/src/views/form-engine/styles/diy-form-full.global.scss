@@ -192,3 +192,51 @@
         background: transparent;
     }
 }
+
+.data-version-diff-dialog {
+    .el-dialog__body {
+        padding-top: 8px;
+        background: var(--el-fill-color-extra-light, #fafafa);
+    }
+
+    .data-version-diff-field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        line-height: 1.35;
+
+        span {
+            color: var(--el-text-color-primary, #303133);
+            font-weight: 600;
+        }
+
+        small {
+            color: var(--el-text-color-secondary, #909399);
+            font-family: Consolas, Monaco, "Courier New", monospace;
+        }
+    }
+
+    .data-version-diff-value {
+        min-height: 32px;
+        max-height: 240px;
+        margin: 0;
+        overflow: auto;
+        padding: 8px;
+        border-radius: 6px;
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+
+        &.is-current {
+            background: var(--el-fill-color-blank, #fff);
+            border: 1px solid var(--el-border-color-lighter, #ebeef5);
+        }
+
+        &.is-version {
+            background: var(--el-color-warning-light-9, #fdf6ec);
+            border: 1px solid var(--el-color-warning-light-7, #f3d19e);
+        }
+    }
+}

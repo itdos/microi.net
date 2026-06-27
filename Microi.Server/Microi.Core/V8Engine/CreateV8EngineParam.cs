@@ -4,30 +4,84 @@ namespace Microi.net
 {
     public class CreateV8EngineParam
     {
+        public static readonly int DefaultTimeout = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_TIMEOUT_SECONDS", 600);
+        public static readonly int MaxTimeout = ReadPositiveEnvironmentInt("MICROI_V8_MAX_TIMEOUT_SECONDS", 3600);
+        public static readonly int DefaultMaxStatements = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_MAX_STATEMENTS", 50_000_000);
+        public static readonly int MaxStatementsLimit = ReadPositiveEnvironmentInt("MICROI_V8_MAX_STATEMENTS", 500_000_000);
+        public static readonly int DefaultLimitMemory = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", 512);
+        public static readonly int MaxLimitMemory = ReadPositiveEnvironmentInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", 2048);
+        public static readonly int DefaultLimitRecursion = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", 2000);
+        public static readonly int MaxLimitRecursion = ReadPositiveEnvironmentInt("MICROI_V8_MAX_LIMIT_RECURSION", 5000);
+
         /// <summary>
-        /// V8引擎执行超时时间，默认1分钟，单位秒
+        /// V8/Jint script timeout in seconds.
         /// </summary>
-        public int Timeout { get; set; } = 60;
+        public int Timeout { get; set; } = DefaultTimeout;
+
         /// <summary>
-        /// 【最大语句数】执行的JavaScript语句数量上限
-        /// 1亿条语句约等于：10万条数据 × 每条1000条语句的处理逻辑
-        /// 超出后抛出 StatementsCountOverflowException
+        /// Maximum JavaScript statements before Jint stops execution.
         /// </summary>
-        public int MaxStatements { get; set; } = 100_000_000;
+        public int MaxStatements { get; set; } = DefaultMaxStatements;
+
         /// <summary>
-        ///  【内存限制】V8引擎可使用的最大内存（2GB）
-        /// 防止恶意代码或内存泄漏导致服务器OOM
-        /// 超出后抛出 MemoryLimitExceededException
-        /// 单位MB
+        /// Maximum memory available to a single V8/Jint execution, in MB.
         /// </summary>
-        public int LimitMemory { get; set; } = 2048;//2GB
+        public int LimitMemory { get; set; } = DefaultLimitMemory;
+
         /// <summary>
-        /// 【递归深度限制】函数调用栈的最大深度
-        ///  防止无限递归导致栈溢出，10000层足够大多数场景
-        /// 超出后抛出 RecursionDepthOverflowException
+        /// Maximum JavaScript recursion depth.
         /// </summary>
-        public int LimitRecursion { get; set; } = 10_000;
+        public int LimitRecursion { get; set; } = DefaultLimitRecursion;
+
+        public void Normalize()
+        {
+            Timeout = NormalizeTimeout(Timeout);
+            MaxStatements = NormalizeMaxStatements(MaxStatements);
+            LimitMemory = NormalizeLimitMemory(LimitMemory);
+            LimitRecursion = NormalizeLimitRecursion(LimitRecursion);
+        }
+
+        public static int NormalizeTimeout(int value)
+        {
+            return ClampPositive(value, DefaultTimeout, MaxTimeout);
+        }
+
+        public static int NormalizeMaxStatements(int value)
+        {
+            return ClampPositive(value, DefaultMaxStatements, MaxStatementsLimit);
+        }
+
+        public static int NormalizeLimitMemory(int value)
+        {
+            return ClampPositive(value, DefaultLimitMemory, MaxLimitMemory);
+        }
+
+        public static int NormalizeLimitRecursion(int value)
+        {
+            return ClampPositive(value, DefaultLimitRecursion, MaxLimitRecursion);
+        }
+
+        private static int ClampPositive(int value, int defaultValue, int maxValue)
+        {
+            if (value <= 0)
+            {
+                return defaultValue;
+            }
+            if (maxValue > 0 && value > maxValue)
+            {
+                return maxValue;
+            }
+            return value;
+        }
+
+        private static int ReadPositiveEnvironmentInt(string name, int defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (int.TryParse(value, out var parsed) && parsed > 0)
+            {
+                return parsed;
+            }
+            return defaultValue;
+        }
     }
-
 }
-

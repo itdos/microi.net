@@ -686,6 +686,16 @@
                     <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth">
                         <template #default="scope">
                             <div style="display: flex;justify-content: right;align-items: center;">
+                                <el-button
+                                    v-if="scope.row.__TreeLazyLoadMore"
+                                    type="primary"
+                                    link
+                                    :loading="scope.row.__TreeLazyLoadingMore"
+                                    @click.stop="LoadMoreTreeLazyChildren(scope.row)"
+                                >
+                                    {{ scope.row.__TreeLazyLoadMoreText || "加载更多" }}
+                                </el-button>
+                                <template v-else>
                                 <template v-for="(btn, btnIndex) in (scope.row._RowMoreBtnsOut || [])" :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex">
                                     <el-button
                                         v-if="!IsTrashMode && btn.IsVisible && !TableChildField.Readonly"
@@ -742,6 +752,7 @@
                                 >
                                     {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                                 </el-button>
+                                </template>
                             </div>
                         </template>
                     </el-table-column>
@@ -1818,6 +1829,10 @@ export default {
         },
         async DiyTableRowClick(row, column, event) {
             var self = this;
+            if (row && row.__TreeLazyLoadMore) {
+                self.LoadMoreTreeLazyChildren(row);
+                return;
+            }
             // 🔥 性能优化：用纯 DOM 方式高亮当前行，替代 Element Plus 的 highlight-current-row。
             // highlight-current-row 会在每次点击时改变表格 store 的 currentRow，导致整个表体重新渲染、
             // 重跑所有单元格函数（isMuban/ShowSelectLabel/GetColValue 等），100~200 行时点击/双击会明显卡顿。

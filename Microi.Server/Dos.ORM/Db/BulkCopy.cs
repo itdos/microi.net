@@ -248,8 +248,8 @@ namespace Dos.ORM
             var dt = BuildDataTable(list, fields, insertableIdx);
             using (var conn = dbSession.Db.CreateConnection())
             {
-                if (async) await conn.OpenAsync(ct).ConfigureAwait(false);
-                else conn.Open();
+                if (async) await dbSession.Db.OpenConnectionWithGuardAsync(conn, ct).ConfigureAwait(false);
+                else dbSession.Db.OpenConnectionWithGuard(conn);
 
                 using (var sbc = (IDisposable)Activator.CreateInstance(sbcType, new object[] { conn }))
                 {
@@ -314,8 +314,8 @@ namespace Dos.ORM
             var dt = BuildDataTable(list, fields, insertableIdx);
             using (var conn = dbSession.Db.CreateConnection())
             {
-                if (async) await conn.OpenAsync(ct).ConfigureAwait(false);
-                else conn.Open();
+                if (async) await dbSession.Db.OpenConnectionWithGuardAsync(conn, ct).ConfigureAwait(false);
+                else dbSession.Db.OpenConnectionWithGuard(conn);
 
                 var bc = Activator.CreateInstance(bcType, new object[] { conn });
                 bcType.GetProperty("DestinationTableName").SetValue(bc, tableName);
@@ -355,8 +355,8 @@ namespace Dos.ORM
                 var beginBinaryImport = conn.GetType().GetMethod("BeginBinaryImport", new[] { typeof(string) });
                 if (beginBinaryImport == null) return false;
 
-                if (async) await conn.OpenAsync(ct).ConfigureAwait(false);
-                else conn.Open();
+                if (async) await dbSession.Db.OpenConnectionWithGuardAsync(conn, ct).ConfigureAwait(false);
+                else dbSession.Db.OpenConnectionWithGuard(conn);
 
                 var colSql = new StringBuilder();
                 for (int j = 0; j < insertableIdx.Count; j++)
