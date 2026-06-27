@@ -26,6 +26,26 @@ export default {
             });
             return result;
         },
+        IsDiyTableTreeLazy() {
+            var model = this.CurrentDiyTableModel || {};
+            if (!(model.IsTree === true || model.IsTree === 1)) {
+                return false;
+            }
+            if (model.TreeLazy === true || model.TreeLazy === 1) {
+                return true;
+            }
+            var tableName = (model.Name || model.TableName || "").toString().toLowerCase();
+            var routePath = (this.$route && this.$route.path ? this.$route.path : "").toString().toLowerCase();
+            return tableName === "diy_lang" || routePath === "/lang";
+        },
+        GetTreeLazyChildPageSize() {
+            var model = this.CurrentDiyTableModel || {};
+            var configured = Number(model.TreeLazyChildPageSize || model.TreeChildPageSize || model.LazyChildPageSize);
+            if (!Number.isNaN(configured) && configured > 0) {
+                return Math.min(Math.max(Math.floor(configured), 20), 500);
+            }
+            return 100;
+        },
         DiyTableLoad(tree, treeNode, resolve) {
             var self = this;
             // 若未配置树形父级字段，默认使用 ParentId；避免发送 _Where: [["","=",id]] 这种非法请求，
@@ -44,7 +64,9 @@ export default {
                 // _Where: [{ Name: treeParentField, Value: tree.Id, Type: "=" }]
                 _Where: [[treeParentField, "=", tree.Id]],
                 // 懒加载展开子节点时显式声明：返回平铺子节点，不要走"根节点过滤+递归"逻辑
-                _TreeLazy: 1
+                _TreeLazy: 1,
+                _PageIndex: 1,
+                _PageSize: self.GetTreeLazyChildPageSize()
             };
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
@@ -74,6 +96,18 @@ export default {
                                 console.warn("Microi：树形展开响应中包含非直属子节点，已自动过滤。", {
                                     expandId: expandId, 过滤前: originalLen, 过滤后: result.Data.length
                                 });
+                            }
+                        }
+                        var totalChildren = Number(result.DataCount || 0);
+                        var loadedChildren = result.Data && result.Data.length ? result.Data.length : 0;
+                        if (totalChildren > loadedChildren && loadedChildren > 0) {
+                            if (!self._treeLazyLargeNodeTipCache) {
+                                self._treeLazyLargeNodeTipCache = {};
+                            }
+                            var tipKey = (tree && tree.Id ? tree.Id : "") + "_" + loadedChildren + "_" + totalChildren;
+                            if (!self._treeLazyLargeNodeTipCache[tipKey]) {
+                                self._treeLazyLargeNodeTipCache[tipKey] = true;
+                                self.DiyCommon.Tips("当前节点数据较多，已加载前 " + loadedChildren + " 条，共 " + totalChildren + " 条；可使用搜索快速定位更多数据。", "warning", 5);
                             }
                         }
 
@@ -590,25 +624,17 @@ export default {
                 }
             }
             //判断模块引擎是否配置了查询接口替换
-            try {
-                var translateTextComponents = ["Text", "Textarea", "RichText", "AutoNumber", "Radio", "Select"];
-                var translateFields = (self.GetShowDiyFieldList ? self.GetShowDiyFieldList() : [])
-                    .filter(function (field) {
-                        if (!field || self.DiyCommon.IsNull(field.Name)) return false;
-                        if (["Id", "Key", "Code", "CreateTime", "UpdateTime", "OsClient"].indexOf(field.Name) > -1) return false;
-                        return translateTextComponents.indexOf(field.Component) > -1 || ["Name", "Title", "Description", "Remark", "ApiDescription"].indexOf(field.Name) > -1;
-                    })
-                    .map(function (field) {
-                        return self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName;
-                    });
-                if (translateFields.length > 0) {
-                    param._TranslateFields = Array.from(new Set(translateFields));
-                }
-            } catch (e) {}
+            // Business row data translation is an explicit client-side action.
+            // Metadata translation still happens on the server through diy_lang.
             var url = self.DiyApi.GetDiyTableRow;
             var paramType = "";
             if (self.CurrentDiyTableModel.IsTree) {
                 url = self.DiyApi.GetTableDataTree;
+                if (self.IsDiyTableTreeLazy()) {
+                    param._TreeLazy = 1;
+                    param._PageIndex = param._PageIndex || self.DiyTableRowPageIndex || 1;
+                    param._PageSize = param._PageSize || self.DiyTableRowPageSize || 15;
+                }
             } else {
                 url = "/api/FormEngine/GetTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
                 paramType = "json";
@@ -643,6 +669,9 @@ export default {
                             self.StatisticsFields = result.DataAppend.StatisticsFields;
                         } else {
                             self.StatisticsFields = null;
+                        }
+                        if (result.DataAppend && result.DataAppend.AutoTreeLazy && self.CurrentDiyTableModel) {
+                            self.CurrentDiyTableModel.TreeLazy = 1;
                         }
 
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）

@@ -193,7 +193,7 @@ async function submitSetPwd() {
       },
       body: JSON.stringify({
         Pwd: newPwd.value,
-        OsClient: 'MicroiDoc'
+        OsClient: 'iTdos'
       })
     })
     const result = await resp.json()

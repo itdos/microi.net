@@ -7,6 +7,19 @@ description: Microi V8 安全 SQL 查询指南。用于选择 V8.FormEngine _Whe
 
 你正在开发 Microi 吾码平台的 V8 引擎代码。数据库查询有两种方式：`V8.FormEngine`（推荐）和 `V8.Db`（原始 SQL）。必须遵守安全规范。
 
+## 性能门禁（必须执行）
+
+写接口引擎前必须先做数据访问计划，避免“循环套循环查数据库”：
+
+- 禁止在 `for` / `while` / `forEach` / `map` 循环内调用 `V8.FormEngine.GetFormData`、`GetTableData`、`V8.Db.FromSql`、`V8.ApiEngine.Run` 或 `V8.Http.*`。确实无法避免时，必须先说明原因，并加分页、缓存或限流。
+- 多条 Id、编码、外键查询必须一次性用 `_Where: [['Id','In', ids]]`、SQL `IN`、JOIN 或聚合查询取回，再用内存字典映射。
+- 需要父子、主从、用户/部门/角色名称映射时，先批量取关联表，只保留 `_SelectFields` 必要列，不要逐行查名称。
+- 统计、计数、汇总优先让数据库一次 `GROUP BY` / `COUNT` / `SUM` 完成，不要把大表全部拉到 V8 里循环统计。
+- 列表接口必须限制 `_PageSize`，管理端默认不要超过 100，导出或批处理必须显式分批。
+- 每次查询都要写 `_SelectFields` 或明确 SQL 字段列表，禁止 `SELECT *` 用在大表、接口列表、循环前置查询中。
+- 外部 HTTP、翻译、短信、AI 等慢调用不能放在数据库事务和大循环中；要么异步队列，要么批量预处理并设置超时。
+- 返回前自检一次：数据库访问次数应与数据量无关或近似常数级，不能随着行数线性增长为 N 次查询。
+
 ## 首选：V8.FormEngine + _Where（自动防注入）
 
 `_Where` 是参数化查询语法，自动防 SQL 注入，**永远优先使用**。

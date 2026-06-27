@@ -25,7 +25,7 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
 
 同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key}--OsClient--{osClient}-- 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。
 
-如果保存或回读时出现 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听等服务不可达问题，不能提前中止。必须自动进入 `Microi.Server/Microi.net.Api` 后执行 `dotnet run --launch-profile Microi.net.Api` 启动后端，等待 `https://localhost:7266` 可达后重试同步；涉及 PC 页面联调或 Playwright 时，还要自动启动 `Microi.Client`：`npm run dev -- --host 0.0.0.0 --port 1988`。只有启动失败、依赖缺失、数据库连接失败或端口冲突无法处理时才报告阻塞。
+如果保存或回读时出现 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听等服务不可达问题，不能提前中止。需要启动或重启本地 API 时，必须在 `Microi.Server/Microi.net.Api` 目录通过 VS Code 可见终端执行 `dotnet run --launch-profile Microi.net.Api`，让开发者能肉眼看到并手动停止；不要用隐藏后台 shell 启动长期占用端口的 API 进程。若工具当前无法打开可见终端，应先说明限制并让用户启动/重启后继续验证。涉及 PC 页面联调或 Playwright 时，`Microi.Client` 也必须使用可见终端执行：`npm run dev -- --host 0.0.0.0 --port 1988`。只有启动失败、依赖缺失、数据库连接失败或端口冲突无法处理时才报告阻塞。
 
 Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`，让 `Program.cs` 读取 `Microi.Server/Microi.net.Api/.microi-local` 并加载对应的 `appsettings.{Env}.json`。
 
@@ -43,6 +43,17 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 所有 FormEngine 方法在服务器端支持第三个参数传入 `V8.DbTrans`（事务对象）
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
+
+## 性能底线（必须自检）
+
+- 写接口引擎前必须先做数据访问计划：需要哪些表、哪些字段、预计数据量、是否分页、是否需要缓存。
+- 禁止在 `for` / `while` / `forEach` / 嵌套循环中反复调用 `GetFormData`、`GetTableData`、`FromSql`、`ApiEngine.Run` 或外部 HTTP。先收集 Id/Key，用一次 `In` 查询或一条 JOIN/聚合 SQL 批量取回，再用对象字典映射。
+- 禁止用双重循环匹配两组列表。先把小表或关联表整理成 `{ id: row }`、`{ parentId: [] }` 这类 Map，再单循环组装结果。
+- 所有列表查询必须设置 `_SelectFields`，只取业务需要的字段；面向前端的列表必须分页或显式限制 `_PageSize`，不能一次拉全表。
+- 报表、统计、跨表汇总优先使用数据库聚合（`COUNT/SUM/GROUP BY/JOIN`）或一次批量查询后内存聚合，不能逐行查明细再累加。
+- 高频读取的系统配置、字典、菜单、字段、角色权限等静态数据要优先使用 `V8.Cache` 或平台已有缓存；写入后必须清理相关缓存。
+- 外部 HTTP、短信、翻译、文件处理等慢操作不要放在数据库事务内循环执行；能批量就批量，不能批量就拆成异步任务/队列。
+- 返回前做一次性能复核：数据库访问次数是否与数据量无关、是否避免 N+1 查询、是否有索引友好的 `_Where` 条件、是否不会因空参数导致全表扫描。
 
 ## DosResult 状态码
 

@@ -1642,13 +1642,13 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     else
                     {
                         var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
-                        roleIds = roles.Select(d => d.Id).ToList();
+                        roleIds = roles?.Select(d => d.Id).ToList() ?? new List<string>();
                     }
                 }
                 catch (Exception ex)
                 {
                     var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
-                    roleIds = roles.Select(d => d.Id).ToList();
+                    roleIds = roles?.Select(d => d.Id).ToList() ?? new List<string>();
                 }
             }
             catch (Exception ex)
@@ -1659,7 +1659,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 sysUser["_RoleLimitsError9"] = ex.Message;
                 return;
             }
-            if (!roleIds.Any())
+            if (roleIds == null || !roleIds.Any())
             {
                 sysUser["_IsAdmin"] = false;
                 sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
@@ -1673,6 +1673,14 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 Ids = roleIds,
                 OsClient = OsClient
             });
+            if (roleList.Code != 1 || roleList.Data == null)
+            {
+                sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
+                sysUser["_RoleLimitsError7"] = roleList.Msg ?? "roleList.Data is null";
+                sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+                return;
+            }
             sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
 
 
@@ -1706,13 +1714,13 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 try
                 {
-                    roleIds = JsonHelper.Deserialize<List<string>>(sysUser.RoleIds);
+                    roleIds = JsonHelper.Deserialize<List<string>>(sysUser.RoleIds) ?? new List<string>();
                 }
                 catch (Exception ex)
                 {
 
                     var roleLists = JsonHelper.Deserialize<List<SysRole>>(sysUser.RoleIds);
-                    roleIds = roleLists.Select(d => d.Id).ToList();
+                    roleIds = roleLists?.Select(d => d.Id).ToList() ?? new List<string>();
                 }
             }
             catch (Exception ex)
@@ -1724,7 +1732,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 sysUser._RoleLimitsError = ex.Message;
                 return;
             }
-            if (!roleIds.Any())
+            if (roleIds == null || !roleIds.Any())
             {
                 sysUser._IsAdmin = false;
                 sysUser._Roles = new List<SysRole>();
@@ -1738,6 +1746,14 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 Ids = roleIds,
                 OsClient = OsClient
             });
+            if (roleList.Code != 1 || roleList.Data == null)
+            {
+                sysUser._IsAdmin = sysUser.Level >= DiyCommon.MaxRoleLevel;
+                sysUser._Roles = new List<SysRole>();
+                sysUser._RoleLimits = new List<SysRoleLimit>();
+                sysUser._RoleLimitsError = roleList.Msg ?? "roleList.Data is null";
+                return;
+            }
             sysUser._Roles = roleList.Data;
 
 

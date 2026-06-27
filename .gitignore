@@ -126,3 +126,5 @@ logs
 Microi.Server/Microi.net.Api/.tmp-api-out.log
 Microi.Server/Microi.net.Api/.tmp-api-err.log
 数据库、案例、文档、资料/docker-compose.libretranslate.yml
+Microi.Server/Microi.net.Api/.tmp-api-err-run.log
+Microi.Server/Microi.net.Api/.tmp-api-out-run.log
