@@ -181,6 +181,7 @@
                             @refresh-data-comment="LoadDataComment"
                             @refresh-data-version="LoadDataVersion"
                             @preview-data-version="PreviewDataVersion"
+                            @diff-data-version="DiffDataVersion"
                             @load-data-version="LoadDataVersionToForm"
                         />
                     </el-col>
@@ -455,6 +456,7 @@
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
+                        @diff-data-version="DiffDataVersion"
                         @load-data-version="LoadDataVersionToForm"
                     />
                 </el-col>
@@ -753,6 +755,7 @@
                         @refresh-data-comment="LoadDataComment"
                         @refresh-data-version="LoadDataVersion"
                         @preview-data-version="PreviewDataVersion"
+                        @diff-data-version="DiffDataVersion"
                         @load-data-version="LoadDataVersionToForm"
                     />
                 </el-col>
@@ -880,6 +883,7 @@
                 @refresh-data-comment="LoadDataComment"
                 @refresh-data-version="LoadDataVersion"
                 @preview-data-version="PreviewDataVersion"
+                @diff-data-version="DiffDataVersion"
                 @load-data-version="LoadDataVersionToForm"
             />
         </el-drawer>
@@ -916,6 +920,40 @@
                 @CallbackGetDiyField="CallbackGetDiyFieldPreview"
                 @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
             />
+        </el-dialog>
+        <el-dialog
+            v-model="ShowDataVersionDiffDialog"
+            class="data-version-diff-dialog"
+            :title="$t('Msg.ViewDiff') + ' ' + ((DataVersionDiffItem && DataVersionDiffItem.Version) || '')"
+            :width="diyStore.IsPhoneView ? '94%' : '1080px'"
+            append-to-body
+            destroy-on-close
+        >
+            <el-table
+                :data="DataVersionDiffRows"
+                border
+                height="min(560px, 62vh)"
+                :empty-text="$t('Msg.NoData')"
+            >
+                <el-table-column prop="Label" label="字段" width="180">
+                    <template #default="{ row }">
+                        <div class="data-version-diff-field">
+                            <span>{{ row.Label }}</span>
+                            <small>{{ row.Name }}</small>
+                        </div>
+                    </template>
+                </el-table-column>
+                <el-table-column label="当前值">
+                    <template #default="{ row }">
+                        <pre class="data-version-diff-value is-current">{{ row.CurrentDisplay || $t('Msg.EmptyValue') }}</pre>
+                    </template>
+                </el-table-column>
+                <el-table-column label="版本值">
+                    <template #default="{ row }">
+                        <pre class="data-version-diff-value is-version">{{ row.VersionDisplay || $t('Msg.EmptyValue') }}</pre>
+                    </template>
+                </el-table-column>
+            </el-table>
         </el-dialog>
         <el-dialog
             v-model="ShowDraftDialog"

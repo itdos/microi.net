@@ -38,6 +38,9 @@
                         <button class="toolbar-btn" @click.prevent="showShortcuts" title="快捷键">
                             <el-icon><InfoFilled /></el-icon> 快捷键
                         </button>
+                        <button v-if="CanUseCodeVersion" class="toolbar-btn" @click.prevent="openCodeVersionDialog" title="代码版本">
+                            <el-icon><Clock /></el-icon> 版本
+                        </button>
                         <!-- <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                             <el-icon><Document /></el-icon> V8文档
                         </button> -->
@@ -118,6 +121,9 @@
                 </button>
                 <button class="toolbar-btn" @click.prevent="showShortcuts" title="快捷键">
                     <el-icon><InfoFilled /></el-icon> 快捷键
+                </button>
+                <button v-if="CanUseCodeVersion" class="toolbar-btn" @click.prevent="openCodeVersionDialog" title="代码版本">
+                    <el-icon><Clock /></el-icon> 版本
                 </button>
                 <!-- <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
                     <el-icon><Document /></el-icon> V8文档
@@ -243,6 +249,92 @@
         </el-dialog>
     </div>
 
+    <el-dialog
+        v-model="codeVersionDialogVisible"
+        class="code-version-dialog"
+        title="代码版本"
+        width="900px"
+        append-to-body
+        destroy-on-close
+        :close-on-click-modal="false"
+        @opened="loadCodeVersionList"
+    >
+        <div class="code-version-toolbar">
+            <div class="code-version-heading">
+                <div class="code-version-title">{{ CodeVersionFieldLabel }}</div>
+                <div class="code-version-subtitle">{{ CodeVersionTableName || CodeVersionTableId }} / {{ CodeVersionDataId }}</div>
+            </div>
+            <div class="code-version-toolbar-actions">
+                <el-button :loading="codeVersionSaving" type="primary" @click="saveCodeVersion">
+                    保存当前版本
+                </el-button>
+                <el-button :loading="codeVersionLoading" @click="loadCodeVersionList">
+                    刷新
+                </el-button>
+            </div>
+        </div>
+        <div class="code-version-list" v-loading="codeVersionLoading">
+            <div v-if="codeVersionList.length > 0">
+                <div v-for="item in codeVersionList" :key="item.Id" class="code-version-item">
+                    <div class="code-version-main">
+                        <div class="code-version-tags">
+                            <el-tag size="small" type="primary" effect="dark">{{ item.Version || '1.0.0' }}</el-tag>
+                            <el-tag size="small" effect="plain">{{ item.__CodeLength }} 字</el-tag>
+                        </div>
+                        <div class="code-version-meta">
+                            <span>{{ item.CreateTime }}</span>
+                            <span>{{ item.UserName || item.CreateUser || item.UserId }}</span>
+                            <span v-if="item.Remark">{{ item.Remark }}</span>
+                        </div>
+                    </div>
+                    <div class="code-version-actions">
+                        <el-button size="small" type="primary" plain @click="previewCodeVersion(item)">
+                            <el-icon><View /></el-icon> 预览
+                        </el-button>
+                        <el-button size="small" plain @click="openCodeVersionDiff(item)">
+                            <el-icon><Document /></el-icon> 对比
+                        </el-button>
+                        <el-button size="small" type="warning" plain @click="restoreCodeVersion(item)">
+                            <el-icon><RefreshLeft /></el-icon> 恢复
+                        </el-button>
+                    </div>
+                </div>
+            </div>
+            <el-empty v-else description="暂无版本" :image-size="72" />
+        </div>
+    </el-dialog>
+
+    <el-dialog
+        v-model="codeVersionPreviewVisible"
+        class="code-version-preview-dialog"
+        :title="'版本预览 ' + ((codeVersionCurrentItem && codeVersionCurrentItem.Version) || '')"
+        width="860px"
+        append-to-body
+        destroy-on-close
+    >
+        <pre class="code-version-preview-code">{{ codeVersionPreviewCode }}</pre>
+    </el-dialog>
+
+    <el-dialog
+        v-model="codeVersionDiffVisible"
+        class="code-version-diff-dialog"
+        :title="'代码对比 ' + ((codeVersionCurrentItem && codeVersionCurrentItem.Version) || '')"
+        width="1100px"
+        append-to-body
+        destroy-on-close
+    >
+        <div class="code-version-diff-grid">
+            <div class="code-version-diff-pane">
+                <div class="code-version-diff-title is-current">当前代码</div>
+                <pre>{{ codeVersionCurrentCode }}</pre>
+            </div>
+            <div class="code-version-diff-pane">
+                <div class="code-version-diff-title is-version">版本代码</div>
+                <pre>{{ codeVersionPreviewCode }}</pre>
+            </div>
+        </div>
+    </el-dialog>
+
     <DiyCodeDesign
         ref="codeDesignerRef"
         :model-value="ModelValue"
@@ -317,6 +409,7 @@ const initMonaco = async () => {
     return monaco;
 };
 import { getToken } from '@/utils/auth.js';
+import { ElMessageBox } from 'element-plus';
 import AiChatPanel from './AiChatPanel.vue';
 import DiyCodeDesign from '../diy-components/diy-code-design.vue';
 import { 
@@ -334,7 +427,9 @@ import {
     Edit,
     RefreshLeft,
     RefreshRight,
-    Operation
+    Operation,
+    Clock,
+    View
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
@@ -364,6 +459,22 @@ const props = defineProps({
     FormData: {
         type: Object,
         default: () => ({})
+    },
+    FormDiyTableModel: {
+        type: Object,
+        default: () => ({})
+    },
+    TableId: {
+        type: String,
+        default: ''
+    },
+    TableName: {
+        type: String,
+        default: ''
+    },
+    TableRowId: {
+        type: String,
+        default: ''
     },
     CodeEditorMini: {
         type: Boolean,
@@ -1032,6 +1143,223 @@ const openConfig = () => {
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+
+// ==================== 代码数据版本 ====================
+const codeVersionDialogVisible = ref(false);
+const codeVersionPreviewVisible = ref(false);
+const codeVersionDiffVisible = ref(false);
+const codeVersionLoading = ref(false);
+const codeVersionSaving = ref(false);
+const codeVersionList = ref([]);
+const codeVersionCurrentItem = ref(null);
+const codeVersionPreviewCode = ref('');
+const codeVersionCurrentCode = ref('');
+
+const CodeVersionFieldName = computed(() => props.field?.Name || '');
+const CodeVersionFieldLabel = computed(() => props.field?.Label || props.field?.Name || '代码');
+const CodeVersionDataId = computed(() => props.TableRowId || props.FormData?.Id || props.FormDiyTableModel?.Id || '');
+const CodeVersionTableId = computed(() => props.TableId || props.field?.TableId || props.FormData?.TableId || '');
+const CodeVersionTableName = computed(() => props.TableName || props.FormData?.FormEngineKey || props.field?.TableName || '');
+const CanUseCodeVersion = computed(() => {
+    return !!(CodeVersionFieldName.value && CodeVersionDataId.value && (CodeVersionTableId.value || CodeVersionTableName.value));
+});
+
+const getEditorCode = () => {
+    if (monacoEditor) {
+        return monacoEditor.getValue() || '';
+    }
+    return ModelValue.value || '';
+};
+
+const buildCodeVersionWhere = () => {
+    const where = [['TableRowId', '=', CodeVersionDataId.value]];
+    if (CodeVersionTableId.value) {
+        where.push(['TableId', '=', CodeVersionTableId.value]);
+    } else if (CodeVersionTableName.value) {
+        where.push(['TableName', '=', CodeVersionTableName.value]);
+    }
+    return where;
+};
+
+const parseCodeVersionData = (item) => {
+    if (!item || !item.Data) return {};
+    try {
+        return typeof item.Data === 'string' ? JSON.parse(item.Data) : JSON.parse(JSON.stringify(item.Data));
+    } catch (error) {
+        console.warn('[CodeEditor] 数据版本解析失败:', error);
+        return {};
+    }
+};
+
+const getCodeFromVersionData = (data) => {
+    if (!data) return '';
+    const fieldName = CodeVersionFieldName.value;
+    if (Object.prototype.hasOwnProperty.call(data, fieldName)) {
+        const value = data[fieldName];
+        return value === null || value === undefined ? '' : String(value);
+    }
+    if (data.__CodeEditorCode !== undefined && data.__CodeEditorCode !== null) {
+        return String(data.__CodeEditorCode);
+    }
+    return '';
+};
+
+const normalizeCodeVersionItem = (item) => {
+    const data = parseCodeVersionData(item);
+    const fieldName = CodeVersionFieldName.value;
+    const isCodeEditorSnapshot = data.__CodeEditorFieldName === fieldName;
+    const hasFieldSnapshot = Object.prototype.hasOwnProperty.call(data, fieldName);
+    if (!isCodeEditorSnapshot && !hasFieldSnapshot) {
+        return null;
+    }
+    const code = getCodeFromVersionData(data);
+    return {
+        ...item,
+        __VersionData: data,
+        __CodeValue: code,
+        __CodeLength: code.length
+    };
+};
+
+const incrementCodeVersion = (latestVersion) => {
+    if (!latestVersion) return '1.0.0';
+    const parts = String(latestVersion).split('.');
+    if (parts.length !== 3) return '1.0.0';
+    let major = parseInt(parts[0], 10);
+    let minor = parseInt(parts[1], 10);
+    let patch = parseInt(parts[2], 10);
+    if (Number.isNaN(major) || Number.isNaN(minor) || Number.isNaN(patch)) {
+        return '1.0.0';
+    }
+    patch += 1;
+    if (patch > 9) {
+        patch = 0;
+        minor += 1;
+    }
+    if (minor > 9) {
+        minor = 0;
+        major += 1;
+    }
+    return `${major}.${minor}.${patch}`;
+};
+
+const getNextCodeVersion = async () => {
+    const result = await DiyCommon.FormEngine.GetTableData('mic_data_version', {
+        _Where: buildCodeVersionWhere(),
+        _SelectFields: ['Id', 'Version'],
+        _OrderBy: 'CreateTime',
+        _OrderByType: 'DESC',
+        _PageIndex: 1,
+        _PageSize: 1
+    });
+    if (result && result.Code == 1 && result.Data && result.Data.length > 0) {
+        return incrementCodeVersion(result.Data[0].Version);
+    }
+    return '1.0.0';
+};
+
+const loadCodeVersionList = async () => {
+    if (!CanUseCodeVersion.value || codeVersionLoading.value) return;
+    try {
+        codeVersionLoading.value = true;
+        const result = await DiyCommon.FormEngine.GetTableData('mic_data_version', {
+            _Where: buildCodeVersionWhere(),
+            _OrderBy: 'CreateTime',
+            _OrderByType: 'DESC',
+            _PageIndex: 1,
+            _PageSize: 200
+        });
+        if (result && result.Code == 1 && Array.isArray(result.Data)) {
+            codeVersionList.value = result.Data
+                .map(normalizeCodeVersionItem)
+                .filter(Boolean);
+        } else {
+            codeVersionList.value = [];
+        }
+    } catch (error) {
+        console.error('[CodeEditor] 加载代码版本失败:', error);
+        DiyCommon.Tips('加载代码版本失败：' + error.message, false);
+    } finally {
+        codeVersionLoading.value = false;
+    }
+};
+
+const openCodeVersionDialog = () => {
+    if (!CanUseCodeVersion.value) {
+        DiyCommon.Tips('当前代码编辑器缺少数据Id或表信息，无法使用版本功能。', false);
+        return;
+    }
+    codeVersionDialogVisible.value = true;
+};
+
+const buildCodeVersionSnapshot = () => {
+    const fieldName = CodeVersionFieldName.value;
+    return {
+        Id: CodeVersionDataId.value,
+        [fieldName]: getEditorCode(),
+        __CodeEditorFieldName: fieldName,
+        __CodeEditorFieldLabel: CodeVersionFieldLabel.value,
+        __CodeEditorLanguage: props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript'
+    };
+};
+
+const saveCodeVersion = async () => {
+    if (!CanUseCodeVersion.value || codeVersionSaving.value) return;
+    try {
+        codeVersionSaving.value = true;
+        const version = await getNextCodeVersion();
+        const result = await DiyCommon.FormEngine.AddFormData('mic_data_version', {
+            TableId: CodeVersionTableId.value,
+            TableName: CodeVersionTableName.value,
+            TableRowId: CodeVersionDataId.value,
+            Version: version,
+            Action: 'Update',
+            Data: JSON.stringify(buildCodeVersionSnapshot()),
+            Remark: '代码编辑器保存：' + CodeVersionFieldLabel.value
+        });
+        if (result && result.Code == 1) {
+            DiyCommon.Tips('代码版本已保存', true);
+            await loadCodeVersionList();
+        } else {
+            DiyCommon.Tips((result && result.Msg) || '代码版本保存失败', false);
+        }
+    } catch (error) {
+        console.error('[CodeEditor] 保存代码版本失败:', error);
+        DiyCommon.Tips('保存代码版本失败：' + error.message, false);
+    } finally {
+        codeVersionSaving.value = false;
+    }
+};
+
+const previewCodeVersion = (item) => {
+    codeVersionCurrentItem.value = item;
+    codeVersionPreviewCode.value = item.__CodeValue || '';
+    codeVersionPreviewVisible.value = true;
+};
+
+const openCodeVersionDiff = (item) => {
+    codeVersionCurrentItem.value = item;
+    codeVersionCurrentCode.value = getEditorCode();
+    codeVersionPreviewCode.value = item.__CodeValue || '';
+    codeVersionDiffVisible.value = true;
+};
+
+const restoreCodeVersion = async (item) => {
+    try {
+        await ElMessageBox.confirm('确定将该版本恢复到当前编辑器？恢复后仍需保存表单才会写入业务数据。', '恢复代码版本', {
+            confirmButtonText: '恢复',
+            cancelButtonText: '取消',
+            type: 'warning'
+        });
+        applyCodeToEditor(item.__CodeValue || '');
+        codeVersionDialogVisible.value = false;
+        DiyCommon.Tips('代码版本已恢复到编辑器', true);
+    } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+            console.warn('[CodeEditor] 恢复代码版本取消或失败:', error);
+        }
+    }
+};
 
 const saveConfig = () => {
     if (!props.field.Config.CodeEditor) {
@@ -2255,6 +2583,197 @@ defineExpose({
                 font-size: 13px;
             }
         }
+    }
+}
+
+.code-version-dialog {
+    .el-dialog__body {
+        padding-top: 8px;
+    }
+
+    .code-version-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .code-version-heading {
+        min-width: 0;
+    }
+
+    .code-version-title {
+        color: var(--el-text-color-primary, #303133);
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .code-version-subtitle {
+        margin-top: 3px;
+        color: var(--el-text-color-secondary, #909399);
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .code-version-toolbar-actions,
+    .code-version-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+
+        .el-button {
+            margin-left: 0;
+        }
+    }
+
+    .code-version-list {
+        max-height: 56vh;
+        overflow-y: auto;
+        padding-right: 2px;
+    }
+
+    .code-version-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--el-border-color-lighter, #ebeef5);
+        border-radius: 8px;
+        background: var(--el-fill-color-extra-light, #fafafa);
+
+        & + .code-version-item {
+            margin-top: 10px;
+        }
+    }
+
+    .code-version-main {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .code-version-tags,
+    .code-version-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .code-version-meta {
+        margin-top: 6px;
+        color: var(--el-text-color-secondary, #909399);
+        font-size: 12px;
+        line-height: 1.45;
+    }
+}
+
+.code-version-preview-dialog,
+.code-version-diff-dialog {
+    .el-dialog__body {
+        padding: 12px;
+        background: var(--el-fill-color-extra-light, #fafafa);
+    }
+}
+
+.code-version-preview-code {
+    min-height: 360px;
+    max-height: 70vh;
+    margin: 0;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.code-version-diff-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    height: min(680px, 72vh);
+    min-height: 360px;
+}
+
+.code-version-diff-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1e1e1e;
+
+    pre {
+        flex: 1;
+        min-height: 0;
+        margin: 0;
+        overflow: auto;
+        padding: 12px;
+        color: #d4d4d4;
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre;
+        tab-size: 4;
+    }
+}
+
+.code-version-diff-title {
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border-bottom: 1px solid #3c3c3c;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+
+    &.is-current {
+        background: #2d2d30;
+    }
+
+    &.is-version {
+        background: #3a2f16;
+    }
+}
+
+@media (max-width: 760px) {
+    .code-version-dialog {
+        width: 94vw !important;
+
+        .code-version-toolbar,
+        .code-version-item {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .code-version-toolbar-actions,
+        .code-version-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+
+    .code-version-preview-dialog,
+    .code-version-diff-dialog {
+        width: 94vw !important;
+    }
+
+    .code-version-diff-grid {
+        grid-template-columns: 1fr;
+        height: 74vh;
+        min-height: 0;
     }
 }
 </style>

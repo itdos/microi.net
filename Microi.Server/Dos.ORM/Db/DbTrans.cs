@@ -72,7 +72,7 @@ namespace Dos.ORM
             this.dbSession = dbSession;
 
             if (this.conn.State != ConnectionState.Open)
-                this.conn.Open();
+                this.dbSession.Db.OpenConnectionWithGuard(this.conn);
 
         }
 

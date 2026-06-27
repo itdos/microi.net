@@ -16,10 +16,12 @@
 #endregion
 
 using System;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos;
 using Dos.Common;
@@ -34,6 +36,11 @@ namespace Dos.ORM
     public sealed class Database : ILogable
     {
         private DbProvider dbProvider;
+        private static readonly int MaxConcurrentConnectionOpens = ReadPositiveEnvironmentInt("DOS_ORM_MAX_CONCURRENT_CONNECTION_OPENS", 64);
+        private static readonly int ConnectionOpenWaitSeconds = ReadPositiveEnvironmentInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", 10);
+        private static readonly int ConnectionPressureBackoffSeconds = ReadPositiveEnvironmentInt("DOS_ORM_CONNECTION_PRESSURE_BACKOFF_SECONDS", 30);
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> ConnectionOpenSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
+        private static readonly ConcurrentDictionary<string, DateTime> ConnectionBackoffUntil = new ConcurrentDictionary<string, DateTime>();
 
         /// <summary>
         /// Default Database
@@ -146,6 +153,142 @@ namespace Dos.ORM
             command.CommandText = commandText;
 
             return command;
+        }
+
+        private static int ReadPositiveEnvironmentInt(string name, int defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
+
+        private string GetConnectionGuardKey()
+        {
+            var providerName = dbProvider?.GetType().FullName ?? string.Empty;
+            var connectionString = ConnectionString ?? string.Empty;
+            return providerName + ":" + connectionString.GetHashCode().ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static bool IsConnectionPressureException(Exception ex)
+        {
+            while (ex != null)
+            {
+                var numberProperty = ex.GetType().GetProperty("Number");
+                if (numberProperty != null)
+                {
+                    try
+                    {
+                        var number = Convert.ToInt32(numberProperty.GetValue(ex, null), CultureInfo.InvariantCulture);
+                        if (number == 1040 || number == 1042 || number == 1043 || number == 1129 || number == 1203 || number == 2003)
+                        {
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                var msg = ex.Message ?? string.Empty;
+                if (msg.IndexOf("blocked because of many connection errors", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("mysqladmin flush-hosts", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("too many connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("max_user_connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("unable to connect to any of the specified mysql hosts", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("timeout expired", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("connection pool", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+
+                ex = ex.InnerException;
+            }
+
+            return false;
+        }
+
+        private void ThrowIfConnectionBackoffActive(string guardKey)
+        {
+            if (ConnectionBackoffUntil.TryGetValue(guardKey, out var until))
+            {
+                if (until > DateTime.UtcNow)
+                {
+                    throw new InvalidOperationException($"Database connection pressure protection is active. Retry after {until:O}.");
+                }
+
+                ConnectionBackoffUntil.TryRemove(guardKey, out _);
+            }
+        }
+
+        private void MarkConnectionBackoff(string guardKey, Exception ex)
+        {
+            if (!IsConnectionPressureException(ex))
+            {
+                return;
+            }
+
+            ConnectionBackoffUntil[guardKey] = DateTime.UtcNow.AddSeconds(ConnectionPressureBackoffSeconds);
+        }
+
+        private SemaphoreSlim GetConnectionOpenSemaphore(string guardKey)
+        {
+            return ConnectionOpenSemaphores.GetOrAdd(guardKey, _ => new SemaphoreSlim(MaxConcurrentConnectionOpens, MaxConcurrentConnectionOpens));
+        }
+
+        internal void OpenConnectionWithGuard(DbConnection connection)
+        {
+            Check.Require(connection, "connection", Check.NotNull);
+            var guardKey = GetConnectionGuardKey();
+            ThrowIfConnectionBackoffActive(guardKey);
+            var semaphore = GetConnectionOpenSemaphore(guardKey);
+            if (!semaphore.Wait(TimeSpan.FromSeconds(ConnectionOpenWaitSeconds)))
+            {
+                throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
+            }
+
+            try
+            {
+                connection.Open();
+            }
+            catch (Exception ex)
+            {
+                MarkConnectionBackoff(guardKey, ex);
+                throw;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        internal async Task OpenConnectionWithGuardAsync(DbConnection connection, CancellationToken cancellationToken = default)
+        {
+            Check.Require(connection, "connection", Check.NotNull);
+            var guardKey = GetConnectionGuardKey();
+            ThrowIfConnectionBackoffActive(guardKey);
+            var semaphore = GetConnectionOpenSemaphore(guardKey);
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(ConnectionOpenWaitSeconds), cancellationToken).ConfigureAwait(false))
+            {
+                throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
+            }
+
+            try
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                MarkConnectionBackoff(guardKey, ex);
+                throw;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
         }
         private void DoLoadDataSet(DbCommand command, DataSet dataSet, string[] tableNames)
         {
@@ -440,7 +583,7 @@ namespace Dos.ORM
             try
             {
                 connection = CreateConnection();
-                connection.Open();
+                OpenConnectionWithGuard(connection);
                 return connection;
             }
             catch
@@ -460,7 +603,7 @@ namespace Dos.ORM
             try
             {
                 connection = CreateConnection();
-                await connection.OpenAsync().ConfigureAwait(false);
+                await OpenConnectionWithGuardAsync(connection).ConfigureAwait(false);
                 return connection;
             }
             catch
