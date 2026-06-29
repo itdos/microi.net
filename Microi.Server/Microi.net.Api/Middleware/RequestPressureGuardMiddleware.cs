@@ -318,9 +318,11 @@ namespace Microi.net.Api
                 return false;
             }
 
-            // 表单保存、删除、导入导出、批量处理可能触发后端 V8 或外部系统同步，
-            // 需要长排队窗口；列表/详情/元数据读取保持普通窗口，避免页面查询被长任务拖住。
-            return action.StartsWith("Add", StringComparison.OrdinalIgnoreCase)
+            // 表格/详情读取也可能触发 DataFilterV8、树形懒加载、复杂 Join 或外部系统同步。
+            // 这些动态 FormEngine 数据接口不能按轻量请求处理，只做限流排队，不误判失败。
+            return action.StartsWith("GetTableData", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("GetFormData", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Add", StringComparison.OrdinalIgnoreCase)
                 || action.StartsWith("Upt", StringComparison.OrdinalIgnoreCase)
                 || action.StartsWith("Del", StringComparison.OrdinalIgnoreCase)
                 || action.StartsWith("Save", StringComparison.OrdinalIgnoreCase)

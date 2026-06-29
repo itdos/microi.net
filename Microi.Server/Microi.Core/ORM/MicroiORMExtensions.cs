@@ -1,6 +1,7 @@
 using System;
 using System.Data.Common;
 using System.Linq;
+using Dos.Common;
 using Dos.ORM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -47,6 +48,9 @@ namespace Microi.net
 
     public static class MicroiORMExtensions
     {
+        private static int DefaultCommandTimeoutSeconds =>
+            ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DEFAULT_COMMAND_TIMEOUT_SECONDS", "OrmLimits:DefaultCommandTimeoutSeconds", 600);
+
         /// <summary>
         /// 创建 Dos.ORM DbSession（含 MySQL 连接字符串自动补充参数）
         /// </summary>
@@ -64,7 +68,7 @@ namespace Microi.net
 
                 if (!connectionString.Contains("DefaultCommandTimeout", StringComparison.OrdinalIgnoreCase)
                     && !connectionString.Contains("Default Command Timeout", StringComparison.OrdinalIgnoreCase))
-                    connectionString = connectionString.TrimEnd(';') + ";Default Command Timeout=300";
+                    connectionString = connectionString.TrimEnd(';') + $";Default Command Timeout={DefaultCommandTimeoutSeconds}";
 
                 if (!connectionString.Contains("AllowUserVariables", StringComparison.OrdinalIgnoreCase)
                     && !connectionString.Contains("Allow User Variables", StringComparison.OrdinalIgnoreCase))

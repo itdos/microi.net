@@ -181,7 +181,8 @@ namespace Microi.net
         };
         public static readonly List<string> NoDbFieldComponent = new List<string>()
         {
-            "OpenTable", "DevComponent", "PhoneSMS", "TableChild", "Button", "Divider"
+            "OpenTable", "DevComponent", "PhoneSMS", "TableChild", "Button", "Divider",
+            "CollapseGroup", "Tabs", "Alert", "StaticText", "Html"
         };
         public static JsonSerializer JsonConfig = new JsonSerializer()
         {
@@ -189,7 +190,16 @@ namespace Microi.net
             DateFormatString = "yyyy-MM-dd HH:mm:ss"
         };
 
-        public static List<string> NotRealField = new List<string>() { "Divider", "Button" };
+        public static readonly List<string> NotRealField = new List<string>()
+        {
+            "Divider", "Button", "TableChild", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html", "DevComponent", "PhoneSMS"
+        };
+
+        public static bool IsNotRealFieldComponent(string component)
+        {
+            return !component.DosIsNullOrWhiteSpace()
+                   && NotRealField.Any(d => d.Equals(component, StringComparison.OrdinalIgnoreCase));
+        }
         /// <summary>
         /// 
         /// </summary>

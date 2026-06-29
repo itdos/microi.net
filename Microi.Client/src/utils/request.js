@@ -15,7 +15,7 @@ const getUserStore = () => useUserStore(pinia);
 const service = axios.create({
     baseURL: import.meta.env.VITE_BASE_API, // url = base url + request url
     // withCredentials: true, // send cookies when cross-domain requests
-    timeout: 30000 // request timeout：原 5000ms 对上传/导出/AI 流式接口过短，提高到 30s
+    timeout: 10 * 60 * 1000 // 通用请求超时：允许接口引擎/V8/导入导出等合法长任务同步等待到10分钟
 });
 
 // request interceptor
