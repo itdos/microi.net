@@ -43,6 +43,16 @@ V8.OsClientModel.AliyunOSSAccessKeySecret
 // ... 任何用户在 sys_osclient 表中扩展的字段
 ```
 
+## 平台级配置与主租户规则
+
+`sys_osclients` 既保存每个租户自己的数据库、Redis、第三方密钥等配置，也可以承载影响整个 API 进程的平台级配置。平台级配置必须遵守“主租户为准、子租户只能降额隔离”的规则：
+
+- 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
+- 环境变量仍然拥有最高优先级，适合容器编排统一兜底；主租户 `sys_osclients` 次之，体现吾码 SaaS 引擎可配置能力；再其次才是 `appsettings.json`；最后才使用代码默认值。
+- 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
+- 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。
+- 新增平台级字段时，字段名建议保持英文稳定，例如 `PressureGlobalMaxConcurrentRequests`、`PressureV8MaxConcurrentExecutions`、`PressureOrmMaxConcurrentConnectionOpens`；字段标签和说明必须中文，说明中写清楚“主租户有效/子租户仅可降低”。
+
 ## 接口调用区分租户的三种方式
 
 ### 方式 1：Token 自动识别（最常用）

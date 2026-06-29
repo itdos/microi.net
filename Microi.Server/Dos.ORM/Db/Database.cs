@@ -36,11 +36,17 @@ namespace Dos.ORM
     public sealed class Database : ILogable
     {
         private DbProvider dbProvider;
-        private static readonly int MaxConcurrentConnectionOpens = ReadPositiveEnvironmentInt("DOS_ORM_MAX_CONCURRENT_CONNECTION_OPENS", 64);
-        private static readonly int ConnectionOpenWaitSeconds = ReadPositiveEnvironmentInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", 10);
-        private static readonly int ConnectionPressureBackoffSeconds = ReadPositiveEnvironmentInt("DOS_ORM_CONNECTION_PRESSURE_BACKOFF_SECONDS", 30);
+        private static int MaxConcurrentConnectionOpens => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MAX_CONCURRENT_CONNECTION_OPENS", "OrmLimits:MaxConcurrentConnectionOpens", 64);
+        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", "OrmLimits:ConnectionOpenWaitSeconds", 60);
+        private static int ConnectionPressureBackoffSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_PRESSURE_BACKOFF_SECONDS", "OrmLimits:ConnectionPressureBackoffSeconds", 120);
+        private static bool MySqlHostCacheAutoRepairEnabled => ConfigHelper.GetEnvOrConfigurationBool("DOS_ORM_MYSQL_HOST_CACHE_AUTO_REPAIR_ENABLED", "OrmLimits:MySqlHostCacheAutoRepairEnabled", true);
+        private static int MySqlHostCacheRepairCooldownSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MYSQL_HOST_CACHE_REPAIR_COOLDOWN_SECONDS", "OrmLimits:MySqlHostCacheRepairCooldownSeconds", 300);
+        private static string MySqlHostCacheRepairConnectionString => ConfigHelper.GetEnvOrConfiguration("DOS_ORM_MYSQL_HOST_CACHE_REPAIR_CONN", "OrmLimits:MySqlHostCacheRepairConnectionString");
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> ConnectionOpenSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
         private static readonly ConcurrentDictionary<string, DateTime> ConnectionBackoffUntil = new ConcurrentDictionary<string, DateTime>();
+        private static readonly ConcurrentDictionary<string, DateTime> MySqlHostCacheRepairCooldownUntil = new ConcurrentDictionary<string, DateTime>();
+
+        public static event Action<string, string, string> OnConnectionGuardEvent;
 
         /// <summary>
         /// Default Database
@@ -155,17 +161,6 @@ namespace Dos.ORM
             return command;
         }
 
-        private static int ReadPositiveEnvironmentInt(string name, int defaultValue)
-        {
-            var value = Environment.GetEnvironmentVariable(name);
-            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
-            {
-                return parsed;
-            }
-
-            return defaultValue;
-        }
-
         private string GetConnectionGuardKey()
         {
             var providerName = dbProvider?.GetType().FullName ?? string.Empty;
@@ -211,15 +206,70 @@ namespace Dos.ORM
             return false;
         }
 
-        private void ThrowIfConnectionBackoffActive(string guardKey)
+        private static bool IsMySqlHostBlockedException(Exception ex)
+        {
+            while (ex != null)
+            {
+                var numberProperty = ex.GetType().GetProperty("Number");
+                if (numberProperty != null)
+                {
+                    try
+                    {
+                        var number = Convert.ToInt32(numberProperty.GetValue(ex, null), CultureInfo.InvariantCulture);
+                        if (number == 1129)
+                        {
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                var msg = ex.Message ?? string.Empty;
+                if (msg.IndexOf("blocked because of many connection errors", StringComparison.OrdinalIgnoreCase) >= 0
+                    || msg.IndexOf("mysqladmin flush-hosts", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+
+                ex = ex.InnerException;
+            }
+
+            return false;
+        }
+
+        private TimeSpan GetConnectionBackoffRemaining(string guardKey)
         {
             if (ConnectionBackoffUntil.TryGetValue(guardKey, out var until))
             {
                 if (until > DateTime.UtcNow)
                 {
-                    throw new InvalidOperationException($"Database connection pressure protection is active. Retry after {until:O}.");
+                    return until - DateTime.UtcNow;
                 }
 
+                ConnectionBackoffUntil.TryRemove(guardKey, out _);
+            }
+
+            return TimeSpan.Zero;
+        }
+
+        private void WaitIfConnectionBackoffActive(string guardKey)
+        {
+            var remaining = GetConnectionBackoffRemaining(guardKey);
+            if (remaining > TimeSpan.Zero)
+            {
+                Thread.Sleep(remaining);
+                ConnectionBackoffUntil.TryRemove(guardKey, out _);
+            }
+        }
+
+        private async Task WaitIfConnectionBackoffActiveAsync(string guardKey, CancellationToken cancellationToken)
+        {
+            var remaining = GetConnectionBackoffRemaining(guardKey);
+            if (remaining > TimeSpan.Zero)
+            {
+                await Task.Delay(remaining, cancellationToken).ConfigureAwait(false);
                 ConnectionBackoffUntil.TryRemove(guardKey, out _);
             }
         }
@@ -232,26 +282,71 @@ namespace Dos.ORM
             }
 
             ConnectionBackoffUntil[guardKey] = DateTime.UtcNow.AddSeconds(ConnectionPressureBackoffSeconds);
+            TryRepairMySqlHostCache(guardKey, ex);
+        }
+
+        private void TryRepairMySqlHostCache(string guardKey, Exception triggerException)
+        {
+            if (!MySqlHostCacheAutoRepairEnabled || !IsMySqlHostBlockedException(triggerException))
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            if (MySqlHostCacheRepairCooldownUntil.TryGetValue(guardKey, out var until) && until > now)
+            {
+                return;
+            }
+            MySqlHostCacheRepairCooldownUntil[guardKey] = now.AddSeconds(MySqlHostCacheRepairCooldownSeconds);
+
+            try
+            {
+                using (var connection = dbProvider.DbProviderFactory.CreateConnection())
+                {
+                    if (connection == null)
+                    {
+                        throw new InvalidOperationException("DbProviderFactory.CreateConnection returned null.");
+                    }
+
+                    connection.ConnectionString = MySqlHostCacheRepairConnectionString.DosIsNullOrWhiteSpace()
+                        ? ConnectionString
+                        : MySqlHostCacheRepairConnectionString;
+                    connection.Open();
+                    using (var command = connection.CreateCommand())
+                    {
+                        command.CommandText = "TRUNCATE TABLE performance_schema.host_cache";
+                        command.ExecuteNonQuery();
+                    }
+                }
+
+                OnConnectionGuardEvent?.Invoke("MySqlHostCacheRepairSucceeded", guardKey, triggerException.Message);
+            }
+            catch (Exception repairException)
+            {
+                OnConnectionGuardEvent?.Invoke("MySqlHostCacheRepairFailed", guardKey, $"{triggerException.Message} | Repair: {repairException.Message}");
+            }
         }
 
         private SemaphoreSlim GetConnectionOpenSemaphore(string guardKey)
         {
-            return ConnectionOpenSemaphores.GetOrAdd(guardKey, _ => new SemaphoreSlim(MaxConcurrentConnectionOpens, MaxConcurrentConnectionOpens));
+            var limit = MaxConcurrentConnectionOpens;
+            return ConnectionOpenSemaphores.GetOrAdd($"{guardKey}:limit:{limit}", _ => new SemaphoreSlim(limit, limit));
         }
 
         internal void OpenConnectionWithGuard(DbConnection connection)
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
-            ThrowIfConnectionBackoffActive(guardKey);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
-            if (!semaphore.Wait(TimeSpan.FromSeconds(ConnectionOpenWaitSeconds)))
+            var waitSeconds = ConnectionOpenWaitSeconds + ConnectionPressureBackoffSeconds;
+            if (!semaphore.Wait(TimeSpan.FromSeconds(waitSeconds)))
             {
                 throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
             }
 
             try
             {
+                WaitIfConnectionBackoffActive(guardKey);
                 connection.Open();
             }
             catch (Exception ex)
@@ -269,15 +364,16 @@ namespace Dos.ORM
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
-            ThrowIfConnectionBackoffActive(guardKey);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
-            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(ConnectionOpenWaitSeconds), cancellationToken).ConfigureAwait(false))
+            var waitSeconds = ConnectionOpenWaitSeconds + ConnectionPressureBackoffSeconds;
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(waitSeconds), cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
             }
 
             try
             {
+                await WaitIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)

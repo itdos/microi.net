@@ -235,6 +235,94 @@
                     </div>
                 </el-card>
             </el-tab-pane>
+            <el-tab-pane name="security" label="恶意攻击">
+                <div class="security-toolbar">
+                    <el-button type="primary" :icon="Refresh" :loading="securityLoading" @click="GetSecurityGuard">刷新</el-button>
+                    <el-button @click="OpenSecurityModule('/mci-security-attack-event')">攻击事件</el-button>
+                    <el-button @click="OpenSecurityModule('/mci-security-ip-block')">封锁记录</el-button>
+                    <el-button @click="OpenSecurityModule('/mci-security-access-log')">访问日志</el-button>
+                    <span class="security-note">这里只显示当前 API 进程内存态防护数据，历史审计请进入右侧低代码菜单查看。</span>
+                </div>
+
+                <div class="stats-flex-row security-stats-row">
+                    <div class="stats-card stats-card--error">
+                        <div class="stats-card__inner">
+                            <el-icon class="stats-card__icon"><WarningFilled /></el-icon>
+                            <div class="stats-card__info">
+                                <div class="stats-card__value">{{ SecurityBlockedList.length }}</div>
+                                <div class="stats-card__label">当前封锁IP</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stats-card stats-card--warn">
+                        <div class="stats-card__inner">
+                            <el-icon class="stats-card__icon"><Collection /></el-icon>
+                            <div class="stats-card__info">
+                                <div class="stats-card__value">{{ SecurityAccessList.length }}</div>
+                                <div class="stats-card__label">最近风险访问</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <el-card shadow="never" class="table-card security-card">
+                    <template #header>
+                        <div class="security-card-header">
+                            <span>当前封锁IP</span>
+                            <el-button size="small" :icon="Refresh" :loading="securityLoading" @click="GetSecurityGuard">刷新</el-button>
+                        </div>
+                    </template>
+                    <el-table v-loading="securityLoading" :data="SecurityBlockedList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                        <el-table-column prop="Ip" label="IP" width="150" fixed="left" />
+                        <el-table-column label="类型" width="90" align="center">
+                            <template #default="scope">
+                                <el-tag :type="scope.row.Manual ? 'warning' : 'danger'" size="small">{{ scope.row.Manual ? '手动' : '自动' }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="Reason" label="原因" min-width="280" show-overflow-tooltip />
+                        <el-table-column label="请求数" width="90" align="right">
+                            <template #default="scope">{{ scope.row.RequestCount || 0 }}</template>
+                        </el-table-column>
+                        <el-table-column label="错误数" width="90" align="right">
+                            <template #default="scope">{{ scope.row.ErrorCount || 0 }}</template>
+                        </el-table-column>
+                        <el-table-column label="封锁时间" width="180">
+                            <template #default="scope">{{ FormatUtcTime(scope.row.BlockedAtUtc) }}</template>
+                        </el-table-column>
+                        <el-table-column label="解封时间" width="180">
+                            <template #default="scope">{{ FormatUtcTime(scope.row.ExpiresAtUtc) }}</template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="110" fixed="right" align="center">
+                            <template #default="scope">
+                                <el-button size="small" type="primary" link @click.stop="UnblockSecurityIp(scope.row)">解封</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-card shadow="never" class="table-card security-card">
+                    <template #header>
+                        <div class="security-card-header">
+                            <span>最近风险访问</span>
+                            <span class="security-note">默认只显示异常状态码和封锁后的访问，避免正常访问明细拖垮数据库。</span>
+                        </div>
+                    </template>
+                    <el-table v-loading="securityLoading" :data="SecurityAccessList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                        <el-table-column prop="Ip" label="IP" width="140" fixed="left" />
+                        <el-table-column prop="StatusCode" label="状态" width="90" align="center" />
+                        <el-table-column prop="Method" label="方法" width="90" align="center" />
+                        <el-table-column prop="Path" label="路径" min-width="260" show-overflow-tooltip />
+                        <el-table-column prop="OsClient" label="租户" width="100" show-overflow-tooltip />
+                        <el-table-column label="耗时" width="100" align="right">
+                            <template #default="scope">{{ FormatTimer(scope.row.ElapsedMilliseconds) }}</template>
+                        </el-table-column>
+                        <el-table-column prop="TraceId" label="TraceId" width="180" show-overflow-tooltip />
+                        <el-table-column label="时间" width="180">
+                            <template #default="scope">{{ FormatUtcTime(scope.row.TimeUtc) }}</template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+            </el-tab-pane>
         </el-tabs>
 
         <!-- 详情弹窗 -->
@@ -354,7 +442,11 @@ export default {
             dockerAutoRefreshTimer: null,
             DockerLogs: [],
             dockerPage: 1,
-            dockerPageSize: 100
+            dockerPageSize: 100,
+            // ---- 安全防护 ----
+            securityLoading: false,
+            SecurityBlockedList: [],
+            SecurityAccessList: []
         };
     },
     computed: {
@@ -449,6 +541,14 @@ export default {
             if (ms >= 1000) return (ms / 1000).toFixed(2) + "s";
             return ms + "ms";
         },
+        FormatUtcTime(value) {
+            if (!value) return "-";
+            try {
+                return new Date(value).Format("yyyy-MM-dd HH:mm:ss");
+            } catch (e) {
+                return value;
+            }
+        },
         FormatParams(paramStr) {
             if (!paramStr) return '-';
             try {
@@ -487,6 +587,9 @@ export default {
         OnTabChange(tab) {
             if (tab === 'docker' && this.DockerLogs.length === 0) {
                 this.GetDockerLogs();
+            }
+            if (tab === 'security' && this.SecurityBlockedList.length === 0 && this.SecurityAccessList.length === 0) {
+                this.GetSecurityGuard();
             }
         },
 
@@ -600,6 +703,66 @@ export default {
         },
 
         // ========== Docker日志 ==========
+        GetSecurityGuard() {
+            var self = this;
+            self.securityLoading = true;
+            var pending = 2;
+            var done = function () {
+                pending--;
+                if (pending <= 0) {
+                    self.securityLoading = false;
+                }
+            };
+            self.DiyCommon.Post(
+                "/api/SecurityGuard/ListBlocked",
+                {},
+                function (result) {
+                    if (self.DiyCommon.Result(result)) {
+                        self.SecurityBlockedList = result.Data || [];
+                    }
+                    done();
+                }
+            );
+            self.DiyCommon.Post(
+                "/api/SecurityGuard/ListRecentAccess",
+                { top: 200 },
+                function (result) {
+                    if (self.DiyCommon.Result(result)) {
+                        self.SecurityAccessList = result.Data || [];
+                    }
+                    done();
+                }
+            );
+        },
+        UnblockSecurityIp(row) {
+            var self = this;
+            if (!row || !row.Ip) return;
+            self.$confirm("确定要解封该 IP 吗？", "提示", {
+                confirmButtonText: "解封",
+                cancelButtonText: "取消",
+                type: "warning"
+            }).then(function () {
+                self.DiyCommon.Post(
+                    "/api/SecurityGuard/UnblockIp",
+                    { ip: row.Ip },
+                    function (result) {
+                        if (self.DiyCommon.Result(result)) {
+                            self.$message.success(result.Msg || "已解封。");
+                            self.GetSecurityGuard();
+                        }
+                    }
+                );
+            }).catch(function () {});
+        },
+        OpenSecurityModule(path) {
+            if (!path) return;
+            if (this.$router) {
+                this.$router.push({ path: path }).catch(function () {});
+            } else {
+                window.location.hash = "#" + path;
+            }
+        },
+
         ToggleDockerAutoRefresh(val) {
             if (val) {
                 this.dockerAutoRefreshTimer = setInterval(() => {
@@ -741,6 +904,31 @@ export default {
 .stats-card--exception .stats-card__icon { color: #f56c6c; }
 .stats-card--info .stats-card__value { color: #67c23a; }
 .stats-card--info .stats-card__icon { color: #67c23a; }
+
+.security-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.security-note {
+    color: #909399;
+    font-size: 12px;
+    line-height: 24px;
+}
+.security-stats-row .stats-card {
+    max-width: 260px;
+}
+.security-card {
+    margin-bottom: 12px;
+}
+.security-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
 
 .table-card {
     border-radius: 8px;

@@ -234,6 +234,42 @@ namespace Microi.net
             
             await base.OnDisconnectedAsync(exception);
         }
+
+        /// <summary>
+        /// 推送当前登录用户的后台任务列表。前端在连接成功、打开任务面板时主动调用，服务端任务状态变化时也会主动推送同名事件。
+        /// </summary>
+        public async Task SendBackgroundTaskList()
+        {
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken();
+                var osClient = currentToken?.OsClient;
+                var userKey = currentToken?.CurrentUser?["Id"].Val<string>();
+                if (userKey.DosIsNullOrWhiteSpace())
+                {
+                    userKey = currentToken?.CurrentUser?["Account"].Val<string>();
+                }
+
+                if ((osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
+                    && Context.User?.Identity?.IsAuthenticated == true)
+                {
+                    osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
+                    userKey = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+                }
+
+                if (osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
+                {
+                    return;
+                }
+
+                await Microi.net.Api.BackgroundTaskService.SendTaskListToUserAsync(osClient, userKey).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【后台任务】WebSocket推送任务列表失败：{ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 
         /// </summary>

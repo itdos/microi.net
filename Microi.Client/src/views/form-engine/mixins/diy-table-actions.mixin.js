@@ -251,7 +251,9 @@ IsPermission(type) {
             self.BtnV8Loading = true;
             var V8 = v8 ? v8 : await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
-                if (!self.DiyCommon.IsNull(btn.V8Code)) {
+                var hasBackgroundApiEngine = (btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
+                    && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey);
+                if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine) {
                     if (self.SysConfig.EnableUserClickLog) {
                         self.DiyCommon.AddSysLog({
                             Type: `点击V8按钮`,
@@ -276,6 +278,19 @@ IsPermission(type) {
                     };
                     V8.EventName = "V8BtnRun";
                     self.SetV8DefaultValue(V8);
+
+                    if ((btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
+                        && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey)) {
+                        var backgroundApiEngineKey = btn.ApiEngineKey || btn.BackgroundApiEngineKey;
+                        await V8.ApiEngine.RunBackground(backgroundApiEngineKey, {
+                            Form: row,
+                            Id: row && row.Id,
+                            Btn: btn
+                        }, btn.Name || backgroundApiEngineKey, function () {
+                            self.BtnV8Loading = false;
+                        });
+                        return;
+                    }
 
                     // eval(btn.V8Code)
                     await eval("(async () => {\n " + btn.V8Code + " \n})()");

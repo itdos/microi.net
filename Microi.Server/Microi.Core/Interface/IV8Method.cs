@@ -84,5 +84,10 @@ namespace Microi.net
         /// 添加系统日志
         /// </summary>
         DosResult AddSysLog(dynamic dynamicParam);
+
+        /// <summary>
+        /// 更新当前后台任务的进度。接口引擎可选调用，不影响普通同步执行。
+        /// </summary>
+        DosResult UpdateBackgroundTask(dynamic dynamicParam);
     }
 }

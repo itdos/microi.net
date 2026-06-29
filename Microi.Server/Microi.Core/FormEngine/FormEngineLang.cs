@@ -22,24 +22,29 @@ namespace Microi.net
             "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns"
         };
         private static readonly ConcurrentDictionary<string, byte> DiyLangFullSyncRunning = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, DateTime> DiyLangFullSyncStartedAt = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, DateTime> DiyLangTranslateUnavailable = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, DateTime> DiyLangTranslateUnsupportedTarget = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, DateTime> DiyLangDbUnavailable = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, byte> DiyLangMetadataSyncQueued = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, ConcurrentQueue<DiyLangMetadataQueueItem>> DiyLangMetadataQueues = new ConcurrentDictionary<string, ConcurrentQueue<DiyLangMetadataQueueItem>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, byte> DiyLangMetadataQueueWorkers = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, string> DiyLangSchemaEnsured = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, HashSet<string>> DiyLangPhysicalColumnsCache = new ConcurrentDictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, byte> SysConfigLangFieldEnsured = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, byte> SysConfigInitLangButtonEnsured = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> DiyLangTenantDbSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, Dictionary<string, string>> DiyLangTreeRootIdsCache = new ConcurrentDictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        private static readonly SemaphoreSlim DiyLangGlobalDbSemaphore = new SemaphoreSlim(4, 4);
+        private static readonly SemaphoreSlim DiyLangGlobalDbSemaphore = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim DiyLangFullSyncSemaphore = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim DiyLangTranslateSemaphore = new SemaphoreSlim(2, 2);
         private static int DiyLangAllClientSyncRunning = 0;
         private static readonly object DiyLangCacheLock = new object();
         private const int DiyLangTranslateTimeoutSeconds = 8;
         private const int DiyLangDbBackoffMinutes = 5;
-        private const int DiyLangDbOperationDelayMs = 3;
+        private const int DiyLangDbOperationDelayMs = 15;
         private const int DiyLangMetadataQueueMax = 2000;
+        private const int DiyLangTextColumnLength = 2000;
         private const string DefaultSysLangsValue = "zh-CN,zh-TW,en";
         private const string SysConfigInitLangButtonId = "sys-config-init-langs";
         private const string SysConfigInitLangButtonName = "\u521d\u59cb\u5316\u591a\u8bed\u8a00";
@@ -54,6 +59,14 @@ namespace Microi.net
             public string Field { get; set; }
             public string Label { get; set; }
             public string TranslateLang { get; set; }
+        }
+
+        private sealed class DiyLangMetadataQueueItem
+        {
+            public string QueueKey { get; set; }
+            public string OsClient { get; set; }
+            public string Key { get; set; }
+            public string SourceText { get; set; }
         }
 
         private static readonly List<DiyLangFieldConfig> SupportedDiyLangFields = new List<DiyLangFieldConfig>()
@@ -692,7 +705,7 @@ namespace Microi.net
                 return;
             }
 
-            await Task.Run(async () =>
+            await RunDiyLangDbOperationAsync(osClient, async () =>
             {
                 try
                 {
@@ -750,7 +763,7 @@ namespace Microi.net
                             .AddInParameter("p11", TokenString(fieldRow, "Id"))
                             .ExecuteNonQuery();
                         await ClearDiyFieldListCacheAsync(osClient, tableId, canonicalTableName);
-                        return;
+                        return 1;
                     }
 
                     var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -792,6 +805,7 @@ namespace Microi.net
                 {
                     Console.WriteLine($"Microi: Ensure field metadata failed. OsClient={osClient}, Table={tableName}, Field={fieldName}, Msg={ex.Message}");
                 }
+                return 1;
             });
         }
 
@@ -845,6 +859,53 @@ namespace Microi.net
             {
                 return true;
             }
+        }
+
+        private static HashSet<string> GetPhysicalColumnNames(DbSession db, string osClient, string tableName)
+        {
+            if (db == null || IsBlank(tableName))
+            {
+                return null;
+            }
+            var cacheKey = $"{osClient}|{tableName}";
+            if (DiyLangPhysicalColumnsCache.TryGetValue(cacheKey, out var cachedColumns))
+            {
+                return cachedColumns;
+            }
+            try
+            {
+                var physicalTableName = ResolvePhysicalTableName(db, tableName);
+                var rows = db.FromSql(@"SELECT COLUMN_NAME
+                        FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND LOWER(TABLE_NAME) = LOWER(@p0)")
+                    .AddInParameter("p0", physicalTableName)
+                    .ToList<dynamic>();
+                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in rows ?? new List<dynamic>())
+                {
+                    var row = ToJObjectSafe(item);
+                    var name = TokenString(row, "COLUMN_NAME");
+                    if (IsBlank(name))
+                    {
+                        name = TokenString(row, "ColumnName");
+                    }
+                    if (!IsBlank(name))
+                    {
+                        columns.Add(name);
+                    }
+                }
+                if (columns.Count > 0)
+                {
+                    DiyLangPhysicalColumnsCache[cacheKey] = columns;
+                    return columns;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi: load physical columns failed. OsClient={osClient}, Table={tableName}, Msg={ex.Message}");
+            }
+            return null;
         }
 
         private static void EnsurePhysicalColumnExists(DbSession db, string tableName, string fieldName, string type)
@@ -947,13 +1008,17 @@ namespace Microi.net
             {
                 try
                 {
-                    var db = OsClientExtend.GetClient(osClient).Db;
-                    db.FromSql("UPDATE sys_config SET SysLangs = @p0, SysLang = @p1, UpdateTime = @p2 WHERE Id = @p3")
-                        .AddInParameter("p0", sysLangs)
-                        .AddInParameter("p1", TokenString(configRow, "SysLang"))
-                        .AddInParameter("p2", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
-                        .AddInParameter("p3", TokenString(configRow, "Id"))
-                        .ExecuteNonQuery();
+                    await RunDiyLangDbOperationAsync(osClient, () =>
+                    {
+                        var db = OsClientExtend.GetClient(osClient).Db;
+                        db.FromSql("UPDATE sys_config SET SysLangs = @p0, SysLang = @p1, UpdateTime = @p2 WHERE Id = @p3")
+                            .AddInParameter("p0", sysLangs)
+                            .AddInParameter("p1", TokenString(configRow, "SysLang"))
+                            .AddInParameter("p2", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                            .AddInParameter("p3", TokenString(configRow, "Id"))
+                            .ExecuteNonQuery();
+                        return Task.FromResult(1);
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -973,7 +1038,7 @@ namespace Microi.net
 
             try
             {
-                var ensureResult = await Task.Run(() =>
+                var ensureResult = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
                     var tableRows = db.FromSql("SELECT Id FROM diy_table WHERE Name = @p0 AND (IsDeleted <> 1 OR IsDeleted IS NULL)")
@@ -982,7 +1047,7 @@ namespace Microi.net
                     var tableId = TokenString(ToJObjectSafe(tableRows?.FirstOrDefault()), "Id");
                     if (IsBlank(tableId))
                     {
-                        return null;
+                        return Task.FromResult<JObject>(null);
                     }
 
                     var menuRows = db.FromSql(@"SELECT Id, Name, DiyTableId, MoreBtns
@@ -1004,7 +1069,7 @@ namespace Microi.net
                     var menuId = TokenString(menuRow, "Id");
                     if (IsBlank(menuId))
                     {
-                        return null;
+                        return Task.FromResult<JObject>(null);
                     }
 
                     var buttons = ParseButtonArray(menuRow["MoreBtns"]) ?? new JArray();
@@ -1039,11 +1104,11 @@ namespace Microi.net
                     }
 
                     menuRow["MoreBtns"] = buttons;
-                    return new JObject()
+                    return Task.FromResult<JObject>(new JObject()
                     {
                         ["Changed"] = changed,
                         ["MenuRow"] = menuRow
-                    };
+                    });
                 });
 
                 var menuForSync = ensureResult?["MenuRow"] as JObject;
@@ -1096,14 +1161,14 @@ namespace Microi.net
                     "diy_lang",
                     lang.Field,
                     lang.Label,
-                    "varchar(500)",
+                    $"varchar({DiyLangTextColumnLength})",
                     "Text",
                     "",
                     "",
                     160,
                     null);
-                await EnsureVarcharColumnCapacityAsync(osClient, "diy_lang", lang.Field, 500);
-                await UpdateDiyFieldMetadataDirectAsync(osClient, "diy_lang", lang.Field, lang.Label, "varchar(500)", "Text", 160);
+                await EnsureVarcharColumnCapacityAsync(osClient, "diy_lang", lang.Field, DiyLangTextColumnLength);
+                await UpdateDiyFieldMetadataDirectAsync(osClient, "diy_lang", lang.Field, lang.Label, $"varchar({DiyLangTextColumnLength})", "Text", 160);
             }
             await EnsureDiyFieldMetadataAsync(osClient, "diy_lang", "Key", "Key", "varchar(500)", "Text", "", "", 220, null);
             await EnsureDiyFieldMetadataAsync(osClient, "diy_lang", "Code", "Code", "varchar(500)", "Text", "", "", 220, null);
@@ -1113,6 +1178,7 @@ namespace Microi.net
             await UpdateDiyFieldMetadataDirectAsync(osClient, "diy_lang", "Key", "Key", "varchar(500)", "Text", 220);
             await UpdateDiyFieldMetadataDirectAsync(osClient, "diy_lang", "Code", "Code", "varchar(500)", "Text", 220);
             await UpdateDiyFieldMetadataDirectAsync(osClient, "diy_lang", "ParentId", "\u4e0a\u7ea7", "varchar(50)", "Text", 160);
+            DiyLangPhysicalColumnsCache.TryRemove($"{osClient}|diy_lang", out _);
             DiyLangSchemaEnsured[osClient] = signature;
             return langConfigs;
         }
@@ -1128,7 +1194,7 @@ namespace Microi.net
         {
             try
             {
-                await Task.Run(() =>
+                await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
                     db.FromSql(@"UPDATE diy_field
@@ -1142,6 +1208,7 @@ namespace Microi.net
                         .AddInParameter("p5", tableName)
                         .AddInParameter("p6", fieldName)
                         .ExecuteNonQuery();
+                    return Task.FromResult(1);
                 });
             }
             catch (Exception ex)
@@ -1158,7 +1225,7 @@ namespace Microi.net
             }
             try
             {
-                await Task.Run(() =>
+                await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var clientModel = OsClientExtend.GetClient(osClient);
                     var db = clientModel.Db;
@@ -1196,6 +1263,7 @@ namespace Microi.net
                                 .ExecuteNonQuery();
                         }
                     }
+                    return Task.FromResult(1);
                 });
             }
             catch (Exception ex)
@@ -1310,8 +1378,16 @@ namespace Microi.net
             }
             if (!DiyLangFullSyncRunning.TryAdd(osClient, 1))
             {
-                return new DosResult(1, null, $"DiyLang sync is already running for {osClient}.");
+                DiyLangFullSyncStartedAt.TryGetValue(osClient, out var startedAt);
+                var data = new JObject()
+                {
+                    ["OsClient"] = osClient,
+                    ["StartedAt"] = startedAt == default ? "" : startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ["ElapsedSeconds"] = startedAt == default ? 0 : (int)(DateTime.UtcNow - startedAt).TotalSeconds
+                };
+                return new DosResult(1, data, $"DiyLang sync is already running for {osClient}.");
             }
+            DiyLangFullSyncStartedAt[osClient] = DateTime.UtcNow;
             _ = Task.Run(async () =>
             {
                 try
@@ -1325,9 +1401,46 @@ namespace Microi.net
                 finally
                 {
                     DiyLangFullSyncRunning.TryRemove(osClient, out _);
+                    DiyLangFullSyncStartedAt.TryRemove(osClient, out _);
                 }
             });
             return new DosResult(1, null, $"DiyLang sync queued for {osClient}.");
+        }
+
+        public DosResult ResetDiyLangFullSync(string osClient = "", string reason = "manual")
+        {
+            osClient = ResolveLangSyncOsClient(osClient);
+            if (IsBlank(osClient))
+            {
+                return new DosResult(0, null, "OsClient is required.");
+            }
+
+            var removed = DiyLangFullSyncRunning.TryRemove(osClient, out _);
+            DiyLangFullSyncStartedAt.TryRemove(osClient, out var startedAt);
+            ClearDiyLangTranslateRuntimeState(osClient);
+            var data = new JObject()
+            {
+                ["OsClient"] = osClient,
+                ["RemovedRunningFlag"] = removed,
+                ["StartedAt"] = startedAt == default ? "" : startedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                ["Reason"] = IsBlank(reason) ? "manual" : reason
+            };
+            return new DosResult(1, data, removed
+                ? $"DiyLang sync running flag reset for {osClient}."
+                : $"DiyLang sync was not marked running for {osClient}.");
+        }
+
+        public DosResult ReloadDiyLangRuntimeConfig(string osClient = "")
+        {
+            osClient = ResolveLangSyncOsClient(osClient);
+            if (IsBlank(osClient))
+            {
+                return new DosResult(0, null, "OsClient is required.");
+            }
+
+            ClearSaasConfigCache(osClient);
+            ClearDiyLangTranslateRuntimeState(osClient);
+            return ReloadRuntimeOsClient(osClient);
         }
 
         public DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true, string source = "startup")
@@ -1364,6 +1477,7 @@ namespace Microi.net
                         {
                             continue;
                         }
+                        DiyLangFullSyncStartedAt[osClient] = DateTime.UtcNow;
                         try
                         {
                             await SyncDiyLangFullAsync(osClient, includeClientText, source);
@@ -1375,6 +1489,7 @@ namespace Microi.net
                         finally
                         {
                             DiyLangFullSyncRunning.TryRemove(osClient, out _);
+                            DiyLangFullSyncStartedAt.TryRemove(osClient, out _);
                         }
                     }
                 }
@@ -1402,6 +1517,102 @@ namespace Microi.net
         private static int TokenInt(JObject obj, string key)
         {
             return obj == null ? 0 : TokenInt(obj[key]);
+        }
+
+        private static string NormalizeDiyLangFailureKey(string value)
+        {
+            value = (value ?? "").Trim();
+            if (IsBlank(value))
+            {
+                return "Unknown";
+            }
+            return value.Length <= 160 ? value : value.Substring(0, 160);
+        }
+
+        private static string LimitDiyLangFailureText(string value, int maxLength = 500)
+        {
+            value = (value ?? "").Trim();
+            if (value.Length <= maxLength)
+            {
+                return value;
+            }
+            return value.Substring(0, maxLength);
+        }
+
+        private static void AddDiyLangFailureReason(JObject stats, string reasonKey, string reasonText, string sampleKey = "", int count = 1)
+        {
+            if (stats == null)
+            {
+                return;
+            }
+            reasonKey = NormalizeDiyLangFailureKey(reasonKey);
+            reasonText = LimitDiyLangFailureText(reasonText);
+            var reasons = stats["FailureReasons"] as JArray;
+            if (reasons == null)
+            {
+                reasons = new JArray();
+                stats["FailureReasons"] = reasons;
+            }
+            var existing = reasons
+                .OfType<JObject>()
+                .FirstOrDefault(item => string.Equals(TokenString(item, "ReasonKey"), reasonKey, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                existing = new JObject()
+                {
+                    ["ReasonKey"] = reasonKey,
+                    ["ReasonText"] = reasonText,
+                    ["Count"] = 0,
+                    ["Samples"] = new JArray()
+                };
+                reasons.Add(existing);
+            }
+            else if (!IsBlank(reasonText) && IsBlank(TokenString(existing, "ReasonText")))
+            {
+                existing["ReasonText"] = reasonText;
+            }
+
+            existing["Count"] = TokenInt(existing, "Count") + Math.Max(1, count);
+            if (!IsBlank(sampleKey))
+            {
+                var samples = existing["Samples"] as JArray;
+                if (samples == null)
+                {
+                    samples = new JArray();
+                    existing["Samples"] = samples;
+                }
+                var safeSample = LimitDiyLangFailureText(sampleKey, 180);
+                if (samples.Count < 20 && !samples.Any(item => string.Equals(TokenString(item), safeSample, StringComparison.OrdinalIgnoreCase)))
+                {
+                    samples.Add(safeSample);
+                }
+            }
+            stats["FailureReasonCount"] = reasons.Count;
+        }
+
+        private static string BuildDiyLangFailureSummary(JObject stats)
+        {
+            var reasons = stats?["FailureReasons"] as JArray;
+            if (reasons == null || reasons.Count == 0)
+            {
+                return "";
+            }
+            var parts = reasons
+                .OfType<JObject>()
+                .OrderByDescending(item => TokenInt(item, "Count"))
+                .Take(5)
+                .Select(item =>
+                {
+                    var text = TokenString(item, "ReasonText");
+                    if (IsBlank(text))
+                    {
+                        text = TokenString(item, "ReasonKey");
+                    }
+                    return $"{LimitDiyLangFailureText(text, 120)}({TokenInt(item, "Count")})";
+                })
+                .Where(item => !IsBlank(item))
+                .ToList();
+            return LimitDiyLangFailureText(string.Join("；", parts), 1000);
         }
 
         private static void CopyLangStatsToLogRow(JObject row, JObject stats)
@@ -1503,7 +1714,7 @@ namespace Microi.net
             return !IsBlank(value) && value.All(ch => char.IsLetterOrDigit(ch) || ch == '_');
         }
 
-        private static void ApplyDiyLangCoverageStats(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
+        private static async Task ApplyDiyLangCoverageStatsAsync(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
         {
             var coverage = new JArray();
             var totalCount = 0;
@@ -1511,46 +1722,62 @@ namespace Microi.net
             var failedCount = 0;
             try
             {
-                var db = OsClientExtend.GetClient(osClient).Db;
-                foreach (var lang in langConfigs ?? new List<DiyLangFieldConfig>())
+                await RunDiyLangDbOperationAsync(osClient, () =>
                 {
-                    var item = new JObject()
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    foreach (var lang in langConfigs ?? new List<DiyLangFieldConfig>())
                     {
-                        ["Locale"] = lang.Locale,
-                        ["Field"] = lang.Field,
-                        ["Label"] = lang.Label
-                    };
-                    if (!IsSafeSqlIdentifier(lang.Field))
-                    {
-                        item["Error"] = "Unsafe field name.";
+                        var item = new JObject()
+                        {
+                            ["Locale"] = lang.Locale,
+                            ["Field"] = lang.Field,
+                            ["Label"] = lang.Label
+                        };
+                        if (!IsSafeSqlIdentifier(lang.Field))
+                        {
+                            item["Error"] = "Unsafe field name.";
+                            AddDiyLangFailureReason(stats, $"UnsafeLangField:{lang.Field}", $"多语言字段[{lang.Field}]不是安全的数据库字段名。", lang.Locale);
+                            coverage.Add(item);
+                            continue;
+                        }
+                        try
+                        {
+                            var sql = $"SELECT COUNT(1) AS TotalCount, SUM(CASE WHEN `{lang.Field}` IS NOT NULL AND `{lang.Field}` <> '' THEN 1 ELSE 0 END) AS FilledCount FROM diy_lang WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)";
+                            var row = ToJObjectSafe(db.FromSql(sql).ToList<dynamic>().FirstOrDefault());
+                            var total = TokenInt(row, "TotalCount");
+                            var filled = TokenInt(row, "FilledCount");
+                            var missing = Math.Max(0, total - filled);
+                            item["TotalCount"] = total;
+                            item["FilledCount"] = filled;
+                            item["MissingCount"] = missing;
+                            totalCount += total;
+                            successCount += filled;
+                            failedCount += missing;
+                            if (missing > 0)
+                            {
+                                AddDiyLangFailureReason(
+                                    stats,
+                                    $"MissingTranslation:{lang.Locale}",
+                                    $"语言[{lang.Label}]还有{missing}条词条未填充，通常是翻译服务不可用、目标语言不支持、任务中断或旧数据尚未初始化。",
+                                    lang.Field,
+                                    missing);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            item["Error"] = ex.Message;
+                            IncJObjectInt(stats, "Errors");
+                            AddDiyLangFailureReason(stats, $"CoverageError:{lang.Locale}", ex.Message, lang.Field);
+                        }
                         coverage.Add(item);
-                        continue;
                     }
-                    try
-                    {
-                        var sql = $"SELECT COUNT(1) AS TotalCount, SUM(CASE WHEN `{lang.Field}` IS NOT NULL AND `{lang.Field}` <> '' THEN 1 ELSE 0 END) AS FilledCount FROM diy_lang WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)";
-                        var row = ToJObjectSafe(db.FromSql(sql).ToList<dynamic>().FirstOrDefault());
-                        var total = TokenInt(row, "TotalCount");
-                        var filled = TokenInt(row, "FilledCount");
-                        var missing = Math.Max(0, total - filled);
-                        item["TotalCount"] = total;
-                        item["FilledCount"] = filled;
-                        item["MissingCount"] = missing;
-                        totalCount += total;
-                        successCount += filled;
-                        failedCount += missing;
-                    }
-                    catch (Exception ex)
-                    {
-                        item["Error"] = ex.Message;
-                        IncJObjectInt(stats, "Errors");
-                    }
-                    coverage.Add(item);
-                }
+                    return Task.FromResult(1);
+                });
             }
             catch (Exception ex)
             {
                 IncJObjectInt(stats, "Errors");
+                AddDiyLangFailureReason(stats, "CoverageStatsFailed", ex.Message);
                 coverage.Add(new JObject()
                 {
                     ["Error"] = ex.Message
@@ -1562,6 +1789,55 @@ namespace Microi.net
             stats["SuccessCount"] = successCount;
             stats["FailedCount"] = failedCount;
             stats["SkippedCount"] = 0;
+        }
+
+        private static async Task FillMissingDiyLangTranslationsAsync(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
+        {
+            if (IsBlank(osClient) || langConfigs == null || langConfigs.Count == 0)
+            {
+                return;
+            }
+            foreach (var lang in langConfigs)
+            {
+                if (string.Equals(lang.Field, "ZhCN", StringComparison.OrdinalIgnoreCase)
+                    || !IsSafeSqlIdentifier(lang.Field))
+                {
+                    continue;
+                }
+                try
+                {
+                    var rows = await RunDiyLangDbOperationAsync(osClient, () =>
+                    {
+                        var db = OsClientExtend.GetClient(osClient).Db;
+                        var data = db.FromSql($@"SELECT Id, `Key`, ZhCN, `{lang.Field}`
+                                FROM diy_lang
+                                WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
+                                  AND ZhCN IS NOT NULL AND ZhCN <> ''
+                                  AND (`{lang.Field}` IS NULL OR `{lang.Field}` = '')
+                                LIMIT 50000")
+                            .ToList<dynamic>()
+                            .Select(ToJObjectSafe)
+                            .ToList();
+                        return Task.FromResult(data);
+                    });
+                    foreach (var row in rows ?? new List<JObject>())
+                    {
+                        var key = TokenString(row, "Key");
+                        var sourceText = TokenString(row, "ZhCN");
+                        if (IsBlank(key) || IsBlank(sourceText))
+                        {
+                            continue;
+                        }
+                        await EnsureDiyLangMetadataAsync(osClient, key, sourceText, null, true, langConfigs);
+                        IncJObjectInt(stats, "MissingFilled");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    IncJObjectInt(stats, "Errors");
+                    AddDiyLangFailureReason(stats, $"FillMissing:{lang.Locale}", ex.Message, lang.Field);
+                }
+            }
         }
 
         private static void PreflightDiyLangTranslateTargets(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
@@ -1594,6 +1870,7 @@ namespace Microi.net
                 {
                     item["Status"] = "ProviderNotConfigured";
                     item["Message"] = "Translate provider is not configured.";
+                    AddDiyLangFailureReason(stats, "TranslateProviderNotConfigured", "翻译服务未配置，非中文语言只能同步词条，不能自动补齐译文。", lang.Locale);
                     unsupportedCount++;
                     targets.Add(item);
                     continue;
@@ -1602,6 +1879,7 @@ namespace Microi.net
                 if (DiyLangTranslateUnsupportedTarget.ContainsKey(unsupportedTargetKey))
                 {
                     item["Status"] = "UnsupportedCached";
+                    AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", $"翻译服务[{providerKey}]缓存标记不支持目标语言[{targetLang}]。", lang.Locale);
                     unsupportedCount++;
                     targets.Add(item);
                     continue;
@@ -1625,12 +1903,14 @@ namespace Microi.net
                     {
                         item["Status"] = "Unsupported";
                         DiyLangTranslateUnsupportedTarget[unsupportedTargetKey] = DateTime.UtcNow;
+                        AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", result.Msg, lang.Locale);
                         unsupportedCount++;
                     }
                     else
                     {
                         item["Status"] = "Unavailable";
                         MarkTranslateUnavailable(osClient, providerKey, result.Msg);
+                        AddDiyLangFailureReason(stats, $"TranslateProviderUnavailable:{providerKey}", result.Msg, lang.Locale);
                         unsupportedCount++;
                     }
                 }
@@ -1639,12 +1919,95 @@ namespace Microi.net
                     item["Status"] = "Unavailable";
                     item["Message"] = ex.Message;
                     MarkTranslateUnavailable(osClient, providerKey, ex.Message);
+                    AddDiyLangFailureReason(stats, $"TranslateProviderException:{providerKey}", ex.Message, lang.Locale);
                     unsupportedCount++;
                 }
                 targets.Add(item);
             }
             stats["ProviderTargets"] = targets;
             stats["UnsupportedLangCount"] = unsupportedCount;
+        }
+
+        public async Task<DosResult> RepairMissingDiyLangTranslationsAsync(string osClient = "", string source = "api")
+        {
+            osClient = ResolveLangSyncOsClient(osClient);
+            if (IsBlank(osClient))
+            {
+                return new DosResult(0, null, "OsClient is required.");
+            }
+            if (IsDiyLangDbBackoffActive(osClient, out var backoffMessage))
+            {
+                return new DosResult(0, null, backoffMessage);
+            }
+
+            await DiyLangFullSyncSemaphore.WaitAsync();
+            try
+            {
+                var startedAt = DateTime.Now;
+                var stats = new JObject()
+                {
+                    ["OsClient"] = osClient,
+                    ["Source"] = IsBlank(source) ? "api" : source,
+                    ["Mode"] = "OnlyFillMissing",
+                    ["Tables"] = 0,
+                    ["Fields"] = 0,
+                    ["Menus"] = 0,
+                    ["ClientTexts"] = 0,
+                    ["LangFields"] = "",
+                    ["SysLangs"] = "",
+                    ["LangCount"] = 0,
+                    ["TotalCount"] = 0,
+                    ["SuccessCount"] = 0,
+                    ["FailedCount"] = 0,
+                    ["SkippedCount"] = 0,
+                    ["TreeFixed"] = 0,
+                    ["MissingFilled"] = 0,
+                    ["Errors"] = 0,
+                    ["UnsupportedLangCount"] = 0,
+                    ["FailureReasonCount"] = 0,
+                    ["FailureReasons"] = new JArray()
+                };
+                var logId = "";
+                try
+                {
+                    var langConfigs = await EnsureDiyLangInfrastructureAsync(osClient);
+                    stats["LangFields"] = string.Join(",", langConfigs.Select(lang => lang.Field));
+                    stats["SysLangs"] = string.Join(",", langConfigs.Select(lang => lang.Locale));
+                    stats["LangCount"] = langConfigs.Count;
+                    logId = await CreateDiyLangInitLogAsync(osClient, source, stats, startedAt);
+                    PreflightDiyLangTranslateTargets(osClient, langConfigs, stats);
+                    await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
+                    await FillMissingDiyLangTranslationsAsync(osClient, langConfigs, stats);
+                    await ReloadDiyLangCacheAsync(osClient);
+                    await NormalizeDiyLangTreeAsync(osClient, langConfigs, stats);
+                    await ReloadDiyLangCacheAsync(osClient);
+                    await ApplyDiyLangCoverageStatsAsync(osClient, langConfigs, stats);
+                    var status = stats.Value<int>("FailedCount") > 0 || stats.Value<int>("Errors") > 0 ? "Partial" : "Success";
+                    var failureSummary = status == "Success" ? "" : BuildDiyLangFailureSummary(stats);
+                    await UpdateDiyLangInitLogAsync(osClient, logId, status, stats, startedAt, failureSummary);
+                    return new DosResult(1, stats, "DiyLang missing translations repaired.", 0, stats);
+                }
+                catch (Exception ex)
+                {
+                    IncJObjectInt(stats, "Errors");
+                    AddDiyLangFailureReason(
+                        stats,
+                        IsDiyLangConnectionPressureMessage(ex.Message) ? "DbConnectionPressure" : "DiyLangRepairMissingException",
+                        ex.Message);
+                    LogDiyLangSyncException(osClient, "DiyLang missing translation repair failed", ex, osClient);
+                    if (IsBlank(logId))
+                    {
+                        logId = await CreateDiyLangInitLogAsync(osClient, source, stats, startedAt);
+                    }
+                    var failureSummary = BuildDiyLangFailureSummary(stats);
+                    await UpdateDiyLangInitLogAsync(osClient, logId, "Failed", stats, startedAt, IsBlank(failureSummary) ? ex.Message : failureSummary);
+                    return new DosResult(0, stats, ex.Message, 0, stats);
+                }
+            }
+            finally
+            {
+                DiyLangFullSyncSemaphore.Release();
+            }
         }
 
         private static async Task NormalizeDiyLangTreeAsync(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
@@ -1656,24 +2019,24 @@ namespace Microi.net
             try
             {
                 var rootIds = await EnsureDiyLangTreeRootsAsync(osClient, langConfigs);
-                var result = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_lang", new
-                    {
-                        OsClient = osClient,
-                        _InvokeType = "Server",
-                        _Lang = "cn",
-                        _PageIndex = 1,
-                        _PageSize = 300000,
-                        _SelectFields = new[] { "Id", "Key", "ParentId" }
-                    }));
-                if (result.Code != 1 || result.Data == null)
+                var rows = await RunDiyLangDbOperationAsync(osClient, () =>
+                {
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var data = db.FromSql(@"SELECT Id, `Key`, ParentId
+                            FROM diy_lang
+                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                            LIMIT 300000")
+                        .ToList<dynamic>()
+                        .Select(ToJObjectSafe)
+                        .ToList();
+                    return Task.FromResult(data);
+                });
+                if (rows == null)
                 {
                     return;
                 }
-                var db = OsClientExtend.GetClient(osClient).Db;
-                foreach (var item in result.Data)
+                foreach (var row in rows)
                 {
-                    var row = ToJObjectSafe(item);
                     var id = TokenString(row, "Id");
                     var key = TokenString(row, "Key");
                     var rootKey = ResolveDiyLangTreeRootKey(key);
@@ -1688,6 +2051,7 @@ namespace Microi.net
                     }
                     await RunDiyLangDbOperationAsync(osClient, () =>
                     {
+                        var db = OsClientExtend.GetClient(osClient).Db;
                         db.FromSql("UPDATE diy_lang SET ParentId = @p0, UpdateTime = @p1 WHERE Id = @p2")
                             .AddInParameter("p0", parentId)
                             .AddInParameter("p1", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
@@ -1739,8 +2103,11 @@ namespace Microi.net
                     ["FailedCount"] = 0,
                     ["SkippedCount"] = 0,
                     ["TreeFixed"] = 0,
+                    ["MissingFilled"] = 0,
                     ["Errors"] = 0,
-                    ["UnsupportedLangCount"] = 0
+                    ["UnsupportedLangCount"] = 0,
+                    ["FailureReasonCount"] = 0,
+                    ["FailureReasons"] = new JArray()
                 };
 
                 try
@@ -1754,22 +2121,23 @@ namespace Microi.net
                     PreflightDiyLangTranslateTargets(osClient, langConfigs, stats);
                     await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
 
-                var tableResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_table", new
-                    {
-                        OsClient = osClient,
-                        _InvokeType = "Server",
-                        _Lang = "cn",
-                        _PageIndex = 1,
-                        _PageSize = 100000,
-                        _SelectFields = new[] { "Id", "Name", "Description", "Tabs", "TableTabs" }
-                    }));
-                var tableById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                if (tableResult.Code == 1 && tableResult.Data != null)
+                var tableRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
-                    foreach (var item in tableResult.Data)
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var data = db.FromSql(@"SELECT Id, Name, Description, Tabs, TableTabs
+                            FROM diy_table
+                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                            LIMIT 100000")
+                        .ToList<dynamic>()
+                        .Select(ToJObjectSafe)
+                        .ToList();
+                    return Task.FromResult(data);
+                });
+                var tableById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (tableRows != null)
+                {
+                    foreach (var row in tableRows)
                     {
-                        var row = ToJObjectSafe(item);
                         var tableId = TokenString(row, "Id");
                         var tableName = TokenString(row, "Name");
                         var description = TokenString(row, "Description");
@@ -1796,21 +2164,22 @@ namespace Microi.net
                 }
                 await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
 
-                var fieldResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
-                    {
-                        OsClient = osClient,
-                        _InvokeType = "Server",
-                        _Lang = "cn",
-                        _PageIndex = 1,
-                        _PageSize = 200000,
-                        _SelectFields = new[] { "Id", "Name", "Label", "TableName", "TableId", "Config" }
-                    }));
-                if (fieldResult.Code == 1 && fieldResult.Data != null)
+                var fieldRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
-                    foreach (var item in fieldResult.Data)
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var data = db.FromSql(@"SELECT Id, Name, Label, TableName, TableId, Config
+                            FROM diy_field
+                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                            LIMIT 200000")
+                        .ToList<dynamic>()
+                        .Select(ToJObjectSafe)
+                        .ToList();
+                    return Task.FromResult(data);
+                });
+                if (fieldRows != null)
+                {
+                    foreach (var row in fieldRows)
                     {
-                        var row = ToJObjectSafe(item);
                         string tableName = TokenString(row, "TableName");
                         if (IsBlank(tableName))
                         {
@@ -1836,21 +2205,22 @@ namespace Microi.net
                 }
                 await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
 
-                var menuResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_menu", new
-                    {
-                        OsClient = osClient,
-                        _InvokeType = "Server",
-                        _Lang = "cn",
-                        _PageIndex = 1,
-                        _PageSize = 100000,
-                        _SelectFields = new[] { "Id", "Name", "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns" }
-                    }));
-                if (menuResult.Code == 1 && menuResult.Data != null)
+                var menuRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
-                    foreach (var item in menuResult.Data)
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var data = db.FromSql(@"SELECT Id, Name, MoreBtns, FormBtns, BatchSelectMoreBtns, PageTabs, ExportMoreBtns, PageBtns
+                            FROM sys_menu
+                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                            LIMIT 100000")
+                        .ToList<dynamic>()
+                        .Select(ToJObjectSafe)
+                        .ToList();
+                    return Task.FromResult(data);
+                });
+                if (menuRows != null)
+                {
+                    foreach (var row in menuRows)
                     {
-                        var row = ToJObjectSafe(item);
                         var menuId = TokenString(row, "Id");
                         var name = TokenString(row, "Name");
                         if (IsBlank(menuId) || IsBlank(name))
@@ -1885,24 +2255,33 @@ namespace Microi.net
                     }
                 }
 
+                await FillMissingDiyLangTranslationsAsync(osClient, langConfigs, stats);
+                await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
+
                 await ReloadDiyLangCacheAsync(osClient);
                 await NormalizeDiyLangTreeAsync(osClient, langConfigs, stats);
                 await ReloadDiyLangCacheAsync(osClient);
-                ApplyDiyLangCoverageStats(osClient, langConfigs, stats);
+                await ApplyDiyLangCoverageStatsAsync(osClient, langConfigs, stats);
                 var status = stats.Value<int>("FailedCount") > 0 || stats.Value<int>("Errors") > 0 ? "Partial" : "Success";
-                await UpdateDiyLangInitLogAsync(osClient, logId, status, stats, startedAt, "");
+                var failureSummary = status == "Success" ? "" : BuildDiyLangFailureSummary(stats);
+                await UpdateDiyLangInitLogAsync(osClient, logId, status, stats, startedAt, failureSummary);
 
                 return new DosResult(1, stats, "DiyLang sync completed.", 0, stats);
             }
             catch (Exception ex)
             {
                 IncJObjectInt(stats, "Errors");
+                AddDiyLangFailureReason(
+                    stats,
+                    IsDiyLangConnectionPressureMessage(ex.Message) ? "DbConnectionPressure" : "DiyLangFullSyncException",
+                    ex.Message);
                 LogDiyLangSyncException(osClient, "DiyLang full sync failed", ex, osClient);
                 if (IsBlank(logId))
                 {
                     logId = await CreateDiyLangInitLogAsync(osClient, source, stats, startedAt);
                 }
-                await UpdateDiyLangInitLogAsync(osClient, logId, "Failed", stats, startedAt, ex.Message);
+                var failureSummary = BuildDiyLangFailureSummary(stats);
+                await UpdateDiyLangInitLogAsync(osClient, logId, "Failed", stats, startedAt, IsBlank(failureSummary) ? ex.Message : failureSummary);
                 return new DosResult(0, stats, ex.Message, 0, stats);
             }
             }
@@ -2175,10 +2554,33 @@ namespace Microi.net
             {
                 var configOsClient = OsClientExtend.GetConfigOsClient();
                 MicroiEngine.CacheTenant.Default().Remove($"Microi:{configOsClient}:saas-engine:{osClient}");
+                MicroiEngine.CacheTenant.Default().Remove($"Microi:{configOsClient}:saas-engine:{osClient.DosToLower()}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Microi: Clear SaaS config cache failed. OsClient={osClient}, Error={ex.Message}");
+            }
+        }
+
+        private static void ClearDiyLangTranslateRuntimeState(string osClient)
+        {
+            if (!IsBlank(osClient))
+            {
+                foreach (var key in DiyLangTranslateUnavailable.Keys.ToList())
+                {
+                    if (key.StartsWith($"{osClient}|", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DiyLangTranslateUnavailable.TryRemove(key, out _);
+                    }
+                }
+                DiyLangTreeRootIdsCache.TryRemove(osClient, out _);
+                DiyLangSchemaEnsured.TryRemove(osClient, out _);
+                DiyLangPhysicalColumnsCache.TryRemove($"{osClient}|diy_lang", out _);
+            }
+
+            foreach (var key in DiyLangTranslateUnsupportedTarget.Keys.ToList())
+            {
+                DiyLangTranslateUnsupportedTarget.TryRemove(key, out _);
             }
         }
 
@@ -2327,21 +2729,62 @@ namespace Microi.net
             {
                 return;
             }
-            _ = Task.Run(async () =>
+            var tenantKey = IsBlank(osClient) ? "__default__" : osClient;
+            var queue = DiyLangMetadataQueues.GetOrAdd(tenantKey, _ => new ConcurrentQueue<DiyLangMetadataQueueItem>());
+            queue.Enqueue(new DiyLangMetadataQueueItem
             {
-                try
-                {
-                    await EnsureDiyLangMetadataAsync(osClient, key, sourceText);
-                }
-                catch (Exception ex)
-                {
-                    LogDiyLangSyncException(osClient, "DiyLang metadata sync failed", ex, key);
-                }
-                finally
-                {
-                    DiyLangMetadataSyncQueued.TryRemove(queueKey, out _);
-                }
+                QueueKey = queueKey,
+                OsClient = osClient,
+                Key = key,
+                SourceText = sourceText
             });
+
+            if (DiyLangMetadataQueueWorkers.TryAdd(tenantKey, 1))
+            {
+                _ = Task.Run(() => DrainDiyLangMetadataQueueAsync(tenantKey));
+            }
+        }
+
+        private static async Task DrainDiyLangMetadataQueueAsync(string tenantKey)
+        {
+            var osClient = tenantKey == "__default__" ? "" : tenantKey;
+            try
+            {
+                var queue = DiyLangMetadataQueues.GetOrAdd(tenantKey, _ => new ConcurrentQueue<DiyLangMetadataQueueItem>());
+                while (queue.TryDequeue(out var item))
+                {
+                    try
+                    {
+                        if (IsDiyLangDbBackoffActive(item.OsClient, out _))
+                        {
+                            return;
+                        }
+                        await EnsureDiyLangMetadataAsync(item.OsClient, item.Key, item.SourceText);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogDiyLangSyncException(item.OsClient, "DiyLang metadata sync failed", ex, item.Key);
+                    }
+                    finally
+                    {
+                        DiyLangMetadataSyncQueued.TryRemove(item.QueueKey, out _);
+                    }
+
+                    if (DiyLangDbOperationDelayMs > 0)
+                    {
+                        await Task.Delay(DiyLangDbOperationDelayMs);
+                    }
+                }
+            }
+            finally
+            {
+                DiyLangMetadataQueueWorkers.TryRemove(tenantKey, out _);
+                if (DiyLangMetadataQueues.TryGetValue(tenantKey, out var queue) && !queue.IsEmpty
+                    && DiyLangMetadataQueueWorkers.TryAdd(tenantKey, 1))
+                {
+                    _ = Task.Run(() => DrainDiyLangMetadataQueueAsync(tenantKey));
+                }
+            }
         }
 
         private void QueueDiyLangMetadataSync(string osClient, string key, string sourceText)
@@ -2359,18 +2802,7 @@ namespace Microi.net
             bool ensureTreeParent = true)
         {
             langConfigs = langConfigs ?? await EnsureDiyLangInfrastructureAsync(osClient);
-            var queryResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_lang", new
-                {
-                    _Where = new List<DiyWhere>() { new DiyWhere() { Name = "Key", Type = "=", Value = key } },
-                    OsClient = osClient,
-                    _InvokeType = "Server",
-                    _Lang = "cn"
-                }));
-
-            JObject row = queryResult.Code == 1 && queryResult.Data != null
-                ? ToJObjectSafe(queryResult.Data)
-                : new JObject();
+            JObject row = await GetDiyLangRowByKeyDirectAsync(osClient, key) ?? new JObject();
             var isNew = IsBlank(TokenString(row, "Id"));
             var changed = isNew;
             row["Key"] = key;
@@ -2431,7 +2863,7 @@ namespace Microi.net
                 {
                     translated = TranslateForDiyLangField(sourceText, langField, osClient);
                 }
-                if (!IsBlank(translated) && translated != sourceText)
+                if (!IsBlank(translated))
                 {
                     row[langField] = translated;
                     changed = true;
@@ -2447,13 +2879,11 @@ namespace Microi.net
             DosResult saveResult;
             if (isNew)
             {
-                saveResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.AddFormDataAsync("diy_lang", row));
+                saveResult = await SaveDiyLangRowDirectAsync(osClient, row, true, langConfigs);
             }
             else
             {
-                saveResult = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.UptFormDataAsync("diy_lang", row));
+                saveResult = await SaveDiyLangRowDirectAsync(osClient, row, false, langConfigs);
             }
 
             if (saveResult.Code == 1)
@@ -2462,6 +2892,106 @@ namespace Microi.net
             }
             saveResult.DataAppend = new { IsNew = isNew, Changed = true };
             return saveResult;
+        }
+
+        private static async Task<JObject> GetDiyLangRowByKeyDirectAsync(string osClient, string key)
+        {
+            if (IsBlank(osClient) || IsBlank(key))
+            {
+                return null;
+            }
+            return await RunDiyLangDbOperationAsync(osClient, () =>
+            {
+                var db = OsClientExtend.GetClient(osClient).Db;
+                var row = db.FromSql(@"SELECT *
+                        FROM diy_lang
+                        WHERE `Key` = @p0 AND (IsDeleted <> 1 OR IsDeleted IS NULL)
+                        ORDER BY CreateTime DESC
+                        LIMIT 1")
+                    .AddInParameter("p0", key)
+                    .ToList<dynamic>()
+                    .Select(ToJObjectSafe)
+                    .FirstOrDefault();
+                return Task.FromResult(row);
+            });
+        }
+
+        private static async Task<DosResult> SaveDiyLangRowDirectAsync(string osClient, JObject row, bool isNew, List<DiyLangFieldConfig> langConfigs)
+        {
+            if (row == null)
+            {
+                return new DosResult(0, null, "diy_lang row is required.");
+            }
+            return await RunDiyLangDbOperationAsync(osClient, () =>
+            {
+                var db = OsClientExtend.GetClient(osClient).Db;
+                var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                if (isNew && IsBlank(TokenString(row, "Id")))
+                {
+                    row["Id"] = Guid.NewGuid().ToString();
+                }
+                row["OsClient"] = osClient;
+                row["UpdateTime"] = now;
+                if (isNew)
+                {
+                    row["CreateTime"] = now;
+                }
+
+                var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "Id", "Key", "Code", "Name", "ParentId", "OsClient", "CreateTime", "UpdateTime", "ZhCN"
+                };
+                foreach (var lang in langConfigs ?? new List<DiyLangFieldConfig>())
+                {
+                    if (IsSafeSqlIdentifier(lang.Field))
+                    {
+                        allowed.Add(lang.Field);
+                    }
+                }
+                var physicalColumns = GetPhysicalColumnNames(db, osClient, "diy_lang");
+
+                var values = row.Properties()
+                    .Where(prop => allowed.Contains(prop.Name)
+                                   && IsSafeSqlIdentifier(prop.Name)
+                                   && (physicalColumns == null || physicalColumns.Contains(prop.Name)))
+                    .ToList();
+                if (values.Count == 0)
+                {
+                    return Task.FromResult(new DosResult(0, row, "No writable diy_lang columns were found."));
+                }
+                if (isNew)
+                {
+                    var columns = values.Select(prop => $"`{prop.Name}`").ToList();
+                    var parameters = values.Select((prop, index) => $"@p{index}").ToList();
+                    var cmd = db.FromSql($"INSERT INTO diy_lang ({string.Join(",", columns)}) VALUES ({string.Join(",", parameters)})");
+                    for (var i = 0; i < values.Count; i++)
+                    {
+                        cmd.AddInParameter($"p{i}", TokenString(values[i].Value));
+                    }
+                    cmd.ExecuteNonQuery();
+                }
+                else
+                {
+                    var id = TokenString(row, "Id");
+                    if (IsBlank(id))
+                    {
+                        return Task.FromResult(new DosResult(0, row, "diy_lang row Id is required for update."));
+                    }
+                    var updateValues = values
+                        .Where(prop => !string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase)
+                                       && !string.Equals(prop.Name, "CreateTime", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    var setters = updateValues.Select((prop, index) => $"`{prop.Name}` = @p{index}").ToList();
+                    var cmd = db.FromSql($"UPDATE diy_lang SET {string.Join(",", setters)} WHERE Id = @p{updateValues.Count}");
+                    for (var i = 0; i < updateValues.Count; i++)
+                    {
+                        cmd.AddInParameter($"p{i}", TokenString(updateValues[i].Value));
+                    }
+                    cmd.AddInParameter($"p{updateValues.Count}", id);
+                    cmd.ExecuteNonQuery();
+                }
+                return Task.FromResult(new DosResult(1, row, isNew ? "Added." : "Updated."));
+            });
         }
 
         private static string GetExistingMetadataTranslation(string osClient, string sourceText, string langField)

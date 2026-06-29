@@ -1,6 +1,13 @@
 export default {
     Msg: {
         Load: "加载",
+        LoadMore: "加载更多",
+        BackgroundTasks: "后台任务",
+        Refresh: "刷新",
+        ClearCompleted: "清除已完成",
+        NoBackgroundTasks: "暂无后台任务",
+        Stop: "停止",
+        Elapsed: "耗时",
         Update: "修改",
         Email: "邮箱",
         Remark: "备注",
