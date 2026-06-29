@@ -1109,7 +1109,7 @@ namespace Microi.net
                             }
                             //注意：如分割线等一些字段，是不需要操作客户的数据库的
                             if (!param.Type.DosIsNullOrWhiteSpace()
-                                && !DiyCommon.NotRealField.Any(d => d == fieldModel.Component))
+                                && !DiyCommon.IsNotRealFieldComponent(fieldModel.Component))
                             {
                                 var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
                                 {
@@ -1334,8 +1334,8 @@ namespace Microi.net
                                 || oldModelObj["Type"].Val<string>() != newField["Type"].Val<string>())
                             {
                                 //注意：如分割线等一些字段，是不需要操作客户的数据库的
-                                if (!oldModelObj["Type"].Val<string>().DosIsNullOrWhiteSpace() 
-                                    && !DiyCommon.NotRealField.Any(d => d == oldModelObj["Component"].Val<string>()))
+                                if (!oldModelObj["Type"].Val<string>().DosIsNullOrWhiteSpace()
+                                    && !DiyCommon.IsNotRealFieldComponent(oldModelObj["Component"].Val<string>()))
                                 {
                                     var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
                                     {
@@ -1606,7 +1606,7 @@ namespace Microi.net
                     if(param._OnlyRealField == true)
                     {
                         diyTableCache = diyTableCache.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
-                                        && !DiyCommon.NotRealField.Contains(d["Component"].Val<string>())).ToList();
+                                        && !DiyCommon.IsNotRealFieldComponent(d["Component"].Val<string>())).ToList();
                     }
                     if (param._SelectFields != null && param._SelectFields.Any())
                     {
@@ -1694,7 +1694,7 @@ namespace Microi.net
                     if(param._OnlyRealField == true)
                     {
                         result = result.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
-                                        && !DiyCommon.NotRealField.Contains(d["Component"].Val<string>())).ToList();
+                                        && !DiyCommon.IsNotRealFieldComponent(d["Component"].Val<string>())).ToList();
                     }
                     if (param._SelectFields != null && param._SelectFields.Any())
                     {
