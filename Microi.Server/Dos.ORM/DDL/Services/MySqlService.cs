@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Dos.Common;
 
 namespace Dos.ORM
@@ -10,6 +12,12 @@ namespace Dos.ORM
     /// </summary>
 	public class MySqlService : IMicroiORM
     {
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> TableDdlGates = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+
+        private static int DdlLockWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DDL_LOCK_WAIT_SECONDS", "OrmLimits:DdlLockWaitSeconds", 8);
+
+        private static int DdlQueueWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DDL_QUEUE_WAIT_SECONDS", "OrmLimits:DdlQueueWaitSeconds", 600);
+
         /// <summary>
         /// 修改表名
         /// </summary>
@@ -108,6 +116,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
+            SemaphoreSlim ddlGate = null;
             try
             {
                 if (param.TableName.DosIsNullOrWhiteSpace()
@@ -124,15 +133,37 @@ namespace Dos.ORM
                     return new DosResult(0, null, "表名或字段名不合法");
 
                 // 转义注释内容防止SQL注入
+                ddlGate = EnterTableDdlGate(param, out var gateError);
+                if (ddlGate == null)
+                {
+                    return new DosResult(0, null, gateError);
+                }
+
+                dynamic session = (object)_trans ?? param.DbSession;
+                PrepareDdlSession(session);
+                if (ColumnExists(session, param.TableName, param.FieldName))
+                {
+                    ddlGate?.Release();
+                    ddlGate = null;
+                    return new DosResult(1, null, "字段已存在，已跳过物理列创建。");
+                }
+
                 var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
                 var sql = $"ALTER TABLE `{param.TableName}` ADD COLUMN `{param.FieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
 
-                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
+                ddlGate?.Release();
+                ddlGate = null;
                 return new DosResult(1);
             }
             catch (Exception ex)
             {
+                ddlGate?.Release();
+                ddlGate = null;
+                if (IsDuplicateColumnException(ex))
+                    return new DosResult(1, null, "字段已存在，已跳过物理列创建。");
+                if (IsMetadataLockException(ex))
+                    return new DosResult(0, null, $"表结构正在被其它操作占用，请稍后重试。{ex.Message}");
                 return new DosResult(0, null, $"添加字段失败: {ex.Message}");
             }
         }
@@ -199,6 +230,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
+            SemaphoreSlim ddlGate = null;
             try
             {
                 if (param.TableName.DosIsNullOrWhiteSpace() ||
@@ -215,15 +247,29 @@ namespace Dos.ORM
                     return new DosResult(0, null, "表名或字段名不合法");
 
                 // 转义注释内容
+                ddlGate = EnterTableDdlGate(param, out var gateError);
+                if (ddlGate == null)
+                {
+                    return new DosResult(0, null, gateError);
+                }
+
+                dynamic session = (object)_trans ?? param.DbSession;
+                PrepareDdlSession(session);
+
                 var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
                 var sql = $"ALTER TABLE `{param.TableName}` CHANGE `{param.FieldName}` `{param.NewFieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
             
-                dynamic session = (object)_trans ?? param.DbSession;
                 session.FromSql(sql).ExecuteNonQuery();
+                ddlGate?.Release();
+                ddlGate = null;
                 return new DosResult(1);
             }
             catch (Exception ex)
             {
+                ddlGate?.Release();
+                ddlGate = null;
+                if (IsMetadataLockException(ex))
+                    return new DosResult(0, null, $"表结构正在被其它操作占用，请稍后重试。{ex.Message}");
                 return new DosResult(0, null, $"修改字段失败: {ex.Message}");
             }
         }
@@ -300,6 +346,63 @@ namespace Dos.ORM
             if (string.IsNullOrWhiteSpace(identifier))
                 return false;
             return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+        }
+
+        private static SemaphoreSlim EnterTableDdlGate(DbServiceParam param, out string error)
+        {
+            error = "";
+            var waitSeconds = Math.Max(1, DdlQueueWaitSeconds);
+            var key = $"{param?.OsClient ?? ""}|{param?.DataBaseId ?? ""}|{param?.TableName ?? ""}";
+            var gate = TableDdlGates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+            if (gate.Wait(TimeSpan.FromSeconds(waitSeconds)))
+            {
+                return gate;
+            }
+
+            error = $"表结构变更正在排队中，已等待 {waitSeconds} 秒，请稍后重试。";
+            return null;
+        }
+
+        private static void PrepareDdlSession(dynamic session)
+        {
+            var seconds = Math.Max(1, DdlLockWaitSeconds);
+            session.FromSql($"SET SESSION lock_wait_timeout = {seconds}").ExecuteNonQuery();
+        }
+
+        private static bool ColumnExists(dynamic session, string tableName, string fieldName)
+        {
+            var count = session.FromSql(@"SELECT COUNT(1)
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+AND table_name = @tableName
+AND column_name = @fieldName")
+                .AddInParameter("@tableName", tableName)
+                .AddInParameter("@fieldName", fieldName)
+                .ToScalar();
+            return Convert.ToInt32(count) > 0;
+        }
+
+        private static bool IsDuplicateColumnException(Exception ex)
+        {
+            var message = GetExceptionMessage(ex);
+            return message.IndexOf("Duplicate column", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("1060", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsMetadataLockException(Exception ex)
+        {
+            var message = GetExceptionMessage(ex);
+            return message.IndexOf("Lock wait timeout exceeded", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("metadata lock", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("1205", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string GetExceptionMessage(Exception ex)
+        {
+            if (ex == null)
+                return "";
+            var baseException = ex.GetBaseException();
+            return $"{ex.Message} {baseException?.Message}";
         }
 
         /// <summary>

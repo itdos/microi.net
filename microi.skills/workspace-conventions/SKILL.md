@@ -226,6 +226,7 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - 再用 MCP 资源/模板列表或最小 `initialize` / `tools/list` 探测确认服务器握手成功。若返回 `handshaking with MCP server failed`、`initialize response`、`connection closed` 等错误，要明确说明“配置存在但当前会话不可调用”。
 - 同时检查 `.vscode/mcp.json`、`.cursor/mcp.json`、`.mcp.json` 和 `~/.codex/config.toml` 是否能解析，并确认目标服务器名、`MICROI_API_URL`、`MICROI_OS_CLIENT`、`MICROI_TOKEN_FILE` 已写入。
 - 如果手动启动 `mcp-server.js` 能响应，而当前 AI 会话仍握手失败，应优先怀疑 MCP stdio 协议兼容、初始化响应格式/大小、服务器进程提前退出或插件生成的 Codex 配置顺序问题，而不是简单归因于“用户没启用”。
+- 当 MCP 工具数量较多时，`tools/list` 的前段必须优先返回通用建模和维护工具，例如 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache`、`microi_create_table`、`microi_create_module`、`microi_get_event_code`、`microi_save_event_code`。部分 AI 客户端或模型上下文只注入前若干个工具，若核心工具排在后面，会误报“缺少 MCP 工具”。
 - MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界，`MICROI_LABEL` 只能作为显示名称，不能把中文显示名当成租户 Key 写入“只能管理某租户”的安全提示。
 - 修复 Microi.VSCode 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
 

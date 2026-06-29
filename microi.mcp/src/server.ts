@@ -71,6 +71,72 @@ function buildRuntimeServerName(context: McpServerContext): string {
   return `Microi-${basePart}`;
 }
 
+const CORE_TOOL_REGISTRATION_ORDER = [
+  'microi_get_status',
+  'microi_get_db_schema',
+  'microi_get_field_list',
+  'microi_add_field',
+  'microi_update_field',
+  'microi_refresh_schema_cache',
+  'microi_create_table',
+  'microi_create_module',
+  'microi_get_event_code',
+  'microi_save_event_code',
+  'microi_list_events',
+  'microi_get_table_data',
+  'microi_add_form_data',
+  'microi_update_form_data',
+  'microi_get_manifest_schema',
+  'microi_plan_system',
+  'microi_generate_system',
+  'microi_validate_system',
+  'microi_build_field_config',
+  'microi_validate_menu_buttons',
+  'microi_list_engines',
+  'microi_get_engine_code',
+  'microi_save_engine_code',
+  'microi_create_engine',
+  'microi_get_module',
+  'microi_update_module',
+  'microi_list_modules',
+  'microi_update_table',
+  'microi_set_role_permission',
+  'microi_set_engine_anonymous',
+];
+
+const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
+
+interface BufferedToolRegistration {
+  name: string;
+  args: unknown[];
+  index: number;
+}
+
+function bufferToolRegistrationsByPriority(server: McpServer): () => void {
+  const mutableServer = server as unknown as { tool: (...args: unknown[]) => unknown };
+  const originalTool = mutableServer.tool.bind(server);
+  const buffered: BufferedToolRegistration[] = [];
+
+  mutableServer.tool = (...args: unknown[]): unknown => {
+    const name = typeof args[0] === 'string' ? args[0] : '';
+    buffered.push({ name, args, index: buffered.length });
+    return undefined;
+  };
+
+  return () => {
+    mutableServer.tool = originalTool;
+    buffered
+      .sort((a, b) => {
+        const priorityA = CORE_TOOL_PRIORITY.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+        const priorityB = CORE_TOOL_PRIORITY.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+        return priorityA - priorityB || a.index - b.index;
+      })
+      .forEach((item) => {
+        originalTool(...item.args);
+      });
+  };
+}
+
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
 function formatDbTables(tables: DbTable[]): string {
   if (!tables.length) return 'No tables found.';
@@ -543,6 +609,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     { name: serverName, version: '1.0.0' },
     { instructions: buildInstructions(context) },
   );
+  const flushToolRegistrations = bufferToolRegistrationsByPriority(server);
 
   // ========================
   // Tool: 获取服务器状态
@@ -1801,5 +1868,6 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   registerAdvancedTools(server, client, context);
   registerBlueprintTools(server, client, context);
 
+  flushToolRegistrations();
   return server;
 }
