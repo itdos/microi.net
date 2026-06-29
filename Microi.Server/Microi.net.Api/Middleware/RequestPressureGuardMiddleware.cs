@@ -5,16 +5,18 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dos.Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net.Api
 {
     /// <summary>
-    /// HTTP 入口压力保护。超过并发阈值时直接返回 DosResult 风格 JSON，
-    /// 避免请求继续进入控制器、V8、ORM 后把数据库和线程池拖垮。
+    /// HTTP 入口并发保护。它只控制同时进入系统的数量，长任务会优先排队，
+    /// 避免把压力继续传递到 V8、ORM 和数据库。
     /// </summary>
     public sealed class RequestPressureGuardMiddleware
     {
@@ -25,27 +27,29 @@ namespace Microi.net.Api
         };
 
         private readonly RequestDelegate _next;
-        private readonly RequestPressureGuardOptions _options;
+        private readonly IConfiguration _configuration;
 
         public RequestPressureGuardMiddleware(RequestDelegate next, IConfiguration configuration)
         {
             _next = next;
-            _options = RequestPressureGuardOptions.From(configuration);
+            _configuration = configuration;
         }
 
         public async Task InvokeAsync(HttpContext context)
         {
-            if (!_options.Enabled || ShouldSkip(context))
+            var options = RequestPressureGuardOptions.From(_configuration);
+            if (!options.Enabled || ShouldSkip(context))
             {
                 await _next(context);
                 return;
             }
 
             var acquired = new List<SemaphoreSlim>();
-            var gates = BuildGateRequests(context);
+            var gates = BuildGateRequests(context, options);
             foreach (var item in gates)
             {
-                var gate = Gates.GetOrAdd(item.Key, _ => new SemaphoreSlim(item.Limit, item.Limit));
+                var gateKey = $"{item.Key}:limit:{item.Limit}";
+                var gate = Gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(item.Limit, item.Limit));
                 var entered = false;
                 try
                 {
@@ -58,7 +62,7 @@ namespace Microi.net.Api
                 if (!entered)
                 {
                     Release(acquired);
-                    await WriteBusyResponse(context, item).ConfigureAwait(false);
+                    await WriteBusyResponse(context, item, options).ConfigureAwait(false);
                     return;
                 }
 
@@ -75,44 +79,62 @@ namespace Microi.net.Api
             }
         }
 
-        private List<GateRequest> BuildGateRequests(HttpContext context)
+        private List<GateRequest> BuildGateRequests(HttpContext context, RequestPressureGuardOptions options)
         {
             var path = context.Request.Path.Value ?? "";
             var osClient = ExtractOsClient(context);
             var apiEngineKey = ExtractApiEngineKey(path);
             var category = ResolveCategory(path);
             var routeKey = NormalizeRouteKey(path, category);
+            var tenantOptions = GetTenantPressureOptions(osClient);
             var waitMilliseconds = IsLongRunningCategory(category)
-                ? _options.LongRunningWaitMilliseconds
-                : _options.WaitMilliseconds;
+                ? LowerPositive(options.LongRunningWaitMilliseconds, tenantOptions.LongRunningWaitMilliseconds)
+                : LowerPositive(options.WaitMilliseconds, tenantOptions.WaitMilliseconds);
+
             var result = new List<GateRequest>
             {
-                new GateRequest("global", _options.GlobalMaxConcurrentRequests, "Global", "系统当前请求较多，请稍后重试。")
+                new GateRequest("global", options.GlobalMaxConcurrentRequests, "Global", "系统当前请求较多，正在排队处理，请稍后重试。")
             };
 
             if (!string.IsNullOrWhiteSpace(osClient))
             {
-                result.Add(new GateRequest($"tenant:{osClient}", _options.TenantMaxConcurrentRequests, "Tenant", "当前租户请求较多，请稍后重试。"));
+                result.Add(new GateRequest(
+                    $"tenant:{osClient}",
+                    LowerPositive(options.TenantMaxConcurrentRequests, tenantOptions.TenantMaxConcurrentRequests),
+                    "Tenant",
+                    "当前租户请求较多，正在排队处理，请稍后重试。"));
             }
 
             if (!string.IsNullOrWhiteSpace(routeKey))
             {
-                result.Add(new GateRequest($"route:{routeKey}", _options.RouteMaxConcurrentRequests, "Route", "当前功能请求较多，请稍后重试。"));
+                result.Add(new GateRequest(
+                    $"route:{routeKey}",
+                    LowerPositive(options.RouteMaxConcurrentRequests, tenantOptions.RouteMaxConcurrentRequests),
+                    "Route",
+                    "当前功能请求较多，正在排队处理，请稍后重试。"));
             }
 
             if (category == "apiengine" || category == "v8")
             {
-                result.Add(new GateRequest("v8:global", _options.V8GlobalMaxConcurrentRequests, "V8Global", "V8 引擎当前执行较多，请稍后重试。"));
+                result.Add(new GateRequest("v8:global", options.V8GlobalMaxConcurrentRequests, "V8Global", "V8 引擎当前执行较多，正在排队处理，请稍后重试。"));
                 if (!string.IsNullOrWhiteSpace(osClient))
                 {
-                    result.Add(new GateRequest($"v8:tenant:{osClient}", _options.V8TenantMaxConcurrentRequests, "V8Tenant", "当前租户 V8 引擎执行较多，请稍后重试。"));
+                    result.Add(new GateRequest(
+                        $"v8:tenant:{osClient}",
+                        LowerPositive(options.V8TenantMaxConcurrentRequests, tenantOptions.V8TenantMaxConcurrentRequests),
+                        "V8Tenant",
+                        "当前租户 V8 引擎执行较多，正在排队处理，请稍后重试。"));
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(apiEngineKey))
             {
                 var key = string.IsNullOrWhiteSpace(osClient) ? apiEngineKey : $"{osClient}:{apiEngineKey}";
-                result.Add(new GateRequest($"apiengine:{key}", _options.ApiEngineMaxConcurrentRequests, "ApiEngine", $"接口引擎[{apiEngineKey}]当前执行较多，请稍后重试。"));
+                result.Add(new GateRequest(
+                    $"apiengine:{key}",
+                    LowerPositive(options.ApiEngineMaxConcurrentRequests, tenantOptions.ApiEngineMaxConcurrentRequests),
+                    "ApiEngine",
+                    $"接口引擎[{apiEngineKey}]当前执行较多，正在排队处理，请稍后重试。"));
             }
 
             foreach (var item in result)
@@ -121,6 +143,68 @@ namespace Microi.net.Api
             }
 
             return result.Where(item => item.Limit > 0).ToList();
+        }
+
+        private static TenantPressureOptions GetTenantPressureOptions(string osClient)
+        {
+            var result = new TenantPressureOptions();
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                return result;
+            }
+
+            try
+            {
+                if (!Microi.net.OsClientExtend.ClientList.TryGetValue(osClient.Trim(), out var client)
+                    || client?.OsClientModel == null)
+                {
+                    return result;
+                }
+
+                result.TenantMaxConcurrentRequests = ReadTenantInt(client.OsClientModel, "PressTenantMax", "PressureTenantMaxConcurrentRequests");
+                result.RouteMaxConcurrentRequests = ReadTenantInt(client.OsClientModel, "PressRouteMax", "PressureRouteMaxConcurrentRequests");
+                result.ApiEngineMaxConcurrentRequests = ReadTenantInt(client.OsClientModel, "PressApiMax", "PressureApiEngineMaxConcurrentRequests");
+                result.V8TenantMaxConcurrentRequests = ReadTenantInt(client.OsClientModel, "PressV8ReqMax", "PressureV8TenantMaxConcurrentRequests");
+                result.WaitMilliseconds = ReadTenantInt(client.OsClientModel, "PressureWaitMilliseconds");
+                result.LongRunningWaitMilliseconds = ReadTenantInt(client.OsClientModel, "PressLongWaitMs", "PressureLongRunningWaitMilliseconds");
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        private static int ReadTenantInt(JObject model, params string[] fieldNames)
+        {
+            if (model == null || fieldNames == null)
+            {
+                return 0;
+            }
+
+            foreach (var fieldName in fieldNames)
+            {
+                var value = model[fieldName]?.ToString();
+                if (int.TryParse(value, out var parsed) && parsed > 0)
+                {
+                    return parsed;
+                }
+            }
+
+            return 0;
+        }
+
+        private static int LowerPositive(int globalValue, int tenantValue)
+        {
+            if (globalValue <= 0)
+            {
+                return tenantValue;
+            }
+            if (tenantValue > 0 && tenantValue < globalValue)
+            {
+                return tenantValue;
+            }
+            return globalValue;
         }
 
         private static void Release(List<SemaphoreSlim> acquired)
@@ -226,7 +310,7 @@ namespace Microi.net.Api
             return values.FirstOrDefault(item => !string.IsNullOrWhiteSpace(item)) ?? "";
         }
 
-        private async Task WriteBusyResponse(HttpContext context, GateRequest gate)
+        private async Task WriteBusyResponse(HttpContext context, GateRequest gate, RequestPressureGuardOptions options)
         {
             if (context.Response.HasStarted)
             {
@@ -235,7 +319,7 @@ namespace Microi.net.Api
 
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "application/json; charset=utf-8";
-            context.Response.Headers["Retry-After"] = _options.RetryAfterSeconds.ToString();
+            context.Response.Headers["Retry-After"] = options.RetryAfterSeconds.ToString();
             var payload = new
             {
                 Code = 0,
@@ -246,7 +330,7 @@ namespace Microi.net.Api
                 {
                     Busy = true,
                     LimitType = gate.Type,
-                    RetryAfterSeconds = _options.RetryAfterSeconds
+                    RetryAfterSeconds = options.RetryAfterSeconds
                 }
             };
             await context.Response.WriteAsync(JsonConvert.SerializeObject(payload)).ConfigureAwait(false);
@@ -269,6 +353,16 @@ namespace Microi.net.Api
             public string Message { get; }
             public int WaitMilliseconds { get; set; }
         }
+
+        private sealed class TenantPressureOptions
+        {
+            public int TenantMaxConcurrentRequests { get; set; }
+            public int RouteMaxConcurrentRequests { get; set; }
+            public int ApiEngineMaxConcurrentRequests { get; set; }
+            public int V8TenantMaxConcurrentRequests { get; set; }
+            public int WaitMilliseconds { get; set; }
+            public int LongRunningWaitMilliseconds { get; set; }
+        }
     }
 
     public sealed class RequestPressureGuardOptions
@@ -278,10 +372,10 @@ namespace Microi.net.Api
         public int TenantMaxConcurrentRequests { get; private set; } = 600;
         public int RouteMaxConcurrentRequests { get; private set; } = 400;
         public int ApiEngineMaxConcurrentRequests { get; private set; } = 80;
-        public int V8GlobalMaxConcurrentRequests { get; private set; } = 160;
-        public int V8TenantMaxConcurrentRequests { get; private set; } = 40;
+        public int V8GlobalMaxConcurrentRequests { get; private set; } = 128;
+        public int V8TenantMaxConcurrentRequests { get; private set; } = 32;
         public int WaitMilliseconds { get; private set; } = 10000;
-        public int LongRunningWaitMilliseconds { get; private set; } = 300000;
+        public int LongRunningWaitMilliseconds { get; private set; } = 1800000;
         public int RetryAfterSeconds { get; private set; } = 3;
 
         public static RequestPressureGuardOptions From(IConfiguration configuration)
@@ -302,20 +396,12 @@ namespace Microi.net.Api
 
         private static int ReadPositiveInt(IConfiguration configuration, string configKey, string envKey, int defaultValue)
         {
-            var value = Environment.GetEnvironmentVariable(envKey);
-            if (int.TryParse(value, out var parsed) && parsed > 0) return parsed;
-            value = configuration?[configKey];
-            if (int.TryParse(value, out parsed) && parsed > 0) return parsed;
-            return defaultValue;
+            return ConfigHelper.GetEnvOrConfigurationInt(envKey, configKey, defaultValue);
         }
 
         private static bool ReadBool(IConfiguration configuration, string configKey, string envKey, bool defaultValue)
         {
-            var value = Environment.GetEnvironmentVariable(envKey);
-            if (bool.TryParse(value, out var parsed)) return parsed;
-            value = configuration?[configKey];
-            if (bool.TryParse(value, out parsed)) return parsed;
-            return defaultValue;
+            return ConfigHelper.GetEnvOrConfigurationBool(envKey, configKey, defaultValue);
         }
     }
 

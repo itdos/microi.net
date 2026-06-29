@@ -203,6 +203,8 @@ namespace Microi.net.Api
         {
             var requestedOsClient = param?["OsClient"].Val<string>();
             var requestedSource = param?["Source"].Val<string>();
+            var requestedForce = param?["Force"].Val<string>();
+            var requestedOnlyFillMissing = param?["OnlyFillMissing"].Val<string>();
             if (requestedSource.DosIsNullOrWhiteSpace() && Request?.HasFormContentType == true)
             {
                 requestedSource = Request.Form["Source"].ToString();
@@ -210,6 +212,22 @@ namespace Microi.net.Api
             if (requestedSource.DosIsNullOrWhiteSpace() && Request?.Query != null)
             {
                 requestedSource = Request.Query["Source"].ToString();
+            }
+            if (requestedForce.DosIsNullOrWhiteSpace() && Request?.HasFormContentType == true)
+            {
+                requestedForce = Request.Form["Force"].ToString();
+            }
+            if (requestedForce.DosIsNullOrWhiteSpace() && Request?.Query != null)
+            {
+                requestedForce = Request.Query["Force"].ToString();
+            }
+            if (requestedOnlyFillMissing.DosIsNullOrWhiteSpace() && Request?.HasFormContentType == true)
+            {
+                requestedOnlyFillMissing = Request.Form["OnlyFillMissing"].ToString();
+            }
+            if (requestedOnlyFillMissing.DosIsNullOrWhiteSpace() && Request?.Query != null)
+            {
+                requestedOnlyFillMissing = Request.Query["OnlyFillMissing"].ToString();
             }
             param = await DefaultParam(param);
             if (!requestedOsClient.DosIsNullOrWhiteSpace())
@@ -220,6 +238,14 @@ namespace Microi.net.Api
             {
                 param["Source"] = requestedSource;
             }
+            if (!requestedForce.DosIsNullOrWhiteSpace())
+            {
+                param["Force"] = requestedForce;
+            }
+            if (!requestedOnlyFillMissing.DosIsNullOrWhiteSpace())
+            {
+                param["OnlyFillMissing"] = requestedOnlyFillMissing;
+            }
             var includeRaw = param["IncludeClientText"].Val<string>();
             var includeClientText = includeRaw.DosIsNullOrWhiteSpace()
                 || (!string.Equals(includeRaw, "0", StringComparison.OrdinalIgnoreCase)
@@ -227,14 +253,32 @@ namespace Microi.net.Api
             var waitRaw = param["Wait"].Val<string>();
             var wait = string.Equals(waitRaw, "1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(waitRaw, "true", StringComparison.OrdinalIgnoreCase);
+            var forceRaw = param["Force"].Val<string>();
+            var force = string.Equals(forceRaw, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(forceRaw, "true", StringComparison.OrdinalIgnoreCase);
+            var onlyFillMissingRaw = param["OnlyFillMissing"].Val<string>();
+            var onlyFillMissing = string.Equals(onlyFillMissingRaw, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(onlyFillMissingRaw, "true", StringComparison.OrdinalIgnoreCase);
             var source = param["Source"].Val<string>();
             if (source.DosIsNullOrWhiteSpace())
             {
                 source = "api";
             }
-            var result = wait
-                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(param["OsClient"].Val<string>(), includeClientText, source)
-                : MicroiEngine.FormEngine.QueueDiyLangFullSync(param["OsClient"].Val<string>(), includeClientText, source);
+            var osClient = param["OsClient"].Val<string>();
+            if (force)
+            {
+                MicroiEngine.FormEngine.ResetDiyLangFullSync(osClient, source);
+            }
+            var reloadResult = MicroiEngine.FormEngine.ReloadDiyLangRuntimeConfig(osClient);
+            if (reloadResult.Code != 1)
+            {
+                return Json(reloadResult);
+            }
+            var result = onlyFillMissing
+                ? await MicroiEngine.FormEngine.RepairMissingDiyLangTranslationsAsync(osClient, source)
+                : wait
+                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(osClient, includeClientText, source)
+                : MicroiEngine.FormEngine.QueueDiyLangFullSync(osClient, includeClientText, source);
             return Json(result);
         }
 

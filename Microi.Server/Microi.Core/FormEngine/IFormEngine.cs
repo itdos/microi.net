@@ -49,7 +49,10 @@ namespace Microi.net
         /// </summary>
         DosResult QueueDiyLangFullSync(string osClient = "", bool includeClientText = true, string source = "api");
         DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true, string source = "startup");
+        DosResult ResetDiyLangFullSync(string osClient = "", string reason = "manual");
+        DosResult ReloadDiyLangRuntimeConfig(string osClient = "");
         Task<DosResult> SyncDiyLangFullAsync(string osClient = "", bool includeClientText = true, string source = "api");
+        Task<DosResult> RepairMissingDiyLangTranslationsAsync(string osClient = "", string source = "api");
 
         #endregion
 

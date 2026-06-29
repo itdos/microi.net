@@ -251,8 +251,10 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
     const button = asRecord(item);
     const name = getString(button, 'Name', 'name');
     if (!name) errors.push(`${fieldName}[${index}].Name 不能为空`);
-    if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url')) {
-      errors.push(`${fieldName}[${index}] 必须配置 V8Code 或 Url`);
+    const runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
+    const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
+    if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url') && !(runBackground && apiEngineKey)) {
+      errors.push(`${fieldName}[${index}] 必须配置 V8Code、Url，或后台任务 ApiEngineKey`);
     }
 
     const id = getString(button, 'Id', 'id') || randomId();
@@ -277,6 +279,10 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
       V8CodeShow: codeShow || undefined,
       V8Code: getString(button, 'V8Code', 'v8Code') || undefined,
       Url: getString(button, 'Url', 'url') || undefined,
+      RunBackground: runBackground === undefined ? undefined : !!runBackground,
+      BackgroundTask: button.BackgroundTask ?? button.backgroundTask ?? undefined,
+      IsBackgroundTask: button.IsBackgroundTask ?? button.isBackgroundTask ?? undefined,
+      ApiEngineKey: apiEngineKey || undefined,
     });
   });
 

@@ -37,7 +37,11 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
   "ShowRow": true,            // MoreBtns 必填：true 显示在行内，false 收进"更多"
   "V8CodeShow": "...",        // 显隐表达式 JS：return true/false 或赋值 V8.Result=true/false
   "V8Code": "...",            // 点击执行的 JS（前端 V8 上下文）
-  "Url": ""                   // 可选：直接跳转 URL（不与 V8Code 同用）
+  "Url": "",                  // 可选：直接跳转 URL（不与 V8Code 同用）
+  "RunBackground": false,      // 可选：true 时以后台任务执行接口引擎
+  "BackgroundTask": false,     // 可选：兼容别名
+  "IsBackgroundTask": false,   // 可选：兼容别名
+  "ApiEngineKey": ""           // 可选：后台任务要执行的接口引擎 Key
 }
 ```
 
@@ -78,6 +82,7 @@ if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
 | `V8.FormSubmit({...})` | 提交当前表单 |
 | `V8.FormSet(field, val)` | 修改表单字段 |
 | `V8.ApiEngine.Run({...})` | 调用接口引擎（业务逻辑必走）|
+| `V8.ApiEngine.RunBackground(...)` | 启动后台任务（用于安装、导入、初始化等长任务）|
 
 ---
 
@@ -173,7 +178,47 @@ return V8.ClientType != 'PC';
 
 ---
 
-## 8. 通过 MCP 创建菜单 + 按钮（一次到位）
+## 8. 模式 F：后台任务按钮（长任务）
+
+应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送进度。
+
+推荐直接使用按钮字段：
+
+```jsonc
+{
+  "Name": "安装",
+  "BtnStyle": "primary",
+  "ShowRow": true,
+  "RunBackground": true,
+  "ApiEngineKey": "import-microi-store-package",
+  "V8Code": "return { Package: V8.Form, _BackgroundTaskTitle: '安装应用：' + (V8.Form.Name || '') };"
+}
+```
+
+也可以在 V8Code 中显式调用：
+
+```js
+V8.ApiEngine.RunBackground('import-microi-store-package', {
+  Package: V8.Form
+}, '安装应用：' + (V8.Form.Name || ''));
+```
+
+接口引擎中需要定期上报进度：
+
+```js
+V8.Method.UpdateBackgroundTask({
+  Progress: 35,
+  Current: 35,
+  Total: 100,
+  Message: '正在导入表单配置'
+});
+```
+
+后台任务不能隐藏真实失败。失败时返回 `Code:0` 和清晰 `Msg`，并把关键阶段写入任务进度或系统日志。
+
+---
+
+## 9. 通过 MCP 创建菜单 + 按钮（一次到位）
 
 > AI 在 `microi_create_module` 调用时，把按钮 JSON **作为字符串** 传入对应字段。
 
@@ -193,7 +238,7 @@ return V8.ClientType != 'PC';
 
 ---
 
-## 9. 与接口引擎配套的工作流
+## 10. 与接口引擎配套的工作流
 
 业务按钮通常与接口引擎配套：
 
@@ -206,7 +251,7 @@ return V8.ClientType != 'PC';
 
 ---
 
-## 9.1 后台直充/调账类行按钮
+## 10.1 后台直充/调账类行按钮
 
 会员积分、余额、库存、额度等会改动资产的后台行按钮，必须采用“前端按钮只收参数，后端接口负责事务”的模式。
 

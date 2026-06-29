@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -12,7 +13,6 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 #endif
 
-
 namespace Dos.Common
 {
     /// <summary>
@@ -20,6 +20,34 @@ namespace Dos.Common
     /// </summary>
     public class ConfigHelper
     {
+        private static Func<string, string> RuntimeConfigurationReader { get; set; }
+
+        /// <summary>
+        /// 注册运行期配置读取器。用于让主租户 sys_osclients 中的平台级配置参与统一配置优先级：
+        /// 环境变量 > 主租户 sys_osclients > appsettings.json > 代码默认值。
+        /// </summary>
+        public static void SetRuntimeConfigurationReader(Func<string, string> reader)
+        {
+            RuntimeConfigurationReader = reader;
+        }
+
+        private static string GetRuntimeConfiguration(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key) || RuntimeConfigurationReader == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return RuntimeConfigurationReader.Invoke(key);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
 #if NETSTANDARD
         //public static IConfiguration Configuration { get; set; }
         public static IConfigurationRoot Configuration { get; set; }
@@ -128,6 +156,76 @@ namespace Dos.Common
             return null;
         }
 #endif
+
+        public static string GetEnvOrConfiguration(string envKey, string configPath = null)
+        {
+            var value = Environment.GetEnvironmentVariable(envKey, EnvironmentVariableTarget.Process)
+                        ?? Environment.GetEnvironmentVariable(envKey);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                value = GetRuntimeConfiguration(configPath);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            value = GetRuntimeConfiguration(envKey);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                value = GetConfiguration(configPath);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        public static int GetEnvOrConfigurationInt(string envKey, string configPath, int defaultValue)
+        {
+            var value = GetEnvOrConfiguration(envKey, configPath);
+            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
+
+        public static bool GetEnvOrConfigurationBool(string envKey, string configPath, bool defaultValue)
+        {
+            var value = GetEnvOrConfiguration(envKey, configPath);
+            if (bool.TryParse(value, out var parsed))
+            {
+                return parsed;
+            }
+            if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "no", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return defaultValue;
+        }
 
 
     }

@@ -1,17 +1,18 @@
 using System;
+using Dos.Common;
 
 namespace Microi.net
 {
     public class CreateV8EngineParam
     {
-        public static readonly int DefaultTimeout = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_TIMEOUT_SECONDS", 600);
-        public static readonly int MaxTimeout = ReadPositiveEnvironmentInt("MICROI_V8_MAX_TIMEOUT_SECONDS", 3600);
-        public static readonly int DefaultMaxStatements = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_MAX_STATEMENTS", 50_000_000);
-        public static readonly int MaxStatementsLimit = ReadPositiveEnvironmentInt("MICROI_V8_MAX_STATEMENTS", 500_000_000);
-        public static readonly int DefaultLimitMemory = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", 512);
-        public static readonly int MaxLimitMemory = ReadPositiveEnvironmentInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", 2048);
-        public static readonly int DefaultLimitRecursion = ReadPositiveEnvironmentInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", 2000);
-        public static readonly int MaxLimitRecursion = ReadPositiveEnvironmentInt("MICROI_V8_MAX_LIMIT_RECURSION", 5000);
+        public static int DefaultTimeout => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_TIMEOUT_SECONDS", "V8Limits:DefaultTimeoutSeconds", 600);
+        public static int MaxTimeout => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_TIMEOUT_SECONDS", "V8Limits:MaxTimeoutSeconds", 3600);
+        public static int DefaultMaxStatements => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_MAX_STATEMENTS", "V8Limits:DefaultMaxStatements", 50_000_000);
+        public static int MaxStatementsLimit => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_STATEMENTS", "V8Limits:MaxStatements", 500_000_000);
+        public static int DefaultLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", "V8Limits:DefaultLimitMemoryMB", 512);
+        public static int MaxLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", "V8Limits:MaxLimitMemoryMB", 2048);
+        public static int DefaultLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", "V8Limits:DefaultLimitRecursion", 2000);
+        public static int MaxLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_RECURSION", "V8Limits:MaxLimitRecursion", 5000);
 
         /// <summary>
         /// V8/Jint script timeout in seconds.
@@ -74,14 +75,5 @@ namespace Microi.net
             return value;
         }
 
-        private static int ReadPositiveEnvironmentInt(string name, int defaultValue)
-        {
-            var value = Environment.GetEnvironmentVariable(name);
-            if (int.TryParse(value, out var parsed) && parsed > 0)
-            {
-                return parsed;
-            }
-            return defaultValue;
-        }
     }
 }

@@ -1703,3 +1703,13 @@
         font-size: 20px;
     }
 }
+
+.tree-lazy-load-more-btn {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+}
+
+.tree-lazy-load-more-btn span {
+    user-select: none;
+}

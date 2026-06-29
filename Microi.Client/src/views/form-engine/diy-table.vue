@@ -689,11 +689,12 @@
                                 <el-button
                                     v-if="scope.row.__TreeLazyLoadMore"
                                     type="primary"
-                                    link
+                                    plain
+                                    class="tree-lazy-load-more-btn"
                                     :loading="scope.row.__TreeLazyLoadingMore"
                                     @click.stop="LoadMoreTreeLazyChildren(scope.row)"
                                 >
-                                    {{ scope.row.__TreeLazyLoadMoreText || "加载更多" }}
+                                    {{ scope.row.__TreeLazyLoadMoreText || $t("Msg.LoadMore") }}
                                 </el-button>
                                 <template v-else>
                                 <template v-for="(btn, btnIndex) in (scope.row._RowMoreBtnsOut || [])" :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex">

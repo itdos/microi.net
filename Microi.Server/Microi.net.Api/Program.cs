@@ -267,6 +267,7 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseSecurityGuard();
 app.UseRequestPressureGuard();
 app.UseRouting();
 //-------注意以下两者的顺序-------
@@ -280,11 +281,38 @@ app.MapControllerRoute(
 
 #region Microi.net 启用
 MicroiEngine.Init(app.Services);
+Dos.ORM.Database.OnConnectionGuardEvent += (eventName, guardKey, message) =>
+{
+    var title = eventName == "MySqlHostCacheRepairSucceeded"
+        ? "MySQL host_cache 自动修复成功"
+        : "MySQL host_cache 自动修复失败";
+    var level = eventName == "MySqlHostCacheRepairSucceeded" ? 2 : 3;
+    var osClientForLog = OsClient.GetConfigOsClient();
+    Console.WriteLine($"Microi：【数据库连接保护】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{title}，GuardKey={guardKey}，Msg={message}");
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await MicroiEngine.MongoDB.AddSysLog(new SysLogParam
+            {
+                OsClient = osClientForLog,
+                Type = "数据库连接保护",
+                Title = title,
+                Content = $"GuardKey={guardKey}\n{message}",
+                Level = level
+            });
+        }
+        catch
+        {
+        }
+    });
+};
 app.UseMicroi();      // 初始化 SaaS 引擎（同步加载 sys_osclients → ClientList）
 app.UseMicroiJob();   // 启用任务计划
 app.UseMicroiMQ();    // 启用消息队列
 app.UseMicroiUpgrade();// 启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
+BackgroundTaskService.ConfigureHubContext(app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>());
 
 // 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
 var osClientName = OsClient.GetConfigOsClient();
@@ -399,9 +427,23 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             // 接口引擎初始化（并行，租户数量可能较大）
             try
             {
-                var initTasks = OsClient.ClientList.Values
-                    .Select(c => new DynamicRoute().Init(c))
-                    .ToList();
+                var maxConcurrency = ConfigHelper.GetEnvOrConfigurationInt(
+                    "MICROI_STARTUP_DYNAMIC_ROUTE_MAX_CONCURRENCY",
+                    "StartupLimits:DynamicRouteInitMaxConcurrency",
+                    2);
+                var startupGate = new System.Threading.SemaphoreSlim(maxConcurrency, maxConcurrency);
+                var initTasks = OsClient.ClientList.Values.Select(async c =>
+                {
+                    await startupGate.WaitAsync();
+                    try
+                    {
+                        await new DynamicRoute().Init(c);
+                    }
+                    finally
+                    {
+                        startupGate.Release();
+                    }
+                }).ToList();
                 await Task.WhenAll(initTasks);
             }
             catch (Exception ex)
@@ -412,8 +454,27 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             // AI 引擎 Schema 缓存初始化
             try
             {
-                MicroiEngine.FormEngine.QueueDiyLangFullSyncForAllClients(true, "startup");
-                Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已排队同步 diy_lang 元数据与前端固定文案。");
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(2));
+                    var startupOsClients = OsClientExtend.ClientList.Keys
+                        .Where(item => !item.DosIsNullOrWhiteSpace())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    if (startupOsClients.Count == 0)
+                    {
+                        var configOsClient = OsClient.GetConfigOsClient();
+                        if (!configOsClient.DosIsNullOrWhiteSpace())
+                        {
+                            startupOsClients.Add(configOsClient);
+                        }
+                    }
+                    foreach (var item in startupOsClients)
+                    {
+                        await MicroiEngine.FormEngine.RepairMissingDiyLangTranslationsAsync(item, "startup");
+                    }
+                    Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已排队同步 diy_lang 元数据与前端固定文案。");
+                });
             }
             catch (Exception ex)
             {

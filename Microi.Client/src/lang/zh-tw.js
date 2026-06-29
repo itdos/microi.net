@@ -5,6 +5,13 @@ import zh from "./zh";
 const Msg = {
     ...zh.Msg,
     Load: "載入",
+    LoadMore: "載入更多",
+    BackgroundTasks: "背景任務",
+    Refresh: "重新整理",
+    ClearCompleted: "清除已完成",
+    NoBackgroundTasks: "暫無背景任務",
+    Stop: "停止",
+    Elapsed: "耗時",
     Update: "修改",
     Email: "郵箱",
     Remark: "備註",

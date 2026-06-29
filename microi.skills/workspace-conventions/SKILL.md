@@ -50,6 +50,36 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 更新 VS Code 插件生成模板时，要同步检查当前已生成的 `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md`、`.cursorrules` 和 Cursor rules，避免模板下一次刷新又把英文写回来。
 - 收尾时用 `rg` 扫描明显英文规范短语（如 `Use when`、`Required:`、`Forbidden:`、`Acceptance:`、`Quick Workflow`、`MCP default visibility`）。剩余英文必须属于必要标识符或专有名词。
 
+## 配置文件说明中文优先规则
+
+AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员或用户阅读的自然语言描述，默认必须写中文。适用范围包括 `appsettings*.json`、`docker-compose*.yml`、`launchSettings.json`、`*.example`、安装脚本注释、部署说明和示例配置。
+
+- `Description`、`Important`、`EnvironmentVariables` 的说明文字、JSON/YAML 注释、示例说明、字段说明默认使用中文。
+- 字段名、环境变量名、枚举值、路由、类名、方法名、包名、协议名等标识符保持原始英文，不要为了中文化而破坏程序读取。
+- 如果配置面向海外交付，才可以在中文说明后补充英文括注；不要整段只写英文。
+- 修改配置说明后，必须确认 JSON/YAML 仍可解析，不能因为中文标点或注释方式导致配置文件失效。
+
+## 多语言优先约定
+
+Microi 平台默认支持多语言。AI 修改 `Microi.Client`、`Microi.Server`、`Microi-V8-Engine`、MCP 建模数据、菜单按钮、接口引擎或表单 V8 事件时，凡是用户可见文字都必须先考虑多语言，不要把中文提示、按钮名、Tab 名、菜单名、字段名、Toast/Msg 等硬写死后结束任务。
+- 前端框架固定文案优先使用 `$t('Msg.xxx')` 或项目现有 i18n 工具；中文简体、中文繁体、英语作为前端兜底包，其它语言应来自后端 `diy_lang` 缓存/接口返回，不要随意把十几种语言全写死到前端源码。
+- 后端返回给前端的表名、字段名、菜单名、按钮名、Tab 名、错误提示等，优先从 `diy_lang` 缓存取值；没有词条时再返回原文，并异步补齐词条。
+- V8 接口引擎、表单 V8 事件、菜单按钮 V8 若需要返回中文 `Msg`、通知、按钮提示或日志标题，应优先使用 `V8.TranslateEngine.GetLang(key)` / 约定多语言 Key，或至少为后端自动同步留下稳定 Key，不要只写一次性中文字符串。
+- 通过 MCP 创建或维护 `diy_lang` 数据时必须保持树形结构：`系统`、`模块引擎`、`表单引擎`、`业务数据` 等分类。菜单名称归 `模块引擎`；表名、字段名、V8 按钮名、Tab 名归 `表单引擎`；固定框架文案归 `系统`；业务数据默认不写入 `diy_lang`，除非用户明确要求某类业务表进入词库。
+- 不允许把所有多语言映射都创建到 `diy_lang` 根目录。新增词条前先查询是否已有同 Key/同分类数据；写入后需要刷新/回读多语言缓存。
+- 完成多语言相关改动后，至少切换一次目标语言或调用对应接口验证；涉及页面的任务优先用 Playwright 截图确认关键区域没有残留明显中文。
+
+## 后台任务与安全防护约定
+
+Microi 平台级长任务和安全防护属于系统能力，AI 修改框架、MCP 或 V8 示例时必须同步考虑：
+
+- 应用安装、初始化多语言、批量导入、批量修复、跨系统同步等长任务优先接入后台任务中心，进度通过吾码标准 WebSocket/SignalR 推送，不要默认用前端轮询接口。
+- 菜单按钮可使用 `RunBackground` / `BackgroundTask` / `IsBackgroundTask` 配合 `ApiEngineKey` 启动后台任务；接口引擎内用 `V8.Method.UpdateBackgroundTask` 上报进度。
+- 平台级安全、访问审计、后台任务、运行态监控等系统表统一使用 `mci_` 前缀；普通业务系统表不要使用 `mci_` 前缀，避免与平台能力混淆。
+- 恶意攻击防护只能根据短时间高频、异常状态码爆发、扫描不存在路径、封禁后继续访问等行为判断，不能因为接口执行时间长或排队时间长就封禁用户。
+- 攻击事件、IP 封禁/解封记录应异步写入 MySQL `mci_` 表并写系统日志；同一 IP、同一原因、同一时间窗必须去重合并，不要重复写大量相同失败原因。
+- 手动封禁、手动解封、自动解封都要有审计记录。封禁响应要返回 DosResult 风格 JSON，便于前端明确提示。
+
 ## VS Code 插件空目录生成规则
 
 Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。
@@ -121,7 +151,7 @@ Pop-Location
 
 普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
 
-**可见终端要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，AI 必须优先使用用户可见的 VS Code 集成终端，在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。如果当前工具环境没有可见终端能力，必须明确说明限制并请用户在 VS Code 终端执行，不能擅自用隐藏窗口或后台服务启动。若 7266 已被本项目后端占用，可先定位并停止该 `Microi.net.Api` 进程，再在可见终端重启；不要误杀数据库、Redis、Node 前端或其它业务进程。
+**本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，AI 允许自动定位并停止占用 `7266` 的本项目 `Microi.net.Api`/`dotnet` 进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。若 `7266` 实在无法释放，允许临时启动 `7267`，并同步把本地 `Microi.Client/src/config.json` 的 API 地址改到 `https://localhost:7267`；任务结束前必须说明端口变更。不要误杀数据库、Redis、Node 前端或其它业务进程。
 
 ## 本地租户与测试凭据读取约定
 
@@ -188,6 +218,17 @@ AI 通过 MCP 修改 `diy_field`、`diy_table`、`sys_menu`、`sys_osclients`、
 2. 修改字段、表、菜单后，必须调用 `microi_get_field_list` / `microi_get_table_data` 回读关键字段，并调用 `microi_refresh_schema_cache` 或对应清缓存接口刷新 Redis。涉及 SaaS 引擎、系统设置、菜单按钮、接口引擎等运行态缓存时，还要调用对应租户清缓存接口并重新请求受影响页面/API。
 3. 最终交付说明必须写清楚：改了哪个表/字段，回读值是什么，刷新了哪些缓存，验证入口是什么。若某个缓存刷新接口失败或只能部分成功，需要把失败消息原样摘要出来，不能把“写入成功”当作“页面一定生效”。
 
+## MCP 可用性排查约定
+
+VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”，不代表当前 AI 会话一定已经成功加载了对应工具。AI 在声称“可以通过 MCP 操作”之前，必须完成一次真实可调用性验证：
+
+- 先用当前会话可用的工具发现能力查找目标 MCP 工具；若工具发现为 0，不能继续假设 MCP 可用。
+- 再用 MCP 资源/模板列表或最小 `initialize` / `tools/list` 探测确认服务器握手成功。若返回 `handshaking with MCP server failed`、`initialize response`、`connection closed` 等错误，要明确说明“配置存在但当前会话不可调用”。
+- 同时检查 `.vscode/mcp.json`、`.cursor/mcp.json`、`.mcp.json` 和 `~/.codex/config.toml` 是否能解析，并确认目标服务器名、`MICROI_API_URL`、`MICROI_OS_CLIENT`、`MICROI_TOKEN_FILE` 已写入。
+- 如果手动启动 `mcp-server.js` 能响应，而当前 AI 会话仍握手失败，应优先怀疑 MCP stdio 协议兼容、初始化响应格式/大小、服务器进程提前退出或插件生成的 Codex 配置顺序问题，而不是简单归因于“用户没启用”。
+- MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界，`MICROI_LABEL` 只能作为显示名称，不能把中文显示名当成租户 Key 写入“只能管理某租户”的安全提示。
+- 修复 Microi.VSCode 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
+
 ## .venv Python 环境说明
 
 工作区根目录的 `.venv/` 是 Python 虚拟环境，**保留，不要删除**。已安装：
@@ -209,7 +250,7 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
    ```powershell
    dotnet run --launch-profile Microi.net.Api
    ```
-   启动必须发生在用户可见的 VS Code 集成终端中，方便用户肉眼看到日志并手动停止。当前工具环境没有可见终端能力时，AI 只能编译验证并提示用户执行上述命令；除非用户明确同意临时后台启动，否则禁止使用 `Start-Process -WindowStyle Hidden` 这类隐藏窗口方式。
+   启动优先发生在用户能在 VS Code 中看到和停止的终端中，方便用户查看日志并手动停止；用户明确允许时，可以使用 VS Code 可追踪的隐藏终端/任务终端。当前工具环境没有 VS Code 终端能力时，允许使用本机可见的 `cmd`/PowerShell 窗口启动；禁止使用脱离用户可见窗口的后台服务或守护进程方式启动。若 `7266` 无法释放，允许临时使用 `7267`，并同步修改本地 `Microi.Client/src/config.json` 指向新端口。
 4. 启动后轮询验证 `https://localhost:7266` 或 launch profile 实际地址可访问；至少确认端口已监听、进程存在、最近日志没有立即崩溃。涉及新增 API 时，再调用新增/受影响接口做一次真实请求。
 5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、7266 是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
 

@@ -19,6 +19,8 @@
             </div>
 
             <!-- 搜索 -->
+            <BackgroundTaskCenter />
+
             <search id="header-search" class="right-menu-item hover-effect" />
 
             <lang-select class="right-menu-item hover-effect" />
@@ -134,6 +136,7 @@ import Hamburger from "@/components/Hamburger";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
+import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
@@ -145,7 +148,8 @@ export default {
         Hamburger,
         LangSelect,
         Search,
-        ThemeSelect
+        ThemeSelect,
+        BackgroundTaskCenter
     },
     setup() {
         const diyStore = useDiyStore();
