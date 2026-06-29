@@ -406,6 +406,18 @@ npm i -D @playwright/test
 npx playwright install chromium
 ```
 
+### 浏览器选择强制顺序
+
+做本地页面级 Playwright 验收时，不能因为 Playwright 官方 Chromium 缓存缺失或下载超时就结束任务。必须按下面顺序自动兜底：
+
+1. 优先读取 `PW_CHROMIUM_EXECUTABLE` / `PW_BROWSER_EXECUTABLE`。
+2. Windows 优先探测本机 Edge / Chrome：`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`、`C:/Program Files/Microsoft/Edge/Application/msedge.exe`、`C:/Users/Administrator/AppData/Local/Google/Chrome/Bin/chrome.exe`、`C:/Program Files/Google/Chrome/Application/chrome.exe`、`C:/Program Files (x86)/Google/Chrome/Application/chrome.exe`。
+3. 再探测工作区本地缓存：`.cache/chromium/**/chrome.exe`、`.tmp/playwright-browsers/**/chrome.exe`。
+4. 仍没有浏览器时，才从吾码 CDN 下载到 `.tmp/playwright-browsers/`，并设置 `PW_CHROMIUM_EXECUTABLE`。
+5. 只有系统浏览器、本地缓存和 CDN 下载全部失败时，才允许报告“浏览器不可用”；报告中必须说明已经尝试过哪些路径。
+
+手写一次性脚本必须把浏览器探测逻辑写在 `.tmp/*.mjs` 中，截图和报告也必须输出到 `.tmp/screenshots/` 或 `.tmp/reports/`，不要写到 `Microi.Client/`、`Microi.Server/` 等子项目目录。
+
 国内或内网环境如果下载浏览器困难，可以使用本机 Edge：
 
 ```bash

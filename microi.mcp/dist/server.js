@@ -64,6 +64,61 @@ function buildRuntimeServerName(context) {
         || 'default';
     return `Microi-${basePart}`;
 }
+const CORE_TOOL_REGISTRATION_ORDER = [
+    'microi_get_status',
+    'microi_get_db_schema',
+    'microi_get_field_list',
+    'microi_add_field',
+    'microi_update_field',
+    'microi_refresh_schema_cache',
+    'microi_create_table',
+    'microi_create_module',
+    'microi_get_event_code',
+    'microi_save_event_code',
+    'microi_list_events',
+    'microi_get_table_data',
+    'microi_add_form_data',
+    'microi_update_form_data',
+    'microi_get_manifest_schema',
+    'microi_plan_system',
+    'microi_generate_system',
+    'microi_validate_system',
+    'microi_build_field_config',
+    'microi_validate_menu_buttons',
+    'microi_list_engines',
+    'microi_get_engine_code',
+    'microi_save_engine_code',
+    'microi_create_engine',
+    'microi_get_module',
+    'microi_update_module',
+    'microi_list_modules',
+    'microi_update_table',
+    'microi_set_role_permission',
+    'microi_set_engine_anonymous',
+];
+const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
+function bufferToolRegistrationsByPriority(server) {
+    const mutableServer = server;
+    const originalTool = mutableServer.tool.bind(server);
+    const buffered = [];
+    mutableServer.tool = (...args) => {
+        const name = typeof args[0] === 'string' ? args[0] : '';
+        buffered.push({ name, args, index: buffered.length });
+        return undefined;
+    };
+    return () => {
+        mutableServer.tool = originalTool;
+        buffered
+            .sort((a, b) => {
+            const priorityA = CORE_TOOL_PRIORITY.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+            const priorityB = CORE_TOOL_PRIORITY.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+            return priorityA - priorityB || a.index - b.index;
+        })
+            .forEach((item) => {
+            originalTool(...item.args);
+        });
+    };
+}
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
 function formatDbTables(tables) {
     if (!tables.length)
@@ -281,7 +336,7 @@ function buildInstructions(ctx) {
 - API Server: ${ctx.apiBaseUrl}
 - OsClient (tenant): ${ctx.osClient}
 
-IMPORTANT: This server ONLY manages tenant "${ctx.label || ctx.osClient}". When the user specifies a different tenant name, do NOT use this server.
+IMPORTANT: This server ONLY manages OsClient tenant "${ctx.osClient}". "${ctx.label || ctx.osClient}" is only a display name. When the user specifies a different tenant name, do NOT use this server.
 BOUNDARY RULES:
 - Bound API Server: ${ctx.apiBaseUrl}
 - Bound OsClient: ${ctx.osClient || '(default)'}
@@ -359,11 +414,19 @@ BOUNDARY RULES:
   "IsVisible": true,
   "ShowRow": true,           // 行内显示(MoreBtns需要)
   "V8CodeShow": "if(V8.Form.Status=='待处理'){V8.Result=true;}else{V8.Result=false;}",  // 显隐JS
-  "V8Code": "V8.ApiEngine.Run({ApiEngineKey:'order_assign', Id:V8.Form.Id}, function(r){V8.RefreshTable({_PageIndex:1});});"  // 点击执行JS
+  "V8Code": "V8.ApiEngine.Run({ApiEngineKey:'order_assign', Id:V8.Form.Id}, function(r){V8.RefreshTable({_PageIndex:1});});",  // 点击执行JS
+  "RunBackground": false,    // 长任务可设 true
+  "BackgroundTask": false,   // 兼容别名
+  "IsBackgroundTask": false, // 兼容别名
+  "ApiEngineKey": ""         // 后台任务执行的接口引擎Key
 }
 \`\`\`
 按钮的 V8Code **强烈建议** 调用接口引擎（V8.ApiEngine.Run）执行后端逻辑，前端只负责弹窗、刷新、提示。
+应用安装、初始化多语言、批量导入、批量修复、跨系统同步等长任务应使用后台任务：按钮设置 RunBackground/BackgroundTask/IsBackgroundTask=true 并提供 ApiEngineKey，接口引擎内用 V8.Method.UpdateBackgroundTask 上报进度。
 详细写法参考 skill 文档：\`microi.skills/v8-menu-buttons/SKILL.md\`
+
+## 系统级表名前缀
+平台级安全、访问审计、后台任务、运行态监控等系统能力表必须使用 mci_ 前缀；普通业务系统表不要使用 mci_ 前缀。
 
 ## 核心系统表名（请严格使用以下表名）
 | 表名 | 说明 |
@@ -502,6 +565,7 @@ export function createMcpServer(client, context) {
     // 服务器名称与 mcp.json key 保持一致：统一使用 Microi- 前缀，如 Microi-乐闪购。
     const serverName = buildRuntimeServerName(context);
     const server = new McpServer({ name: serverName, version: '1.0.0' }, { instructions: buildInstructions(context) });
+    const flushToolRegistrations = bufferToolRegistrationsByPriority(server);
     // ========================
     // Tool: 获取服务器状态
     // ========================
@@ -1403,7 +1467,7 @@ export function createMcpServer(client, context) {
         defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
         sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
         diyConfig: z.string().optional().describe('Advanced module config JSON string'),
-        moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code}. V8Code typically calls V8.ApiEngine.Run(...). Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
+        moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
         formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required.'),
         batchSelectMoreBtns: z.string().optional().describe('Batch action buttons (after selecting multiple rows) JSON ARRAY (string). Same item shape as moreBtns. Use V8.TableRowSelected to access selected rows.'),
         pageTabs: z.string().optional().describe('Page top tabs JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,V8Code,V8CodeShow}. V8Code typically calls V8.SearchSet({field:value}) to filter. V8CodeShow controls visibility per V8.ClientType.'),
@@ -1560,6 +1624,7 @@ export function createMcpServer(client, context) {
     registerDesignTools(server, client, context);
     registerAdvancedTools(server, client, context);
     registerBlueprintTools(server, client, context);
+    flushToolRegistrations();
     return server;
 }
 //# sourceMappingURL=server.js.map

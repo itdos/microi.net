@@ -87,7 +87,7 @@ namespace Microi.net.Api
             var category = ResolveCategory(path);
             var routeKey = NormalizeRouteKey(path, category);
             var tenantOptions = GetTenantPressureOptions(osClient);
-            var waitMilliseconds = IsLongRunningCategory(category)
+            var waitMilliseconds = IsLongRunningRequest(path, category)
                 ? LowerPositive(options.LongRunningWaitMilliseconds, tenantOptions.LongRunningWaitMilliseconds)
                 : LowerPositive(options.WaitMilliseconds, tenantOptions.WaitMilliseconds);
 
@@ -299,10 +299,52 @@ namespace Microi.net.Api
             return parts[0];
         }
 
-        private static bool IsLongRunningCategory(string category)
+        private static bool IsLongRunningRequest(string path, string category)
         {
-            return string.Equals(category, "apiengine", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(category, "v8", StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(category, "apiengine", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(category, "v8", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (!string.Equals(category, "formengine", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var action = ExtractFormEngineAction(path);
+            if (string.IsNullOrWhiteSpace(action))
+            {
+                return false;
+            }
+
+            // 表单保存、删除、导入导出、批量处理可能触发后端 V8 或外部系统同步，
+            // 需要长排队窗口；列表/详情/元数据读取保持普通窗口，避免页面查询被长任务拖住。
+            return action.StartsWith("Add", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Upt", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Del", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Save", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Submit", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Import", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Export", StringComparison.OrdinalIgnoreCase)
+                || action.StartsWith("Batch", StringComparison.OrdinalIgnoreCase)
+                || action.IndexOf("Upload", StringComparison.OrdinalIgnoreCase) >= 0
+                || action.IndexOf("Download", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string ExtractFormEngineAction(string path)
+        {
+            var value = (path ?? "").Trim('/');
+            var parts = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3 || !parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)
+                || !parts[1].Equals("FormEngine", StringComparison.OrdinalIgnoreCase))
+            {
+                return "";
+            }
+
+            var action = parts[2];
+            var dashIndex = action.IndexOf('-');
+            return dashIndex > 0 ? action.Substring(0, dashIndex) : action;
         }
 
         private static string FirstNonBlank(params string[] values)
