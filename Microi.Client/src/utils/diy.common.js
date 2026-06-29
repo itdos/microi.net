@@ -4110,6 +4110,17 @@ var DiyCommon = {
                 }
                 return result;
             }
+        },
+        async RunBackground(apiEngineKey, param, title, callback) {
+            var result = await DiyCommon.PostAsync("/api/BackgroundTask/RunApiEngine", {
+                ApiEngineKey: apiEngineKey,
+                Param: param || {},
+                Title: title || apiEngineKey
+            }, null, null, "json");
+            if (callback) {
+                callback(result);
+            }
+            return result;
         }
     },
     ModuleEngine: {

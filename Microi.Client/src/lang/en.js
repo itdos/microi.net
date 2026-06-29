@@ -1,6 +1,13 @@
 export default {
     Msg: {
         Load: "Load",
+        LoadMore: "Load more",
+        BackgroundTasks: "Background tasks",
+        Refresh: "Refresh",
+        ClearCompleted: "Clear completed",
+        NoBackgroundTasks: "No background tasks",
+        Stop: "Stop",
+        Elapsed: "Elapsed",
         Update: "Update",
         Email: "Email",
         Remark: "Remark",

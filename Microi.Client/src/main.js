@@ -360,6 +360,7 @@ function InitDiyWebcoket() {
                 ws.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
                 ws.start().then(function () {
                     console.log("[成功] 连接消息服务器成功！");
+                    window.dispatchEvent(new CustomEvent("microi-websocket-connected", { detail: { state: "Connected" } }));
                     // 连接成功后重置重连计数器
                     if (window.resetWebSocketRetry) {
                         window.resetWebSocketRetry();
@@ -372,6 +373,7 @@ function InitDiyWebcoket() {
                 });
                 ws.onreconnected((connectionId) => {
                     console.log("消息服务器已重新连接！", connectionId);
+                    window.dispatchEvent(new CustomEvent("microi-websocket-connected", { detail: { state: "Reconnected", connectionId } }));
                 });
                 ws.onreconnecting((error) => {
                     console.log("消息服务器正在重连...", error);

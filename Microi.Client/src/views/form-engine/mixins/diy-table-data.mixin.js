@@ -160,7 +160,8 @@ export default {
         },
         BuildTreeLazyLoadMoreRow(tree, nextPageIndex, pageSize, loadedCount, totalCount) {
             var parentId = tree && tree.Id ? tree.Id : "";
-            var text = "加载更多（" + loadedCount + "/" + totalCount + "）";
+            var loadMoreLabel = this.$t ? this.$t("Msg.LoadMore") : "加载更多";
+            var text = loadMoreLabel + " (" + loadedCount + "/" + totalCount + ")";
             var row = {
                 Id: "__TreeLazyLoadMore_" + parentId + "_" + nextPageIndex,
                 __TreeLazyLoadMore: true,
