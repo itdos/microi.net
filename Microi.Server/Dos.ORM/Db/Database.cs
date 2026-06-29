@@ -37,7 +37,7 @@ namespace Dos.ORM
     {
         private DbProvider dbProvider;
         private static int MaxConcurrentConnectionOpens => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MAX_CONCURRENT_CONNECTION_OPENS", "OrmLimits:MaxConcurrentConnectionOpens", 64);
-        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", "OrmLimits:ConnectionOpenWaitSeconds", 60);
+        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", "OrmLimits:ConnectionOpenWaitSeconds", 600);
         private static int ConnectionPressureBackoffSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_PRESSURE_BACKOFF_SECONDS", "OrmLimits:ConnectionPressureBackoffSeconds", 120);
         private static bool MySqlHostCacheAutoRepairEnabled => ConfigHelper.GetEnvOrConfigurationBool("DOS_ORM_MYSQL_HOST_CACHE_AUTO_REPAIR_ENABLED", "OrmLimits:MySqlHostCacheAutoRepairEnabled", true);
         private static int MySqlHostCacheRepairCooldownSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MYSQL_HOST_CACHE_REPAIR_COOLDOWN_SECONDS", "OrmLimits:MySqlHostCacheRepairCooldownSeconds", 300);
@@ -337,8 +337,9 @@ namespace Dos.ORM
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
+            WaitIfConnectionBackoffActive(guardKey);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
-            var waitSeconds = ConnectionOpenWaitSeconds + ConnectionPressureBackoffSeconds;
+            var waitSeconds = ConnectionOpenWaitSeconds;
             if (!semaphore.Wait(TimeSpan.FromSeconds(waitSeconds)))
             {
                 throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
@@ -346,7 +347,6 @@ namespace Dos.ORM
 
             try
             {
-                WaitIfConnectionBackoffActive(guardKey);
                 connection.Open();
             }
             catch (Exception ex)
@@ -364,8 +364,9 @@ namespace Dos.ORM
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
+            await WaitIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
-            var waitSeconds = ConnectionOpenWaitSeconds + ConnectionPressureBackoffSeconds;
+            var waitSeconds = ConnectionOpenWaitSeconds;
             if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(waitSeconds), cancellationToken).ConfigureAwait(false))
             {
                 throw new TimeoutException("Database connection open is throttled because too many requests are opening connections.");
@@ -373,7 +374,6 @@ namespace Dos.ORM
 
             try
             {
-                await WaitIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
