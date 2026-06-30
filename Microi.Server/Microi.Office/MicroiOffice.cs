@@ -1365,6 +1365,149 @@ namespace Microi.net
                 .FirstOrDefault(d => nameSet.Contains(d["Name"].Val<string>()) || labelSet.Contains(d["Label"].Val<string>()));
         }
 
+        private class ImportChildParentMatch
+        {
+            public JObject ChildField { get; set; }
+            public JObject ParentField { get; set; }
+            public string ParentAlias { get; set; }
+        }
+
+        private static JObject ImportFindFieldByNameOrLabel(IEnumerable<JObject> fields, string nameOrLabel, string label = null)
+        {
+            if (fields == null) return null;
+            var list = fields.Where(d => d != null).ToList();
+            if (!nameOrLabel.DosIsNullOrWhiteSpace())
+            {
+                var match = list.FirstOrDefault(d => string.Equals(d["Name"].Val<string>(), nameOrLabel, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match;
+                match = list.FirstOrDefault(d => string.Equals(d["Label"].Val<string>(), nameOrLabel, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match;
+            }
+            if (!label.DosIsNullOrWhiteSpace())
+            {
+                return list.FirstOrDefault(d => string.Equals(d["Label"].Val<string>(), label, StringComparison.OrdinalIgnoreCase));
+            }
+            return null;
+        }
+
+        private static object ImportJTokenToObject(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return null;
+            if (token is JValue value) return value.Value;
+            return token.ToString(Formatting.None);
+        }
+
+        private static string ImportBuildMatchKey(IEnumerable<string> values)
+        {
+            return string.Join("\u001F", values.Select(d => (d ?? "").Trim().ToUpperInvariant()));
+        }
+
+        private static List<ImportChildParentMatch> ImportBuildChildParentMatches(
+            List<JObject> childFields,
+            List<JObject> parentFields,
+            DiyFieldConfig relationConfig)
+        {
+            var result = new List<ImportChildParentMatch>();
+            var tableChildConfig = relationConfig?.TableChild;
+            if (tableChildConfig?.ImportRelations != null)
+            {
+                foreach (var relation in tableChildConfig.ImportRelations)
+                {
+                    var parentKey = relation.ParentFieldName.DosIsNullOrWhiteSpace(relation.Parent);
+                    var childKey = relation.ChildFieldName.DosIsNullOrWhiteSpace(relation.Child);
+                    var parentField = ImportFindFieldByNameOrLabel(parentFields, parentKey, relation.ParentFieldLabel);
+                    var childField = ImportFindFieldByNameOrLabel(childFields, childKey, relation.ChildFieldLabel);
+                    if (parentField != null && childField != null)
+                    {
+                        result.Add(new ImportChildParentMatch()
+                        {
+                            ParentField = parentField,
+                            ChildField = childField,
+                            ParentAlias = $"Match{result.Count}"
+                        });
+                    }
+                }
+            }
+
+            if (!result.Any()
+                && tableChildConfig != null
+                && (!tableChildConfig.ImportParentMatchFieldName.DosIsNullOrWhiteSpace()
+                    || !tableChildConfig.ImportChildMatchFieldName.DosIsNullOrWhiteSpace()))
+            {
+                var parentField = ImportFindFieldByNameOrLabel(parentFields, tableChildConfig.ImportParentMatchFieldName);
+                var childField = ImportFindFieldByNameOrLabel(childFields, tableChildConfig.ImportChildMatchFieldName);
+                if (parentField != null && childField != null)
+                {
+                    result.Add(new ImportChildParentMatch()
+                    {
+                        ParentField = parentField,
+                        ChildField = childField,
+                        ParentAlias = "Match0"
+                    });
+                }
+            }
+
+            if (result.Any()) return result;
+
+            var preferredNames = new[]
+            {
+                "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH",
+                "CustomerName", "KehuMC", "KehuName", "ClientName",
+                "SupplierName", "GongyingshangMC", "Name", "Code", "No"
+            };
+            foreach (var name in preferredNames)
+            {
+                var parentField = ImportFindFieldByNameOrLabel(parentFields, name);
+                var childField = ImportFindFieldByNameOrLabel(childFields, name);
+                if (parentField != null && childField != null)
+                {
+                    result.Add(new ImportChildParentMatch()
+                    {
+                        ParentField = parentField,
+                        ChildField = childField,
+                        ParentAlias = "Match0"
+                    });
+                    return result;
+                }
+            }
+
+            var preferredLabels = new[] { "项目编号", "项目编码", "项目号", "客户名称", "客户名", "客户", "供应商名称", "供应商", "编号", "编码", "名称" };
+            foreach (var label in preferredLabels)
+            {
+                var parentField = ImportFindFieldByNameOrLabel(parentFields, label);
+                var childField = ImportFindFieldByNameOrLabel(childFields, label);
+                if (parentField != null && childField != null)
+                {
+                    result.Add(new ImportChildParentMatch()
+                    {
+                        ParentField = parentField,
+                        ChildField = childField,
+                        ParentAlias = "Match0"
+                    });
+                    return result;
+                }
+            }
+
+            var fallbackChildField = ImportFindField(
+                childFields,
+                new[] { "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH", "Code" },
+                new[] { "项目编号", "项目编码", "项目号" });
+            var fallbackParentField = ImportFindField(
+                parentFields,
+                new[] { "Code", "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH" },
+                new[] { "项目编号", "项目编码", "项目号" });
+            if (fallbackParentField != null && fallbackChildField != null)
+            {
+                result.Add(new ImportChildParentMatch()
+                {
+                    ParentField = fallbackParentField,
+                    ChildField = fallbackChildField,
+                    ParentAlias = "Match0"
+                });
+            }
+            return result;
+        }
+
         private int ImportAutoFillChildFkByParentCode(
             List<dynamic> fileDataList,
             List<JObject> currentFieldList,
@@ -1372,7 +1515,7 @@ namespace Microi.net
             DiyTable currentTable,
             DbSession dbSession,
             DbInfo dbInfo,
-            dynamic osClientModel,
+            OsClientSecret osClientModel,
             List<string> importStepList,
             string dateTimeFormat)
         {
@@ -1382,6 +1525,7 @@ namespace Microi.net
                 .Where(d => d.Component == "TableChild" && d.IsDeleted == 0)
                 .ToList();
 
+            var duplicateMatchWarnings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var relationField in tableChildFields)
             {
                 DiyFieldConfig relationConfig = null;
@@ -1398,28 +1542,13 @@ namespace Microi.net
                 {
                     continue;
                 }
+                if (relationConfig.TableChild?.ImportAutoFillFk == false)
+                {
+                    continue;
+                }
 
                 var fkField = currentFieldList.FirstOrDefault(d => string.Equals(d["Name"].Val<string>(), relationConfig.TableChildFkFieldName, StringComparison.OrdinalIgnoreCase));
                 if (fkField == null) continue;
-
-                var childCodeField = ImportFindField(
-                    currentFieldList,
-                    new[] { "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH", "Code" },
-                    new[] { "项目编号", "项目编码", "项目号" });
-                if (childCodeField == null) continue;
-
-                var projectCodes = fileDataList
-                    .Select(ImportGetRowDictionary)
-                    .Where(row => row != null && !ImportHasFieldValue(row, fixedField, fkField))
-                    .Select(row =>
-                    {
-                        ImportTryGetFieldValue(row, null, childCodeField, out var codeValue);
-                        return ImportNormalizeValue(codeValue, childCodeField);
-                    })
-                    .Where(code => !code.DosIsNullOrWhiteSpace())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                if (!projectCodes.Any()) continue;
 
                 var parentTable = dbSession.From<DiyTable>()
                     .Where(d => d.Id == relationField.TableId && d.IsDeleted == 0)
@@ -1434,48 +1563,126 @@ namespace Microi.net
                     parentFields,
                     new[] { "Code", "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH" },
                     new[] { "项目编号", "项目编码", "项目号" });
-                if (parentCodeField == null) continue;
+                var importParentMatchFieldName = relationConfig.TableChild?.ImportParentMatchFieldName;
+                var importChildMatchFieldName = relationConfig.TableChild?.ImportChildMatchFieldName;
+                var hasExplicitImportRelation = relationConfig.TableChild?.ImportRelations?.Any() == true
+                    || !importParentMatchFieldName.DosIsNullOrWhiteSpace()
+                    || !importChildMatchFieldName.DosIsNullOrWhiteSpace();
+                var matches = ImportBuildChildParentMatches(currentFieldList, parentFields, relationConfig);
+                if (!matches.Any() && parentCodeField != null)
+                {
+                    var childCodeField = ImportFindField(
+                        currentFieldList,
+                        new[] { "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH", "Code" },
+                        new[] { "项目编号", "项目编码", "项目号" });
+                    if (childCodeField != null)
+                    {
+                        matches.Add(new ImportChildParentMatch()
+                        {
+                            ParentField = parentCodeField,
+                            ChildField = childCodeField,
+                            ParentAlias = "Match0"
+                        });
+                    }
+                }
+                if (!matches.Any()) continue;
+
+                for (var matchIndex = 0; matchIndex < matches.Count; matchIndex++)
+                {
+                    matches[matchIndex].ParentAlias = $"Match{matchIndex}";
+                }
+
+                var pendingRowKeys = new List<KeyValuePair<IDictionary<string, object>, string>>();
+                var firstMatchValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in fileDataList.Select(ImportGetRowDictionary))
+                {
+                    if (row == null || ImportHasFieldValue(row, fixedField, fkField)) continue;
+                    var values = new List<string>();
+                    foreach (var match in matches)
+                    {
+                        ImportTryGetFieldValue(row, null, match.ChildField, out var childValue);
+                        var normalized = ImportNormalizeValue(childValue, match.ChildField);
+                        if (normalized.DosIsNullOrWhiteSpace())
+                        {
+                            values.Clear();
+                            break;
+                        }
+                        values.Add(normalized);
+                    }
+                    if (!values.Any()) continue;
+                    pendingRowKeys.Add(new KeyValuePair<IDictionary<string, object>, string>(row, ImportBuildMatchKey(values)));
+                    firstMatchValues.Add(values[0]);
+                }
+                if (!pendingRowKeys.Any()) continue;
 
                 var primaryFieldName = relationConfig.TableChild?.PrimaryTableFieldName;
                 if (primaryFieldName.DosIsNullOrWhiteSpace()) primaryFieldName = "Id";
 
-                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(parentTable.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
+                var dbOracleTableSpace = osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>();
+                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(parentTable.Name, dbOracleTableSpace);
                 var sqlPkFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(primaryFieldName);
-                var sqlCodeFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(parentCodeField["Name"].Val<string>());
+                var firstSqlMatchFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(matches[0].ParentField["Name"].Val<string>());
+                var matchSelectSql = string.Join(",", matches.Select(d =>
+                    $"{MicroiEngine.ORM(dbInfo.DbType).GetFieldName(d.ParentField["Name"].Val<string>())} {d.ParentAlias}"));
                 var codeToId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var duplicateKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var relationFilledCount = 0;
 
-                foreach (var chunk in projectCodes.Select((code, index) => new { code, index }).GroupBy(d => d.index / 500))
+                foreach (var chunk in firstMatchValues.Select((code, index) => new { code, index }).GroupBy(d => d.index / 500))
                 {
                     var inValues = string.Join(",", chunk.Select(d => $"'{ImportEscapeSql(d.code)}'"));
-                    var sql = $"SELECT {sqlPkFieldName} Id,{sqlCodeFieldName} Code FROM {sqlTableName} WHERE IsDeleted = 0 AND {sqlCodeFieldName} IN ({inValues})";
+                    var sql = $"SELECT {sqlPkFieldName} Id,{matchSelectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {firstSqlMatchFieldName} IN ({inValues})";
                     var parentRows = dbSession.FromSql(sql).ToArray();
                     foreach (var row in parentRows)
                     {
-                        var rowObj = JObject.FromObject(row);
-                        var code = rowObj["Code"].Val<string>();
-                        var id = rowObj["Id"].Val<string>();
-                        if (!code.DosIsNullOrWhiteSpace() && !id.DosIsNullOrWhiteSpace() && !codeToId.ContainsKey(code))
+                        var rowObj = JObject.FromObject((object)row);
+                        var values = new List<string>();
+                        foreach (var match in matches)
+                        {
+                            var normalized = ImportNormalizeValue(ImportJTokenToObject(rowObj[match.ParentAlias]), match.ParentField);
+                            if (normalized.DosIsNullOrWhiteSpace())
+                            {
+                                values.Clear();
+                                break;
+                            }
+                            values.Add(normalized);
+                        }
+                        if (!values.Any()) continue;
+                        var code = ImportBuildMatchKey(values);
+                        var id = ImportNormalizeValue(ImportJTokenToObject(rowObj["Id"]), null);
+                        if (code.DosIsNullOrWhiteSpace() || id.DosIsNullOrWhiteSpace()) continue;
+                        if (codeToId.ContainsKey(code) && !string.Equals(codeToId[code], id, StringComparison.OrdinalIgnoreCase))
+                        {
+                            duplicateKeys.Add(code);
+                            continue;
+                        }
+                        if (!codeToId.ContainsKey(code))
                         {
                             codeToId.Add(code, id);
                         }
                     }
                 }
 
-                foreach (var item in fileDataList)
+                foreach (var item in pendingRowKeys)
                 {
-                    IDictionary<string, object> row = ImportGetRowDictionary((object)item);
-                    if (row == null || ImportHasFieldValue(row, fixedField, fkField)) continue;
-                    object codeValue;
-                    ImportTryGetFieldValue(row, null, childCodeField, out codeValue);
-                    var code = ImportNormalizeValue(codeValue, childCodeField);
-                    if (code.DosIsNullOrWhiteSpace() || !codeToId.TryGetValue(code, out var parentId)) continue;
+                    var row = item.Key;
+                    var code = item.Value;
+                    if (code.DosIsNullOrWhiteSpace() || duplicateKeys.Contains(code) || !codeToId.TryGetValue(code, out var parentId)) continue;
                     row[fkField["Label"].Val<string>()] = parentId;
                     row[fkField["Name"].Val<string>()] = parentId;
+                    relationFilledCount++;
                     filledCount++;
                 }
-                if (filledCount > 0)
+                var matchText = string.Join(" + ", matches.Select(d => $"{parentTable.Name}.{d.ParentField["Name"].Val<string>()}={currentTable.Name}.{d.ChildField["Name"].Val<string>()}"));
+                if (relationFilledCount > 0)
                 {
-                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据[{parentTable.Name}.{parentCodeField["Name"].Val<string>()}]批量补齐子表字段[{currentTable.Name}.{fkField["Name"].Val<string>()}]【{filledCount}】条。");
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据导入关联[{matchText}]批量补齐子表字段[{currentTable.Name}.{fkField["Name"].Val<string>()}]【{relationFilledCount}】条。");
+                }
+                var duplicateWarningKey = $"{parentTable.Name}|{currentTable.Name}|{matchText}";
+                if (hasExplicitImportRelation && duplicateKeys.Count > 0 && !duplicateMatchWarnings.Contains(duplicateWarningKey))
+                {
+                    duplicateMatchWarnings.Add(duplicateWarningKey);
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：主表匹配字段存在【{duplicateKeys.Count}】个重复值，相关子表行未自动补齐外键。");
                 }
             }
             return filledCount;

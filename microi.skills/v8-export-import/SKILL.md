@@ -173,6 +173,38 @@ var bytes = resp.RawBytes;            // .NET byte[]
 var base64 = System.Convert.ToBase64String(bytes);
 ```
 
+## 子表导入自动关联主表
+
+当单独导入 `TableChild` 子表时，Excel 经常没有主表 Id，只带项目编号、客户名称等业务字段。默认导入引擎支持通过子表控件配置批量反查主表，并自动补齐子表外键。
+
+在主表 `TableChild` 字段的 `Config.TableChild` 中配置：
+
+```json
+{
+  "TableChild": {
+    "TableChildTableId": "子表 diy_table.Id",
+    "TableChildFkFieldName": "XiangmuID",
+    "ImportAutoFillFk": true,
+    "ImportRelations": [
+      { "Parent": "Code", "Child": "XiangmuBM" }
+    ]
+  }
+}
+```
+
+配置含义：
+
+- `ImportAutoFillFk`：是否在导入子表时自动补齐 `TableChildFkFieldName`；默认建议开启。
+- `ImportRelations`：主表字段与子表/Excel 字段的匹配关系，`Parent` 和 `Child` 可填字段名或字段标题。可配置多组，作为组合条件匹配。
+- 兼容旧配置：`ImportParentMatchFieldName` + `ImportChildMatchFieldName` 仍可使用，但新配置优先使用 `ImportRelations`。
+
+运行规则：
+
+- 只有子表外键为空时才补齐；Excel 已传外键时不覆盖。
+- 导入前按业务字段批量查询主表，避免逐行查询。
+- 如果业务字段为空、主表找不到或匹配到多条主表，当前行不自动补齐，并写入导入进度/后台日志，避免错误关联。
+- 示例：项目主表 `xiangmuguanli.Code` 匹配用料清单 `yongliaoqqingdan.XiangmuBM`，自动写入 `yongliaoqqingdan.XiangmuID`。
+
 ## 安全 / 性能注意
 
 - ❌ 不要在循环中逐条 `AddFormData` 而不传 `V8.DbTrans`：每条独立事务，性能差且部分失败会留脏数据
