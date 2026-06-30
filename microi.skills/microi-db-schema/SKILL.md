@@ -25,6 +25,8 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 
 ## sys_menu 生成默认配置
 
+后台菜单默认必须是有分类的树形结构。AI/MCP 创建真实业务后台时，先创建业务域或系统域父菜单，再把 CRUD、报表、规则、任务、日志、设置等叶子模块挂到父级；不要把一批叶子模块直接创建到根级。改造已有菜单时必须回读 `sys_menu`，更新 `ParentId`/`Sort`，补管理员角色权限，并再次回读验证最终树结构。
+
 通过自然语言 + MCP 创建后端菜单时，不能只写 `Name`、`DiyTableId` 和基础路由。绑定 `diyTableId` 的 CRUD 菜单应显式配置，或允许 MCP/后端自动推断以下字段：
 
 - `TableDiyFieldIds` / `SelectFields`：列表列优先选择名称、标题、编号、状态、类型、负责人、金额、数量、时间等业务可读字段。
@@ -43,6 +45,23 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 表单控件以 `Microi.Client/src/views/form-engine/diy-field-component/` 和 `diy-component-list.json` 为事实源。当前常用组件包括：`Text`、`Guid`、`Textarea`、`NumberText`、`DateTime`、`Select`、`MultipleSelect`、`Radio`、`Checkbox`、`Switch`、`Rate`、`Progress`、`Slider`、`ColorPicker`、`AutoNumber`、`Button`、`Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText`、`CodeEditor`、`JsonTable`、`ImgUpload`、`FileUpload`、`Autocomplete`、`TagInput`、`Transfer`、`Cascader`、`Address`、`Department`、`SelectTree`、`TreeCheckbox`、`OpenTable`、`JoinTable`、`JoinForm`、`TableChild`、`Map`、`MapArea`、`Qrcode`、`FontAwesome`、`DevComponent`。
 
 字段较多的表单不要全部堆在一页：优先设置 `diy_table.Tabs`，并给字段写入 `diy_field.Tab`，常见分组为基础信息、联系信息、业务信息、附件备注、扩展信息。局部区域再用 `CollapseGroup` 或字段级 `Tabs` 控件做折叠/分段；`Textarea`、`RichText`、`CodeEditor`、上传、地图、子表、布局/自定义控件等使用 `FormWidth=24` 独占整行。
+
+`TableChild` 子表控件如需支持单独导入子表数据，应在 `diy_field.Config.TableChild` 中同时配置子表表名/Id、关联子表列名，以及导入反查主表关系：
+
+```json
+{
+  "TableChild": {
+    "TableChildTableId": "子表 diy_table.Id",
+    "TableChildFkFieldName": "XiangmuID",
+    "ImportAutoFillFk": true,
+    "ImportRelations": [
+      { "Parent": "Code", "Child": "XiangmuBM" }
+    ]
+  }
+}
+```
+
+`ImportRelations` 中 `Parent` 和 `Child` 可填字段名或字段标题；多组关系表示组合匹配。典型场景是 Excel 只有项目编号/客户名称，没有主表 Id，导入引擎通过 `Parent` 字段批量查主表 Id，再写入子表 `TableChildFkFieldName`。不要只依赖猜测字段名；业务关键子表必须显式配置 `ImportRelations`，并在修改后刷新结构缓存。
 
 ## 安全注意
 

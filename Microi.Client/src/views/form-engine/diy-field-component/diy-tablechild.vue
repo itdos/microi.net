@@ -63,6 +63,10 @@
             <el-form-item label="关联子表列名">
                 <el-input v-model="configForm.TableChildFkFieldName" placeholder="请输入子表外键列名" />
             </el-form-item>
+
+            <el-form-item label="导入自动补齐外键">
+                <el-switch v-model="configForm.ImportAutoFillFk" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
             
             
             
@@ -92,6 +96,14 @@
                         :height="'300px'"
                     />
                 <div class="form-item-tip">格式：[{ "Father" : "FieldName1", "Child" : "FieldName2" }]</div>
+            </el-form-item>
+            <el-form-item label="导入匹配关系" :label-position="'top'"  style="display: block;">
+                <DiyCodeEditor
+                        v-model="configForm.ImportRelations"
+                        :field="{ Id: 'ImportRelations', Name: 'ImportRelations' }"
+                        :height="'220px'"
+                    />
+                <div class="form-item-tip">格式：[{ "Parent" : "Name", "Child" : "CustomerName" }]，导入子表时用 Child 列值反查主表 Parent 列，并自动写入关联子表列名。</div>
             </el-form-item>
         </el-form>
         <template #footer>
@@ -176,6 +188,8 @@ const configForm = ref({
     PrimaryTableFieldName: '',
     TableChildFkFieldName: '',
     TableChildCallbackField: '',
+    ImportAutoFillFk: true,
+    ImportRelations: '[]',
     LastSysMenuId: '',
     LastSysMenuName: '',
     LastTableId: '',
@@ -254,6 +268,17 @@ const getTableChildTableRowId = () => {
     return props.TableRowId;
 };
 
+const stringifyImportRelations = (value) => {
+    if (typeof value === 'string') {
+        return value || '[]';
+    }
+    try {
+        return JSON.stringify(value || [], null, 2);
+    } catch (error) {
+        return '[]';
+    }
+};
+
 // 事件转发
 const handleParentFormSet = (...args) => {
     emit("ParentFormSet", ...args);
@@ -288,6 +313,8 @@ const openConfig = () => {
         TableChildCallbackField: typeof props.field.Config.TableChildCallbackField === 'string' 
             ? props.field.Config.TableChildCallbackField 
             : JSON.stringify(props.field.Config.TableChildCallbackField || ''),
+        ImportAutoFillFk: props.field.Config.TableChild.ImportAutoFillFk !== false,
+        ImportRelations: stringifyImportRelations(props.field.Config.TableChild.ImportRelations),
         LastSysMenuId: props.field.Config.TableChild.LastSysMenuId || '',
         LastSysMenuName: props.field.Config.TableChild.LastSysMenuName || '',
         LastTableId: props.field.Config.TableChild.LastTableId || '',
@@ -333,6 +360,26 @@ const saveConfig = () => {
         }
     } else {
         props.field.Config.TableChildCallbackField = '';
+    }
+
+    // 保存导入自动补齐外键配置
+    props.field.Config.TableChild.ImportAutoFillFk = configForm.value.ImportAutoFillFk !== false;
+    let importRelationsValue = configForm.value.ImportRelations;
+    if (!DiyCommon.IsNull(importRelationsValue)) {
+        try {
+            const parsed = JSON.parse(importRelationsValue);
+            if (Array.isArray(parsed)) {
+                props.field.Config.TableChild.ImportRelations = parsed;
+            } else {
+                DiyCommon.Tips('导入匹配关系必须是数组格式', false);
+                return;
+            }
+        } catch (error) {
+            DiyCommon.Tips('导入匹配关系 JSON 格式错误：' + error.message, false);
+            return;
+        }
+    } else {
+        props.field.Config.TableChild.ImportRelations = [];
     }
     
     // 保存上级模块信息
