@@ -2163,6 +2163,8 @@ var DiyCommon = {
                 LastSysMenuName: "",
                 LastSysMenuName: "",
                 PrimaryTableFieldName: "Id",
+                ImportAutoFillFk: true,
+                ImportRelations: [],
                 DisablePagination: false,
                 NoneDefaultHeight: false
             },

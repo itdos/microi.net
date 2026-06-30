@@ -349,6 +349,19 @@ namespace Microi.net
     public partial class DiyFieldConfigTableChild
     {
         public string PrimaryTableFieldName { get; set; }
+        public bool? ImportAutoFillFk { get; set; }
+        public string ImportParentMatchFieldName { get; set; }
+        public string ImportChildMatchFieldName { get; set; }
+        public List<DiyFieldConfigTableChildImportRelation> ImportRelations { get; set; }
+    }
+    public partial class DiyFieldConfigTableChildImportRelation
+    {
+        public string Parent { get; set; }
+        public string Child { get; set; }
+        public string ParentFieldName { get; set; }
+        public string ChildFieldName { get; set; }
+        public string ParentFieldLabel { get; set; }
+        public string ChildFieldLabel { get; set; }
     }
     public partial class DiyFieldConfigCascader
     {
