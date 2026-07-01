@@ -6,11 +6,11 @@
 
         <!-- 弹出表格对话框 -->
         <el-dialog
-            v-if="ShowAnyTable"
+            v-if="ShowAnyTable && !IsOpenAnyTableDrawer()"
             draggable
             align-center
             :modal="true"
-            :width="'80%'"
+            :width="GetOpenAnyTableWidth()"
             :modal-append-to-body="true"
             :append-to-body="true"
             v-model="ShowAnyTable"
@@ -54,6 +54,50 @@
         </el-dialog>
 
         <!-- 分类标题和操作按钮 -->
+        <el-drawer
+            v-if="ShowAnyTable && IsOpenAnyTableDrawer()"
+            v-model="ShowAnyTable"
+            :modal="true"
+            :size="GetOpenAnyTableWidth()"
+            :direction="GetOpenAnyTableDrawerDirection()"
+            :append-to-body="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            :destroy-on-close="true"
+            :show-close="false"
+            class="drawer-opentable"
+        >
+            <template #header
+                ><div>
+                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+                        <fa-icon :icon="'fas fa-table'" />
+                        弹出表格
+                    </div>
+                    <div class="pull-right">
+                        <el-button :loading="BtnLoading" type="primary" :icon="CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                            {{ $t("Msg.Submit") }}
+                        </el-button>
+                        <el-button :icon="Close" @click="ShowAnyTable = false">
+                            {{ $t("Msg.Close") }}
+                        </el-button>
+                    </div>
+                    <div class="clear"></div></div
+            ></template>
+
+            <div class="clear">
+                <DiyTable
+                    :TypeFieldName="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+                    :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                    :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                    :PropsTableType="'OpenTable'"
+                    :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
+                    :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
+                    :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
+                    :PropsWhere="OpenAnyTableParam.PropsWhere"
+                />
+            </div>
+        </el-drawer>
+
         <div class="left-tree-toolbar">
             <div class="left-tree-title">
                 <el-icon class="mr-2"><Operation /></el-icon>
@@ -214,6 +258,40 @@ export default {
         await this.treeData();
     },
     methods: {
+        IsOpenAnyTableDrawer() {
+            var param = this.OpenAnyTableParam || {};
+            var dialogType = param.DialogType || param.OpenType || param.Type || "";
+            return String(dialogType).toLowerCase() === "drawer";
+        },
+        GetOpenAnyTableWidth() {
+            var param = this.OpenAnyTableParam || {};
+            var width = param.Width || param.DialogWidth || param.DrawerWidth || param.Size;
+            return this.NormalizeOpenAnyTableSize(width, "80%");
+        },
+        GetOpenAnyTableDrawerDirection() {
+            var param = this.OpenAnyTableParam || {};
+            var direction = String(param.Direction || param.DrawerDirection || "rtl").toLowerCase();
+            return ["rtl", "ltr", "ttb", "btt"].includes(direction) ? direction : "rtl";
+        },
+        NormalizeOpenAnyTableSize(value, fallback) {
+            if (typeof value === "number" && value > 0) {
+                return value + "px";
+            }
+            if (typeof value !== "string") {
+                return fallback;
+            }
+            var size = value.trim();
+            if (!size) {
+                return fallback;
+            }
+            if (/^\d+(\.\d+)?$/.test(size)) {
+                return size + "px";
+            }
+            if (/^\d+(\.\d+)?(px|%|vw)$/i.test(size)) {
+                return size;
+            }
+            return fallback;
+        },
         // 打开页面配置表单
         OpenPageConfig() {
             var param = {
@@ -411,6 +489,7 @@ export default {
         // 打开表格方法
         OpenAnyTable(param) {
             var self = this;
+            param = param || {};
             if (!param.SysMenuId && !param.ModuleEngineKey) {
                 self.DiyCommon.Tips("SysMenuId或ModuleEngineKey必传！", false);
                 return;

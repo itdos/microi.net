@@ -33,6 +33,11 @@ namespace Microi.net
         /// <returns></returns>
         Task<DosResult<byte[]>> ExportWordByTpl(OfficeExportParam param);
         /// <summary>
+        /// Export a simple Word document from plain text lines.
+        /// </summary>
+        DosResult<byte[]> ExportWordText(dynamic dynamicParam);
+        Task<DosResult<byte[]>> ExportWordTextAsync(OfficeExportWordTextParam param);
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>

@@ -1375,6 +1375,85 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
+    // Tool: 批量更新 diy_field（一次提交多字段，事务 + 自动清缓存）
+    // ========================
+    server.tool('microi_update_field_list', `Batch update multiple diy_field records for OsClient "${osClient}" in a single transaction. Calls FormEngine.UptDiyFieldList on the backend, which automatically clears the diy_table_field_list Redis cache. Use this for bulk operations like assigning Tab values to many fields at once, batch updating Sort/Visible/Component, or any operation that would otherwise require many microi_update_field calls.`, {
+        tableId: z.string().describe('TableId (required). The fields must belong to this table.'),
+        fieldList: z.array(z.object({
+            id: z.string().describe('FieldId (required).'),
+            tab: z.string().optional().describe('Form tab group name.'),
+            sort: z.number().optional().describe('Field display order.'),
+            visible: z.number().optional().describe('Visible in PC form (1=yes, 0=no).'),
+            appVisible: z.number().optional().describe('Visible in mobile app.'),
+            component: z.string().optional(),
+            label: z.string().optional(),
+            formWidth: z.number().nullable().optional(),
+            tableWidth: z.number().optional(),
+            notEmpty: z.number().optional(),
+            readonly: z.number().optional(),
+            placeholder: z.string().optional(),
+            defaultValue: z.string().optional(),
+            data: z.string().optional(),
+            config: z.string().optional(),
+            description: z.string().optional(),
+            inTableEdit: z.number().optional(),
+            unique: z.number().optional(),
+        })).describe('Array of field patches. Each item must include id; other fields are optional and only applied when present.'),
+    }, async (args) => {
+        try {
+            const fieldList = (args.fieldList || []).map((f) => {
+                const out = {};
+                if (f.id !== undefined)
+                    out.Id = f.id;
+                if (f.tab !== undefined)
+                    out.Tab = f.tab;
+                if (f.sort !== undefined)
+                    out.Sort = f.sort;
+                if (f.visible !== undefined)
+                    out.Visible = f.visible;
+                if (f.appVisible !== undefined)
+                    out.AppVisible = f.appVisible;
+                if (f.component !== undefined)
+                    out.Component = f.component;
+                if (f.label !== undefined)
+                    out.Label = f.label;
+                if (f.formWidth !== undefined)
+                    out.FormWidth = f.formWidth;
+                if (f.tableWidth !== undefined)
+                    out.TableWidth = f.tableWidth;
+                if (f.notEmpty !== undefined)
+                    out.NotEmpty = f.notEmpty;
+                if (f.readonly !== undefined)
+                    out.Readonly = f.readonly;
+                if (f.placeholder !== undefined)
+                    out.Placeholder = f.placeholder;
+                if (f.defaultValue !== undefined)
+                    out.DefaultValue = f.defaultValue;
+                if (f.data !== undefined)
+                    out.Data = f.data;
+                if (f.config !== undefined)
+                    out.Config = f.config;
+                if (f.description !== undefined)
+                    out.Description = f.description;
+                if (f.inTableEdit !== undefined)
+                    out.InTableEdit = f.inTableEdit;
+                if (f.unique !== undefined)
+                    out.Unique = f.unique;
+                return out;
+            });
+            const result = await client.updateFieldList({
+                TableId: args.tableId,
+                FieldList: fieldList,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: `✅ ${fieldList.length} fields updated. ${JSON.stringify(result.Data)}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
     // Tool: 修改 diy_table 属性（如表单列数 Column）
     // ========================
     server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (e.g. set Column=2 for a two-column form layout, change Description, IsTree, etc). Automatically clears diy_table + diy_table_field_list Redis caches.`, {

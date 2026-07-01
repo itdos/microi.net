@@ -92,6 +92,7 @@ export default {
          */
         async OpenAnyTable(param) {
             var self = this;
+            param = param || {};
             if (!param.SysMenuId && !param.ModuleEngineKey) {
                 self.DiyCommon.Tips("SysMenuId或ModuleEngineKey必传！", false);
                 return;

@@ -507,6 +507,12 @@ export class MicroiClient {
             ...patch,
         });
     }
+    async updateFieldList(patch) {
+        return this.post(API.UPDATE_FIELD_LIST, {
+            OsClient: this.config.osClient,
+            ...patch,
+        });
+    }
     async getFieldList(tableName, tableId) {
         return this.post(API.GET_FIELD_LIST, {
             OsClient: this.config.osClient,

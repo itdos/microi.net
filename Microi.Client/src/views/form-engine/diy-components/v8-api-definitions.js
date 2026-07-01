@@ -128,10 +128,10 @@ export const V8ApiDefinitions = {
                 label: "OpenAnyTable",
                 kind: "Method",
                 documentation:
-                    '打开一个任意列表\n\n参数:\n  - SysMenuId/ModuleEngineKey: 菜单Id或模块引擎Key(必传其一)\n  - MultipleSelect: 是否多选\n  - PropsWhere: 查询条件\n  - SubmitEvent: 提交事件回调\n\n示例:\nV8.OpenAnyTable({\n  SysMenuId: "xxx-xxx",\n  MultipleSelect: true,\n  SubmitEvent: async function(selectData, callback) {\n    callback(result);\n  }\n});',
+                    '打开一个任意列表\n\n参数:\n  - SysMenuId/ModuleEngineKey: 菜单Id或模块引擎Key(必传其一)\n  - DialogType: 打开方式 Dialog/Drawer，默认 Dialog\n  - Width: 弹窗宽度/抽屉尺寸，支持 80%、80vw、960px、960\n  - Direction: Drawer 方向 rtl/ltr/ttb/btt，默认 rtl\n  - MultipleSelect: 是否多选\n  - PropsWhere: 查询条件\n  - SubmitEvent: 提交事件回调\n\n示例:\nV8.OpenAnyTable({\n  SysMenuId: "xxx-xxx",\n  DialogType: "Drawer",\n  Width: "80vw",\n  MultipleSelect: true,\n  PropsWhere: [\n    ["FkId", "=", V8.Form.Id]\n  ],\n  SubmitEvent: async function(selectData, callback) {\n    callback({ Code: 1, Data: selectData });\n  }\n});',
                 insertText: "OpenAnyTable",
                 snippet:
-                    'OpenAnyTable({\n\tSysMenuId: "${1:menuId}",\n\tMultipleSelect: ${2:true},\n\tSubmitEvent: async function(selectData, callback) {\n\t\t${3:// 处理提交}\n\t\tcallback(result);\n\t}\n})'
+                    'OpenAnyTable({\n\tSysMenuId: "${1:menuId}",\n\tDialogType: "${2|Dialog,Drawer|}",\n\tWidth: "${3:80vw}",\n\tMultipleSelect: ${4:true},\n\tPropsWhere: [\n\t\t["${5:FkId}", "=", ${6:V8.Form.Id}]\n\t],\n\tSubmitEvent: async function(selectData, callback) {\n\t\t${7:// 处理提交}\n\t\tcallback({ Code: 1, Data: selectData });\n\t}\n})'
             },
 
             // ========== 表格操作方法 ==========

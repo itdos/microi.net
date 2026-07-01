@@ -277,6 +277,7 @@ export declare class MicroiClient {
         InTableEdit?: number;
     }): Promise<ApiResponse>;
     updateField(patch: Record<string, unknown>): Promise<ApiResponse>;
+    updateFieldList(patch: Record<string, unknown>): Promise<ApiResponse>;
     getFieldList(tableName?: string, tableId?: string): Promise<ApiResponse>;
     updateTable(patch: Record<string, unknown>): Promise<ApiResponse>;
     refreshSchemaCache(tables: string[]): Promise<ApiResponse>;

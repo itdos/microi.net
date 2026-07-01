@@ -1493,6 +1493,54 @@ microi_update_table {
 
 ---
 
+## 表单分组规范：Tabs vs CollapseGroup（强制）
+
+> **核心原则**：默认**不分组** → 小业务域用 **`CollapseGroup` 折叠分组** → 大业务域（≥8 字段）才用 **`Tabs` 分页**。**禁止为 ≤7 字段的业务域单独创建 Tab**，否则用户必须点击切换才能看到少量字段，违反"首屏信息密度"。
+
+### 三种分组方式
+
+| 方式 | 存储位置 | 控件 | 适用场景 |
+|------|---------|------|---------|
+| **A. 表级 Tab** | `diy_table.Tabs` + 字段 `Tab` | 表单顶部 Tab 条 | 大表单（>30 字段）拆 2~5 个业务域，每域 ≥8 字段 |
+| **B. 字段级 CollapseGroup** | `diy_field.Component='CollapseGroup'` + `Config.CollapseGroup` | 折叠面板标题 | 小业务域（≤7 字段），**所有分组同屏可见、可同时展开** |
+| **C. 字段级 Tabs 控件** | `diy_field.Component='Tabs'` + `Config.FieldTabs` | 字段是 Tab 容器 | 嵌套 Tab 场景（不推荐优先用） |
+
+### 字段数与分组决策表
+
+| 字段总数 | 推荐方案 |
+|---------|---------|
+| ≤ 12 | **不分组**（直接平铺） |
+| 13 ~ 30，单一业务域 | `CollapseGroup` 收起次要字段 |
+| 13 ~ 30，可拆 2~4 个业务域 | `diy_table.Tabs`（大域）或混合（Tab + 嵌套 CollapseGroup） |
+| > 30 | `diy_table.Tabs`（3~5 个 Tab，每个 Tab 6~12 字段） |
+
+### CollapseGroup Config 示例
+
+```jsonc
+// diy_field 必要字段
+{
+  "Component": "CollapseGroup",
+  "Type": "varchar(50)",
+  "Visible": 1,
+  "AppVisible": 1,
+  "Config": "{\"CollapseGroup\":{\"DefaultCollapsed\":false,\"ScopeMode\":\"UntilNextGroup\",\"Description\":\"MRP 运算状态、批次号与时间\",\"Icon\":\"fas fa-calculator\",\"Theme\":\"primary\",\"ShowFieldCount\":true}}"
+}
+```
+
+### 必做与禁止
+
+- ✅ 任何 Tab / CollapseGroup 必须有 `Description` 解释分组用途。
+- ✅ CollapseGroup 必须设 `Icon`（如 `fas fa-calculator`、`fas fa-info-circle`），不默认空白。
+- ✅ 修改 Tab/CollapseGroup 配置后必须 `microi_refresh_schema_cache`。
+- ❌ **禁止**为 ≤7 字段的业务域单独建 Tab。
+- ❌ **禁止**为 13~30 字段的表单平铺所有字段（必须有可见的业务分组）。
+- ❌ **禁止**给 Tabs/CollapseGroup/Divider/Alert 等布局控件设 `FormWidth=24`（天然占整行）。
+- ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属。
+
+完整规范、Config JSON 模板、回读验收清单和反例参考见 `microi-form-layout/SKILL.md`。
+
+---
+
 ## 缓存刷新（解决"我改了字段但页面不变"问题）
 
 平台对 `diy_field` 的字段列表有 Redis 缓存，键格式 `Microi:{OsClient}:FormData:diy_table_field_list:{TableId|TableName}`。

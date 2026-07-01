@@ -84,6 +84,37 @@ if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
 | `V8.ApiEngine.Run({...})` | 调用接口引擎（业务逻辑必走）|
 | `V8.ApiEngine.RunBackground(...)` | 启动后台任务（用于安装、导入、初始化等长任务）|
 
+### V8Code 格式化强制要求
+- AI、MCP、VS Code 插件或脚本生成 `V8Code` / `V8CodeShow` 时，必须保存为可读的多行 JavaScript，包含换行和缩进；禁止把完整逻辑压成一整行。
+- 写入 `sys_menu.MoreBtns/FormBtns/PageTabs/BatchSelectMoreBtns` 等 JSON 字符串时，也要先按 `.js` 文件格式组织代码，再通过 `JSON.stringify` 或等价方式转义保存。
+- `V8.OpenAnyTable`、`V8.OpenAnyForm`、`V8.ApiEngine.Run`、确认弹窗、回调函数等嵌套结构必须分行，回调内部逻辑至少缩进一级。
+- 只允许极短的单表达式显隐代码写成一行，例如 `V8.Result = true;`；一旦包含 `if`、`return`、`function`、`async`、数组/对象字面量或接口调用，就必须多行格式化。
+
+格式化示例：
+```js
+var projectId = V8.Form && V8.Form.Id ? V8.Form.Id : "";
+if (!projectId) {
+  V8.Tips("缺少项目Id，无法打开关联清单。", false);
+  return;
+}
+
+V8.OpenAnyTable({
+  SysMenuId: "01K...",
+  DialogType: "Drawer",
+  Width: "80vw",
+  MultipleSelect: false,
+  PropsWhere: [
+    ["XiangmuID", "=", projectId]
+  ],
+  SubmitEvent: async function(selectData, callback) {
+    callback({
+      Code: 1,
+      Data: selectData
+    });
+  }
+});
+```
+
 ---
 
 ## 3. 模式 A：弹窗收集参数 → 调接口引擎（最常用）
@@ -222,19 +253,40 @@ V8.Method.UpdateBackgroundTask({
 
 > AI 在 `microi_create_module` 调用时，把按钮 JSON **作为字符串** 传入对应字段。
 
-```jsonc
-{
-  "name": "售后任务",
-  "diyTableId": "<TableId>",
-  "icon": "fab fa-first-order",
-  "moreBtns": "[{\"Id\":\"01K...\",\"Name\":\"指派\",\"BtnStyle\":\"primary\",\"IsVisible\":true,\"ShowRow\":true,\"V8CodeShow\":\"V8.Result = (V8.Form.Status=='\\''待指派'\\'')\",\"V8Code\":\"V8.OpenAnyForm({TableName:'Diy_AfterSale',Id:V8.Form.Id,FormMode:'Edit',SelectFields:['AssigneeId','AssigneeName'],Width:'600px',EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:'aftersale_assign',Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});\"}]",
-  "formBtns":  "[{\"Id\":\"01K...\",\"Name\":\"完成\",\"BtnStyle\":\"success\",\"IsVisible\":true,\"V8CodeShow\":\"V8.Result=(V8.Form.Status=='\\''待完成'\\'')\",\"V8Code\":\"V8.FormSet('Status','待验收');V8.FormSubmit({CloseForm:true});\"}]",
-  "pageTabs":  "[{\"Id\":\"01K...\",\"Name\":\"全部\",\"V8Code\":\"V8.SearchSet({});\",\"V8CodeShow\":\"V8.Result=true;\"},{\"Id\":\"01K...\",\"Name\":\"待办\",\"V8Code\":\"V8.SearchSet({Status:'\\''待办'\\''});\"}]",
-  "batchSelectMoreBtns": "[{\"Id\":\"01K...\",\"Name\":\"批量删除\",\"V8Code\":\"var rows=V8.TableRowSelected;if(!rows.length){V8.Tips('\\''请勾选'\\'');return;}var ids=rows.map(r=>r.Id);V8.ConfirmTips('\\''确认删除？'\\'',function(){V8.FormEngine.DelFormDataByWhere({FormEngineKey:'\\''Diy_AfterSale'\\'',_Where:[{Name:'\\''Id'\\'',Value:JSON.stringify(ids),Type:'\\''In'\\''}]},function(r){V8.Tips(r.Code==1?'\\''ok'\\'':r.Msg);V8.RefreshTable({_PageIndex:1});});});\"}]"
-}
+```js
+var moreBtns = [
+  {
+    Id: "01K...",
+    Name: "指派",
+    BtnStyle: "primary",
+    IsVisible: true,
+    ShowRow: true,
+    V8CodeShow: "V8.Result = (V8.Form.Status == '待指派');",
+    V8Code: `
+var assignResult = await V8.ApiEngine.Run({
+  ApiEngineKey: "aftersale_assign",
+  Id: V8.Form.Id,
+  AssigneeId: V8.Form.AssigneeId
+});
+
+V8.Tips(assignResult.Code == 1 ? "指派成功" : assignResult.Msg, assignResult.Code == 1);
+V8.RefreshTable({ _PageIndex: 1 });
+`
+  }
+];
+
+var modulePayload = {
+  name: "售后任务",
+  diyTableId: "<TableId>",
+  icon: "fab fa-first-order",
+  moreBtns: JSON.stringify(moreBtns),
+  formBtns: JSON.stringify([]),
+  pageTabs: JSON.stringify([]),
+  batchSelectMoreBtns: JSON.stringify([])
+};
 ```
 
-> ⚠️ 真实调用时直接传 JSON 字符串即可；JS 模板字符串里嵌单引号建议改为双引号或转义。
+> ⚠️ 真实调用 `microi_create_module` 时传 `modulePayload.moreBtns` 这样的 JSON 字符串。不要为了“看起来短”把 `V8Code` 压成一行。
 
 ---
 

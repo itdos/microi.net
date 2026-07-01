@@ -567,9 +567,15 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
     # 导致后续项目引用该 DLL 时报 "file is being used by another process"。
     # VBCSCompiler 是纯后台缓存进程，终止后下次编译会自动重启，无副作用。
     print_step "清理 Roslyn 编译服务进程（VBCSCompiler）..."
-    powershell.exe -NoProfile -NonInteractive -Command \
-        "Get-Process 'VBCSCompiler' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue" \
-        > /dev/null 2>&1 || true
+    # 用 taskkill 而不是 powershell.exe：
+    #   1. PowerShell 启动要加载 .NET（1-2s），VBCSCompiler 进程多时线性变慢；
+    #   2. PowerShell 管道 "Get-Process | Stop-Process" 会一直等到进程真正退出，
+    #      VBCSCompiler 持有 DLL 文件句柄时强制终止会长时间挂起；
+    #   3. Git Bash 重定向 PowerShell 的 stdin 没显式关闭时，
+    #      powershell.exe 会等 stdin EOF 才退出，整个脚本就僵在那。
+    # taskkill 是原生 exe，无 .NET 依赖，配合 < /dev/null 关闭 stdin、timeout 10 兜底，
+    # 即便杀不掉也不会卡住后续流程（VBCSCompiler 下次 build 会自动重启）。
+    timeout 10 cmd.exe //c "taskkill /F /IM VBCSCompiler.exe /T 2>nul" </dev/null >/dev/null 2>&1 || true
     print_info "Windows 环境：-m:1 -nodeReuse:false，已清理 VBCSCompiler"
 fi
 
@@ -635,23 +641,113 @@ if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
     print_success "NuGet 包生成成功"
 fi
 
+# --- 冒烟测试前：注入当前环境的 appsettings ---
+# Microi.net.Api.csproj 默认 <Content Update="appsettings.*.json" CopyToPublishDirectory="Never" />
+# 阻止了 appsettings.{OsClient}.json 被复制到发布目录。但 Microi 启动靠 .microi-local 切换
+# 环境名，并依赖 ASP.NET Core 加载 appsettings.{Environment}.json 覆盖 appsettings.json 里的
+# 数据库/Redis/Mongo 连接串。如果发布目录里只有空的 appsettings.json，启动会卡在初始化直到超时。
+# 这里临时把当前环境的 appsettings.{OsClient}.json 拷贝到发布目录，冒烟测试结束后还原。
+SMOKE_BACKUP="$PUBLISH_DIR/appsettings.json.smoke.bak"
+SMOKE_INJECTED=false
+if [ -f "Microi.Server/Microi.net.Api/.microi-local" ]; then
+    _local_env=$(tr -d '\r\n[:space:]' < "Microi.Server/Microi.net.Api/.microi-local")
+    _local_appsettings="Microi.Server/Microi.net.Api/appsettings.${_local_env}.json"
+    if [ -f "$_local_appsettings" ] && [ -d "$PUBLISH_DIR" ]; then
+        [ -f "$PUBLISH_DIR/appsettings.json" ] && cp "$PUBLISH_DIR/appsettings.json" "$SMOKE_BACKUP"
+        cp "$_local_appsettings" "$PUBLISH_DIR/appsettings.json"
+        SMOKE_INJECTED=true
+        print_info "冒烟测试已注入环境配置: $_local_env"
+    else
+        print_warning ".microi-local=$_local_env，但未找到 $_local_appsettings，冒烟测试将用空配置（必失败）"
+    fi
+else
+    print_warning "未找到 Microi.Server/Microi.net.Api/.microi-local，冒烟测试将用空配置（必失败）"
+fi
+
+# --- 冒烟测试前：预检依赖服务连通性 ---
+# Microi 启动后会立即尝试连 MySQL/Redis/Mongo。如果任一不可达，程序会卡在初始化阶段
+# 静默等到 .NET 默认连接超时（30s+），跟冒烟测试的 30s 超时窗口几乎重叠，
+# 看起来像"卡住"，实际是依赖服务问题。提前 3s TCP 探测可快速定位。
+if [ "$SMOKE_INJECTED" = true ]; then
+    _appsettings_path="Microi.Server/Microi.net.Api/appsettings.${_local_env}.json"
+    if [ -f "$_appsettings_path" ]; then
+        print_step "预检依赖服务连通性（$_local_env）..."
+
+        _db_conn=$(json_value "OsClientDbConn" "$_appsettings_path")
+        _redis_host=$(json_value "OsClientRedisHost" "$_appsettings_path")
+        _redis_port=$(json_value "OsClientRedisPort" "$_appsettings_path")
+        _mongo_conn=$(json_value "OsClientDbMongoConn" "$_appsettings_path")
+
+        # 解析 MySQL 连接串: "Data Source=HOST;...Port=PORT;..."
+        _db_host=$(echo "$_db_conn" | sed -n 's/.*Data Source=\([^;]*\).*/\1/p' | head -1)
+        _db_port=$(echo "$_db_conn" | sed -n 's/.*Port=\([0-9]*\).*/\1/p' | head -1)
+        [ -z "$_db_port" ] && _db_port=3306
+
+        # 解析 Mongo 连接串: "mongodb://user:pass@HOST:PORT" 或 "...HOST:PORT"
+        _mongo_host=$(echo "$_mongo_conn" | sed -n 's|.*@\([^:/@]*\).*|\1|p' | head -1)
+        _mongo_port=$(echo "$_mongo_conn" | sed -n 's|.*@\([^:/@]*\):\([0-9]*\).*|\2|p' | head -1)
+
+        _tcp_check() {
+            local host=$1 port=$2 name=$3
+            if [ -z "$host" ] || [ -z "$port" ]; then
+                print_info "  - ${name}: 配置缺失（跳过）"
+                return 0
+            fi
+            if timeout 3 bash -c "</dev/tcp/${host}/${port}" 2>/dev/null; then
+                print_info "  ✓ ${name} ${host}:${port} 可达"
+                return 0
+            else
+                print_warning "  ✗ ${name} ${host}:${port} 不可达！"
+                return 1
+            fi
+        }
+
+        _precheck_failed=false
+        _tcp_check "$_db_host" "$_db_port" "MySQL"   || _precheck_failed=true
+        _tcp_check "$_redis_host" "$_redis_port" "Redis" || _precheck_failed=true
+        # MongoDB 不是阻塞 Microi 启动的关键依赖（多数接口引擎不用 Mongo），不可达只警告不中止
+        _tcp_check "$_mongo_host" "$_mongo_port" "MongoDB" || print_warning "    MongoDB 不可达，但不会阻塞启动，继续冒烟测试"
+
+        if [ "$_precheck_failed" = true ]; then
+            # 先还原 appsettings 备份再中止，避免临时配置遗留
+            [ -f "$SMOKE_BACKUP" ] && mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
+            print_fail "依赖服务不可达，冒烟测试必失败。
+  排查方向：
+    1. DNS / 路由: ping ${_db_host:-net.itdos.net}
+    2. 端口: 防火墙是否放行 ${_db_port:-3306} / ${_redis_port:-6379} / ${_mongo_port:-27017}
+    3. 服务: MySQL/Redis/Mongo 进程是否在跑
+  修好后再重跑，或编辑 appsettings.${_local_env}.json 指向可达的本地服务"
+        fi
+    fi
+fi
+
 # --- 冒烟测试 ---
+# 成功标记：Program.cs:506 打印的 "开始访问系统吧"（Kestrel 已绑定端口并接受请求），
+# 而 Program.cs:178 打印的 "Microi所有初始化成功" 只是 Quartz 之后、Kestrel 之前，
+# 间隔约 5s（看历史日志 .tmp-api-out-run.log）。30s 太短，Quartz 集群锁竞争/加载 Job
+# 在数据库/Redis 慢时会超 30s。改成 90s + 以 Kestrel 真开始监听为准。
+SMOKE_TIMEOUT=${SMOKE_TIMEOUT:-90}
 print_divider
-print_step "冒烟测试: 验证程序能否正常启动..."
+print_step "冒烟测试: 验证程序能否正常启动（超时 ${SMOKE_TIMEOUT}s）..."
 SMOKE_LOG="$(mktemp /tmp/microi-smoke-test.XXXXXX.log)"
 if ! (
     cd "$PUBLISH_DIR"
     dotnet Microi.net.Api.dll --urls=http://0.0.0.0:8080 > "$SMOKE_LOG" 2>&1 &
     SMOKE_PID=$!
-    for i in $(seq 1 30); do
-        if grep -q "Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
-            echo "  ✅ 冒烟测试通过: Microi所有初始化成功！"
+    # 两个任一出现即视为成功：提前的 "Microi所有初始化成功" + 最终的 "开始访问系统吧"
+    for i in $(seq 1 "$SMOKE_TIMEOUT"); do
+        if grep -qE "开始访问系统吧|Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
+            if grep -q "开始访问系统吧" "$SMOKE_LOG" 2>/dev/null; then
+                echo "  ✅ 冒烟测试通过: Kestrel 已开始监听端口！"
+            else
+                echo "  ✅ 冒烟测试通过: Microi所有初始化成功（${i}s）"
+            fi
             kill $SMOKE_PID 2>/dev/null; wait $SMOKE_PID 2>/dev/null || true
             rm -f "$SMOKE_LOG"; exit 0
         fi
         if ! kill -0 $SMOKE_PID 2>/dev/null; then
-            if grep -q "Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
-                echo "  ✅ 冒烟测试通过: Microi所有初始化成功！（进程已正常退出）"
+            if grep -qE "开始访问系统吧|Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
+                echo "  ✅ 冒烟测试通过！（进程已正常退出）"
                 rm -f "$SMOKE_LOG"; exit 0
             else
                 echo "  ❌ 冒烟测试失败: 程序异常退出！"
@@ -661,13 +757,25 @@ if ! (
         fi
         sleep 1
     done
-    echo "  ❌ 冒烟测试失败: 启动超时（30秒）！"
+    echo "  ❌ 冒烟测试失败: 启动超时（${SMOKE_TIMEOUT}秒）！"
     echo "--- 启动日志 ---"; cat "$SMOKE_LOG"; echo "----------------"
     kill $SMOKE_PID 2>/dev/null; wait $SMOKE_PID 2>/dev/null || true
     rm -f "$SMOKE_LOG"; exit 1
 ); then
     rm -f "$SMOKE_LOG" 2>/dev/null
+    # 先还原 appsettings，再让脚本整体中止，避免把临时配置留给发布产物
+    if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
+        mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
+    fi
     print_fail "冒烟测试失败，请检查编译产物"
+fi
+rm -f "$SMOKE_LOG" 2>/dev/null
+
+# --- 还原冒烟测试临时注入的 appsettings ---
+# 还原发布目录原始的 appsettings.json，避免发布产物带真实数据库/Redis/Mongo 连接串。
+if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
+    mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
+    print_info "已还原发布目录的 appsettings.json"
 fi
 
 # --- DLL 加密（仅源码作者环境） ---

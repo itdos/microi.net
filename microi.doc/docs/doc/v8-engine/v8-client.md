@@ -640,6 +640,9 @@ V8.OpenAnyForm({
 V8.OpenAnyTable({   
   SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
   //ModuleEngineKey: "modelKey",
+  DialogType: "Drawer", // 可选：Dialog / Drawer，默认 Dialog
+  Width: "80vw", // 可选：支持 80%、80vw、960px、960，数字会按 px 处理
+  Direction: "rtl", // 可选：Drawer 方向，支持 rtl/ltr/ttb/btt，默认 rtl
   MultipleSelect: true, // 是否多选   
   PropsWhere : [
     ['FkId', '=', V8.Form.Id]
@@ -667,6 +670,8 @@ V8.OpenAnyTable({
 })
 ```
 :::
+
+`DialogType` 不传时继续使用弹窗模式；传 `"Drawer"` 时使用抽屉模式。`Width` 同时作用于弹窗宽度和抽屉尺寸，支持百分比、`vw` 和固定 `px`，纯数字会按 `px` 处理。列表型子表建议使用 `"80vw"` 或 `"80%"`，窄表单类选择可使用 `"960px"`。
 
 ## 表单按钮防重复点击
 ```js

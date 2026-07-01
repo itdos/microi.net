@@ -679,7 +679,7 @@
 /* 性能优化V3：全局共享菜单样式 */
 .global-more-menu {
     position: fixed;
-    z-index: 2500;
+    z-index: 65000;
     background: var(--el-bg-color, #fff);
     border: 1px solid var(--el-border-color, #e4e7ed);
     border-radius: 4px;
