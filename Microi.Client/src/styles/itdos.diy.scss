@@ -191,6 +191,24 @@
             padding-left: 0px !important;
         }
     }
+    .drawer-opentable {
+        .el-drawer__header {
+            margin-bottom: 0;
+            padding: 10px;
+            box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
+        }
+        .el-drawer__body {
+            padding: 10px;
+            overflow: auto;
+        }
+        .el-card__body {
+            padding: 0;
+        }
+        .keyword-search,
+        .search-outside {
+            padding-left: 0px !important;
+        }
+    }
     .el-timeline-item__content{
         line-height: 25px;
     }

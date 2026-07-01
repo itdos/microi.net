@@ -44,6 +44,7 @@
 | **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
 | **ui-design** | Microi吾码设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |
 | **microi-ui** | 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法 | `microi-ui/SKILL.md` |
+| **microi-form-layout** | 表单布局分组规范：Tabs vs CollapseGroup 决策、字段数阈值、回读验收 | `microi-form-layout/SKILL.md` |
 | **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
 
 ### 项目交付、前端与移动端
@@ -225,3 +226,7 @@ MIT
 ## 新增通用前端 SDK Skill
 
 - `microi.skills/microi-frontend-sdk/SKILL.md`：Microi Vue3 前端 SDK 规范，覆盖请求、Token、上传、资源 URL、ApiEngine/FormEngine、Vue3 app 挂载。所有移动端 H5、UniApp、PC 官网、响应式站点和独立前端项目都应优先参考。
+
+## 新增表单布局分组 Skill
+
+- `microi.skills/microi-form-layout/SKILL.md`：低代码表单布局分组规范，**强制 AI 在通过 MCP、Manifest、VS Code 插件或 V8 引擎创建设计表单时优先使用 `CollapseGroup` 折叠分组，只有 ≥8 字段的大业务域才用 `Tabs` 分页**。覆盖三种分组方式（`diy_table.Tabs` 表级 Tab / `Component='Tabs'` 字段级 Tab / `Component='CollapseGroup'` 折叠分组）的存储位置、Config JSON 示例、决策算法、禁止事项和回读验收清单。所有表单设计任务必须先读本 skill 再下结论。

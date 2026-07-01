@@ -720,6 +720,17 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpPost]
+        public async Task<IActionResult> UpdateFieldList([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.UpdateFieldList(osClient, param);
+            return Ok(result);
+        }
+
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetFieldList(string? osClient, string? tableId, string? tableName = null, [FromBody] JObject? param = null)
         {

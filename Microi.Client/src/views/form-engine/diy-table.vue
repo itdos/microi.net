@@ -1369,11 +1369,11 @@
         ></DiyCustomDialog>
 
         <el-dialog
-            v-if="ShowAnyTable"
+            v-if="ShowAnyTable && !IsOpenAnyTableDrawer()"
             draggable
             align-center
             :modal="true"
-            :width="'80%'"
+            :width="GetOpenAnyTableWidth()"
             :modal-append-to-body="true"
             :append-to-body="true"
             v-model="ShowAnyTable"
@@ -1400,7 +1400,7 @@
                 </div>
             </template>
              <!-- style="background-color: #ebeef5" -->
-            <el-row>
+            <el-row class="open-any-table-body">
                 <el-col :span="6" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
                     <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
                 </el-col>
@@ -1423,6 +1423,59 @@
                 </el-col>
             </el-row>
         </el-dialog>
+
+        <el-drawer
+            v-if="ShowAnyTable && IsOpenAnyTableDrawer()"
+            v-model="ShowAnyTable"
+            :modal="true"
+            :size="GetOpenAnyTableWidth()"
+            :direction="GetOpenAnyTableDrawerDirection()"
+            :append-to-body="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            :destroy-on-close="true"
+            :show-close="false"
+            class="drawer-opentable"
+        >
+            <template #header>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+                        <fa-icon :icon="'fas fa-table'" />
+                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                    </div>
+                    <div class="pull-right">
+                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                            {{ $t("Msg.Submit") }}
+                        </el-button>
+                        <el-button :icon="Close" @click="ShowAnyTable = false">
+                            {{ $t("Msg.Close") }}
+                        </el-button>
+                    </div>
+                </div>
+            </template>
+            <el-row class="open-any-table-body">
+                <el-col :span="6" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
+                    <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
+                </el-col>
+                <el-col :span="OpenAnyTableParam.ShowLeftSelectionList || false ? 18 : 24">
+                    <el-card class="box-card">
+                        <DiyTableChild
+                            :TypeFieldName="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+                            :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                            :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                            :PropsTableType="'OpenTable'"
+                            @getOpenAnyTableParam="getOpenAnyTableParam"
+                            :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
+                            :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
+                            :PropsTableId="OpenAnyTableParam.TableId"
+                            :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
+                            :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
+                            :PropsWhere="OpenAnyTableParam.PropsWhere"
+                        />
+                    </el-card>
+                </el-col>
+            </el-row>
+        </el-drawer>
 
         <!-- 菜单权限设置弹窗 -->
         <DiyPermissionDialog
@@ -1672,6 +1725,40 @@ export default {
                 pageSizes.push(menuDefault);
             }
             return Array.from(new Set(pageSizes)).sort((a, b) => a - b);
+        },
+        IsOpenAnyTableDrawer() {
+            var param = this.OpenAnyTableParam || {};
+            var dialogType = param.DialogType || param.OpenType || param.Type || "";
+            return String(dialogType).toLowerCase() === "drawer";
+        },
+        GetOpenAnyTableWidth() {
+            var param = this.OpenAnyTableParam || {};
+            var width = param.Width || param.DialogWidth || param.DrawerWidth || param.Size;
+            return this.NormalizeOpenAnyTableSize(width, "80%");
+        },
+        GetOpenAnyTableDrawerDirection() {
+            var param = this.OpenAnyTableParam || {};
+            var direction = String(param.Direction || param.DrawerDirection || "rtl").toLowerCase();
+            return ["rtl", "ltr", "ttb", "btt"].includes(direction) ? direction : "rtl";
+        },
+        NormalizeOpenAnyTableSize(value, fallback) {
+            if (typeof value === "number" && value > 0) {
+                return value + "px";
+            }
+            if (typeof value !== "string") {
+                return fallback;
+            }
+            var size = value.trim();
+            if (!size) {
+                return fallback;
+            }
+            if (/^\d+(\.\d+)?$/.test(size)) {
+                return size + "px";
+            }
+            if (/^\d+(\.\d+)?(px|%|vw)$/i.test(size)) {
+                return size;
+            }
+            return fallback;
         },
         GetDefaultTablePageSize(options = {}) {
             var self = this;
