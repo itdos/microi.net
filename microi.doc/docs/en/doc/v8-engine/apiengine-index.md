@@ -247,6 +247,36 @@ return {
 
 
 
+## Custom Export Word
+> * Since 2026-06-30, `V8.Office.ExportWordText()` can export plain text to a compact Word document. It is suitable for question banks, contracts, legal documents, and other line-preserving text exports.
+> * The method returns `byte[]`. Enable response file for the API engine and convert the bytes with `System.Convert.ToBase64String()`.
+
+::: details JavaScript example
+```javascript
+var content = 'Question: sample question\nOptions: A. one; B. two\nAnswer: A';
+var wordResult = V8.Office.ExportWordText({
+  OsClient: V8.OsClient,
+  Title: 'Question Bank Export',
+  Content: content,
+  FontSize: 9,
+  TitleFontSize: 14,
+  Compact: true,
+  SpacingAfter: 40
+});
+if (wordResult.Code != 1) {
+  return wordResult;
+}
+return {
+  Code: 1,
+  Data: {
+    FileName: 'question-bank.docx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+:::
+
 ## Receiving, downloading, and uploading files in the interface engine
 ::: details Expand to view JavaScript code (line 62)
 ```js

@@ -297,6 +297,36 @@ var excelResult = V8.Office.ExportExcel({
 
 
 
+## 自定义导出 Word
+>* 2026-06-30 开始支持通过 `V8.Office.ExportWordText()` 将纯文本内容导出为紧凑版式的 Word 文档，适合题库、合同、法律文案等需要保留原始排版行的场景。
+>* 该方法返回 `byte[]`，接口引擎需要开启【响应文件】，并使用 `System.Convert.ToBase64String()` 转成文件响应。
+
+::: details 展开查看 JavaScript 代码
+```javascript
+var content = '题目：示例题目\n选项：A、选项一；B、选项二\n答案：A';
+var wordResult = V8.Office.ExportWordText({
+  OsClient: V8.OsClient,
+  Title: '题库导出',
+  Content: content,
+  FontSize: 9,
+  TitleFontSize: 14,
+  Compact: true,
+  SpacingAfter: 40
+});
+if (wordResult.Code != 1) {
+  return wordResult;
+}
+return {
+  Code: 1,
+  Data: {
+    FileName: '题库导出.docx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+:::
+
 ## 在接口引擎中对文件的接收、下载、上传
 ::: details 展开查看 JavaScript 代码（62 行）
 ```js

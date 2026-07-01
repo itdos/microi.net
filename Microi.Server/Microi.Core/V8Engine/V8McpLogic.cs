@@ -4262,6 +4262,57 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 批量更新 diy_field 字段列表（一次调用传多个字段 + patch）
+        /// 适用场景：批量修改字段 Tab / Sort / Visible 等元数据
+        /// 后端走 FormEngine.UptDiyFieldList（事务 + 自动清缓存）
+        /// </summary>
+        public static async Task<DosResult<object>> UpdateFieldList(string osClient, JObject patch)
+        {
+            try
+            {
+                if (patch == null) return new DosResult<object>(0, null, "patch 不能为空");
+                if (string.IsNullOrWhiteSpace(patch["TableId"]?.Val<string>()))
+                {
+                    return new DosResult<object>(0, null, "TableId 不能为空");
+                }
+                var fieldListToken = patch["FieldList"] ?? patch["_FieldList"];
+                if (fieldListToken == null)
+                {
+                    return new DosResult<object>(0, null, "FieldList 不能为空，必须传字段数组（每项含 Id 与待更新字段）");
+                }
+                List<JObject> fieldList;
+                if (fieldListToken is JArray jArr)
+                {
+                    fieldList = jArr.ToObject<List<JObject>>();
+                }
+                else if (fieldListToken.Type == JTokenType.String)
+                {
+                    fieldList = JsonHelper.Deserialize<List<JObject>>(fieldListToken.Value<string>());
+                }
+                else
+                {
+                    fieldList = JsonHelper.Deserialize<List<JObject>>(fieldListToken.ToString());
+                }
+                if (fieldList == null || fieldList.Count == 0)
+                {
+                    return new DosResult<object>(0, null, "FieldList 解析后为空");
+                }
+                var diyFieldParam = new DiyFieldParam
+                {
+                    OsClient = osClient,
+                    TableId = patch["TableId"]?.Value<string>(),
+                    FieldList = fieldList
+                };
+                var r = await MicroiEngine.FormEngine.UptDiyFieldList(diyFieldParam);
+                return new DosResult<object>(r.Code, new { UpdateCount = fieldList.Count }, r.Msg);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "UpdateFieldList 失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// 获取指定表的所有字段（含 V8 代码字段，供 VSCode 插件字段 V8 事件目录使用）
         /// 至少返回：Id / TableId / Name / Label / V8Code / KeyupV8Code / V8TmpEngineTable / V8TmpEngineForm / UpdateTime
         /// </summary>

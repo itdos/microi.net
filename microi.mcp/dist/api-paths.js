@@ -30,6 +30,7 @@ export const API = {
     ADD_FIELD: '/api/V8Engine/AddField',
     GET_FIELD_LIST: '/api/V8Engine/GetFieldList',
     UPDATE_FIELD: '/api/V8Engine/UpdateField',
+    UPDATE_FIELD_LIST: '/api/V8Engine/UpdateFieldList',
     UPDATE_TABLE: '/api/V8Engine/UpdateTable',
     REFRESH_SCHEMA_CACHE: '/api/V8Engine/RefreshSchemaCache',
     SET_ENGINE_ANONYMOUS: '/api/V8Engine/SetEngineAnonymous',

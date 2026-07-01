@@ -55,7 +55,25 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 搜索字段默认覆盖名称/标题/编号、状态/类型/分类、负责人/部门/客户、日期时间；金额、价格、数量、积分、余额、人数等数值字段默认进入 `StatisticsFields`。选择类、开关、部门、树、级联、地址等字段应尽量使用等值筛选。
 
-字段较多的表单必须做视觉分组：优先使用 `diy_table.Tabs` 和字段 `Tab` 划分基础信息、联系信息、业务信息、附件备注、扩展信息；局部复杂区域再使用 `CollapseGroup` 或字段级 `Tabs` 控件折叠/分段。不要把 15 个以上字段无分组平铺在一个表单里。
+字段较多的表单必须做视觉分组，但**优先用 `CollapseGroup` 折叠分组**，**只有大业务域（≥8 字段）才用 Tabs**。详细决策表、Config JSON 示例、字段数阈值和回读验收必须先读 `microi-form-layout/SKILL.md`，再按以下快速决策表执行：
+
+| 字段总数 | 业务域拆分 | 推荐方案 |
+|---------|----------|---------|
+| ≤ 12 | — | **不分组**，全部平铺第一屏 |
+| 13 ~ 30 | 不可拆 | `CollapseGroup` 把次要业务域收起 |
+| 13 ~ 30 | 可拆且每个域 ≥ 8 | `diy_table.Tabs`（表级 Tab） |
+| 13 ~ 30 | 域大小混合（大域 ≥ 8 + 小域 ≤ 7） | `diy_table.Tabs` + Tab 内嵌套 `CollapseGroup` |
+| > 30 | 多域 | `diy_table.Tabs`（3~5 个 Tab，每个 Tab 6~12 字段），必要时嵌套 `CollapseGroup` |
+
+**强制禁止**：
+
+- ❌ **禁止**为 ≤7 字段的业务域单独建 Tab（必须改用 `CollapseGroup`，否则用户必须点击 Tab 才能看到 3~5 个字段，违反"首屏信息密度"原则）。
+- ❌ **禁止**为 13~30 字段的表把所有字段平铺（必须用 Tab 或 CollapseGroup 分组）。
+- ❌ **禁止**在用户没有要求时使用 `Component='Tabs'` 字段级控件（更优先用 `diy_table.Tabs` 表级 Tab）。
+- ❌ **禁止**为 Tabs / CollapseGroup / Divider / Alert 等布局控件设置 `FormWidth=24`（这些控件天然占整行）。
+- ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属（每个 Tab 必须有至少 1 个非空 `Tab` 的字段）。
+
+典型反例：`yutaoliaojieguo` 表 13 字段有"MRP 运算"3 字段 Tab — 这是错误的，应该用 `CollapseGroup` 把 MRP 3 字段收起（默认展开），让用户第一屏看到基础信息 + MRP 字段而不是必须点击 Tab 切换。详见 `microi-form-layout/SKILL.md` 的"反例参考"章节。
 
 表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。
 
