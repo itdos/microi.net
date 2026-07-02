@@ -517,7 +517,7 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## Microi 项目技能规范
 
-处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 36 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 38 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -540,6 +540,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/print-engine/SKILL.md` — Microi 打印引擎（Print Engine）模板 JSON 生成
 - `microi.skills/ui-design/SKILL.md` — Microi吾码设计规范
 - `microi.skills/microi-ui/SKILL.md` — Microi.UI / MCI-UI
+- `microi.skills/microi-form-layout/SKILL.md` — Microi 表单布局分组规范（Tabs vs CollapseGroup）
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
@@ -554,3 +555,4 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/uniapp-mall-assets/SKILL.md` — 商城前端：图片 / 资源路径规范
 - `microi.skills/playwright-e2e/SKILL.md` — Microi 吾码 Playwright E2E 自动化测试
 - `microi.skills/performance-testing/SKILL.md` — Microi 高并发性能压力测试
+- `microi.skills/spider-engine/SKILL.md` — Microi 采集引擎

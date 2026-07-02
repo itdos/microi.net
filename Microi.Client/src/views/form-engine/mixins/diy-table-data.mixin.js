@@ -4,22 +4,50 @@ import { debounce } from "lodash";
 
 export default {
     methods: {
+        cloneWhereItem(item) {
+            if (!item) return item;
+            if (Array.isArray(item)) {
+                var clonedArray = item.slice();
+                Object.keys(item).forEach(function(key) {
+                    if (!/^\d+$/.test(key)) {
+                        clonedArray[key] = item[key];
+                    }
+                });
+                return clonedArray;
+            }
+            if (typeof item === "object") {
+                return Object.assign({}, item);
+            }
+            return item;
+        },
+        cloneWhereList(whereList) {
+            var self = this;
+            if (!Array.isArray(whereList) || whereList.length === 0) {
+                return [];
+            }
+            return whereList.map(function(item) {
+                return self.cloneWhereItem(item);
+            }).filter(function(item) {
+                return !!item;
+            });
+        },
         mergeWhereList(baseWhere, appendWhere) {
-            var result = Array.isArray(baseWhere) ? baseWhere.slice() : [];
+            var self = this;
+            var result = self.cloneWhereList(baseWhere);
             if (!Array.isArray(appendWhere) || appendWhere.length === 0) {
                 return result;
             }
             appendWhere.forEach(function(item) {
                 if (!item) return;
                 if (Array.isArray(item)) {
-                    result.push(item.slice());
+                    result.push(self.cloneWhereItem(item));
                     return;
                 }
                 var index = result.findIndex(function(d) {
                     return d && !Array.isArray(d) && d.Name == item.Name;
                 });
                 if (index === -1) {
-                    result.push(Object.assign({}, item));
+                    result.push(self.cloneWhereItem(item));
                 } else {
                     result[index] = Object.assign({}, result[index], item);
                 }
@@ -548,26 +576,27 @@ export default {
             //zhy此处通过判断是pc或移动端的搜索条件，来决定如何合并搜索条件。type1,2为移动端下拉菜单搜索和更多搜索，3，4为PC端外部搜索和更多搜索
             // console.log(recParam,type,666666)
             if(recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2 || type == 3 || type == 4)){
+              var recWhere = self.cloneWhereList(recParam._Where);
               if(type == 1 && self.hbParam1.length == 0){
-                self.hbParam1 = recParam._Where;
+                self.hbParam1 = recWhere;
               }else if(type == 1 && self.hbParam1.length > 0){
                 self.hbParam1 = [];
-                self.hbParam1 = recParam._Where;
+                self.hbParam1 = recWhere;
               }else if(type == 2 && self.hbParam2.length == 0){
-                self.hbParam2 = recParam._Where;
+                self.hbParam2 = recWhere;
               }else if(type == 2 && self.hbParam2.length > 0){
                 self.hbParam2 = [];
-                self.hbParam2 = recParam._Where;
+                self.hbParam2 = recWhere;
               }else if(type == 3 && self.hbParam3.length == 0){
-                self.hbParam3 = recParam._Where;
+                self.hbParam3 = recWhere;
               }else if(type == 3 && self.hbParam3.length > 0){
                 self.hbParam3 = [];
-                self.hbParam3 = recParam._Where;
+                self.hbParam3 = recWhere;
               }else if(type == 4 && self.hbParam4.length == 0){
-                self.hbParam4 = recParam._Where;
+                self.hbParam4 = recWhere;
               }else if(type == 4 && self.hbParam4.length > 0){
                 self.hbParam4 = [];
-                self.hbParam4 = recParam._Where;
+                self.hbParam4 = recWhere;
               }
             }
             // 2026-04-26 Anderson 修复：typed 搜索（diy-search/diy-mobile-search）传入空 _Where 表示清空该来源的搜索条件
@@ -580,8 +609,8 @@ export default {
             }
             let hbYdParams = [];
             let hbPcParams = [];
-            hbYdParams=[...self.hbParam1,...self.hbParam2];
-            hbPcParams=[...self.hbParam3,...self.hbParam4];
+            hbYdParams = self.cloneWhereList(self.hbParam1).concat(self.cloneWhereList(self.hbParam2));
+            hbPcParams = self.cloneWhereList(self.hbParam3).concat(self.cloneWhereList(self.hbParam4));
             // 2026-04-26 Anderson 修复：将 typed 搜索（diy-search 等）合并后的 _Where 持久化到 self.SearchWhere
             // 这样后续的"无 type 调用"（如搜索框 append 按钮、ExportDiyTableRow、V8按钮里调用 V8.GetDiyTableRow 等）
             // 才能通过下方 `else if (self.SearchWhere.length > 0)` 分支保留住搜索条件，避免搜索丢失
@@ -592,7 +621,7 @@ export default {
                 } else {
                     _typedCombinedWhere = hbPcParams;
                 }
-                self.SearchWhere = _typedCombinedWhere;
+                self.SearchWhere = self.cloneWhereList(_typedCombinedWhere);
             }
             // ========== 关键：立即递增版本号取消所有旧操作 ==========
             self._paginationVersion++;
@@ -682,17 +711,17 @@ export default {
 
             //zhy此处添加移动和PC合并搜索的参数传接
             if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 1 || type == 2)){
-                param._Where = hbYdParams;
+                param._Where = self.cloneWhereList(hbYdParams);
             } else if (recParam && recParam._Where && recParam._Where.length > 0 && (type == 3 || type == 4)){
-                param._Where = hbPcParams;
+                param._Where = self.cloneWhereList(hbPcParams);
             } else if (recParam && recParam._Where && recParam._Where.length > 0) {
-                param._Where = recParam._Where;
-                self.SearchWhere = param._Where;
+                param._Where = self.cloneWhereList(recParam._Where);
+                self.SearchWhere = self.cloneWhereList(recParam._Where);
             } else if (recParam && recParam._Where && recParam._Where.length == 0) {
                 self.SearchWhere = [];
                 delete param._Where;
             } else if (self.SearchWhere.length > 0) {
-                param._Where = self.SearchWhere;
+                param._Where = self.cloneWhereList(self.SearchWhere);
             } else {
                 self.SearchWhere = [];
                 delete param._Where;
@@ -710,11 +739,11 @@ export default {
                 self.Where.forEach((item) => {
                     //2026-01-12 Anderson：支持新版_Where
                     if (Array.isArray(item)) {
-                        param._Where.push(item);
+                        param._Where.push(self.cloneWhereItem(item));
                     } else {
                         const index = param._Where.findIndex((d) => d.Name == item.Name);
                         if (index === -1) {
-                            param._Where.push(item);
+                            param._Where.push(self.cloneWhereItem(item));
                         } else {
                             param._Where[index] = { ...param._Where[index], ...item };
                         }

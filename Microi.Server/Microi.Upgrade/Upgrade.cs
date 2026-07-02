@@ -26,6 +26,8 @@ namespace Microi.net
             var needUptServerVersion = false;
             var uptVersion = "";
 
+            EnsureMicroServiceColumns(osClientSecret);
+
             #region 升级AppDisplay、AppVisible  --2024-09-19【必须】
             if (NeedUpgrade(CurrentVersion, UpgradeAppDisplay.Version))
             {
@@ -383,6 +385,113 @@ namespace Microi.net
             #endregion
             return new DosResultList<MicroiUpgradeResult>(1, result);
         }
+
+        private void EnsureMicroServiceColumns(OsClientSecret osClientSecret)
+        {
+            try
+            {
+                if (osClientSecret?.Db == null || !TableExists(osClientSecret, "sys_microiservice"))
+                {
+                    return;
+                }
+
+                var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["StorageMode"] = "varchar(50)",
+                    ["Runtime"] = "varchar(50)",
+                    ["BuildVersion"] = "varchar(50)",
+                    ["EntryPath"] = "varchar(500)",
+                    ["AssetManifestJson"] = "longtext",
+                    ["AssetsJson"] = "longtext",
+                    ["DistHash"] = "varchar(200)",
+                    ["AssetCount"] = "int",
+                    ["TotalSize"] = "bigint",
+                    ["PublishTime"] = "varchar(25)",
+                    ["SourceDirName"] = "varchar(200)"
+                };
+
+                foreach (var column in columns)
+                {
+                    EnsureColumn(osClientSecret, "sys_microiservice", column.Key, column.Value);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret?.OsClient}】【检查微前端服务表字段】失败：{ex.Message}");
+            }
+        }
+
+        private bool TableExists(OsClientSecret osClientSecret, string tableName)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            if (dbType == "MySql")
+            {
+                return osClientSecret.Db.FromSql(@"SELECT COUNT(*) FROM information_schema.TABLES
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @p0")
+                    .AddInParameter("p0", tableName)
+                    .ToScalar<int>() > 0;
+            }
+
+            if (dbType == "SqlServer")
+            {
+                return osClientSecret.Db.FromSql("SELECT CASE WHEN OBJECT_ID(@p0, 'U') IS NULL THEN 0 ELSE 1 END")
+                    .AddInParameter("p0", tableName)
+                    .ToScalar<int>() > 0;
+            }
+
+            return false;
+        }
+
+        private void EnsureColumn(OsClientSecret osClientSecret, string tableName, string columnName, string fieldType)
+        {
+            if (ColumnExists(osClientSecret, tableName, columnName))
+            {
+                return;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var sql = dbType == "MySql"
+                ? $"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {fieldType} NULL"
+                : $"ALTER TABLE [{tableName}] ADD [{columnName}] {fieldType} NULL";
+            try
+            {
+                osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
+                Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐微前端服务表字段】{tableName}.{columnName}");
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("Duplicate column", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("Column names in each table must be unique", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+                throw;
+            }
+        }
+
+        private bool ColumnExists(OsClientSecret osClientSecret, string tableName, string columnName)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            if (dbType == "MySql")
+            {
+                return osClientSecret.Db.FromSql(@"SELECT COUNT(*) FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @p0 AND COLUMN_NAME = @p1")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>() > 0;
+            }
+
+            if (dbType == "SqlServer")
+            {
+                return osClientSecret.Db.FromSql("SELECT CASE WHEN COL_LENGTH(@p0, @p1) IS NULL THEN 0 ELSE 1 END")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>() > 0;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// 
         /// </summary>
