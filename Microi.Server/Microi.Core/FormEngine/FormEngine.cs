@@ -92,6 +92,12 @@ namespace Microi.net
                                 JObject formData = null
                             )
         {
+            if(tableName.DosToLower() == "sys_config")
+            {
+                var sysConfigCacheKey = $"Microi:{osClient}:SysConfig";
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(sysConfigCacheKey);
+                await MicroiEngine.CacheTenant.Default().RemoveAsync(sysConfigCacheKey);
+            }
             //如果【增删改】diy_field表
             if(tableName.DosToLower() == "diy_field")
             {
