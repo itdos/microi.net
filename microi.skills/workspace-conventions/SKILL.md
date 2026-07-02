@@ -117,7 +117,7 @@ Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格�
 
 接口引擎代码头、表单/工作流 V8 事件代码头、前端微服务 `sys_microiservice.BuildVersion` 与 `sys_microiservice_page.BuildVersion` 这类业务发布版本统一使用带 `v` 前缀的格式：`v1.0.0 -> v1.0.1 -> v1.0.9 -> v1.1.0 -> v1.9.9 -> v2.0.0 -> v9.9.9 -> v10.0.0`。禁止使用时间戳、随机串或日期作为 BuildVersion；前端微服务上传到分布式存储的目录也必须使用同一个 BuildVersion 分段，便于回溯与 CDN 缓存隔离。
 
-`Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本和 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本。skills 同步到工作区时仍以每个文件的 hash 判断是否可覆盖：本地未改过的旧插件文件可自动升级，本地已修改的文件必须保留用户版本，不得仅凭版本号覆盖。
+`Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本，并把 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本写成同一个插件版本号；skills 不再独立自增。skills 同步到工作区时仍以每个文件的 hash 判断是否可覆盖：本地未改过的旧插件文件可自动升级，本地已修改的文件必须保留用户版本，不得仅凭版本号覆盖。
 
 ## C# dynamic 强类型落地规则
 
@@ -284,6 +284,8 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 
 1. 先确认 `.vscode/mcp.json`、`.cursor/mcp.json`、工作区根 `.mcp.json` 和 `~/.codex/config.toml` 都能解析，且目标 server key 为稳定 ASCII 格式，例如 `microi_itdos`，不要使用中文名或横杠。
 2. 再用 Microi.VSCode 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
-3. 如果真实握手成功但 Codex 当前对话仍没有工具，结论应写明：MCP 配置和进程可用，但 Codex 已打开的当前对话不会热加载新增/重启的 MCP，需要新开对话或重载 Codex 后才会注入工具。
-4. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
-5. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
+3. 如果当前 AI 客户端支持工具发现或延迟加载，AI 必须先主动执行工具发现/热加载流程，例如 `tool_search`、客户端 MCP refresh、Microi.VSCode 的启动/诊断命令；不要先让用户手动重启、重载或重新生成 MCP。
+4. 如果真实握手成功但 Codex 当前对话仍没有注入 `mcp__...` 工具，AI 仍应优先使用等价的 MCP stdio JSON-RPC 直连 fallback 完成当前任务：读取对应 MCP 配置、启动 adapter/server、执行 `initialize`、`tools/list`、`tools/call`，并严格遵守该 MCP 绑定的 API Server 和 OsClient 边界。直连脚本必须放在 `.tmp/` 或使用一次性 stdin，不得散落到项目目录。
+5. 只有在客户端不支持热加载、直连 fallback 也无法完成任务，或写操作边界无法确认时，才告知用户需要新开对话、重载 Codex 或检查 MCP 配置。说明必须写清楚：MCP 配置和进程是否可用、当前会话为什么没有注入工具、已经尝试过哪些自动恢复动作。
+6. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
+7. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
