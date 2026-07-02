@@ -151,7 +151,7 @@
 <tr><td>🧩 <strong>微服务</strong></td><td>Vue2 基于 Qiankun，Vue3 基于 MicroApp</td></tr>
 <tr><td>⏱️ <strong><a href="/doc/system-engine/job">任务调度</a></strong></td><td>定时执行接口引擎或定制 DLL</td></tr>
 <tr><td>💬 <strong>聊天系统</strong></td><td>自研在线聊天 + 腾讯 IM 集成</td></tr>
-<tr><td>🕷️ <strong>采集引擎</strong></td><td>网页采集、MVVM 渲染前后、接口请求全覆盖</td></tr>
+<tr><td>🕷️ <strong><a href="/doc/system-engine/spider-engine">采集引擎</a></strong></td><td>可重复规则采集、真实 Chrome Worker、验证码人工兜底、接口与 DOM 全覆盖</td></tr>
 <tr><td>🌍 <strong><a href="/doc/system-engine/translate-engine">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
 <tr><td>📊 <strong>goView 数据大屏</strong></td><td><a href="https://lisaisai.blog.csdn.net/article/details/149858192?spm=1001.2014.3001.5502">集成 goView</a>，快速实现数据可视化</td></tr>
 <tr><td>🧊 <strong>WebGL 3D 渲染器</strong></td><td>基于 Three.js，支持 .gltf / .obj / .glb / .fbx / .stl 格式</td></tr>

@@ -2228,6 +2228,7 @@ export default {
             //     self.$router.push('/aiju-map/find-by-map');
             // }
             self.InitSearch();
+            self.Where = [];
 
             // var tabModel = self.GetPageTabs()[parseInt(tab.index)];
             var tabModel = self.SysMenuModel.PageTabs.filter((item) => item.IsVisible)[parseInt(tab.index)];

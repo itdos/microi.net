@@ -29,6 +29,7 @@ globs: ["**/*.{vue,js,ts,jsx,tsx,css,scss,json,md,mdc,cs,csproj,xml,yml,yaml}", 
 - @microi.skills/print-engine/SKILL.md — Microi 打印引擎（Print Engine）模板 JSON 生成
 - @microi.skills/ui-design/SKILL.md — Microi吾码设计规范
 - @microi.skills/microi-ui/SKILL.md — Microi.UI / MCI-UI
+- @microi.skills/microi-form-layout/SKILL.md — Microi 表单布局分组规范（Tabs vs CollapseGroup）
 - @microi.skills/microi-db-schema/SKILL.md — Microi DB Schema
 - @microi.skills/business-blueprint/SKILL.md — Microi 业务架构蓝图（System Blueprint）
 - @microi.skills/microi-system-delivery/SKILL.md — Microi 全系统交付复盘与总控规范
@@ -43,3 +44,4 @@ globs: ["**/*.{vue,js,ts,jsx,tsx,css,scss,json,md,mdc,cs,csproj,xml,yml,yaml}", 
 - @microi.skills/uniapp-mall-assets/SKILL.md — 商城前端：图片 / 资源路径规范
 - @microi.skills/playwright-e2e/SKILL.md — Microi 吾码 Playwright E2E 自动化测试
 - @microi.skills/performance-testing/SKILL.md — Microi 高并发性能压力测试
+- @microi.skills/spider-engine/SKILL.md — Microi 采集引擎

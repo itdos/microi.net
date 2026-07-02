@@ -237,9 +237,13 @@ export default {
             if (Array.isArray(val)) {
                 if (val.length > 0) {
                     val.forEach((item) => {
+                        if (Array.isArray(item)) {
+                            self.Where.push(self.cloneWhereItem(item));
+                            return;
+                        }
                         const index = self.Where.findIndex((d) => d.Name == item.Name);
                         if (index === -1) {
-                            self.Where.push(item);
+                            self.Where.push(self.cloneWhereItem(item));
                         } else {
                             self.Where[index] = { ...self.Where[index], ...item };
                         }
@@ -256,7 +260,7 @@ export default {
         SearchSetFunc(val) {
             var self = this;
             if (Array.isArray(val)) {
-                self.Where = val;
+                self.Where = self.cloneWhereList(val);
             } else {
                 // 2025-12-04 Anderson：转换为_Where格式
                 // self.V8SearchModel = val;
@@ -406,7 +410,7 @@ export default {
             param.UserId = self.GetCurrentUser.Id;
 
             if (self.SearchWhere.length > 0) {
-                param._Where = self.SearchWhere.slice();
+                param._Where = self.cloneWhereList(self.SearchWhere);
             }
             if (self.PropsWhere && self.PropsWhere.length > 0) {
                 param._Where = self.mergeWhereList(param._Where, self.PropsWhere);
@@ -416,7 +420,7 @@ export default {
                     param._Where = [];
                 }
                 self.Where.forEach(function(item) {
-                    param._Where.push(item);
+                    param._Where.push(self.cloneWhereItem(item));
                 });
             }
 
