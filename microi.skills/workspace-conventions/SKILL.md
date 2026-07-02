@@ -6,6 +6,15 @@ applyTo: "**"
 
 # Microi 工作区全局约定
 
+## 任务启动前 Skill 读取规则（强制）
+
+AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端、后端、UniApp、文档、测试或交付任务前，必须先按任务类型读取相关 `microi.skills/**/SKILL.md`。不能等到写代码或出问题后才补读。
+
+- 通用任务至少读取本文件；涉及完整交付、MCP 建模、远端 V8、菜单、字段或生产数据时，同时读取 `microi-system-delivery`。
+- 涉及采集引擎、浏览器 Worker、验证码、站点规则、导出产物时，同时读取 `spider-engine`。
+- 涉及 V8 CRUD、SQL、上传下载、导入导出、菜单按钮、表单事件、前端页面或自动化测试时，继续读取对应专项 Skill。
+- 最终交付说明必须能逐条对应用户编号需求；不得遗漏、合并或把仍可执行的需求写成“下一步继续”。
+
 ## 临时文件与 AI 产物放置规则（强制）
 
 AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、测试截图、临时报告**，**严禁放在工作区根目录（`d:\Work\microi.net.all\`）**，必须放在指定位置：
@@ -21,6 +30,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 **严禁在根目录创建**：
 - 任何 `*.mjs`、`*.py`、`*.ps1`、`*.sh` 一次性临时脚本
+- 任何 `.tmp-*.js`、`.tmp-*.json`、`.tmp-*.txt`、`.tmp-*/` 这类伪临时文件或目录
 - 任何 `screenshots/`、`dark-mode-*/`、`test-*/`、`debug-*/` 临时目录
 - 孤立的 `node_modules/`（根目录没有 `package.json`，不应安装 npm 包）
 - 孤立的 `obj/`、`dist/`、`build/`（非对应项目文件）
@@ -267,3 +277,13 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、7266 是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
 
 这条规则优先于“避免打断正在运行服务”的默认谨慎策略；本地开发联调场景下，用户通常需要运行中的 7266 后端加载最新代码。
+
+## MCP 可调用性诊断补充
+
+当用户反馈“Codex/VS Code 设置中能看到 MCP，但当前 AI 会话不能调用对应工具”时，不能只回答“当前会话没有注入”。必须按层排查：
+
+1. 先确认 `.vscode/mcp.json`、`.cursor/mcp.json`、工作区根 `.mcp.json` 和 `~/.codex/config.toml` 都能解析，且目标 server key 为稳定 ASCII 格式，例如 `microi_itdos`，不要使用中文名或横杠。
+2. 再用 Microi.VSCode 插件的“诊断 MCP 可调用性”命令，或等价脚本直接启动对应 `mcp-server.js` / `mcp-codex-stdio-adapter.js`，执行 `initialize` 和 `tools/list`，确认 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache` 等核心工具真实返回。
+3. 如果真实握手成功但 Codex 当前对话仍没有工具，结论应写明：MCP 配置和进程可用，但 Codex 已打开的当前对话不会热加载新增/重启的 MCP，需要新开对话或重载 Codex 后才会注入工具。
+4. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
+5. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
