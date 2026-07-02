@@ -1,6 +1,6 @@
 {
-  "version": "1.6.9",
-  "versionRule": "Microi version uses three numeric parts. Each publish increments the last part; when a part exceeds 9 it carries to the previous part: 1.0.9 -> 1.1.0, 1.9.9 -> 2.0.0.",
+  "version": "2.7.3",
+  "versionRule": "Microi skills version mirrors Microi.VSCode/package.json. During publish, Microi.VSCode/bump-version.js bumps the VS Code extension version first and writes the same value here. Do not bump skills independently.",
   "managedBy": "Microi.VSCode/bump-version.js",
-  "updatedAt": "2026-07-02T03:09:26.336Z"
+  "updatedAt": "2026-07-02T07:11:28.511Z"
 }
