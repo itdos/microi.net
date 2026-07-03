@@ -1,6 +1,6 @@
 {
-  "version": "2.7.3",
+  "version": "2.8.1",
   "versionRule": "Microi skills version mirrors Microi.VSCode/package.json. During publish, Microi.VSCode/bump-version.js bumps the VS Code extension version first and writes the same value here. Do not bump skills independently.",
   "managedBy": "Microi.VSCode/bump-version.js",
-  "updatedAt": "2026-07-02T07:11:28.511Z"
+  "updatedAt": "2026-07-03T17:32:40.415Z"
 }
