@@ -76,7 +76,7 @@
           <span>{{ displayWrapperTitle }}</span>
 
           <el-link
-            v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden"
+            v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden !== true"
             @click="handleMoreClick"
             :style="
               wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
@@ -181,7 +181,7 @@
         </div>
         <vue-custom-scrollbar
           v-else
-          :style="{ height: props.wrapperObj.wrapperOption.height + 'px' }"
+          :style="{ height: designScrollHeight }"
           class="scroll-area"
           :settings="settings"
         >
@@ -250,11 +250,39 @@ const updateTime = () => {
   currentDate.value = new Date()
 }
 
+const wrapperHeightValue = computed(() => props.wrapperObj.wrapperOption?.height)
+
+const isAutoHeightValue = (value) => {
+  if (value === undefined || value === null || value === '') return false
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'auto' || normalized === '100%' || normalized === 'full') {
+      return true
+    }
+  }
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) && numberValue <= 0
+}
+
+const toPositiveHeight = (value, fallback) => {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) && numberValue > 0
+    ? numberValue + 'px'
+    : fallback
+}
+
 const autoHeight = computed(() => {
   if (formData.value.JsonObj.formConfig?.mobile) {
     return 'auto'
   }
-  return props.wrapperObj.wrapperOption.height + 'px'
+  if (!isDesignMode.value && isAutoHeightValue(wrapperHeightValue.value)) {
+    return 'auto'
+  }
+  return toPositiveHeight(wrapperHeightValue.value, 'auto')
+})
+
+const designScrollHeight = computed(() => {
+  return toPositiveHeight(wrapperHeightValue.value, '320px')
 })
 
 const wrapperTitleOption = computed(() => props.wrapperObj.wrapperOption.titleOption || {})
@@ -275,8 +303,8 @@ const displayWrapperTitle = computed(() =>
 
 const showWrapperTitle = computed(() => {
   if (!wrapperTitleOption.value.title) return false
-  if (wrapperTitleOption.value.hidden === true) return true
-  return !isDesignMode.value && wrapperTitleOption.value.hidden === false
+  if (wrapperTitleOption.value.hidden === true && !isDesignMode.value) return false
+  return true
 })
 
 // 组件挂载时启动定时器

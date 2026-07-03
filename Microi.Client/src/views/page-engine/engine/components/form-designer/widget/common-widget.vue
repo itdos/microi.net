@@ -168,17 +168,41 @@ const props = defineProps({
   },
 })
 
+const widgetHeightValue = computed(() => props.widgetObj.widgetOption?.height)
+
+const isAutoHeightValue = (value) => {
+  if (value === undefined || value === null || value === '') return false
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'auto' || normalized === '100%' || normalized === 'full') {
+      return true
+    }
+  }
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) && numberValue <= 0
+}
+
+const toPositiveHeight = (value, fallback) => {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) && numberValue > 0
+    ? numberValue + 'px'
+    : fallback
+}
+
 const autoHeight = computed(() => {
   if (formData.value.JsonObj.formConfig?.mobile) {
     return 'auto'
   }
-  if (!isDesignMode.value && autoContentWidgetTypes.has(props.widgetObj.type)) {
+  if (
+    !isDesignMode.value &&
+    (autoContentWidgetTypes.has(props.widgetObj.type) || isAutoHeightValue(widgetHeightValue.value))
+  ) {
     return 'auto'
   }
-  return props.widgetObj.widgetOption.height + 'px'
+  return toPositiveHeight(widgetHeightValue.value, 'auto')
 })
 
-const autoContentWidgetTypes = new Set(['statistic', 'progress'])
+const autoContentWidgetTypes = new Set(['statistic', 'progress', 'html'])
 
 const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap'])
 const tableWidgetTypes = new Set(['tabel', 'gantt', 'diytable'])
@@ -197,8 +221,7 @@ const skeletonMinHeight = computed(() => {
   if (formData.value.JsonObj.formConfig?.mobile) {
     return widgetSkeletonType.value === 'statistic' ? '96px' : '140px'
   }
-  const height = Number(props.widgetObj.widgetOption.height)
-  return Number.isFinite(height) && height > 0 ? height + 'px' : '160px'
+  return toPositiveHeight(widgetHeightValue.value, '160px')
 })
 
 const isDesignMode = computed(() => {
