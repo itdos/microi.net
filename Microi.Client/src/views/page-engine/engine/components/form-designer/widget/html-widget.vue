@@ -1,5 +1,5 @@
 <template>
-  <div v-safe-html="computedHtml" style="width: 100%; height: 100%"></div>
+  <div v-safe-html="computedHtml" class="pe-html-widget"></div>
 </template>
 
 <script setup name="html-widget">
@@ -41,4 +41,10 @@ const { loadRemoteData } = useWidget(
 await loadRemoteData()
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.pe-html-widget {
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+}
+</style>

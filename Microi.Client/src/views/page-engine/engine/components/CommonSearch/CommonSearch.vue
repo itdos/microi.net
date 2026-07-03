@@ -165,7 +165,11 @@ const hasRemoteDataSource = computed(
   () => !!props.widgetObj.widgetParams[0]?.value
 )
 const enableAutoPeriodSearch = computed(
-  () => autoPeriodWidgets.includes(props.widgetObj.type) && hasRemoteDataSource.value
+  () =>
+    autoPeriodWidgets.includes(props.widgetObj.type) &&
+    hasRemoteDataSource.value &&
+    props.widgetObj.widgetParams[props.searchIndex]?.value !== false &&
+    props.widgetObj.widgetParams[props.pickerIndex]?.value !== false
 )
 
 const enableSearch = computed(
@@ -177,7 +181,8 @@ const enableSearch = computed(
 const enableDateFilter = computed(
   () =>
     props.widgetObj.widgetParams[props.pickerIndex]?.value === true ||
-    enableAutoPeriodSearch.value
+    (enableAutoPeriodSearch.value &&
+      props.widgetObj.widgetParams[props.pickerIndex]?.value !== false)
 )
 
 const showSearchPanel = computed(
