@@ -4,6 +4,7 @@ import zh from "./zh";
 
 const Msg = {
     ...zh.Msg,
+    Home: "首頁",
     Load: "載入",
     LoadMore: "載入更多",
     BackgroundTasks: "背景任務",
@@ -12,6 +13,15 @@ const Msg = {
     NoBackgroundTasks: "暫無背景任務",
     Stop: "停止",
     Elapsed: "耗時",
+    NotificationCenter: "通知中心",
+    OfficialApps: "官方應用",
+    NoOfficialAppUpdates: "暫無官方應用更新提醒",
+    OfficialAppUninstalled: "未安裝",
+    OfficialAppOutdated: "可更新",
+    OfficialAppInstalledVersion: "已安裝版本：",
+    OfficialAppLatestVersion: "最新版本：",
+    GoAppStore: "去應用商城",
+    OfficialAppUpdateTip: "檢測官方應用未安裝和可更新項",
     Update: "修改",
     Email: "郵箱",
     Remark: "備註",

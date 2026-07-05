@@ -918,9 +918,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             } else {
                 var url = "/";
                 var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
+                var configuredDefaultIndexUrl = "";
                 //这里需要跳转到sys_menu的第一个路由
                 //2022-07-05新增：以系统设置的默认首页路由为优先
                 if (self.SysConfig && self.SysConfig.DefaultIndexUrl) {
+                    configuredDefaultIndexUrl = String(self.SysConfig.DefaultIndexUrl || "").trim();
                     url = String(self.SysConfig.DefaultIndexUrl || "");
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
@@ -937,7 +939,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                     return;
                 }
                 url = normalizeMenuRoutePath(url || fallbackUrl || "/");
-                if ((url === "/" || self.$router.resolve(url).matched.length === 0) && fallbackUrl) {
+                var keepConfiguredRoot = configuredDefaultIndexUrl && normalizeMenuRoutePath(configuredDefaultIndexUrl) === "/";
+                if (!keepConfiguredRoot && (url === "/" || self.$router.resolve(url).matched.length === 0) && fallbackUrl) {
                     url = fallbackUrl;
                 }
                 
@@ -948,8 +951,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 //     console.log('[Login] 检测到移动端设备，跳转到移动端首页:', url);
                 // }
                 
-                var targetPath = self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : normalizeMenuRoutePath(self.redirect);
-                if ((targetPath === "/" || self.$router.resolve(targetPath).matched.length === 0) && fallbackUrl) {
+                var useDefaultTarget = self.DiyCommon.IsNull(self.redirect) || self.redirect == "/";
+                var targetPath = useDefaultTarget ? url : normalizeMenuRoutePath(self.redirect);
+                if (!(useDefaultTarget && keepConfiguredRoot) && (targetPath === "/" || self.$router.resolve(targetPath).matched.length === 0) && fallbackUrl) {
                     targetPath = fallbackUrl;
                 }
                 self.$router.push({
