@@ -1,5 +1,6 @@
 export default {
     Msg: {
+        Home: "Home",
         Load: "Load",
         LoadMore: "Load more",
         BackgroundTasks: "Background tasks",
@@ -8,6 +9,15 @@ export default {
         NoBackgroundTasks: "No background tasks",
         Stop: "Stop",
         Elapsed: "Elapsed",
+        NotificationCenter: "Notification center",
+        OfficialApps: "Official apps",
+        NoOfficialAppUpdates: "No official app notices",
+        OfficialAppUninstalled: "Not installed",
+        OfficialAppOutdated: "Update available",
+        OfficialAppInstalledVersion: "Installed:",
+        OfficialAppLatestVersion: "Latest:",
+        GoAppStore: "App Store",
+        OfficialAppUpdateTip: "Check official apps that are not installed or need updates",
         Update: "Update",
         Email: "Email",
         Remark: "Remark",

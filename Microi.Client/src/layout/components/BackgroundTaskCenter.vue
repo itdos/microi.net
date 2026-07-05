@@ -1,8 +1,8 @@
 <template>
-    <el-popover placement="bottom-end" trigger="click" width="440" popper-class="microi-task-popover" @show="refreshTasks">
+    <el-popover placement="bottom-end" trigger="click" width="520" popper-class="microi-task-popover" @show="refreshAll">
         <template #reference>
-            <div class="right-menu-item hover-effect task-entry" :title="$t('Msg.BackgroundTasks')">
-                <el-badge :value="runningCount" :max="99" :hidden="runningCount === 0" :class="{ 'task-badge-flash': runningCount > 0 }">
+            <div class="right-menu-item hover-effect task-entry" :title="$t('Msg.NotificationCenter')">
+                <el-badge :value="badgeCount" :max="99" :hidden="badgeCount === 0" :class="{ 'task-badge-flash': badgeCount > 0 }">
                     <el-icon class="task-icon"><Bell /></el-icon>
                 </el-badge>
             </div>
@@ -10,30 +10,70 @@
 
         <div class="task-panel">
             <div class="task-panel-header">
-                <span>{{ $t("Msg.BackgroundTasks") }}</span>
+                <span>{{ $t("Msg.NotificationCenter") }}</span>
                 <div class="task-panel-actions">
-                    <el-button link size="small" :icon="Refresh" :loading="loading" @click="refreshTasks">{{ $t("Msg.Refresh") }}</el-button>
-                    <el-button link size="small" :icon="Delete" @click="clearCompleted">{{ $t("Msg.ClearCompleted") }}</el-button>
+                    <el-button link size="small" :icon="Refresh" :loading="loading || storeLoading" @click="refreshAll">{{ $t("Msg.Refresh") }}</el-button>
                 </div>
             </div>
-            <div v-if="tasks.length === 0" class="task-empty">{{ $t("Msg.NoBackgroundTasks") }}</div>
-            <div v-else class="task-list">
-                <div v-for="item in tasks" :key="item.Id" class="task-item">
-                    <div class="task-main">
-                        <span class="task-title">{{ item.Title || item.Type || $t("Msg.BackgroundTasks") }}</span>
-                        <span class="task-status" :class="'status-' + item.Status">{{ item.StatusText || item.Status }}</span>
+
+            <el-tabs v-model="activeTab" class="notification-tabs">
+                <el-tab-pane name="tasks">
+                    <template #label>
+                        <span>{{ $t("Msg.BackgroundTasks") }}</span>
+                        <span v-if="runningCount > 0" class="tab-count">{{ runningCount }}</span>
+                    </template>
+
+                    <div class="task-sub-actions">
+                        <el-button link size="small" :icon="Delete" @click="clearCompleted">{{ $t("Msg.ClearCompleted") }}</el-button>
                     </div>
-                    <el-progress :percentage="Number(item.Progress || 0)" :stroke-width="6" :show-text="false" />
-                    <div class="task-meta">
-                        <span>{{ formatTime(item.CreateTime) }}</span>
-                        <span v-if="item.ElapsedText">{{ $t("Msg.Elapsed") }} {{ item.ElapsedText }}</span>
-                        <el-button v-if="canCancel(item)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(item)">
-                            {{ $t("Msg.Stop") }}
-                        </el-button>
+                    <div v-if="tasks.length === 0" class="task-empty">{{ $t("Msg.NoBackgroundTasks") }}</div>
+                    <div v-else class="task-list">
+                        <div v-for="item in tasks" :key="item.Id" class="task-item">
+                            <div class="task-main">
+                                <span class="task-title">{{ item.Title || item.Type || $t("Msg.BackgroundTasks") }}</span>
+                                <span class="task-status" :class="'status-' + item.Status">{{ item.StatusText || item.Status }}</span>
+                            </div>
+                            <el-progress :percentage="Number(item.Progress || 0)" :stroke-width="6" :show-text="false" />
+                            <div class="task-meta">
+                                <span>{{ formatTime(item.CreateTime) }}</span>
+                                <span v-if="item.ElapsedText">{{ $t("Msg.Elapsed") }} {{ item.ElapsedText }}</span>
+                                <el-button v-if="canCancel(item)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(item)">
+                                    {{ $t("Msg.Stop") }}
+                                </el-button>
+                            </div>
+                            <div v-if="item.Msg" class="task-msg" :title="item.Msg">{{ item.Msg }}</div>
+                        </div>
                     </div>
-                    <div v-if="item.Msg" class="task-msg" :title="item.Msg">{{ item.Msg }}</div>
-                </div>
-            </div>
+                </el-tab-pane>
+
+                <el-tab-pane name="apps">
+                    <template #label>
+                        <span>{{ $t("Msg.OfficialApps") }}</span>
+                        <span v-if="appNoticeCount > 0" class="tab-count warning">{{ appNoticeCount }}</span>
+                    </template>
+
+                    <div class="app-panel-toolbar">
+                        <span class="app-panel-tip">{{ $t("Msg.OfficialAppUpdateTip") }}</span>
+                        <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
+                    </div>
+                    <div v-if="storeLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
+                    <div v-else-if="storeNotices.length === 0" class="task-empty">{{ $t("Msg.NoOfficialAppUpdates") }}</div>
+                    <div v-else class="app-notice-list">
+                        <div v-for="item in storeNotices" :key="(item.AppId || item.StoreId || item.AppName) + item.Status" class="app-notice-item">
+                            <div class="app-notice-main">
+                                <span class="app-name">{{ item.AppName || item.AppId || $t("Msg.Unnamed") }}</span>
+                                <el-tag v-if="item.Status === 'Uninstalled'" size="small" type="danger">{{ $t("Msg.OfficialAppUninstalled") }}</el-tag>
+                                <el-tag v-else size="small" type="warning">{{ $t("Msg.OfficialAppOutdated") }}</el-tag>
+                            </div>
+                            <div class="app-notice-meta">
+                                <span v-if="item.InstalledVersion">{{ $t("Msg.OfficialAppInstalledVersion") }} {{ item.InstalledVersion }}</span>
+                                <span>{{ $t("Msg.OfficialAppLatestVersion") }} {{ item.AppVersion || "-" }}</span>
+                            </div>
+                            <div v-if="item.AppDetail" class="app-notice-desc" :title="item.AppDetail">{{ item.AppDetail }}</div>
+                        </div>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
         </div>
     </el-popover>
 </template>
@@ -42,6 +82,9 @@
 import { DiyCommon } from "@/utils/diy.common";
 import { Bell, CircleClose, Delete, Refresh } from "@element-plus/icons-vue";
 
+const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
+const MASTER_STORE_ENGINE_URL = "https://api.itdos.com/api/ApiEngine/Run";
+
 export default {
     name: "BackgroundTaskCenter",
     components: {
@@ -49,8 +92,13 @@ export default {
     },
     data() {
         return {
+            activeTab: "tasks",
             tasks: [],
+            storeNotices: [],
             loading: false,
+            storeLoading: false,
+            lastStoreCheckTime: 0,
+            storeCheckTimer: null,
             Delete,
             Refresh,
             CircleClose
@@ -59,15 +107,29 @@ export default {
     computed: {
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;
+        },
+        appNoticeCount() {
+            return this.storeNotices.length;
+        },
+        badgeCount() {
+            return this.runningCount + this.appNoticeCount;
         }
     },
     mounted() {
         this.bindWebsocket();
         this.refreshTasks();
+        this.checkOfficialApps(false);
+        this.storeCheckTimer = window.setInterval(() => {
+            this.checkOfficialApps(false);
+        }, STORE_CHECK_INTERVAL);
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
     },
     beforeUnmount() {
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
+        if (this.storeCheckTimer) {
+            window.clearInterval(this.storeCheckTimer);
+            this.storeCheckTimer = null;
+        }
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
             ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
@@ -91,6 +153,10 @@ export default {
         },
         handleTaskList(data) {
             this.tasks = Array.isArray(data) ? data : [];
+        },
+        refreshAll() {
+            this.refreshTasks();
+            this.checkOfficialApps(true);
         },
         async refreshTasks() {
             this.bindWebsocket();
@@ -123,6 +189,50 @@ export default {
             } finally {
                 this.loading = false;
             }
+        },
+        async loadInstalledVersions() {
+            try {
+                const result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
+                    _PageIndex: 1,
+                    _PageSize: 5000
+                });
+                if (result && result.Code === 1 && Array.isArray(result.Data)) {
+                    return result.Data;
+                }
+            } catch (error) {
+                console.warn("[BackgroundTask] load installed app versions failed", error);
+            }
+            return [];
+        },
+        async checkOfficialApps(force) {
+            const now = Date.now();
+            if (!force && this.lastStoreCheckTime && now - this.lastStoreCheckTime < STORE_CHECK_INTERVAL) {
+                return;
+            }
+            if (this.storeLoading) return;
+            this.storeLoading = true;
+            try {
+                const installedVersions = await this.loadInstalledVersions();
+                const result = await DiyCommon.PostAsync(MASTER_STORE_ENGINE_URL, {
+                    ApiEngineKey: "get-microi-store",
+                    OsClient: "iTdos",
+                    Action: "CheckOfficialUpdates",
+                    TargetOsClient: DiyCommon.GetOsClient(),
+                    InstalledVersions: installedVersions
+                }, null, null, "json");
+                if (result && result.Code === 1) {
+                    const data = result.Data || {};
+                    this.storeNotices = Array.isArray(data.Notices) ? data.Notices : [];
+                    this.lastStoreCheckTime = now;
+                }
+            } catch (error) {
+                console.warn("[BackgroundTask] official app check failed", error);
+            } finally {
+                this.storeLoading = false;
+            }
+        },
+        goAppStore() {
+            this.$router.push({ path: "/microi-store" });
         },
         async clearCompleted() {
             const result = await DiyCommon.PostAsync("/api/BackgroundTask/ClearCompleted", {}, null, null, "json");
@@ -170,6 +280,17 @@ export default {
     justify-content: center;
 }
 
+.task-entry :deep(.el-badge__content) {
+    top: 7px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    border: 1px solid #fff;
+    padding: 0 4px;
+    box-shadow: 0 2px 8px rgba(255, 74, 35, 0.28);
+}
+
 .task-icon {
     font-size: 21px;
     line-height: 1;
@@ -183,10 +304,16 @@ export default {
     width: 100%;
 }
 
-.task-panel-header {
+.task-panel-header,
+.task-sub-actions,
+.app-panel-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
+}
+
+.task-panel-header {
     font-weight: 600;
     color: #303133;
     margin-bottom: 8px;
@@ -198,6 +325,34 @@ export default {
     gap: 6px;
 }
 
+.notification-tabs :deep(.el-tabs__header) {
+    margin-bottom: 8px;
+}
+
+.tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    margin-left: 5px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ff4d2e;
+    color: #fff;
+    font-size: 11px;
+    line-height: 16px;
+
+    &.warning {
+        background: #e6a23c;
+    }
+}
+
+.task-sub-actions {
+    justify-content: flex-end;
+    min-height: 24px;
+}
+
 .task-empty {
     height: 80px;
     display: flex;
@@ -207,12 +362,14 @@ export default {
     font-size: 13px;
 }
 
-.task-list {
+.task-list,
+.app-notice-list {
     max-height: 380px;
     overflow: auto;
 }
 
-.task-item {
+.task-item,
+.app-notice-item {
     padding: 10px 0;
     border-bottom: 1px solid #ebeef5;
 
@@ -222,14 +379,17 @@ export default {
 }
 
 .task-main,
-.task-meta {
+.task-meta,
+.app-notice-main,
+.app-notice-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
 }
 
-.task-title {
+.task-title,
+.app-name {
     min-width: 0;
     font-size: 13px;
     color: #303133;
@@ -258,16 +418,27 @@ export default {
     }
 }
 
-.task-meta {
+.task-meta,
+.app-notice-meta {
     margin-top: 6px;
     font-size: 12px;
     color: #909399;
 }
 
-.task-msg {
+.task-msg,
+.app-notice-desc {
     margin-top: 4px;
     font-size: 12px;
     color: #909399;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-panel-tip {
+    min-width: 0;
+    color: #909399;
+    font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

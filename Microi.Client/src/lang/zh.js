@@ -1,6 +1,7 @@
 export default {
     Msg: {
         Load: "加载",
+        Home: "首页",
         LoadMore: "加载更多",
         BackgroundTasks: "后台任务",
         Refresh: "刷新",
@@ -8,6 +9,15 @@ export default {
         NoBackgroundTasks: "暂无后台任务",
         Stop: "停止",
         Elapsed: "耗时",
+        NotificationCenter: "通知中心",
+        OfficialApps: "官方应用",
+        NoOfficialAppUpdates: "暂无官方应用更新提醒",
+        OfficialAppUninstalled: "未安装",
+        OfficialAppOutdated: "可更新",
+        OfficialAppInstalledVersion: "已安装版本：",
+        OfficialAppLatestVersion: "最新版本：",
+        GoAppStore: "去应用商城",
+        OfficialAppUpdateTip: "检测官方应用未安装和可更新项",
         Update: "修改",
         Email: "邮箱",
         Remark: "备注",

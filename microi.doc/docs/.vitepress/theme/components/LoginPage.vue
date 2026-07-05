@@ -217,7 +217,7 @@ function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
     return 'https://localhost:7266'
   }
-  return 'https://api.microi.net'
+  return 'https://api.itdos.com'
 }
 
 const brandFeatures = [
