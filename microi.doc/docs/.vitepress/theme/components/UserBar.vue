@@ -119,7 +119,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-const API_BASE = import.meta.env.VITE_MICROI_API_BASE || 'https://api.microi.net'
+const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 
 const user = ref(null)
 const showMenu = ref(false)
@@ -129,12 +129,21 @@ const confirmPwd = ref('')
 const isSettingPwd = ref(false)
 
 const backendUrl = computed(() => {
+  const savedUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant_url') : null
+  if (savedUrl) return savedUrl
   const tenant = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant') : null
   if (tenant) {
-    return `https://microi.net/?OsClient=${encodeURIComponent(tenant)}`
+    return `https://${tenant}.microi.net`
   }
   return 'https://microi.net'
 })
+
+function getDefaultApiBase() {
+  if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
+    return 'https://localhost:7266'
+  }
+  return 'https://api.microi.net'
+}
 
 function normalizeToken(raw) {
   return (raw || '').replace(/^Bearer\s+/i, '').trim()
@@ -155,6 +164,7 @@ function handleLogout() {
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_tenant')
+  localStorage.removeItem('microi_doc_tenant_url')
   localStorage.removeItem('microi_doc_phone')
   user.value = null
   showMenu.value = false
@@ -189,7 +199,8 @@ async function submitSetPwd() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'authorization': 'Bearer ' + token
+        'authorization': 'Bearer ' + token,
+        'Token': token
       },
       body: JSON.stringify({
         Pwd: newPwd.value,
@@ -225,7 +236,8 @@ async function refreshToken() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'authorization': 'Bearer ' + token
+        'authorization': 'Bearer ' + token,
+        'Token': token
       },
       body: JSON.stringify({ authorization: 'Bearer ' + token })
     })

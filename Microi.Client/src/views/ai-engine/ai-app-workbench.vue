@@ -32,7 +32,7 @@
                 >
                     <div class="app-card-top">
                         <el-tag size="small" effect="dark">{{ app.AppType || "Web" }}</el-tag>
-                        <span>v{{ app.CurrentVersion || 1 }}</span>
+                        <span>{{ formatVersionNo(getAppCurrentVersion(app)) }}</span>
                     </div>
                     <h4>{{ app.Name }}</h4>
                     <p>{{ app.Description || "暂无应用说明" }}</p>
@@ -238,6 +238,21 @@
                     <span v-else>一个应用一条主记录，源码、版本、发布记录独立管理。</span>
                 </div>
                 <div class="stage-actions">
+                    <el-select
+                        v-if="sortedVersions.length"
+                        v-model="selectedVersionKey"
+                        size="small"
+                        class="version-select"
+                        placeholder="选择版本"
+                        @change="selectVersionByKey"
+                    >
+                        <el-option
+                            v-for="item in sortedVersions"
+                            :key="versionKey(item)"
+                            :label="versionLabel(item)"
+                            :value="versionKey(item)"
+                        />
+                    </el-select>
                     <el-button :disabled="!activeFile" @click="formatActiveFile">格式化</el-button>
                     <el-button :disabled="!activeFile" :loading="fileSaving" @click="saveActiveFile">保存源码</el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('source')">下载源码ZIP</el-button>
@@ -298,7 +313,7 @@
                     </div>
 
                     <div v-show="activeView === 'versions'" class="version-pane">
-                        <el-table :data="versions" size="small" height="100%" border>
+                        <el-table :data="sortedVersions" size="small" height="100%" border @row-click="selectVersion">
                             <el-table-column prop="VersionNo" label="版本" width="90" />
                             <el-table-column prop="Status" label="状态" width="120" />
                             <el-table-column prop="PreviewUrl" label="预览地址" min-width="220" show-overflow-tooltip />
@@ -391,6 +406,7 @@ const versions = ref([]);
 const activeFile = ref(null);
 const activeContent = ref("");
 const activeView = ref("source");
+const selectedVersionKey = ref("");
 const fileSaving = ref(false);
 const building = ref(false);
 const previewUrl = ref("");
@@ -439,6 +455,7 @@ const editorField = computed(() => ({
 }));
 const activeFileSize = computed(() => getFileSize(activeFile.value, activeContent.value));
 const fileTreeData = computed(() => buildFileTree(files.value));
+const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
 const canSendAppChat = computed(() => (
     !appChatSending.value
     && currentApp.value
@@ -607,11 +624,32 @@ function normalizeAppList(list) {
     list.filter(isCurrentUserApp).forEach((app) => {
         const key = getAppGroupKey(app);
         const old = grouped.get(key);
-        if (!old || appSortScore(app) > appSortScore(old)) {
-            grouped.set(key, app);
+        if (!old) {
+            grouped.set(key, { ...app });
+            return;
         }
+        const newer = appSortScore(app) > appSortScore(old) ? app : old;
+        const older = newer === app ? old : app;
+        grouped.set(key, mergeAppSummary(newer, older));
     });
     return Array.from(grouped.values()).sort((a, b) => appSortScore(b) - appSortScore(a));
+}
+
+function mergeAppSummary(primary, secondary) {
+    const merged = { ...(secondary || {}), ...(primary || {}) };
+    const currentVersion = [primary, secondary].map(getAppCurrentVersion).sort(compareVersionDesc)[0] || "v1.0.0";
+    merged.CurrentVersionNo = formatVersionNo(currentVersion);
+    merged.PreviewUrl = normalizePreviewUrl(primary?.PreviewUrl || primary?.PublishUrl || primary?.PublicUrl || secondary?.PreviewUrl || secondary?.PublishUrl || secondary?.PublicUrl || "");
+    merged.BuildStatus = primary?.BuildStatus || primary?.Status || secondary?.BuildStatus || secondary?.Status || merged.BuildStatus;
+    return merged;
+}
+
+function compareVersionDesc(a, b) {
+    const [am, an, ap] = parseVersionParts(a);
+    const [bm, bn, bp] = parseVersionParts(b);
+    if (am !== bm) return bm - am;
+    if (an !== bn) return bn - an;
+    return bp - ap;
 }
 
 function isCurrentUserApp(app) {
@@ -634,25 +672,103 @@ function isCurrentUserApp(app) {
 
 function getAppGroupKey(app) {
     const rootKey = String(app?.RootAppId || app?.MainAppId || app?.ParentAppId || "").trim();
-    if (rootKey) return rootKey;
-    const key = String(app?.AppId || app?.AppKey || app?.Name || app?.Id || "").trim();
-    return normalizeGeneratedAppKey(key) || String(app?.Id || Math.random());
+    if (rootKey) return `root:${rootKey}`;
+    const nameKey = normalizeAppNameKey(app?.Name || app?.Title || "");
+    const appKey = normalizeGeneratedAppKey(app?.AppId || app?.AppKey || "");
+    if (nameKey) return `name:${nameKey}`;
+    if (appKey) return `key:${appKey}`;
+    return `id:${app?.Id || Math.random()}`;
 }
 
 function normalizeGeneratedAppKey(value) {
     return String(value || "")
         .trim()
-        .replace(/(?:验收|测试|预览)[a-z0-9_-]*$/i, "")
+        .toLowerCase()
+        .replace(/(?:验收|测试|预览|演示)[a-z0-9_-]*$/i, "")
         .replace(/-(?:e2e|layout|preview|test|demo|build|version)-[a-z0-9]+$/i, "")
-        .replace(/-v\d+$/i, "")
+        .replace(/-v\d+(?:\.\d+){0,2}$/i, "")
         .replace(/-{2,}/g, "-")
         .replace(/-$/g, "");
 }
 
+function normalizeAppNameKey(value) {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, "")
+        .replace(/(?:验收|测试|预览|演示)[a-zA-Z0-9_-]*$/g, "")
+        .replace(/(?:应用|项目)$/g, "")
+        .toLowerCase();
+}
+
 function appSortScore(app) {
     const time = Date.parse(String(app?.UpdateTime || app?.CreateTime || "").replace(/-/g, "/")) || 0;
-    const version = Number(app?.CurrentVersion || app?.Version || 0);
+    const version = versionScore(app);
     return time + version;
+}
+
+function getAppCurrentVersion(app) {
+    return app?.CurrentVersionNo || app?.VersionNo || app?.BuildVersion || app?.CurrentVersion || app?.Version || "v1.0.0";
+}
+
+function parseVersionParts(value) {
+    const text = String(value || "").trim().replace(/^v/i, "");
+    const parts = text.split(".").map((item) => Number(item));
+    if (parts.length >= 3 && parts.every((item) => Number.isFinite(item))) {
+        return parts.slice(0, 3);
+    }
+    const numeric = Number(text);
+    if (Number.isFinite(numeric) && numeric > 0) {
+        return [1, 0, Math.max(0, numeric - 1)];
+    }
+    return [1, 0, 0];
+}
+
+function formatVersionNo(value) {
+    const [major, minor, patch] = parseVersionParts(value);
+    return `v${major}.${minor}.${patch}`;
+}
+
+function versionScore(item) {
+    const [major, minor, patch] = parseVersionParts(getAppCurrentVersion(item));
+    const time = Date.parse(String(item?.UpdateTime || item?.CreateTime || "").replace(/-/g, "/")) || 0;
+    return major * 1000000 + minor * 10000 + patch * 100 + Math.floor(time / 1000000000);
+}
+
+function versionKey(item) {
+    return String(item?.Id || item?.VersionId || item?.VersionNo || item?.BuildVersion || item?.CreateTime || "");
+}
+
+function versionLabel(item) {
+    const status = item?.Status || item?.BuildStatus || "Success";
+    return `${formatVersionNo(getAppCurrentVersion(item))} · ${status}`;
+}
+
+function getVersionPreviewUrl(item) {
+    return normalizePreviewUrl(item?.PreviewUrl || item?.PublishUrl || item?.PublicUrl || item?.Url || "");
+}
+
+function selectVersion(item) {
+    if (!item) return;
+    selectedVersionKey.value = versionKey(item);
+    const url = getVersionPreviewUrl(item);
+    if (url) {
+        previewUrl.value = url;
+        refreshPreviewHtml(url);
+        activeView.value = "preview";
+    }
+    if (currentApp.value) {
+        currentApp.value = {
+            ...currentApp.value,
+            CurrentVersionNo: getAppCurrentVersion(item),
+            BuildStatus: item.Status || item.BuildStatus || currentApp.value.BuildStatus,
+            PreviewUrl: url || currentApp.value.PreviewUrl
+        };
+    }
+}
+
+function selectVersionByKey(key) {
+    const row = sortedVersions.value.find((item) => versionKey(item) === key);
+    if (row) selectVersion(row);
 }
 
 async function selectApp(app) {
@@ -666,10 +782,17 @@ async function selectApp(app) {
         const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
         const selected = detail?.App || app;
         currentApp.value = selected;
-        previewUrl.value = normalizePreviewUrl(selected.PreviewUrl || "");
-        await refreshPreviewHtml();
         files.value = detail?.Files || [];
         versions.value = detail?.Versions || [];
+        const latestVersion = sortedVersions.value[0];
+        if (latestVersion) {
+            selectedVersionKey.value = versionKey(latestVersion);
+            previewUrl.value = getVersionPreviewUrl(latestVersion) || normalizePreviewUrl(selected.PreviewUrl || "");
+        } else {
+            selectedVersionKey.value = "";
+            previewUrl.value = normalizePreviewUrl(selected.PreviewUrl || "");
+        }
+        await refreshPreviewHtml();
         const firstFile = files.value.find((item) => Number(item.IsDirectory || 0) !== 1);
         if (firstFile) await openFile(firstFile, { focusSource: false });
         if (previewUrl.value || previewHtml.value) {
@@ -692,35 +815,26 @@ async function enterDevelop(app) {
 async function previewApp(app) {
     if (!app?.Id) return;
     previewingAppId.value = app.Id;
-    const previewWindow = window.open("about:blank", "_blank");
     try {
-        if (previewWindow && previewWindow.document) {
-            previewWindow.document.write(buildPreviewMessageHtml("正在准备AI应用预览..."));
-            previewWindow.document.close();
-        }
-        const url = await ensureAppPreviewUrl(app);
-        if (!url) throw new Error("预览地址为空，请先运行/发布应用");
-        if (previewWindow) {
-            previewWindow.location.href = url;
-        } else {
-            window.open(url, "_blank");
-        }
+        const url = await getPublishedPreviewUrl(app);
+        if (!url) throw new Error("还没有正式发布版本，请先进入开发工作台点击“运行/发布”。");
+        window.open(url, "_blank");
     } catch (error) {
-        if (previewWindow) previewWindow.close();
         ElMessage.error(error.message || "打开预览失败");
     } finally {
         previewingAppId.value = "";
     }
 }
 
-async function ensureAppPreviewUrl(app) {
-    let url = normalizePreviewUrl(app.PreviewUrl || "");
-    if (!url || String(app.AppType || "").toLowerCase() === "uniapp") {
-        const data = await runAiAppEngine("ai_app_build", { AppId: app.Id });
-        url = normalizePreviewUrl(data?.PreviewUrl || url);
-        await loadApps();
-    }
-    return url;
+async function getPublishedPreviewUrl(app) {
+    const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
+    const latestVersion = [...(detail?.Versions || [])]
+        .filter((item) => /success|published|done|完成|成功/i.test(String(item?.Status || item?.BuildStatus || "Success")))
+        .sort((a, b) => versionScore(b) - versionScore(a))[0]
+        || [...(detail?.Versions || [])].sort((a, b) => versionScore(b) - versionScore(a))[0];
+    return getVersionPreviewUrl(latestVersion)
+        || normalizePreviewUrl(detail?.App?.PreviewUrl || detail?.App?.PublishUrl || detail?.App?.PublicUrl || "")
+        || normalizePreviewUrl(app?.PreviewUrl || app?.PublishUrl || app?.PublicUrl || "");
 }
 
 function backToGallery() {
@@ -1051,11 +1165,28 @@ function normalizePreviewHtml(html, baseUrl) {
     const content = isEncodedHtml(raw) ? decodeHtmlEntities(raw) : raw;
     if (!content) return buildPreviewMessageHtml("预览内容为空");
     const base = `<base href="${escapeHtml(getPreviewBaseHref(baseUrl))}">`;
+    const previewStyle = buildPreviewShellStyle(content);
     if (/<head[^>]*>/i.test(content) && !/<base\s/i.test(content)) {
-        return content.replace(/<head([^>]*)>/i, `<head$1>${base}`);
+        return content.replace(/<head([^>]*)>/i, `<head$1>${base}${previewStyle}`);
+    }
+    if (/<head[^>]*>/i.test(content)) {
+        return content.replace(/<head([^>]*)>/i, `<head$1>${previewStyle}`);
     }
     if (/<!doctype html>|<html[\s>]/i.test(content)) return content;
-    return `<!doctype html><html><head><meta charset="utf-8">${base}</head><body>${content}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8">${base}${previewStyle}</head><body>${content}</body></html>`;
+}
+
+function buildPreviewShellStyle(content) {
+    if (!/UniApp|uni-app|tabbar|tab-bar|pages\/|App\.vue/i.test(content || "")) return "";
+    return `<style data-microi-ai-preview>
+html,body{min-height:100%;background:#eef4f8!important;margin:0;}
+body{display:grid;place-items:center;padding:22px;box-sizing:border-box;}
+.preview-shell,.phone-shell,.uniapp-preview,.page{box-sizing:border-box;}
+.preview-shell,.phone-shell,.uniapp-preview{width:min(430px,100%);min-height:720px;margin:0 auto;background:#fff;border-radius:30px;overflow:hidden;box-shadow:0 22px 70px rgba(16,24,40,.18);position:relative;}
+.tabbar,.tab-bar,.bottom-nav,.bottom-tab,.nav-tabs{position:absolute!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;z-index:20;background:#fff!important;box-shadow:0 -8px 24px rgba(15,23,42,.08);}
+.page{min-height:720px!important;padding-bottom:78px!important;overflow:auto!important;}
+@media(max-width:520px){body{padding:0}.preview-shell,.phone-shell,.uniapp-preview{width:100%;min-height:100vh;border-radius:0;box-shadow:none}.page{min-height:100vh!important}}
+</style>`;
 }
 
 function isEncodedHtml(text) {
@@ -1378,8 +1509,8 @@ function scrollAppChat() {
     height: calc(100vh - 150px);
     min-height: 560px;
     display: grid;
-    grid-template-columns: minmax(380px, 430px) 300px minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: minmax(320px, 380px) minmax(220px, 270px) minmax(0, 1fr);
+    gap: 10px;
     background: #f7f9fc;
 }
 
@@ -1820,7 +1951,7 @@ function scrollAppChat() {
     width: 100%;
     height: 100%;
     border: 0;
-    background: #fff;
+    background: #eef4f8;
 }
 
 .empty-area,
@@ -2086,9 +2217,20 @@ function scrollAppChat() {
     height: 34px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1400px) {
     .ai-app-workbench {
-        grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+        grid-template-columns: minmax(300px, 340px) minmax(210px, 240px) minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .stage-actions {
+        gap: 6px;
+    }
+}
+
+@media (max-width: 1160px) {
+    .ai-app-workbench {
+        grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
     }
 
     .file-panel {

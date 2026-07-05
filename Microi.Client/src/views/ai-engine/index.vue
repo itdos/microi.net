@@ -192,7 +192,12 @@
                             </div>
 
                             <div v-if="message.queryRows && message.queryRows.length" class="query-result">
-                                <el-table :data="message.queryRows" size="small" height="240" border>
+                                <el-table
+                                    :data="message.queryRows"
+                                    size="small"
+                                    :max-height="queryResultMaxHeight(message.queryRows)"
+                                    border
+                                >
                                     <el-table-column
                                         v-for="column in Object.keys(message.queryRows[0] || {})"
                                         :key="column"
@@ -972,6 +977,25 @@ function formatFileSize(size) {
     return `${(size / 1024 / 1024).toFixed(1)}MB`;
 }
 
+function queryResultMaxHeight(rows) {
+    const count = Array.isArray(rows) ? rows.length : 0;
+    if (count <= 2) return undefined;
+    return Math.min(420, 54 + count * 42);
+}
+
+function buildDataThinkingSummary(data, question) {
+    const lines = [
+        "已识别为数据分析请求。",
+        "判断依据：用户询问当前系统内的数量、统计或数据概况，需要读取租户数据库中的业务/系统表。"
+    ];
+    if (question) lines.push(`用户问题：${question}`);
+    if (data?.Source) lines.push(`数据源策略：${data.Source}`);
+    if (data?.GeneratedSQL) lines.push(`执行方式：生成只读 SELECT 语句并在服务端受控执行。`);
+    const count = Array.isArray(data?.QueryResult) ? data.QueryResult.length : 0;
+    lines.push(`结果处理：返回 ${count} 条结果用于前端表格展示，同时生成自然语言回答。`);
+    return lines.join("\n");
+}
+
 function buildSystemPrompt(mode) {
     const modelName = selectedAiModel.value?.Name || "";
     const modelKey = selectedAiModel.value?.AiModel || "";
@@ -1076,6 +1100,8 @@ async function sendDataQuestion(text, assistantMessage) {
     }, null, null, "json");
     if (!isOk(result)) throw new Error(result?.Msg || "数据分析失败");
     const data = result.Data || {};
+    assistantMessage.thinking = data.Thinking || buildDataThinkingSummary(data, text);
+    assistantMessage.thinkingCollapsed = false;
     assistantMessage.content = [
         data.Answer || "查询完成",
         data.GeneratedSQL ? `SQL: ${data.GeneratedSQL}` : ""
