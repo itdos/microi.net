@@ -256,6 +256,19 @@ export const asyncRoutes = [
             }
         ]
     },
+    {
+        path: "/mic-ai-engine",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/mic-ai-engine",
+                name: "mic_ai_engine_workspace",
+                meta: { title: "AI引擎", keepAlive: false },
+                component: () => import("@/views/ai-engine/index.vue")
+            }
+        ]
+    },
     // 业务架构蓝图（Business Blueprint）
     {
         path: "/blueprint/list",
