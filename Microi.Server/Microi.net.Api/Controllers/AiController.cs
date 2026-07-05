@@ -14,7 +14,9 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Microi.net.Api
@@ -53,6 +55,215 @@ namespace Microi.net.Api
             return (userId, userName);
         }
 
+        private const int AiContextRecentCount = 20;
+        private const int AiContextSummaryThreshold = 28;
+
+        private class AiConversationRecord
+        {
+            public string Id { get; set; }
+            public string Source { get; set; }
+            public string ConversationId { get; set; }
+            public string Role { get; set; }
+            public string Mode { get; set; }
+            public string Content { get; set; }
+            public string CreatedAt { get; set; }
+        }
+
+        private async Task ApplyServerConversationContextAsync(AiParam param)
+        {
+            if (param == null || string.IsNullOrWhiteSpace(param.ConversationId))
+            {
+                return;
+            }
+
+            var source = string.IsNullOrWhiteSpace(param.Source) ? "ai-engine-workbench" : param.Source;
+            var rowsResult = await _formEngine.GetTableDataAsync("mic_ai_record", new
+            {
+                _OrderBy = "CreateTime",
+                _OrderByType = "DESC",
+                _PageSize = 300,
+                _SelectFields = new[] { "Id", "Content", "CreateTime" }
+            });
+            if (rowsResult.Code != 1 || rowsResult.Data == null)
+            {
+                return;
+            }
+
+            var records = new List<AiConversationRecord>();
+            foreach (var row in rowsResult.Data)
+            {
+                var rowJson = SafeJObject(row);
+                var raw = rowJson?["Content"]?.ToString();
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                var payload = SafeJObject(raw);
+                if (payload == null) continue;
+                var rowSource = payload["Source"]?.ToString();
+                var rowConversationId = payload["ConversationId"]?.ToString();
+                if (!string.Equals(rowSource, source, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.Equals(rowConversationId, param.ConversationId, StringComparison.OrdinalIgnoreCase)) continue;
+
+                records.Add(new AiConversationRecord
+                {
+                    Id = rowJson?["Id"]?.ToString() ?? payload["Id"]?.ToString() ?? "",
+                    Source = rowSource,
+                    ConversationId = rowConversationId,
+                    Role = (payload["Role"]?.ToString() ?? "assistant").Trim().ToLowerInvariant(),
+                    Mode = payload["Mode"]?.ToString() ?? param.Mode ?? "",
+                    Content = payload["Content"]?.ToString() ?? "",
+                    CreatedAt = payload["CreatedAt"]?.ToString() ?? rowJson?["CreateTime"]?.ToString() ?? ""
+                });
+            }
+
+            records = records
+                .Where(item => !string.IsNullOrWhiteSpace(item.Content))
+                .OrderBy(item => item.CreatedAt)
+                .ToList();
+            if (records.Count == 0)
+            {
+                return;
+            }
+
+            // 前端会先把当前用户消息写入 mic_ai_record，再请求 AI。这里排除同一条当前消息，避免模型看到重复问题。
+            var currentUserMessageIndex = records.FindLastIndex(item =>
+                item.Role == "user" && string.Equals(item.Content, param.UserChatMsg ?? "", StringComparison.Ordinal));
+            if (currentUserMessageIndex >= 0)
+            {
+                records.RemoveAt(currentUserMessageIndex);
+            }
+
+            var nonSummary = records
+                .Where(item => item.Role != "summary")
+                .ToList();
+            var history = new List<ChatHistoryItem>();
+            if (nonSummary.Count > AiContextSummaryThreshold)
+            {
+                var olderRecords = nonSummary.Take(Math.Max(0, nonSummary.Count - AiContextRecentCount)).ToList();
+                var summary = BuildConversationSummary(olderRecords);
+                if (!string.IsNullOrWhiteSpace(summary))
+                {
+                    history.Add(new ChatHistoryItem
+                    {
+                        Role = "system",
+                        Content = "以下是本对话较早上下文的自动压缩摘要，请结合最近消息继续回答：\n" + summary
+                    });
+                    if (nonSummary.Count % 16 == 0)
+                    {
+                        _ = SaveConversationSummaryAsync(param, source, summary);
+                    }
+                }
+            }
+
+            history.AddRange(nonSummary
+                .TakeLast(AiContextRecentCount)
+                .Select(item => new ChatHistoryItem
+                {
+                    Role = item.Role == "assistant" || item.Role == "ai" ? "assistant" : "user",
+                    Content = item.Content
+                }));
+
+            param.ChatHistory = history;
+        }
+
+        private static string BuildConversationSummary(List<AiConversationRecord> records)
+        {
+            if (records == null || records.Count == 0) return "";
+            var sb = new StringBuilder();
+            sb.AppendLine($"自动摘要共压缩 {records.Count} 条较早消息：");
+            foreach (var item in records.TakeLast(60))
+            {
+                var role = item.Role == "user" ? "用户" : "AI";
+                var content = (item.Content ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
+                if (content.Length > 260)
+                {
+                    content = content.Substring(0, 260) + "...";
+                }
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    sb.AppendLine($"- {role}: {content}");
+                }
+                if (sb.Length > 6000) break;
+            }
+            return sb.ToString().Trim();
+        }
+
+        private async Task SaveConversationSummaryAsync(AiParam param, string source, string summary)
+        {
+            try
+            {
+                await _formEngine.AddFormDataAsync("mic_ai_record", new
+                {
+                    AiModel = param.AiModel ?? "",
+                    Content = JsonConvert.SerializeObject(new
+                    {
+                        Source = source,
+                        ConversationId = param.ConversationId,
+                        Title = "上下文自动压缩摘要",
+                        Role = "summary",
+                        Mode = param.Mode ?? "chat",
+                        Content = summary,
+                        ModelId = param.AiModel ?? "",
+                        AiModel = param.AiModel ?? "",
+                        Time = DateTime.Now.ToString("HH:mm"),
+                        CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    })
+                });
+            }
+            catch { }
+        }
+
+        private static JObject SafeJObject(object value)
+        {
+            try
+            {
+                if (value == null) return null;
+                if (value is JObject jObject) return jObject;
+                if (value is string text) return JObject.Parse(text);
+                return JObject.FromObject(value);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string TryBuildBuiltinChatReply(AiParam param)
+        {
+            var text = (param?.UserChatMsg ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return "";
+            }
+
+            if (Regex.IsMatch(text, "(你当前是什么模型|当前是什么模型|你是什么模型|模型是什么|当前模型|使用.*模型)", RegexOptions.IgnoreCase))
+            {
+                var modelId = param?.AiModel?.Trim();
+                var modelName = "";
+                var systemText = param?.SystemChatMsg ?? "";
+                var match = Regex.Match(systemText, "当前模型名称：(?<name>[^，,\\n]+).*?模型标识：(?<id>[^，,。\\n]+)", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    modelName = match.Groups["name"].Value.Trim();
+                    if (string.IsNullOrWhiteSpace(modelId))
+                    {
+                        modelId = match.Groups["id"].Value.Trim();
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(modelName))
+                {
+                    modelName = modelId;
+                }
+                if (string.IsNullOrWhiteSpace(modelId))
+                {
+                    return "当前尚未选择 AI 模型，请先在输入框右侧选择一个模型。";
+                }
+                return modelName == modelId
+                    ? $"当前使用的 AI 模型是：{modelId}。"
+                    : $"当前使用的 AI 模型是：{modelName}（{modelId}）。";
+            }
+
+            return "";
+        }
+
         // ============================================================
         // region: AI 对话 / NL2SQL / NL2V8Engine（原有功能）
         // ============================================================
@@ -61,18 +272,109 @@ namespace Microi.net.Api
         /// AI对话
         /// </summary>
         [HttpPost, HttpGet]
-        public async Task<JsonResult> Chat(AiParam param)
+        public async Task<JsonResult> Chat(
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
+            [FromQuery] string UserChatMsg = null,
+            [FromQuery] string SystemChatMsg = null,
+            [FromQuery] string AiModel = null,
+            [FromQuery] string OsClient = null)
         {
+            var param = bodyParam ?? new AiParam();
+            if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
+            if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
+            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+
+            var builtinReply = TryBuildBuiltinChatReply(param);
+            if (!string.IsNullOrWhiteSpace(builtinReply))
+            {
+                return Json(new DosResult(1, builtinReply));
+            }
+
+            await ApplyServerConversationContextAsync(param);
             var result = await _microiAi.Chat(param);
             return Json(result);
+        }
+
+        /// <summary>
+        /// AI对话（SSE流式输出）
+        /// </summary>
+        [HttpPost, HttpGet]
+        public async Task ChatStream(
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
+            [FromQuery] string UserChatMsg = null,
+            [FromQuery] string SystemChatMsg = null,
+            [FromQuery] string AiModel = null,
+            [FromQuery] string OsClient = null)
+        {
+            var param = bodyParam ?? new AiParam();
+            if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
+            if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
+            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+
+            Response.ContentType = "text/event-stream; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["Connection"] = "keep-alive";
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            var builtinReply = TryBuildBuiltinChatReply(param);
+            if (!string.IsNullOrWhiteSpace(builtinReply))
+            {
+                foreach (var ch in builtinReply)
+                {
+                    await WriteSseEventAsync("message", ch.ToString());
+                    await Task.Delay(8);
+                }
+                await WriteSseEventAsync("result", JsonConvert.SerializeObject(builtinReply));
+                await WriteSseEventAsync("done", "[DONE]");
+                return;
+            }
+
+            await ApplyServerConversationContextAsync(param);
+
+            try
+            {
+                var result = await _microiAi.ChatStream(param, async (chunk) =>
+                {
+                    await WriteSseEventAsync("message", chunk);
+                });
+
+                if (result.Code == 1 && result.Data != null)
+                {
+                    await WriteSseEventAsync("result", JsonConvert.SerializeObject(result.Data));
+                }
+                else if (result.Code != 1)
+                {
+                    await WriteSseEventAsync("error", result.Msg ?? "AI 对话失败");
+                }
+                await WriteSseEventAsync("done", "[DONE]");
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await WriteSseEventAsync("error", $"服务异常：{ex.Message}");
+                    await WriteSseEventAsync("done", "[DONE]");
+                }
+                catch { }
+            }
         }
 
         /// <summary>
         /// 自然语言转SQL查询
         /// </summary>
         [HttpPost, HttpGet]
-        public async Task<JsonResult> NL2SQL(NL2SQLParam param)
+        public async Task<JsonResult> NL2SQL(
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2SQLParam bodyParam,
+            [FromQuery] string Question = null,
+            [FromQuery] string AiModel = null,
+            [FromQuery] string OsClient = null)
         {
+            var param = bodyParam ?? new NL2SQLParam();
+            if (!string.IsNullOrWhiteSpace(Question)) param.Question = Question;
+            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             var result = await _microiAi.NL2SQL(param);
             return Json(result);
         }

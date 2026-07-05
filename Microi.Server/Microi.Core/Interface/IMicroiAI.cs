@@ -31,6 +31,14 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <returns></returns>
         Task<DosResult> Chat(AiParam param);
+
+        /// <summary>
+        /// AI对话（流式输出）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <param name="onChunkReceived">流式数据块回调函数</param>
+        /// <returns></returns>
+        Task<DosResult> ChatStream(AiParam param, Func<string, Task> onChunkReceived);
         
         /// <summary>
         /// 自然语言转SQL并执行查询

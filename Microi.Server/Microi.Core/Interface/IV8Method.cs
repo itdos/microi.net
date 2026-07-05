@@ -66,6 +66,11 @@ namespace Microi.net
         DosResult Upload(dynamic dynamicParam);
 
         /// <summary>
+        /// 移动 HDFS 文件到指定完整路径。用于发布类接口引擎生成稳定对象地址。
+        /// </summary>
+        DosResult MoveObject(dynamic dynamicParam);
+
+        /// <summary>
         /// 获取访问token
         /// </summary>
         DosResult<CurrentToken> GetAccessToken(dynamic dynamicParam);

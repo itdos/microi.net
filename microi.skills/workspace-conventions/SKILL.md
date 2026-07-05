@@ -101,6 +101,16 @@ Microi 平台级长任务和安全防护属于系统能力，AI 修改框架、M
 - 攻击事件、IP 封禁/解封记录应异步写入 MySQL `mci_` 表并写系统日志；同一 IP、同一原因、同一时间窗必须去重合并，不要重复写大量相同失败原因。
 - 手动封禁、手动解封、自动解封都要有审计记录。封禁响应要返回 DosResult 风格 JSON，便于前端明确提示。
 
+## 平台功能优先接口引擎约定
+
+AI 为 Microi 平台新增租户功能、后台工具、数据维护能力、在线 AI 能力、导入导出、初始化、修复任务或页面配套接口时，默认优先使用接口引擎实现，不要直接新增 `Microi.net.Api` Controller 或把业务逻辑写死到 C# 后端。
+
+- 能用 `V8.FormEngine`、`V8.Db`、`V8.Method`、`V8.Http`、`V8.Office`、`V8.ApiEngine` 完成的功能，必须优先建 `sys_apiengine` 接口引擎，并通过前端 `DiyCommon.ApiEngine.Run` 或菜单按钮调用。
+- 需要持久化的数据结构必须优先通过 MCP / Manifest 创建标准低代码表、字段和菜单，让表能在表单引擎中可见、可维护、可授权；不要只在 C# 中 `CREATE TABLE` 物理表。
+- 如果接口引擎缺少底层能力，优先扩展 V8 能力（例如 `V8.Method`、`V8.FormEngine`、HDFS 辅助方法），再让接口引擎调用新增能力；只有跨平台核心框架、协议层、鉴权管线、SignalR/WebSocket、ORM、任务调度内核等接口引擎无法表达的能力，才新增或修改 C# Controller/Service。
+- 新增 C# Controller 前必须能说明为什么不能用接口引擎实现，并在交付说明中列出原因、影响范围和版本升级要求。
+- 从 C# Controller 迁移到接口引擎时，前端不得继续调用旧 `/api/<Controller>/<Action>`；应统一改为 `DiyCommon.ApiEngine.Run('<ApiEngineKey>', params)`，并保留 DosResult 返回格式。
+
 ## VS Code 插件空目录生成规则
 
 Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。

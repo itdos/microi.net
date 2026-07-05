@@ -7,12 +7,42 @@ namespace Microi.net
 {
     public class AiParam
     {
-        public string UserChatMsg { get; set; }
-        public string SystemChatMsg { get; set; }
-        public string ApiKey { get; set; }
-        public string Endpoint { get; set; }
-        public string AiModel { get; set; }
+        public string? UserChatMsg { get; set; }
+        public string? SystemChatMsg { get; set; }
+        public string? ApiKey { get; set; }
+        public string? Endpoint { get; set; }
+        public string? AiModel { get; set; }
+        public string? OsClient { get; set; }
+        /// <summary>
+        /// 对话Id。前端只传这个Id，后端会从 mic_ai_record 读取历史并压缩上下文。
+        /// </summary>
+        public string? ConversationId { get; set; }
+        /// <summary>
+        /// 对话来源，如 ai-engine-workbench、ai-app-workbench。
+        /// </summary>
+        public string? Source { get; set; }
+        /// <summary>
+        /// 对话模式，如 chat、data、code、builder、project。
+        /// </summary>
+        public string? Mode { get; set; }
+        public List<AiAttachmentParam>? Attachments { get; set; }
+        /// <summary>
+        /// 对话历史。推荐仅由后端上下文压缩逻辑填充，前端不要长期传入大量历史。
+        /// </summary>
+        public List<ChatHistoryItem>? ChatHistory { get; set; }
 
+    }
+
+    /// <summary>
+    /// AI 对话附件。图片会随请求传给支持视觉的模型；文本类附件会拼入用户消息。
+    /// </summary>
+    public class AiAttachmentParam
+    {
+        public string? FileName { get; set; }
+        public string? ContentType { get; set; }
+        public string? FileByteBase64 { get; set; }
+        public string? Text { get; set; }
+        public long Size { get; set; }
     }
 
     /// <summary>
@@ -23,22 +53,22 @@ namespace Microi.net
         /// <summary>
         /// 用户的自然语言问题，如：今天订单数量多少
         /// </summary>
-        public string Question { get; set; }
+        public string? Question { get; set; }
         
         /// <summary>
         /// AI模型名称
         /// </summary>
-        public string AiModel { get; set; }
+        public string? AiModel { get; set; }
         
         /// <summary>
         /// 租户标识
         /// </summary>
-        public string OsClient { get; set; }
+        public string? OsClient { get; set; }
         
         /// <summary>
         /// 允许查询的表名列表（白名单），为空则允许所有表
         /// </summary>
-        public List<string> AllowedTables { get; set; }
+        public List<string>? AllowedTables { get; set; }
     }
 
     /// <summary>
@@ -49,27 +79,27 @@ namespace Microi.net
         /// <summary>
         /// 用户的原始问题
         /// </summary>
-        public string Question { get; set; }
+        public string? Question { get; set; }
         
         /// <summary>
         /// AI生成的SQL语句
         /// </summary>
-        public string GeneratedSQL { get; set; }
+        public string? GeneratedSQL { get; set; }
         
         /// <summary>
         /// SQL执行结果
         /// </summary>
-        public object QueryResult { get; set; }
+        public object? QueryResult { get; set; }
         
         /// <summary>
         /// 自然语言答案
         /// </summary>
-        public string Answer { get; set; }
+        public string? Answer { get; set; }
         
         /// <summary>
         /// SQL来源：模板匹配 / AI生成
         /// </summary>
-        public string Source { get; set; }
+        public string? Source { get; set; }
     }
 
     /// <summary>
@@ -80,22 +110,22 @@ namespace Microi.net
         /// <summary>
         /// 用户问题
         /// </summary>
-        public string Question { get; set; }
+        public string? Question { get; set; }
         
         /// <summary>
         /// AI模型名称
         /// </summary>
-        public string AiModel { get; set; }
+        public string? AiModel { get; set; }
         
         /// <summary>
         /// 租户标识
         /// </summary>
-        public string OsClient { get; set; }
+        public string? OsClient { get; set; }
         
         /// <summary>
         /// 允许查询的表名列表（白名单），为空则允许所有表
         /// </summary>
-        public List<string> AllowedTables { get; set; }
+        public List<string>? AllowedTables { get; set; }
     }
 
     /// <summary>
@@ -135,14 +165,14 @@ namespace Microi.net
     public class ChatHistoryItem
     {
         /// <summary>
-        /// 角色：user / ai / assistant
+        /// 角色：system / user / ai / assistant
         /// </summary>
-        public string Role { get; set; }
+        public string? Role { get; set; }
 
         /// <summary>
         /// 消息内容
         /// </summary>
-        public string Content { get; set; }
+        public string? Content { get; set; }
     }
 
     /// <summary>
@@ -153,27 +183,27 @@ namespace Microi.net
         /// <summary>
         /// 用户的原始需求描述
         /// </summary>
-        public string Question { get; set; }
+        public string? Question { get; set; }
 
         /// <summary>
         /// AI生成的V8引擎代码
         /// </summary>
-        public string GeneratedCode { get; set; }
+        public string? GeneratedCode { get; set; }
 
         /// <summary>
         /// 检索到的相关V8文档章节
         /// </summary>
-        public List<string> RelevantDocs { get; set; }
+        public List<string>? RelevantDocs { get; set; }
 
         /// <summary>
         /// 检索到的相关数据库表
         /// </summary>
-        public List<string> RelevantTables { get; set; }
+        public List<string>? RelevantTables { get; set; }
 
         /// <summary>
         /// 来源信息
         /// </summary>
-        public string Source { get; set; }
+        public string? Source { get; set; }
     }
 
     /// <summary>
@@ -189,22 +219,22 @@ namespace Microi.net
         /// <summary>
         /// 响应类型：普通聊天 / NL2SQL数据查询 / 异常
         /// </summary>
-        public string ResponseType { get; set; }
+        public string? ResponseType { get; set; }
         
         /// <summary>
         /// AI回复内容
         /// </summary>
-        public string Content { get; set; }
+        public string? Content { get; set; }
         
         /// <summary>
         /// SQL查询结果（仅NL2SQL模式）
         /// </summary>
-        public object QueryResult { get; set; }
+        public object? QueryResult { get; set; }
         
         /// <summary>
         /// 生成的SQL（仅NL2SQL模式）
         /// </summary>
-        public string GeneratedSQL { get; set; }
+        public string? GeneratedSQL { get; set; }
     }
 
 }

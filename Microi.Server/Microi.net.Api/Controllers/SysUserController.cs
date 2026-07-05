@@ -351,6 +351,7 @@ namespace Microi.net.Api
                         Name = phone,
                         Level = 1,
                         State = 1,
+                        IsDeleted = 0,
                         RoleIds = "[]",
                         OsClient = param.OsClient
                     });
@@ -360,7 +361,11 @@ namespace Microi.net.Api
                         return Json(new DosResult(0, null, $"注册失败：{addResult.Msg}"));
                     }
 
-                    userId = addResult.Data?.ToString();
+                    userId = DynamicHelper.GetDynamicStringValue(addResult.Data, "Id", "");
+                    if (userId.DosIsNullOrWhiteSpace())
+                    {
+                        userId = addResult.Data?.ToString();
+                    }
                     loginAccount = phone;
                     #endregion
                 }
@@ -368,24 +373,56 @@ namespace Microi.net.Api
                 {
                     #region 用户已存在，验证状态
                     var state = DynamicHelper.GetDynamicIntValue(userResult.Data, "State", 0);
-                    if (state != 1)
+                    userId = DynamicHelper.GetDynamicStringValue(userResult.Data, "Id", "");
+                    if (userId.DosIsNullOrWhiteSpace())
                     {
-                        return Json(new DosResult(0, null, "账号已被禁用！"));
+                        return Json(new DosResult(0, null, "账号数据异常：Id为空！"));
                     }
-                    userId = userResult.Data.Id?.ToString();
                     var existingAccount = DynamicHelper.GetDynamicStringValue(userResult.Data, "Account", "");
-                    if (string.IsNullOrWhiteSpace(existingAccount))
+                    var existingName = DynamicHelper.GetDynamicStringValue(userResult.Data, "Name", "");
+                    var accountToSave = string.IsNullOrWhiteSpace(existingAccount) ? phone : existingAccount;
+                    if (state != 1 || string.IsNullOrWhiteSpace(existingAccount) || string.IsNullOrWhiteSpace(existingName))
                     {
-                        var uptAccountResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                        var restoreResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
                         {
                             Id = userId,
-                            Account = phone,
+                            Account = accountToSave,
+                            Phone = phone,
+                            Name = string.IsNullOrWhiteSpace(existingName) ? phone : existingName,
+                            State = 1,
+                            IsDeleted = 0,
                             OsClient = param.OsClient
                         });
-                        if (uptAccountResult.Code != 1)
+                        if (restoreResult.Code != 1)
                         {
-                            return Json(new DosResult(0, null, $"补全登录账号失败：{uptAccountResult.Msg}"));
+                            return Json(new DosResult(0, null, $"恢复账号失败：{restoreResult.Msg}"));
                         }
+                    }
+                    if (!param.Pwd.DosIsNullOrWhiteSpace())
+                    {
+                        var resetPwd = param.Pwd.Trim();
+                        if (resetPwd.Length < 6)
+                        {
+                            return Json(new DosResult(0, null, "密码长度不能少于6位！"));
+                        }
+                        var checkPwdResult = await _sysUserLogic.CheckPwd(resetPwd, param._Lang);
+                        if (!checkPwdResult.DosIsNullOrWhiteSpace())
+                        {
+                            return Json(new DosResult(0, null, checkPwdResult));
+                        }
+                        var resetPwdResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+                        {
+                            Id = userId,
+                            Pwd = EncryptHelper.DESEncode(resetPwd),
+                            OsClient = param.OsClient
+                        });
+                        if (resetPwdResult.Code != 1)
+                        {
+                            return Json(new DosResult(0, null, $"更新登录密码失败：{resetPwdResult.Msg}"));
+                        }
+                    }
+                    if (string.IsNullOrWhiteSpace(existingAccount))
+                    {
                         loginAccount = phone;
                     }
                     else
