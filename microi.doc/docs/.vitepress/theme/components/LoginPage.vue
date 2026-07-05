@@ -71,6 +71,7 @@
           <div v-if="tenantReady" class="tenant-ready-panel">
             <div class="tenant-badge">{{ tenantOsClient }}</div>
             <p>{{ tenantName || tenantOsClient }} 已创建完成，可以进入后台开始配置系统。</p>
+            <a v-if="adminUrl" class="tenant-url" :href="adminUrl" target="_blank" rel="noopener">{{ adminUrl }}</a>
             <a class="login-btn tenant-action" :href="adminUrl" target="_blank" rel="noopener">进入后台</a>
             <button class="link-btn" type="button" @click="resetSession">切换账号</button>
           </div>
@@ -85,6 +86,7 @@
               <input v-model.trim="systemName" class="login-input" placeholder="系统名称，例如 我的吾码系统" autocomplete="organization" />
             </div>
             <p class="login-tip">Key 必须以英文字母开头，仅支持英文字母、数字、- 和 _。</p>
+            <p v-if="tenantProgress" class="tenant-progress">{{ tenantProgress }}</p>
             <button class="login-btn" type="submit" :class="{ loading: isCreating }" :disabled="isCreating">
               {{ isCreating ? '正在创建...' : '创建我的免费租户' }}
             </button>
@@ -180,7 +182,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
-const API_BASE = import.meta.env.VITE_MICROI_API_BASE || 'https://api.microi.net'
+const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
 
 const phone = ref('')
@@ -201,12 +203,22 @@ const tenantKey = ref('')
 const systemName = ref('')
 const tenantOsClient = ref('')
 const tenantName = ref('')
+const tenantUrl = ref('')
+const tenantProgress = ref('')
 const particleCanvas = ref(null)
 
 let smsTimer = null
 let toastTimer = null
 let animFrame = null
 let resizeHandler = null
+let tenantProgressTimer = null
+
+function getDefaultApiBase() {
+  if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
+    return 'https://localhost:7266'
+  }
+  return 'https://api.microi.net'
+}
 
 const brandFeatures = [
   'AI 引擎 · 智能数据分析与编程',
@@ -223,7 +235,7 @@ const devSmsBypass = computed(() => {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('devSmsBypass') === '1'
 })
-const adminUrl = computed(() => `https://microi.net/?OsClient=${encodeURIComponent(tenantOsClient.value)}`)
+const adminUrl = computed(() => tenantUrl.value || (tenantOsClient.value ? `https://${tenantOsClient.value}.microi.net` : ''))
 const titleText = computed(() => tenantReady.value ? '租户已就绪' : isAuthed.value ? '创建 SaaS 租户' : '手机号登录 / 注册')
 const descText = computed(() => tenantReady.value ? '你的独立低代码工作台已经准备好' : isAuthed.value ? '填写系统信息，一键生成全新租户数据库' : '输入手机号，获取验证码快捷登录')
 
@@ -239,7 +251,11 @@ function normalizeToken(raw) {
 }
 
 function authHeaders() {
-  return authToken.value ? { authorization: `Bearer ${authToken.value}` } : {}
+  return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
+}
+
+function apiEngineUrl(key) {
+  return `${API_BASE}/apiengine/${key}?OsClient=${OS_CLIENT}`
 }
 
 async function refreshCaptcha() {
@@ -355,14 +371,17 @@ function handleLoginSuccess(resp, result) {
   currentUser.value = result.Data || {}
   tenantOsClient.value = result.DataAppend?.TenantOsClient || ''
   tenantName.value = result.DataAppend?.TenantName || tenantOsClient.value
+  tenantUrl.value = result.DataAppend?.TenantUrl || result.DataAppend?.Url || (tenantOsClient.value ? `https://${tenantOsClient.value}.microi.net` : '')
 
   localStorage.setItem('microi_doc_token', token)
   localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
   localStorage.setItem('microi_doc_phone', phone.value)
   if (tenantOsClient.value) {
     localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
+    localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
   } else {
     localStorage.removeItem('microi_doc_tenant')
+    localStorage.removeItem('microi_doc_tenant_url')
   }
 
   window.dispatchEvent(new CustomEvent('microi-login-success', { detail: currentUser.value }))
@@ -381,13 +400,15 @@ async function createTenant() {
   }
 
   isCreating.value = true
+  startTenantProgress()
   try {
-    const resp = await fetch(`${API_BASE}/api/SysUser/CreateTenant`, {
+    const resp = await fetch(apiEngineUrl('official_create_tenant'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         TenantKey: tenantKey.value,
-        SystemName: systemName.value
+        SystemName: systemName.value,
+        _Lang: 'zh-CN'
       })
     })
     const result = await resp.json()
@@ -395,14 +416,43 @@ async function createTenant() {
       showToast(result.Msg || '租户创建失败。', 'error')
       return
     }
-    tenantOsClient.value = result.Data?.OsClient || tenantKey.value
-    tenantName.value = result.Data?.SystemName || systemName.value
+    const data = result.Data || result.data || {}
+    tenantOsClient.value = data.OsClient || tenantKey.value
+    tenantName.value = data.SystemName || systemName.value
+    tenantUrl.value = data.Url || (data.DomainName ? `https://${data.DomainName}` : `https://${tenantOsClient.value}.microi.net`)
     localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
+    localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
+    tenantProgress.value = `租户创建成功，访问地址：${tenantUrl.value}`
     showToast('租户创建成功。', 'success')
   } catch {
     showToast('网络异常，租户创建失败。', 'error')
   } finally {
+    stopTenantProgress()
     isCreating.value = false
+  }
+}
+
+function startTenantProgress() {
+  const steps = [
+    '正在校验租户 Key 和账号权限，请耐心等待...',
+    '正在创建独立数据库并导入空库模板，耗时会受服务器和网络影响...',
+    '正在写入 SaaS 引擎配置、复制主租户公共配置...',
+    `创建成功后，你将可以访问 https://${tenantKey.value}.microi.net`,
+    '正在刷新 SaaS 引擎缓存，确保新租户立即生效...'
+  ]
+  let index = 0
+  tenantProgress.value = steps[index]
+  if (tenantProgressTimer) clearInterval(tenantProgressTimer)
+  tenantProgressTimer = setInterval(() => {
+    index = (index + 1) % steps.length
+    tenantProgress.value = steps[index]
+  }, 3200)
+}
+
+function stopTenantProgress() {
+  if (tenantProgressTimer) {
+    clearInterval(tenantProgressTimer)
+    tenantProgressTimer = null
   }
 }
 
@@ -410,6 +460,7 @@ function restoreSession() {
   const token = normalizeToken(localStorage.getItem('microi_doc_token'))
   const userRaw = localStorage.getItem('microi_doc_user')
   const tenant = localStorage.getItem('microi_doc_tenant')
+  const savedTenantUrl = localStorage.getItem('microi_doc_tenant_url')
   if (token && userRaw) {
     authToken.value = token
     try {
@@ -421,6 +472,7 @@ function restoreSession() {
   if (tenant) {
     tenantOsClient.value = tenant
     tenantName.value = tenant
+    tenantUrl.value = savedTenantUrl || `https://${tenant}.microi.net`
   }
 }
 
@@ -429,11 +481,15 @@ function resetSession() {
   currentUser.value = null
   tenantOsClient.value = ''
   tenantName.value = ''
+  tenantUrl.value = ''
+  tenantProgress.value = ''
   tenantKey.value = ''
   systemName.value = ''
+  stopTenantProgress()
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_tenant')
+  localStorage.removeItem('microi_doc_tenant_url')
   showToast('已退出登录。')
 }
 
@@ -933,6 +989,17 @@ onUnmounted(() => {
   text-align: center;
 }
 
+.tenant-progress {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 191, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(0, 191, 255, 0.08);
+  color: rgba(236, 249, 255, 0.92);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .agreement {
   margin-top: 20px;
   font-size: 12px;
@@ -947,6 +1014,15 @@ onUnmounted(() => {
 .tenant-ready-panel {
   text-align: center;
   color: rgba(230, 230, 246, 0.84);
+}
+
+.tenant-url {
+  display: block;
+  margin: 12px 0;
+  color: #00bfff;
+  font-size: 13px;
+  text-decoration: none;
+  word-break: break-all;
 }
 
 .tenant-badge {

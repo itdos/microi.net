@@ -95,6 +95,12 @@ namespace Microi.net
         /// 自然语言答案
         /// </summary>
         public string? Answer { get; set; }
+
+        /// <summary>
+        /// 可展示给前端的分析过程摘要。
+        /// 注意：这里只放可审计的执行步骤，不输出模型内部隐式推理。
+        /// </summary>
+        public string? Thinking { get; set; }
         
         /// <summary>
         /// SQL来源：模板匹配 / AI生成
