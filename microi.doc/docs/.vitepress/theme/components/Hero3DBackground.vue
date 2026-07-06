@@ -30,8 +30,14 @@ const isMobile = () => {
   return window.innerWidth < 768
 }
 
+const prefersReducedMotion = () => {
+  if (typeof window === 'undefined' || !window.matchMedia) return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
 async function initScene() {
   if (!canvasRef.value || typeof window === 'undefined') return
+  if (prefersReducedMotion()) return
 
   const THREE = await import('three')
 
@@ -47,7 +53,7 @@ async function initScene() {
     powerPreference: 'high-performance'
   })
   renderer.setSize(width, height)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35))
   renderer.setClearColor(0x000000, 0)
 
   // --- 场景 ---
@@ -60,7 +66,7 @@ async function initScene() {
   camera.position.set(0, 0, 500)
 
   // --- 粒子数量根据设备调整 ---
-  const particleCount = isMobile() ? 1500 : 4000
+  const particleCount = isMobile() ? 420 : 1200
 
   // ========================
   // 1. 主星场粒子系统
@@ -154,7 +160,7 @@ async function initScene() {
   // ========================
   // 2. 星云/光雾效果 (大型半透明粒子)
   // ========================
-  const nebulaCount = isMobile() ? 30 : 80
+  const nebulaCount = isMobile() ? 8 : 22
   const nebulaGeo = new THREE.BufferGeometry()
   const nebulaPositions = new Float32Array(nebulaCount * 3)
   const nebulaSizes = new Float32Array(nebulaCount)
@@ -227,7 +233,7 @@ async function initScene() {
   // ========================
   // 3. 连线网络 (科技感网格)
   // ========================
-  const lineCount = isMobile() ? 100 : 300
+  const lineCount = isMobile() ? 32 : 90
   const lineGeo = new THREE.BufferGeometry()
   const linePositions = new Float32Array(lineCount * 3)
   const lineVelocities = []
@@ -259,8 +265,8 @@ async function initScene() {
 
   // 连线 - 动态生成
   let linesObj = null
-  const maxConnections = isMobile() ? 150 : 400
-  const connectionDistance = isMobile() ? 120 : 100
+  const maxConnections = isMobile() ? 28 : 90
+  const connectionDistance = isMobile() ? 110 : 92
 
   // ========================
   // 4. 左下角 "Microi" 3D 品牌水印 (DOM + CSS 3D Transform)
@@ -369,9 +375,11 @@ async function initScene() {
   // ========================
   let animId = null
   const clock = new THREE.Clock()
+  let lineFrame = 0
 
   const animate = () => {
     animId = requestAnimationFrame(animate)
+    if (document.hidden) return
     const elapsed = clock.getElapsedTime()
 
     // 更新 uniforms
@@ -418,39 +426,46 @@ async function initScene() {
     }
     lineGeo.attributes.position.needsUpdate = true
 
-    // 动态连线
-    if (linesObj) scene.remove(linesObj)
-    const lineSegments = []
-    let connCount = 0
-    for (let i = 0; i < lineCount && connCount < maxConnections; i++) {
-      for (let j = i + 1; j < lineCount && connCount < maxConnections; j++) {
-        const dx = positions[i * 3] - positions[j * 3]
-        const dy = positions[i * 3 + 1] - positions[j * 3 + 1]
-        const dz = positions[i * 3 + 2] - positions[j * 3 + 2]
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    // 动态连线降频重建，避免每帧 O(n²) 扫描拖慢首页。
+    lineFrame += 1
+    if (lineFrame % 6 === 0) {
+      if (linesObj) {
+        scene.remove(linesObj)
+        linesObj.geometry?.dispose?.()
+        linesObj.material?.dispose?.()
+      }
+      const lineSegments = []
+      let connCount = 0
+      for (let i = 0; i < lineCount && connCount < maxConnections; i++) {
+        for (let j = i + 1; j < lineCount && connCount < maxConnections; j++) {
+          const dx = positions[i * 3] - positions[j * 3]
+          const dy = positions[i * 3 + 1] - positions[j * 3 + 1]
+          const dz = positions[i * 3 + 2] - positions[j * 3 + 2]
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-        if (dist < connectionDistance) {
-          lineSegments.push(
-            positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
-            positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]
-          )
-          connCount++
+          if (dist < connectionDistance) {
+            lineSegments.push(
+              positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+              positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]
+            )
+            connCount++
+          }
         }
       }
-    }
 
-    if (lineSegments.length > 0) {
-      const lGeo = new THREE.BufferGeometry()
-      lGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineSegments, 3))
-      const lMat = new THREE.LineBasicMaterial({
-        color: 0x8a2be2,
-        transparent: true,
-        opacity: 0.15,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      })
-      linesObj = new THREE.LineSegments(lGeo, lMat)
-      scene.add(linesObj)
+      if (lineSegments.length > 0) {
+        const lGeo = new THREE.BufferGeometry()
+        lGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineSegments, 3))
+        const lMat = new THREE.LineBasicMaterial({
+          color: 0x8a2be2,
+          transparent: true,
+          opacity: 0.15,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+        linesObj = new THREE.LineSegments(lGeo, lMat)
+        scene.add(linesObj)
+      }
     }
 
     renderer.render(scene, camera)
