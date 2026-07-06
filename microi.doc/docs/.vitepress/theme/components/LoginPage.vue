@@ -319,6 +319,7 @@ let smsTimer = null
 let toastTimer = null
 let animFrame = null
 let resizeHandler = null
+let visibilityHandler = null
 let tenantProgressTimer = null
 let tenantProgressTraceId = ''
 
@@ -645,20 +646,19 @@ function handleLoginSuccess(resp, result) {
   }
 
   window.dispatchEvent(new CustomEvent('microi-login-success', { detail: currentUser.value }))
-  showToast(tenantOsClient.value ? '登录成功，租户已就绪。' : '登录成功，请创建你的租户。', 'success')
+  showToast('登录成功，正在进入个人中心。', 'success')
   const redirect = getRedirectTarget()
-  if (redirect) {
-    window.setTimeout(() => {
-      window.location.href = redirect
-    }, 350)
-  }
+  window.setTimeout(() => {
+    window.location.href = redirect || '/profile.html#/overview'
+  }, 350)
 }
 
 function getRedirectTarget() {
   if (typeof window === 'undefined') return ''
   const redirect = new URLSearchParams(window.location.search).get('redirect')
   if (!redirect || /^https?:\/\//i.test(redirect)) return ''
-  return redirect.startsWith('/') ? redirect : '/' + redirect
+  const safeRedirect = redirect.startsWith('/') ? redirect : '/' + redirect
+  return safeRedirect === '/profile.html' ? '/profile.html#/overview' : safeRedirect
 }
 
 async function createTenant() {
@@ -695,6 +695,15 @@ async function createTenant() {
       return
     }
     const data = result.Data || result.data || {}
+    const returnedTraceId = data.TraceId || data.TaskId || result.DataAppend?.TraceId || result.DataAppend?.TaskId || traceId
+    if (returnedTraceId && returnedTraceId !== tenantProgressTraceId) {
+      startTenantProgress(returnedTraceId)
+    }
+    if (data.Status === 'running' || data.TaskId || data.TraceId) {
+      tenantProgress.value = result.Msg || '租户创建任务已提交，正在后台处理。'
+      keepPollingAfterRequestError = true
+      return
+    }
     tenantOsClient.value = data.OsClient || tenantKey.value
     tenantName.value = data.SystemName || systemName.value
     tenantUrl.value = data.Url || (data.DomainName ? `https://${data.DomainName}` : `https://${tenantOsClient.value}.microi.net`)
@@ -861,14 +870,18 @@ function resetSession() {
 function initParticles() {
   const canvas = particleCanvas.value
   if (!canvas) return
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (prefersReducedMotion) return
   const ctx = canvas.getContext('2d')
   const particles = []
-  const count = 56
+  const count = window.innerWidth < 768 ? 18 : 34
   let width = 0
   let height = 0
+  let lastDraw = 0
+  let isVisible = !document.hidden
 
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.35)
     width = window.innerWidth || document.documentElement.clientWidth || 1440
     height = window.innerHeight || document.documentElement.clientHeight || 900
     canvas.style.width = `${width}px`
@@ -892,9 +905,16 @@ function initParticles() {
   resize()
   resizeHandler = resize
   window.addEventListener('resize', resizeHandler)
+  visibilityHandler = () => {
+    isVisible = !document.hidden
+  }
+  document.addEventListener('visibilitychange', visibilityHandler)
   for (let i = 0; i < count; i += 1) particles.push(createParticle())
 
-  function draw() {
+  function draw(now = 0) {
+    animFrame = requestAnimationFrame(draw)
+    if (!isVisible || now - lastDraw < 33) return
+    lastDraw = now
     ctx.clearRect(0, 0, width, height)
     particles.forEach((particle, index) => {
       particle.x += particle.vx
@@ -921,13 +941,16 @@ function initParticles() {
         }
       }
     })
-    animFrame = requestAnimationFrame(draw)
   }
   draw()
 }
 
 onMounted(() => {
   restoreSession()
+  if (isAuthed.value) {
+    window.location.href = getRedirectTarget() || '/profile.html#/overview'
+    return
+  }
   nextTick(() => {
     initParticles()
     if (!devSmsBypass.value) {
@@ -941,6 +964,7 @@ onUnmounted(() => {
   if (toastTimer) clearTimeout(toastTimer)
   if (animFrame) cancelAnimationFrame(animFrame)
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler)
 })
 </script>
 
