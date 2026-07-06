@@ -1352,6 +1352,7 @@
             :fatherFormModelData="FatherFormModel_Data"
             :primaryTableFieldName="PrimaryTableFieldName"
             :tableChildTableRowId="TableChildTableRowId"
+            :tableChildImportContext="GetTableChildImportContext()"
             @import-success="GetDiyTableRow({ _PageIndex: 1 })"
         />
         <!-- :DataAppend="GetDiyCustomDialogDataAppend()" -->
@@ -1418,6 +1419,11 @@
                             :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
                             :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
                             :PropsWhere="OpenAnyTableParam.PropsWhere"
+                            :TableChildFkFieldName="OpenAnyTableParam.TableChildFkFieldName || ''"
+                            :PrimaryTableFieldName="OpenAnyTableParam.PrimaryTableFieldName || ''"
+                            :TableChildTableRowId="OpenAnyTableParam.TableChildTableRowId || ''"
+                            :FatherFormModel="OpenAnyTableParam.FatherFormModel || null"
+                            :TableChildConfig="OpenAnyTableParam.TableChildConfig || null"
                         />
                     </el-card>
                 </el-col>
@@ -1471,6 +1477,11 @@
                             :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
                             :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
                             :PropsWhere="OpenAnyTableParam.PropsWhere"
+                            :TableChildFkFieldName="OpenAnyTableParam.TableChildFkFieldName || ''"
+                            :PrimaryTableFieldName="OpenAnyTableParam.PrimaryTableFieldName || ''"
+                            :TableChildTableRowId="OpenAnyTableParam.TableChildTableRowId || ''"
+                            :FatherFormModel="OpenAnyTableParam.FatherFormModel || null"
+                            :TableChildConfig="OpenAnyTableParam.TableChildConfig || null"
                         />
                     </el-card>
                 </el-col>
@@ -1759,6 +1770,33 @@ export default {
                 return size;
             }
             return fallback;
+        },
+        GetTableChildImportContext() {
+            var self = this;
+            var fixedValues = {};
+            var fkFieldName = self.TableChildFkFieldName || "";
+            var parentValue = "";
+            if (fkFieldName) {
+                if (self.FatherFormModel_Data) {
+                    var primaryFieldName = self.PrimaryTableFieldName || "Id";
+                    parentValue = self.FatherFormModel_Data[primaryFieldName];
+                } else {
+                    parentValue = self.TableChildTableRowId;
+                }
+                if (parentValue !== undefined && parentValue !== null && parentValue !== "") {
+                    fixedValues[fkFieldName] = parentValue;
+                }
+            }
+            if (Object.keys(fixedValues).length == 0) {
+                return {};
+            }
+            return {
+                Source: self.PropsTableType || "TableChild",
+                TableChildFkFieldName: fkFieldName,
+                PrimaryTableFieldName: self.PrimaryTableFieldName || "Id",
+                ParentTableRowId: parentValue,
+                FixedValues: fixedValues
+            };
         },
         GetDefaultTablePageSize(options = {}) {
             var self = this;

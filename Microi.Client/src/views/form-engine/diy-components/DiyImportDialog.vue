@@ -96,6 +96,11 @@ export default {
         tableChildTableRowId: {
             type: String,
             default: ""
+        },
+        // 子表导入固定上下文，例如 OpenAnyTable 从 PropsWhere 推断出的外键值
+        tableChildImportContext: {
+            type: Object,
+            default: () => ({})
         }
     },
     emits: ["import-success"],
@@ -131,24 +136,73 @@ export default {
                 TableId: this.tableId,
                 UserId: this.$store?.getters?.GetCurrentUser?.Id || ""
             };
+            var fixedFormData = this.buildChildImportFixedData();
+            if (Object.keys(fixedFormData).length > 0) {
+                result["_FieldId"] = JSON.stringify(fixedFormData);
+            }
             if (this.tableChildFkFieldName) {
-                result["_FormData"] = {};
-                if (this.fatherFormModelData) {
-                    if (this.primaryTableFieldName) {
-                        result["_FormData"][this.tableChildFkFieldName] = this.fatherFormModelData[this.primaryTableFieldName];
-                    } else {
-                        result["_FormData"][this.tableChildFkFieldName] = this.fatherFormModelData.Id;
-                    }
-                } else {
-                    result["_FormData"][this.tableChildFkFieldName] = this.tableChildTableRowId;
-                }
-                result["_FieldId"] = JSON.stringify(result["_FormData"]);
-                delete result["_FormData"];
+                result.TableChildFkFieldName = this.tableChildFkFieldName;
+            }
+            if (this.primaryTableFieldName) {
+                result.PrimaryTableFieldName = this.primaryTableFieldName;
+            }
+            if (this.tableChildTableRowId) {
+                result.ParentTableRowId = this.tableChildTableRowId;
+            }
+            if (this.tableChildImportContext && Object.keys(this.tableChildImportContext).length > 0) {
+                result["_ChildImportContext"] = JSON.stringify(this.tableChildImportContext);
             }
             return result;
         }
     },
     methods: {
+        mergeFixedImportValue(target, key, value) {
+            if (key && value !== undefined && value !== null && value !== "") {
+                target[key] = value;
+            }
+        },
+        mergeFixedImportObject(target, source) {
+            var self = this;
+            if (!source) {
+                return;
+            }
+            var sourceObj = source;
+            if (typeof source === "string") {
+                try {
+                    sourceObj = JSON.parse(source);
+                } catch (error) {
+                    sourceObj = null;
+                }
+            }
+            if (!sourceObj || typeof sourceObj !== "object") {
+                return;
+            }
+            Object.keys(sourceObj).forEach(function(key) {
+                self.mergeFixedImportValue(target, key, sourceObj[key]);
+            });
+        },
+        buildChildImportFixedData() {
+            var fixedFormData = {};
+            var context = this.tableChildImportContext || {};
+            this.mergeFixedImportObject(fixedFormData, context.FixedValues);
+            this.mergeFixedImportObject(fixedFormData, context.FieldValues);
+            this.mergeFixedImportObject(fixedFormData, context._FieldId);
+
+            if (this.tableChildFkFieldName) {
+                var fkValue = "";
+                if (this.fatherFormModelData) {
+                    if (this.primaryTableFieldName) {
+                        fkValue = this.fatherFormModelData[this.primaryTableFieldName];
+                    } else {
+                        fkValue = this.fatherFormModelData.Id;
+                    }
+                } else {
+                    fkValue = this.tableChildTableRowId;
+                }
+                this.mergeFixedImportValue(fixedFormData, this.tableChildFkFieldName, fkValue);
+            }
+            return fixedFormData;
+        },
         show() {
             this.visible = true;
         },
@@ -184,9 +238,16 @@ export default {
         },
         handleUploadSuccess(result) {
             var self = this;
-            if (self.DiyCommon.Result(result)) {
-                self.getImportProgress();
+            self.getImportProgress();
+            setTimeout(function() {
+                if (self && self.getImportProgress) {
+                    self.getImportProgress();
+                }
+            }, 800);
+            if (result && result.Code == 1) {
                 self.$emit("import-success");
+            } else if (result) {
+                self.DiyCommon.Result(result);
             }
         },
         handleBeforeUpload() {

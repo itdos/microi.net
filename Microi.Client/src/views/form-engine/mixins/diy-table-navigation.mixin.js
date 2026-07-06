@@ -90,6 +90,80 @@ export default {
         /**
          * 必传：SysMenuId或ModuleEngineKey、SubmitEvent、可选：MultipleSelect、PropsWhere、
          */
+        GetOpenAnyTableEqualWhere(propsWhere) {
+            if (!Array.isArray(propsWhere)) {
+                return null;
+            }
+            for (var i = 0; i < propsWhere.length; i++) {
+                var item = propsWhere[i];
+                if (!Array.isArray(item)) {
+                    continue;
+                }
+                var offset = 0;
+                var first = String(item[0] || "").toUpperCase();
+                if (first === "AND" || first === "OR") {
+                    offset = 1;
+                }
+                var fieldName = item[offset];
+                var operate = item[offset + 1];
+                var fieldValue = item[offset + 2];
+                if (!fieldName || fieldValue === undefined || fieldValue === null || fieldValue === "") {
+                    continue;
+                }
+                var op = String(operate || "").toLowerCase();
+                if (op === "=" || op === "==" || op === "equal") {
+                    return {
+                        FieldName: fieldName,
+                        Value: fieldValue
+                    };
+                }
+            }
+            return null;
+        },
+        BuildOpenAnyTableImportContext(param) {
+            var self = this;
+            var result = { ...(param || {}) };
+            var relationWhere = self.GetOpenAnyTableEqualWhere(result.PropsWhere);
+            var fixedValues = {};
+            if (result.TableChildImportContext && result.TableChildImportContext.FixedValues) {
+                fixedValues = { ...result.TableChildImportContext.FixedValues };
+            }
+
+            if (relationWhere) {
+                if (!result.TableChildFkFieldName) {
+                    result.TableChildFkFieldName = relationWhere.FieldName;
+                }
+                if (!result.TableChildTableRowId) {
+                    result.TableChildTableRowId = relationWhere.Value;
+                }
+            }
+
+            if (result.TableChildFkFieldName && result.TableChildTableRowId !== undefined && result.TableChildTableRowId !== null && result.TableChildTableRowId !== "") {
+                fixedValues[result.TableChildFkFieldName] = result.TableChildTableRowId;
+            }
+
+            if (!result.FatherFormModel && result.ParentFormModel) {
+                result.FatherFormModel = result.ParentFormModel;
+            }
+            if (!result.FatherFormModel && result.ParentForm) {
+                result.FatherFormModel = result.ParentForm;
+            }
+            if (!result.PrimaryTableFieldName && result.FatherFormModel) {
+                result.PrimaryTableFieldName = "Id";
+            }
+
+            if (Object.keys(fixedValues).length > 0) {
+                result.TableChildImportContext = {
+                    ...(result.TableChildImportContext || {}),
+                    Source: "OpenAnyTable",
+                    TableChildFkFieldName: result.TableChildFkFieldName,
+                    PrimaryTableFieldName: result.PrimaryTableFieldName || "",
+                    ParentTableRowId: result.TableChildTableRowId || "",
+                    FixedValues: fixedValues
+                };
+            }
+            return result;
+        },
         async OpenAnyTable(param) {
             var self = this;
             param = param || {};
@@ -118,7 +192,7 @@ export default {
                 }
             }
 
-            self.OpenAnyTableParam = param;
+            self.OpenAnyTableParam = self.BuildOpenAnyTableImportContext(param);
             self.ShowAnyTable = true;
         },
         RunOpenAnyTableSubmitEvent() {

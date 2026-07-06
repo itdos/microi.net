@@ -56,16 +56,61 @@ namespace Microi.net
         /// <returns></returns>
         private IWorkbook CreateWorkbook(Stream stream)
         {
+            if (stream == null)
+            {
+                throw new ArgumentException("Excel文件流为空。");
+            }
+            var bytes = ReadAllBytes(stream);
+
             //XSSFWorkbook 适用XLSX格式，HSSFWorkbook 适用XLS格式
+            Exception xlsxException = null;
             try
             {
-                return new XSSFWorkbook(stream); //07
+                var xssfWorkbook = new XSSFWorkbook(new MemoryStream(bytes)); //07
+                if (xssfWorkbook.NumberOfSheets > 0)
+                {
+                    return xssfWorkbook;
+                }
+                xlsxException = new ArgumentException("XLSX读取成功但未识别到任何Sheet。");
             }
             catch (Exception ex)
             {
-                return new HSSFWorkbook(stream); //03
+                xlsxException = ex;
             }
 
+            try
+            {
+                var hssfWorkbook = new HSSFWorkbook(new MemoryStream(bytes)); //03
+                if (hssfWorkbook.NumberOfSheets > 0)
+                {
+                    return hssfWorkbook;
+                }
+                throw new ArgumentException("XLS读取成功但未识别到任何Sheet。");
+            }
+            catch (Exception xlsException)
+            {
+                throw new ArgumentException(
+                    $"无法识别Excel工作簿，请确认文件是真实的.xls/.xlsx文件且至少包含一个Sheet。XLSX读取错误：{xlsxException?.Message}；XLS读取错误：{xlsException.Message}",
+                    xlsException);
+            }
+        }
+
+        private static byte[] ReadAllBytes(Stream stream)
+        {
+            ResetStream(stream);
+            using (var memoryStream = new MemoryStream())
+            {
+                stream.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            }
+        }
+
+        private static void ResetStream(Stream stream)
+        {
+            if (stream != null && stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
         }
 
         /// <summary>
@@ -250,19 +295,54 @@ namespace Microi.net
 
         public List<dynamic> ExcelToListDynamic(int sheetIndex = 0)
         {
-            return ExcelToListDynamic(_IWorkbook.GetSheetAt(sheetIndex));
+            if (_IWorkbook == null)
+            {
+                throw new ArgumentException("Excel工作簿初始化失败。");
+            }
+            if (_IWorkbook.NumberOfSheets <= 0)
+            {
+                throw new ArgumentException("Excel文件未识别到任何Sheet，请检查文件是否损坏或是否为真实的Excel文件。");
+            }
+            if (sheetIndex < 0 || sheetIndex >= _IWorkbook.NumberOfSheets)
+            {
+                throw new ArgumentException($"Sheet索引({sheetIndex})超出范围，当前文件共有{_IWorkbook.NumberOfSheets}个Sheet。");
+            }
+            var sheet = _IWorkbook.GetSheetAt(sheetIndex);
+            if (sheet == null)
+            {
+                throw new ArgumentException($"未读取到第{sheetIndex + 1}个Sheet，请检查Excel文件内容。");
+            }
+            return ExcelToListDynamic(sheet);
         }
         private List<dynamic> ExcelToListDynamic(ISheet sheet)
         {
             var list = new List<dynamic>();
-            var cells = sheet.GetRow(sheet.FirstRowNum).Cells;
+            if (sheet == null)
+            {
+                throw new ArgumentException("Excel Sheet为空。");
+            }
+            var headRow = sheet.GetRow(sheet.FirstRowNum);
+            if (headRow == null)
+            {
+                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到表头行，请确认第一行是字段标题。");
+            }
+            var cells = headRow.Cells;
+            if (cells == null || cells.Count == 0)
+            {
+                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]表头为空，请确认第一行是字段标题。");
+            }
             var fields = new List<string>();
             foreach (var cell in cells)
             {
-                if (cell != null && !cell.StringCellValue.DosIsNullOrWhiteSpace())
+                var fieldName = cell?.ToString();
+                if (!fieldName.DosIsNullOrWhiteSpace())
                 {
-                    fields.Add(cell.StringCellValue);
+                    fields.Add(fieldName.Trim());
                 }
+            }
+            if (fields.Count == 0)
+            {
+                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到有效表头，请确认第一行是字段标题。");
             }
 
             //遍历每一行数据

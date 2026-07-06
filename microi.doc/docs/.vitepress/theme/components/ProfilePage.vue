@@ -128,6 +128,7 @@
                 <span>{{ index + 1 }}</span>
                 <div>
                   <strong>{{ step.Title }}</strong>
+                  <em class="step-elapsed">{{ stepElapsedText(step) }}</em>
                   <small>{{ step.Detail }}</small>
                 </div>
               </div>
@@ -187,9 +188,10 @@ const tenantProgress = ref('')
 const createError = ref('')
 const profileError = ref('')
 const tenantSteps = ref([])
+const tenantProgressTick = ref(Date.now())
 
 let tenantProgressTimer = null
-let tenantProgressIndex = 0
+let tenantProgressTraceId = ''
 
 const menus = [
   { key: 'overview', name: '概览', icon: '⌂' },
@@ -237,7 +239,7 @@ const tenantStepSummary = computed(() => {
   const runningStep = tenantSteps.value.find(step => step.Status === 'running')
   if (runningStep) {
     const index = tenantSteps.value.findIndex(step => step.Key === runningStep.Key) + 1
-    return `正在执行第 ${index}/${tenantSteps.value.length} 步：${runningStep.Title}`
+    return `正在执行第 ${index}/${tenantSteps.value.length} 步：${runningStep.Title}，已耗时 ${formatStepElapsed(runningStep)} 秒`
   }
   const doneCount = tenantSteps.value.filter(step => step.Status === 'done').length
   if (doneCount === tenantSteps.value.length) return '所有步骤已完成。'
@@ -297,6 +299,32 @@ function createTenantSteps() {
 
 tenantSteps.value = createTenantSteps()
 
+function createTraceId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID().replace(/-/g, '')
+  }
+  return `${Date.now()}${Math.floor(Math.random() * 100000)}`
+}
+
+function getStepElapsedMs(step) {
+  const tick = tenantProgressTick.value
+  if (!step) return 0
+  if (step.Status === 'running' && step.StartAt) {
+    return Math.max(0, tick - step.StartAt)
+  }
+  return Math.max(0, Number(step.ElapsedMs || 0))
+}
+
+function formatStepElapsed(step) {
+  return (Math.round(getStepElapsedMs(step) / 100) / 10).toFixed(1)
+}
+
+function stepElapsedText(step) {
+  if (!step || step.Status === 'pending') return '等待中'
+  if (step.Status === 'skipped') return '未执行'
+  return `耗时 ${formatStepElapsed(step)} 秒`
+}
+
 function restoreSession() {
   authToken.value = normalizeToken(localStorage.getItem('microi_doc_token'))
   const userRaw = localStorage.getItem('microi_doc_user')
@@ -349,12 +377,13 @@ async function createTenant() {
     return
   }
   isCreating.value = true
-  startTenantProgress()
+  const traceId = createTraceId()
+  startTenantProgress(traceId)
   try {
     const resp = await fetch(apiEngineUrl('official_create_tenant'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ TenantKey: tenantKey.value, SystemName: systemName.value, _Lang: 'zh-CN' })
+      body: JSON.stringify({ TenantKey: tenantKey.value, SystemName: systemName.value, TraceId: traceId, _Lang: 'zh-CN' })
     })
     const result = await resp.json()
     mergeTenantSteps(result.DataAppend?.Steps || result.Data?.Steps)
@@ -382,18 +411,17 @@ async function createTenant() {
   }
 }
 
-function startTenantProgress() {
+function startTenantProgress(traceId) {
   tenantSteps.value = createTenantSteps()
-  tenantProgressIndex = 0
-  markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'running')
+  tenantProgressTraceId = traceId
+  tenantProgressTick.value = Date.now()
+  markTenantStep(tenantSteps.value[0].Key, 'running')
   if (tenantProgressTimer) clearInterval(tenantProgressTimer)
   tenantProgressTimer = setInterval(() => {
-    if (tenantProgressIndex < tenantSteps.value.length - 1) {
-      markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'done')
-      tenantProgressIndex += 1
-      markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'running')
-    }
-  }, 3200)
+    tenantProgressTick.value = Date.now()
+    pollTenantProgress(traceId)
+  }, 1000)
+  pollTenantProgress(traceId)
 }
 
 function stopTenantProgress() {
@@ -401,13 +429,39 @@ function stopTenantProgress() {
     clearInterval(tenantProgressTimer)
     tenantProgressTimer = null
   }
+  tenantProgressTraceId = ''
 }
 
 function markTenantStep(key, status, detail) {
   tenantSteps.value = tenantSteps.value.map(step => {
     if (step.Key !== key) return step
-    return { ...step, Status: status, Detail: detail || step.Detail }
+    const now = Date.now()
+    const next = { ...step, Status: status, Detail: detail || step.Detail }
+    if (status === 'running' && !next.StartAt) next.StartAt = now
+    if ((status === 'done' || status === 'error' || status === 'skipped') && !next.EndAt) {
+      next.EndAt = now
+      if (next.StartAt) next.ElapsedMs = now - next.StartAt
+    }
+    return next
   })
+}
+
+async function pollTenantProgress(traceId) {
+  if (!traceId || traceId !== tenantProgressTraceId) return
+  try {
+    const resp = await fetch(apiEngineUrl('official_create_tenant_progress'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ TraceId: traceId, _Lang: 'zh-CN' })
+    })
+    const result = await resp.json()
+    const data = result.Data || {}
+    mergeTenantSteps(data.Steps)
+    if (data.Status === 'error' && data.Msg) {
+      tenantProgress.value = data.Msg
+    }
+  } catch {
+  }
 }
 
 function mergeTenantSteps(serverSteps) {
@@ -419,7 +473,11 @@ function mergeTenantSteps(serverSteps) {
       ...localStep,
       Title: serverStep.Title || localStep.Title,
       Detail: serverStep.Detail || localStep.Detail,
-      Status: serverStep.Status || localStep.Status
+      Status: serverStep.Status || localStep.Status,
+      StartTime: serverStep.StartTime || localStep.StartTime,
+      EndTime: serverStep.EndTime || localStep.EndTime,
+      ElapsedMs: serverStep.ElapsedMs || localStep.ElapsedMs || 0,
+      ElapsedSeconds: serverStep.ElapsedSeconds || localStep.ElapsedSeconds || 0
     }
   })
 }
@@ -853,8 +911,17 @@ onUnmounted(() => {
 }
 
 .step-item strong,
+.step-item em,
 .step-item small {
   display: block;
+}
+
+.step-item em {
+  margin-top: 3px;
+  color: #f97316;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .step-item small {
@@ -1011,6 +1078,10 @@ onUnmounted(() => {
 .dark .step-item span {
   background: #1f2937;
   color: #cbd5e1;
+}
+
+.dark .step-item em {
+  color: #fdba74;
 }
 
 .dark .step-item.running {
