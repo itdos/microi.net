@@ -1,6 +1,6 @@
 <template>
   <ClientOnly>
-    <div class="user-bar">
+    <div class="user-bar" :class="{ 'home-user-bar': isHomePage }">
       <!-- 未登录：显示登录按钮 -->
       <template v-if="!user">
         <a href="/login.html" class="login-link">
@@ -65,43 +65,52 @@
       </template>
 
       <!-- 设置密码弹窗 -->
-      <Transition name="dropdown">
-        <div v-if="showSetPwd" class="pwd-overlay" @click.self="showSetPwd = false">
-          <div class="pwd-dialog">
-            <h3>设置登录密码</h3>
-            <p class="pwd-desc">设置密码后可以使用 账号+密码 方式登录</p>
-            <input
-              v-model="newPwd"
-              type="password"
-              placeholder="请输入密码（至少6位）"
-              maxlength="32"
-              class="pwd-input"
-            />
-            <input
-              v-model="confirmPwd"
-              type="password"
-              placeholder="请再次确认密码"
-              maxlength="32"
-              class="pwd-input"
-              @keyup.enter="submitSetPwd"
-            />
-            <div class="pwd-actions">
-              <button class="pwd-cancel" @click="showSetPwd = false">取消</button>
-              <button class="pwd-submit" :disabled="isSettingPwd" @click="submitSetPwd">
-                {{ isSettingPwd ? '设置中...' : '确认设置' }}
-              </button>
+      <Teleport to="body">
+        <Transition name="dropdown">
+          <div v-if="showSetPwd" class="pwd-overlay" @click.self="showSetPwd = false">
+            <div class="pwd-dialog" :style="pwdDialogStyle">
+              <div class="pwd-dialog-head" @pointerdown="startPwdDrag">
+                <div>
+                  <h3>设置登录密码</h3>
+                  <p class="pwd-desc">设置密码后可以使用 账号+密码 方式登录</p>
+                </div>
+                <button class="pwd-close" type="button" @click="showSetPwd = false">×</button>
+              </div>
+              <input
+                v-model="newPwd"
+                type="password"
+                placeholder="请输入密码（至少6位）"
+                maxlength="32"
+                class="pwd-input"
+              />
+              <input
+                v-model="confirmPwd"
+                type="password"
+                placeholder="请再次确认密码"
+                maxlength="32"
+                class="pwd-input"
+                @keyup.enter="submitSetPwd"
+              />
+              <div class="pwd-actions">
+                <button class="pwd-cancel" @click="showSetPwd = false">取消</button>
+                <button class="pwd-submit" :disabled="isSettingPwd" @click="submitSetPwd">
+                  {{ isSettingPwd ? '设置中...' : '确认设置' }}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </Transition>
+        </Transition>
+      </Teleport>
     </div>
   </ClientOnly>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vitepress'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
+const route = useRoute()
 
 const user = ref(null)
 const showMenu = ref(false)
@@ -109,6 +118,13 @@ const showSetPwd = ref(false)
 const newPwd = ref('')
 const confirmPwd = ref('')
 const isSettingPwd = ref(false)
+const pwdDialogOffset = ref({ x: 0, y: 0 })
+const pwdDragState = ref(null)
+
+const isHomePage = computed(() => route.path === '/' || route.path === '/index.html')
+const pwdDialogStyle = computed(() => ({
+  transform: `translate(${pwdDialogOffset.value.x}px, ${pwdDialogOffset.value.y}px)`
+}))
 
 function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
@@ -165,7 +181,34 @@ function openSetPwd() {
   showMenu.value = false
   newPwd.value = ''
   confirmPwd.value = ''
+  pwdDialogOffset.value = { x: 0, y: 0 }
   showSetPwd.value = true
+}
+
+function startPwdDrag(e) {
+  if (e.button !== undefined && e.button !== 0) return
+  pwdDragState.value = {
+    startX: e.clientX,
+    startY: e.clientY,
+    baseX: pwdDialogOffset.value.x,
+    baseY: pwdDialogOffset.value.y
+  }
+  window.addEventListener('pointermove', onPwdDrag)
+  window.addEventListener('pointerup', stopPwdDrag)
+}
+
+function onPwdDrag(e) {
+  if (!pwdDragState.value) return
+  pwdDialogOffset.value = {
+    x: pwdDragState.value.baseX + e.clientX - pwdDragState.value.startX,
+    y: pwdDragState.value.baseY + e.clientY - pwdDragState.value.startY
+  }
+}
+
+function stopPwdDrag() {
+  pwdDragState.value = null
+  window.removeEventListener('pointermove', onPwdDrag)
+  window.removeEventListener('pointerup', stopPwdDrag)
 }
 
 async function submitSetPwd() {
@@ -221,6 +264,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('microi-login-success', onLoginSuccess)
   document.removeEventListener('click', closeMenu)
+  stopPwdDrag()
 })
 </script>
 
@@ -351,6 +395,24 @@ onUnmounted(() => {
   --microi-userbar-home-bg: rgba(18, 31, 67, 0.72);
 }
 
+.home-user-bar {
+  --microi-userbar-home-text: rgba(255, 255, 255, 0.96);
+  --microi-userbar-home-muted: rgba(255, 255, 255, 0.74);
+  --microi-userbar-home-border: rgba(148, 163, 255, 0.46);
+  --microi-userbar-home-bg: rgba(18, 31, 67, 0.78);
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info,
+.home-user-bar .login-link,
+.home-user-bar .user-info {
+  color: var(--microi-userbar-home-text) !important;
+  background: var(--microi-userbar-home-bg);
+  border-color: var(--microi-userbar-home-border);
+  box-shadow: 0 12px 32px rgba(16, 24, 64, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+}
+
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link,
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info {
   color: var(--microi-userbar-home-text) !important;
@@ -361,7 +423,9 @@ onUnmounted(() => {
 }
 
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info:hover,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link:hover {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link:hover,
+.home-user-bar .user-info:hover,
+.home-user-bar .login-link:hover {
   background: rgba(35, 50, 104, 0.86);
   border-color: rgba(255, 90, 46, 0.58);
 }
@@ -369,33 +433,42 @@ onUnmounted(() => {
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .user-name,
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .arrow-icon,
 :global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link span,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link svg {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link svg,
+.home-user-bar .user-name,
+.home-user-bar .arrow-icon,
+.home-user-bar .login-link span,
+.home-user-bar .login-link svg {
   color: var(--microi-userbar-home-text) !important;
   opacity: 1;
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .default-avatar {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .default-avatar,
+.home-user-bar .default-avatar {
   background: rgba(255, 90, 46, 0.16);
   color: #ff7a45;
   border-color: rgba(255, 90, 46, 0.5);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .dropdown-menu {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .dropdown-menu,
+.home-user-bar .dropdown-menu {
   background: rgba(8, 16, 40, 0.96);
   border-color: rgba(148, 163, 255, 0.26);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item,
+.home-user-bar .menu-item {
   color: rgba(255, 255, 255, 0.88);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item:hover {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item:hover,
+.home-user-bar .menu-item:hover {
   background: rgba(255, 90, 46, 0.16);
   color: #fff;
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-divider {
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-divider,
+.home-user-bar .menu-divider {
   background: rgba(255, 255, 255, 0.12);
 }
 
@@ -426,7 +499,7 @@ onUnmounted(() => {
 }
 
 /* 设置密码弹窗 */
-.pwd-overlay {
+:global(.pwd-overlay) {
   position: fixed;
   top: 0;
   left: 0;
@@ -439,28 +512,54 @@ onUnmounted(() => {
   justify-content: center;
   z-index: 10000;
 }
-.pwd-dialog {
-  background: rgba(30,30,50,0.98);
-  border: 1px solid rgba(138,43,226,0.2);
-  border-radius: 14px;
-  padding: 28px;
-  width: 360px;
-  max-width: 90vw;
+:global(.pwd-dialog) {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(82vh, 620px);
+  overflow: auto;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 90, 46, 0.16), transparent 32%),
+    rgba(30,30,50,0.98);
+  border: 1px solid rgba(138,43,226,0.24);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.46);
+  will-change: transform;
 }
-.pwd-dialog h3 {
+:global(.pwd-dialog-head) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  cursor: move;
+  user-select: none;
+}
+:global(.pwd-dialog h3) {
   font-size: 17px;
   color: rgba(240,240,255,0.95);
-  margin-bottom: 6px;
+  margin: 0 0 6px;
 }
-.pwd-desc {
+:global(.pwd-desc) {
   font-size: 13px;
   color: rgba(180,180,200,0.6);
-  margin-bottom: 18px;
+  margin: 0;
 }
-.pwd-input {
+:global(.pwd-close) {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.72);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+:global(.pwd-input) {
   width: 100%;
-  padding: 10px 14px;
-  border-radius: 8px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.05);
   color: rgba(240,240,255,0.9);
@@ -470,28 +569,28 @@ onUnmounted(() => {
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
-.pwd-input:focus {
+:global(.pwd-input:focus) {
   border-color: rgba(138,43,226,0.4);
 }
-.pwd-actions {
+:global(.pwd-actions) {
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 16px;
 }
-.pwd-cancel {
+:global(.pwd-cancel) {
   flex: 1;
-  padding: 9px;
-  border-radius: 8px;
+  height: 44px;
+  border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
   background: transparent;
   color: rgba(200,200,220,0.8);
   cursor: pointer;
   font-size: 14px;
 }
-.pwd-submit {
+:global(.pwd-submit) {
   flex: 1;
-  padding: 9px;
-  border-radius: 8px;
+  height: 44px;
+  border-radius: 12px;
   border: none;
   background: linear-gradient(135deg, #8a2be2, #6a1fb5);
   color: #fff;
@@ -499,7 +598,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 500;
 }
-.pwd-submit:disabled {
+:global(.pwd-submit:disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -661,5 +760,121 @@ onUnmounted(() => {
 
 .profile-note {
   margin-top: 14px;
+}
+</style>
+
+<style>
+/* Teleport 到 body 的弹窗不能依赖 scoped 样式，必须用全局样式保证居中和可拖动。 */
+.pwd-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(6px);
+}
+
+.pwd-dialog {
+  width: min(520px, calc(100vw - 32px)) !important;
+  max-height: min(82vh, 620px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(138, 43, 226, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 90, 46, 0.16), transparent 32%),
+    rgba(30, 30, 50, 0.98);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.46);
+  will-change: transform;
+}
+
+.pwd-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  cursor: move;
+  user-select: none;
+}
+
+.pwd-dialog h3 {
+  margin: 0 0 6px;
+  color: rgba(240, 240, 255, 0.95);
+  font-size: 17px;
+}
+
+.pwd-desc {
+  margin: 0;
+  color: rgba(180, 180, 200, 0.6);
+  font-size: 13px;
+}
+
+.pwd-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pwd-input {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(240, 240, 255, 0.9);
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.pwd-input:focus {
+  border-color: rgba(138, 43, 226, 0.4);
+}
+
+.pwd-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pwd-cancel,
+.pwd-submit {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pwd-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(200, 200, 220, 0.8);
+}
+
+.pwd-submit {
+  border: 0;
+  background: linear-gradient(135deg, #8a2be2, #6a1fb5);
+  color: #fff;
+  font-weight: 500;
+}
+
+.pwd-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 </style>
