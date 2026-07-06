@@ -71,8 +71,14 @@
           <div v-if="tenantReady" class="tenant-ready-panel">
             <div class="tenant-badge">{{ tenantOsClient }}</div>
             <p>{{ tenantName || tenantOsClient }} 已创建完成，可以进入后台开始配置系统。</p>
+            <div class="tenant-admin-tip">
+              默认管理员账号 <strong>admin</strong>，初始密码 <strong>{{ tenantOsClient }}</strong>，请登录后及时修改。
+            </div>
             <a v-if="adminUrl" class="tenant-url" :href="adminUrl" target="_blank" rel="noopener">{{ adminUrl }}</a>
-            <a class="login-btn tenant-action" :href="adminUrl" target="_blank" rel="noopener">进入后台</a>
+            <div class="tenant-actions">
+              <a class="login-btn tenant-action" :href="adminUrl" target="_blank" rel="noopener">进入后台</a>
+              <a class="login-btn tenant-action secondary" href="/profile.html">进入个人中心</a>
+            </div>
             <button class="link-btn" type="button" @click="resetSession">切换账号</button>
           </div>
 
@@ -391,12 +397,24 @@ function createTraceId() {
   return `${Date.now()}${Math.floor(Math.random() * 100000)}`
 }
 
+function parseStepTimeMs(step, msField, timeField) {
+  const ms = Number(step?.[msField] || 0)
+  if (ms > 0) return ms
+  const raw = step?.[timeField]
+  if (!raw) return 0
+  const parsed = Date.parse(String(raw).replace(/-/g, '/'))
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
 function getStepElapsedMs(step) {
   const tick = tenantProgressTick.value
   if (!step) return 0
-  if (step.Status === 'running' && step.StartAt) {
-    return Math.max(0, tick - step.StartAt)
+  const startMs = step.StartAt || parseStepTimeMs(step, 'StartMs', 'StartTime')
+  if (step.Status === 'running' && startMs) {
+    return Math.max(0, tick - startMs)
   }
+  const endMs = step.EndAt || parseStepTimeMs(step, 'EndMs', 'EndTime')
+  if (startMs && endMs) return Math.max(0, endMs - startMs)
   return Math.max(0, Number(step.ElapsedMs || 0))
 }
 
@@ -656,6 +674,7 @@ async function createTenant() {
 
   isCreating.value = true
   const traceId = createTraceId()
+  let keepPollingAfterRequestError = false
   startTenantProgress(traceId)
   try {
     const resp = await fetch(apiEngineUrl('official_create_tenant'), {
@@ -685,12 +704,14 @@ async function createTenant() {
     window.dispatchEvent(new CustomEvent('microi-tenant-updated'))
     showToast('租户创建成功。', 'success')
   } catch {
-    markTenantStep('reload', 'error', '网络异常，无法确认租户创建结果，请稍后到个人中心查看。')
-    tenantProgress.value = '网络异常，租户创建失败。'
-    showToast('网络异常，租户创建失败。', 'error')
+    keepPollingAfterRequestError = true
+    tenantProgress.value = '请求连接已中断，后台可能仍在创建租户；页面会继续读取实时进度。'
+    showToast('连接超时，继续为你读取后台进度。', 'info')
   } finally {
-    stopTenantProgress()
-    isCreating.value = false
+    if (!keepPollingAfterRequestError) {
+      stopTenantProgress()
+      isCreating.value = false
+    }
   }
 }
 
@@ -741,8 +762,25 @@ async function pollTenantProgress(traceId) {
     const result = await resp.json()
     const data = result.Data || {}
     mergeTenantSteps(data.Steps)
+    if (data.Status === 'success') {
+      const payload = data.Data || {}
+      tenantOsClient.value = payload.OsClient || tenantKey.value
+      tenantName.value = payload.SystemName || systemName.value
+      tenantUrl.value = payload.Url || (payload.DomainName ? `https://${payload.DomainName}` : `https://${tenantOsClient.value}.microi.net`)
+      localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
+      localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
+      tenantProgress.value = `租户创建成功，访问地址：${tenantUrl.value}`
+      window.dispatchEvent(new CustomEvent('microi-tenant-updated'))
+      showToast('租户创建成功。', 'success')
+      stopTenantProgress()
+      isCreating.value = false
+      return
+    }
     if (data.Status === 'error' && data.Msg) {
       tenantProgress.value = data.Msg
+      showToast(data.Msg, 'error')
+      stopTenantProgress()
+      isCreating.value = false
     }
   } catch {
   }
@@ -760,6 +798,10 @@ function mergeTenantSteps(serverSteps) {
       Status: serverStep.Status || localStep.Status,
       StartTime: serverStep.StartTime || localStep.StartTime,
       EndTime: serverStep.EndTime || localStep.EndTime,
+      StartMs: serverStep.StartMs || localStep.StartMs || 0,
+      EndMs: serverStep.EndMs || localStep.EndMs || 0,
+      StartAt: localStep.StartAt || serverStep.StartMs || 0,
+      EndAt: localStep.EndAt || serverStep.EndMs || 0,
       ElapsedMs: serverStep.ElapsedMs || localStep.ElapsedMs || 0,
       ElapsedSeconds: serverStep.ElapsedSeconds || localStep.ElapsedSeconds || 0
     }
@@ -1492,8 +1534,35 @@ onUnmounted(() => {
   font-weight: 700;
 }
 
+.tenant-admin-tip {
+  margin: 12px 0 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 191, 255, 0.24);
+  border-radius: 14px;
+  background: rgba(0, 191, 255, 0.08);
+  color: rgba(235, 249, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.tenant-admin-tip strong {
+  color: #8be6ff;
+}
+
+.tenant-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .tenant-action {
   text-decoration: none;
+}
+
+.tenant-action.secondary {
+  background: linear-gradient(135deg, rgba(0, 191, 255, 0.18), rgba(123, 97, 255, 0.22));
+  border: 1px solid rgba(139, 230, 255, 0.28);
+  box-shadow: none;
 }
 
 .link-btn {
