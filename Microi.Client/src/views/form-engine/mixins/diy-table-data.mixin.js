@@ -844,8 +844,8 @@ export default {
                 }
             }
             //判断模块引擎是否配置了查询接口替换
-            // Business row data translation is an explicit client-side action.
-            // Metadata translation still happens on the server through diy_lang.
+            // Metadata translation happens on the server through diy_lang.
+            // Selected modules can still translate business row display text on the client.
             var url = self.DiyApi.GetDiyTableRow;
             var paramType = "";
             if (self.CurrentDiyTableModel.IsTree) {
@@ -1064,6 +1064,11 @@ export default {
                                     // 🔥 PC端：重置懒渲染窗口（首屏只渲染前 _lazyRenderInitial 行，后续滚动追加）
                                     self.ResetLazyRender();
                                 }
+                            }
+                            if (typeof self.AutoTranslateBusinessDataIfNeeded === "function") {
+                                self.AutoTranslateBusinessDataIfNeeded().catch(function (error) {
+                                    console.warn("[AutoTranslateBusinessDataIfNeeded] failed:", error);
+                                });
                             }
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);

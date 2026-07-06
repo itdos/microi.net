@@ -600,6 +600,19 @@ function handleLoginSuccess(resp, result) {
 
   window.dispatchEvent(new CustomEvent('microi-login-success', { detail: currentUser.value }))
   showToast(tenantOsClient.value ? '登录成功，租户已就绪。' : '登录成功，请创建你的租户。', 'success')
+  const redirect = getRedirectTarget()
+  if (redirect) {
+    window.setTimeout(() => {
+      window.location.href = redirect
+    }, 350)
+  }
+}
+
+function getRedirectTarget() {
+  if (typeof window === 'undefined') return ''
+  const redirect = new URLSearchParams(window.location.search).get('redirect')
+  if (!redirect || /^https?:\/\//i.test(redirect)) return ''
+  return redirect.startsWith('/') ? redirect : '/' + redirect
 }
 
 async function createTenant() {

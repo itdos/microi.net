@@ -43,7 +43,7 @@
       <section v-if="!isAuthed" class="state-panel">
         <h2>请先登录</h2>
         <p>登录后可以查看你的 SaaS 租户、免费创建第一个数据库，并进入后台管理系统。</p>
-        <a class="primary-action inline" href="/login.html">去登录</a>
+        <a class="primary-action inline" href="/login.html?redirect=/profile.html">去登录</a>
       </section>
 
       <template v-else>
@@ -446,8 +446,17 @@ function onTenantUpdated() {
   refreshCenter()
 }
 
+function redirectToLoginIfNeeded() {
+  if (isAuthed.value) return false
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login.html?redirect=/profile.html'
+  }
+  return true
+}
+
 onMounted(() => {
   restoreSession()
+  if (redirectToLoginIfNeeded()) return
   window.addEventListener('microi-login-success', onLoginSuccess)
   window.addEventListener('microi-tenant-updated', onTenantUpdated)
   refreshCenter()
@@ -915,6 +924,110 @@ onUnmounted(() => {
 
 .account-grid label {
   color: #64748b;
+}
+
+.dark .profile-page {
+  background: #0b1120;
+  color: #e5e7eb;
+}
+
+.dark .profile-sidebar {
+  background: linear-gradient(180deg, #030712 0%, #111827 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.dark .profile-main {
+  background: #0b1120;
+}
+
+.dark .profile-header h1,
+.dark .panel-head h2,
+.dark .state-panel h2,
+.dark .content-panel h2,
+.dark .stat-card strong,
+.dark .tenant-card strong,
+.dark .price-card strong,
+.dark .account-grid span,
+.dark .form-row label,
+.dark .step-item strong {
+  color: #f8fafc;
+}
+
+.dark .header-desc,
+.dark .panel-head p,
+.dark .state-panel p,
+.dark .stat-card span,
+.dark .stat-card small,
+.dark .tenant-card small,
+.dark .tenant-card em,
+.dark .empty-card p,
+.dark .form-row small,
+.dark .account-grid label,
+.dark .step-item small,
+.dark .price-card span,
+.dark .price-card p,
+.dark .loading-row {
+  color: #94a3b8;
+}
+
+.dark .stat-card,
+.dark .content-panel,
+.dark .state-panel,
+.dark .tenant-card,
+.dark .empty-card,
+.dark .loading-row,
+.dark .price-card {
+  background: #111827;
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.dark .tenant-card {
+  background: linear-gradient(180deg, #111827, #0f172a);
+}
+
+.dark .ghost-action {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e2e8f0;
+}
+
+.dark .link-action {
+  background: rgba(255, 90, 46, 0.12);
+  color: #fb923c;
+}
+
+.dark .form-row input {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #f8fafc;
+}
+
+.dark .step-item {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.dark .step-item span {
+  background: #1f2937;
+  color: #cbd5e1;
+}
+
+.dark .step-item.running {
+  background: rgba(251, 146, 60, 0.12);
+  border-color: rgba(251, 146, 60, 0.38);
+}
+
+.dark .step-item.done {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.34);
+}
+
+.dark .step-item.error,
+.dark .error-box,
+.dark .page-error {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.34);
 }
 
 @media (max-width: 960px) {
