@@ -63,13 +63,15 @@
                             <div class="app-notice-main">
                                 <span class="app-name">{{ item.AppName || item.AppId || $t("Msg.Unnamed") }}</span>
                                 <el-tag v-if="item.Status === 'Uninstalled'" size="small" type="danger">{{ $t("Msg.OfficialAppUninstalled") }}</el-tag>
+                                <el-tag v-else-if="item.Status === 'Abnormal'" size="small" type="danger">{{ $t("Msg.OfficialAppAbnormal") }}</el-tag>
                                 <el-tag v-else size="small" type="warning">{{ $t("Msg.OfficialAppOutdated") }}</el-tag>
                             </div>
                             <div class="app-notice-meta">
-                                <span v-if="item.InstalledVersion">{{ $t("Msg.OfficialAppInstalledVersion") }} {{ item.InstalledVersion }}</span>
+                                <span v-if="item.AppVersionInstall || item.InstalledVersion">
+                                    {{ $t("Msg.OfficialAppInstalledVersion") }} {{ item.AppVersionInstall || item.InstalledVersion }}
+                                </span>
                                 <span>{{ $t("Msg.OfficialAppLatestVersion") }} {{ item.AppVersion || "-" }}</span>
                             </div>
-                            <div v-if="item.AppDetail" class="app-notice-desc" :title="item.AppDetail">{{ item.AppDetail }}</div>
                         </div>
                     </div>
                 </el-tab-pane>
@@ -231,7 +233,18 @@ export default {
             try {
                 const result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
                     _PageIndex: 1,
-                    _PageSize: 5000
+                    _PageSize: 5000,
+                    _SelectFields: [
+                        "Id",
+                        "StoreId",
+                        "AppId",
+                        "AppName",
+                        "AppVersion",
+                        "AppVersionInstall",
+                        "InstallStatus",
+                        "InstallTime",
+                        "UpdateTime"
+                    ]
                 });
                 if (result && result.Code === 1 && Array.isArray(result.Data)) {
                     return result.Data;
@@ -463,8 +476,7 @@ export default {
     color: #909399;
 }
 
-.task-msg,
-.app-notice-desc {
+.task-msg {
     margin-top: 4px;
     font-size: 12px;
     color: #909399;

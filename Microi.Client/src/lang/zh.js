@@ -14,6 +14,7 @@ export default {
         NoOfficialAppUpdates: "暂无官方应用更新提醒",
         OfficialAppUninstalled: "未安装",
         OfficialAppOutdated: "可更新",
+        OfficialAppAbnormal: "版本异常",
         OfficialAppInstalledVersion: "已安装版本：",
         OfficialAppLatestVersion: "最新版本：",
         GoAppStore: "去应用商城",

@@ -226,47 +226,41 @@ namespace Microi.net.Api
             }
         }
 
-        private static string TryBuildBuiltinChatReply(AiParam param)
-        {
-            var text = (param?.UserChatMsg ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return "";
-            }
-
-            if (Regex.IsMatch(text, "(你当前是什么模型|当前是什么模型|你是什么模型|模型是什么|当前模型|使用.*模型)", RegexOptions.IgnoreCase))
-            {
-                var modelId = param?.AiModel?.Trim();
-                var modelName = "";
-                var systemText = param?.SystemChatMsg ?? "";
-                var match = Regex.Match(systemText, "当前模型名称：(?<name>[^，,\\n]+).*?模型标识：(?<id>[^，,。\\n]+)", RegexOptions.IgnoreCase);
-                if (match.Success)
-                {
-                    modelName = match.Groups["name"].Value.Trim();
-                    if (string.IsNullOrWhiteSpace(modelId))
-                    {
-                        modelId = match.Groups["id"].Value.Trim();
-                    }
-                }
-                if (string.IsNullOrWhiteSpace(modelName))
-                {
-                    modelName = modelId;
-                }
-                if (string.IsNullOrWhiteSpace(modelId))
-                {
-                    return "当前尚未选择 AI 模型，请先在输入框右侧选择一个模型。";
-                }
-                return modelName == modelId
-                    ? $"当前使用的 AI 模型是：{modelId}。"
-                    : $"当前使用的 AI 模型是：{modelName}（{modelId}）。";
-            }
-
-            return "";
-        }
-
         // ============================================================
         // region: AI 对话 / NL2SQL / NL2V8Engine（原有功能）
         // ============================================================
+
+        /// <summary>
+        /// AI语义分析：手动模式由前端指定，自动模式由后端模型先识别意图。
+        /// </summary>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> RecognizeIntent(
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
+            [FromQuery] string UserChatMsg = null,
+            [FromQuery] string AiModel = null,
+            [FromQuery] string OsClient = null)
+        {
+            var param = bodyParam ?? new AiParam();
+            if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
+            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+
+            var intent = await _microiAi.ResolveIntentAsync(param);
+            return Json(new DosResult(1, new
+            {
+                intent.Mode,
+                ModeName = intent.Mode switch
+                {
+                    "data" => "数据分析",
+                    "builder" => "低代码建模",
+                    "project" => "AI应用",
+                    "code" => "V8 编程",
+                    _ => "AI对话"
+                },
+                intent.Reason,
+                intent.Source
+            }));
+        }
 
         /// <summary>
         /// AI对话
@@ -285,7 +279,7 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
 
-            var builtinReply = TryBuildBuiltinChatReply(param);
+            var builtinReply = _microiAi.TryBuildBuiltinChatReply(param);
             if (!string.IsNullOrWhiteSpace(builtinReply))
             {
                 return Json(new DosResult(1, builtinReply));
@@ -318,7 +312,7 @@ namespace Microi.net.Api
             Response.Headers["Connection"] = "keep-alive";
             Response.Headers["X-Accel-Buffering"] = "no";
 
-            var builtinReply = TryBuildBuiltinChatReply(param);
+            var builtinReply = _microiAi.TryBuildBuiltinChatReply(param);
             if (!string.IsNullOrWhiteSpace(builtinReply))
             {
                 foreach (var ch in builtinReply)

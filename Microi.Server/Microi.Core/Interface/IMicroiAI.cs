@@ -33,6 +33,20 @@ namespace Microi.net
         Task<DosResult> Chat(AiParam param);
 
         /// <summary>
+        /// 构建无需调用大模型即可直接回答的运行态问题（如当前模型）。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        string TryBuildBuiltinChatReply(AiParam param);
+
+        /// <summary>
+        /// 识别 AI 引擎语义意图。Controller 只负责转发，具体规则和 AI 路由逻辑放在 AI 服务中维护。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        Task<(string Mode, string Reason, string Source)> ResolveIntentAsync(AiParam param);
+
+        /// <summary>
         /// AI对话（流式输出）
         /// </summary>
         /// <param name="param"></param>

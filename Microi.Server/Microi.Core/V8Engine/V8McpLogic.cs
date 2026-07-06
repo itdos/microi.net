@@ -3971,6 +3971,353 @@ namespace Microi.net
 
         #endregion
 
+        #region MicroService
+
+        private static string NormalizeMicroServiceKey(string value)
+        {
+            var key = SafeString(value).Trim();
+            if (key.DosIsNullOrWhiteSpace()) return "";
+            key = Regex.Replace(key, @"[^a-zA-Z0-9_-]+", "-").Trim('-', '_');
+            return key.Length > 80 ? key.Substring(0, 80) : key;
+        }
+
+        private static string NormalizeMicroServiceVersion(string value)
+        {
+            var parsed = NormalizeV8SemanticVersion(value);
+            return parsed.DosIsNullOrWhiteSpace() ? "" : parsed;
+        }
+
+        private static string NextMicroServiceBuildVersion(string current)
+        {
+            var normalized = NormalizeMicroServiceVersion(current);
+            if (normalized.DosIsNullOrWhiteSpace()) return "v1.0.0";
+            var match = Regex.Match(normalized, @"^v(\d+)\.(\d+)\.(\d+)$", RegexOptions.IgnoreCase);
+            if (!match.Success) return "v1.0.0";
+            var major = int.Parse(match.Groups[1].Value);
+            var minor = int.Parse(match.Groups[2].Value);
+            var patch = int.Parse(match.Groups[3].Value);
+            patch++;
+            if (patch > 9)
+            {
+                patch = 0;
+                minor++;
+            }
+            if (minor > 9)
+            {
+                minor = 0;
+                major++;
+            }
+            return $"v{major}.{minor}.{patch}";
+        }
+
+        private static JObject UnwrapMicroServiceParam(JObject param)
+        {
+            return param?["microService"] as JObject
+                ?? param?["MicroService"] as JObject
+                ?? param?["service"] as JObject
+                ?? param?["Service"] as JObject
+                ?? param;
+        }
+
+        private static JArray GetArrayParam(JObject param, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (param?[name] is JArray array) return array;
+            }
+            return new JArray();
+        }
+
+        private static JObject BuildMicroServiceData(string osClient, JObject source, string buildVersion = null, string assetsJson = null, string assetManifestJson = null)
+        {
+            var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
+            var msName = source?["MsName"]?.Val<string>() ?? source?["Name"]?.Val<string>() ?? source?["Title"]?.Val<string>() ?? msKey;
+            var data = new JObject
+            {
+                ["OsClient"] = osClient,
+                ["MsKey"] = msKey,
+                ["MsName"] = msName,
+                ["MsType"] = source?["MsType"]?.Val<string>() ?? "前端",
+                ["Runtime"] = source?["Runtime"]?.Val<string>() ?? "micro-app",
+                ["StorageMode"] = source?["StorageMode"]?.Val<string>() ?? "file",
+                ["MsUrl"] = source?["MsUrl"]?.Val<string>() ?? "",
+                ["IsEnable"] = source?["IsEnable"]?.Val<int?>() ?? 1,
+                ["PublishTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+
+            var id = source?["Id"]?.Val<string>();
+            if (!id.DosIsNullOrWhiteSpace()) data["Id"] = id;
+
+            var optionalFields = new[]
+            {
+                "SourceDirName", "EntryPath", "AssetCount", "TotalSize", "DistHash", "Remark", "Description"
+            };
+            foreach (var field in optionalFields)
+            {
+                if (source?[field] != null) data[field] = CloneToken(source[field]);
+            }
+
+            var version = NormalizeMicroServiceVersion(buildVersion ?? source?["BuildVersion"]?.Val<string>());
+            if (!version.DosIsNullOrWhiteSpace()) data["BuildVersion"] = version;
+            if (!assetsJson.DosIsNullOrWhiteSpace()) data["AssetsJson"] = assetsJson;
+            if (!assetManifestJson.DosIsNullOrWhiteSpace()) data["AssetManifestJson"] = assetManifestJson;
+            return data;
+        }
+
+        public static async Task<DosResult<object>> GetMicroService(string osClient, string msKey)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                msKey = NormalizeMicroServiceKey(msKey);
+                if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空");
+
+                var serviceResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object> { new List<object> { "MsKey", "=", msKey } }
+                });
+                if (serviceResult.Code != 1) return new DosResult<object>(serviceResult.Code, serviceResult.Data, serviceResult.Msg);
+
+                var service = JObject.FromObject(serviceResult.Data);
+                var serviceId = SafeJString(service, "Id");
+                object pages = new List<object>();
+                if (!serviceId.DosIsNullOrWhiteSpace())
+                {
+                    var pageResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice_page", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object> { new List<object> { "MicroServiceId", "=", serviceId } },
+                        _OrderBy = "Sort",
+                        _OrderByType = "ASC",
+                        _PageSize = 200
+                    });
+                    if (pageResult.Code == 1) pages = pageResult.Data;
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    Service = service,
+                    Pages = pages
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取微服务失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> CreateMicroService(string osClient, JObject param, dynamic currentToken)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                var source = UnwrapMicroServiceParam(param);
+                var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
+                if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");
+                source["MsKey"] = msKey;
+                var data = BuildMicroServiceData(osClient, source);
+                var upsertResult = await UpsertRecordByIdOrKey(osClient, "sys_microiservice", data, "MsKey", "微服务");
+                if (upsertResult.Code != 1) return upsertResult;
+                return await GetMicroService(osClient, msKey);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "创建微服务失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> PublishMicroService(string osClient, JObject param, dynamic currentToken)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                var source = UnwrapMicroServiceParam(param);
+                var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
+                if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");
+                source["MsKey"] = msKey;
+
+                var assets = GetArrayParam(param, "Assets", "assets", "Files", "files");
+                if (assets.Count == 0) return new DosResult<object>(0, null, "Assets 不能为空");
+
+                string currentVersion = "";
+                var existingResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object> { new List<object> { "MsKey", "=", msKey } }
+                });
+                if (existingResult.Code == 1 && existingResult.Data != null)
+                {
+                    var existing = JObject.FromObject(existingResult.Data);
+                    currentVersion = SafeJString(existing, "BuildVersion");
+                    if (source["Id"] == null) source["Id"] = SafeJString(existing, "Id");
+                }
+
+                var buildVersion = NormalizeMicroServiceVersion(source["BuildVersion"]?.Val<string>());
+                if (buildVersion.DosIsNullOrWhiteSpace()) buildVersion = NextMicroServiceBuildVersion(currentVersion);
+
+                var uploadedAssets = new JArray();
+                var totalSize = 0L;
+                var entryPath = source["EntryPath"]?.Val<string>() ?? "";
+                for (var i = 0; i < assets.Count; i++)
+                {
+                    if (!(assets[i] is JObject asset)) continue;
+                    var relativePath = asset["Path"]?.Val<string>() ?? asset["RelativePath"]?.Val<string>() ?? asset["FilePath"]?.Val<string>() ?? asset["FileName"]?.Val<string>();
+                    relativePath = SafeString(relativePath).Trim().TrimStart('/', '\\').Replace("\\", "/");
+                    if (relativePath.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"Assets[{i}].Path 不能为空");
+                    var fileName = asset["FileName"]?.Val<string>() ?? Path.GetFileName(relativePath);
+                    var base64 = asset["FileByteBase64"]?.Val<string>() ?? asset["ContentBase64"]?.Val<string>() ?? asset["Base64"]?.Val<string>();
+                    if (base64.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"Assets[{i}].FileByteBase64 不能为空");
+
+                    var uploadDir = $"micro-app/{msKey}/{buildVersion}/{Path.GetDirectoryName(relativePath)?.Replace("\\", "/")}".TrimEnd('/');
+                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, false, true, "", "", "", currentToken);
+                    if (uploadResult.Code != 1) return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"发布微服务文件失败：{relativePath}，{uploadResult.Msg}");
+
+                    var uploadObj = JObject.FromObject(uploadResult.Data);
+                    var filePathName = SafeJString(uploadObj, "FilePathName");
+                    var size = asset["Size"]?.Val<long?>() ?? 0L;
+                    totalSize += size;
+                    var isEntry = asset["IsEntry"]?.Val<bool?>() == true || asset["Entry"]?.Val<bool?>() == true;
+                    if (isEntry || entryPath.DosIsNullOrWhiteSpace())
+                    {
+                        if (relativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || isEntry) entryPath = relativePath;
+                    }
+
+                    uploadedAssets.Add(new JObject
+                    {
+                        ["Path"] = relativePath,
+                        ["FileName"] = fileName,
+                        ["FilePathName"] = filePathName,
+                        ["ContentType"] = asset["ContentType"]?.Val<string>() ?? "",
+                        ["Size"] = size,
+                        ["Sha256"] = asset["Sha256"]?.Val<string>() ?? asset["Hash"]?.Val<string>() ?? "",
+                        ["IsEntry"] = isEntry
+                    });
+                }
+
+                if (entryPath.DosIsNullOrWhiteSpace()) entryPath = "index.html";
+                source["EntryPath"] = entryPath;
+                source["BuildVersion"] = buildVersion;
+                source["AssetCount"] = uploadedAssets.Count;
+                if (source["TotalSize"] == null) source["TotalSize"] = totalSize.ToString();
+
+                var assetManifestJson = new JObject
+                {
+                    ["MsKey"] = msKey,
+                    ["BuildVersion"] = buildVersion,
+                    ["EntryPath"] = entryPath,
+                    ["Assets"] = uploadedAssets
+                }.ToString(Newtonsoft.Json.Formatting.None);
+
+                var serviceData = BuildMicroServiceData(osClient, source, buildVersion, uploadedAssets.ToString(Newtonsoft.Json.Formatting.None), assetManifestJson);
+                var upsertResult = await UpsertRecordByIdOrKey(osClient, "sys_microiservice", serviceData, "MsKey", "微服务");
+                if (upsertResult.Code != 1) return upsertResult;
+
+                var detailResult = await GetMicroService(osClient, msKey);
+                if (detailResult.Code != 1) return detailResult;
+                var detailObj = JObject.FromObject(detailResult.Data);
+                var service = detailObj["Service"] as JObject;
+                var serviceId = SafeJString(service, "Id");
+                var routeWarnings = await SyncMicroServicePages(osClient, serviceId, msKey, buildVersion, entryPath, GetArrayParam(param, "Routes", "routes", "Pages", "pages"));
+
+                return new DosResult<object>(1, new
+                {
+                    MsKey = msKey,
+                    BuildVersion = buildVersion,
+                    EntryPath = entryPath,
+                    AssetCount = uploadedAssets.Count,
+                    Assets = uploadedAssets,
+                    RouteWarnings = routeWarnings,
+                    Service = service
+                }, "微服务发布完成");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "发布微服务失败：" + ex.Message);
+            }
+        }
+
+        private static async Task<List<string>> SyncMicroServicePages(string osClient, string serviceId, string msKey, string buildVersion, string entryPath, JArray routes)
+        {
+            var warnings = new List<string>();
+            if (serviceId.DosIsNullOrWhiteSpace())
+            {
+                warnings.Add("未获取到微服务 Id，跳过页面路由同步。");
+                return warnings;
+            }
+
+            if (routes == null || routes.Count == 0)
+            {
+                routes = new JArray
+                {
+                    new JObject
+                    {
+                        ["PageKey"] = "home",
+                        ["PageName"] = "首页",
+                        ["PageTitle"] = "首页",
+                        ["RoutePath"] = "/",
+                        ["EntryPath"] = entryPath,
+                        ["Sort"] = 0,
+                        ["IsHome"] = 1
+                    }
+                };
+            }
+
+            for (var i = 0; i < routes.Count; i++)
+            {
+                if (!(routes[i] is JObject route)) continue;
+                var routePath = route["RoutePath"]?.Val<string>() ?? route["Path"]?.Val<string>() ?? "/";
+                if (routePath.DosIsNullOrWhiteSpace()) routePath = "/";
+                var pageData = new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["MicroServiceId"] = serviceId,
+                    ["MicroServiceKey"] = msKey,
+                    ["PageKey"] = route["PageKey"]?.Val<string>() ?? route["Key"]?.Val<string>() ?? $"page-{i + 1}",
+                    ["PageName"] = route["PageName"]?.Val<string>() ?? route["Name"]?.Val<string>() ?? route["PageTitle"]?.Val<string>() ?? $"页面{i + 1}",
+                    ["PageTitle"] = route["PageTitle"]?.Val<string>() ?? route["Title"]?.Val<string>() ?? route["PageName"]?.Val<string>() ?? $"页面{i + 1}",
+                    ["RoutePath"] = routePath,
+                    ["EntryPath"] = route["EntryPath"]?.Val<string>() ?? entryPath,
+                    ["MenuUrl"] = route["MenuUrl"]?.Val<string>() ?? $"/micro-app/{msKey}{routePath}",
+                    ["Sort"] = route["Sort"]?.Val<int?>() ?? i,
+                    ["IsHome"] = route["IsHome"]?.Val<int?>() ?? (i == 0 ? 1 : 0),
+                    ["IsEnable"] = route["IsEnable"]?.Val<int?>() ?? 1,
+                    ["BuildVersion"] = buildVersion,
+                    ["RouteMetaJson"] = route.ToString(Newtonsoft.Json.Formatting.None)
+                };
+
+                var exist = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice_page", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "MicroServiceId", "=", serviceId },
+                        new List<object> { "RoutePath", "=", routePath }
+                    }
+                });
+                DosResult opResult;
+                if (exist.Code == 1 && exist.Data != null)
+                {
+                    pageData["Id"] = (string)exist.Data.Id;
+                    opResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_microiservice_page", pageData);
+                }
+                else
+                {
+                    pageData["Id"] = Ulid.NewUlid().ToString();
+                    opResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_microiservice_page", pageData);
+                }
+
+                if (opResult.Code != 1)
+                {
+                    warnings.Add($"路由 {routePath} 同步失败：{opResult.Msg}");
+                }
+            }
+
+            return warnings;
+        }
+
+        #endregion
+
         #region SetRolePermission
 
         /// <summary>

@@ -206,6 +206,41 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetMicroService(string osClient, string msKey, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            msKey = msKey ?? param?["MsKey"].Val<string>() ?? param?["MicroServiceKey"].Val<string>();
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            if (string.IsNullOrWhiteSpace(msKey)) return Ok(new DosResult(0, null, "MsKey 不能为空"));
+            var result = await V8McpLogic.GetMicroService(osClient, msKey);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateMicroService([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.CreateMicroService(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> PublishMicroService([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.PublishMicroService(osClient, param, token);
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<IActionResult> CheckVersions([FromBody] JObject param)
         {
