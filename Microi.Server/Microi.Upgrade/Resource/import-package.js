@@ -1,55 +1,9 @@
-/**
- * 导入应用数据包接口引擎（B系统）
- * v2026-04-05 16:00
- * 功能：导入应用数据包，根据Id判断新增或修改
- * 
- * 业务逻辑：
- * 1. 接收应用数据包
- * 2. 解析数据包中的各类数据
- * 3. 依次处理：diy_table -> diy_field -> sys_menu -> wf_flowdesign -> wf_node -> sys_apiengine
- * 4. 每条数据根据判断规则决定新增或修改：
- *    - diy_table: 根据 Id 和 Name 判断（不修改 Id 和 Name）
- *    - sys_apiengine: 根据 Id 或 ApiEngineKey 判断（不修改 Id 和 ApiEngineKey）
- *    - 其他表: 根据 Id 判断
- * 5. 使用事务保证数据一致性
- * 
- * 说明：
- * - 支持导出接口通过 TableIds 额外传入的表（与MenuIds中的表合并去重后一起导出）
- * - 支持导出接口自动发现的子表控件（TableChild）关联的菜单和表
- * - 上述额外的表数据已包含在 DiyTables、DiyFields、DDLStatements 中，导入时统一处理
- * 
- * 接口配置：
- * - ApiEngineKey: import-microi-store-package
- * - ApiAddress: /apiengine/import-microi-store-package
- * - 允许匿名调用: 否
- * - 分布式锁: 是（防止并发导入）
- * 
- * 前端调用示例：
- * V8.ApiEngine.Run('import-microi-store-package', {
- *   Package: packageData  // 从export-microi-store-package接口导出的数据包
- * })
- * 
- * 返回格式：
- * {
- *   Code: 1,
- *   Data: {
- *     MenuInserted: 5,
- *     MenuUpdated: 3,
- *     TableInserted: 2,
- *     TableUpdated: 1,
- *     FieldInserted: 50,
- *     FieldUpdated: 20,
- *     FlowInserted: 1,
- *     FlowUpdated: 0,
- *     NodeInserted: 10,
- *     NodeUpdated: 5,
- *     LineInserted: 8,
- *     LineUpdated: 3,
- *     ApiEngineInserted: 3,
- *     ApiEngineUpdated: 2
- *   },
- *   Msg: '导入成功'
- * }
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: import-microi-store-package
+ * Version: v1.0.2
+ * Function:
+ * - 请补充该 V8 代码的完整功能说明。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -416,6 +370,182 @@ try {
         return 'varchar(255)';
     };
 
+    var isSafeIdentifier = function (name) {
+        return !!name && /^[A-Za-z0-9_]+$/.test(String(name));
+    };
+
+    var sqlString = function (value) {
+        return String(value || '').replace(/'/g, "''");
+    };
+
+    var normalizeSqlType = function (value) {
+        return String(value || '').toLowerCase().replace(/\s+/g, '');
+    };
+
+    var getPhysicalValue = function (row, names) {
+        for (var i = 0; i < names.length; i++) {
+            if (row[names[i]] !== undefined && row[names[i]] !== null) return row[names[i]];
+        }
+        return null;
+    };
+
+    var buildPhysicalColumnDefinition = function (column, includePrimaryKey) {
+        var columnName = getPhysicalValue(column, ['COLUMN_NAME', 'ColumnName', 'Name']);
+        var columnType = getPhysicalValue(column, ['COLUMN_TYPE', 'ColumnType', 'Type']);
+        if (!columnName || !columnType || !isSafeIdentifier(columnName)) return '';
+
+        var definition = '`' + columnName + '` ' + String(columnType);
+        var nullable = String(getPhysicalValue(column, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
+        definition += nullable == 'NO' ? ' NOT NULL' : ' NULL';
+
+        var extra = getPhysicalValue(column, ['EXTRA', 'Extra']);
+        var columnDefault = getPhysicalValue(column, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
+        if (columnDefault !== null && columnDefault !== undefined && columnDefault !== '' &&
+            !/text|blob|json/i.test(String(columnType)) && !/auto_increment/i.test(String(extra || ''))) {
+            var defaultText = String(columnDefault);
+            if (/^current_timestamp(\(\))?$/i.test(defaultText) || /^CURRENT_TIMESTAMP/i.test(defaultText)) {
+                definition += ' DEFAULT ' + defaultText;
+            } else if (/^b'.*'$/i.test(defaultText)) {
+                definition += ' DEFAULT ' + defaultText;
+            } else {
+                definition += " DEFAULT '" + sqlString(defaultText) + "'";
+            }
+        }
+        if (extra && /auto_increment|on update/i.test(String(extra))) definition += ' ' + String(extra);
+
+        var comment = getPhysicalValue(column, ['COLUMN_COMMENT', 'ColumnComment', 'Comment']);
+        if (comment) definition += " COMMENT '" + sqlString(comment) + "'";
+
+        var columnKey = String(getPhysicalValue(column, ['COLUMN_KEY', 'ColumnKey']) || '').toUpperCase();
+        if (includePrimaryKey && columnKey == 'PRI') {
+            definition += ' PRIMARY KEY';
+        }
+
+        return definition;
+    };
+
+    var getTargetPhysicalColumns = function (tableName) {
+        var map = {};
+        if (!isSafeIdentifier(tableName)) return map;
+
+        var rows = V8.Db.FromSql(
+            "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT " +
+            "FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)"
+        ).AddInParameter('@p0', tableName).ToArray();
+
+        for (var i = 0; i < rows.length; i++) {
+            var columnName = rows[i].COLUMN_NAME;
+            if (!columnName) continue;
+            map[String(columnName).toLowerCase()] = rows[i];
+        }
+        return map;
+    };
+
+    var groupPackagePhysicalColumns = function (columns) {
+        var grouped = {};
+        columns = columns || [];
+        for (var i = 0; i < columns.length; i++) {
+            var column = columns[i];
+            var tableName = getPhysicalValue(column, ['TABLE_NAME', 'TableName']);
+            var columnName = getPhysicalValue(column, ['COLUMN_NAME', 'ColumnName', 'Name']);
+            if (!tableName || !columnName || !isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) continue;
+
+            var tableKey = String(tableName).toLowerCase();
+            if (!grouped[tableKey]) {
+                grouped[tableKey] = {
+                    TableName: String(tableName),
+                    Columns: []
+                };
+            }
+            grouped[tableKey].Columns.push(column);
+        }
+        return grouped;
+    };
+
+    var syncPhysicalColumnsFromPackage = function (tableFilterMap) {
+        var columns = Package.PhysicalColumns || [];
+        var grouped = groupPackagePhysicalColumns(columns);
+        var result = { Added: 0, Modified: 0, Skipped: 0, Errors: 0 };
+
+        for (var tableKey in grouped) {
+            if (!Object.prototype.hasOwnProperty.call(grouped, tableKey)) continue;
+            if (tableFilterMap && !tableFilterMap[tableKey]) continue;
+
+            var group = grouped[tableKey];
+            var tableName = group.TableName;
+            if (!isSafeIdentifier(tableName)) continue;
+
+            var targetColumns = {};
+            try {
+                targetColumns = getTargetPhysicalColumns(tableName);
+            } catch (targetError) {
+                debugLog['physical_schema_target_error_' + tableName] = targetError.message;
+                result.Errors++;
+                continue;
+            }
+
+            for (var i = 0; i < group.Columns.length; i++) {
+                var sourceColumn = group.Columns[i];
+                var columnName = getPhysicalValue(sourceColumn, ['COLUMN_NAME', 'ColumnName', 'Name']);
+                var columnType = getPhysicalValue(sourceColumn, ['COLUMN_TYPE', 'ColumnType', 'Type']);
+                if (!columnName || !columnType || !isSafeIdentifier(columnName)) continue;
+
+                var definition = buildPhysicalColumnDefinition(sourceColumn, false);
+                if (!definition) continue;
+
+                var targetColumn = targetColumns[String(columnName).toLowerCase()];
+                try {
+                    if (!targetColumn) {
+                        var addSql = 'ALTER TABLE `' + tableName + '` ADD COLUMN ' + definition;
+                        V8.Db.FromSql(addSql).ExecuteNonQuery();
+                        result.Added++;
+                        debugLog['physical_schema_added_' + tableName + '_' + columnName] = String(columnType);
+                        continue;
+                    }
+
+                    var sourceNullable = String(getPhysicalValue(sourceColumn, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
+                    var targetNullable = String(targetColumn.IS_NULLABLE || '').toUpperCase();
+                    var sourceDefault = getPhysicalValue(sourceColumn, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
+                    var targetDefault = targetColumn.COLUMN_DEFAULT;
+                    var sourceComment = String(getPhysicalValue(sourceColumn, ['COLUMN_COMMENT', 'ColumnComment', 'Comment']) || '');
+                    var targetComment = String(targetColumn.COLUMN_COMMENT || '');
+                    var typeChanged = normalizeSqlType(targetColumn.COLUMN_TYPE) != normalizeSqlType(columnType);
+                    var nullChanged = sourceNullable && sourceNullable != targetNullable;
+                    var defaultChanged = String(sourceDefault === null || sourceDefault === undefined ? '' : sourceDefault) !=
+                        String(targetDefault === null || targetDefault === undefined ? '' : targetDefault);
+                    var commentChanged = sourceComment != targetComment;
+
+                    if (typeChanged || nullChanged || defaultChanged || commentChanged) {
+                        var modifySql = 'ALTER TABLE `' + tableName + '` MODIFY COLUMN ' + definition;
+                        V8.Db.FromSql(modifySql).ExecuteNonQuery();
+                        result.Modified++;
+                        debugLog['physical_schema_modified_' + tableName + '_' + columnName] =
+                            'type:' + targetColumn.COLUMN_TYPE + '->' + columnType + ', null:' + targetNullable + '->' + sourceNullable;
+                    } else {
+                        result.Skipped++;
+                    }
+                } catch (syncError) {
+                    debugLog['physical_schema_sync_error_' + tableName + '_' + columnName] = syncError.message;
+                    result.Errors++;
+                }
+            }
+        }
+
+        return result;
+    };
+
+    var buildPhysicalTableFilter = function (tableNames) {
+        if (!tableNames || tableNames.length == 0) return null;
+        var map = {};
+        for (var i = 0; i < tableNames.length; i++) {
+            if (isSafeIdentifier(tableNames[i])) {
+                map[String(tableNames[i]).toLowerCase()] = true;
+            }
+        }
+        return map;
+    };
+
     for (var i = 0; i < ddlStatements.length; i++) {
         var ddlItem = ddlStatements[i];
         if (!ddlItem.DDL || !ddlItem.TableName) continue;
@@ -563,6 +693,13 @@ try {
     stats.DDLSkipped = ddlSkipped;
     stats.FieldsAdded = fieldsAdded;
     debugLog.step0Result = 'DDL执行完成：创建表' + ddlExecuted + '，跳过' + ddlSkipped + '，添加字段' + fieldsAdded;
+
+    var earlyPhysicalSync = syncPhysicalColumnsFromPackage(null);
+    stats.PhysicalFieldsAdded = (stats.PhysicalFieldsAdded || 0) + earlyPhysicalSync.Added;
+    stats.PhysicalFieldsModified = (stats.PhysicalFieldsModified || 0) + earlyPhysicalSync.Modified;
+    stats.PhysicalFieldsSkipped = (stats.PhysicalFieldsSkipped || 0) + earlyPhysicalSync.Skipped;
+    stats.PhysicalFieldsErrors = (stats.PhysicalFieldsErrors || 0) + earlyPhysicalSync.Errors;
+    debugLog.step0_5Result = '真实物理字段预同步完成：修改' + earlyPhysicalSync.Modified + '，新增' + earlyPhysicalSync.Added + '，跳过' + earlyPhysicalSync.Skipped + '，异常' + earlyPhysicalSync.Errors;
 
     // ==================== 步骤1：处理diy_table数据 ====================
 
@@ -1172,9 +1309,21 @@ try {
         }
     }
 
-    stats.PhysicalFieldsAdded = physicalFieldsAdded;
-    stats.PhysicalFieldsRenamed = physicalFieldsRenamed;
-    stats.PhysicalFieldsModified = physicalFieldsModified;
+    var physicalSyncTableNames = [];
+    for (var ps = 0; ps < diyTables.length; ps++) {
+        if (diyTables[ps] && diyTables[ps].Name) physicalSyncTableNames.push(diyTables[ps].Name);
+    }
+    var packagePhysicalSync = syncPhysicalColumnsFromPackage(buildPhysicalTableFilter(physicalSyncTableNames));
+    physicalFieldsAdded += packagePhysicalSync.Added;
+    physicalFieldsModified += packagePhysicalSync.Modified;
+    stats.PhysicalFieldsSkipped = (stats.PhysicalFieldsSkipped || 0) + packagePhysicalSync.Skipped;
+    stats.PhysicalFieldsErrors = (stats.PhysicalFieldsErrors || 0) + packagePhysicalSync.Errors;
+    debugLog.step2_5_physicalPackageSync =
+        '真实物理字段复核完成：修改' + packagePhysicalSync.Modified + '，新增' + packagePhysicalSync.Added + '，跳过' + packagePhysicalSync.Skipped + '，异常' + packagePhysicalSync.Errors;
+
+    stats.PhysicalFieldsAdded = (stats.PhysicalFieldsAdded || 0) + physicalFieldsAdded;
+    stats.PhysicalFieldsRenamed = (stats.PhysicalFieldsRenamed || 0) + physicalFieldsRenamed;
+    stats.PhysicalFieldsModified = (stats.PhysicalFieldsModified || 0) + physicalFieldsModified;
     debugLog.step2_5Result = '物理表字段同步完成：重命名' + physicalFieldsRenamed + '，修改' + physicalFieldsModified + '，新增' + physicalFieldsAdded;
 
     // ==================== 步骤3：处理sys_menu数据 ====================

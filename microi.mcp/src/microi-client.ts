@@ -573,6 +573,27 @@ export class MicroiClient {
     });
   }
 
+  async getMicroService(msKey: string): Promise<ApiResponse> {
+    return this.post(API.GET_MICRO_SERVICE, {
+      OsClient: this.config.osClient,
+      MsKey: msKey,
+    });
+  }
+
+  async createMicroService(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.CREATE_MICRO_SERVICE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async publishMicroService(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.PUBLISH_MICRO_SERVICE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
   async getTableData(tableName: string, query: Record<string, unknown> = {}): Promise<ApiResponse> {
     return this.post(API.FORM_GET_TABLE_DATA, {
       OsClient: this.config.osClient,

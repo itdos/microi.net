@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using Dos.Common;
+using Dos.ORM;
 using Newtonsoft.Json;
 namespace Microi.net
 {
@@ -14,7 +16,16 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "5.5.5.0";
+        public static string Version = "6.0.0.0";
+        private static readonly string[] CoreNullableTables =
+        {
+            "diy_table",
+            "diy_field",
+            "sys_user",
+            "sys_menu",
+            "sys_role",
+            "sys_osclients"
+        };
         
         /// <summary>
         /// 从嵌入资源读取文件内容
@@ -42,6 +53,8 @@ namespace Microi.net
         public async Task<List<string>> Run(string osClient)
         {
             var msgs = new List<string>();
+
+            EnsureCoreTableColumnsNullable(osClient, msgs);
             
             #region 导入数据包V8
             //更新应用商城的导入数据包接口引擎
@@ -189,6 +202,84 @@ namespace Microi.net
             await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:diy_table_field_list:sys_microistore");
             
             return msgs;
+        }
+
+        private static void EnsureCoreTableColumnsNullable(string osClient, List<string> msgs)
+        {
+            try
+            {
+                var osClientModel = OsClient.GetClient(osClient);
+                if (osClientModel?.Db == null)
+                {
+                    msgs.Add($"核心表字段可空升级跳过：未找到租户 {osClient} 的数据库连接。");
+                    return;
+                }
+
+                var dbType = osClientModel.OsClientModel?["DbType"]?.Val<string>();
+                var dbInfo = DiyCommon.GetDbInfo(dbType);
+                var orm = MicroiEngine.ORM(dbInfo.DbType);
+
+                foreach (var tableName in CoreNullableTables)
+                {
+                    var columnsResult = orm.GetColumns(new DbServiceParam
+                    {
+                        OsClient = osClient,
+                        TableName = tableName,
+                        DbSession = osClientModel.Db,
+                        DbInfo = dbInfo
+                    });
+                    if (columnsResult.Code != 1 || columnsResult.Data == null)
+                    {
+                        msgs.Add($"核心表 {tableName} 字段可空升级跳过：{columnsResult.Msg}");
+                        continue;
+                    }
+
+                    var changedCount = 0;
+                    foreach (var column in columnsResult.Data)
+                    {
+                        var columnName = column.column_name ?? "";
+                        if (columnName.Equals("Id", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(column.is_nullable, "YES", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        var columnType = column.column_type;
+                        if (columnType.DosIsNullOrWhiteSpace())
+                        {
+                            columnType = column.data_type;
+                        }
+                        if (columnType.DosIsNullOrWhiteSpace()) continue;
+
+                        var changeResult = orm.ChangeColumn(new DbServiceParam
+                        {
+                            OsClient = osClient,
+                            TableName = tableName,
+                            FieldName = columnName,
+                            NewFieldName = columnName,
+                            FieldType = columnType,
+                            FieldLabel = column.column_comment ?? "",
+                            FieldNotNull = false,
+                            DbSession = osClientModel.Db,
+                            DbInfo = dbInfo
+                        });
+                        if (changeResult.Code == 1)
+                        {
+                            changedCount++;
+                        }
+                        else
+                        {
+                            msgs.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
+                        }
+                    }
+
+                    if (changedCount > 0)
+                    {
+                        msgs.Add($"核心表 {tableName} 已将 {changedCount} 个字段调整为允许为空。");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                msgs.Add($"核心表字段可空升级异常：{ex.Message}");
+            }
         }
     }
 }

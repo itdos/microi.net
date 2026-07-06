@@ -100,7 +100,7 @@
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
                     </div>
                     <div class="platform-stats" v-loading="statsLoading">
-                        <div v-for="stat in statCards" :key="stat.key" class="platform-stat">
+                        <div v-for="stat in statCards" :key="stat.key" class="platform-stat" :data-stat="stat.key">
                             <span>{{ stat.label }}</span>
                             <strong>{{ stat.value }}</strong>
                             <small>{{ stat.desc }}</small>
@@ -280,7 +280,20 @@
                             <el-tooltip content="上传文件或图片" placement="top">
                                 <el-button class="icon-action" text :icon="Paperclip" @click="triggerAttachmentPicker" />
                             </el-tooltip>
-                            <span>{{ currentIntentText }}</span>
+                            <span class="semantic-label">语义分析</span>
+                            <el-select
+                                v-model="semanticMode"
+                                size="small"
+                                class="semantic-select"
+                                :disabled="sending"
+                            >
+                                <el-option
+                                    v-for="item in semanticModeOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
                         </div>
                         <div class="composer-right">
                             <el-select
@@ -393,7 +406,8 @@ const sending = ref(false);
 const messageWrapRef = ref(null);
 const fileInputRef = ref(null);
 const selectedFiles = ref([]);
-const inferredMode = ref("chat");
+const semanticMode = ref("auto");
+const resolvedMode = ref("chat");
 const aiSysMenuId = ref("");
 const aiModelTableId = ref("");
 const modelDrawerVisible = ref(false);
@@ -410,6 +424,13 @@ const actionContext = reactive({
     lastTableName: ""
 });
 let abortController = null;
+
+const semanticModeOptions = [
+    { label: "自动识别", value: "auto" },
+    { label: "AI对话", value: "chat" },
+    { label: "数据分析", value: "data" },
+    { label: "低代码建模", value: "builder" }
+];
 
 const quickPrompts = computed(() => [
     {
@@ -439,7 +460,6 @@ const filteredConversations = computed(() => {
 });
 
 const sendDisabled = computed(() => sending.value || (!inputText.value.trim() && selectedFiles.value.length === 0));
-const currentIntentText = computed(() => `自动识别：${modeName(detectWorkMode(inputText.value, selectedFiles.value.length > 0))}`);
 const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 999;
@@ -477,6 +497,7 @@ function nowText() {
 function modeName(mode) {
     if (mode === "project") return "AI应用";
     const map = {
+        auto: "自动识别",
         chat: "AI对话",
         code: "V8 编程",
         data: "数据分析",
@@ -754,10 +775,10 @@ async function sendMessage() {
         return;
     }
 
-    const mode = detectWorkMode(text, selectedFiles.value.length > 0);
-    inferredMode.value = mode;
-
     const attachmentPayload = await readAttachments();
+    const mode = await resolveSemanticMode(text, attachmentPayload);
+    resolvedMode.value = mode;
+
     const attachmentMeta = attachmentPayload.map((item) => ({
         FileName: item.FileName,
         ContentType: item.ContentType,
@@ -858,22 +879,63 @@ async function sendMessage() {
     }
 }
 
-function detectWorkMode(text, hasAttachment = false) {
-    const value = String(text || "").trim();
-    const lower = value.toLowerCase();
-    if (/(web|网站|官网|网页|h5|uniapp|uni-app|移动端|小程序|app项目|新项目|前端项目|源码项目|电商网站|预约功能)/i.test(value)) {
-        return "project";
+function normalizeWorkMode(mode) {
+    const value = String(mode || "").trim().toLowerCase();
+    const map = {
+        auto: "auto",
+        自动识别: "auto",
+        chat: "chat",
+        ai对话: "chat",
+        对话: "chat",
+        data: "data",
+        数据分析: "data",
+        builder: "builder",
+        lowcode: "builder",
+        低代码建模: "builder",
+        code: "code",
+        v8: "code",
+        project: "project",
+        ai应用: "project",
+        app: "project"
+    };
+    return map[value] || "";
+}
+
+function buildIntentAttachmentSummary(attachments = []) {
+    return (attachments || []).map((item) => ({
+        FileName: item.FileName,
+        ContentType: item.ContentType,
+        Size: item.Size,
+        Text: item.Text ? String(item.Text).slice(0, 1000) : ""
+    }));
+}
+
+async function resolveSemanticMode(text, attachments = []) {
+    const manualMode = normalizeWorkMode(semanticMode.value);
+    if (manualMode && manualMode !== "auto") {
+        return manualMode;
     }
-    if (!value && hasAttachment) return "chat";
-    if (/(创建|生成|新增|设计|菜单|模块|表单|表\b|字段|流程|工作流|界面|页面|低代码|建模)/.test(value)) {
-        return "builder";
+    try {
+        const result = await DiyCommon.PostAsync("/api/Ai/RecognizeIntent", {
+            UserChatMsg: text || "请分析我上传的附件。",
+            AiModel: selectedAiModel.value?.AiModel || "",
+            OsClient: osClient.value,
+            ConversationId: currentConversationId.value,
+            Source: SOURCE,
+            Attachments: buildIntentAttachmentSummary(attachments)
+        }, null, null, "json");
+        if (isOk(result)) {
+            const data = getData(result) || {};
+            const mode = normalizeWorkMode(data.Mode || data.mode);
+            if (mode && mode !== "auto") {
+                return mode;
+            }
+        }
+        console.warn("[AiEngine] intent recognition returned invalid result", result);
+    } catch (error) {
+        console.warn("[AiEngine] intent recognition failed", error);
     }
-    if (/(v8|接口引擎|表单事件|按钮代码|脚本|javascript|js\b|c#|代码|sql|bug|报错|函数)/i.test(lower)) {
-        return "code";
-    }
-    if (/(统计|分析|查询|多少|排行|趋势|报表|top|同比|环比|本月|本周|数据表|数据量)/.test(value)) {
-        return "data";
-    }
+    ElMessage.warning("语义分析暂时不可用，已按 AI对话处理。");
     return "chat";
 }
 
@@ -1000,7 +1062,7 @@ function buildSystemPrompt(mode) {
     const modelName = selectedAiModel.value?.Name || "";
     const modelKey = selectedAiModel.value?.AiModel || "";
     const lines = [
-        "你是 Microi 吾码 AI 助手。",
+        "你是平台内置 AI 助手。",
         `当前租户：${osClient.value}。`,
         `运行态模型信息：Name=${modelName || modelKey}，Id=${modelKey}。`,
         "涉及当前会话、模型、租户等运行态信息时，以运行态上下文为准，不要编造成业务数据查询结果。",
@@ -1010,7 +1072,7 @@ function buildSystemPrompt(mode) {
         lines.push("低代码建模必须先输出可核对方案；涉及写入平台时只输出可人工确认的 MCP 动作，不要声称已经执行。");
     }
     if (mode === "code") {
-        lines.push("V8 编程回答要遵守 Microi V8 API、参数化查询、多语言和性能规范。");
+        lines.push("V8 编程回答要遵守平台 V8 API、参数化查询、多语言和性能规范。");
     }
     return lines.join("\n");
 }
@@ -1311,9 +1373,9 @@ function parseCodeResponse(text) {
 
 function buildMcpPrompt(text) {
     return [
-        "线上AI已接入 Microi skills + MCP 受控工具桥：低代码建模动作必须输出 McpActions，由前端按钮调用 /api/V8Engine 对应工具执行。",
+        "线上AI已接入平台 Skills + MCP 受控工具桥：低代码建模动作必须输出 McpActions，由前端按钮调用 /api/V8Engine 对应工具执行。",
         "当前支持表、字段、菜单、接口引擎、界面引擎、校验和缓存刷新；复杂 AI 应用源码走 ai_app_* 接口引擎并存储到 HDFS。",
-        "你是 Microi 吾码线上低代码建模助手。",
+        "你是线上低代码建模助手。",
         `当前租户 OsClient=${osClient.value}。`,
         "你需要根据用户需求给出简洁方案，并在确实需要写入平台时，输出可人工确认执行的 MCP 动作。",
         "可用动作：CreateTable、AddField、CreateModule、CreateApiEngine、UpdateApiEngineCode、SavePageEngine、ValidateLowCodeSystem、RefreshSchemaCache。",
@@ -1455,7 +1517,7 @@ async function saveMessage(message) {
                 ConversationId: currentConversationId.value,
                 Title: firstLine(messages.value.find((item) => item.role === "user")?.content || message.content),
                 Role: message.role,
-                Mode: message.mode || inferredMode.value,
+                Mode: message.mode || resolvedMode.value,
                 Content: message.content || "",
                 RawContent: message.rawContent || message.content || "",
                 ModelId: message.modelId || selectedAiModel.value?.AiModel || "",
@@ -1517,14 +1579,19 @@ async function copyText(text) {
 
 <style scoped>
 .ai-engine-page {
-    height: calc(100vh - 84px);
+    height: calc(100vh - 104px);
     min-height: 0;
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
+    box-sizing: border-box;
+    margin: 8px 12px 12px;
+    border: 1px solid #e6e9f2;
+    border-radius: 18px;
     background: #f7f8fb;
     color: #20242c;
+    box-shadow: 0 22px 56px rgba(20, 30, 55, .08);
 }
 
 .ai-engine-page.is-app-workspace {
@@ -1753,15 +1820,18 @@ async function copyText(text) {
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
-    gap: 12px;
-    padding: 6px 0 16px;
+    gap: 18px;
+    padding: clamp(24px, 6vh, 58px) 18px;
 }
 
 .empty-hero {
     max-width: 780px;
     text-align: center;
+    display: grid;
+    justify-items: center;
+    gap: 10px;
 }
 
 .hero-kicker {
@@ -1779,20 +1849,20 @@ async function copyText(text) {
 
 .empty-state h1 {
     margin: 0;
-    margin-top: 8px;
     color: #24272e;
-    font-size: 28px;
+    font-size: clamp(26px, 2.4vw, 38px);
     font-weight: 760;
     letter-spacing: 0;
+    line-height: 1.18;
 }
 
 .empty-state p {
-    max-width: 580px;
+    max-width: 640px;
     margin: 0;
     color: #747b88;
     font-size: 14px;
     text-align: center;
-    line-height: 1.7;
+    line-height: 1.85;
 }
 
 .platform-stats {
@@ -2232,9 +2302,19 @@ async function copyText(text) {
     min-width: 0;
 }
 
-.composer-left span {
+.semantic-label {
     color: #767e8a;
     font-size: 13px;
+}
+
+.semantic-select {
+    width: 132px;
+}
+
+.semantic-select :deep(.el-input__wrapper) {
+    min-height: 32px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px var(--ai-border, #dfe3eb) inset;
 }
 
 .attachment-input {
@@ -2267,6 +2347,450 @@ async function copyText(text) {
 
 :deep(.ai-engine-table-drawer) {
     height: calc(100vh - 120px);
+}
+
+.ai-engine-page {
+    --ai-primary: var(--mci-color-primary, var(--el-color-primary, #ff5f2e));
+    --ai-primary-dark: var(--mci-color-primary-dark, var(--el-color-primary-dark-2, #e34f24));
+    --ai-primary-soft: color-mix(in srgb, var(--ai-primary) 12%, transparent);
+    --ai-bg: var(--mci-bg-base, var(--el-bg-color-page, #f7f8fb));
+    --ai-panel: var(--mci-bg-elevated, var(--el-bg-color, #fff));
+    --ai-surface: var(--mci-bg-surface, var(--el-fill-color-light, #f4f6fa));
+    --ai-card: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --ai-card-hover: var(--mci-bg-card-hover, var(--el-fill-color-extra-light, #fff));
+    --ai-border: var(--mci-border-color, var(--el-border-color-lighter, #e6e9f2));
+    --ai-border-hover: var(--mci-border-color-hover, var(--el-border-color, #d7dce8));
+    --ai-text: var(--mci-text-primary, var(--el-text-color-primary, #20242c));
+    --ai-text-secondary: var(--mci-text-secondary, var(--el-text-color-regular, #606a7a));
+    --ai-text-tertiary: var(--mci-text-tertiary, var(--el-text-color-placeholder, #98a2b3));
+    --ai-on-primary: var(--mci-text-on-primary, #fff);
+    --ai-shadow: var(--mci-shadow-card, 0 14px 36px rgba(20, 30, 55, .08));
+    --ai-shadow-hover: var(--mci-shadow-card-hover, 0 20px 46px rgba(20, 30, 55, .12));
+    border-color: var(--ai-border);
+    background:
+        radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--ai-primary) 12%, transparent), transparent 34%),
+        var(--ai-bg);
+    color: var(--ai-text);
+    box-shadow: var(--ai-shadow);
+}
+
+html.dark .ai-engine-page,
+body.dark .ai-engine-page,
+.dark .ai-engine-page,
+[data-theme="dark"] .ai-engine-page {
+    --ai-bg: var(--mci-bg-base, #0b1118);
+    --ai-panel: var(--mci-bg-elevated, #101923);
+    --ai-surface: var(--mci-bg-surface, #172332);
+    --ai-card: var(--mci-bg-card, rgba(255, 255, 255, .055));
+    --ai-card-hover: var(--mci-bg-card-hover, rgba(255, 255, 255, .085));
+    --ai-border: var(--mci-border-color, rgba(255, 255, 255, .10));
+    --ai-border-hover: var(--mci-border-color-hover, rgba(255, 255, 255, .18));
+    --ai-text: var(--mci-text-primary, #f6f8fb);
+    --ai-text-secondary: var(--mci-text-secondary, #b9c2d0);
+    --ai-text-tertiary: var(--mci-text-tertiary, #7f8ba0);
+    --ai-shadow: var(--mci-shadow-card, 0 18px 46px rgba(0, 0, 0, .34));
+}
+
+.ai-engine-sidebar {
+    border-right-color: var(--ai-border);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--ai-primary) 12%, var(--ai-panel)), var(--ai-panel) 52%, var(--ai-bg));
+}
+
+.workspace-tab,
+.conversation-item,
+.app-sidebar-intro,
+.header-workspace-switch,
+.composer-box,
+.message-text,
+.message-thinking,
+.code-block,
+.query-result,
+.mcp-actions,
+.mcp-action-item,
+.platform-stat,
+.quick-prompt {
+    border-color: var(--ai-border);
+    background: var(--ai-card);
+    color: var(--ai-text);
+    box-shadow: var(--ai-shadow);
+}
+
+.workspace-tab:hover,
+.workspace-tab.active,
+.conversation-item:hover,
+.conversation-item.active,
+.quick-prompt:hover,
+.mcp-action-item:hover {
+    border-color: color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
+    background: var(--ai-card-hover);
+    color: var(--ai-primary);
+    box-shadow: var(--ai-shadow-hover);
+}
+
+.new-chat-btn,
+.send-btn,
+.store-link-btn {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--ai-primary), var(--ai-primary-dark));
+    color: var(--ai-on-primary);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--ai-primary) 28%, transparent);
+}
+
+.app-sidebar-intro strong,
+.header-left h2,
+.message-meta strong,
+.platform-stat strong,
+.quick-prompt strong {
+    color: var(--ai-text);
+}
+
+.app-sidebar-intro p,
+.sidebar-section-title,
+.conversation-item small,
+.empty-state p,
+.platform-stat span,
+.platform-stat small,
+.quick-prompt span,
+.message-meta span,
+.message-thinking,
+.semantic-label {
+    color: var(--ai-text-secondary);
+}
+
+.ai-engine-main,
+.inline-project-workbench {
+    background: var(--ai-bg);
+}
+
+.ai-engine-header {
+    border-bottom-color: var(--ai-border);
+    background: color-mix(in srgb, var(--ai-panel) 94%, transparent);
+}
+
+.hero-kicker,
+.message.is-assistant .message-avatar,
+.message-copy-btn:hover {
+    color: var(--ai-primary);
+}
+
+.empty-hero h1 {
+    color: var(--ai-text);
+    text-shadow: 0 8px 32px color-mix(in srgb, var(--ai-primary) 14%, transparent);
+}
+
+.hero-kicker {
+    border-color: color-mix(in srgb, var(--ai-primary) 26%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 10%, var(--ai-card));
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--ai-primary) 12%, transparent);
+}
+
+.message-avatar,
+.message.is-assistant .message-avatar {
+    background: color-mix(in srgb, var(--ai-primary) 11%, var(--ai-card));
+    color: var(--ai-primary);
+}
+
+.message-copy-btn {
+    border-color: var(--ai-border);
+    background: var(--ai-card);
+    color: var(--ai-text-secondary);
+}
+
+.thinking-toggle,
+.attachment-chip {
+    border-color: var(--ai-border);
+    background: var(--ai-surface);
+    color: var(--ai-text-secondary);
+}
+
+.thinking-content,
+.code-block pre {
+    color: var(--ai-text);
+}
+
+.composer {
+    background: linear-gradient(180deg, transparent, var(--ai-bg) 28%);
+}
+
+.composer-box {
+    border-color: var(--ai-border);
+    background: var(--ai-panel);
+}
+
+.composer-box :deep(.el-textarea__inner),
+.composer-model-select :deep(.el-input__wrapper) {
+    background: var(--ai-surface);
+    color: var(--ai-text);
+    box-shadow: none;
+}
+
+.ai-engine-main:not(.is-apps) {
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at 50% 16%, color-mix(in srgb, var(--ai-primary) 18%, transparent), transparent 28%),
+        linear-gradient(135deg, color-mix(in srgb, var(--ai-bg) 88%, var(--ai-primary)), var(--ai-bg) 58%);
+}
+
+.ai-engine-main:not(.is-apps)::before,
+.ai-engine-main:not(.is-apps)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ai-engine-main:not(.is-apps)::before {
+    opacity: .45;
+    background:
+        linear-gradient(color-mix(in srgb, var(--ai-primary) 10%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--ai-primary) 10%, transparent) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at 50% 18%, #000 0%, transparent 58%);
+    animation: ai-grid-drift 18s linear infinite;
+}
+
+.ai-engine-main:not(.is-apps)::after {
+    inset: 10% 12% auto;
+    height: 260px;
+    border-radius: 999px;
+    opacity: .38;
+    background:
+        radial-gradient(circle at 25% 48%, color-mix(in srgb, var(--ai-primary) 34%, transparent), transparent 34%),
+        radial-gradient(circle at 72% 52%, rgba(77, 171, 247, .28), transparent 34%);
+    filter: blur(32px);
+    transform: translateZ(0);
+    animation: ai-aura-breathe 8s ease-in-out infinite;
+}
+
+.ai-engine-header,
+.message-wrap,
+.composer {
+    position: relative;
+    z-index: 1;
+}
+
+.ai-engine-sidebar {
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-engine-sidebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 20% 8%, color-mix(in srgb, var(--ai-primary) 18%, transparent), transparent 32%),
+        linear-gradient(180deg, transparent, color-mix(in srgb, var(--ai-primary) 7%, transparent));
+    opacity: .65;
+}
+
+.ai-engine-sidebar > * {
+    position: relative;
+    z-index: 1;
+}
+
+.conversation-list {
+    padding: 6px 12px 18px;
+}
+
+.conversation-item {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--ai-border) 72%, transparent);
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--ai-card) 88%, var(--ai-primary)), var(--ai-card));
+    box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.conversation-item::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    border-radius: 8px 0 0 8px;
+    background: linear-gradient(180deg, var(--ai-primary), color-mix(in srgb, var(--ai-primary) 45%, #4dabf7));
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+.conversation-item:hover,
+.conversation-item.active {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--ai-primary) 34%, var(--ai-border));
+    box-shadow: 0 16px 34px color-mix(in srgb, var(--ai-primary) 13%, rgba(15, 23, 42, .08));
+}
+
+.conversation-item:hover::before,
+.conversation-item.active::before {
+    opacity: 1;
+}
+
+.platform-stats {
+    gap: 14px;
+}
+
+.platform-stat {
+    position: relative;
+    overflow: hidden;
+    min-height: 94px;
+    border-color: color-mix(in srgb, var(--ai-primary) 18%, var(--ai-border));
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--ai-primary) 16%, var(--ai-card)), color-mix(in srgb, var(--ai-card) 92%, #fff)),
+        var(--ai-card);
+    box-shadow: 0 18px 40px color-mix(in srgb, var(--ai-primary) 12%, rgba(15, 23, 42, .08));
+    transform: translateZ(0);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.platform-stat::before {
+    content: "";
+    position: absolute;
+    inset: -35% -24% auto auto;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ai-primary) 28%, transparent);
+    filter: blur(2px);
+    opacity: .68;
+}
+
+.platform-stat::after {
+    content: "";
+    position: absolute;
+    inset: auto 14px 12px auto;
+    width: 36px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--ai-primary);
+    opacity: .55;
+}
+
+.platform-stat:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--ai-primary) 46%, var(--ai-border));
+    box-shadow: 0 24px 52px color-mix(in srgb, var(--ai-primary) 18%, rgba(15, 23, 42, .11));
+}
+
+.platform-stat[data-stat="module"]::before {
+    background: rgba(77, 171, 247, .24);
+}
+
+.platform-stat[data-stat="api"]::before {
+    background: rgba(133, 91, 255, .22);
+}
+
+.platform-stat[data-stat="user"]::before {
+    background: rgba(35, 213, 171, .24);
+}
+
+.platform-stat span,
+.platform-stat strong,
+.platform-stat small {
+    position: relative;
+    z-index: 1;
+}
+
+.platform-stat span {
+    font-weight: 700;
+}
+
+.platform-stat strong {
+    font-size: 28px;
+}
+
+.quick-prompts {
+    gap: 16px;
+}
+
+.quick-prompt {
+    position: relative;
+    overflow: hidden;
+    min-height: 118px;
+    border-color: color-mix(in srgb, var(--ai-primary) 18%, var(--ai-border));
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--ai-card) 84%, var(--ai-primary)), var(--ai-card));
+    box-shadow: 0 18px 38px rgba(15, 23, 42, .07);
+}
+
+.quick-prompt::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--ai-primary) 14%, transparent), transparent);
+    transform: translateX(-65%);
+    transition: opacity .18s ease;
+}
+
+.quick-prompt:hover::before {
+    opacity: 1;
+    animation: ai-card-sheen 1.1s ease;
+}
+
+.quick-prompt .el-icon {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ai-primary) 12%, var(--ai-card));
+    color: var(--ai-primary);
+}
+
+.quick-prompt strong,
+.quick-prompt span,
+.quick-prompt .el-icon {
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes ai-grid-drift {
+    from {
+        background-position: 0 0, 0 0;
+    }
+    to {
+        background-position: 44px 44px, 44px 44px;
+    }
+}
+
+@keyframes ai-aura-breathe {
+    0%, 100% {
+        transform: translate3d(0, 0, 0) scale(1);
+        opacity: .32;
+    }
+    50% {
+        transform: translate3d(0, 8px, 0) scale(1.04);
+        opacity: .48;
+    }
+}
+
+@keyframes ai-card-sheen {
+    from {
+        transform: translateX(-65%);
+    }
+    to {
+        transform: translateX(65%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-engine-main:not(.is-apps)::before,
+    .ai-engine-main:not(.is-apps)::after,
+    .quick-prompt:hover::before {
+        animation: none;
+    }
+
+    .conversation-item,
+    .platform-stat,
+    .quick-prompt {
+        transition: none;
+    }
 }
 
 @media (max-width: 1080px) {
