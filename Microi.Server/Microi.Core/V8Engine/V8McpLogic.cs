@@ -255,37 +255,38 @@ namespace Microi.net
                     return new DosResult<object>(0, null, "OsClient 不能为空");
                 }
 
-                DosResult<dynamic> getResult;
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    return new DosResult<object>(0, null, $"未找到租户数据库连接：{osClient}");
+                }
+
+                dynamic latestData;
                 if (!IsBlank(id))
                 {
-                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
-                    {
-                        OsClient = osClient,
-                        Id = id
-                    });
+                    var section = client.Db.FromSql("SELECT * FROM sys_apiengine WHERE Id=?id AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
+                        .AddInParameter("?id", SafeString(id));
+                    section.SetCommandTimeout(10);
+                    latestData = section.ToFirst<dynamic>();
                 }
                 else if (!IsBlank(apiEngineKey))
                 {
-                    getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
-                    {
-                        OsClient = osClient,
-                        _Where = new List<object>()
-                        {
-                            new List<object>() { "ApiEngineKey", "=", apiEngineKey },
-                        }
-                    });
+                    var section = client.Db.FromSql("SELECT * FROM sys_apiengine WHERE ApiEngineKey=?key AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
+                        .AddInParameter("?key", SafeString(apiEngineKey));
+                    section.SetCommandTimeout(10);
+                    latestData = section.ToFirst<dynamic>();
                 }
                 else
                 {
                     return new DosResult<object>(0, null, "ApiEngineKey 和 Id 不能同时为空");
                 }
 
-                if (getResult.Code != 1 || getResult.Data == null)
+                if (latestData == null)
                 {
-                    return new DosResult<object>(getResult.Code, getResult.Data, IsBlank(getResult.Msg) ? "刷新接口引擎缓存失败：未找到最新数据" : SafeString(getResult.Msg));
+                    return new DosResult<object>(0, null, "刷新接口引擎缓存失败：未找到最新数据");
                 }
 
-                var row = JObject.FromObject(getResult.Data);
+                var row = JObject.FromObject(latestData);
                 var latestId = NormalizeApiEngineCacheKeyPart(SafeJString(row, "Id"));
                 var latestKey = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiEngineKey", apiEngineKey ?? ""));
                 var latestAddress = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiAddress"));
@@ -294,15 +295,15 @@ namespace Microi.net
 
                 if (!IsBlank(latestKey))
                 {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestKey), getResult.Data));
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestKey), latestData));
                 }
                 if (!IsBlank(latestId))
                 {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestId), getResult.Data));
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestId), latestData));
                 }
                 if (!IsBlank(latestAddress))
                 {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestAddress), getResult.Data));
+                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestAddress), latestData));
                 }
 
                 if (tasks.Any())
@@ -310,7 +311,7 @@ namespace Microi.net
                     await Task.WhenAll(tasks);
                 }
 
-                return new DosResult<object>(1, getResult.Data);
+                return new DosResult<object>(1, latestData);
             }
             catch (Exception ex)
             {
