@@ -249,16 +249,32 @@ const tenantStepSummary = computed(() => {
 const TenantList = defineComponent({
   props: { tenants: { type: Array, default: () => [] } },
   setup(props) {
-    return () => h('div', { class: 'tenant-grid' }, props.tenants.map(tenant => h('a', {
-      class: 'tenant-card',
-      href: tenant.Url,
-      target: '_blank',
-      rel: 'noopener noreferrer'
+    return () => h('div', { class: 'tenant-grid' }, props.tenants.map(tenant => h('article', {
+      class: 'tenant-card'
     }, [
-      h('span', { class: 'tenant-status' }, tenant.IsEnable == 1 ? '启用' : '停用'),
-      h('strong', tenant.ClientName || tenant.OsClient),
-      h('small', `${tenant.OsClient || ''} · ${tenant.DomainName || ''}`),
-      h('em', tenant.Url || '')
+      h('div', { class: 'tenant-card-top' }, [
+        h('span', { class: 'tenant-status' }, tenant.IsEnable == 1 ? '启用' : '停用'),
+        h('strong', tenant.ClientName || tenant.OsClient)
+      ]),
+      h('div', { class: 'tenant-meta' }, [
+        h('span', '租户Key'),
+        h('b', tenant.OsClient || '-')
+      ]),
+      h('div', { class: 'tenant-meta' }, [
+        h('span', '访问域名'),
+        h('a', { href: tenant.Url, target: '_blank', rel: 'noopener noreferrer' }, tenant.DomainName || tenant.Url || '-')
+      ]),
+      h('div', { class: 'tenant-password-tip' }, [
+        h('span', '默认管理员'),
+        h('b', `admin / ${tenant.AdminDefaultPassword || tenant.OsClient || '-'}`),
+        h('small', '请首次登录后及时修改密码')
+      ]),
+      h('a', {
+        class: 'tenant-open',
+        href: tenant.Url,
+        target: '_blank',
+        rel: 'noopener noreferrer'
+      }, '进入后台')
     ])))
   }
 })
@@ -306,12 +322,24 @@ function createTraceId() {
   return `${Date.now()}${Math.floor(Math.random() * 100000)}`
 }
 
+function parseStepTimeMs(step, msField, timeField) {
+  const ms = Number(step?.[msField] || 0)
+  if (ms > 0) return ms
+  const raw = step?.[timeField]
+  if (!raw) return 0
+  const parsed = Date.parse(String(raw).replace(/-/g, '/'))
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
 function getStepElapsedMs(step) {
   const tick = tenantProgressTick.value
   if (!step) return 0
-  if (step.Status === 'running' && step.StartAt) {
-    return Math.max(0, tick - step.StartAt)
+  const startMs = step.StartAt || parseStepTimeMs(step, 'StartMs', 'StartTime')
+  if (step.Status === 'running' && startMs) {
+    return Math.max(0, tick - startMs)
   }
+  const endMs = step.EndAt || parseStepTimeMs(step, 'EndMs', 'EndTime')
+  if (startMs && endMs) return Math.max(0, endMs - startMs)
   return Math.max(0, Number(step.ElapsedMs || 0))
 }
 
@@ -378,6 +406,7 @@ async function createTenant() {
   }
   isCreating.value = true
   const traceId = createTraceId()
+  let keepPollingAfterRequestError = false
   startTenantProgress(traceId)
   try {
     const resp = await fetch(apiEngineUrl('official_create_tenant'), {
@@ -402,12 +431,14 @@ async function createTenant() {
     await refreshCenter()
     activeMenu.value = 'tenants'
   } catch {
-    markTenantStep('reload', 'error', '网络异常，无法确认租户创建结果，请稍后刷新个人中心查看。')
-    createError.value = '网络异常，租户创建失败。'
-    tenantProgress.value = createError.value
+    keepPollingAfterRequestError = true
+    createError.value = ''
+    tenantProgress.value = '请求连接已中断，后台可能仍在创建租户；页面会继续读取实时进度。'
   } finally {
-    stopTenantProgress()
-    isCreating.value = false
+    if (!keepPollingAfterRequestError) {
+      stopTenantProgress()
+      isCreating.value = false
+    }
   }
 }
 
@@ -457,8 +488,25 @@ async function pollTenantProgress(traceId) {
     const result = await resp.json()
     const data = result.Data || {}
     mergeTenantSteps(data.Steps)
+    if (data.Status === 'success') {
+      const payload = data.Data || {}
+      const url = payload.Url || (payload.DomainName ? `https://${payload.DomainName}` : `https://${payload.OsClient || tenantKey.value}.microi.net`)
+      localStorage.setItem('microi_doc_tenant', payload.OsClient || tenantKey.value)
+      localStorage.setItem('microi_doc_tenant_url', url)
+      tenantProgress.value = `租户创建成功，访问地址：${url}`
+      tenantKey.value = ''
+      systemName.value = ''
+      await refreshCenter()
+      activeMenu.value = 'tenants'
+      stopTenantProgress()
+      isCreating.value = false
+      return
+    }
     if (data.Status === 'error' && data.Msg) {
       tenantProgress.value = data.Msg
+      createError.value = data.Msg
+      stopTenantProgress()
+      isCreating.value = false
     }
   } catch {
   }
@@ -476,6 +524,10 @@ function mergeTenantSteps(serverSteps) {
       Status: serverStep.Status || localStep.Status,
       StartTime: serverStep.StartTime || localStep.StartTime,
       EndTime: serverStep.EndTime || localStep.EndTime,
+      StartMs: serverStep.StartMs || localStep.StartMs || 0,
+      EndMs: serverStep.EndMs || localStep.EndMs || 0,
+      StartAt: localStep.StartAt || serverStep.StartMs || 0,
+      EndAt: localStep.EndAt || serverStep.EndMs || 0,
       ElapsedMs: serverStep.ElapsedMs || localStep.ElapsedMs || 0,
       ElapsedSeconds: serverStep.ElapsedSeconds || localStep.ElapsedSeconds || 0
     }
@@ -784,35 +836,94 @@ onUnmounted(() => {
   display: flex;
   min-height: 126px;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   padding: 16px;
   border: 1px solid #e8eef6;
   border-radius: 12px;
   background: linear-gradient(180deg, #fff, #f8fafc);
   color: inherit;
   text-decoration: none;
+  min-width: 0;
 }
 
-.tenant-card strong {
-  max-width: 220px;
+.tenant-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tenant-card-top strong {
+  min-width: 0;
   overflow: hidden;
   font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tenant-card small,
-.tenant-card em {
+.tenant-meta {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.tenant-meta span,
+.tenant-password-tip span,
+.tenant-password-tip small {
   color: #64748b;
+}
+
+.tenant-meta b,
+.tenant-meta a {
+  min-width: 0;
+  overflow: hidden;
+  color: #1e293b;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-meta a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.tenant-password-tip {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
   font-size: 12px;
-  font-style: normal;
-  word-break: break-all;
+}
+
+.tenant-password-tip b {
+  color: #c2410c;
+}
+
+.tenant-password-tip small {
+  grid-column: 2;
+  line-height: 1.5;
+}
+
+.tenant-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  margin-top: auto;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff4d2d, #ff8a3d);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .tenant-status {
-  position: absolute;
-  top: 14px;
-  right: 14px;
   padding: 4px 8px;
   border-radius: 999px;
   background: #dcfce7;
