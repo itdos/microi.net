@@ -15,7 +15,7 @@
           type="button"
           class="side-menu-item"
           :class="{ active: activeMenu === item.key }"
-          @click="activeMenu = item.key"
+          @click="navigateProfile(item.key)"
         >
           <span class="menu-icon">{{ item.icon }}</span>
           <span>{{ item.name }}</span>
@@ -71,12 +71,12 @@
               <h2>最近租户</h2>
               <p>你的独立低代码数据库与访问入口。</p>
             </div>
-            <button class="link-action" type="button" @click="activeMenu = tenants.length ? 'tenants' : 'create'">
+            <button class="link-action" type="button" @click="navigateProfile(tenants.length ? 'tenants' : 'create')">
               {{ tenants.length ? '查看全部' : '创建租户' }}
             </button>
           </div>
           <TenantList :tenants="tenants.slice(0, 3)" />
-          <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="activeMenu = 'create'" />
+          <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
         </section>
 
         <section v-if="activeMenu === 'tenants'" class="content-panel">
@@ -85,11 +85,11 @@
               <h2>我的租户</h2>
               <p>当前账号名下所有 SaaS 租户数据库。</p>
             </div>
-            <button class="primary-action small" type="button" @click="activeMenu = 'create'">创建租户</button>
+            <button class="primary-action small" type="button" @click="navigateProfile('create')">创建租户</button>
           </div>
           <div v-if="isLoading" class="loading-row">正在读取租户信息...</div>
           <TenantList v-else :tenants="tenants" />
-          <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="activeMenu = 'create'" />
+          <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
         </section>
 
         <section v-if="activeMenu === 'create'" class="content-grid">
@@ -201,6 +201,8 @@ const menus = [
   { key: 'account', name: '账号信息', icon: '◉' }
 ]
 
+const menuKeys = menus.map(item => item.key)
+
 const defaultTenantSteps = [
   { Key: 'validate', Title: '校验账号与租户Key', Detail: '检查登录态、租户Key格式和系统名称。', Status: 'pending' },
   { Key: 'quota', Title: '检查免费开通额度', Detail: '每个账号可免费创建一个租户，第二个起按 9.9 元/年。', Status: 'pending' },
@@ -253,15 +255,14 @@ const TenantList = defineComponent({
       class: 'tenant-card'
     }, [
       h('div', { class: 'tenant-card-top' }, [
-        h('span', { class: 'tenant-status' }, tenant.IsEnable == 1 ? '启用' : '停用'),
-        h('strong', tenant.ClientName || tenant.OsClient)
+        h('div', { class: 'tenant-title-block' }, [
+          h('strong', tenant.ClientName || tenant.OsClient || '未命名租户'),
+          h('small', tenant.OsClient || '-')
+        ]),
+        h('span', { class: ['tenant-status', tenant.IsEnable == 1 ? 'enabled' : 'disabled'] }, tenant.IsEnable == 1 ? '启用中' : '已停用')
       ]),
-      h('div', { class: 'tenant-meta' }, [
-        h('span', '租户Key'),
-        h('b', tenant.OsClient || '-')
-      ]),
-      h('div', { class: 'tenant-meta' }, [
-        h('span', '访问域名'),
+      h('div', { class: 'tenant-domain' }, [
+        h('span', '访问入口'),
         h('a', { href: tenant.Url, target: '_blank', rel: 'noopener noreferrer' }, tenant.DomainName || tenant.Url || '-')
       ]),
       h('div', { class: 'tenant-password-tip' }, [
@@ -269,12 +270,19 @@ const TenantList = defineComponent({
         h('b', `admin / ${tenant.AdminDefaultPassword || tenant.OsClient || '-'}`),
         h('small', '请首次登录后及时修改密码')
       ]),
-      h('a', {
-        class: 'tenant-open',
-        href: tenant.Url,
-        target: '_blank',
-        rel: 'noopener noreferrer'
-      }, '进入后台')
+      h('div', { class: 'tenant-card-actions' }, [
+        h('a', {
+          class: 'tenant-open',
+          href: tenant.Url,
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }, '进入后台'),
+        h('button', {
+          class: 'tenant-copy',
+          type: 'button',
+          onClick: () => copyTenantUrl(tenant.Url)
+        }, '复制链接')
+      ])
     ])))
   }
 })
@@ -289,6 +297,32 @@ const EmptyTenants = defineComponent({
     ])
   }
 })
+
+function copyTenantUrl(url) {
+  if (!url || typeof navigator === 'undefined' || !navigator.clipboard) return
+  navigator.clipboard.writeText(url)
+}
+
+function normalizeProfileRoute(raw) {
+  const key = String(raw || '').replace(/^#\/?/, '').split('?')[0] || 'overview'
+  return menuKeys.includes(key) ? key : 'overview'
+}
+
+function syncMenuFromHash() {
+  if (typeof window === 'undefined') return
+  activeMenu.value = normalizeProfileRoute(window.location.hash)
+}
+
+function navigateProfile(key) {
+  const nextKey = normalizeProfileRoute(key)
+  activeMenu.value = nextKey
+  if (typeof window !== 'undefined') {
+    const nextHash = `#/${nextKey}`
+    if (window.location.hash !== nextHash) {
+      window.history.pushState(null, '', nextHash)
+    }
+  }
+}
 
 function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
@@ -422,6 +456,15 @@ async function createTenant() {
       return
     }
     const data = result.Data || {}
+    const returnedTraceId = data.TraceId || data.TaskId || result.DataAppend?.TraceId || result.DataAppend?.TaskId || traceId
+    if (returnedTraceId && returnedTraceId !== tenantProgressTraceId) {
+      startTenantProgress(returnedTraceId)
+    }
+    if (data.Status === 'running' || data.TaskId || data.TraceId) {
+      tenantProgress.value = result.Msg || '租户创建任务已提交，正在后台处理。'
+      keepPollingAfterRequestError = true
+      return
+    }
     const url = data.Url || (data.DomainName ? `https://${data.DomainName}` : `https://${tenantKey.value}.microi.net`)
     localStorage.setItem('microi_doc_tenant', data.OsClient || tenantKey.value)
     localStorage.setItem('microi_doc_tenant_url', url)
@@ -429,7 +472,7 @@ async function createTenant() {
     tenantKey.value = ''
     systemName.value = ''
     await refreshCenter()
-    activeMenu.value = 'tenants'
+    navigateProfile('tenants')
   } catch {
     keepPollingAfterRequestError = true
     createError.value = ''
@@ -497,7 +540,7 @@ async function pollTenantProgress(traceId) {
       tenantKey.value = ''
       systemName.value = ''
       await refreshCenter()
-      activeMenu.value = 'tenants'
+      navigateProfile('tenants')
       stopTenantProgress()
       isCreating.value = false
       return
@@ -544,7 +587,7 @@ function logout(goLogin = true) {
   currentUser.value = null
   tenants.value = []
   tenantCenter.value = {}
-  if (goLogin) window.location.href = '/login.html'
+  if (goLogin) window.location.href = '/'
 }
 
 function onLoginSuccess() {
@@ -559,16 +602,19 @@ function onTenantUpdated() {
 function redirectToLoginIfNeeded() {
   if (isAuthed.value) return false
   if (typeof window !== 'undefined') {
-    window.location.href = '/login.html?redirect=/profile.html'
+    window.location.href = '/login.html?redirect=/profile.html%23/overview'
   }
   return true
 }
 
 onMounted(() => {
   restoreSession()
+  syncMenuFromHash()
   if (redirectToLoginIfNeeded()) return
   window.addEventListener('microi-login-success', onLoginSuccess)
   window.addEventListener('microi-tenant-updated', onTenantUpdated)
+  window.addEventListener('hashchange', syncMenuFromHash)
+  window.addEventListener('popstate', syncMenuFromHash)
   refreshCenter()
 })
 
@@ -576,6 +622,8 @@ onUnmounted(() => {
   stopTenantProgress()
   window.removeEventListener('microi-login-success', onLoginSuccess)
   window.removeEventListener('microi-tenant-updated', onTenantUpdated)
+  window.removeEventListener('hashchange', syncMenuFromHash)
+  window.removeEventListener('popstate', syncMenuFromHash)
 })
 </script>
 
@@ -584,7 +632,9 @@ onUnmounted(() => {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 248px 1fr;
-  background: #f5f7fb;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(255, 90, 46, 0.08), transparent 30%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
   color: #1f2937;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans CJK SC', sans-serif;
 }
@@ -794,7 +844,7 @@ onUnmounted(() => {
 
 .content-panel,
 .state-panel {
-  padding: 20px;
+  padding: 22px;
 }
 
 .content-grid {
@@ -827,66 +877,96 @@ onUnmounted(() => {
 
 .tenant-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .tenant-card {
   position: relative;
   display: flex;
-  min-height: 126px;
+  min-height: 220px;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid #e8eef6;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #fff, #f8fafc);
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.96)),
+    radial-gradient(circle at top right, rgba(255, 122, 69, 0.1), transparent 34%);
   color: inherit;
   text-decoration: none;
   min-width: 0;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  overflow: hidden;
+}
+
+.tenant-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #ff4d2d, #ff9f43, #38bdf8);
+}
+
+.tenant-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 122, 69, 0.42);
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.1);
 }
 
 .tenant-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.tenant-card-top strong {
+.tenant-title-block {
   min-width: 0;
+}
+
+.tenant-title-block strong {
+  display: block;
   overflow: hidden;
   font-size: 16px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tenant-meta {
-  display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  gap: 10px;
-  align-items: baseline;
+.tenant-title-block small {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
   font-size: 13px;
+  font-weight: 700;
 }
 
-.tenant-meta span,
+.tenant-domain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #e8eef6;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.tenant-domain span,
 .tenant-password-tip span,
 .tenant-password-tip small {
   color: #64748b;
 }
 
-.tenant-meta b,
-.tenant-meta a {
+.tenant-domain a {
   min-width: 0;
   overflow: hidden;
-  color: #1e293b;
+  color: #2563eb;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tenant-meta a {
-  color: #2563eb;
   text-decoration: none;
 }
 
@@ -894,9 +974,10 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 68px minmax(0, 1fr);
   gap: 6px 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #fff7ed;
+  padding: 12px;
+  border: 1px solid rgba(251, 146, 60, 0.22);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.95), rgba(255, 237, 213, 0.55));
   font-size: 12px;
 }
 
@@ -909,26 +990,54 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-.tenant-open {
+.tenant-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 104px;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.tenant-open,
+.tenant-copy {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 34px;
-  margin-top: auto;
   border-radius: 10px;
-  background: linear-gradient(135deg, #ff4d2d, #ff8a3d);
-  color: #fff;
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
 
+.tenant-open {
+  background: linear-gradient(135deg, #ff4d2d, #ff8a3d);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(255, 90, 46, 0.18);
+}
+
+.tenant-copy {
+  border: 1px solid #d9e1ec;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
 .tenant-status {
-  padding: 4px 8px;
+  flex-shrink: 0;
+  padding: 5px 10px;
   border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tenant-status.enabled {
   background: #dcfce7;
   color: #15803d;
-  font-size: 12px;
+}
+
+.tenant-status.disabled {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .empty-card,
@@ -1161,7 +1270,9 @@ onUnmounted(() => {
 }
 
 .dark .tenant-card {
-  background: linear-gradient(180deg, #111827, #0f172a);
+  background:
+    linear-gradient(180deg, #111827, #0f172a),
+    radial-gradient(circle at top right, rgba(251, 146, 60, 0.14), transparent 34%);
 }
 
 .dark .ghost-action {
@@ -1173,6 +1284,22 @@ onUnmounted(() => {
 .dark .link-action {
   background: rgba(255, 90, 46, 0.12);
   color: #fb923c;
+}
+
+.dark .tenant-domain {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.dark .tenant-password-tip {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.22);
+}
+
+.dark .tenant-copy {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #cbd5e1;
 }
 
 .dark .form-row input {

@@ -98,7 +98,7 @@ onUnmounted(() => {
 .glow-layer {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px); /* 降低模糊半径提升性能 */
+  filter: blur(56px);
   mix-blend-mode: screen;
   will-change: transform;
   backface-visibility: hidden;
@@ -107,102 +107,102 @@ onUnmounted(() => {
 
 /* 只保留上半部分的3个光晕 - 缩小尺寸 */
 .glow-1 {
-  width: 500px;
-  height: 500px;
+  width: 430px;
+  height: 430px;
   background: radial-gradient(circle, rgba(138, 43, 226, 1), rgba(138, 43, 226, 0.7) 35%, transparent 60%);
   top: -20%;
   left: -5%;
-  opacity: 0.95;
-  animation: moveGlow1 4s infinite ease-in-out; /* 大幅加快 */
+  opacity: 0.78;
+  animation: moveGlow1 12s infinite ease-in-out;
 }
 
 .glow-2 {
-  width: 550px;
-  height: 550px;
+  width: 470px;
+  height: 470px;
   background: radial-gradient(circle, rgba(0, 191, 255, 1), rgba(0, 191, 255, 0.7) 35%, transparent 60%);
   top: -25%;
   right: -5%;
-  opacity: 1;
-  animation: moveGlow2 5s infinite ease-in-out; /* 大幅加快 */
+  opacity: 0.82;
+  animation: moveGlow2 14s infinite ease-in-out;
 }
 
 .glow-3 {
-  width: 450px;
-  height: 450px;
+  width: 380px;
+  height: 380px;
   background: radial-gradient(circle, rgba(255, 0, 128, 0.95), rgba(255, 0, 128, 0.65) 35%, transparent 60%);
   top: 5%;
   left: 50%;
-  opacity: 0.9;
+  opacity: 0.72;
   transform: translateX(-50%);
-  animation: moveGlow3 4.5s infinite ease-in-out; /* 大幅加快 */
+  animation: moveGlow3 15s infinite ease-in-out;
 }
 
 /* 光晕动画 - 缩小缩放范围提升性能 */
 @keyframes moveGlow1 {
   0% { 
-    transform: translate3d(-30px, -30px, 0) scale(0.9);
+    transform: translate3d(-18px, -18px, 0) scale(0.95);
     opacity: 0.7;
   }
   25% {
-    transform: translate3d(40px, 20px, 0) scale(1.05);
-    opacity: 0.95;
+    transform: translate3d(24px, 14px, 0) scale(1.02);
+    opacity: 0.84;
   }
   50% {
-    transform: translate3d(80px, 100px, 0) scale(1.2);
+    transform: translate3d(42px, 58px, 0) scale(1.08);
     opacity: 0.75;
   }
   75% {
-    transform: translate3d(30px, 140px, 0) scale(1.1);
-    opacity: 0.85;
+    transform: translate3d(18px, 72px, 0) scale(1.05);
+    opacity: 0.78;
   }
   100% { 
-    transform: translate3d(-30px, -30px, 0) scale(0.9);
+    transform: translate3d(-18px, -18px, 0) scale(0.95);
     opacity: 0.7;
   }
 }
 
 @keyframes moveGlow2 {
   0% { 
-    transform: translate3d(30px, -20px, 0) scale(0.9);
+    transform: translate3d(18px, -12px, 0) scale(0.95);
     opacity: 0.75;
   }
   25% {
-    transform: translate3d(-30px, 30px, 0) scale(1.1);
-    opacity: 0.9;
+    transform: translate3d(-18px, 18px, 0) scale(1.04);
+    opacity: 0.82;
   }
   50% {
-    transform: translate3d(-80px, 90px, 0) scale(1.25);
+    transform: translate3d(-44px, 54px, 0) scale(1.1);
     opacity: 0.8;
   }
   75% {
-    transform: translate3d(-40px, 130px, 0) scale(1.15);
-    opacity: 0.95;
+    transform: translate3d(-24px, 76px, 0) scale(1.05);
+    opacity: 0.86;
   }
   100% { 
-    transform: translate3d(30px, -20px, 0) scale(0.9);
+    transform: translate3d(18px, -12px, 0) scale(0.95);
     opacity: 0.75;
   }
 }
 
 @keyframes moveGlow3 {
   0% { 
-    transform: translateX(-50%) translate3d(0, -20px, 0) scale(0.95);
+    transform: translateX(-50%) translate3d(0, -12px, 0) scale(0.97);
     opacity: 0.7;
   }
   25% {
-    transform: translateX(-50%) translate3d(0, 20px, 0) scale(1.05);
-    opacity: 0.85;
+    transform: translateX(-50%) translate3d(0, 14px, 0) scale(1.02);
+    opacity: 0.78;
   }
   50% {
-    transform: translateX(-50%) translate3d(0, 60px, 0) scale(1.2);
-    opacity: 0.7;
+    transform: translateX(-50%) translate3d(0, 36px, 0) scale(1.08);
+    opacity: 0.72;
   }
   75% {
-    transform: translateX(-50%) translate3d(0, 90px, 0) scale(1.1);
-    opacity: 0.8;
+    transform: translateX(-50%) translate3d(0, 48px, 0) scale(1.04);
+    opacity: 0.76;
   }
   100% { 
-    transform: translateX(-50%) translate3d(0, -20px, 0) scale(0.95);
+    transform: translateX(-50%) translate3d(0, -12px, 0) scale(0.97);
     opacity: 0.7;
   }
 }
@@ -214,7 +214,7 @@ onUnmounted(() => {
   }
   
   .glow-layer {
-    filter: blur(70px);
+    filter: blur(48px);
   }
   
   .glow-1, .glow-2, .glow-3 {
@@ -229,12 +229,18 @@ onUnmounted(() => {
   }
   
   .glow-layer {
-    filter: blur(50px);
+    filter: blur(38px);
   }
   
   .glow-1, .glow-2, .glow-3 {
     width: 350px;
     height: 350px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-layer {
+    animation: none;
   }
 }
 </style>

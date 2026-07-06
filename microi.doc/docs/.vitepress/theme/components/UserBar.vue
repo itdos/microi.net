@@ -152,6 +152,7 @@ function handleLogout() {
   localStorage.removeItem('microi_doc_phone')
   user.value = null
   showMenu.value = false
+  window.location.href = '/'
 }
 
 function onLoginSuccess(e) {
