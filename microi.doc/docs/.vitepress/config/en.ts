@@ -88,6 +88,18 @@ function nav(): DefaultTheme.NavItem[] {
 					link: "https://web.microi.net/",
 				},
 				{
+					text: "Microi UI",
+					link: "/en/doc/system-engine/microi-ui",
+				},
+				{
+					text: "OpenClaw",
+					link: "https://gitee.com/microi-net/microi.openclaw",
+				},
+				{
+					text: "Microi Video Downloader",
+					link: "https://gitee.com/microi-net/microi.spider",
+				},
+				{
 					text: "CSDN Official Blog",
 					link: "https://microi.blog.csdn.net/?type=blog",
 				},
