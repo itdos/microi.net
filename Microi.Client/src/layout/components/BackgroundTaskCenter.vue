@@ -46,7 +46,7 @@
                     </div>
                 </el-tab-pane>
 
-                <el-tab-pane name="apps">
+                <el-tab-pane v-if="isAdmin" name="apps">
                     <template #label>
                         <span>{{ $t("Msg.OfficialApps") }}</span>
                         <span v-if="appNoticeCount > 0" class="tab-count warning">{{ appNoticeCount }}</span>
@@ -81,6 +81,7 @@
 <script>
 import { DiyCommon } from "@/utils/diy.common";
 import { Bell, CircleClose, Delete, Refresh } from "@element-plus/icons-vue";
+import { useDiyStore } from "@/pinia";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
 const MASTER_STORE_ENGINE_URL = "https://api.itdos.com/api/ApiEngine/Run";
@@ -89,6 +90,10 @@ export default {
     name: "BackgroundTaskCenter",
     components: {
         Bell
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        return { diyStore };
     },
     data() {
         return {
@@ -105,11 +110,18 @@ export default {
         };
     },
     computed: {
+        isAdmin() {
+            const user = this.diyStore?.GetCurrentUser || {};
+            return user._IsAdmin === true
+                || user._IsAdmin === 1
+                || user._IsAdmin === "1"
+                || user._IsAdmin === "true";
+        },
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;
         },
         appNoticeCount() {
-            return this.storeNotices.length;
+            return this.isAdmin ? this.storeNotices.length : 0;
         },
         badgeCount() {
             return this.runningCount + this.appNoticeCount;
@@ -118,21 +130,28 @@ export default {
     mounted() {
         this.bindWebsocket();
         this.refreshTasks();
-        this.checkOfficialApps(false);
-        this.storeCheckTimer = window.setInterval(() => {
-            this.checkOfficialApps(false);
-        }, STORE_CHECK_INTERVAL);
+        this.startOfficialAppChecker();
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
     },
     beforeUnmount() {
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
-        if (this.storeCheckTimer) {
-            window.clearInterval(this.storeCheckTimer);
-            this.storeCheckTimer = null;
-        }
+        this.stopOfficialAppChecker();
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
             ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
+        }
+    },
+    watch: {
+        isAdmin(value) {
+            if (value) {
+                this.startOfficialAppChecker(true);
+            } else {
+                this.stopOfficialAppChecker();
+                this.storeNotices = [];
+                if (this.activeTab === "apps") {
+                    this.activeTab = "tasks";
+                }
+            }
         }
     },
     methods: {
@@ -156,7 +175,24 @@ export default {
         },
         refreshAll() {
             this.refreshTasks();
-            this.checkOfficialApps(true);
+            if (this.isAdmin) {
+                this.checkOfficialApps(true);
+            }
+        },
+        startOfficialAppChecker(force = false) {
+            if (!this.isAdmin) return;
+            this.checkOfficialApps(force);
+            if (!this.storeCheckTimer) {
+                this.storeCheckTimer = window.setInterval(() => {
+                    this.checkOfficialApps(false);
+                }, STORE_CHECK_INTERVAL);
+            }
+        },
+        stopOfficialAppChecker() {
+            if (this.storeCheckTimer) {
+                window.clearInterval(this.storeCheckTimer);
+                this.storeCheckTimer = null;
+            }
         },
         async refreshTasks() {
             this.bindWebsocket();
@@ -191,6 +227,7 @@ export default {
             }
         },
         async loadInstalledVersions() {
+            if (!this.isAdmin) return [];
             try {
                 const result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
                     _PageIndex: 1,
@@ -205,6 +242,7 @@ export default {
             return [];
         },
         async checkOfficialApps(force) {
+            if (!this.isAdmin) return;
             const now = Date.now();
             if (!force && this.lastStoreCheckTime && now - this.lastStoreCheckTime < STORE_CHECK_INTERVAL) {
                 return;
