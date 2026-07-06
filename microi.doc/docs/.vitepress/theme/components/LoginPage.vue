@@ -86,7 +86,23 @@
               <input v-model.trim="systemName" class="login-input" placeholder="系统名称，例如 我的吾码系统" autocomplete="organization" />
             </div>
             <p class="login-tip">Key 必须以英文字母开头，仅支持英文字母、数字、- 和 _。</p>
-            <p v-if="tenantProgress" class="tenant-progress">{{ tenantProgress }}</p>
+            <div v-if="visibleTenantSteps" class="tenant-progress-panel">
+              <div class="tenant-step-summary">{{ tenantProgress || tenantStepSummary }}</div>
+              <div class="tenant-step-list">
+                <div
+                  v-for="(step, index) in tenantSteps"
+                  :key="step.Key"
+                  class="tenant-step"
+                  :class="step.Status"
+                >
+                  <span class="step-index">{{ index + 1 }}</span>
+                  <div class="step-content">
+                    <strong>{{ step.Title }}</strong>
+                    <small>{{ step.Detail }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
             <button class="login-btn" type="submit" :class="{ loading: isCreating }" :disabled="isCreating">
               {{ isCreating ? '正在创建...' : '创建我的免费租户' }}
             </button>
@@ -94,17 +110,94 @@
           </form>
 
           <div v-else>
-            <div class="mode-switcher single">
-              <button class="mode-btn active" type="button">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                  <line x1="12" y1="18" x2="12.01" y2="18" />
-                </svg>
-                手机号验证码
-              </button>
+            <div class="auth-tabs" role="tablist" aria-label="登录注册切换">
+              <button class="auth-tab" :class="{ active: authTab === 'login' }" type="button" @click="switchAuthTab('login')">登录</button>
+              <button class="auth-tab" :class="{ active: authTab === 'register' }" type="button" @click="switchAuthTab('register')">注册</button>
             </div>
 
-            <form class="phone-login-form" @submit.prevent="handleLogin">
+            <form v-if="authTab === 'login'" class="phone-login-form" @submit.prevent="handleLogin">
+              <div class="mode-switcher">
+                <button class="mode-btn" :class="{ active: loginType === 'sms' }" type="button" @click="switchLoginType('sms')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                  验证码登录
+                </button>
+                <button class="mode-btn" :class="{ active: loginType === 'password' }" type="button" @click="switchLoginType('password')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  密码登录
+                </button>
+              </div>
+
+              <template v-if="loginType === 'sms'">
+                <div class="input-group">
+                  <div class="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                  </div>
+                  <input v-model.trim="loginPhone" type="tel" placeholder="请输入手机号" maxlength="11" class="login-input" autocomplete="tel" />
+                </div>
+
+                <div v-if="!devSmsBypass" class="input-group captcha-group">
+                  <div class="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </div>
+                  <input v-model.trim="captchaValue" type="text" placeholder="图形验证码" maxlength="6" class="login-input captcha-input" autocomplete="off" />
+                  <button class="captcha-img-wrapper" type="button" @click="refreshCaptcha">
+                    <img v-if="captchaImgSrc" :src="captchaImgSrc" alt="验证码" class="captcha-img" />
+                    <span v-else class="captcha-loading"></span>
+                  </button>
+                </div>
+
+                <div v-if="!devSmsBypass" class="input-group">
+                  <div class="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </div>
+                  <input v-model.trim="loginSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
+                  <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !loginPhone" @click="sendSmsCode">
+                    {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
+                  </button>
+                </div>
+              </template>
+
+              <template v-else>
+                <div class="input-group">
+                  <div class="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  </div>
+                  <input v-model.trim="loginAccount" placeholder="手机号或登录账号" maxlength="32" class="login-input" autocomplete="username" />
+                </div>
+                <div class="input-group">
+                  <div class="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </div>
+                  <input v-model="loginPassword" type="password" placeholder="请输入登录密码" maxlength="32" class="login-input" autocomplete="current-password" />
+                </div>
+              </template>
+
+              <button class="login-btn" type="submit" :class="{ loading: isLogging }" :disabled="isLogging">
+                {{ isLogging ? '登录中...' : '登录' }}
+              </button>
+            </form>
+
+            <form v-else class="phone-login-form" @submit.prevent="handleRegister">
               <div class="input-group">
                 <div class="input-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -112,7 +205,7 @@
                     <line x1="12" y1="18" x2="12.01" y2="18" />
                   </svg>
                 </div>
-                <input v-model.trim="phone" type="tel" placeholder="请输入手机号" maxlength="11" class="login-input" autocomplete="tel" />
+                <input v-model.trim="registerPhone" type="tel" placeholder="请输入注册手机号" maxlength="11" class="login-input" autocomplete="tel" />
               </div>
 
               <div v-if="!devSmsBypass" class="input-group captcha-group">
@@ -135,8 +228,8 @@
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </div>
-                <input v-model.trim="smsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
-                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !phone" @click="sendSmsCode">
+                <input v-model.trim="registerSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
+                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !registerPhone" @click="sendSmsCode">
                   {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
                 </button>
               </div>
@@ -148,18 +241,18 @@
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </div>
-                <input v-model="registerPassword" type="password" placeholder="首次注册可设置登录密码" maxlength="32" class="login-input" autocomplete="new-password" />
+                <input v-model="registerPassword" type="password" placeholder="设置登录密码" maxlength="32" class="login-input" autocomplete="new-password" />
               </div>
 
               <div class="input-group">
                 <div class="input-icon">✓</div>
-                <input v-model="confirmPassword" type="password" placeholder="确认登录密码（已注册手机号可留空）" maxlength="32" class="login-input" autocomplete="new-password" />
+                <input v-model="confirmPassword" type="password" placeholder="确认登录密码" maxlength="32" class="login-input" autocomplete="new-password" />
               </div>
 
               <button class="login-btn" type="submit" :class="{ loading: isLogging }" :disabled="isLogging">
-                {{ isLogging ? '登录中...' : '登录 / 注册' }}
+                {{ isLogging ? '注册中...' : '注册并登录' }}
               </button>
-              <p class="login-tip">未注册手机号将自动创建账号；填写密码后可用于后续密码登录。</p>
+              <p class="login-tip">注册成功后可继续创建一个免费的 SaaS 租户。</p>
             </form>
           </div>
 
@@ -185,11 +278,17 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
 
-const phone = ref('')
+const authTab = ref('login')
+const loginType = ref('sms')
+const loginPhone = ref('')
+const loginAccount = ref('')
+const loginPassword = ref('')
+const loginSmsCode = ref('')
+const registerPhone = ref('')
+const registerSmsCode = ref('')
 const captchaValue = ref('')
 const captchaId = ref('')
 const captchaImgSrc = ref('')
-const smsCode = ref('')
 const smsCooldown = ref(0)
 const registerPassword = ref('')
 const confirmPassword = ref('')
@@ -205,6 +304,7 @@ const tenantOsClient = ref('')
 const tenantName = ref('')
 const tenantUrl = ref('')
 const tenantProgress = ref('')
+const tenantSteps = ref([])
 const particleCanvas = ref(null)
 
 let smsTimer = null
@@ -212,6 +312,7 @@ let toastTimer = null
 let animFrame = null
 let resizeHandler = null
 let tenantProgressTimer = null
+let tenantProgressIndex = 0
 
 function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
@@ -228,6 +329,20 @@ const brandFeatures = [
   '分布式架构 · Docker / K8S / 微服务'
 ]
 
+const defaultTenantSteps = [
+  { Key: 'validate', Title: '校验账号与租户Key', Detail: '检查登录态、租户Key格式和系统名称。', Status: 'pending' },
+  { Key: 'quota', Title: '检查免费开通额度', Detail: '每个账号可免费创建一个租户。', Status: 'pending' },
+  { Key: 'columns', Title: '检查主库字段', Detail: '补齐官网开通所需的租户归属字段。', Status: 'pending' },
+  { Key: 'database-info', Title: '生成数据库信息', Detail: '生成数据库名、连接串和访问域名。', Status: 'pending' },
+  { Key: 'create-database', Title: '创建租户数据库', Detail: '创建独立租户库。', Status: 'pending' },
+  { Key: 'import-template', Title: '下载并导入空库模板', Detail: '每次都从 CDN 获取最新空库模板。', Status: 'pending' },
+  { Key: 'create-osclient', Title: '写入SaaS引擎配置', Detail: '复制主租户公共配置并写入新租户配置。', Status: 'pending' },
+  { Key: 'owner', Title: '绑定账号与租户', Detail: '用于个人中心展示和免费额度判断。', Status: 'pending' },
+  { Key: 'admin', Title: '关联默认管理员', Detail: '复用空库模板中的默认 admin 账号，不额外插入管理员数据。', Status: 'pending' },
+  { Key: 'sys-config', Title: '初始化系统设置', Detail: '写入一条启用的系统设置。', Status: 'pending' },
+  { Key: 'reload', Title: '刷新SaaS引擎缓存', Detail: '让新租户立即可访问。', Status: 'pending' }
+]
+
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
 const tenantReady = computed(() => !!tenantOsClient.value)
 const devSmsBypass = computed(() => {
@@ -236,8 +351,36 @@ const devSmsBypass = computed(() => {
   return new URLSearchParams(window.location.search).get('devSmsBypass') === '1'
 })
 const adminUrl = computed(() => tenantUrl.value || (tenantOsClient.value ? `https://${tenantOsClient.value}.microi.net` : ''))
-const titleText = computed(() => tenantReady.value ? '租户已就绪' : isAuthed.value ? '创建 SaaS 租户' : '手机号登录 / 注册')
-const descText = computed(() => tenantReady.value ? '你的独立低代码工作台已经准备好' : isAuthed.value ? '填写系统信息，一键生成全新租户数据库' : '输入手机号，获取验证码快捷登录')
+const titleText = computed(() => {
+  if (tenantReady.value) return '租户已就绪'
+  if (isAuthed.value) return '创建 SaaS 租户'
+  return authTab.value === 'register' ? '注册 Microi吾码账号' : '登录 Microi吾码'
+})
+const descText = computed(() => {
+  if (tenantReady.value) return '你的独立低代码工作台已经准备好'
+  if (isAuthed.value) return '填写系统信息，一键生成全新租户数据库'
+  return authTab.value === 'register' ? '手机号验证后设置登录密码' : '支持验证码登录或密码登录'
+})
+const activeSmsPhone = computed(() => authTab.value === 'register' ? registerPhone.value : loginPhone.value)
+const visibleTenantSteps = computed(() => isCreating.value || tenantSteps.value.some(step => step.Status !== 'pending'))
+const tenantStepSummary = computed(() => {
+  const errorStep = tenantSteps.value.find(step => step.Status === 'error')
+  if (errorStep) return `${errorStep.Title}失败：${errorStep.Detail}`
+  const runningStep = tenantSteps.value.find(step => step.Status === 'running')
+  if (runningStep) {
+    const index = tenantSteps.value.findIndex(step => step.Key === runningStep.Key) + 1
+    return `正在执行第 ${index}/${tenantSteps.value.length} 步：${runningStep.Title}`
+  }
+  const doneCount = tenantSteps.value.filter(step => step.Status === 'done').length
+  if (doneCount === tenantSteps.value.length) return '所有步骤已完成。'
+  return `准备创建租户，共 ${tenantSteps.value.length} 步。`
+})
+
+function createTenantSteps() {
+  return defaultTenantSteps.map(step => ({ ...step }))
+}
+
+tenantSteps.value = createTenantSteps()
 
 function showToast(msg, type = 'info') {
   toastMsg.value = msg
@@ -258,6 +401,21 @@ function apiEngineUrl(key) {
   return `${API_BASE}/apiengine/${key}?OsClient=${OS_CLIENT}`
 }
 
+function switchAuthTab(tab) {
+  authTab.value = tab
+  captchaValue.value = ''
+  loginSmsCode.value = ''
+  registerSmsCode.value = ''
+  if (!devSmsBypass.value) refreshCaptcha()
+}
+
+function switchLoginType(type) {
+  loginType.value = type
+  captchaValue.value = ''
+  loginSmsCode.value = ''
+  if (!devSmsBypass.value && type === 'sms') refreshCaptcha()
+}
+
 async function refreshCaptcha() {
   try {
     const resp = await fetch(`${API_BASE}/api/Captcha/GetCaptcha?OsClient=${OS_CLIENT}&t=${Date.now()}`)
@@ -272,7 +430,8 @@ async function refreshCaptcha() {
 }
 
 async function sendSmsCode() {
-  if (!/^1\d{10}$/.test(phone.value)) {
+  const smsPhone = activeSmsPhone.value
+  if (!/^1\d{10}$/.test(smsPhone)) {
     showToast('请输入正确的11位手机号。', 'error')
     return
   }
@@ -285,7 +444,7 @@ async function sendSmsCode() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        Phone: phone.value,
+        Phone: smsPhone,
         _CaptchaId: captchaId.value,
         _CaptchaValue: captchaValue.value,
         OsClient: OS_CLIENT
@@ -312,7 +471,6 @@ async function sendSmsCode() {
 }
 
 function validatePasswordFields() {
-  if (!registerPassword.value && !confirmPassword.value) return true
   if (!registerPassword.value || registerPassword.value.length < 6) {
     showToast('密码长度不能少于6位。', 'error')
     return false
@@ -326,27 +484,42 @@ function validatePasswordFields() {
 
 async function handleLogin() {
   if (isLogging.value) return
-  if (!/^1\d{10}$/.test(phone.value)) {
-    showToast('请输入正确的11位手机号。', 'error')
-    return
+  if (loginType.value === 'sms') {
+    if (!/^1\d{10}$/.test(loginPhone.value)) {
+      showToast('请输入正确的11位手机号。', 'error')
+      return
+    }
+    if (!devSmsBypass.value && !loginSmsCode.value) {
+      showToast('请输入短信验证码。', 'error')
+      return
+    }
+  } else {
+    if (!loginAccount.value) {
+      showToast('请输入登录账号。', 'error')
+      return
+    }
+    if (!loginPassword.value) {
+      showToast('请输入登录密码。', 'error')
+      return
+    }
   }
-  if (!devSmsBypass.value && !smsCode.value) {
-    showToast('请输入短信验证码。', 'error')
-    return
-  }
-  if (!validatePasswordFields()) return
 
   isLogging.value = true
   try {
     const payload = {
-      Phone: phone.value,
-      _CaptchaValue: devSmsBypass.value ? '' : smsCode.value,
+      Action: 'login',
+      LoginType: loginType.value,
       OsClient: OS_CLIENT
     }
-    if (registerPassword.value) {
-      payload.Pwd = registerPassword.value
+    if (loginType.value === 'sms') {
+      payload.Phone = loginPhone.value
+      payload._CaptchaValue = devSmsBypass.value ? '' : loginSmsCode.value
+      payload._SmsCaptchaValue = devSmsBypass.value ? '' : loginSmsCode.value
+    } else {
+      payload.Account = loginAccount.value
+      payload.Pwd = loginPassword.value
     }
-    const resp = await fetch(`${API_BASE}/api/SysUser/SmsLogin`, {
+    const resp = await fetch(apiEngineUrl('official_sms_login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -365,6 +538,47 @@ async function handleLogin() {
   }
 }
 
+async function handleRegister() {
+  if (isLogging.value) return
+  if (!/^1\d{10}$/.test(registerPhone.value)) {
+    showToast('请输入正确的11位手机号。', 'error')
+    return
+  }
+  if (!devSmsBypass.value && !registerSmsCode.value) {
+    showToast('请输入短信验证码。', 'error')
+    return
+  }
+  if (!validatePasswordFields()) return
+
+  isLogging.value = true
+  try {
+    const resp = await fetch(apiEngineUrl('official_sms_login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Action: 'register',
+        LoginType: 'sms',
+        Phone: registerPhone.value,
+        _CaptchaValue: devSmsBypass.value ? '' : registerSmsCode.value,
+        _SmsCaptchaValue: devSmsBypass.value ? '' : registerSmsCode.value,
+        Pwd: registerPassword.value,
+        OsClient: OS_CLIENT
+      })
+    })
+    const result = await resp.json()
+    if (result.Code !== 1) {
+      showToast(result.Msg || '注册失败，请重试。', 'error')
+      refreshCaptcha()
+      return
+    }
+    handleLoginSuccess(resp, result)
+  } catch {
+    showToast('网络异常，注册失败。', 'error')
+  } finally {
+    isLogging.value = false
+  }
+}
+
 function handleLoginSuccess(resp, result) {
   const token = normalizeToken(resp.headers.get('authorization') || result.Data?.Authorization || result.DataAppend?.Token)
   authToken.value = token
@@ -375,7 +589,7 @@ function handleLoginSuccess(resp, result) {
 
   localStorage.setItem('microi_doc_token', token)
   localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
-  localStorage.setItem('microi_doc_phone', phone.value)
+  localStorage.setItem('microi_doc_phone', result.Data?.Phone || registerPhone.value || loginPhone.value || loginAccount.value)
   if (tenantOsClient.value) {
     localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
     localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
@@ -412,7 +626,9 @@ async function createTenant() {
       })
     })
     const result = await resp.json()
+    mergeTenantSteps(result.DataAppend?.Steps || result.Data?.Steps)
     if (result.Code !== 1) {
+      tenantProgress.value = result.Msg || '租户创建失败。'
       showToast(result.Msg || '租户创建失败。', 'error')
       return
     }
@@ -423,8 +639,11 @@ async function createTenant() {
     localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
     localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
     tenantProgress.value = `租户创建成功，访问地址：${tenantUrl.value}`
+    window.dispatchEvent(new CustomEvent('microi-tenant-updated'))
     showToast('租户创建成功。', 'success')
   } catch {
+    markTenantStep('reload', 'error', '网络异常，无法确认租户创建结果，请稍后到个人中心查看。')
+    tenantProgress.value = '网络异常，租户创建失败。'
     showToast('网络异常，租户创建失败。', 'error')
   } finally {
     stopTenantProgress()
@@ -433,19 +652,17 @@ async function createTenant() {
 }
 
 function startTenantProgress() {
-  const steps = [
-    '正在校验租户 Key 和账号权限，请耐心等待...',
-    '正在创建独立数据库并导入空库模板，耗时会受服务器和网络影响...',
-    '正在写入 SaaS 引擎配置、复制主租户公共配置...',
-    `创建成功后，你将可以访问 https://${tenantKey.value}.microi.net`,
-    '正在刷新 SaaS 引擎缓存，确保新租户立即生效...'
-  ]
-  let index = 0
-  tenantProgress.value = steps[index]
+  tenantSteps.value = createTenantSteps()
+  tenantProgressIndex = 0
+  tenantProgress.value = ''
+  markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'running')
   if (tenantProgressTimer) clearInterval(tenantProgressTimer)
   tenantProgressTimer = setInterval(() => {
-    index = (index + 1) % steps.length
-    tenantProgress.value = steps[index]
+    if (tenantProgressIndex < tenantSteps.value.length - 1) {
+      markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'done')
+      tenantProgressIndex += 1
+      markTenantStep(tenantSteps.value[tenantProgressIndex].Key, 'running')
+    }
   }, 3200)
 }
 
@@ -454,6 +671,27 @@ function stopTenantProgress() {
     clearInterval(tenantProgressTimer)
     tenantProgressTimer = null
   }
+}
+
+function markTenantStep(key, status, detail) {
+  tenantSteps.value = tenantSteps.value.map(step => {
+    if (step.Key !== key) return step
+    return { ...step, Status: status, Detail: detail || step.Detail }
+  })
+}
+
+function mergeTenantSteps(serverSteps) {
+  if (!Array.isArray(serverSteps) || serverSteps.length === 0) return
+  tenantSteps.value = tenantSteps.value.map((localStep, index) => {
+    const serverStep = serverSteps.find(item => item.Key === localStep.Key) || serverSteps[index]
+    if (!serverStep) return localStep
+    return {
+      ...localStep,
+      Title: serverStep.Title || localStep.Title,
+      Detail: serverStep.Detail || localStep.Detail,
+      Status: serverStep.Status || localStep.Status
+    }
+  })
 }
 
 function restoreSession() {
@@ -483,8 +721,21 @@ function resetSession() {
   tenantName.value = ''
   tenantUrl.value = ''
   tenantProgress.value = ''
+  tenantSteps.value = createTenantSteps()
+  tenantProgressIndex = 0
   tenantKey.value = ''
   systemName.value = ''
+  authTab.value = 'login'
+  loginType.value = 'sms'
+  loginPhone.value = ''
+  loginAccount.value = ''
+  loginPassword.value = ''
+  loginSmsCode.value = ''
+  registerPhone.value = ''
+  registerSmsCode.value = ''
+  registerPassword.value = ''
+  confirmPassword.value = ''
+  captchaValue.value = ''
   stopTenantProgress()
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_user')
@@ -823,6 +1074,35 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 5px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.auth-tab {
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(222, 222, 238, 0.76);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.34), rgba(0, 191, 255, 0.22));
+  box-shadow: 0 10px 24px rgba(0, 191, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
 .mode-switcher {
   display: flex;
   gap: 10px;
@@ -849,6 +1129,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 1;
   gap: 8px;
   height: 42px;
   border-radius: 11px;
@@ -989,15 +1270,109 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.tenant-progress {
-  margin: 0;
-  padding: 10px 12px;
+.tenant-progress-panel {
+  padding: 12px;
   border: 1px solid rgba(0, 191, 255, 0.18);
-  border-radius: 12px;
+  border-radius: 14px;
   background: rgba(0, 191, 255, 0.08);
-  color: rgba(236, 249, 255, 0.92);
+}
+
+.tenant-step-summary {
+  margin-bottom: 10px;
+  color: rgba(236, 249, 255, 0.94);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.tenant-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.tenant-step {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tenant-step.done {
+  border-color: rgba(34, 197, 94, 0.32);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.tenant-step.running {
+  border-color: rgba(0, 191, 255, 0.38);
+  background: rgba(0, 191, 255, 0.1);
+}
+
+.tenant-step.error {
+  border-color: rgba(239, 68, 68, 0.42);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.tenant-step.skipped {
+  opacity: 0.58;
+}
+
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(230, 230, 246, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tenant-step.done .step-index {
+  background: rgba(34, 197, 94, 0.22);
+  color: #86efac;
+}
+
+.tenant-step.running .step-index {
+  background: rgba(0, 191, 255, 0.2);
+  color: #8be6ff;
+  animation: stepPulse 1.1s ease-in-out infinite;
+}
+
+.tenant-step.error .step-index {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.step-content strong {
+  color: rgba(245, 245, 255, 0.92);
+  font-size: 12px;
+}
+
+.step-content small {
+  color: rgba(210, 210, 226, 0.62);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+@keyframes stepPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 191, 255, 0.24); }
+  50% { box-shadow: 0 0 0 5px rgba(0, 191, 255, 0); }
 }
 
 .agreement {
