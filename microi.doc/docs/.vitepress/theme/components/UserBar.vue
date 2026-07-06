@@ -45,6 +45,13 @@
               </svg>
               进入后台
             </a>
+            <a href="/profile.html" class="menu-item" @click="showMenu = false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              个人中心
+            </a>
             <button class="menu-item" @click="openSetPwd">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -80,6 +87,19 @@
           <line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
         <span>进入后台</span>
+      </a>
+
+      <a
+        v-if="user"
+        class="profile-btn"
+        href="/profile.html"
+        title="个人中心"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>个人中心</span>
       </a>
 
       <!-- 设置密码弹窗 -->
@@ -142,11 +162,23 @@ function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
     return 'https://localhost:7266'
   }
-  return 'https://api.microi.net'
+  return 'https://api.itdos.com'
 }
 
 function normalizeToken(raw) {
   return (raw || '').replace(/^Bearer\s+/i, '').trim()
+}
+
+function apiEngineUrl(key) {
+  return `${API_BASE}/apiengine/${key}?OsClient=iTdos`
+}
+
+function authHeaders() {
+  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
+  return token ? {
+    'authorization': 'Bearer ' + token,
+    'Token': token
+  } : {}
 }
 
 function loadUser() {
@@ -195,7 +227,7 @@ async function submitSetPwd() {
   isSettingPwd.value = true
   try {
     const token = normalizeToken(localStorage.getItem('microi_doc_token'))
-    const resp = await fetch(API_BASE + '/api/SysUser/SetPassword', {
+    const resp = await fetch(API_BASE + '/apiengine/official_set_password?OsClient=iTdos', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -227,55 +259,13 @@ function closeMenu(e) {
   }
 }
 
-// Token以旧换新：如果有旧token，尝试刷新获取新token
-async function refreshToken() {
-  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
-  if (!token) return
-  try {
-    const resp = await fetch(API_BASE + '/api/SysUser/refreshToken', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authorization': 'Bearer ' + token,
-        'Token': token
-      },
-      body: JSON.stringify({ authorization: 'Bearer ' + token })
-    })
-    const result = await resp.json()
-    if (result.Code === 1) {
-      // 更新token
-      const newToken = resp.headers.get('authorization') || ''
-      if (newToken) {
-        localStorage.setItem('microi_doc_token', normalizeToken(newToken))
-      }
-      // 更新用户信息
-      if (result.Data) {
-        localStorage.setItem('microi_doc_user', JSON.stringify(result.Data))
-        user.value = result.Data
-      }
-    }
-  } catch {
-    // 刷新失败不做处理，保留旧token
-  }
-}
-
-let refreshTokenTimer = null
-
 onMounted(() => {
   loadUser()
-  // 以旧换新：页面加载时尝试刷新token
-  refreshToken()
-  // 定时刷新token（每60秒）
-  refreshTokenTimer = setInterval(refreshToken, 60 * 1000)
   window.addEventListener('microi-login-success', onLoginSuccess)
   document.addEventListener('click', closeMenu)
 })
 
 onUnmounted(() => {
-  if (refreshTokenTimer) {
-    clearInterval(refreshTokenTimer)
-    refreshTokenTimer = null
-  }
   window.removeEventListener('microi-login-success', onLoginSuccess)
   document.removeEventListener('click', closeMenu)
 })
@@ -419,6 +409,26 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid rgba(138,43,226,0.18);
+  border-radius: 8px;
+  background: rgba(138,43,226,0.08);
+  color: rgba(230,230,245,0.92);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.25s;
+}
+
+.profile-btn:hover {
+  background: rgba(138,43,226,0.16);
+  color: #fff;
+}
+
 /* 下拉动画 */
 .dropdown-enter-active,
 .dropdown-leave-active {
@@ -440,7 +450,11 @@ onUnmounted(() => {
   .console-btn span {
     display: none;
   }
-  .console-btn {
+  .profile-btn span {
+    display: none;
+  }
+  .console-btn,
+  .profile-btn {
     padding: 6px 8px;
   }
   .login-link span {
@@ -528,5 +542,164 @@ onUnmounted(() => {
 .pwd-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.profile-dialog {
+  width: 480px;
+  max-width: 92vw;
+  max-height: 82vh;
+  overflow: auto;
+  padding: 26px;
+  border: 1px solid rgba(138,43,226,0.22);
+  border-radius: 16px;
+  background: rgba(26,26,44,0.98);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.42);
+}
+
+.profile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-head h3 {
+  margin: 0 0 6px;
+  color: rgba(245,245,255,0.96);
+  font-size: 18px;
+}
+
+.profile-head p,
+.profile-note,
+.profile-loading,
+.empty-tenant p {
+  margin: 0;
+  color: rgba(205,205,226,0.68);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.profile-close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(240,240,255,0.82);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-stats div {
+  padding: 14px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.045);
+}
+
+.profile-stats strong {
+  display: block;
+  color: #fff;
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.profile-stats span {
+  color: rgba(205,205,226,0.62);
+  font-size: 12px;
+}
+
+.profile-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239,68,68,0.32);
+  border-radius: 10px;
+  background: rgba(239,68,68,0.1);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+.tenant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tenant-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.045);
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.tenant-item:hover {
+  border-color: rgba(0,191,255,0.28);
+  background: rgba(0,191,255,0.08);
+}
+
+.tenant-item strong {
+  display: block;
+  color: rgba(245,245,255,0.94);
+  font-size: 14px;
+}
+
+.tenant-item small {
+  display: block;
+  max-width: 300px;
+  overflow: hidden;
+  color: rgba(205,205,226,0.58);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-item em {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(34,197,94,0.14);
+  color: #86efac;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.empty-tenant {
+  padding: 16px;
+  border: 1px dashed rgba(138,43,226,0.28);
+  border-radius: 12px;
+  background: rgba(138,43,226,0.06);
+  text-align: center;
+}
+
+.create-tenant-link {
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8a2be2, #00bfff);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.profile-note {
+  margin-top: 14px;
 }
 </style>

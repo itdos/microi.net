@@ -9,6 +9,7 @@ import ProductShowcase from "./components/ProductShowcase.vue";
 import AiChat from "./components/AiChat.vue";
 import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
+import ProfilePage from "./components/ProfilePage.vue";
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
 import "./styles/mci-site.scss";
@@ -26,5 +27,6 @@ export default {
         DefaultTheme.enhanceApp(ctx);
         ctx.app.component('ContactCard', ContactCard);
         ctx.app.component('LoginPage', LoginPage);
+        ctx.app.component('ProfilePage', ProfilePage);
     }
 };

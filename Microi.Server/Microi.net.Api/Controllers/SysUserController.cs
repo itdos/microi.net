@@ -517,8 +517,8 @@ namespace Microi.net.Api
                     SysConfig = sysConfig,
                     IsNewUser = isNewUser,
                     Token = accessToken,
-                    TenantOsClient = tenantData == null ? null : tenantData.OsClient,
-                    TenantName = tenantData == null ? null : tenantData.ClientName
+                    TenantOsClient = tenantData == null ? null : DynamicHelper.GetDynamicStringValue(tenantData, "OsClient", ""),
+                    TenantName = tenantData == null ? null : DynamicHelper.GetDynamicStringValue(tenantData, "ClientName", "")
                 };
 
                 MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
