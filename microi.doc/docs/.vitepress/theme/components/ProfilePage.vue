@@ -1,11 +1,12 @@
 <template>
   <div class="profile-page">
     <aside class="profile-sidebar">
-      <a class="brand" href="/">
-        <span class="brand-mark">M</span>
+      <a class="brand" href="/profile.html">
+        <img v-if="profileAvatarUrl" class="brand-avatar-img" :src="profileAvatarUrl" :alt="profileName" />
+        <span v-else class="brand-mark">{{ profileInitial }}</span>
         <span>
-          <strong>Microi吾码</strong>
-          <small>个人中心</small>
+          <strong>{{ profileName }}</strong>
+          <small>{{ licenseShortText }}</small>
         </span>
       </a>
       <nav class="side-menu">
@@ -47,6 +48,19 @@
       </section>
 
       <template v-else>
+        <section v-if="activeMenu === 'overview'" class="profile-hero">
+          <div>
+            <p class="eyebrow">Microi Account</p>
+            <h2>个人中心</h2>
+            <p>{{ profileName }} 的 SaaS 工作空间、授权状态和租户入口都在这里。</p>
+          </div>
+          <article class="license-card">
+            <span>当前授权</span>
+            <strong>{{ licenseDisplayTitle }}</strong>
+            <small>{{ licenseDisplayDesc }}</small>
+          </article>
+        </section>
+
         <section v-if="activeMenu === 'overview'" class="overview-grid">
           <article class="stat-card">
             <span>已创建租户</span>
@@ -65,31 +79,29 @@
           </article>
         </section>
 
-        <section v-if="activeMenu === 'overview'" class="content-panel">
+        <section v-if="activeMenu === 'overview'" class="content-panel tenant-overview-panel">
           <div class="panel-head">
             <div>
-              <h2>最近租户</h2>
-              <p>你的独立低代码数据库与访问入口。</p>
-            </div>
-            <button class="link-action" type="button" @click="navigateProfile(tenants.length ? 'tenants' : 'create')">
-              {{ tenants.length ? '查看全部' : '创建租户' }}
-            </button>
-          </div>
-          <TenantList :tenants="tenants.slice(0, 3)" />
-          <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
-        </section>
-
-        <section v-if="activeMenu === 'tenants'" class="content-panel">
-          <div class="panel-head">
-            <div>
-              <h2>我的租户</h2>
-              <p>当前账号名下所有 SaaS 租户数据库。</p>
+              <h2>SaaS 租户</h2>
+              <p>每个租户都是独立低代码数据库与访问入口。默认管理员为 admin，默认密码为租户 Key，请首次登录后及时修改。</p>
             </div>
             <button class="primary-action small" type="button" @click="navigateProfile('create')">创建租户</button>
           </div>
           <div v-if="isLoading" class="loading-row">正在读取租户信息...</div>
           <TenantList v-else :tenants="tenants" />
           <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
+          <div class="billing-strip">
+            <div>
+              <span>免费额度</span>
+              <strong>1 个租户</strong>
+              <small>适合试用、学习和小型系统搭建。</small>
+            </div>
+            <div>
+              <span>扩容价格</span>
+              <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }} / 年 / 个</strong>
+              <small>第二个租户开始计费，付费开通功能后续上线。</small>
+            </div>
+          </div>
         </section>
 
         <section v-if="activeMenu === 'create'" class="content-grid">
@@ -136,20 +148,6 @@
           </div>
         </section>
 
-        <section v-if="activeMenu === 'billing'" class="content-panel">
-          <h2>费用说明</h2>
-          <div class="price-card">
-            <span>免费额度</span>
-            <strong>1 个租户</strong>
-            <p>适合试用、学习和小型系统搭建。</p>
-          </div>
-          <div class="price-card">
-            <span>更多租户</span>
-            <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }} / 年 / 个</strong>
-            <p>第二个租户开始计费，付费开通功能后续上线。</p>
-          </div>
-        </section>
-
         <section v-if="activeMenu === 'account'" class="content-panel">
           <h2>账号信息</h2>
           <div class="account-grid">
@@ -192,16 +190,16 @@ const tenantProgressTick = ref(Date.now())
 
 let tenantProgressTimer = null
 let tenantProgressTraceId = ''
+let tenantProgressRestorePending = false
 
 const menus = [
-  { key: 'overview', name: '概览', icon: '⌂' },
-  { key: 'tenants', name: '我的租户', icon: '▦' },
+  { key: 'overview', name: '个人中心', icon: '⌂' },
   { key: 'create', name: '创建租户', icon: '+' },
-  { key: 'billing', name: '费用说明', icon: '¥' },
   { key: 'account', name: '账号信息', icon: '◉' }
 ]
 
 const menuKeys = menus.map(item => item.key)
+const routeAliases = { tenants: 'overview', billing: 'overview' }
 
 const defaultTenantSteps = [
   { Key: 'validate', Title: '校验账号与租户Key', Detail: '检查登录态、租户Key格式和系统名称。', Status: 'pending' },
@@ -220,12 +218,38 @@ const defaultTenantSteps = [
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
 const canCreateFreeTenant = computed(() => tenants.value.length < (tenantCenter.value.FreeQuota || 1))
 const primaryTenantUrl = computed(() => tenants.value[0]?.Url || '')
+const profileName = computed(() => currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || 'Microi吾码')
+const profileInitial = computed(() => String(profileName.value || 'M').trim().slice(0, 1).toUpperCase())
+const profileAvatarUrl = computed(() => normalizeAvatarUrl(currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl))
+const licenseInfo = computed(() => {
+  const raw = String(currentUser.value?.LicenseType || tenantCenter.value?.LicenseType || tenantCenter.value?.SysConfig?.LicenseType || '').trim().toLowerCase()
+  if (raw === 'personal') {
+    return {
+      short: '个人版',
+      title: 'Personal（个人版）',
+      desc: '授权永久有效，售后服务支持有效期 1 年，续费 499/年。'
+    }
+  }
+  if (raw === 'enterprise') {
+    return {
+      short: '企业版',
+      title: 'Enterprise（企业版）',
+      desc: '授权永久有效，售后服务支持有效期 1 年，续费 2.5w/年。'
+    }
+  }
+  return {
+    short: '开源版',
+    title: '开源版',
+    desc: '当前账号使用开源版能力，可按需升级到个人版或企业版。'
+  }
+})
+const licenseShortText = computed(() => licenseInfo.value.short)
+const licenseDisplayTitle = computed(() => licenseInfo.value.title)
+const licenseDisplayDesc = computed(() => licenseInfo.value.desc)
 const pageTitle = computed(() => {
   const map = {
-    overview: '账号概览',
-    tenants: '我的租户',
+    overview: '个人中心',
     create: '创建租户',
-    billing: '费用说明',
     account: '账号信息'
   }
   return map[activeMenu.value] || '个人中心'
@@ -233,7 +257,7 @@ const pageTitle = computed(() => {
 const pageDesc = computed(() => {
   if (!isAuthed.value) return '登录后管理你的 Microi SaaS 工作空间。'
   if (activeMenu.value === 'create') return '第一个租户免费，第二个开始每个 9.9 元/年。'
-  return `${currentUser.value?.Name || currentUser.value?.Account || '用户'} 的 SaaS 工作空间管理。`
+  return `${profileName.value} 的 SaaS 工作空间管理。`
 })
 const tenantStepSummary = computed(() => {
   const errorStep = tenantSteps.value.find(step => step.Status === 'error')
@@ -305,12 +329,28 @@ function copyTenantUrl(url) {
 
 function normalizeProfileRoute(raw) {
   const key = String(raw || '').replace(/^#\/?/, '').split('?')[0] || 'overview'
-  return menuKeys.includes(key) ? key : 'overview'
+  return routeAliases[key] || (menuKeys.includes(key) ? key : 'overview')
+}
+
+function normalizeAvatarUrl(value) {
+  const url = String(value || '').trim()
+  if (!url) return ''
+  if (/^(https?:|data:|blob:)/i.test(url)) return url
+  if (url.startsWith('//')) return `https:${url}`
+  if (url.startsWith('/')) return `${API_BASE}${url}`
+  return `${API_BASE}/${url.replace(/^\.?\//, '')}`
 }
 
 function syncMenuFromHash() {
   if (typeof window === 'undefined') return
-  activeMenu.value = normalizeProfileRoute(window.location.hash)
+  const nextKey = normalizeProfileRoute(window.location.hash)
+  activeMenu.value = nextKey
+  if (nextKey === 'create') {
+    restoreActiveTenantProgress()
+  } else if (tenantProgressTimer) {
+    stopTenantProgress()
+    isCreating.value = false
+  }
 }
 
 function navigateProfile(key) {
@@ -321,6 +361,12 @@ function navigateProfile(key) {
     if (window.location.hash !== nextHash) {
       window.history.pushState(null, '', nextHash)
     }
+  }
+  if (nextKey === 'create') {
+    restoreActiveTenantProgress()
+  } else if (tenantProgressTimer) {
+    stopTenantProgress()
+    isCreating.value = false
   }
 }
 
@@ -472,7 +518,7 @@ async function createTenant() {
     tenantKey.value = ''
     systemName.value = ''
     await refreshCenter()
-    navigateProfile('tenants')
+    navigateProfile('overview')
   } catch {
     keepPollingAfterRequestError = true
     createError.value = ''
@@ -485,11 +531,12 @@ async function createTenant() {
   }
 }
 
-function startTenantProgress(traceId) {
-  tenantSteps.value = createTenantSteps()
+function startTenantProgress(traceId, options = {}) {
+  const shouldReset = options.reset !== false
+  if (shouldReset) tenantSteps.value = createTenantSteps()
   tenantProgressTraceId = traceId
   tenantProgressTick.value = Date.now()
-  markTenantStep(tenantSteps.value[0].Key, 'running')
+  if (shouldReset && tenantSteps.value[0]) markTenantStep(tenantSteps.value[0].Key, 'running')
   if (tenantProgressTimer) clearInterval(tenantProgressTimer)
   tenantProgressTimer = setInterval(() => {
     tenantProgressTick.value = Date.now()
@@ -504,6 +551,39 @@ function stopTenantProgress() {
     tenantProgressTimer = null
   }
   tenantProgressTraceId = ''
+}
+
+function isActiveTenantProgressStatus(status) {
+  const normalized = String(status || '').toLowerCase()
+  return normalized === 'running' || normalized === 'queued' || normalized === 'pending'
+}
+
+async function restoreActiveTenantProgress() {
+  if (!isAuthed.value || activeMenu.value !== 'create' || tenantProgressTimer || tenantProgressRestorePending) return
+  tenantProgressRestorePending = true
+  try {
+    const resp = await fetch(apiEngineUrl('official_create_tenant_progress'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ ActiveOnly: 1, _Lang: 'zh-CN' })
+    })
+    const result = await resp.json()
+    const data = result.Data || {}
+    const activeTask = data.ActiveTask || data.Task || {}
+    const traceId = data.TraceId || data.TaskId || activeTask.TraceId || activeTask.TaskId
+    if (result.Code !== 1 || !traceId || !isActiveTenantProgressStatus(data.Status || activeTask.Status)) return
+
+    if (!tenantKey.value && activeTask.OsClient) tenantKey.value = activeTask.OsClient
+    if (!systemName.value && activeTask.SystemName) systemName.value = activeTask.SystemName
+    createError.value = ''
+    isCreating.value = true
+    tenantProgress.value = data.Msg || '检测到租户创建任务正在后台执行，已恢复实时进度。'
+    mergeTenantSteps(data.Steps)
+    startTenantProgress(traceId, { reset: false })
+  } catch {
+  } finally {
+    tenantProgressRestorePending = false
+  }
 }
 
 function markTenantStep(key, status, detail) {
@@ -540,7 +620,7 @@ async function pollTenantProgress(traceId) {
       tenantKey.value = ''
       systemName.value = ''
       await refreshCenter()
-      navigateProfile('tenants')
+      navigateProfile('overview')
       stopTenantProgress()
       isCreating.value = false
       return
@@ -616,6 +696,7 @@ onMounted(() => {
   window.addEventListener('hashchange', syncMenuFromHash)
   window.addEventListener('popstate', syncMenuFromHash)
   refreshCenter()
+  if (activeMenu.value === 'create') restoreActiveTenantProgress()
 })
 
 onUnmounted(() => {
@@ -668,6 +749,15 @@ onUnmounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #ff4d2d, #ff8a3d);
   font-weight: 800;
+}
+
+.brand-avatar-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .brand strong,
@@ -810,6 +900,62 @@ onUnmounted(() => {
   color: #ff5a2e;
 }
 
+.profile-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.profile-hero > div,
+.license-card {
+  border: 1px solid #e6edf5;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 86% 10%, rgba(255, 90, 46, 0.11), transparent 32%),
+    linear-gradient(135deg, #fff, #f8fbff);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.profile-hero > div {
+  padding: 24px;
+}
+
+.profile-hero h2 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.18;
+}
+
+.profile-hero p:not(.eyebrow) {
+  margin: 10px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.license-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px;
+}
+
+.license-card span {
+  color: #64748b;
+}
+
+.license-card strong {
+  margin: 10px 0 8px;
+  color: #111827;
+  font-size: 24px;
+}
+
+.license-card small {
+  color: #64748b;
+  line-height: 1.7;
+}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -851,6 +997,8 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(360px, 520px) 1fr;
   gap: 18px;
+  align-items: stretch;
+  min-height: calc(100vh - 190px);
 }
 
 .panel-head {
@@ -875,9 +1023,13 @@ onUnmounted(() => {
   line-height: 1.6;
 }
 
+.tenant-overview-panel {
+  overflow: hidden;
+}
+
 .tenant-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -1040,6 +1192,192 @@ onUnmounted(() => {
   color: #b91c1c;
 }
 
+.profile-page :deep(.tenant-grid) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-page :deep(.tenant-card) {
+  position: relative;
+  display: flex;
+  min-height: 220px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.96)),
+    radial-gradient(circle at top right, rgba(255, 122, 69, 0.1), transparent 34%);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.profile-page :deep(.tenant-card)::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #ff4d2d, #ff9f43, #38bdf8);
+}
+
+.profile-page :deep(.tenant-card-top),
+.profile-page :deep(.tenant-card-actions),
+.profile-page :deep(.tenant-domain),
+.profile-page :deep(.tenant-password-tip) {
+  min-width: 0;
+}
+
+.profile-page :deep(.tenant-card-top) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-page :deep(.tenant-title-block) {
+  min-width: 0;
+}
+
+.profile-page :deep(.tenant-title-block strong) {
+  display: block;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-page :deep(.tenant-title-block small) {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-page :deep(.tenant-domain),
+.profile-page :deep(.tenant-password-tip) {
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.profile-page :deep(.tenant-domain) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #e8eef6;
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.profile-page :deep(.tenant-domain a) {
+  min-width: 0;
+  overflow: hidden;
+  color: #2563eb;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.profile-page :deep(.tenant-password-tip) {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 6px 10px;
+  border: 1px solid rgba(251, 146, 60, 0.22);
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.95), rgba(255, 237, 213, 0.55));
+  font-size: 12px;
+}
+
+.profile-page :deep(.tenant-password-tip b) {
+  color: #c2410c;
+}
+
+.profile-page :deep(.tenant-password-tip small) {
+  grid-column: 2;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.profile-page :deep(.tenant-card-actions) {
+  display: grid;
+  grid-template-columns: 1fr 104px;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.profile-page :deep(.tenant-open),
+.profile-page :deep(.tenant-copy) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.profile-page :deep(.tenant-open) {
+  background: linear-gradient(135deg, #ff4d2d, #ff8a3d);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(255, 90, 46, 0.18);
+}
+
+.profile-page :deep(.tenant-copy) {
+  border: 1px solid #d9e1ec;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.profile-page :deep(.tenant-status) {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.profile-page :deep(.tenant-status.enabled) {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.profile-page :deep(.tenant-status.disabled) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.billing-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.billing-strip > div {
+  padding: 16px;
+  border: 1px solid #e8eef6;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc, #fff);
+}
+
+.billing-strip span,
+.billing-strip small {
+  display: block;
+  color: #64748b;
+}
+
+.billing-strip strong {
+  display: block;
+  margin: 6px 0;
+  color: #111827;
+  font-size: 20px;
+}
+
 .empty-card,
 .loading-row {
   padding: 28px;
@@ -1103,8 +1441,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 520px;
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+
+.progress-panel {
+  display: flex;
+  flex-direction: column;
 }
 
 .step-item {
@@ -1228,6 +1572,9 @@ onUnmounted(() => {
 }
 
 .dark .profile-header h1,
+.dark .profile-hero h2,
+.dark .license-card strong,
+.dark .billing-strip strong,
 .dark .panel-head h2,
 .dark .state-panel h2,
 .dark .content-panel h2,
@@ -1241,6 +1588,11 @@ onUnmounted(() => {
 }
 
 .dark .header-desc,
+.dark .profile-hero p:not(.eyebrow),
+.dark .license-card span,
+.dark .license-card small,
+.dark .billing-strip span,
+.dark .billing-strip small,
 .dark .panel-head p,
 .dark .state-panel p,
 .dark .stat-card span,
@@ -1258,6 +1610,9 @@ onUnmounted(() => {
 }
 
 .dark .stat-card,
+.dark .profile-hero > div,
+.dark .license-card,
+.dark .billing-strip > div,
 .dark .content-panel,
 .dark .state-panel,
 .dark .tenant-card,
@@ -1273,6 +1628,29 @@ onUnmounted(() => {
   background:
     linear-gradient(180deg, #111827, #0f172a),
     radial-gradient(circle at top right, rgba(251, 146, 60, 0.14), transparent 34%);
+}
+
+.dark .profile-page :deep(.tenant-card) {
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, #111827, #0f172a),
+    radial-gradient(circle at top right, rgba(251, 146, 60, 0.14), transparent 34%);
+}
+
+.dark .profile-page :deep(.tenant-domain) {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.dark .profile-page :deep(.tenant-password-tip) {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.22);
+}
+
+.dark .profile-page :deep(.tenant-copy) {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #cbd5e1;
 }
 
 .dark .ghost-action {
@@ -1355,7 +1733,10 @@ onUnmounted(() => {
   }
 
   .overview-grid,
-  .content-grid {
+  .profile-hero,
+  .content-grid,
+  .billing-strip,
+  .profile-page :deep(.tenant-grid) {
     grid-template-columns: 1fr;
   }
 
