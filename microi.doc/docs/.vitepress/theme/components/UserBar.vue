@@ -3,7 +3,7 @@
     <div class="user-bar">
       <!-- 未登录：显示登录按钮 -->
       <template v-if="!user">
-        <a href="/login" class="login-link">
+        <a href="/login.html" class="login-link">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
             <polyline points="10 17 15 12 10 7"/>
@@ -37,14 +37,6 @@
         <!-- 下拉菜单 -->
         <Transition name="dropdown">
           <div v-if="showMenu" class="dropdown-menu">
-            <a :href="backendUrl" target="_blank" rel="noopener noreferrer" class="menu-item primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
-              </svg>
-              进入后台
-            </a>
             <a href="/profile.html" class="menu-item" @click="showMenu = false">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -71,36 +63,6 @@
           </div>
         </Transition>
       </template>
-
-      <!-- 进入后台按钮（仅登录后显示） -->
-      <a 
-        v-if="user"
-        :href="backendUrl" 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        class="console-btn"
-        title="进入 Microi 后台管理系统"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        <span>进入后台</span>
-      </a>
-
-      <a
-        v-if="user"
-        class="profile-btn"
-        href="/profile.html"
-        title="个人中心"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-        <span>个人中心</span>
-      </a>
 
       <!-- 设置密码弹窗 -->
       <Transition name="dropdown">
@@ -137,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 
@@ -147,16 +109,6 @@ const showSetPwd = ref(false)
 const newPwd = ref('')
 const confirmPwd = ref('')
 const isSettingPwd = ref(false)
-
-const backendUrl = computed(() => {
-  const savedUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant_url') : null
-  if (savedUrl) return savedUrl
-  const tenant = typeof localStorage !== 'undefined' ? localStorage.getItem('microi_doc_tenant') : null
-  if (tenant) {
-    return `https://${tenant}.microi.net`
-  }
-  return 'https://microi.net'
-})
 
 function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
@@ -277,6 +229,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin-left: 8px;
+  position: relative;
 }
 
 /* 登录链接 */
@@ -287,17 +240,18 @@ onUnmounted(() => {
   padding: 6px 14px;
   border-radius: 8px;
   font-size: 13px;
-  color: rgba(200,200,220,0.85) !important;
+  color: var(--vp-c-text-1) !important;
   text-decoration: none;
-  background: rgba(138,43,226,0.08);
-  border: 1px solid rgba(138,43,226,0.15);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
   transition: all 0.25s;
   white-space: nowrap;
 }
 .login-link:hover {
-  background: rgba(138,43,226,0.15);
-  border-color: rgba(138,43,226,0.3);
+  background: linear-gradient(135deg, #8a2be2, #ff5a2e);
+  border-color: transparent;
   color: #fff !important;
+  box-shadow: 0 10px 24px rgba(255, 90, 46, 0.18);
 }
 
 /* 用户信息 */
@@ -306,39 +260,44 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 9px;
   border-radius: 8px;
-  transition: background 0.2s;
+  transition: all 0.2s;
   position: relative;
+  color: var(--vp-c-text-1);
+  background: rgba(124, 58, 237, 0.07);
+  border: 1px solid rgba(124, 58, 237, 0.16);
 }
 .user-info:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(255, 90, 46, 0.26);
 }
 .user-avatar {
   width: 26px;
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1.5px solid rgba(138,43,226,0.3);
+  border: 1.5px solid rgba(255, 90, 46, 0.35);
 }
 .default-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(138,43,226,0.12);
-  color: #b388ff;
+  background: rgba(255, 90, 46, 0.12);
+  color: #ff5a2e;
 }
 .user-name {
   font-size: 13px;
-  color: rgba(220,220,240,0.9) !important;
-  max-width: 80px;
+  color: var(--vp-c-text-1) !important;
+  font-weight: 700;
+  max-width: 118px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .arrow-icon {
   transition: transform 0.2s;
-  color: rgba(180,180,200,0.5);
+  color: var(--vp-c-text-2);
 }
 .arrow-icon.open {
   transform: rotate(180deg);
@@ -350,12 +309,12 @@ onUnmounted(() => {
   top: calc(100% + 8px);
   right: 0;
   min-width: 160px;
-  background: rgba(20,20,32,0.95);
+  background: var(--vp-c-bg-elv);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(138,43,226,0.15);
+  border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 18px 38px rgba(15,23,42,0.18);
   z-index: 100;
 }
 .menu-item {
@@ -366,7 +325,7 @@ onUnmounted(() => {
   padding: 10px 14px;
   border: none;
   background: transparent;
-  color: rgba(200,200,220,0.85);
+  color: var(--vp-c-text-1);
   font-size: 13px;
   border-radius: 8px;
   cursor: pointer;
@@ -374,59 +333,69 @@ onUnmounted(() => {
   text-decoration: none;
 }
 .menu-item:hover {
-  background: rgba(138,43,226,0.12);
-  color: #fff;
-}
-.menu-item.primary {
-  color: #b388ff;
-}
-.menu-item.primary:hover {
-  background: rgba(138,43,226,0.18);
-  color: #d0a0ff;
+  background: rgba(255, 90, 46, 0.1);
+  color: #ff5a2e;
 }
 .menu-divider {
   height: 1px;
-  background: rgba(255,255,255,0.06);
+  background: var(--vp-c-divider);
   margin: 4px 8px;
 }
 
-/* 进入后台按钮 */
-.console-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #fff !important;
-  text-decoration: none;
-  background: linear-gradient(135deg, #8a2be2, #6a1fd0);
-  transition: all 0.25s;
-  white-space: nowrap;
-}
-.console-btn:hover {
-  box-shadow: 0 0 18px rgba(138,43,226,0.35);
-  transform: translateY(-1px);
+/* 首页强制暗色导航，账号区需要独立提升对比度 */
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-bar {
+  --microi-userbar-home-text: rgba(255, 255, 255, 0.94);
+  --microi-userbar-home-muted: rgba(255, 255, 255, 0.72);
+  --microi-userbar-home-border: rgba(148, 163, 255, 0.42);
+  --microi-userbar-home-bg: rgba(18, 31, 67, 0.72);
 }
 
-.profile-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
-  border: 1px solid rgba(138,43,226,0.18);
-  border-radius: 8px;
-  background: rgba(138,43,226,0.08);
-  color: rgba(230,230,245,0.92);
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.25s;
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info {
+  color: var(--microi-userbar-home-text) !important;
+  background: var(--microi-userbar-home-bg);
+  border-color: var(--microi-userbar-home-border);
+  box-shadow: 0 12px 32px rgba(16, 24, 64, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
 }
 
-.profile-btn:hover {
-  background: rgba(138,43,226,0.16);
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info:hover,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link:hover {
+  background: rgba(35, 50, 104, 0.86);
+  border-color: rgba(255, 90, 46, 0.58);
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-name,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .arrow-icon,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link span,
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link svg {
+  color: var(--microi-userbar-home-text) !important;
+  opacity: 1;
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .default-avatar {
+  background: rgba(255, 90, 46, 0.16);
+  color: #ff7a45;
+  border-color: rgba(255, 90, 46, 0.5);
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .dropdown-menu {
+  background: rgba(8, 16, 40, 0.96);
+  border-color: rgba(148, 163, 255, 0.26);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item:hover {
+  background: rgba(255, 90, 46, 0.16);
   color: #fff;
+}
+
+:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-divider {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 下拉动画 */
@@ -446,16 +415,6 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .user-name {
     display: none;
-  }
-  .console-btn span {
-    display: none;
-  }
-  .profile-btn span {
-    display: none;
-  }
-  .console-btn,
-  .profile-btn {
-    padding: 6px 8px;
   }
   .login-link span {
     display: none;

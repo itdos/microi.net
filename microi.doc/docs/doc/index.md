@@ -16,7 +16,7 @@
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
 .NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
 
-[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[官网](https://microi.net/) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 
@@ -30,9 +30,8 @@
 
 | 资源 | 地址 |
 |---|---|
-| 🌐 官方文档 | [https://microi.net](https://microi.net) |
+| 🌐 官网 | [https://microi.net](https://microi.net) |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
-| 🖥️ 在线使用 | [https://web.microi.net](https://web.microi.net) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
 | 📝 官方 CSDN 博客 | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |

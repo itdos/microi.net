@@ -47,6 +47,7 @@ V8.OsClientModel.AliyunOSSAccessKeySecret
 
 `sys_osclients` 既保存每个租户自己的数据库、Redis、第三方密钥等配置，也可以承载影响整个 API 进程的平台级配置。平台级配置必须遵守“主租户为准、子租户只能降额隔离”的规则：
 
+- 所有可变业务逻辑默认必须由接口引擎编排，包括但不限于租户开通、开库、初始化、归属修复、官网个人中心、付费额度等 SaaS 业务流程。C# 后端只暴露原子 V8 能力，例如建库、导入空库模板、复制 `sys_config`、刷新 SaaS 缓存、补偿回滚、字段兜底等；不要把可变业务分支写死到 Controller 或 `TenantProvisioningService` 这类后端定制代码里。接口引擎缺少能力时，优先扩展 `V8.Method`/V8 引擎原子函数，再由接口引擎调用。
 - 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
 - 环境变量仍然拥有最高优先级，适合容器编排统一兜底；主租户 `sys_osclients` 次之，体现吾码 SaaS 引擎可配置能力；再其次才是 `appsettings.json`；最后才使用代码默认值。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。

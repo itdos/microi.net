@@ -89,12 +89,16 @@ function nav(): DefaultTheme.NavItem[] {
 					link: "https://gitee.com/ITdos/microi.net",
 				},
 				{
-					text: "WebOS 试用",
-					link: "https://webos.microi.net/",
+					text: "吾码UI",
+					link: "/doc/system-engine/microi-ui",
 				},
 				{
-					text: "传统界面试用",
-					link: "https://web.microi.net/",
+					text: "OpenClaw 吾码小龙虾",
+					link: "https://gitee.com/microi-net/microi.openclaw",
+				},
+				{
+					text: "吾码视频下载器",
+					link: "https://gitee.com/microi-net/microi.spider",
 				},
 				{
 					text: "CSDN 官方博客",

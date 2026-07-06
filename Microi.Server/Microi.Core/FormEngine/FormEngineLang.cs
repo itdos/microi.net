@@ -1742,10 +1742,16 @@ namespace Microi.net
                         }
                         try
                         {
-                            var sql = $"SELECT COUNT(1) AS TotalCount, SUM(CASE WHEN `{lang.Field}` IS NOT NULL AND `{lang.Field}` <> '' THEN 1 ELSE 0 END) AS FilledCount FROM diy_lang WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)";
-                            var row = ToJObjectSafe(db.FromSql(sql).ToList<dynamic>().FirstOrDefault());
-                            var total = TokenInt(row, "TotalCount");
-                            var filled = TokenInt(row, "FilledCount");
+                            var rows = db.FromSql($@"SELECT `Key`, ZhCN, `{lang.Field}`
+                                    FROM diy_lang
+                                    WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                                    LIMIT 300000")
+                                .ToList<dynamic>()
+                                .Select(ToJObjectSafe)
+                                .ToList();
+                            var total = rows.Count;
+                            var filled = rows.Count(row =>
+                                IsFilledDiyLangValue(TokenString(row[lang.Field]), TokenString(row, "Key")));
                             var missing = Math.Max(0, total - filled);
                             item["TotalCount"] = total;
                             item["FilledCount"] = filled;
@@ -1758,7 +1764,7 @@ namespace Microi.net
                                 AddDiyLangFailureReason(
                                     stats,
                                     $"MissingTranslation:{lang.Locale}",
-                                    $"语言[{lang.Label}]还有{missing}条词条未填充，通常是翻译服务不可用、目标语言不支持、任务中断或旧数据尚未初始化。",
+                                    $"语言[{lang.Label}]还有{missing}条词条未填充或仍为词条Key占位，通常是翻译服务不可用、目标语言不支持、任务中断或旧数据尚未初始化。",
                                     lang.Field,
                                     missing);
                             }
@@ -1813,7 +1819,6 @@ namespace Microi.net
                                 FROM diy_lang
                                 WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
                                   AND ZhCN IS NOT NULL AND ZhCN <> ''
-                                  AND (`{lang.Field}` IS NULL OR `{lang.Field}` = '')
                                 LIMIT 50000")
                             .ToList<dynamic>()
                             .Select(ToJObjectSafe)
@@ -1825,6 +1830,11 @@ namespace Microi.net
                         var key = TokenString(row, "Key");
                         var sourceText = TokenString(row, "ZhCN");
                         if (IsBlank(key) || IsBlank(sourceText))
+                        {
+                            continue;
+                        }
+                        var currentValue = TokenString(row[lang.Field]);
+                        if (IsFilledDiyLangValue(currentValue, key))
                         {
                             continue;
                         }
@@ -2703,6 +2713,10 @@ namespace Microi.net
             {
                 return false;
             }
+            if (IsDiyLangPlaceholderValue(value))
+            {
+                return false;
+            }
             if (IsBlank(sourceText))
             {
                 return true;
@@ -2710,6 +2724,30 @@ namespace Microi.net
             var normalizedValue = value.Trim().Replace(" ", "");
             var normalizedSource = sourceText.Trim().Replace(" ", "");
             return !string.Equals(normalizedValue, normalizedSource, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsFilledDiyLangValue(string value, string key = "")
+        {
+            return !IsBlank(value) && !IsDiyLangPlaceholderValue(value, key);
+        }
+
+        private static bool IsDiyLangPlaceholderValue(string value, string key = "")
+        {
+            value = (value ?? "").Trim();
+            if (IsBlank(value))
+            {
+                return false;
+            }
+            if (!IsBlank(key) && string.Equals(value, key, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            var lower = value.ToLowerInvariant();
+            return lower.StartsWith("diy_table:", StringComparison.Ordinal)
+                || lower.StartsWith("diy_field:", StringComparison.Ordinal)
+                || lower.StartsWith("sys_menu:", StringComparison.Ordinal)
+                || lower.StartsWith("msg.", StringComparison.Ordinal)
+                || lower.StartsWith("data.", StringComparison.Ordinal);
         }
 
         private static void QueueDiyLangMetadataSyncStatic(string osClient, string key, string sourceText)
@@ -2830,7 +2868,7 @@ namespace Microi.net
                 row["Code"] = key;
                 changed = true;
             }
-            if (IsBlank(TokenString(row, "ZhCN")))
+            if (IsBlank(TokenString(row, "ZhCN")) || IsDiyLangPlaceholderValue(TokenString(row, "ZhCN"), key))
             {
                 row["ZhCN"] = sourceText;
                 changed = true;
@@ -2842,9 +2880,15 @@ namespace Microi.net
                 {
                     continue;
                 }
-                if (!IsBlank(TokenString(row[langField])))
+                var currentValue = TokenString(row[langField]);
+                if (!IsBlank(currentValue) && !IsDiyLangPlaceholderValue(currentValue, key))
                 {
                     continue;
+                }
+                if (!IsBlank(currentValue))
+                {
+                    row[langField] = "";
+                    changed = true;
                 }
                 var translated = "";
                 if (fixedTranslations != null && fixedTranslations.TryGetValue(langField, out var fixedValue))

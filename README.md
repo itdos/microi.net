@@ -16,7 +16,7 @@
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
 .NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
 
-[官方文档](https://microi.net/) · [在线使用](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[官网](https://microi.net/) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 
@@ -30,9 +30,8 @@
 
 | 资源 | 地址 |
 |---|---|
-| 🌐 官方文档 | [https://microi.net](https://microi.net) |
+| 🌐 官网 | [https://microi.net](https://microi.net) |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
-| 🖥️ 在线使用 | [https://web.microi.net](https://web.microi.net) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
 | 📝 官方 CSDN 博客 | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |
@@ -151,7 +150,7 @@
 <tr><td>🧩 <strong>微服务</strong></td><td>Vue2 基于 Qiankun，Vue3 基于 MicroApp</td></tr>
 <tr><td>⏱️ <strong><a href="/doc/system-engine/job">任务调度</a></strong></td><td>定时执行接口引擎或定制 DLL</td></tr>
 <tr><td>💬 <strong>聊天系统</strong></td><td>自研在线聊天 + 腾讯 IM 集成</td></tr>
-<tr><td>🕷️ <strong>采集引擎</strong></td><td>网页采集、MVVM 渲染前后、接口请求全覆盖</td></tr>
+<tr><td>🕷️ <strong><a href="/doc/system-engine/spider-engine">采集引擎</a></strong></td><td>可重复规则采集、真实 Chrome Worker、验证码人工兜底、接口与 DOM 全覆盖</td></tr>
 <tr><td>🌍 <strong><a href="/doc/system-engine/translate-engine">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
 <tr><td>📊 <strong>goView 数据大屏</strong></td><td><a href="https://lisaisai.blog.csdn.net/article/details/149858192?spm=1001.2014.3001.5502">集成 goView</a>，快速实现数据可视化</td></tr>
 <tr><td>🧊 <strong>WebGL 3D 渲染器</strong></td><td>基于 Three.js，支持 .gltf / .obj / .glb / .fbx / .stl 格式</td></tr>

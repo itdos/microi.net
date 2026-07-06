@@ -122,12 +122,34 @@ export default {
                 .filter(function (field) { return self.IsBusinessTranslateField(field); });
         },
 
-        async TranslateBusinessData() {
+        ShouldAutoTranslateBusinessData() {
             var self = this;
+            var lang = (self.DiyCommon.GetCurrentLang ? self.DiyCommon.GetCurrentLang() : "").trim();
+            if (!lang || lang === "zh-CN" || lang === "cn" || lang === "zh" || lang === "zh-Hans") return false;
+            var tableName = "";
+            if (self.CurrentDiyTableModel) {
+                tableName = self.CurrentDiyTableModel.Name || self.CurrentDiyTableModel.TableName || self.CurrentDiyTableModel.Table || "";
+            }
+            tableName = (tableName || self.TableName || "").toLowerCase();
+            if (tableName === "sys_microistore") return true;
+            return !!(self.SysMenuModel && (self.SysMenuModel.AutoTranslateBusinessData === true || self.SysMenuModel.AutoTranslateBusinessData === 1));
+        },
+
+        async AutoTranslateBusinessDataIfNeeded() {
+            var self = this;
+            if (!self.ShouldAutoTranslateBusinessData || !self.ShouldAutoTranslateBusinessData()) return;
+            await self.TranslateBusinessData({ silent: true, auto: true });
+        },
+
+        async TranslateBusinessData(options) {
+            var self = this;
+            options = options || {};
             if (self.BusinessDataTranslateLoading) return;
             var lang = (self.DiyCommon.GetCurrentLang ? self.DiyCommon.GetCurrentLang() : "").trim();
             if (!lang || lang === "zh-CN" || lang === "cn" || lang === "zh" || lang === "zh-Hans") {
-                self.DiyCommon.Tips(self.$t ? self.$t("Msg.SelectTargetLangFirst") : "Please switch language first.", false);
+                if (!options.silent) {
+                    self.DiyCommon.Tips(self.$t ? self.$t("Msg.SelectTargetLangFirst") : "Please switch language first.", false);
+                }
                 return;
             }
             var rows = self.DiyTableRowList || [];
@@ -142,7 +164,9 @@ export default {
             });
             var texts = Object.keys(textMap);
             if (texts.length === 0) {
-                self.DiyCommon.Tips(self.$t ? self.$t("Msg.NoTranslatableBusinessData") : "No translatable data.", false);
+                if (!options.silent) {
+                    self.DiyCommon.Tips(self.$t ? self.$t("Msg.NoTranslatableBusinessData") : "No translatable data.", false);
+                }
                 return;
             }
             self.BusinessDataTranslateLoading = true;
@@ -167,7 +191,9 @@ export default {
                     row._BusinessTranslations = overlay;
                 });
                 self.DiyTableRowList = rows.slice();
-                self.DiyCommon.Tips(self.$t ? self.$t("Msg.TranslateBusinessDataDone") : "Translated.", true);
+                if (!options.silent) {
+                    self.DiyCommon.Tips(self.$t ? self.$t("Msg.TranslateBusinessDataDone") : "Translated.", true);
+                }
             } finally {
                 self.BusinessDataTranslateLoading = false;
             }
