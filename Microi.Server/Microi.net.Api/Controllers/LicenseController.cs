@@ -218,11 +218,16 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public JsonResult WriteLicenseFile([FromBody] WriteLicenseFileRequest request)
+        public async Task<JsonResult> WriteLicenseFile([FromBody] WriteLicenseFileRequest request)
         {
             try
             {
                 var result = LicenseService.WriteLicenseFile(request?.LicenseContent);
+                if (result != null && result.Code == 1)
+                {
+                    var saveResult = await LicenseServerStore.SaveCurrentServerLicenseAsync(request?.LicenseContent, result);
+                    result.DataAppend = saveResult;
+                }
                 return Json(result);
             }
             catch (Exception ex)

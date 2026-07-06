@@ -241,20 +241,50 @@
                         </el-tabs>
                     </el-card>
                 </template>
+
+                <el-card class="info-card license-server-card" shadow="hover">
+                    <template #header>
+                        <div class="card-title server-title">
+                            <span><el-icon><Connection /></el-icon> 已部署服务器节点</span>
+                            <el-button link type="primary" :loading="licenseServersLoading" @click="loadLicenseServers">刷新</el-button>
+                        </div>
+                    </template>
+                    <el-table
+                        v-loading="licenseServersLoading"
+                        :data="licenseServers"
+                        size="small"
+                        border
+                        empty-text="暂无服务器授权记录"
+                    >
+                        <el-table-column label="当前" width="72" align="center">
+                            <template #default="{ row }">
+                                <el-tag v-if="row.HID === hid" type="success" size="small">当前</el-tag>
+                                <span v-else class="server-dot"></span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="ServerName" label="服务器" min-width="150" show-overflow-tooltip />
+                        <el-table-column prop="HID" label="HID" min-width="220" show-overflow-tooltip />
+                        <el-table-column prop="ProductType" label="授权类型" width="120" />
+                        <el-table-column prop="Company" label="授权主体" min-width="160" show-overflow-tooltip />
+                        <el-table-column prop="LastDeployTime" label="最后部署" min-width="160" />
+                        <el-table-column prop="LastRestoreTime" label="最后恢复" min-width="160" />
+                        <el-table-column prop="Status" label="状态" width="110" />
+                    </el-table>
+                </el-card>
             </template>
         </div>
     </div>
 </template>
 
 <script>
-import { Refresh, Monitor, CopyDocument, EditPen, Promotion, Search, Download, Upload } from "@element-plus/icons-vue";
+import { Refresh, Monitor, CopyDocument, EditPen, Promotion, Search, Download, Upload, Connection } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 const LICENSE_API_BASE = "https://api.itdos.com";
 
 export default {
     name: "system_license",
-    components: { Refresh, Monitor, CopyDocument, EditPen, Promotion, Search, Download, Upload },
+    components: { Refresh, Monitor, CopyDocument, EditPen, Promotion, Search, Download, Upload, Connection },
     data() {
         return {
             pageLoading: true,
@@ -284,6 +314,8 @@ export default {
             existingApp: null,
             // 检查结果
             checkResult: null,
+            licenseServers: [],
+            licenseServersLoading: false,
         };
     },
     mounted() {
@@ -314,6 +346,7 @@ export default {
             this.loadHID(() => {
                 self.loadVerify(() => {
                     self.pageLoading = false;
+                    self.loadLicenseServers();
                     // 如果未授权，向License服务器查询是否已提交过申请
                     if (!self.isLicensed && self.hid) {
                         self.queryExistingApplication();
@@ -389,6 +422,29 @@ export default {
                     }
                 })
                 .catch(() => { /* 静默失败，不影响正常使用 */ });
+        },
+
+        // 读取当前主租户中已经部署过License的服务器节点
+        async loadLicenseServers() {
+            const self = this;
+            self.licenseServersLoading = true;
+            try {
+                const result = await self.DiyCommon.FormEngine.GetTableData("mci_license_server", {
+                    _PageIndex: 1,
+                    _PageSize: 50,
+                    _OrderBy: "UpdateTime",
+                    _OrderByType: "DESC"
+                });
+                if (result && result.Code === 1 && Array.isArray(result.Data)) {
+                    self.licenseServers = result.Data;
+                } else {
+                    self.licenseServers = [];
+                }
+            } catch (error) {
+                self.licenseServers = [];
+            } finally {
+                self.licenseServersLoading = false;
+            }
         },
 
         // Tab切换事件
@@ -554,7 +610,9 @@ export default {
                         ElMessage.success(result.Msg || "License已成功部署！");
                         // 刷新验证状态
                         self.checkResult = null;
-                        self.loadVerify();
+                        self.loadVerify(() => {
+                            self.loadLicenseServers();
+                        });
                     } else {
                         ElMessage.error((result && result.Msg) || "部署失败");
                     }
@@ -753,6 +811,26 @@ export default {
 }
 .info-card {
     margin-bottom: 20px;
+}
+.license-server-card {
+    :deep(.el-card__header) {
+        padding: 14px 18px;
+    }
+}
+.server-title {
+    justify-content: space-between;
+}
+.server-title > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.server-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #dcdfe6;
 }
 .main-card {
     margin-bottom: 20px;

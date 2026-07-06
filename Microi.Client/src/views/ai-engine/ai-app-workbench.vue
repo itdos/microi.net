@@ -2217,6 +2217,160 @@ function scrollAppChat() {
     height: 34px;
 }
 
+.ai-app-workbench {
+    --app-primary: var(--mci-color-primary, var(--el-color-primary, #ff5f2e));
+    --app-primary-dark: var(--mci-color-primary-dark, var(--el-color-primary-dark-2, #e34f24));
+    --app-bg: var(--mci-bg-base, var(--el-bg-color-page, #f7f9fc));
+    --app-panel: var(--mci-bg-elevated, var(--el-bg-color, #fff));
+    --app-surface: var(--mci-bg-surface, var(--el-fill-color-light, #f4f6fa));
+    --app-card: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --app-card-hover: var(--mci-bg-card-hover, var(--el-fill-color-extra-light, #fff));
+    --app-border: var(--mci-border-color, var(--el-border-color-lighter, #e8edf5));
+    --app-text: var(--mci-text-primary, var(--el-text-color-primary, #20242c));
+    --app-text-secondary: var(--mci-text-secondary, var(--el-text-color-regular, #606a7a));
+    --app-text-tertiary: var(--mci-text-tertiary, var(--el-text-color-placeholder, #98a2b3));
+    --app-on-primary: var(--mci-text-on-primary, #fff);
+    --app-shadow: var(--mci-shadow-card, 0 14px 34px rgba(15, 23, 42, .07));
+    background:
+        radial-gradient(circle at 18% 0, color-mix(in srgb, var(--app-primary) 10%, transparent), transparent 30%),
+        var(--app-bg);
+    color: var(--app-text);
+}
+
+html.dark .ai-app-workbench,
+body.dark .ai-app-workbench,
+.dark .ai-app-workbench,
+[data-theme="dark"] .ai-app-workbench {
+    --app-bg: var(--mci-bg-base, #0b1118);
+    --app-panel: var(--mci-bg-elevated, #101923);
+    --app-surface: var(--mci-bg-surface, #172332);
+    --app-card: var(--mci-bg-card, rgba(255, 255, 255, .055));
+    --app-card-hover: var(--mci-bg-card-hover, rgba(255, 255, 255, .085));
+    --app-border: var(--mci-border-color, rgba(255, 255, 255, .10));
+    --app-text: var(--mci-text-primary, #f6f8fb);
+    --app-text-secondary: var(--mci-text-secondary, #b9c2d0);
+    --app-text-tertiary: var(--mci-text-tertiary, #7f8ba0);
+    --app-shadow: var(--mci-shadow-card, 0 18px 46px rgba(0, 0, 0, .32));
+}
+
+.app-gallery-hero,
+.app-card,
+.app-panel,
+.file-panel,
+.app-stage,
+.viewer-card,
+.app-chat,
+.app-chat-message pre,
+.app-chat-composer,
+.app-chat-in-panel,
+.preview-pane,
+.source-pane {
+    border-color: var(--app-border);
+    background: var(--app-card);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow);
+}
+
+.app-gallery-hero {
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 10%, var(--app-panel)), var(--app-panel));
+}
+
+.gallery-title .el-icon,
+.app-send-btn,
+.app-card-actions :deep(.el-button--primary),
+.stage-actions :deep(.el-button--primary) {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--app-primary), var(--app-primary-dark));
+    color: var(--app-on-primary);
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--app-primary) 26%, transparent);
+}
+
+.gallery-title strong,
+.app-card h4,
+.app-card-meta strong,
+.app-develop-head strong,
+.active-file-meta .path,
+.app-chat-header strong,
+.app-message-meta strong,
+.source-tree-node.active {
+    color: var(--app-text);
+}
+
+.gallery-title span,
+.app-card p,
+.app-card-top span,
+.app-card-meta span,
+.app-develop-head span,
+.app-item span,
+.active-file-meta,
+.publish-meta,
+.app-chat-empty,
+.app-message-meta span,
+.source-tree-node small {
+    color: var(--app-text-secondary);
+}
+
+.app-card:hover,
+.app-card.active,
+.app-item.active,
+.app-item:hover,
+.file-item.active,
+.file-item:hover,
+.source-tree :deep(.el-tree-node__content:hover) {
+    border-color: color-mix(in srgb, var(--app-primary) 40%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 10%, var(--app-card));
+    color: var(--app-primary);
+}
+
+.app-develop-head,
+.app-toolbar,
+.app-create,
+.file-panel header,
+.stage-toolbar,
+.app-chat-header,
+.active-file-meta,
+.publish-meta {
+    border-color: var(--app-border);
+    background: color-mix(in srgb, var(--app-primary) 5%, var(--app-panel));
+}
+
+.source-tree {
+    --el-tree-node-hover-bg-color: color-mix(in srgb, var(--app-primary) 10%, var(--app-card));
+    background: transparent;
+    color: var(--app-text);
+}
+
+.source-tree :deep(.el-tree-node__content) {
+    color: var(--app-text);
+}
+
+.viewer-tabs button,
+.attachment-chip {
+    border-color: var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-secondary);
+}
+
+.viewer-tabs button.active,
+.viewer-tabs button:hover {
+    border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-border));
+    background: color-mix(in srgb, var(--app-primary) 12%, var(--app-card));
+    color: var(--app-primary);
+}
+
+.app-chat-composer :deep(.el-textarea__inner),
+.app-model-select :deep(.el-input__wrapper),
+.gallery-tools :deep(.el-input__wrapper) {
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: none;
+}
+
+.preview-frame {
+    background: #fff;
+}
+
 @media (max-width: 1400px) {
     .ai-app-workbench {
         grid-template-columns: minmax(300px, 340px) minmax(210px, 240px) minmax(0, 1fr);

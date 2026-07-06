@@ -4,6 +4,7 @@
 using System.Text;
 using System.Diagnostics;
 using Dos.Common;
+using Microi.License;
 using Microi.net;
 using Microi.net.Api;
 using Microsoft.AspNetCore.Http.Features;
@@ -333,6 +334,25 @@ var clientModel = OsClient.GetClient(osClientName);
 
 #region Redis
 redisConn = RedisConnBuilder.Build(clientModel);
+#endregion
+
+#region License 自动恢复
+try
+{
+    var licenseRestoreResult = await LicenseServerStore.RestoreCurrentServerLicenseAsync(osClientName);
+    if (licenseRestoreResult != null && licenseRestoreResult.Code == 1)
+    {
+        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】已根据当前HID自动恢复License文件。");
+    }
+    else if (licenseRestoreResult != null && licenseRestoreResult.Code == 0)
+    {
+        Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复未完成：{licenseRestoreResult.Msg}");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复失败：{ex.Message}");
+}
 #endregion
 
 #region MQTT（在主机完全启动后再启动 Broker，确保依赖注入与 V8 引擎就绪）

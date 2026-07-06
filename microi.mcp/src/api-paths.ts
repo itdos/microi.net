@@ -22,6 +22,11 @@ export const API = {
   EXECUTE_ENGINE: '/api/V8Engine/ExecuteApiEngine',
   UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
 
+  // 微服务 / 微应用
+  GET_MICRO_SERVICE: '/api/V8Engine/GetMicroService',
+  CREATE_MICRO_SERVICE: '/api/V8Engine/CreateMicroService',
+  PUBLISH_MICRO_SERVICE: '/api/V8Engine/PublishMicroService',
+
   // V8 事件
   GET_EVENT_LIST: '/api/V8Engine/GetV8EventList',
   GET_EVENT_CODE: '/api/V8Engine/GetV8EventCode',

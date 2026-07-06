@@ -14,6 +14,7 @@ export default {
         NoOfficialAppUpdates: "No official app notices",
         OfficialAppUninstalled: "Not installed",
         OfficialAppOutdated: "Update available",
+        OfficialAppAbnormal: "Version anomaly",
         OfficialAppInstalledVersion: "Installed:",
         OfficialAppLatestVersion: "Latest:",
         GoAppStore: "App Store",

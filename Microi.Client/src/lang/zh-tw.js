@@ -18,6 +18,7 @@ const Msg = {
     NoOfficialAppUpdates: "暫無官方應用更新提醒",
     OfficialAppUninstalled: "未安裝",
     OfficialAppOutdated: "可更新",
+    OfficialAppAbnormal: "版本異常",
     OfficialAppInstalledVersion: "已安裝版本：",
     OfficialAppLatestVersion: "最新版本：",
     GoAppStore: "去應用商城",
