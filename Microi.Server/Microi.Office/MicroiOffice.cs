@@ -1688,6 +1688,34 @@ namespace Microi.net
             return filledCount;
         }
 
+        private static string ImportBuildExceptionDebug(Exception ex)
+        {
+            if (ex == null) return "";
+            var messages = new List<string>()
+            {
+                $"{ex.GetType().Name}: {ex.Message}"
+            };
+            var inner = ex.InnerException;
+            var innerIndex = 1;
+            while (inner != null && innerIndex <= 2)
+            {
+                messages.Add($"Inner{innerIndex} {inner.GetType().Name}: {inner.Message}");
+                inner = inner.InnerException;
+                innerIndex++;
+            }
+            if (!ex.StackTrace.DosIsNullOrWhiteSpace())
+            {
+                var firstStackLine = ex.StackTrace
+                    .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (!firstStackLine.DosIsNullOrWhiteSpace())
+                {
+                    messages.Add($"Stack: {firstStackLine.Trim()}");
+                }
+            }
+            return string.Join("；", messages);
+        }
+
         public async Task<DosResult> ImportExcel(DiyTableRowParam param, HttpContext _httpContext = null)
         {
             if (param.OsClient.DosIsNullOrWhiteSpace()
@@ -2056,7 +2084,7 @@ namespace Microi.net
                     Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]StackTrace：{ex}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：lastSql：{lastSqlLog}");
-                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ex.GetType().Name}，详见后端Console日志。");
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ImportBuildExceptionDebug(ex)}");
                     await diyCacheBase.SetAsync(stepSign, importStepList);
                 }
             });
@@ -2067,7 +2095,7 @@ namespace Microi.net
             await diyCacheBase.SetAsync(startSign, "0");
             Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{param.TableId}]初始化失败：{ex}");
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
-            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ex.GetType().Name}，详见后端Console日志。");
+            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ImportBuildExceptionDebug(ex)}");
             await diyCacheBase.SetAsync(stepSign, importStepList);
             result = new DosResult(0, null, $"已失败！请查看导入进度。{ex.Message}");
         }
