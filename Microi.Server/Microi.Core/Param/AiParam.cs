@@ -12,7 +12,23 @@ namespace Microi.net
         public string? ApiKey { get; set; }
         public string? Endpoint { get; set; }
         public string? AiModel { get; set; }
+        /// <summary>
+        /// mic_ai 表主键。前端传入后，后端优先按 Id 精确读取模型配置。
+        /// </summary>
+        public string? AiModelId { get; set; }
+        /// <summary>
+        /// 兼容部分调用方使用 AiId 传递 mic_ai 主键。
+        /// </summary>
+        public string? AiId { get; set; }
         public string? OsClient { get; set; }
+        /// <summary>
+        /// 当前登录用户 Id，由 Controller 从 Token 注入，前端不要自行伪造。
+        /// </summary>
+        public string? CurrentUserId { get; set; }
+        /// <summary>
+        /// 当前登录用户名称，由 Controller 从 Token 注入。
+        /// </summary>
+        public string? CurrentUserName { get; set; }
         /// <summary>
         /// 对话Id。前端只传这个Id，后端会从 mic_ai_record 读取历史并压缩上下文。
         /// </summary>
@@ -59,6 +75,22 @@ namespace Microi.net
         /// AI模型名称
         /// </summary>
         public string? AiModel { get; set; }
+        /// <summary>
+        /// mic_ai 表主键。前端传入后，后端优先按 Id 精确读取模型配置。
+        /// </summary>
+        public string? AiModelId { get; set; }
+        /// <summary>
+        /// 兼容部分调用方使用 AiId 传递 mic_ai 主键。
+        /// </summary>
+        public string? AiId { get; set; }
+        /// <summary>
+        /// 当前登录用户 Id，由 Controller 从 Token 注入。
+        /// </summary>
+        public string? CurrentUserId { get; set; }
+        /// <summary>
+        /// 当前登录用户名称，由 Controller 从 Token 注入。
+        /// </summary>
+        public string? CurrentUserName { get; set; }
         
         /// <summary>
         /// 租户标识
