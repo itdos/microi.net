@@ -77,6 +77,11 @@
             <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }}</strong>
             <small>第二个租户起 / 年</small>
           </article>
+          <article class="stat-card token-stat-card">
+            <span>AI 中转站 Token</span>
+            <strong>{{ formatTokenNumber(relayToken.RemainingTokens) }}</strong>
+            <small>已用 {{ formatTokenNumber(relayToken.UsedTokens) }} / 赠送 {{ formatTokenNumber(relayToken.GiftTokens) }}</small>
+          </article>
         </section>
 
         <section v-if="activeMenu === 'overview'" class="content-panel tenant-overview-panel">
@@ -187,6 +192,11 @@ const createError = ref('')
 const profileError = ref('')
 const tenantSteps = ref([])
 const tenantProgressTick = ref(Date.now())
+const relayToken = ref({
+  GiftTokens: 100000,
+  UsedTokens: 0,
+  RemainingTokens: 100000
+})
 
 let tenantProgressTimer = null
 let tenantProgressTraceId = ''
@@ -389,6 +399,11 @@ function authHeaders() {
   return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
 }
 
+function formatTokenNumber(value) {
+  const num = Number(value || 0)
+  return Number.isFinite(num) ? num.toLocaleString('zh-CN') : '0'
+}
+
 function createTenantSteps() {
   return defaultTenantSteps.map(step => ({ ...step }))
 }
@@ -465,10 +480,32 @@ async function refreshCenter() {
       localStorage.setItem('microi_doc_tenant', tenants.value[0].OsClient || '')
       localStorage.setItem('microi_doc_tenant_url', tenants.value[0].Url || '')
     }
+    await refreshRelayTokenSummary()
   } catch {
     profileError.value = '网络异常，租户信息读取失败。'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function refreshRelayTokenSummary() {
+  if (!isAuthed.value) return
+  try {
+    const resp = await fetch(`${API_BASE}/api/Ai/RelayTokenSummary?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ OsClient: OS_CLIENT })
+    })
+    const result = await resp.json()
+    if (result.Code === 1 && result.Data) {
+      relayToken.value = {
+        GiftTokens: Number(result.Data.GiftTokens || 100000),
+        UsedTokens: Number(result.Data.UsedTokens || 0),
+        RemainingTokens: Number(result.Data.RemainingTokens || 0)
+      }
+    }
+  } catch {
+    // Token 统计不阻塞个人中心主流程。
   }
 }
 
@@ -958,7 +995,7 @@ onUnmounted(() => {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 18px;
 }
@@ -974,6 +1011,12 @@ onUnmounted(() => {
 
 .stat-card {
   padding: 18px;
+}
+
+.token-stat-card {
+  background:
+    radial-gradient(circle at 86% 12%, rgba(255, 90, 46, 0.16), transparent 36%),
+    linear-gradient(135deg, #fff, #f7fbff);
 }
 
 .stat-card span,

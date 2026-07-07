@@ -98,6 +98,7 @@
                         <span class="hero-kicker">AI引擎</span>
                         <h1>让 AI 直接进入你的业务现场</h1>
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
+                        <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
                     </div>
                     <div class="platform-stats" v-loading="statsLoading">
                         <div v-for="stat in statCards" :key="stat.key" class="platform-stat" :data-stat="stat.key">
@@ -775,21 +776,19 @@ async function sendMessage() {
         return;
     }
 
-    const attachmentPayload = await readAttachments();
-    const mode = await resolveSemanticMode(text, attachmentPayload);
-    resolvedMode.value = mode;
-
-    const attachmentMeta = attachmentPayload.map((item) => ({
-        FileName: item.FileName,
-        ContentType: item.ContentType,
-        Size: item.Size
+    const files = selectedFiles.value.slice(0, 10);
+    const attachmentMeta = files.map((file) => ({
+        FileName: file.name,
+        ContentType: file.type || "application/octet-stream",
+        Size: file.size
     }));
     const visibleText = text || "请分析我上传的附件。";
+    const provisionalMode = normalizeWorkMode(semanticMode.value) || "auto";
 
     const userMessage = reactive({
         id: makeId("user"),
         role: "user",
-        mode,
+        mode: provisionalMode,
         content: visibleText,
         rawContent: visibleText,
         attachments: attachmentMeta,
@@ -799,40 +798,16 @@ async function sendMessage() {
     messages.value.push(userMessage);
     inputText.value = "";
     selectedFiles.value = [];
-    await saveMessage(userMessage);
-
-    const deniedText = getModePermissionDeniedText(mode);
-    if (deniedText) {
-        const deniedMessage = reactive({
-            id: makeId("ai"),
-            role: "assistant",
-            mode,
-            content: deniedText,
-            rawContent: deniedText,
-            thinking: "",
-            thinkingCollapsed: true,
-            streaming: false,
-            code: "",
-            actions: [],
-            queryRows: [],
-            attachments: [],
-            modelId: selectedAiModel.value?.AiModel || "",
-            time: nowText()
-        });
-        messages.value.push(deniedMessage);
-        await saveMessage(deniedMessage);
-        refreshCurrentConversationTitle(userMessage);
-        scrollToBottom();
-        return;
-    }
+    sending.value = true;
+    scrollToBottom();
 
     const assistantMessage = reactive({
         id: makeId("ai"),
         role: "assistant",
-        mode,
+        mode: provisionalMode,
         content: "",
         rawContent: "",
-        thinking: "",
+        thinking: "正在分析语义并准备回答...",
         thinkingCollapsed: false,
         streaming: true,
         code: "",
@@ -843,10 +818,29 @@ async function sendMessage() {
         time: nowText()
     });
     messages.value.push(assistantMessage);
-    sending.value = true;
     scrollToBottom();
+    await nextTick();
 
+    let userSaved = false;
     try {
+        const attachmentPayload = await readAttachments(files);
+        const mode = await resolveSemanticMode(text, attachmentPayload);
+        resolvedMode.value = mode;
+        userMessage.mode = mode;
+        assistantMessage.mode = mode;
+        assistantMessage.thinking = "正在组织回答...";
+        await saveMessage(userMessage);
+        userSaved = true;
+
+        const deniedText = getModePermissionDeniedText(mode);
+        if (deniedText) {
+            assistantMessage.content = deniedText;
+            assistantMessage.rawContent = deniedText;
+            assistantMessage.thinking = "";
+            assistantMessage.thinkingCollapsed = true;
+            return;
+        }
+
         if (mode === "code") {
             await sendCodeQuestion(visibleText, assistantMessage);
         } else if (mode === "data") {
@@ -871,6 +865,9 @@ async function sendMessage() {
             assistantMessage.content = "AI 暂无可显示内容，请稍后重试或切换模型。";
         }
         assistantMessage.streaming = false;
+        if (!userSaved) {
+            await saveMessage(userMessage);
+        }
         await saveMessage(assistantMessage);
         refreshCurrentConversationTitle(userMessage);
         sending.value = false;
@@ -919,6 +916,7 @@ async function resolveSemanticMode(text, attachments = []) {
         const result = await DiyCommon.PostAsync("/api/Ai/RecognizeIntent", {
             UserChatMsg: text || "请分析我上传的附件。",
             AiModel: selectedAiModel.value?.AiModel || "",
+            AiModelId: selectedAiModel.value?.Id || "",
             OsClient: osClient.value,
             ConversationId: currentConversationId.value,
             Source: SOURCE,
@@ -994,8 +992,7 @@ function normalizePermission(permission) {
     }
 }
 
-async function readAttachments() {
-    const files = selectedFiles.value.slice(0, 10);
+async function readAttachments(files = selectedFiles.value.slice(0, 10)) {
     const payload = [];
     for (const file of files) {
         const contentType = file.type || "application/octet-stream";
@@ -1082,6 +1079,7 @@ async function sendChatQuestion(text, assistantMessage, attachments = []) {
         UserChatMsg: text,
         SystemChatMsg: buildSystemPrompt("chat"),
         AiModel: selectedAiModel.value.AiModel,
+        AiModelId: selectedAiModel.value.Id || "",
         OsClient: osClient.value,
         Attachments: attachments,
         ConversationId: currentConversationId.value,
@@ -1128,6 +1126,7 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
         UserChatMsg: prompt,
         SystemChatMsg: buildSystemPrompt("builder"),
         AiModel: selectedAiModel.value.AiModel,
+        AiModelId: selectedAiModel.value.Id || "",
         OsClient: osClient.value,
         Attachments: attachments,
         ConversationId: currentConversationId.value,
@@ -1158,6 +1157,7 @@ async function sendDataQuestion(text, assistantMessage) {
     const result = await DiyCommon.PostAsync("/api/Ai/NL2SQL", {
         Question: text,
         AiModel: selectedAiModel.value.AiModel,
+        AiModelId: selectedAiModel.value.Id || "",
         OsClient: osClient.value
     }, null, null, "json");
     if (!isOk(result)) throw new Error(result?.Msg || "数据分析失败");
@@ -1863,6 +1863,23 @@ async function copyText(text) {
     font-size: 14px;
     text-align: center;
     line-height: 1.85;
+}
+
+.empty-state .hero-local-tip {
+    max-width: 760px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 95, 46, .22);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(255, 95, 46, .12), rgba(126, 87, 255, .08));
+    color: var(--mci-theme-color, #ff5f2e);
+    box-shadow: 0 14px 34px rgba(255, 95, 46, .08);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.55;
 }
 
 .platform-stats {

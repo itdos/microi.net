@@ -64,6 +64,26 @@ namespace Microi.net
         // MongoDB连接配置缓存，避免频繁调用OsClient.GetClient
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _mongoConnectionCache = new();
 
+        private static string SafeString(object? value)
+        {
+            if (value == null)
+            {
+                return "";
+            }
+
+            return value is StringValues stringValues ? stringValues.ToString() : value.ToString() ?? "";
+        }
+
+        private static bool IsBlank(object? value)
+        {
+            return string.IsNullOrWhiteSpace(SafeString(value));
+        }
+
+        private static bool IsNotBlank(object? value)
+        {
+            return !IsBlank(value);
+        }
+
         public DiyWebSocket(IMicroiAI microiAI)
         {
             _microiAI = microiAI;
@@ -84,11 +104,13 @@ namespace Microi.net
             var osClient = currentToken?.OsClient;
             var userId = sysUser?["Id"].Val<string>();
             var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-            var userName = sysUser?["Name"].Val<string>().DosIsNullOrWhiteSpace() == null ? sysUser?["Account"].Val<string>() : sysUser?["Name"].Val<string>();
+            var name = sysUser?["Name"]?.Val<string>();
+            var account = sysUser?["Account"]?.Val<string>();
+            var userName = string.IsNullOrWhiteSpace(name) ? account : name;
             var userAvatar = sysUser?["Avatar"].Val<string>();
             
             // SignalR 特殊处理：如果 GetCurrentToken 返回空用户，尝试从 Context.User 获取
-            if(currentToken.CurrentUser == null && Context.User?.Identity?.IsAuthenticated == true)
+            if(currentToken?.CurrentUser == null && Context.User?.Identity?.IsAuthenticated == true)
             {
                 userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
                 osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
@@ -138,7 +160,7 @@ namespace Microi.net
                     clientInfo.ConnectionIds.Remove(connid);
                     clientInfo.ConnectionIds.Insert(0, connid);
                     clientInfo.ConnectionIds = clientInfo.ConnectionIds.Take(10).ToList();
-                    if (!deviceClientId.ToString().DosIsNullOrWhiteSpace())
+                    if (IsNotBlank(deviceClientId))
                     {
                         clientInfo.DeviceClientId = deviceClientId;
                     }
@@ -245,19 +267,19 @@ namespace Microi.net
                 var currentToken = await DiyToken.GetCurrentToken();
                 var osClient = currentToken?.OsClient;
                 var userKey = currentToken?.CurrentUser?["Id"].Val<string>();
-                if (userKey.DosIsNullOrWhiteSpace())
+                if (IsBlank(userKey))
                 {
                     userKey = currentToken?.CurrentUser?["Account"].Val<string>();
                 }
 
-                if ((osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
+                if ((IsBlank(osClient) || IsBlank(userKey))
                     && Context.User?.Identity?.IsAuthenticated == true)
                 {
                     osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
                     userKey = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
                 }
 
-                if (osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
+                if (IsBlank(osClient) || IsBlank(userKey))
                 {
                     return;
                 }
@@ -335,7 +357,7 @@ namespace Microi.net
             msg.CreateTime = DateTime.Now;
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
-            if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.Content.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.Content) || IsBlank(msg.OsClient))
             {
 
                 ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
@@ -752,7 +774,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendChatRecordToUser(MessageBody msg)
         {
-            if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
             {
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
@@ -854,7 +876,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendUnreadCountToUser(MessageBodyParam msg)
         {
-            if (msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
             {
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
@@ -937,7 +959,7 @@ namespace Microi.net
         {
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
             ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-            if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
             {
                 if (clientInfoFrom != null)
                 {
@@ -987,7 +1009,7 @@ namespace Microi.net
             {
                 return;
             }
-            if (msg.UserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.UserId) || IsBlank(msg.OsClient))
             {
                 if (clientInfo != null)
                 {
@@ -1025,7 +1047,7 @@ namespace Microi.net
                 string[] field = null;
                 SortDefinition<MessageChatContactList> sort = Builders<MessageChatContactList>.Sort.Descending("UpdateTime");
                 List<FilterDefinition<MessageChatContactList>> list2 = new List<FilterDefinition<MessageChatContactList>>();
-                if (!msg.ContactUserId.DosIsNullOrWhiteSpace())
+                if (IsNotBlank(msg.ContactUserId))
                 {
                     var contactUserClientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ContactUserId}");
 
@@ -1050,32 +1072,32 @@ namespace Microi.net
                         MessageChatContactList tModel = contactList.First();
                         if (msg._IsUpdateTime)
                             tModel.UpdateTime = DateTime.Now;
-                        if (!msg.LastMessage.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.LastMessage))
                             tModel.LastMessage = msg.LastMessage;
-                        if (!msg.LastMessageType.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.LastMessageType))
                             tModel.LastMessageType = msg.LastMessageType;
-                        if (!msg.UserName.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.UserName))
                             tModel.UserName = msg.UserName;
-                        if (!msg.UserAvatar.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.UserAvatar))
                             tModel.UserAvatar = msg.UserAvatar;
-                        if (!msg.ContactUserName.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.ContactUserName))
                             tModel.ContactUserName = msg.ContactUserName;
-                        if (!msg.ContactUserAvatar.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.ContactUserAvatar))
                             tModel.ContactUserAvatar = msg.ContactUserAvatar;
 
                         if (contactUserClientInfo != null)
                         {
-                            if (!contactUserClientInfo.DeviceClientId.DosIsNullOrWhiteSpace())
+                            if (IsNotBlank(contactUserClientInfo.DeviceClientId))
                             {
                                 tModel.ContactUserDeviceClientId = contactUserClientInfo.DeviceClientId;
                             }
-                            if (!contactUserClientInfo.OtherInfo.DosIsNullOrWhiteSpace())
+                            if (IsNotBlank(contactUserClientInfo.OtherInfo))
                             {
                                 tModel.OtherInfo = contactUserClientInfo.OtherInfo;
                             }
                         }
 
-                        if (!msg.OtherInfo.DosIsNullOrWhiteSpace())
+                        if (IsNotBlank(msg.OtherInfo))
                             tModel.OtherInfo = msg.OtherInfo;
 
                         MessageChatContactList messageChatContactList = tModel;
@@ -1086,11 +1108,11 @@ namespace Microi.net
                     {
                         if (contactUserClientInfo != null)
                         {
-                            if (!contactUserClientInfo.DeviceClientId.DosIsNullOrWhiteSpace())
+                            if (IsNotBlank(contactUserClientInfo.DeviceClientId))
                             {
                                 msg.ContactUserDeviceClientId = contactUserClientInfo.DeviceClientId;
                             }
-                            if (msg.OtherInfo.DosIsNullOrWhiteSpace() && !contactUserClientInfo.OtherInfo.DosIsNullOrWhiteSpace())
+                            if (IsBlank(msg.OtherInfo) && IsNotBlank(contactUserClientInfo.OtherInfo))
                             {
                                 msg.OtherInfo = contactUserClientInfo.OtherInfo;
                             }
@@ -1170,7 +1192,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendDelLastContact(MessageChatContactList msg)
         {
-            if (msg.UserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace() || msg.ContactUserId.DosIsNullOrWhiteSpace())
+            if (IsBlank(msg.UserId) || IsBlank(msg.OsClient) || IsBlank(msg.ContactUserId))
             {
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfo2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");

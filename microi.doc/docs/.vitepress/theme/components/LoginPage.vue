@@ -260,6 +260,7 @@
                 {{ isLogging ? '注册中...' : '注册并登录' }}
               </button>
               <p class="login-tip">注册成功后可继续创建一个免费的 SaaS 租户。</p>
+              <p class="login-tip token-tip">注册即赠送 100,000 AI 中转站 Token，可在个人中心查看已用和剩余额度。</p>
             </form>
           </div>
 
@@ -1406,6 +1407,15 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.6;
   text-align: center;
+}
+
+.token-tip {
+  margin-top: 6px;
+  border: 1px solid rgba(0, 191, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(0, 191, 255, 0.08);
+  color: rgba(236, 249, 255, 0.92);
+  padding: 8px 10px;
 }
 
 .tenant-progress-panel {

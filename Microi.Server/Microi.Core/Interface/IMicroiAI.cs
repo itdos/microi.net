@@ -33,6 +33,13 @@ namespace Microi.net
         Task<DosResult> Chat(AiParam param);
 
         /// <summary>
+        /// 获取当前用户 AI 中转站 Token 额度。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        Task<DosResult> GetRelayTokenSummary(AiParam param);
+
+        /// <summary>
         /// 构建无需调用大模型即可直接回答的运行态问题（如当前模型）。
         /// </summary>
         /// <param name="param"></param>
