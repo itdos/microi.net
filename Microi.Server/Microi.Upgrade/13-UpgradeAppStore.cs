@@ -16,7 +16,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.0.0.0";
+        public static string Version = "6.1.0.0";
         private static readonly string[] CoreNullableTables =
         {
             "diy_table",

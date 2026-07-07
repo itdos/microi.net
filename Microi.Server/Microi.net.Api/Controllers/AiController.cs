@@ -48,11 +48,66 @@ namespace Microi.net.Api
         /// </summary>
         private async Task<(string UserId, string UserName)> GetCurrentUserAsync()
         {
+            var context = await GetCurrentUserContextAsync();
+            return (context.UserId, context.UserName);
+        }
+
+        private string GetRequestOsClient()
+        {
+            var osClient = Request?.Headers["OsClient"].ToString();
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                osClient = Request?.Headers["osclient"].ToString();
+            }
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                osClient = Request?.Query["OsClient"].ToString();
+            }
+            return osClient ?? "";
+        }
+
+        private async Task<(string UserId, string UserName, string OsClient)> GetCurrentUserContextAsync()
+        {
             var token = await DiyToken.GetCurrentToken();
-            if (token?.CurrentUser == null) return (null, null);
+            var osClient = GetRequestOsClient();
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                osClient = token?.OsClient ?? "";
+            }
+            if (token?.CurrentUser == null) return (null, null, osClient);
             var userId = token.CurrentUser["Id"]?.ToString();
             var userName = token.CurrentUser["Name"]?.ToString() ?? token.CurrentUser["Account"]?.ToString() ?? "";
-            return (userId, userName);
+            return (userId, userName, osClient);
+        }
+
+        private async Task EnrichCurrentUserAsync(AiParam param)
+        {
+            if (param == null)
+            {
+                return;
+            }
+            var (userId, userName, osClient) = await GetCurrentUserContextAsync();
+            param.CurrentUserId = userId;
+            param.CurrentUserName = userName;
+            if (string.IsNullOrWhiteSpace(param.OsClient))
+            {
+                param.OsClient = osClient;
+            }
+        }
+
+        private async Task EnrichCurrentUserAsync(NL2SQLParam param)
+        {
+            if (param == null)
+            {
+                return;
+            }
+            var (userId, userName, osClient) = await GetCurrentUserContextAsync();
+            param.CurrentUserId = userId;
+            param.CurrentUserName = userName;
+            if (string.IsNullOrWhiteSpace(param.OsClient))
+            {
+                param.OsClient = osClient;
+            }
         }
 
         private const int AiContextRecentCount = 20;
@@ -238,12 +293,15 @@ namespace Microi.net.Api
             [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
             [FromQuery] string UserChatMsg = null,
             [FromQuery] string AiModel = null,
+            [FromQuery] string AiModelId = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new AiParam();
             if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+            await EnrichCurrentUserAsync(param);
 
             var intent = await _microiAi.ResolveIntentAsync(param);
             return Json(new DosResult(1, new
@@ -271,13 +329,16 @@ namespace Microi.net.Api
             [FromQuery] string UserChatMsg = null,
             [FromQuery] string SystemChatMsg = null,
             [FromQuery] string AiModel = null,
+            [FromQuery] string AiModelId = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new AiParam();
             if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
             if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+            await EnrichCurrentUserAsync(param);
 
             var builtinReply = _microiAi.TryBuildBuiltinChatReply(param);
             if (!string.IsNullOrWhiteSpace(builtinReply))
@@ -299,13 +360,16 @@ namespace Microi.net.Api
             [FromQuery] string UserChatMsg = null,
             [FromQuery] string SystemChatMsg = null,
             [FromQuery] string AiModel = null,
+            [FromQuery] string AiModelId = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new AiParam();
             if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
             if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+            await EnrichCurrentUserAsync(param);
 
             Response.ContentType = "text/event-stream; charset=utf-8";
             Response.Headers["Cache-Control"] = "no-cache";
@@ -363,13 +427,35 @@ namespace Microi.net.Api
             [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2SQLParam bodyParam,
             [FromQuery] string Question = null,
             [FromQuery] string AiModel = null,
+            [FromQuery] string AiModelId = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new NL2SQLParam();
             if (!string.IsNullOrWhiteSpace(Question)) param.Question = Question;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+            await EnrichCurrentUserAsync(param);
             var result = await _microiAi.NL2SQL(param);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 获取当前用户 AI 中转站 Token 额度。
+        /// </summary>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> RelayTokenSummary(
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
+            [FromQuery] string AiModel = null,
+            [FromQuery] string AiModelId = null,
+            [FromQuery] string OsClient = null)
+        {
+            var param = bodyParam ?? new AiParam();
+            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
+            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
+            await EnrichCurrentUserAsync(param);
+            var result = await _microiAi.GetRelayTokenSummary(param);
             return Json(result);
         }
 
@@ -471,6 +557,38 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "请先登录！"));
 
             var result = await _subService.GetUserSubscription(userId);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 获取当前用户的 AI 中转 API Key。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetUserAiApiKey()
+        {
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
+            if (string.IsNullOrEmpty(userId))
+                return Json(new DosResult(0, null, "请先登录！"));
+            if (string.IsNullOrWhiteSpace(osClient))
+                return Json(new DosResult(0, null, "OsClient不能为空！"));
+
+            var result = await _subService.EnsureUserAiApiKey(userId, osClient);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 重置当前用户的 AI 中转 API Key。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> ResetUserAiApiKey()
+        {
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
+            if (string.IsNullOrEmpty(userId))
+                return Json(new DosResult(0, null, "请先登录！"));
+            if (string.IsNullOrWhiteSpace(osClient))
+                return Json(new DosResult(0, null, "OsClient不能为空！"));
+
+            var result = await _subService.EnsureUserAiApiKey(userId, osClient, true);
             return Json(result);
         }
 

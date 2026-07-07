@@ -35,6 +35,20 @@ if (!Package.PackageInfo) {
 try {
     debugLog.startTime = new Date().toISOString();
     debugLog.packageInfo = Package.PackageInfo;
+    var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+    var reportProgress = function (progress, msg) {
+        if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
+        try {
+            V8.Method.UpdateBackgroundTask({
+                _BackgroundTaskId: backgroundTaskId,
+                Progress: progress,
+                Msg: msg
+            });
+        } catch (progressError) {
+            debugLog['background_progress_error_' + progress] = progressError.message;
+        }
+    };
+    reportProgress(5, '开始导入应用数据包');
 
     // ==================== 辅助函数：判断数据是否存在 ====================
 
@@ -66,7 +80,8 @@ try {
         LineInserted: 0,
         LineUpdated: 0,
         ApiEngineInserted: 0,
-        ApiEngineUpdated: 0
+        ApiEngineUpdated: 0,
+        VersionRecordUpdated: 0
     };
 
     // ==================== 辅助函数：导入 Id 对齐和引用修复 ====================
@@ -94,6 +109,89 @@ try {
 
     var execNonQuery = function (sql, params) {
         return addInParameters(V8.Db.FromSql(sql), params || []).ExecuteNonQuery();
+    };
+
+    var firstText = function (values) {
+        for (var i = 0; i < values.length; i++) {
+            var value = values[i];
+            if (value !== undefined && value !== null && String(value) !== '') {
+                return String(value);
+            }
+        }
+        return '';
+    };
+
+    var upsertMicroiStoreVersionRecord = function () {
+        try {
+            var pkgInfoForVersion = Package.PackageInfo || {};
+            var storeId = firstText([V8.Param.StoreId, V8.Param.MicroiStoreId, V8.Param.Id]);
+            var appId = firstText([V8.Param.AppId, V8.Param.AppKey, pkgInfoForVersion.AppId, storeId]);
+            var appName = firstText([V8.Param.AppName, V8.Param.Name, pkgInfoForVersion.Name, appId]);
+            var appVersion = firstText([V8.Param.AppVersion, V8.Param.Version, pkgInfoForVersion.Version, pkgInfoForVersion.AppVersion]);
+            if (!storeId && !appId && !appName) {
+                debugLog.version_record_skip = '未传入应用商城元数据，跳过安装版本记录';
+                return;
+            }
+
+            var where = [];
+            if (appId) {
+                where.push(['AppId', '=', appId]);
+            } else if (storeId) {
+                where.push(['StoreId', '=', storeId]);
+            } else {
+                where.push(['AppName', '=', appName]);
+            }
+
+            var now = DateNow('yyyy-MM-dd HH:mm:ss');
+            var model = {
+                StoreId: storeId,
+                AppId: appId,
+                AppName: appName,
+                AppVersion: appVersion,
+                AppVersionInstall: appVersion,
+                AppAuthor: firstText([V8.Param.AppAuthor, pkgInfoForVersion.AppAuthor, pkgInfoForVersion.CreateUser]),
+                InstallStatus: 'Installed',
+                InstallOsClient: V8.OsClient,
+                InstallTime: now,
+                LastCheckTime: now,
+                InstallUserId: V8.CurrentUser ? firstText([V8.CurrentUser.Id]) : '',
+                InstallUserName: V8.CurrentUser ? firstText([V8.CurrentUser.Name, V8.CurrentUser.Account]) : '',
+                PackageName: firstText([pkgInfoForVersion.Name, appName]),
+                PackageVersion: firstText([pkgInfoForVersion.Version, appVersion]),
+                PackageOsClient: firstText([pkgInfoForVersion.OsClient]),
+                InstallResult: JSON.stringify({
+                    TableInserted: stats.TableInserted,
+                    TableUpdated: stats.TableUpdated,
+                    FieldInserted: stats.FieldInserted,
+                    FieldUpdated: stats.FieldUpdated,
+                    MenuInserted: stats.MenuInserted,
+                    MenuUpdated: stats.MenuUpdated,
+                    ApiEngineInserted: stats.ApiEngineInserted,
+                    ApiEngineUpdated: stats.ApiEngineUpdated
+                }),
+                Remark: '应用商城安装完成'
+            };
+
+            var existing = V8.FormEngine.GetFormData('sys_microistoreversion', {
+                _Where: where,
+                _PageSize: 1
+            });
+            var saveResult;
+            if (existing && existing.Code == 1 && existing.Data && existing.Data.Id) {
+                model.Id = existing.Data.Id;
+                saveResult = V8.FormEngine.UptFormData('sys_microistoreversion', model);
+            } else {
+                saveResult = V8.FormEngine.AddFormData('sys_microistoreversion', model);
+            }
+            if (saveResult && saveResult.Code == 1) {
+                stats.VersionRecordUpdated++;
+                debugLog.version_record_result = '已写入应用安装版本：' + appName + ' ' + appVersion;
+            } else {
+                debugLog.version_record_error = saveResult ? saveResult.Msg : '未知错误';
+            }
+        } catch (versionError) {
+            debugLog.version_record_error = versionError.message || String(versionError);
+        }
     };
 
     var normalizeId = function (id) {
@@ -325,6 +423,7 @@ try {
 
     // ==================== 步骤0：执行DDL创建表和字段 ====================
 
+    reportProgress(10, '正在创建和检查物理表');
     debugLog.step0 = '开始执行DDL创建表';
 
     var ddlStatements = Package.DDLStatements || [];
@@ -703,6 +802,7 @@ try {
 
     // ==================== 步骤1：处理diy_table数据 ====================
 
+    reportProgress(25, '正在导入表单引擎表定义');
     debugLog.step1 = '开始处理diy_table数据';
 
     var diyTables = Package.DiyTables || [];
@@ -776,6 +876,7 @@ try {
 
     // ==================== 步骤2：处理diy_field数据 ====================
 
+    reportProgress(40, '正在导入字段定义');
     debugLog.step2 = '开始处理diy_field数据';
 
     var diyFields = Package.DiyFields || [];
@@ -1044,6 +1145,7 @@ try {
 
     // ==================== 步骤2.5：同步物理表字段（补充所有表的缺失字段） ====================
 
+    reportProgress(55, '正在同步物理表字段');
     debugLog.step2_5 = '开始同步物理表字段';
 
     var physicalFieldsAdded = 0;
@@ -1328,6 +1430,7 @@ try {
 
     // ==================== 步骤3：处理sys_menu数据 ====================
 
+    reportProgress(70, '正在导入菜单和按钮配置');
     debugLog.step3 = '开始处理sys_menu数据';
 
     var sysMenus = Package.SysMenus || [];
@@ -1460,6 +1563,7 @@ try {
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
 
     if (Package.WfFlowDesigns && Package.WfFlowDesigns.length > 0) {
+        reportProgress(80, '正在导入工作流设计');
         debugLog.step4 = '开始处理wf_flowdesign数据';
 
         var wfFlows = Package.WfFlowDesigns;
@@ -1503,6 +1607,7 @@ try {
     // ==================== 步骤5：处理wf_node数据（可选） ====================
 
     if (Package.WfNodes && Package.WfNodes.length > 0) {
+        reportProgress(85, '正在导入工作流节点');
         debugLog.step5 = '开始处理wf_node数据';
 
         var wfNodes = Package.WfNodes;
@@ -1546,6 +1651,7 @@ try {
     // ==================== 步骤6：处理wf_line数据（可选） ====================
 
     if (Package.WfLines && Package.WfLines.length > 0) {
+        reportProgress(90, '正在导入工作流连线');
         debugLog.step6 = '开始处理wf_line数据';
 
         var wfLines = Package.WfLines;
@@ -1590,6 +1696,7 @@ try {
     // ==================== 步骤7：处理sys_apiengine数据（可选） ====================
 
     if (Package.SysApiEngines && Package.SysApiEngines.length > 0) {
+        reportProgress(95, '正在导入接口引擎');
         debugLog.step7 = '开始处理sys_apiengine数据';
 
         var sysApiEngines = Package.SysApiEngines;
@@ -1688,6 +1795,9 @@ try {
         debugLog.step7Result = '接口引擎数据处理完成：新增' + stats.ApiEngineInserted + '，修改' + stats.ApiEngineUpdated;
     }
 
+    reportProgress(97, '正在写入应用安装版本记录');
+    upsertMicroiStoreVersionRecord();
+
     debugLog.endTime = new Date().toISOString();
 
     // ==================== 构建中文执行日志 ====================
@@ -1730,7 +1840,8 @@ try {
             工作流: '新增' + stats.FlowInserted + '条，修改' + stats.FlowUpdated + '条',
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
-            接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条'
+            接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条',
+            应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };
 
@@ -1747,6 +1858,7 @@ try {
     // Code=1 时自动提交事务，Code=0 时自动回滚事务
 
     var hasErrors = errors.length > 0;
+    reportProgress(98, hasErrors ? '导入完成，正在整理异常详情' : '导入完成，正在返回结果');
     return {
         Code: 1,
         Data: resultData,
