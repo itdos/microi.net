@@ -229,6 +229,9 @@ export declare class MicroiClient {
         TargetId?: string;
         TargetField?: string;
     }): Promise<ApiResponse>;
+    getMicroService(msKey: string): Promise<ApiResponse>;
+    createMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
+    publishMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     getTableData(tableName: string, query?: Record<string, unknown>): Promise<ApiResponse>;
     addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
     updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;

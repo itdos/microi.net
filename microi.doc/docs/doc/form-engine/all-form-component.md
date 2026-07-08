@@ -4,6 +4,23 @@
 
 ---
 
+## 通用配置项速查
+
+表单字段的配置主要存储在 `diy_field.Config`。以下配置项为 AI 生成字段、人工设计字段时必须优先理解的通用约定：
+
+| 配置项 | 说明 |
+| --- | --- |
+| `DataSource`、`Data` | 选项/下拉/树/级联的数据来源。`Select`、`MultipleSelect`、`Radio`、`Checkbox` 必须配置数据源，否则表单为空。 |
+| `Sql`、`DataSourceSqlRemote` | SQL 数据源与远程搜索。远程搜索时注意 `$Keyword$` 过滤和 `limit`。 |
+| `SelectLabel`、`SelectSaveField`、`SelectSaveFormat` | 显示字段、保存字段、保存格式。用于下拉、树、级联、关联选择等组件。 |
+| `EnableSearch` | 是否作为列表搜索条件。 |
+| `V8Code`、`V8CodeBlur` | 值变更、失焦等前端 V8 事件代码，代码应格式化保存。 |
+| `TextIcon`、`TextIconPosition`、`TextApend`、`TextApendPosition` | 文本类输入框图标、前后缀。 |
+| `DateTimeType` | 日期控件类型，例如 `date`、`datetime`。 |
+| `ImgUpload`、`FileUpload`、`Upload` | 上传数量、大小、私有文件、上传前后 V8 等配置。 |
+| `OpenTable`、`JoinForm`、`JoinTable` | 弹表选择、关联表单、关联表配置。 |
+| `TableChild` | 子表配置，包含关联子表、外键、导入匹配、导入回填等。 |
+
 ## 单行文本 Text
 
 若要限制单行文本只允许输入数字、身份证号、手机号、纯字母等，可通过字段的值变更 V8 事件、表单提交前 V8 事件进行限制：
@@ -87,6 +104,36 @@ if(V8.Form.Phone.length != 11){
 
 ## 子表格 TableChild
 >* 非常常用的子表
+>* 常用配置：
+```json
+{
+  "TableChildTableId": "子表 diy_table.Id",
+  "TableChildSysMenuId": "子表菜单 sys_menu.Id",
+  "TableChildSysMenuName": "子表菜单名称",
+  "TableChildFkFieldName": "XiangmuID",
+  "TableChildCallbackField": "[{\"Parent\":\"Code\",\"Child\":\"XiangmuBM\"}]",
+  "TableChild": {
+    "PrimaryTableFieldName": "Id",
+    "DisablePagination": false,
+    "NoneDefaultHeight": false,
+    "ImportAutoFillFk": true,
+    "ImportRelations": [
+      { "Parent": "Code", "Child": "XiangmuBM" }
+    ],
+    "ImportBackfillFields": [
+      { "Parent": "Code", "Child": "XiangmuBM" },
+      { "Parent": "Name", "Child": "XiangmuMC" }
+    ]
+  }
+}
+```
+>* `TableChildFkFieldName`：子表保存主表关联值的字段。
+>* `TableChild.PrimaryTableFieldName`：主表被关联字段，默认 `Id`。
+>* `ImportAutoFillFk`：导入子表 Excel 时自动补齐子表外键。
+>* `ImportRelations`：导入时用主表字段和子表/Excel 字段匹配主表，`Parent`、`Child` 可填字段名或字段标题。
+>* `ImportBackfillFields`：匹配到主表后，把主表字段回填到子表字段。适用于 Excel 中没有项目编号、项目名称、客户名称等展示冗余列的场景。
+>* `TableChildCallbackField`：旧版“回写子表列”配置，保存同类 JSON 字符串；导入逻辑会兼容读取。
+>* 在主表详情的子表区域导入，或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有主表关联列，也应由前端把固定主表关系传给 `/api/FormEngine/ImportDiyTableRow`，后端再补齐外键和 `ImportBackfillFields`。
 
 ## 地图(点) Map
 >* 地图画点
@@ -182,3 +229,19 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 
 ## JSON表格 JsonTable
 >* 支持JSON数据的表格展示与编辑
+
+## 组件配置项补充表
+
+| 组件 | 常用配置项 |
+| --- | --- |
+| Text / Textarea | `TextShowPassword`、`TextIcon`、`TextApend`、`Textarea.DefaultRows` |
+| NumberText | `NumberTextStep`、`NumberTextPrecision`、`NumberTextMath`、`NumberTextBtn`、`NumberTextBtnPosition` |
+| Select / MultipleSelect / Radio / Checkbox | `DataSource`、`Data`、`Sql`、`DataSourceId`、`DataSourceApiEngineKey`、`SelectLabel`、`SelectSaveField`、`SelectSaveFormat` |
+| AutoNumber | `AutoNumberFixed`、`AutoNumberLength`、`AutoNumberFields`、`AutoNumber.DataRule`、`AutoNumber.CreateRule` |
+| Button | `Button.Type`、`Button.Icon`、`Button.Size`、`Button.PreviewCanClick`、`Button.RefreshTableAfterClick` |
+| Divider / CollapseGroup / Tabs / Alert | `DividerPosition`、`Divider.Icon`、`CollapseGroup.*`、`FieldTabs.*`、`Alert.*` |
+| ImgUpload / FileUpload | `Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`、`Upload.*V8` |
+| Cascader / SelectTree / Department / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
+| OpenTable / JoinForm / JoinTable | `OpenTable.BtnName`、`OpenTable.MultipleSelect`、`OpenTable.BeforeOpenV8`、`OpenTable.SubmitV8`、`JoinForm.*`、`JoinTable.*` |
+| CodeEditor / JsonTable / Html / RichText | `CodeEditor.Height`、JSON/HTML/富文本内容配置 |
+| Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany`、二维码源字段、图标类名、`DevComponentName`、`DevComponentPath` |

@@ -373,8 +373,12 @@ namespace Microi.net
             {
                 if (needUptServerVersion)
                 {
-                    var count = osClientSecret.Db.FromSql($"update sys_config set ServerVersion='{uptVersion}'").ExecuteNonQuery();
-                    Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】成功！");
+                    var count = osClientSecret.Db.FromSql("update sys_config set ServerVersion=@p0")
+                        .AddInParameter("p0", uptVersion)
+                        .ExecuteNonQuery();
+                    await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient).RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config");
+                    await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient).RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config:sys_config");
+                    Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】成功，共更新 {count} 行！");
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】完成！");
                 }
             }

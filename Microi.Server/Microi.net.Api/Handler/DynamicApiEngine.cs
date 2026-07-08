@@ -290,7 +290,8 @@ namespace Microi.net.Api
                     }
 
                     // 检查接口是否启用
-                    bool isEnable = DynamicHelper.GetDynamicBoolValue(apiModel, "IsEnable");
+                    // 兼容旧缓存/导入包半量缓存：缺失 IsEnable 时按启用处理，显式 0/false 仍然停用。
+                    bool isEnable = DynamicHelper.GetDynamicBoolValue(apiModel, "IsEnable", true);
                     if (!isEnable)
                     {
                         values["controller"] = "ApiEngine";

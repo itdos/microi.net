@@ -105,6 +105,14 @@
                     />
                 <div class="form-item-tip">格式：[{ "Parent" : "Name", "Child" : "CustomerName" }]，导入子表时用 Child 列值反查主表 Parent 列，并自动写入关联子表列名。</div>
             </el-form-item>
+            <el-form-item label="导入回填子表列" :label-position="'top'"  style="display: block;">
+                <DiyCodeEditor
+                        v-model="configForm.ImportBackfillFields"
+                        :field="{ Id: 'ImportBackfillFields', Name: 'ImportBackfillFields' }"
+                        :height="'220px'"
+                    />
+                <div class="form-item-tip">格式：[{ "Parent" : "XiangmuBH", "Child" : "XiangmuBH" }]。导入子表时根据已匹配到的主表行，把主表列值补写到子表列；兼容上方“回写子表列”的 Father/Child 配置。</div>
+            </el-form-item>
         </el-form>
         <template #footer>
             <el-button @click="configDialogVisible = false">取消</el-button>
@@ -190,6 +198,7 @@ const configForm = ref({
     TableChildCallbackField: '',
     ImportAutoFillFk: true,
     ImportRelations: '[]',
+    ImportBackfillFields: '[]',
     LastSysMenuId: '',
     LastSysMenuName: '',
     LastTableId: '',
@@ -315,6 +324,7 @@ const openConfig = () => {
             : JSON.stringify(props.field.Config.TableChildCallbackField || ''),
         ImportAutoFillFk: props.field.Config.TableChild.ImportAutoFillFk !== false,
         ImportRelations: stringifyImportRelations(props.field.Config.TableChild.ImportRelations),
+        ImportBackfillFields: stringifyImportRelations(props.field.Config.TableChild.ImportBackfillFields),
         LastSysMenuId: props.field.Config.TableChild.LastSysMenuId || '',
         LastSysMenuName: props.field.Config.TableChild.LastSysMenuName || '',
         LastTableId: props.field.Config.TableChild.LastTableId || '',
@@ -380,6 +390,24 @@ const saveConfig = () => {
         }
     } else {
         props.field.Config.TableChild.ImportRelations = [];
+    }
+
+    let importBackfillValue = configForm.value.ImportBackfillFields;
+    if (!DiyCommon.IsNull(importBackfillValue)) {
+        try {
+            const parsed = JSON.parse(importBackfillValue);
+            if (Array.isArray(parsed)) {
+                props.field.Config.TableChild.ImportBackfillFields = parsed;
+            } else {
+                DiyCommon.Tips('导入回填子表列必须是数组格式', false);
+                return;
+            }
+        } catch (error) {
+            DiyCommon.Tips('导入回填子表列 JSON 格式错误：' + error.message, false);
+            return;
+        }
+    } else {
+        props.field.Config.TableChild.ImportBackfillFields = [];
     }
     
     // 保存上级模块信息

@@ -910,8 +910,19 @@ export default {
                         }
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
+                        var apiReplaceSelectApiBase = "";
+                        try {
+                            if (/^https?:\/\//i.test(url)) {
+                                apiReplaceSelectApiBase = new URL(url).origin;
+                            } else {
+                                apiReplaceSelectApiBase = self.DiyCommon.GetApiBase();
+                            }
+                        } catch (e) {
+                            apiReplaceSelectApiBase = self.DiyCommon.GetApiBase();
+                        }
                         for (var i = 0; i < result.Data.length; i++) {
                             // 默认都显示，后续异步更新
+                            result.Data[i]._ApiReplaceSelectApiBase = apiReplaceSelectApiBase;
                             result.Data[i].IsVisibleDetail = true;
                             result.Data[i].IsVisibleEdit = true;
                             result.Data[i].IsVisibleDel = true;
