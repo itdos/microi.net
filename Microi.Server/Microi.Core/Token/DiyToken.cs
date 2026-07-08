@@ -13,6 +13,10 @@ namespace Microi.net
 {
     public partial class DiyToken
     {
+        public const string AuthVersionClaimType = "MicroiAuthVersion";
+        public const string TokenIssuedAtClaimType = "MicroiTokenIssuedAt";
+        public const string CurrentAuthVersion = "2026-07-09-official-security-v2";
+
         public static bool IsWeakJwtSecret(string secret, string osClient)
         {
             if (secret.DosIsNullOrWhiteSpace())
@@ -40,6 +44,41 @@ namespace Microi.net
 
             jwtKey = jwtKey.Trim();
             return jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+        }
+
+        private static string NormalizeBearerToken(string token)
+        {
+            return token.DosTrim().DosReplace("Bearer ", "");
+        }
+
+        public static bool IsCurrentAuthVersion(IEnumerable<Claim> claims)
+        {
+            var authVersion = claims?.FirstOrDefault(d => d.Type == AuthVersionClaimType)?.Value;
+            return string.Equals(authVersion, CurrentAuthVersion, StringComparison.Ordinal);
+        }
+
+        public static bool IsActiveCachedToken(CurrentToken tokenModel, string requestToken)
+        {
+            var normalizedToken = NormalizeBearerToken(requestToken);
+            if (tokenModel == null || normalizedToken.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            if (!string.Equals(tokenModel.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (string.Equals(NormalizeBearerToken(tokenModel.Token), normalizedToken, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return tokenModel.Tokens != null
+                && tokenModel.Tokens.Any(d =>
+                    string.Equals(d.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal)
+                    && string.Equals(NormalizeBearerToken(d.Token), normalizedToken, StringComparison.Ordinal));
         }
 
         /// <summary>
@@ -299,6 +338,8 @@ namespace Microi.net
                     claims.Add(new Claim("Did", did));
                     claims.Add(new Claim("IP", ip));
                     claims.Add(new Claim("CreateTime", dateTimeNow.ToString("yyyy-MM-dd HH:mm:ss")));
+                    claims.Add(new Claim(AuthVersionClaimType, CurrentAuthVersion));
+                    claims.Add(new Claim(TokenIssuedAtClaimType, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
                     #region header返回
                     if (context != null)
                     {
@@ -378,12 +419,14 @@ namespace Microi.net
                             CreateTime = dateTimeNow,
                             UpdateTime = dateTimeNow,
                             Token = access_token,
+                            AuthVersion = CurrentAuthVersion,
                             OsClient = osClient,
                             Tokens = new List<TokensModel>()
                             {
                                 new TokensModel()
                                 {
                                     Token = access_token,
+                                    AuthVersion = CurrentAuthVersion,
                                     ClientType = clientType,
                                     Did = did,
                                     IP = ip,
@@ -399,6 +442,7 @@ namespace Microi.net
                         tokenModel.CurrentUser = currentUser;
                         tokenModel.UpdateTime = dateTimeNow;
                         tokenModel.Token = access_token;
+                        tokenModel.AuthVersion = CurrentAuthVersion;
                         tokenModel.OsClient = osClient;
                         if (tokenModel.Tokens == null)
                         {
@@ -408,6 +452,7 @@ namespace Microi.net
                         {
                             var firstToken = tokenModel.Tokens.First(d => d.Did == did && d.ClientType == clientType);
                             firstToken.Token = access_token;
+                            firstToken.AuthVersion = CurrentAuthVersion;
                             firstToken.IP = ip;
                             firstToken.UpdateTime = dateTimeNow;
                         }
@@ -416,6 +461,7 @@ namespace Microi.net
                             tokenModel.Tokens.Add(new TokensModel()
                             {
                                 Token = access_token,
+                                AuthVersion = CurrentAuthVersion,
                                 ClientType = clientType,
                                 Did = did,
                                 IP = ip,
@@ -489,12 +535,17 @@ namespace Microi.net
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
                     clientType = clientType.DosIsNullOrWhiteSpace("Empty");
 
+                    if (!IsCurrentAuthVersion(claims))
+                    {
+                        return null;
+                    }
+
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                        if (tokenModel != null && tokenModel.CurrentUser != null)
+                        if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
                         {
                             return tokenModel.CurrentUser;
                         }
@@ -569,6 +620,15 @@ namespace Microi.net
 
                 clientType = clientType.DosIsNullOrWhiteSpace("Empty");
 
+                if (!token.DosIsNullOrWhiteSpace() && !IsCurrentAuthVersion(claims))
+                {
+                    return new CurrentToken()
+                    {
+                        OsClient = osClient,
+                        Token = token
+                    };
+                }
+
                 if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
                 {
                     return new CurrentToken()
@@ -582,6 +642,14 @@ namespace Microi.net
 
                 var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (tokenModel == null || tokenModel.CurrentUser == null)
+                {
+                    return new CurrentToken()
+                    {
+                        OsClient = osClient,
+                        Token = token
+                    };
+                }
+                if (!IsActiveCachedToken(tokenModel, token))
                 {
                     return new CurrentToken()
                     {
@@ -632,11 +700,16 @@ namespace Microi.net
                     }
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
                     clientType = clientType.DosIsNullOrWhiteSpace("Empty");
+                    if (!IsCurrentAuthVersion(claims))
+                    {
+                        return null;
+                    }
+
                     if (!userId.DosIsNullOrWhiteSpace() && !thisOsClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(thisOsClient);
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{thisOsClient}:LoginTokenSysUser:{userId}");
-                        if (tokenModel != null && tokenModel.CurrentUser != null)
+                        if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
                         {
                             tokenModel.OsClient = thisOsClient;
                             return tokenModel;

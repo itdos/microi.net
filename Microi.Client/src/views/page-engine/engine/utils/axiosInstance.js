@@ -10,7 +10,7 @@ import { DiyCommon } from "@/utils/diy.common.js";
 // 创建 axios 实例
 const axiosInstance = axios.create({
   baseURL: '',
-  timeout: 10000,
+  timeout: 10 * 60 * 1000,
 })
 
 // 请求拦截器

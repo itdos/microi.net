@@ -109,58 +109,46 @@ PW_HOME_PATH=/#/pages/index/index
 
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
-## 全自动登录（免验证码 / 免手填密码）——必读
+## 全自动登录（免验证码，但不免密码）——必读
 
-E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端提供 **两套开发期登录旁路**，自动化时优先用它们直接拿 Token，跳过验证码与登录页 UI。源码见 `Microi.Server/Microi.net.Api/Controllers/SysUserController.cs`（`Login` 方法开头）。
+E2E 自动化最容易卡在「登录页有图形验证码」。Microi 后端允许自动化跳过验证码，但账号和密码必须始终走真实校验；如果密码配置错了，登录接口必须返回账号或密码错误。源码见 `Microi.Server/Microi.net.Api/Controllers/SysUserController.cs`（`Login` 方法开头）。
 
-### 方式 A：请求头 Dev Key 旁路（CI/E2E 首选，最稳）
+### 方式 A：自动化登录参数（远端/本地通用）
 
-- 触发条件：后端进程环境变量 `MICROI_DEV_TEST_KEY` 已设置，且请求头 `X-Microi-Dev-Key` 与之**完全相等**。
-- 效果：**跳过验证码**；若密码传占位值 `_DEV_BYPASS_`，则**连密码都不校验**（`param._DevBypassPwd=true`）。
-- 适用：任何来源 IP（不限 loopback），最适合容器/CI。
-- 风险控制：生产环境**绝不要**设置 `MICROI_DEV_TEST_KEY`。
-
-启动后端时注入（PowerShell）：
-
-```powershell
-$env:MICROI_DEV_TEST_KEY = 'itdos-smoketest-2026'
-Push-Location Microi.Server/Microi.net.Api
-dotnet run --launch-profile Microi.net.Api
-Pop-Location
-```
+- 触发条件：请求体传 `_AutomationTestLogin=true` 或 `_SkipCaptchaForAutomation=true`，且当前租户 `sys_config.AutoTestSkipCaptcha=true`（中文 Label：允许自动化测试登录时绕开验证码；字段缺失时按默认开启兼容旧库）。
+- 效果：只跳过图形验证码，仍校验 `Account` / `Pwd`。
+- 适用：MCP 连接远端租户、CI、Playwright 截图验收、接口自动化登录。
+- 风险控制：如果远端环境不希望自动化免验证码，请在系统设置关闭【允许自动化测试登录时绕开验证码】。
 
 Playwright 登录助手（直接拿 Token，不走登录页）：
 
 ```js
 // helpers/microi-login.js
-export async function devLogin(page, {
+export async function automationLogin(page, {
   backend = process.env.BACKEND || 'https://localhost:7266',
   osClient = process.env.MICROI_OSCLIENT || 'iTdos',
   account = process.env.PW_TEST_ACCOUNT || 'admin',
-  devKey  = process.env.MICROI_DEV_KEY || 'itdos-smoketest-2026',
+  password = process.env.PW_TEST_PASSWORD || '',
   frontend = process.env.FRONTEND || 'http://localhost:1988',
 } = {}) {
   const resp = await page.request.post(`${backend}/api/SysUser/Login`, {
-    headers: { 'X-Microi-Dev-Key': devKey, OsClient: osClient },
-    data: { Account: account, Pwd: '_DEV_BYPASS_', OsClient: osClient },
+    headers: { OsClient: osClient },
+    data: { Account: account, Pwd: password, OsClient: osClient, _AutomationTestLogin: true },
     ignoreHTTPSErrors: true,
   });
   const json = await resp.json();
-  if (json.Code !== 1) throw new Error('devLogin failed: ' + JSON.stringify(json).slice(0, 300));
+  if (json.Code !== 1) throw new Error('automationLogin failed: ' + JSON.stringify(json).slice(0, 300));
   const token = json.Data?.Token || json.Token;
   const userId = json.Data?.Id || json.Id;
-  // 把 Token 写进前端约定的 localStorage，刷新后即为已登录态
   await page.goto(frontend, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(({ t, u, oc }) => {
+  await page.evaluate(({ t, u, oc, account }) => {
     localStorage.setItem('Token', t);
-    localStorage.setItem('CurrentUser', JSON.stringify({ Id: u, Account: 'admin' }));
+    localStorage.setItem('CurrentUser', JSON.stringify({ Id: u, Account: account }));
     localStorage.setItem('OsClient', oc);
-  }, { t: token, u: userId, oc: osClient });
+  }, { t: token, u: userId, oc: osClient, account });
   return { token, userId };
 }
 ```
-
-可直接参照工作区现成用例：`Microi.Client/tests/blueprint-e2e.spec.mjs`（`X-Microi-Dev-Key` + `Pwd:'_DEV_BYPASS_'`）。
 
 ### 方式 B：配置驱动旁路（本地 localhost 调试用）
 
@@ -178,15 +166,15 @@ export async function devLogin(page, {
 ```
 
 - 触发条件：`Enabled=true`，且后端环境为 `Development`，且请求来自本机回环地址。生产、容器反代、非回环来源均不得生效。
-- 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`。
-- 与方式 A 区别：**仍会校验真实密码**，只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登；不要把它当成 CI/远端免密码登录能力。
+- 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`，仍会校验真实密码。
+- 与方式 A 区别：仅允许 Development + loopback。适合在本机用真实账号跑 UI 登录或直登；不要把它当成远端能力。
 - 生产环境务必保持 `Enabled=false` 或删除该块。
 
 `Microi.Client/scripts/run-form-engine-freeze-trace.mjs` 会在跑诊断前自动把 `DevLoginBypass` 写入 `appsettings.{Env}.json`；可用 `PW_CONFIG_DEV_LOGIN=0` 关闭该自动改写。
 
 ### 选型口诀
 
-- 容器/CI、无图形界面、要最稳 → **方式 A（Dev Key + `_DEV_BYPASS_`）**，直接 request 拿 Token。
+- 容器/CI、无图形界面、要最稳 → **方式 A（`_AutomationTestLogin=true` + 真实密码）**，直接 request 拿 Token。
 - 本机调试、想顺带验真实密码或走真实 UI 登录 → **方式 B（DevLoginBypass）**。
 - 两者都失败时再退回 UI 兜底：填账号密码、点登录（参见 `tests/form-engine-freeze-trace.spec.mjs` 的 `loginThroughUiIfNeeded`）。
 - Token 可能在响应体 `Data.Token`，也可能在响应头 `Authorization`，两处都要兜底取。
@@ -203,7 +191,7 @@ export async function devLogin(page, {
 > 4. 点「登 录」，落到首页；
 > 5. 再 `location.hash = '#/<目标路由>'` 进入目标页。
 >
-> 直连接口验收（不进页面）才用方式 A 拿 Token。
+> 直连接口验收（不进页面）才用方式 A 拿 Token。历史 `_DEV_BYPASS_` 只能在本机 DevLoginBypass 下替换为配置密码后继续校验，不能作为免密码能力。
 
 ## 服务自启动纪律（必做）
 

@@ -72,11 +72,6 @@ namespace Microi.net.Api
 
         private bool IsDevLoginBypassEnabled(string configKey, bool defaultValue = false)
         {
-            if (IsDevTestKeyMatched())
-            {
-                return true;
-            }
-
             if (!IsLocalDevelopmentLoginBypassAllowed())
             {
                 return false;
@@ -84,6 +79,17 @@ namespace Microi.net.Api
 
             var cfg = GetConfiguration();
             return cfg.GetValue<bool>(configKey, defaultValue);
+        }
+
+        private static bool IsAutomationCaptchaBypassRequested(SysUserParam param)
+        {
+            return param != null && (param._AutomationTestLogin || param._SkipCaptchaForAutomation);
+        }
+
+        private static bool IsAutomationCaptchaBypassAllowed(dynamic sysConfig)
+        {
+            var shortFieldValue = DynamicHelper.GetDynamicBoolValue(sysConfig, "AutoTestSkipCaptcha", true);
+            return DynamicHelper.GetDynamicBoolValue(sysConfig, "AllowAutomationLoginSkipCaptcha", shortFieldValue);
         }
 
         public class CreateTenantRequest
@@ -108,6 +114,13 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> Login(SysUserParam param)
         {
+            if (param == null)
+            {
+                return new JsonResult(new DosResult(0, null, "登录参数不能为空！"));
+            }
+            // 历史兼容字段不再允许跳过密码校验，避免外部请求通过模型绑定伪造。
+            param._DevBypassPwd = false;
+
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 return new JsonResult(new DosResult(1003, null, "OsClient不能为空！"));
@@ -128,58 +141,51 @@ namespace Microi.net.Api
             try
             {
                 var enableCaptcha = DynamicHelper.GetDynamicBoolValue(sysConfigResult.Data, "EnableCaptcha");
-                // ===== 自动化测试旁路：仅当环境变量 MICROI_DEV_TEST_KEY 显式设置且请求头 X-Microi-Dev-Key 匹配时，跳过验证码 =====
-                // 用途：CI/E2E 自动化登录。生产环境不要设置该变量。
-                var isDevTest = IsDevTestKeyMatched();
-                if (isDevTest)
+                // ===== 自动化测试旁路：只跳过验证码，账号密码永远走真实校验 =====
+                // 远端自动化：请求传 _AutomationTestLogin=true，且 sys_config.AutoTestSkipCaptcha=true。
+                // 本地/CI 兼容：MICROI_DEV_TEST_KEY + X-Microi-Dev-Key 仅用于跳验证码，不再跳过密码。
+                if ((IsAutomationCaptchaBypassRequested(param) && IsAutomationCaptchaBypassAllowed(sysConfigResult.Data))
+                    || IsDevTestKeyMatched())
                 {
                     enableCaptcha = false;
-                    // 在该模式下，密码字段允许为占位值（如 "_DEV_BYPASS_"），后续 Login() 会跳过密码校验
-                    if (string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
-                    {
-                        param._DevBypassPwd = true;
-                    }
                 }
                 // ===== 本地开发旁路（配置驱动）=====
                 // 仅本机 Development 环境允许配置驱动的开发登录旁路。
                 // 即使误把 DevLoginBypass.Enabled=true 发布到生产，非 Development 环境也不会生效。
-                else
+                if (IsLocalDevelopmentLoginBypassAllowed())
                 {
-                    if (IsLocalDevelopmentLoginBypassAllowed())
+                    var cfg = GetConfiguration();
+                    if (cfg != null)
                     {
-                        var cfg = GetConfiguration();
-                        if (cfg != null)
+                        if (cfg.GetValue<bool>("DevLoginBypass:SkipCaptcha", true))
                         {
-                            if (cfg.GetValue<bool>("DevLoginBypass:SkipCaptcha", true))
+                            enableCaptcha = false;
+                        }
+                        var defaultAccount = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
+                        var defaultPassword = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
+                        var accounts = cfg.GetSection("DevLoginBypass:Accounts").GetChildren();
+                        foreach (var accountCfg in accounts)
+                        {
+                            var osClient = accountCfg.GetValue<string>("OsClient");
+                            if (!osClient.DosIsNullOrWhiteSpace()
+                                && string.Equals(osClient, param.OsClient, StringComparison.OrdinalIgnoreCase))
                             {
-                                enableCaptcha = false;
+                                defaultAccount = accountCfg.GetValue<string>("Account") ?? defaultAccount;
+                                defaultPassword = accountCfg.GetValue<string>("Password")
+                                    ?? accountCfg.GetValue<string>("Pwd")
+                                    ?? defaultPassword;
+                                break;
                             }
-                            var defaultAccount = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
-                            var defaultPassword = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
-                            var accounts = cfg.GetSection("DevLoginBypass:Accounts").GetChildren();
-                            foreach (var accountCfg in accounts)
-                            {
-                                var osClient = accountCfg.GetValue<string>("OsClient");
-                                if (!osClient.DosIsNullOrWhiteSpace()
-                                    && string.Equals(osClient, param.OsClient, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    defaultAccount = accountCfg.GetValue<string>("Account") ?? defaultAccount;
-                                    defaultPassword = accountCfg.GetValue<string>("Password")
-                                        ?? accountCfg.GetValue<string>("Pwd")
-                                        ?? defaultPassword;
-                                    break;
-                                }
-                            }
-                            // 自动填充缺省账号密码（仅当请求未带）；_DEV_BYPASS_ 会替换为配置密码，但仍走真实密码校验。
-                            if (param.Account.DosIsNullOrWhiteSpace())
-                            {
-                                param.Account = defaultAccount;
-                            }
-                            if (param.Pwd.DosIsNullOrWhiteSpace()
-                                || string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
-                            {
-                                param.Pwd = defaultPassword;
-                            }
+                        }
+                        // 自动填充缺省账号密码（仅当请求未带）；_DEV_BYPASS_ 会替换为配置密码，但仍走真实密码校验。
+                        if (param.Account.DosIsNullOrWhiteSpace())
+                        {
+                            param.Account = defaultAccount;
+                        }
+                        if (param.Pwd.DosIsNullOrWhiteSpace()
+                            || string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
+                        {
+                            param.Pwd = defaultPassword;
                         }
                     }
                 }

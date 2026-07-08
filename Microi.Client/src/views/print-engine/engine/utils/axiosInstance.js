@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 // 创建 axios 实例
 const axiosInstance = axios.create({
   baseURL: '', // 替换为你的 API 基础 URL
-  timeout: 10000, // 请求超时时间
+  timeout: 10 * 60 * 1000, // 请求超时时间：兼容接口引擎、打印数据源等长业务
 })
 
 // 请求拦截器

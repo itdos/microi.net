@@ -69,9 +69,11 @@ Microi.Client/
 默认内容如下：
 ```json
 {
-  "ApiBaseDev": "https://api.itdos.com"
+  "ApiBaseDev": "https://localhost:7266"
 }
 ```
+
+> 安全提示：本地开发必须显式连接自己的本地/测试 API。不要把开源源码的 `ApiBaseDev` 配置为官方 `https://api.itdos.com`，也不要依赖空配置自动连接官方 API。
 
 ## 访问系统
 ```
