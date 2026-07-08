@@ -291,6 +291,7 @@ import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { getFirstValidRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
+import config from "@/config.json";
 
 export default {
     name: "Login",
@@ -408,13 +409,8 @@ export default {
                 Pwd2: "",
                 SmsCaptchaValue: ""
             },
-            // RSA公钥（1024位，已测试可用）
-            publicKey: `-----BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
-XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
-1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
-1DsI9VJ7gTHGL3R7sQIDAQAB
------END PUBLIC KEY-----`
+            // 登录RSA公钥：默认不内置固定密钥。如需启用，请通过 config.json 的 LoginRsaPublicKey 或 window.MicroiLoginPublicKey 配置。
+            publicKey: (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || ""
             // TokenLoginCount : 0
         };
     },
@@ -533,6 +529,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         encryptPassword(password) {
             var self = this;
             try {
+                if (!self.publicKey || !String(self.publicKey).trim()) {
+                    return password;
+                }
                 var encrypt = new JSEncrypt();
                 encrypt.setPublicKey(self.publicKey);
                 var encrypted = encrypt.encrypt(password);

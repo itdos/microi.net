@@ -205,8 +205,6 @@ var DiyOsClient = {
         }
     },
     GetApiBase: function () {
-        
-        
         //如果index.html指定了ApiBase，这个权重最大
         if (!DiyCommon.IsNull(ApiBase)) {
             return ApiBase.trim().replace(/\/+$/, "");
@@ -215,8 +213,22 @@ var DiyOsClient = {
         if (config && config.ApiBaseDev) {
             return config.ApiBaseDev.replace(/\/+$/, "");
         }
-        
-        return "https://api.itdos.com";
+
+        var cachedApiBase = localStorage.getItem("Microi.ApiBase");
+        if (!DiyCommon.IsNull(cachedApiBase)) {
+            cachedApiBase = String(cachedApiBase).trim().replace(/\/+$/, "");
+            if (!DiyCommon.IsLegacyOfficialApiBase || !DiyCommon.IsLegacyOfficialApiBase(cachedApiBase)) {
+                return cachedApiBase;
+            }
+            localStorage.removeItem("Microi.ApiBase");
+        }
+
+        // 安全兜底：开源源码未显式配置 API 地址时只使用同源，不再默认连接官方 API。
+        if (typeof window !== "undefined" && window.location && window.location.origin) {
+            console.warn("Microi：未配置 ApiBase，已使用当前站点同源地址。请显式配置后端 API。");
+            return window.location.origin.replace(/\/+$/, "");
+        }
+        return "";
     },
 
     GetOsClient: function () {

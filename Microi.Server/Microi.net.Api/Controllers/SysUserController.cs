@@ -27,30 +27,62 @@ namespace Microi.net.Api
             _captcha = captcha;
         }
 
-        private bool IsDevLoginBypassEnabled(string configKey, bool defaultValue = false)
+        private Microsoft.Extensions.Configuration.IConfiguration GetConfiguration()
+        {
+            return HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
+                as Microsoft.Extensions.Configuration.IConfiguration;
+        }
+
+        private Microsoft.AspNetCore.Hosting.IWebHostEnvironment GetHostEnvironment()
+        {
+            return HttpContext.RequestServices.GetService(typeof(Microsoft.AspNetCore.Hosting.IWebHostEnvironment))
+                as Microsoft.AspNetCore.Hosting.IWebHostEnvironment;
+        }
+
+        private bool IsDevTestKeyMatched()
         {
             var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
-            if (!string.IsNullOrWhiteSpace(devKey)
-                && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal))
-            {
-                return true;
-            }
+            return !string.IsNullOrWhiteSpace(devKey)
+                && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal);
+        }
 
-            var cfg = HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
-                as Microsoft.Extensions.Configuration.IConfiguration;
+        private bool IsLoopbackRequest()
+        {
+            var remoteIp = HttpContext.Connection.RemoteIpAddress;
+            return remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
+        }
+
+        private bool IsLocalDevelopmentLoginBypassAllowed()
+        {
+            var cfg = GetConfiguration();
             if (cfg == null || !cfg.GetValue<bool>("DevLoginBypass:Enabled"))
             {
                 return false;
             }
 
-            var onlyLoopback = cfg.GetValue<bool>("DevLoginBypass:OnlyLoopback", true);
-            var remoteIp = HttpContext.Connection.RemoteIpAddress;
-            var isLoopback = remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
-            if (onlyLoopback && !isLoopback)
+            var env = GetHostEnvironment();
+            if (env == null || !env.IsDevelopment())
             {
                 return false;
             }
 
+            // 配置驱动旁路只允许本机回环，避免生产反代、容器网关、内网IP误判后开放默认账号密码。
+            return IsLoopbackRequest();
+        }
+
+        private bool IsDevLoginBypassEnabled(string configKey, bool defaultValue = false)
+        {
+            if (IsDevTestKeyMatched())
+            {
+                return true;
+            }
+
+            if (!IsLocalDevelopmentLoginBypassAllowed())
+            {
+                return false;
+            }
+
+            var cfg = GetConfiguration();
             return cfg.GetValue<bool>(configKey, defaultValue);
         }
 
@@ -98,9 +130,7 @@ namespace Microi.net.Api
                 var enableCaptcha = DynamicHelper.GetDynamicBoolValue(sysConfigResult.Data, "EnableCaptcha");
                 // ===== 自动化测试旁路：仅当环境变量 MICROI_DEV_TEST_KEY 显式设置且请求头 X-Microi-Dev-Key 匹配时，跳过验证码 =====
                 // 用途：CI/E2E 自动化登录。生产环境不要设置该变量。
-                var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
-                var isDevTest = !string.IsNullOrWhiteSpace(devKey)
-                    && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal);
+                var isDevTest = IsDevTestKeyMatched();
                 if (isDevTest)
                 {
                     enableCaptcha = false;
@@ -111,19 +141,14 @@ namespace Microi.net.Api
                     }
                 }
                 // ===== 本地开发旁路（配置驱动）=====
-                // 当 appsettings.{Env}.json 中 DevLoginBypass.Enabled=true 且
-                // （OnlyLoopback=false 或 请求来自 127.0.0.1/::1）时，跳过验证码。
-                // 生产环境务必保持 DevLoginBypass.Enabled=false 或不配置。
+                // 仅本机 Development 环境允许配置驱动的开发登录旁路。
+                // 即使误把 DevLoginBypass.Enabled=true 发布到生产，非 Development 环境也不会生效。
                 else
                 {
-                    var cfg = HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
-                        as Microsoft.Extensions.Configuration.IConfiguration;
-                    if (cfg != null && cfg.GetValue<bool>("DevLoginBypass:Enabled"))
+                    if (IsLocalDevelopmentLoginBypassAllowed())
                     {
-                        var onlyLoopback = cfg.GetValue<bool>("DevLoginBypass:OnlyLoopback", true);
-                        var remoteIp = HttpContext.Connection.RemoteIpAddress;
-                        var isLoopback = remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
-                        if (!onlyLoopback || isLoopback)
+                        var cfg = GetConfiguration();
+                        if (cfg != null)
                         {
                             if (cfg.GetValue<bool>("DevLoginBypass:SkipCaptcha", true))
                             {
