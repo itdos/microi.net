@@ -38,12 +38,7 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
         // var clientModel = scope.ServiceProvider.GetRequiredService<IOsClientService>().GetClient(osClientName);
         var clientModel = OsClient.GetClient(osClientName);
 
-        var jwtKey = clientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace()
-            ? clientModel.OsClient
-            : clientModel.OsClientModel["AuthSecret"].Val<string>();
-        jwtKey = jwtKey.Length > 32
-            ? jwtKey.Substring(0, 32)
-            : jwtKey.PadRight(32, '.');
+        var jwtKey = DiyToken.ResolveJwtSigningKey(clientModel);
 
         options.RequireHttpsMetadata = false;
         options.TokenValidationParameters = new TokenValidationParameters

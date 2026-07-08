@@ -46,6 +46,9 @@
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="width:100%"/></td>
   </tr>
   <tr>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" style="width:100%"/></td>
+  </tr>
+  <tr>
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="width:100%"/></td>
   </tr>
   <tr>

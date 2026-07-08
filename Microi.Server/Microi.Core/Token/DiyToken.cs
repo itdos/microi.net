@@ -13,6 +13,35 @@ namespace Microi.net
 {
     public partial class DiyToken
     {
+        public static bool IsWeakJwtSecret(string secret, string osClient)
+        {
+            if (secret.DosIsNullOrWhiteSpace())
+            {
+                return true;
+            }
+
+            var value = secret.Trim();
+            if (value.Length < 32)
+            {
+                return true;
+            }
+
+            return !osClient.DosIsNullOrWhiteSpace()
+                && value.Equals(osClient, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string ResolveJwtSigningKey(OsClientSecret clientModel)
+        {
+            var jwtKey = clientModel?.OsClientModel?["AuthSecret"]?.Val<string>();
+            if (IsWeakJwtSecret(jwtKey, clientModel?.OsClient))
+            {
+                throw new Exception($"租户[{clientModel?.OsClient}]的JWT AuthSecret为空、过短或等于租户Key，请在SaaS引擎中配置强随机AuthSecret后重试。");
+            }
+
+            jwtKey = jwtKey.Trim();
+            return jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+        }
+
         /// <summary>
         /// 获取当前 OsClient
         /// </summary>
@@ -311,8 +340,7 @@ namespace Microi.net
 
                     var handler = new JwtSecurityTokenHandler();
 
-                    var jwtKey = clientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace() ? clientModel.OsClient : clientModel.OsClientModel["AuthSecret"].Val<string>();
-                    jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+                    var jwtKey = ResolveJwtSigningKey(clientModel);
 
                     var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
                     var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);

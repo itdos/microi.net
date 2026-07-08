@@ -292,12 +292,17 @@ var DiyCommon = {
             value: apiBase
         });
     },
+    IsLegacyOfficialApiBase(apiBase) {
+        if (DiyCommon.IsNull(apiBase)) {
+            return false;
+        }
+        var value = String(apiBase).trim().replace(/\/+$/, "").toLowerCase();
+        return value === "https://api.itdos.com" || value === "https://api-china.itdos.com";
+    },
     GetApiBase: function () {
-        
-
         //如果index.html指定了ApiBase，这个权力最大
         if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase;
+            return ApiBase.trim().replace(/\/+$/, "");
         }
         // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
         if (config && config.ApiBaseDev) {
@@ -305,13 +310,27 @@ var DiyCommon = {
         }
         var result = store.state.DiyStore.ApiBase;
         if (!DiyCommon.IsNull(result)) {
-            return result;
+            result = String(result).trim().replace(/\/+$/, "");
+            if (!DiyCommon.IsLegacyOfficialApiBase(result)) {
+                return result;
+            }
         }
         var cachedApiBase = LocalStorageManager.get("ApiBase");
         if (!DiyCommon.IsNull(cachedApiBase)) {
-            return cachedApiBase;
+            cachedApiBase = String(cachedApiBase).trim().replace(/\/+$/, "");
+            if (!DiyCommon.IsLegacyOfficialApiBase(cachedApiBase)) {
+                return cachedApiBase;
+            }
+            LocalStorageManager.remove("ApiBase");
+            localStorage.removeItem("Microi.ApiBase");
         }
-        return "https://api-china.itdos.com";
+        // 安全兜底：开源源码未显式配置 API 地址时，只回落到当前站点同源。
+        // 禁止默认连接官方 API，避免本地开发者清空 config.json 后误连官方数据库。
+        if (typeof window !== "undefined" && window.location && window.location.origin) {
+            console.warn("Microi：未配置 ApiBase，已使用当前站点同源地址。请在 index.html、config.json 或 Microi.ApiBase 中显式配置后端 API。");
+            return window.location.origin.replace(/\/+$/, "");
+        }
+        return "";
     },
     IsNull: function (str) {
         // try {

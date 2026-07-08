@@ -578,12 +578,14 @@ VS Code 插件提供 API 知识和表结构 → MCP 提供实时数据查询和�
 # 修复Codex五次websocket连接失败、Codex的移动端无法连接的问题
 # 存放路径：~/.codex/.env 或 C:\Users\Administrator\.codex\.env
 # 注意：Clash Verge的默认端口是7897，而v2ray的默认端口是10808（设置-参数设置-本地混合监听端口）
-HTTP_PROXY=http://127.0.0.1:7897
-HTTPS_PROXY=http://127.0.0.1:7897
-ALL_PROXY=http://127.0.0.1:7897
+HTTP_PROXY=http://127.0.0.1:10808
+HTTPS_PROXY=http://127.0.0.1:10808
+ALL_PROXY=http://127.0.0.1:10808
 NO_PROXY=localhost,127.0.0.1,::1
 
 # 2、windows powershell需要执行以下2条命令，然后可通过【curl.exe -4 https://ipinfo.io/json】测试地区
 $env:HTTP_PROXY="http://127.0.0.1:10808"
 $env:HTTPS_PROXY="http://127.0.0.1:10808"
+
+# 3、不要使用新加坡、中国香港、中国台湾地区节点
 ```

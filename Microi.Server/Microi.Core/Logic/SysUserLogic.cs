@@ -1167,6 +1167,23 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
+        private static string GetLoginRsaPrivateKey()
+        {
+            var privateKey = ConfigHelper.GetEnvOrConfiguration("MICROI_LOGIN_RSA_PRIVATE_KEY", "Security:LoginRsaPrivateKey");
+            if (!privateKey.DosIsNullOrWhiteSpace())
+            {
+                return privateKey.Replace("\\n", "\n").Trim();
+            }
+
+            var privateKeyPath = ConfigHelper.GetEnvOrConfiguration("MICROI_LOGIN_RSA_PRIVATE_KEY_PATH", "Security:LoginRsaPrivateKeyPath");
+            if (!privateKeyPath.DosIsNullOrWhiteSpace() && System.IO.File.Exists(privateKeyPath))
+            {
+                return System.IO.File.ReadAllText(privateKeyPath).Trim();
+            }
+
+            return "";
+        }
+
         public async Task<DosResult<dynamic>> Login(SysUserParam param)
         {
             //LogHelper.Debug("开始1", "调试Login_");
@@ -1191,27 +1208,21 @@ namespace Microi.net
             {
                 if (!param.Pwd.DosIsNullOrWhiteSpace() && EncryptHelper.IsRSAEncrypted(param.Pwd))
                 {
-                    var originalPwd = param.Pwd;
-                    param.Pwd = EncryptHelper.RSADecrypt(param.Pwd, @"-----BEGIN RSA PRIVATE KEY-----
-MIICXAIBAAKBgQC7q21EG3HiSFNO9XFUJoMeyz2RXaFX8UgCFE4d4pvK6IvQsWun
-m+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ1rS/MVn4i6CsPgP9Q7nFV6dZ
-vbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg1DsI9VJ7gTHGL3R7sQIDAQAB
-AoGAX0s22oSNGXfcRZXADBjaL8LH6o5+pOcxx0yENgyhSzE1/ax5m8w/luVDu2gc
-iEEfMbXoK0l03rT3WvZoxQ8rgAGd9fT4tSyusChEIbo2meS5ildJLtChe4k2JTam
-iFf7uhw3a1MPXcGdM982157/EHwnGodlT9URf88IJjYKObkCQQDbV07MvAdxZLA5
-12cyJYkMMRPEoTs5e2kDplFj8tdViJvSEjqICdBlqi7Xq9EP2dRfVHbMzmN8w+NU
-8bD/Em9nAkEA2wkH64ip7EUBAAplkZj42HC2+9GH2PL1R3jCe+4iav1U6w55i52U
-wwRBSRnLzlsL8ImuCXTeQYsgPQ05V/OFJwJARgu2tXkio1q1UHNymDgWcRdHKdcX
-c77uhWTavyFxFPagVFDP8lu3+o+DkAplpDs7MApoOfV7Hf/snFbm4D5B5wJAPUq6
-p6M3gYERtZQzNdnrkI2B9td8Py5Firl1Gr7ZbLz1HU2Qn4v6C9RN/Im2aUk6/xVX
-2ReV9htbaxofOMhRMwJBALxMseOT5HnYThuju6v6c4VIzP1prTWkaZ0AAx+gEBhV
-o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
------END RSA PRIVATE KEY-----");
+                    var privateKey = GetLoginRsaPrivateKey();
+                    if (privateKey.DosIsNullOrWhiteSpace())
+                    {
+                        return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
+                    }
+                    param.Pwd = EncryptHelper.RSADecrypt(param.Pwd, privateKey);
+                    if (param.Pwd.DosIsNullOrWhiteSpace())
+                    {
+                        return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
+                    }
                 }
             }
             catch (Exception ex)
             {
-                // RSA解密失败，继续使用原密码
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             //LogHelper.Debug("开始2", "调试Login_");
              //获取系统设置
