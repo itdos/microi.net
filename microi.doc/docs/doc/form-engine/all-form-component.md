@@ -228,20 +228,95 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 >* 这是一个非常强大的组件
 
 ## JSON表格 JsonTable
->* 支持JSON数据的表格展示与编辑
+>* 支持 JSON 数据的表格展示与编辑，字段值保存为结构化 JSON。
+>* 配置来源为 `diy_field.Config.JsonTable`，事实源组件是 `Microi.Client/src/views/form-engine/diy-field-component/diy-jsontable.vue`。
+>* 必须配置 `Columns`，否则前端只能显示空表。
+
+常用根配置：
+
+| 配置项 | 说明 |
+| --- | --- |
+| `Columns` | 列配置数组。 |
+| `DataSource` | 批量导入/候选数据源类型：`KeyValue`、`Sql`、`DataSource`、`ApiEngine` 等。 |
+| `Sql` | SQL 数据源语句；远程搜索时建议带 `$Keyword$` 和 `limit`。 |
+| `DataSourceId` | 数据源引擎 Key/Id。 |
+| `ApiEngineKey` / `DataSourceApiEngineKey` | 接口引擎 Key。根节点保存为 `ApiEngineKey`，列级配置可使用 `DataSourceApiEngineKey`。 |
+| `SelectLabel` | 候选数据展示字段。 |
+| `DataSourceSqlRemote` | 是否远程搜索。数据量大时必须启用。 |
+| `KeyValueList` | 静态键值数据，格式为 `[{ "Key": "A", "Value": "选项A" }]`。 |
+
+`Columns[]` 每列配置：
+
+| 配置项 | 说明 |
+| --- | --- |
+| `Id` | 列唯一 Id。 |
+| `Sort` | 列排序。 |
+| `Label` | 列标题，必填。 |
+| `Key` | JSON 行对象属性名，必填。 |
+| `Component` | 列编辑控件，支持 `Text`、`Number`、`Textarea`、`Password`、`Select`、`MultipleSelect`、`Radio`、`Checkbox`、`Switch`、`Cascader`、`SelectTree`、`DateTime`、`Rate`、`ColorPicker`、`Progress`、`AutoNumber`、`Autocomplete`、`Address`、`Department`、`Map`、`ImgUpload`、`FileUpload`、`RichText`、`CodeEditor`、`Html`、`Fontawesome`、`Qrcode`、`Divider`、`Button`。 |
+| `Width` / `MinWidth` | 固定宽度 / 最小宽度。 |
+| `Required` | 是否必填。 |
+| `Visible` | 是否显示。 |
+| `DefaultValue` | 新增行默认值。 |
+| `Placeholder` | 占位提示。 |
+| `Readonly` | 是否只读。 |
+| `Config` | 列级控件配置。选择类列常用 `DataSource`、`Sql`、`DataSourceId`、`DataSourceApiEngineKey`、`DataSourceSqlRemote`、`SelectLabel`、`SelectSaveField`、`SelectSaveFormat`、`EnableSearch`。 |
+| `Data` / `KeyValueList` | 列级静态选项。 |
+
+配置示例：
+
+```json
+{
+  "JsonTable": {
+    "Columns": [
+      {
+        "Id": "col-material",
+        "Sort": 1,
+        "Label": "材料名称",
+        "Key": "MaterialName",
+        "Component": "Text",
+        "MinWidth": 160,
+        "Required": true,
+        "Visible": true,
+        "Placeholder": "请输入材料名称"
+      },
+      {
+        "Id": "col-status",
+        "Sort": 2,
+        "Label": "状态",
+        "Key": "Status",
+        "Component": "Select",
+        "MinWidth": 120,
+        "Visible": true,
+        "Config": {
+          "DataSource": "KeyValue",
+          "SelectLabel": "Value",
+          "SelectSaveField": "Key",
+          "SelectSaveFormat": "Text"
+        },
+        "KeyValueList": [
+          { "Key": "draft", "Value": "草稿" },
+          { "Key": "confirmed", "Value": "已确认" }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ## 组件配置项补充表
 
 | 组件 | 常用配置项 |
 | --- | --- |
 | Text / Textarea | `TextShowPassword`、`TextIcon`、`TextApend`、`Textarea.DefaultRows` |
-| NumberText | `NumberTextStep`、`NumberTextPrecision`、`NumberTextMath`、`NumberTextBtn`、`NumberTextBtnPosition` |
+| NumberText / Slider / Rate / Progress / ColorPicker | `NumberTextStep`、`NumberTextPrecision`、`NumberTextMath`、`NumberTextBtn`、`NumberTextBtnPosition`、滑块/评分/进度/颜色值配置 |
 | Select / MultipleSelect / Radio / Checkbox | `DataSource`、`Data`、`Sql`、`DataSourceId`、`DataSourceApiEngineKey`、`SelectLabel`、`SelectSaveField`、`SelectSaveFormat` |
+| Autocomplete / TagInput / Transfer | 联想数据源、`TagInput.Placeholder`、`TagInput.Options`、`TagInput.MaxCount`、`Transfer.LeftTitle`、`Transfer.RightTitle`、`Transfer.Filterable`、`Transfer.Options` |
 | AutoNumber | `AutoNumberFixed`、`AutoNumberLength`、`AutoNumberFields`、`AutoNumber.DataRule`、`AutoNumber.CreateRule` |
 | Button | `Button.Type`、`Button.Icon`、`Button.Size`、`Button.PreviewCanClick`、`Button.RefreshTableAfterClick` |
-| Divider / CollapseGroup / Tabs / Alert | `DividerPosition`、`Divider.Icon`、`CollapseGroup.*`、`FieldTabs.*`、`Alert.*` |
+| Divider / CollapseGroup / Tabs / Alert / StaticText | `DividerPosition`、`Divider.Icon`、`CollapseGroup.*`、`FieldTabs.*`、`Alert.*`、`StaticText.Content` |
 | ImgUpload / FileUpload | `Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`、`Upload.*V8` |
-| Cascader / SelectTree / Department / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
+| Cascader / SelectTree / Department / Address / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
 | OpenTable / JoinForm / JoinTable | `OpenTable.BtnName`、`OpenTable.MultipleSelect`、`OpenTable.BeforeOpenV8`、`OpenTable.SubmitV8`、`JoinForm.*`、`JoinTable.*` |
-| CodeEditor / JsonTable / Html / RichText | `CodeEditor.Height`、JSON/HTML/富文本内容配置 |
+| CodeEditor / JsonTable / Html / RichText | `CodeEditor.Height`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML/富文本内容配置 |
 | Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany`、二维码源字段、图标类名、`DevComponentName`、`DevComponentPath` |

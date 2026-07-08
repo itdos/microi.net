@@ -4645,6 +4645,73 @@ namespace Microi.net
                 {
                     return new DosResult<object>(0, null, "FieldList 解析后为空");
                 }
+
+                // UptDiyFieldList expects designer-style full field rows and will
+                // reorder Sort / normalize missing fields. MCP callers usually send
+                // sparse patches such as { Id, Tab }, so handle those directly.
+                string ToLocalCamelCase(string name)
+                {
+                    return string.IsNullOrEmpty(name) ? name : char.ToLowerInvariant(name[0]) + name.Substring(1);
+                }
+
+                var fullRowFields = new[] { "Name", "Label", "Type", "Component", "Sort" };
+                var isSparsePatch = fieldList.Any(item =>
+                    fullRowFields.Any(name => item[name] == null && item[ToLocalCamelCase(name)] == null));
+                if (isSparsePatch)
+                {
+                    var fieldMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Label"] = "Label",
+                        ["Component"] = "Component",
+                        ["Visible"] = "Visible",
+                        ["AppVisible"] = "AppVisible",
+                        ["Readonly"] = "Readonly",
+                        ["NotEmpty"] = "NotEmpty",
+                        ["Unique"] = "Unique",
+                        ["Encrypt"] = "Encrypt",
+                        ["Sort"] = "Sort",
+                        ["FormWidth"] = "FormWidth",
+                        ["TableWidth"] = "TableWidth",
+                        ["Placeholder"] = "Placeholder",
+                        ["DefaultValue"] = "DefaultValue",
+                        ["Tab"] = "Tab",
+                        ["Data"] = "Data",
+                        ["Config"] = "Config",
+                        ["Description"] = "Description",
+                        ["InTableEdit"] = "InTableEdit",
+                        ["V8Code"] = "V8Code",
+                        ["KeyupV8Code"] = "KeyupV8Code",
+                        ["V8TmpEngineTable"] = "V8TmpEngineTable",
+                        ["V8TmpEngineForm"] = "V8TmpEngineForm"
+                    };
+                    var updateCount = 0;
+                    foreach (var item in fieldList)
+                    {
+                        var fieldId = item["Id"].Val<string>() ?? item["id"].Val<string>();
+                        if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "FieldList 每项必须包含 Id");
+                        var directPatch = new JObject
+                        {
+                            ["OsClient"] = osClient,
+                            ["Id"] = fieldId
+                        };
+                        foreach (var prop in item.Properties())
+                        {
+                            if (prop.Name.Equals("Id", StringComparison.OrdinalIgnoreCase)) continue;
+                            if (fieldMappings.TryGetValue(prop.Name, out var targetName))
+                            {
+                                directPatch[targetName] = prop.Value;
+                            }
+                        }
+                        if (directPatch.Properties().Count() <= 2) continue;
+                        var directResult = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", directPatch);
+                        if (directResult.Code != 1) return new DosResult<object>(directResult.Code, null, directResult.Msg);
+                        updateCount++;
+                    }
+
+                    await RefreshSchemaCache(osClient, new List<string> { patch["TableId"]?.Value<string>() });
+                    return new DosResult<object>(1, new { UpdateCount = updateCount, Mode = "Patch" });
+                }
+
                 var diyFieldParam = new DiyFieldParam
                 {
                     OsClient = osClient,
