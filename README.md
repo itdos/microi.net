@@ -30,7 +30,7 @@
 
 | 资源 | 地址 |
 |---|---|
-| 🌐 官网 | [https://microi.net](https://microi.net) |
+| 🌐 官网 | [https://microi.net](https://microi.net) 【<font color="red">支持在线注册免费使用</font>】 |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |

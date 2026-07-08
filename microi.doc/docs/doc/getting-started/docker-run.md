@@ -116,6 +116,548 @@ bash install-microi-offline.sh
 # 请替换帐号、密码、地域
 docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
+
+如果不使用宝塔等面板在编排界面操作，可使用脚本将编排内容转换成一行命令在SSH中执行，请将以下脚本命名为【一键编排生成.sh】文件然后直接运行
+
+::: details 如果不使用宝塔等面板在编排界面操作，可使用脚本将编排内容置换成一行命令在SSH中执行
+```bash
+:<<'WIN'
+@echo off
+chcp 65001 2>nul
+setlocal EnableDelayedExpansion
+rem ════════════════════════════════════════════════════════════════
+rem  Docker 编排 → 一行 SSH 命令生成器 - Windows 自动启动器
+rem  自动查找 Git Bash 或 WSL 并执行此脚本
+rem ════════════════════════════════════════════════════════════════
+set "BASH_EXE="
+if exist "%ProgramFiles%\Git\bin\bash.exe"           set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
+if exist "%ProgramFiles(x86)%\Git\bin\bash.exe"      if not defined BASH_EXE set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
+if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe"  if not defined BASH_EXE set "BASH_EXE=%LOCALAPPDATA%\Programs\Git\bin\bash.exe"
+if exist "C:\Git\bin\bash.exe"                       if not defined BASH_EXE set "BASH_EXE=C:\Git\bin\bash.exe"
+if exist "C:\msys64\usr\bin\bash.exe"                if not defined BASH_EXE set "BASH_EXE=C:\msys64\usr\bin\bash.exe"
+if not defined BASH_EXE (
+    for /f "delims=" %%i in ('where bash 2^>nul') do (
+        echo %%i | findstr /i "System32" >nul || if not defined BASH_EXE set "BASH_EXE=%%i"
+    )
+)
+if defined BASH_EXE goto :bash_run
+where wsl >nul 2>nul
+if %ERRORLEVEL% equ 0 goto :wsl_run
+echo.
+echo   ════════════════════════════════════════════════════════
+echo   ERROR: 未找到 Git Bash 或 WSL！请安装以下任意一种:
+echo     1. Git for Windows: https://git-scm.com/download/win
+echo     2. WSL2: 在管理员 PowerShell 中运行 wsl --install
+echo   ════════════════════════════════════════════════════════
+echo.
+pause
+exit /b 1
+:bash_run
+echo   ^> Bash: !BASH_EXE!
+"!BASH_EXE!" "%~f0" %*
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+:wsl_run
+echo   ^> WSL: 执行中...
+for /f "delims=" %%p in ('wsl wslpath -u "%~f0"') do set "WSLP=%%p"
+wsl bash "!WSLP!" %*
+set EC=!ERRORLEVEL!
+echo.
+pause
+exit /b !EC!
+WIN
+#!/usr/bin/env bash
+# 如果用户在 macOS/Linux 上用 `sh 一键编排生成.sh` 启动，
+# 这里先切回 bash；脚本后续依赖数组、case 等 bash 特性。
+if [ -z "${BASH_VERSION:-}" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+    printf '%s\n' "ERROR: 未找到 bash，请安装 bash 后执行: bash $0" >&2
+    exit 1
+fi
+set +o posix 2>/dev/null || true
+
+# ════════════════════════════════════════════════════════════════
+#  Docker 编排 → 一行 SSH 命令生成器
+#  把任意 docker-compose 编排文件 / 编排内容 转成可在 SSH 终端
+#  直接粘贴运行的一行命令：
+#      mkdir -p <目录> && echo '<b64>' | base64 -d > <目录>/<文件> \
+#          && cd <目录> && <compose命令> up -d
+#
+#  使用场景：
+#      A 电脑有编排文件 → 一键生成一行命令 → 复制粘到 B 电脑的 SSH
+#      终端 → 在 C 服务器(CentOS)上一键拉起所有编排容器。
+#
+#  两种调用方式：
+#      [1] 双击 / 无参数    → 交互模式（输入路径或粘贴内容，生成 .sh 文件）
+#      [2] bash 一键编排生成.sh <编排文件> [...选项]
+#                          → 命令行模式（直接输出命令到屏幕）
+#
+#  平台支持：
+#      macOS / Linux:  bash 一键编排生成.sh [选项]
+#      Windows:        在资源管理器双击 .sh（自动调用 Git Bash / WSL）
+#                      或 Git Bash 终端中执行同样的 bash 命令
+# ════════════════════════════════════════════════════════════════
+set -e
+set -o pipefail
+
+# 切换到脚本所在目录（确保编排文件相对路径可用，也是生成 .sh 文件的输出目录）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Windows (Git Bash / WSL) 下：异常退出也暂停等待用户确认，避免窗口一闪而过
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    trap 'echo ""; read -r -p "  按回车键关闭窗口..." _w' EXIT
+fi
+
+# ──────────────────────────────────────────────────────────────
+# 工具函数
+# ──────────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+print_banner() {
+    echo ""
+    echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    printf "${BOLD}${CYAN}║${NC}  ${BOLD}%-58s${NC}${BOLD}${CYAN}║${NC}\n" "$1"
+    echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+print_step() {
+    echo -e "  ${CYAN}▸${NC} $1"
+}
+
+print_success() {
+    echo -e "  ${GREEN}[OK]${NC} $1"
+}
+
+print_fail() {
+    echo -e "  ${RED}[ERR]${NC} $1" >&2
+    echo ""
+    echo -e "  ${RED}════════════════════════════════════════════════════════════${NC}" >&2
+    echo -e "  ${RED}脚本中止！${NC}" >&2
+    echo -e "  ${RED}════════════════════════════════════════════════════════════${NC}" >&2
+    exit 1
+}
+
+print_warning() {
+    echo -e "  ${YELLOW}[WARN]${NC} $1"
+}
+
+# 跨平台 base64 编码（Linux 用 -w0，macOS BSD base64 没有 -w）
+b64_encode() {
+    if echo "test" | base64 -w0 >/dev/null 2>&1; then
+        base64 -w0
+    else
+        base64 | tr -d '\n'
+    fi
+}
+
+# 跨平台复制到剪贴板
+copy_to_clipboard() {
+    local content=$1
+    if command -v pbcopy >/dev/null 2>&1; then
+        printf '%s' "$content" | pbcopy
+        print_success "已复制到剪贴板 (pbcopy)"
+    elif command -v xclip >/dev/null 2>&1; then
+        printf '%s' "$content" | xclip -selection clipboard
+        print_success "已复制到剪贴板 (xclip)"
+    elif command -v wl-copy >/dev/null 2>&1; then
+        printf '%s' "$content" | wl-copy
+        print_success "已复制到剪贴板 (wl-copy)"
+    elif command -v clip.exe >/dev/null 2>&1; then
+        printf '%s' "$content" | clip.exe
+        print_success "已复制到剪贴板 (clip.exe)"
+    elif command -v powershell.exe >/dev/null 2>&1; then
+        printf '%s' "$content" | powershell.exe -NoProfile -Command "$input | Set-Clipboard"
+        print_success "已复制到剪贴板 (PowerShell Set-Clipboard)"
+    else
+        print_warning "未检测到任何剪贴板命令（pbcopy / xclip / wl-copy / clip.exe / powershell.exe），请手动复制"
+    fi
+}
+
+# Windows 路径转 Git Bash 路径：d:\Work\a.txt → /d/Work/a.txt
+# 同时把反斜杠全部转为正斜杠
+normalize_path() {
+    local p=$1
+    # 先把所有 \ 替换为 /
+    p="${p//\\//}"
+    # 把盘符前缀 X: 转为 /x（小写）
+    if [[ "$p" =~ ^([A-Za-z]):(/|$) ]]; then
+        local drive="${BASH_REMATCH[1],,}"
+        local rest="${BASH_REMATCH[2]}"
+        p="/${drive}${rest}"
+    fi
+    printf '%s' "$p"
+}
+
+# ──────────────────────────────────────────────────────────────
+# 核心：把内容编码并写入 gen-cmdline-<timestamp>.sh 到 SCRIPT_DIR
+# 入参: $1=内容字符串  $2=源描述(用于注释)  $3=是否复制到剪贴板(true/false)
+# 副作用: 创建 .sh 文件,打印命令,可选复制剪贴板
+# ──────────────────────────────────────────────────────────────
+generate_sh_file() {
+    local content=$1
+    local source_desc=$2
+    local copy_clip=${3:-false}
+
+    local content_len=${#content}
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    local output_file="${SCRIPT_DIR}/gen-cmdline-${timestamp}.txt"
+
+    # Base64 编码（用 printf 确保不加末尾换行）
+    local b64
+    b64=$(printf '%s' "$content" | b64_encode)
+    local b64_len=${#b64}
+
+    # 拼成最终一行命令（base64 用单引号包裹）
+    local cmd="mkdir -p ${REMOTE_DIR} && echo '${b64}' | base64 -d > ${REMOTE_DIR}/${COMPOSE_FILE} && cd ${REMOTE_DIR} && ${COMPOSE_CMD} up -d"
+    local cmd_len=${#cmd}
+
+    # 写入新的 .txt 文件（纯文本，方便用记事本/VSCode 直接打开）
+    cat > "$output_file" <<HEADER
+# ════════════════════════════════════════════════════════════════
+#  一行 SSH 命令 - 由 一键编排生成.sh 自动生成
+#  生成时间:  $(date '+%Y-%m-%d %H:%M:%S')
+#  源:        ${source_desc}
+#  内容字节:  ${content_len}
+#  Base64:    ${b64_len} 字符
+#  写入远程:  ${REMOTE_DIR}/${COMPOSE_FILE}
+#  启动命令:  ${COMPOSE_CMD} up -d
+#  文件路径:  ${output_file}
+# ════════════════════════════════════════════════════════════════
+#
+#  用法 (任选其一):
+#    1) 在 B 电脑的 SSH 终端(C 服务器)直接粘贴下面这一行命令
+#    2) 在 A 电脑执行: cat 此文件 | ssh root@C服务器
+#    3) 用文本编辑器打开此文件,复制下面这一行命令
+
+${cmd}
+HEADER
+
+    # 显示信息
+    echo ""
+    echo -e "${BOLD}${GREEN}================ 一行 SSH 命令 (复制后粘到 B 电脑 SSH 终端) ================${NC}"
+    echo ""
+    echo "$cmd"
+    echo ""
+    echo -e "${BOLD}${GREEN}================ 信息 ================${NC}"
+    echo "  源:        $source_desc"
+    echo "  内容字节:  $content_len"
+    echo "  Base64:    $b64_len 字符"
+    echo "  命令总长:  $cmd_len 字符"
+    echo "  写入远程:  ${REMOTE_DIR}/${COMPOSE_FILE}"
+    echo "  启动命令:  ${COMPOSE_CMD} up -d"
+    echo ""
+    echo -e "${BOLD}${YELLOW}📁 已生成可重复使用的命令文件:${NC}"
+    echo -e "  ${BOLD}${output_file}${NC}"
+    echo ""
+    echo -e "  💡 以后想再次部署,直接用文本编辑器打开该文件,复制里面那一行命令粘到 SSH 终端即可。"
+    echo ""
+
+    if [ "$copy_clip" = true ]; then
+        copy_to_clipboard "$cmd"
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────
+# 交互模式（双击 / 无参数 / -i）
+# ──────────────────────────────────────────────────────────────
+interactive_mode() {
+    print_banner "Docker 编排 → 一行 SSH 命令生成器  [交互模式]"
+
+    echo "  请选择输入方式:"
+    echo ""
+    echo "    [1] 输入编排文件路径 (支持绝对/相对路径)"
+    echo "    [2] 直接粘贴编排内容 (YAML 多行,以单独空行结束)"
+    echo ""
+    echo -n "  请输入选项 [1/2] (直接回车 = 1): "
+    IFS= read -r choice
+    choice="${choice:-1}"
+
+    case "$choice" in
+        2)
+            # ─── 内容粘贴模式 ───
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────┐"
+            echo "  │ 请粘贴 docker-compose 编排内容 (YAML)                        │"
+            echo "  │ 粘贴完成后,单独输入一个空行 (直接按回车) 即可结束           │"
+            echo "  └──────────────────────────────────────────────────────────────┘"
+            echo ""
+            local content=""
+            local line_count=0
+            local first_line=1
+            while IFS= read -r line; do
+                # 第一个空行 = 结束
+                if [ -z "$line" ] && [ $first_line -eq 0 ]; then
+                    break
+                fi
+                first_line=0
+                # 第一行不空才开始记录;首行若为空也允许(空内容时直接按回车)
+                if [ $line_count -eq 0 ]; then
+                    content="$line"
+                else
+                    content="$content"$'\n'"$line"
+                fi
+                line_count=$((line_count + 1))
+            done
+
+            if [ -z "$content" ]; then
+                print_fail "未粘贴任何编排内容"
+            fi
+
+            echo ""
+            print_success "已接收编排内容 (${#content} 字符, $line_count 行)"
+
+            # 可选复制
+            echo -n "  是否同时复制生成的命令到剪贴板? [y/N]: "
+            IFS= read -r copy_choice
+            local want_clip=false
+            [[ "$copy_choice" =~ ^[Yy]$ ]] && want_clip=true
+
+            generate_sh_file "$content" "直接粘贴的编排内容 (${line_count} 行)" "$want_clip"
+            ;;
+
+        *)
+            # ─── 文件路径模式 ───
+            echo ""
+            echo "  请输入编排文件路径 (支持 Windows 路径 d:\\... 或 POSIX 路径 /d/...):"
+            echo ""
+            echo -e "  ${DIM}提示: 当前目录 = ${SCRIPT_DIR}${NC}"
+            echo -e "  ${DIM}      相对路径示例: ./程序编排.txt  或  程序编排.txt${NC}"
+            echo ""
+            echo -n "  文件路径: "
+            IFS= read -r file_path
+
+            if [ -z "$file_path" ]; then
+                print_fail "未输入文件路径"
+            fi
+
+            # 去掉首尾空白与可能附带的引号
+            file_path="${file_path#"${file_path%%[![:space:]]*}"}"  # 去前导空格
+            file_path="${file_path%"${file_path##*[![:space:]]}"}"  # 去尾部空格
+            file_path="${file_path%\"}"  # 去尾部引号
+            file_path="${file_path#\"}"  # 去前导引号
+
+            # 路径规范化: Windows 路径转 Git Bash 风格
+            local normalized
+            normalized=$(normalize_path "$file_path")
+
+            # 多候选位置尝试解析(用户输入相对路径时,智能匹配)
+            local resolved=""
+            if [[ "$normalized" =~ ^/ ]] || [[ "$normalized" =~ ^[A-Za-z]: ]]; then
+                # 绝对路径,直接用
+                [ -f "$normalized" ] && resolved="$normalized"
+            else
+                # 相对路径,按顺序尝试以下候选位置,哪个能找到就用哪个:
+                local -a candidates=(
+                    "$normalized"                          # 1) 原值(纯文件名,依赖 CWD)
+                    "${SCRIPT_DIR}/${normalized}"          # 2) 脚本所在目录(最常见,用户双击时)
+                    "$(pwd)/${normalized}"                 # 3) 当前工作目录
+                    "${SCRIPT_DIR}/../${normalized}"       # 4) 脚本的父目录(可能在 ToDesk 上层)
+                    "${SCRIPT_DIR}/../../${normalized}"     # 5) 上两级目录
+                    "${HOME:-}/${normalized}"               # 6) 用户 HOME 目录
+                )
+                for cand in "${candidates[@]}"; do
+                    if [ -f "$cand" ]; then
+                        resolved="$cand"
+                        break
+                    fi
+                done
+                [ -z "$resolved" ] && resolved="${SCRIPT_DIR}/${normalized}"
+            fi
+
+            if [ -z "$resolved" ] || [ ! -f "$resolved" ]; then
+                echo ""
+                echo "  ${RED}[ERR]${NC} 文件不存在: $file_path"
+                echo ""
+                echo "  已尝试解析为以下路径,均未找到文件:"
+                echo "    - $file_path (原始输入)"
+                echo "    - ${normalized} (规范化后)"
+                if [[ ! "$normalized" =~ ^/ ]] && [[ ! "$normalized" =~ ^[A-Za-z]: ]]; then
+                    echo "    - ${SCRIPT_DIR}/${normalized}  (脚本目录)"
+                    echo "    - $(pwd)/${normalized}  (当前目录)"
+                    echo "    - ${SCRIPT_DIR}/../${normalized}  (上级目录)"
+                    echo "    - ${HOME:-}/${normalized}  (HOME)"
+                fi
+                echo ""
+                echo "  当前工作目录: $(pwd)"
+                echo "  脚本目录:     ${SCRIPT_DIR}"
+                echo ""
+                echo "  提示:"
+                echo "    1) 直接粘贴文件的完整绝对路径(Windows 路径可: d:\\... 或 /d/...)"
+                echo "    2) 确认文件名拼写正确,以及文件确实存在"
+                echo "    3) 或者选 [2] 直接粘贴编排内容"
+                echo ""
+                exit 1
+            fi
+
+            local file_size
+            file_size=$(wc -c < "$resolved" | tr -d ' ')
+            print_success "编排文件: $resolved (${file_size} 字节)"
+
+            # 读取文件内容
+            local content
+            content=$(cat "$resolved")
+
+            # 可选复制
+            echo -n "  是否同时复制生成的命令到剪贴板? [y/N]: "
+            IFS= read -r copy_choice
+            local want_clip=false
+            [[ "$copy_choice" =~ ^[Yy]$ ]] && want_clip=true
+
+            generate_sh_file "$content" "文件: $normalized (${file_size} 字节)" "$want_clip"
+            ;;
+    esac
+}
+
+# ──────────────────────────────────────────────────────────────
+# 帮助信息
+# ──────────────────────────────────────────────────────────────
+print_usage() {
+    cat <<EOF
+
+${BOLD}用法:${NC}
+  bash 一键编排生成.sh                       [交互模式: 输入路径或粘贴内容]
+  bash 一键编排生成.sh <编排文件> [...选项]  [命令行模式]
+
+${BOLD}位置参数 (命令行模式):${NC}
+  <编排文件>       必填。要转换的 docker-compose 编排文件路径。
+  [远程目录]       可选。远程服务器目标目录，默认 /microi。
+  [compose文件名]  可选。远程服务器上落地的文件名，默认 docker-compose.yml。
+  [compose命令]    可选。远程服务器上的 compose 命令，默认 docker-compose。
+
+${BOLD}选项 (放任意位置):${NC}
+  -i, --interactive   强制进入交互模式。
+  --save              同时把生成的一行命令保存为 .sh 文件到本脚本同目录。
+  --clip              复制到剪贴板。
+  -h, --help          显示帮助。
+
+${BOLD}典型示例:${NC}
+  # 1) 双击 .sh / 无参数 → 交互模式
+  bash 一键编排生成.sh
+
+  # 2) 命令行: 转换编排文件
+  bash 一键编排生成.sh 程序编排.txt
+
+  # 3) 命令行 + 自定义参数 + 保存 + 复制
+  bash 一键编排生成.sh app.yml /opt/app docker-compose.yml "docker compose" --save --clip
+
+  # 4) 强制交互
+  bash 一键编排生成.sh -i
+EOF
+}
+
+# ──────────────────────────────────────────────────────────────
+# 主入口
+# ──────────────────────────────────────────────────────────────
+# 先解析选项
+FORCE_INTERACTIVE=false
+SAVE_TO_FILE=false
+COPY_CLIP=false
+POSITIONAL=()
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        -i|--interactive)
+            FORCE_INTERACTIVE=true
+            ;;
+        --save)
+            SAVE_TO_FILE=true
+            ;;
+        --clip)
+            COPY_CLIP=true
+            ;;
+        *)
+            POSITIONAL+=("$arg")
+            ;;
+    esac
+done
+
+# 默认参数 (远端目录 / compose 文件名 / compose 命令)
+REMOTE_DIR="${POSITIONAL[1]:-/microi}"
+COMPOSE_FILE="${POSITIONAL[2]:-docker-compose.yml}"
+COMPOSE_CMD="${POSITIONAL[3]:-docker-compose}"
+
+# 决定模式
+if [ "$FORCE_INTERACTIVE" = true ] || [ ${#POSITIONAL[@]} -eq 0 ]; then
+    # ── 交互模式 ──
+    interactive_mode
+else
+    # ── 命令行模式 ──
+    FILE="${POSITIONAL[0]}"
+
+    # 路径规范化
+    FILE=$(normalize_path "$FILE")
+    if [[ ! "$FILE" =~ ^/ ]] && [[ ! "$FILE" =~ ^[A-Za-z]: ]]; then
+        FILE="${SCRIPT_DIR}/${FILE}"
+    fi
+
+    if [ ! -f "$FILE" ]; then
+        print_banner "Docker 编排 → 一行 SSH 命令生成器  [命令行模式]"
+        print_fail "找不到编排文件: ${POSITIONAL[0]}\n  解析后路径: $FILE"
+    fi
+
+    FILE_BYTES=$(wc -c < "$FILE" | tr -d ' ')
+    print_banner "Docker 编排 → 一行 SSH 命令生成器  [命令行模式]"
+    print_step "读取编排文件: $FILE"
+    print_success "编排文件: $FILE (${FILE_BYTES} 字节)"
+
+    print_step "Base64 编码中..."
+    CONTENT=$(cat "$FILE")
+    B64=$(printf '%s' "$CONTENT" | b64_encode)
+    B64_LEN=${#B64}
+    print_success "Base64 长度: $B64_LEN"
+
+    # 拼成最终一行命令
+    CMD="mkdir -p ${REMOTE_DIR} && echo '${B64}' | base64 -d > ${REMOTE_DIR}/${COMPOSE_FILE} && cd ${REMOTE_DIR} && ${COMPOSE_CMD} up -d"
+    CMD_LEN=${#CMD}
+
+    echo ""
+    echo -e "${BOLD}${GREEN}================ 一行 SSH 命令 (复制后粘到 B 电脑 SSH 终端) ================${NC}"
+    echo ""
+    echo "$CMD"
+    echo ""
+    echo -e "${BOLD}${GREEN}================ 信息 ================${NC}"
+    echo "  编排文件:    $FILE"
+    echo "  文件字节:    $FILE_BYTES"
+    echo "  Base64 长度: $B64_LEN"
+    echo "  命令总长度:  $CMD_LEN"
+    echo "  写入远程:    ${REMOTE_DIR}/${COMPOSE_FILE}"
+    echo "  启动命令:    ${COMPOSE_CMD} up -d"
+    echo ""
+
+    if [ "$COPY_CLIP" = true ]; then
+        copy_to_clipboard "$CMD"
+    fi
+
+    if [ "$SAVE_TO_FILE" = true ]; then
+        generate_sh_file "$CONTENT" "文件: $FILE (${FILE_BYTES} 字节)" "$COPY_CLIP"
+    fi
+fi
+
+# Windows (Git Bash / WSL) 下：正常结束时也给用户看一眼结果再关闭窗口
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    echo ""
+    read -r -p "  按回车键关闭窗口..." _w
+fi
+```
+::: 
+
 ---
 
 ### 1️⃣ 安装 MySQL
@@ -125,7 +667,7 @@ docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 :::
 
 ::: danger Ubuntu 24 + MySQL 8.0 注意
-使用宝塔面板在 Ubuntu 24 上原生安装的 MySQL 8.0，可能遇到修改 3306 端口为其它端口后无法启动的问题，建议直接使用 3306 端口。
+使用宝塔面板在 Ubuntu 24 上原生安装的 MySQL 8.0，可能遇到修改 3306 端口为其它端口后无法启动的问题，此时直接使用 3306 端口即可。
 :::
 
 **安装后操作：**
@@ -543,7 +1085,6 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
-      - /microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件
     environment:  
       - OsClient=iTdos
       - OsClientType=Product

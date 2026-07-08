@@ -553,3 +553,37 @@ VS Code 插件提供 API 知识和表结构 → MCP 提供实时数据查询和�
 
 平台源码（含 Skills、MCP）：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 :::
+
+## 📌 Codex开通流程
+
+> 1、准备一部苹果手机，设置-通用-语言与地区-地区-修改为美国
+
+> 2、准备一个邮箱，优先Gmail，163也行
+
+> 3、苹果手机-设置-App-邮件-邮件账户-添加账户-从列表中选取-iCloud-创建新Apple账户，填写姓名、邮箱，电话号码使用国内的即可，运气好直接就能注册成功，运气不好多试几次
+
+> 4、IOS26.5 + 在设置-Apple账户、iCloud等-媒体与购买项目-退出旧的app store账户，然后打开App Store登录上面注册的账号，首次登录会提示需要验证Apple ID账户，去邮箱查看邮件通过AppleID帐号密码进行验证，然后再次尝试登录一般会成功
+
+> 5、支付宝搜索【PockyShop】,使用支付宝登录，首页-App Store & iTunes USA-购买对应礼品卡卡号
+
+> 6、app store 头像-兑换代码-手动输入兑换码，并搜索ChatGPT下载
+
+> 7、手机VPN翻墙，打开ChatGPT，使用上面的邮箱进行注册，然后订阅Plus $20，支付时会提示补充app store信息：街道【1234 SW Main Street】，城市【Portland】，州【俄勒冈州】，邮政编码【97205】，电话【212-5551234】，然后重新支付订阅（可能会提示【你的购买无法完成，请联系iTunes支持】，这一般是AppleID被风控，暂时无解）
+
+> 8、进入VS Code Codex插件，通过ChatGPT登录（在手机成功订阅之前，网页登录会需要验证手机号，手机订阅成功后再登录网页就不需要验证手机号了），OVER
+
+> 9、常见问题
+```
+# 1、创建一个.env文件
+# 修复Codex五次websocket连接失败、Codex的移动端无法连接的问题
+# 存放路径：~/.codex/.env 或 C:\Users\Administrator\.codex\.env
+# 注意：Clash Verge的默认端口是7897，而v2ray的默认端口是10808（设置-参数设置-本地混合监听端口）
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+ALL_PROXY=http://127.0.0.1:7897
+NO_PROXY=localhost,127.0.0.1,::1
+
+# 2、windows powershell需要执行以下2条命令，然后可通过【curl.exe -4 https://ipinfo.io/json】测试地区
+$env:HTTP_PROXY="http://127.0.0.1:10808"
+$env:HTTPS_PROXY="http://127.0.0.1:10808"
+```
