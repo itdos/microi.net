@@ -112,6 +112,14 @@ AI进销存V3
 dev.log
 .tmp-build
 *.csproj.lscache
+
+# License / signing private keys must never enter the public repository.
+# Public keys and test licenses can stay tracked when needed.
+Microi.Server/Microi.net/License/keys/microi_private.pem
+Microi.Server/Microi.net/License/keys/*.private.pem
+Microi.Server/Microi.net/License/keys/*_private.pem
+microi_private.pem
+*_private.pem
 switch-env.ps1
 .tmp
 .microi-performance

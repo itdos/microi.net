@@ -381,9 +381,7 @@ namespace Microi.net.Api
                         var jwtToken = tokenHandler.ReadJwtToken(tokenString);
                         
                         // 手动验证签名（可选，如果验证失败也不会中断）
-                        var jwtKey = defaultClientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace()
-                            ? defaultClientModel.OsClient : defaultClientModel.OsClientModel["AuthSecret"].Val<string>();
-                        jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+                        var jwtKey = DiyToken.ResolveJwtSigningKey(defaultClientModel);
                         
                         // 验证签名（手动方式，不会抛出中断异常）
                         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));

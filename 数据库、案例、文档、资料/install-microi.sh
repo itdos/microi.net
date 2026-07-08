@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：2026-06-24
+# 版本：v2026-07-08
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
 #   microi-install-mysql      - MySQL 5.7 数据库
@@ -32,7 +32,7 @@ export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || tr
 
 echo ''
 echo '=================================================================='
-echo 'Microi：Docker Compose 一键安装脚本 v2026-03-22'
+echo 'Microi：Docker Compose 一键安装脚本 v2026-07-08'
 echo '=================================================================='
 echo ''
 
@@ -1154,18 +1154,24 @@ echo '[步骤9/11] MinIO 部署完成 ✓'
 
 
 # ============================================================
-# 步骤10：部署 Ollama + Qdrant + 平台应用 + Watchtower
+# 步骤10：部署在线 AI 依赖与平台应用
 # ============================================================
 echo ''
-echo '[步骤10/11] 部署 Ollama AI 服务'
+echo '[步骤10/11] 部署在线 AI 依赖与平台应用'
 echo '------------------------------------------------------------------'
 
-OLLAMA_DIR="${COMPOSE_BASE_DIR}/microi-install-ollama"
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  echo 'Microi：已选择安装在线 AI 引擎依赖，将部署 Ollama 与 Qdrant。'
+  echo ''
+  echo 'Microi：部署 Ollama AI 服务'
+  echo '------------------------------------------------------------------'
 
-echo "Microi：Ollama 端口: ${OLLAMA_PORT}"
+  OLLAMA_DIR="${COMPOSE_BASE_DIR}/microi-install-ollama"
 
-mkdir -p "${OLLAMA_DIR}"
-cat > "${OLLAMA_DIR}/docker-compose.yml" <<EOF
+  echo "Microi：Ollama 端口: ${OLLAMA_PORT}"
+
+  mkdir -p "${OLLAMA_DIR}"
+  cat > "${OLLAMA_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
 services:
   microi-install-ollama:
@@ -1190,24 +1196,24 @@ services:
         max-size: "10m"
         max-file: "10"
 EOF
-echo "Microi：Ollama 编排文件已生成 ✓"
+  echo "Microi：Ollama 编排文件已生成 ✓"
 
-compose_up "${OLLAMA_DIR}"
+  compose_up "${OLLAMA_DIR}"
 
-echo ''
-echo 'Microi：Ollama 部署完成 ✓'
+  echo ''
+  echo 'Microi：Ollama 部署完成 ✓'
 
-# --- Qdrant ---
-echo ''
-echo 'Microi：部署 Qdrant 向量数据库'
-echo '------------------------------------------------------------------'
+  # --- Qdrant ---
+  echo ''
+  echo 'Microi：部署 Qdrant 向量数据库'
+  echo '------------------------------------------------------------------'
 
-QDRANT_DIR="${COMPOSE_BASE_DIR}/microi-install-qdrant"
+  QDRANT_DIR="${COMPOSE_BASE_DIR}/microi-install-qdrant"
 
-echo "Microi：Qdrant HTTP端口: ${QDRANT_HTTP_PORT}, gRPC端口: ${QDRANT_GRPC_PORT}, API Key: ${QDRANT_API_KEY}"
+  echo "Microi：Qdrant HTTP端口: ${QDRANT_HTTP_PORT}, gRPC端口: ${QDRANT_GRPC_PORT}, API Key: ${QDRANT_API_KEY}"
 
-mkdir -p "${QDRANT_DIR}"
-cat > "${QDRANT_DIR}/docker-compose.yml" <<EOF
+  mkdir -p "${QDRANT_DIR}"
+  cat > "${QDRANT_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
 services:
   microi-install-qdrant:
@@ -1255,12 +1261,15 @@ services:
         max-size: "10m"
         max-file: "10"
 EOF
-echo "Microi：Qdrant 编排文件已生成 ✓"
+  echo "Microi：Qdrant 编排文件已生成 ✓"
 
-compose_up "${QDRANT_DIR}"
+  compose_up "${QDRANT_DIR}"
 
-echo ''
-echo 'Microi：Qdrant 部署完成 ✓'
+  echo ''
+  echo 'Microi：Qdrant 部署完成 ✓'
+else
+  echo 'Microi：已选择不安装在线 AI 引擎依赖，跳过 Ollama 与 Qdrant。'
+fi
 
 # --- 平台应用（API + Web）---
 echo ''
@@ -1332,7 +1341,11 @@ echo ''
 echo 'Microi：平台应用（API + Web）部署完成 ✓'
 
 echo ''
-echo '[步骤10/11] Ollama + Qdrant + 平台应用 部署完成 ✓'
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  echo '[步骤10/11] Ollama + Qdrant + 平台应用 部署完成 ✓'
+else
+  echo '[步骤10/11] 平台应用部署完成，已跳过在线 AI 依赖 ✓'
+fi
 
 
 # ============================================================
@@ -1427,17 +1440,22 @@ echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_
 echo "             数据目录: ${MINIO_DATA_DIR}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-minio/"
 echo ""
-echo "Ollama:      容器 microi-install-ollama,    端口 ${OLLAMA_PORT}"
-echo "             数据目录: /microi/ollama/data"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-ollama/"
-echo "             下载模型: docker exec microi-install-ollama ollama pull deepseek-r1:1.5b"
-echo ""
-echo "Qdrant:      容器 microi-install-qdrant,    端口 ${QDRANT_HTTP_PORT}(HTTP) / ${QDRANT_GRPC_PORT}(gRPC)"
-echo "             API Key: ${QDRANT_API_KEY}"
-echo "             管理界面: http://${ACCESS_IP}:${QDRANT_HTTP_PORT}/dashboard"
-echo "             数据目录: /microi/qdrant/storage"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-qdrant/"
-echo ""
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  echo "Ollama:      容器 microi-install-ollama,    端口 ${OLLAMA_PORT}"
+  echo "             数据目录: /microi/ollama/data"
+  echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-ollama/"
+  echo "             下载模型: docker exec microi-install-ollama ollama pull deepseek-r1:1.5b"
+  echo ""
+  echo "Qdrant:      容器 microi-install-qdrant,    端口 ${QDRANT_HTTP_PORT}(HTTP) / ${QDRANT_GRPC_PORT}(gRPC)"
+  echo "             API Key: ${QDRANT_API_KEY}"
+  echo "             管理界面: http://${ACCESS_IP}:${QDRANT_HTTP_PORT}/dashboard"
+  echo "             数据目录: /microi/qdrant/storage"
+  echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-qdrant/"
+  echo ""
+else
+  echo "在线AI依赖: 已跳过 Ollama 与 Qdrant。后续如需在线AI数据分析/在线AI编程，请重新执行脚本并选择安装。"
+  echo ""
+fi
 echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
 echo "Client:      容器 microi-install-client,        端口 ${VUE_PORT}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-app/"

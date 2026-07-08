@@ -168,18 +168,18 @@ export async function devLogin(page, {
 
 ```jsonc
 "DevLoginBypass": {
-  "//": "Local development / E2E login bypass. Keep disabled in production.",
+  "//": "Local Development only / E2E login bypass. Keep disabled in production.",
   "Enabled": true,
   "SkipCaptcha": true,      // 跳过图形验证码
-  "OnlyLoopback": true,     // 仅当请求来自 127.0.0.1 / ::1 时生效
+  "OnlyLoopback": true,     // 必须保留 true；仅 Development + 127.0.0.1 / ::1 生效
   "DefaultAccount": "<default-account>",
   "DefaultPassword": "<default-password>"
 }
 ```
 
-- 触发条件：`Enabled=true`，且（`OnlyLoopback=false` 或请求来自本机回环地址）。
+- 触发条件：`Enabled=true`，且后端环境为 `Development`，且请求来自本机回环地址。生产、容器反代、非回环来源均不得生效。
 - 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`。
-- 与方式 A 区别：**仍会校验真实密码**，只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登。
+- 与方式 A 区别：**仍会校验真实密码**，只是免验证码、可省略账号密码字段。适合在本机用真实账号跑 UI 登录或直登；不要把它当成 CI/远端免密码登录能力。
 - 生产环境务必保持 `Enabled=false` 或删除该块。
 
 `Microi.Client/scripts/run-form-engine-freeze-trace.mjs` 会在跑诊断前自动把 `DevLoginBypass` 写入 `appsettings.{Env}.json`；可用 `PW_CONFIG_DEV_LOGIN=0` 关闭该自动改写。

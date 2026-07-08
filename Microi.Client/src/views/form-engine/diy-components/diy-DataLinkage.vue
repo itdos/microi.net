@@ -296,8 +296,10 @@ export default {
         getDiyApiBase() {
             if (localStorage.getItem("Microi.ApiBase")) {
                 this.https = localStorage.getItem("Microi.ApiBase");
+            } else if (this.DiyCommon && this.DiyCommon.GetApiBase) {
+                this.https = this.DiyCommon.GetApiBase();
             } else {
-                this.https = "https://api-china.itdos.com";
+                this.https = window.location.origin || "";
             }
         },
         // 添加条件
