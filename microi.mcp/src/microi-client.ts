@@ -7,13 +7,6 @@ import { prepareV8VersionedCode } from './v8-version.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const NO_LOGIN_CODE = 1001;
 
-const DEFAULT_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
-XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
-1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
-1DsI9VJ7gTHGL3R7sQIDAQAB
------END PUBLIC KEY-----`;
-
 export interface MicroiConfig {
   apiBaseUrl: string;
   username: string;
@@ -197,7 +190,7 @@ export class MicroiClient {
 
   constructor(config: MicroiConfig) {
     this.config = config;
-    this.rsaPublicKey = config.rsaPublicKey || DEFAULT_RSA_PUBLIC_KEY;
+    this.rsaPublicKey = config.rsaPublicKey || '';
     // 如果直接传入 token，跳过登录流程
     if (config.token) {
       this.token = config.token;
@@ -206,8 +199,12 @@ export class MicroiClient {
 
   /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
   private rsaEncrypt(plainText: string): string {
+    const publicKey = (this.rsaPublicKey || '').trim();
+    if (!publicKey) {
+      return plainText;
+    }
     const encrypted = crypto.publicEncrypt(
-      { key: this.rsaPublicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+      { key: publicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
       Buffer.from(plainText, 'utf-8'),
     );
     return encrypted.toString('base64');
@@ -232,15 +229,21 @@ export class MicroiClient {
 
     const encryptedPwd = this.rsaEncrypt(this.config.password);
 
+    const loginBody = new URLSearchParams();
+    loginBody.append('Account', this.config.username);
+    loginBody.append('Pwd', encryptedPwd);
+    if (this.config.osClient) {
+      loginBody.append('OsClient', this.config.osClient);
+    }
+    loginBody.append('_ClientType', 'MCP');
+
     const res = await fetch(`${this.config.apiBaseUrl}${API.LOGIN}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        Account: this.config.username,
-        Pwd: encryptedPwd,
-        OsClient: this.config.osClient || undefined,
-        _ClientType: 'MCP',
-      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+      },
+      body: loginBody.toString(),
     });
 
     const token = res.headers.get('authorization') || '';
@@ -554,6 +557,9 @@ export class MicroiClient {
     if (!payload.ApiAddress || payload.ApiAddress.trim().length === 0) {
       payload.ApiAddress = `/apiengine/${data.ApiEngineKey}`;
     }
+    payload.IsEnable = payload.IsEnable ?? 1;
+    payload.StopHttp = payload.StopHttp ?? 0;
+    payload.AllowAnonymous = payload.AllowAnonymous ?? 0;
     return this.post(API.CREATE_ENGINE, payload);
   }
 

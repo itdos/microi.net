@@ -39,6 +39,27 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.VSCode 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
+## Microi 源码路径速查（工作区根相对路径）
+
+当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
+
+| 用户常用说法 | 默认路径 |
+|--------------|----------|
+| 吾码 MCP 前端源码 | `microi.mcp/` |
+| 吾码 MCP 后端源码 | `Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs` |
+| 吾码 skills / 知识库 | `microi.skills/` |
+| 吾码 VS Code 插件项目 | `Microi.VSCode/` |
+| 吾码低代码平台后台系统前端源码 | `Microi.Client/` |
+| 吾码低代码后端源码 | `Microi.Server/` |
+| 吾码表单引擎源码 | `Microi.Client/src/views/form-engine/` |
+| 吾码界面引擎源码 | `Microi.Client/src/views/page-engine/` |
+| 吾码打印引擎源码 | `Microi.Client/src/views/print-engine/` |
+| 吾码 App 源码 | `microi.app/` |
+| 吾码 UniApp 源码 | `microi.uniapp/` |
+| 吾码官方网站 / 文档源码 | `microi.doc/` |
+
+以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
+
 ## Skills 通用化原则
 
 编写或更新 `microi.skills/` 下的技能文档时，**不能加入特定项目名称、特定本地路径或特定业务规则**，必须保持通用性：
@@ -127,7 +148,9 @@ Microi 通用版本号采用 `主版本.次版本.修订版本` 三段数字格�
 
 接口引擎代码头、表单/工作流 V8 事件代码头、前端微服务 `sys_microiservice.BuildVersion` 与 `sys_microiservice_page.BuildVersion` 这类业务发布版本统一使用带 `v` 前缀的格式：`v1.0.0 -> v1.0.1 -> v1.0.9 -> v1.1.0 -> v1.9.9 -> v2.0.0 -> v9.9.9 -> v10.0.0`。禁止使用时间戳、随机串或日期作为 BuildVersion；前端微服务上传到分布式存储的目录也必须使用同一个 BuildVersion 分段，便于回溯与 CDN 缓存隔离。
 
-`Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本，并把 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本写成同一个插件版本号；skills 不再独立自增。skills 同步到工作区时仍以每个文件的 hash 判断是否可覆盖：本地未改过的旧插件文件可自动升级，本地已修改的文件必须保留用户版本，不得仅凭版本号覆盖。
+`Microi.VSCode` 发布时会通过 `bump-version.js` 自动自增插件版本，并把 `microi.skills/.microi-skills-version.json` 中的 skills 发布版本写成同一个插件版本号；skills 不再独立自增。`.microi-skills-version.json` 只用于记录 skills 包版本和提示用户当前来源，不能单独作为覆盖依据。
+
+插件初始化或升级同步 `microi.skills/` 时，必须以 `.microi-skills-manifest.json` 的逐文件 hash 判断是否可覆盖：本地文件不存在则写入；本地文件与旧 manifest hash 一致说明用户未改，可自动升级；本地文件已被用户修改、或本地版本比插件捆绑版本更新时，必须保留用户版本并提示差异。不能因为插件版本号更高或更低，就粗暴覆盖本地 skills。创始人本地随时修改 skills 的工作区尤其要保护；普通用户未修改过的旧 skills 才应该被最新插件覆盖升级。
 
 ## C# dynamic 强类型落地规则
 

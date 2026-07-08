@@ -66,12 +66,20 @@ AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有
     "ImportAutoFillFk": true,
     "ImportRelations": [
       { "Parent": "Code", "Child": "XiangmuBM" }
+    ],
+    "ImportBackfillFields": [
+      { "Parent": "Code", "Child": "XiangmuBM" },
+      { "Parent": "Name", "Child": "XiangmuMC" }
     ]
   }
 }
 ```
 
 `ImportRelations` 中 `Parent` 和 `Child` 可填字段名或字段标题；多组关系表示组合匹配。典型场景是 Excel 只有项目编号/客户名称，没有主表 Id，导入引擎通过 `Parent` 字段批量查主表 Id，再写入子表 `TableChildFkFieldName`。不要只依赖猜测字段名；业务关键子表必须显式配置 `ImportRelations`，并在修改后刷新结构缓存。
+
+`ImportBackfillFields` 用于把已匹配到的主表字段回填到子表字段，例如项目主表的 `Code`、`Name` 回填到成品清单的 `XiangmuBM`、`XiangmuMC`。当 Excel 缺少这些展示冗余列，但导入发生在主表子表弹窗或可通过 `ImportRelations` 找到主表时，导入引擎会批量查询主表并补齐；Excel 已传值时不覆盖。旧版根节点 `Config.TableChildCallbackField` 保存的同类 JSON 数组也会被导入引擎兼容读取。
+
+更多表单组件配置项见 `references/form-component-options.md`。新增或修改 `Microi.Client/src/views/form-engine/diy-field-component/` 组件配置时，同步更新该参考文档和官方表单组件文档。
 
 ## 安全注意
 
