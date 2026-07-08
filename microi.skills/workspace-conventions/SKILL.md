@@ -212,7 +212,7 @@ AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需
 }
 ```
 
-本地旁路配置必须保留 `OnlyLoopback=true`，并且只允许在 `ASPNETCORE_ENVIRONMENT/DOTNET_ENVIRONMENT=Development` 且请求来自本机回环地址时生效。自动化脚本可传 `Pwd="_DEV_BYPASS_"`，但配置驱动旁路只能替换为本地配置密码后继续走真实密码校验；只有显式设置 `MICROI_DEV_TEST_KEY` 且请求头 `X-Microi-Dev-Key` 匹配时，才允许真正跳过密码校验。不要把具体项目租户名或密码写进 skill；真实值只放环境配置文件。
+本地旁路配置必须保留 `OnlyLoopback=true`，并且只允许在 `ASPNETCORE_ENVIRONMENT/DOTNET_ENVIRONMENT=Development` 且请求来自本机回环地址时生效。自动化脚本可传 `_AutomationTestLogin=true` 或本地 Dev Key 来跳过验证码，但任何方式都不能跳过密码校验；`Pwd="_DEV_BYPASS_"` 只能在本机 DevLoginBypass 下替换为本地配置密码后继续走真实密码校验。远端自动化若要免验证码，必须先在 `sys_config.AutoTestSkipCaptcha`（中文 Label：允许自动化测试登录时绕开验证码）开启开关，再传 `_AutomationTestLogin=true`，仍使用真实账号密码。不要把具体项目租户名或密码写进 skill；真实值只放环境配置文件。
 
 ## V8 远端/本地同步收尾约定
 

@@ -141,6 +141,15 @@ namespace Microi.net
                 return;
                 // throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
             }
+            sysUser = currentToken.CurrentUser;
+            osClient = currentToken.OsClient;
+            userId = sysUser?["Id"].Val<string>();
+            diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+            name = sysUser?["Name"]?.Val<string>();
+            account = sysUser?["Account"]?.Val<string>();
+            userName = string.IsNullOrWhiteSpace(name) ? account : name;
+            userAvatar = sysUser?["Avatar"].Val<string>();
+
             HttpContext httpContext = base.Context.GetHttpContext();
             httpContext.Request.Query.TryGetValue("groupName", out var groupName);
             // httpContext.Request.Query.TryGetValue("UserId", out var userId);
@@ -151,12 +160,13 @@ namespace Microi.net
             // httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
 
-            if (!userId.Equals(StringValues.Empty))
+            if (!string.IsNullOrEmpty(userId))
             {
                 ClientInfo clientInfo = await diyCacheBase.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
                 if (clientInfo != null)
                 {
                     clientInfo.LastConnectionId = connid;
+                    clientInfo.ConnectionIds ??= new List<string>();
                     clientInfo.ConnectionIds.Remove(connid);
                     clientInfo.ConnectionIds.Insert(0, connid);
                     clientInfo.ConnectionIds = clientInfo.ConnectionIds.Take(10).ToList();
@@ -182,6 +192,16 @@ namespace Microi.net
                     };
                 }
                 await diyCacheBase.SetAsync($"Microi:{osClient}:ChatOnline:{userId}", clientInfo);
+                await Microi.net.Api.OnlineTerminalService.TrackConnectedAsync(
+                    osClient,
+                    sysUser,
+                    connid,
+                    httpContext,
+                    Context.User?.Claims,
+                    groupName.ToString(),
+                    otherInfo.ToString(),
+                    deviceClientId.ToString(),
+                    currentToken.Token).ConfigureAwait(false);
                 try
                 {
                     await SendLastContacts(new MessageChatContactListParam
@@ -228,6 +248,7 @@ namespace Microi.net
                     ClientInfo clientInfo = await diyCacheBase.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
                     if (clientInfo != null)
                     {
+                        clientInfo.ConnectionIds ??= new List<string>();
                         // 移除当前断开的连接ID
                         clientInfo.ConnectionIds.Remove(connid);
                         if (clientInfo.LastConnectionId == connid)
@@ -248,6 +269,7 @@ namespace Microi.net
                         Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
                     }
                 }
+                await Microi.net.Api.OnlineTerminalService.TrackDisconnectedAsync(osClient, userId, connid).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

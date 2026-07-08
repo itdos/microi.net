@@ -107,6 +107,12 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
             },
             OnTokenValidated = context =>
             {
+                if (!DiyToken.IsCurrentAuthVersion(context.Principal?.Claims))
+                {
+                    context.Fail("Token安全版本已失效，请重新登录");
+                    return Task.CompletedTask;
+                }
+
                 var userId = context.Principal?.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
                 var osClient = context.Principal?.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
                 // Console.WriteLine($"[JWT] 验证成功 - UserId: {userId}, OsClient: {osClient}, Path: {context.HttpContext.Request.Path}");

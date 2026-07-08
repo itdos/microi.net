@@ -433,6 +433,10 @@ namespace Microi.net
         /// </summary>
         public string Token { get; set; }
         /// <summary>
+        /// 登录令牌安全版本。后端升级鉴权策略时可用于让旧登录态立即失效。
+        /// </summary>
+        public string AuthVersion { get; set; }
+        /// <summary>
         /// 指用户在所有客户端登陆时存储的token，如PC、Empty
         /// </summary>
         public List<TokensModel> Tokens { get; set; } 
@@ -444,6 +448,10 @@ namespace Microi.net
         /// Token里面包含了UserId、OsClient、CreateTime（string）、ClientType、Did
         /// </summary>
         public string Token { get; set; }
+        /// <summary>
+        /// 登录令牌安全版本。
+        /// </summary>
+        public string AuthVersion { get; set; }
         /// <summary>
         /// PC、Empty
         /// </summary>
