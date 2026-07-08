@@ -79,10 +79,87 @@
 | --- | --- | --- |
 | `RichText` | `mediumtext` | 富文本内容，图片上传遵循平台上传配置。 |
 | `CodeEditor` | `mediumtext` | `CodeEditor.Height`。 |
-| `JsonTable` | `mediumtext` | JSON 表格展示/编辑，保存结构化 JSON。 |
+| `JsonTable` | `mediumtext` | JSON 表格展示/编辑，保存结构化 JSON；配置必须写在 `Config.JsonTable`。 |
 | `ImgUpload` | `mediumtext` | `ImgUpload.Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`。 |
 | `FileUpload` | `mediumtext` | `FileUpload.Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`MaxSize`。 |
 | `ImgUpload` / `FileUpload` | - | `Upload.BeforeUploadV8`、`GetPrivateFileBeforeServerV8`、`GetPrivateFileAfterServerV8`。 |
+
+### JsonTable 配置
+
+`JsonTable` 的事实源是 `Microi.Client/src/views/form-engine/diy-field-component/diy-jsontable.vue`。AI 生成字段时不要只写 `Component=JsonTable`，必须同步生成 `Config.JsonTable.Columns`，否则前端只能显示空表。
+
+`Config.JsonTable` 根节点：
+
+| 配置 | 说明 |
+| --- | --- |
+| `Columns` | JSON 表格列数组，必填。每一项描述一列的显示、编辑控件和数据源。 |
+| `DataSource` | 批量导入/候选数据源类型：`KeyValue`、`Sql`、`DataSource`、`ApiEngine` 等。 |
+| `Sql` | `DataSource=Sql` 时的 SQL；远程搜索时必须带 `$Keyword$` 条件和 `limit`。 |
+| `DataSourceId` | `DataSource=DataSource` 时的数据源引擎 Key/Id。 |
+| `ApiEngineKey` / `DataSourceApiEngineKey` | `DataSource=ApiEngine` 时的接口引擎 Key；前端保存到 `ApiEngineKey`，列级配置可用 `DataSourceApiEngineKey`。 |
+| `SelectLabel` | 候选数据展示字段。 |
+| `DataSourceSqlRemote` | 是否远程搜索。大数据量必须设为 `true`。 |
+| `KeyValueList` | 静态键值数据，格式为 `[{ "Key": "A", "Value": "选项A" }]`。 |
+
+`Config.JsonTable.Columns[]` 列对象：
+
+| 配置 | 说明 |
+| --- | --- |
+| `Id` | 列唯一 Id，建议使用 Guid/Ulid。 |
+| `Sort` | 列排序。 |
+| `Label` | 列标题，必填。 |
+| `Key` | JSON 行对象中的属性名，必填，使用英文或既有字段名。 |
+| `Component` | 列编辑控件：`Text`、`Number`、`Textarea`、`Password`、`Select`、`MultipleSelect`、`Radio`、`Checkbox`、`Switch`、`Cascader`、`SelectTree`、`DateTime`、`Rate`、`ColorPicker`、`Progress`、`AutoNumber`、`Autocomplete`、`Address`、`Department`、`Map`、`ImgUpload`、`FileUpload`、`RichText`、`CodeEditor`、`Html`、`Fontawesome`、`Qrcode`、`Divider`、`Button`。 |
+| `Width` / `MinWidth` | 固定宽度 / 最小宽度，`MinWidth` 默认可用 `120`。 |
+| `Required` | 是否必填。 |
+| `Visible` | 是否显示，默认 `true`。 |
+| `DefaultValue` | 新增行默认值。 |
+| `Placeholder` | 占位提示。 |
+| `Readonly` | 是否只读。 |
+| `Config` | 列控件配置。选择类列使用 `SelectLabel`、`SelectSaveField`、`SelectSaveFormat`、`EnableSearch`、`DataSource`、`Sql`、`DataSourceId`、`DataSourceApiEngineKey`、`DataSourceSqlRemote`。 |
+| `Data` | 列级普通静态选项。 |
+| `KeyValueList` | 列级键值选项，格式同根节点。 |
+
+示例：
+
+```json
+{
+  "JsonTable": {
+    "Columns": [
+      {
+        "Id": "col-material",
+        "Sort": 1,
+        "Label": "材料名称",
+        "Key": "MaterialName",
+        "Component": "Text",
+        "MinWidth": 160,
+        "Required": true,
+        "Visible": true,
+        "Placeholder": "请输入材料名称"
+      },
+      {
+        "Id": "col-status",
+        "Sort": 2,
+        "Label": "状态",
+        "Key": "Status",
+        "Component": "Select",
+        "MinWidth": 120,
+        "Visible": true,
+        "Config": {
+          "DataSource": "KeyValue",
+          "SelectLabel": "Value",
+          "SelectSaveField": "Key",
+          "SelectSaveFormat": "Text"
+        },
+        "KeyValueList": [
+          { "Key": "draft", "Value": "草稿" },
+          { "Key": "confirmed", "Value": "已确认" }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ## 树、级联、组织
 
@@ -140,4 +217,3 @@
 | `FontAwesome` | `varchar(100)` | 图标类名。 |
 | `DevComponent` | 视组件而定 | `DevComponentName`、`DevComponentPath`。 |
 | `V8TmpEngine` | `mediumtext` | V8 模板引擎承载控件。 |
-
