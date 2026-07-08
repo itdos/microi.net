@@ -1693,6 +1693,75 @@ try {
         debugLog.step6Result = '连线数据处理完成：新增' + stats.LineInserted + '，修改' + stats.LineUpdated;
     }
 
+    function isMissingValue(value) {
+        return typeof value === 'undefined' || value === null || value === '';
+    }
+
+    function normalizeApiEngineModel(model) {
+        if (isMissingValue(model.IsEnable)) model.IsEnable = 1;
+        if (isMissingValue(model.IsDeleted)) model.IsDeleted = 0;
+        if (isMissingValue(model.StopHttp)) model.StopHttp = 0;
+        if (isMissingValue(model.AllowAnonymous)) model.AllowAnonymous = 0;
+        if (isMissingValue(model.Lock)) model.Lock = 0;
+        if (isMissingValue(model.ResponseFile)) model.ResponseFile = 0;
+        if (isMissingValue(model.EnableLog)) model.EnableLog = 0;
+    }
+
+    function removeApiEngineCacheValue(value) {
+        if (isMissingValue(value)) return;
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(value).toLowerCase()}`);
+    }
+
+    function refreshApiEngineCache(apiEngineKey, apiEngineId, apiAddress) {
+        removeApiEngineCacheValue(apiEngineKey);
+        removeApiEngineCacheValue(apiEngineId);
+        removeApiEngineCacheValue(apiAddress);
+
+        var latest = null;
+        if (!isMissingValue(apiEngineKey)) {
+            var latestByKey = V8.FormEngine.GetFormData('sys_apiengine', {
+                OsClient: V8.OsClient,
+                _Where: [['ApiEngineKey', '=', apiEngineKey]],
+                _PageSize: 1
+            });
+            if (latestByKey.Code == 1 && latestByKey.Data) {
+                latest = latestByKey.Data;
+            }
+        }
+        if (!latest && !isMissingValue(apiEngineId)) {
+            var latestById = V8.FormEngine.GetFormData('sys_apiengine', {
+                OsClient: V8.OsClient,
+                Id: apiEngineId,
+                _PageSize: 1
+            });
+            if (latestById.Code == 1 && latestById.Data) {
+                latest = latestById.Data;
+            }
+        }
+        if (!latest && !isMissingValue(apiAddress)) {
+            var latestByAddress = V8.FormEngine.GetFormData('sys_apiengine', {
+                OsClient: V8.OsClient,
+                _Where: [['ApiAddress', '=', apiAddress]],
+                _PageSize: 1
+            });
+            if (latestByAddress.Code == 1 && latestByAddress.Data) {
+                latest = latestByAddress.Data;
+            }
+        }
+
+        if (!latest) return;
+        normalizeApiEngineModel(latest);
+        if (!isMissingValue(latest.ApiEngineKey)) {
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiEngineKey).toLowerCase()}`, latest);
+        }
+        if (!isMissingValue(latest.Id)) {
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.Id).toLowerCase()}`, latest);
+        }
+        if (!isMissingValue(latest.ApiAddress)) {
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latest);
+        }
+    }
+
     // ==================== 步骤7：处理sys_apiengine数据（可选） ====================
 
     if (Package.SysApiEngines && Package.SysApiEngines.length > 0) {
@@ -1754,20 +1823,12 @@ try {
             }
             modelCopy.OsClient = V8.OsClient;
             modelCopy.Id = apiEngine.Id;
+            normalizeApiEngineModel(modelCopy);
             if (exists) {
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
-                    // 同步缓存（更新最新数据）
-                    if (apiEngine.ApiEngineKey) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiEngineKey.toLowerCase()}`, modelCopy);
-                    }
-                    if (apiEngine.Id) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.Id.toLowerCase()}`, modelCopy);
-                    }
-                    if (apiEngine.ApiAddress) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiAddress.toLowerCase()}`, modelCopy);
-                    }
+                    refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
                 } else {
                     debugLog['apiengine_upt_error_' + existingId] = uptResult.Msg;
                 }
@@ -1776,16 +1837,7 @@ try {
                 var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
-                    // 同步缓存（写入新数据）
-                    if (apiEngine.ApiEngineKey) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiEngineKey.toLowerCase()}`, modelCopy);
-                    }
-                    if (apiEngine.Id) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.Id.toLowerCase()}`, modelCopy);
-                    }
-                    if (apiEngine.ApiAddress) {
-                        V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${apiEngine.ApiAddress.toLowerCase()}`, modelCopy);
-                    }
+                    refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
                 } else {
                     debugLog['apiengine_add_error_' + (apiEngine.Id || apiEngine.ApiEngineKey)] = addResult.Msg;
                 }

@@ -1372,6 +1372,13 @@ namespace Microi.net
             public string ParentAlias { get; set; }
         }
 
+        private class ImportChildParentBackfill
+        {
+            public JObject ChildField { get; set; }
+            public JObject ParentField { get; set; }
+            public string ParentAlias { get; set; }
+        }
+
         private static JObject ImportFindFieldByNameOrLabel(IEnumerable<JObject> fields, string nameOrLabel, string label = null)
         {
             if (fields == null) return null;
@@ -1395,6 +1402,14 @@ namespace Microi.net
             if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return null;
             if (token is JValue value) return value.Value;
             return token.ToString(Formatting.None);
+        }
+
+        private static string ImportGetFixedFieldString(JObject fixedField, JObject field)
+        {
+            if (fixedField == null || field == null) return "";
+            var name = field["Name"].Val<string>();
+            if (name.DosIsNullOrWhiteSpace() || !fixedField.ContainsKey(name)) return "";
+            return ImportNormalizeValue(ImportJTokenToObject(fixedField[name]), field);
         }
 
         private static string ImportBuildMatchKey(IEnumerable<string> values)
@@ -1508,6 +1523,77 @@ namespace Microi.net
             return result;
         }
 
+        private static List<ImportChildParentBackfill> ImportBuildChildParentBackfills(
+            List<JObject> childFields,
+            List<JObject> parentFields,
+            DiyFieldConfig relationConfig)
+        {
+            var result = new List<ImportChildParentBackfill>();
+            var mappings = new List<DiyFieldConfigTableChildImportBackfill>();
+            if (relationConfig?.TableChild?.ImportBackfillFields != null)
+            {
+                mappings.AddRange(relationConfig.TableChild.ImportBackfillFields);
+            }
+            if (relationConfig != null && !relationConfig.TableChildCallbackField.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var legacyMappings = JsonHelper.Deserialize<List<DiyFieldConfigTableChildImportBackfill>>(relationConfig.TableChildCallbackField);
+                    if (legacyMappings != null)
+                    {
+                        mappings.AddRange(legacyMappings);
+                    }
+                }
+                catch { }
+            }
+            foreach (var mapping in mappings)
+            {
+                if (mapping == null) continue;
+                var parentKey = mapping.ParentFieldName
+                    .DosIsNullOrWhiteSpace(mapping.FatherFieldName)
+                    .DosIsNullOrWhiteSpace(mapping.Parent)
+                    .DosIsNullOrWhiteSpace(mapping.Father);
+                var childKey = mapping.ChildFieldName.DosIsNullOrWhiteSpace(mapping.Child);
+                var parentField = ImportFindFieldByNameOrLabel(parentFields, parentKey, mapping.ParentFieldLabel);
+                var childField = ImportFindFieldByNameOrLabel(childFields, childKey, mapping.ChildFieldLabel);
+                if (parentField == null || childField == null) continue;
+                if (result.Any(d => string.Equals(d.ChildField["Name"].Val<string>(), childField["Name"].Val<string>(), StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                result.Add(new ImportChildParentBackfill()
+                {
+                    ParentField = parentField,
+                    ChildField = childField,
+                    ParentAlias = $"Backfill{result.Count}"
+                });
+            }
+            return result;
+        }
+
+        private static int ImportBackfillChildFieldsFromParentRow(
+            IDictionary<string, object> childRow,
+            JObject fixedField,
+            JObject parentRow,
+            List<ImportChildParentBackfill> backfills)
+        {
+            if (childRow == null || parentRow == null || backfills == null || backfills.Count == 0) return 0;
+            var count = 0;
+            foreach (var backfill in backfills)
+            {
+                if (backfill?.ChildField == null || backfill.ParentField == null) continue;
+                if (ImportHasFieldValue(childRow, fixedField, backfill.ChildField)) continue;
+                var value = ImportNormalizeValue(ImportJTokenToObject(parentRow[backfill.ParentAlias]), backfill.ParentField);
+                if (value.DosIsNullOrWhiteSpace()) continue;
+                var childLabel = backfill.ChildField["Label"].Val<string>();
+                var childName = backfill.ChildField["Name"].Val<string>();
+                if (!childLabel.DosIsNullOrWhiteSpace()) childRow[childLabel] = value;
+                if (!childName.DosIsNullOrWhiteSpace()) childRow[childName] = value;
+                count++;
+            }
+            return count;
+        }
+
         private int ImportAutoFillChildFkByParentCode(
             List<dynamic> fileDataList,
             List<JObject> currentFieldList,
@@ -1563,6 +1649,35 @@ namespace Microi.net
                     parentFields,
                     new[] { "Code", "XiangmuBH", "ProjectCode", "ProjectNo", "ProjectBH" },
                     new[] { "项目编号", "项目编码", "项目号" });
+                var primaryFieldName = relationConfig.TableChild?.PrimaryTableFieldName;
+                if (primaryFieldName.DosIsNullOrWhiteSpace()) primaryFieldName = "Id";
+
+                var dbOracleTableSpace = osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>();
+                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(parentTable.Name, dbOracleTableSpace);
+                var sqlPkFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(primaryFieldName);
+                var backfills = ImportBuildChildParentBackfills(currentFieldList, parentFields, relationConfig);
+                var backfillSelectSql = string.Join(",", backfills.Select(d =>
+                    $"{MicroiEngine.ORM(dbInfo.DbType).GetFieldName(d.ParentField["Name"].Val<string>())} {d.ParentAlias}"));
+                var fixedParentKey = ImportGetFixedFieldString(fixedField, fkField);
+                if (!fixedParentKey.DosIsNullOrWhiteSpace() && backfills.Any())
+                {
+                    var fixedSql = $"SELECT {backfillSelectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {sqlPkFieldName} = '{ImportEscapeSql(fixedParentKey)}'";
+                    var fixedParent = dbSession.FromSql(fixedSql).First<dynamic>();
+                    if (fixedParent != null)
+                    {
+                        var fixedParentRow = JObject.FromObject((object)fixedParent);
+                        var fixedBackfillCount = 0;
+                        foreach (var row in fileDataList.Select(ImportGetRowDictionary))
+                        {
+                            fixedBackfillCount += ImportBackfillChildFieldsFromParentRow(row, fixedField, fixedParentRow, backfills);
+                        }
+                        if (fixedBackfillCount > 0)
+                        {
+                            var backfillText = string.Join(" + ", backfills.Select(d => $"{parentTable.Name}.{d.ParentField["Name"].Val<string>()}->{currentTable.Name}.{d.ChildField["Name"].Val<string>()}"));
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据固定父表[{parentTable.Name}.{primaryFieldName}={fixedParentKey}]回填子表字段[{backfillText}]【{fixedBackfillCount}】处。");
+                        }
+                    }
+                }
                 var importParentMatchFieldName = relationConfig.TableChild?.ImportParentMatchFieldName;
                 var importChildMatchFieldName = relationConfig.TableChild?.ImportChildMatchFieldName;
                 var hasExplicitImportRelation = relationConfig.TableChild?.ImportRelations?.Any() == true
@@ -1615,23 +1730,24 @@ namespace Microi.net
                 }
                 if (!pendingRowKeys.Any()) continue;
 
-                var primaryFieldName = relationConfig.TableChild?.PrimaryTableFieldName;
-                if (primaryFieldName.DosIsNullOrWhiteSpace()) primaryFieldName = "Id";
-
-                var dbOracleTableSpace = osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>();
-                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(parentTable.Name, dbOracleTableSpace);
-                var sqlPkFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(primaryFieldName);
                 var firstSqlMatchFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(matches[0].ParentField["Name"].Val<string>());
                 var matchSelectSql = string.Join(",", matches.Select(d =>
                     $"{MicroiEngine.ORM(dbInfo.DbType).GetFieldName(d.ParentField["Name"].Val<string>())} {d.ParentAlias}"));
+                var selectSql = matchSelectSql;
+                if (!backfillSelectSql.DosIsNullOrWhiteSpace())
+                {
+                    selectSql += "," + backfillSelectSql;
+                }
                 var codeToId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var codeToParentRow = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
                 var duplicateKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var relationFilledCount = 0;
+                var relationBackfillCount = 0;
 
                 foreach (var chunk in firstMatchValues.Select((code, index) => new { code, index }).GroupBy(d => d.index / 500))
                 {
                     var inValues = string.Join(",", chunk.Select(d => $"'{ImportEscapeSql(d.code)}'"));
-                    var sql = $"SELECT {sqlPkFieldName} Id,{matchSelectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {firstSqlMatchFieldName} IN ({inValues})";
+                    var sql = $"SELECT {sqlPkFieldName} Id,{selectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {firstSqlMatchFieldName} IN ({inValues})";
                     var parentRows = dbSession.FromSql(sql).ToArray();
                     foreach (var row in parentRows)
                     {
@@ -1659,6 +1775,7 @@ namespace Microi.net
                         if (!codeToId.ContainsKey(code))
                         {
                             codeToId.Add(code, id);
+                            codeToParentRow.Add(code, rowObj);
                         }
                     }
                 }
@@ -1670,6 +1787,10 @@ namespace Microi.net
                     if (code.DosIsNullOrWhiteSpace() || duplicateKeys.Contains(code) || !codeToId.TryGetValue(code, out var parentId)) continue;
                     row[fkField["Label"].Val<string>()] = parentId;
                     row[fkField["Name"].Val<string>()] = parentId;
+                    if (codeToParentRow.TryGetValue(code, out var parentRow))
+                    {
+                        relationBackfillCount += ImportBackfillChildFieldsFromParentRow(row, fixedField, parentRow, backfills);
+                    }
                     relationFilledCount++;
                     filledCount++;
                 }
@@ -1677,6 +1798,11 @@ namespace Microi.net
                 if (relationFilledCount > 0)
                 {
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据导入关联[{matchText}]批量补齐子表字段[{currentTable.Name}.{fkField["Name"].Val<string>()}]【{relationFilledCount}】条。");
+                }
+                if (relationBackfillCount > 0)
+                {
+                    var backfillText = string.Join(" + ", backfills.Select(d => $"{parentTable.Name}.{d.ParentField["Name"].Val<string>()}->{currentTable.Name}.{d.ChildField["Name"].Val<string>()}"));
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：已根据导入关联[{matchText}]批量回填子表字段[{backfillText}]【{relationBackfillCount}】处。");
                 }
                 var duplicateWarningKey = $"{parentTable.Name}|{currentTable.Name}|{matchText}";
                 if (hasExplicitImportRelation && duplicateKeys.Count > 0 && !duplicateMatchWarnings.Contains(duplicateWarningKey))

@@ -97,6 +97,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_set_engine_anonymous',
 ];
 const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
+const jsonRecordSchema = z.record(z.unknown());
 function bufferToolRegistrationsByPriority(server) {
     const mutableServer = server;
     const originalTool = mutableServer.tool.bind(server);
@@ -1695,6 +1696,71 @@ export function createMcpServer(client, context) {
             }
             const data = result.Data;
             return { content: [{ type: 'text', text: `✅ ${data?.Message || 'Page saved successfully.'}\n- PageId: ${data?.PageId}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 查询微服务 / 微应用
+    // ========================
+    server.tool('microi_get_microservice', `Get one Microi microservice / micro-app by MsKey for OsClient "${osClient}". Use this before publishing to inspect current BuildVersion, EntryPath and asset manifest.`, {
+        msKey: z.string().describe('Microservice key, stored in sys_microiservice.MsKey'),
+    }, async ({ msKey }) => {
+        try {
+            const result = await client.getMicroService(msKey);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 创建微服务 / 微应用元数据
+    // ========================
+    server.tool('microi_create_microservice', `Create or update sys_microiservice metadata for OsClient "${osClient}". This only writes metadata. For generated app source/dist files, use microi_publish_microservice.`, {
+        microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: MsType, Runtime, StorageMode, SourceDirName, EntryPath, BuildVersion.'),
+        confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
+    }, async ({ microService, confirmExecution }) => {
+        if (!confirmExecution) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService }, null, 2) }],
+            };
+        }
+        try {
+            const result = await client.createMicroService(microService);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 发布微服务 / 微应用文件资产
+    // ========================
+    server.tool('microi_publish_microservice', `Publish generated microservice / micro-app files for OsClient "${osClient}". Uploads assets to Microi HDFS, upserts sys_microiservice and syncs sys_microiservice_page routes.`, {
+        microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: BuildVersion, EntryPath, SourceDirName.'),
+        assets: z.array(jsonRecordSchema).describe('Built asset files. Each item needs Path/RelativePath/FileName and FileByteBase64/ContentBase64. Mark the main HTML/JS entry with IsEntry=true or Entry=true.'),
+        routes: z.array(jsonRecordSchema).optional().describe('Optional route/page records for sys_microiservice_page. Fields: PageKey, PageName, PageTitle, RoutePath, EntryPath, Sort, IsHome.'),
+        confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
+    }, async ({ microService, assets, routes, confirmExecution }) => {
+        if (!confirmExecution) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, assetCount: assets.length, routes: routes || [] }, null, 2) }],
+            };
+        }
+        try {
+            const result = await client.publishMicroService({ microService, assets, routes: routes || [] });
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

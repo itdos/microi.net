@@ -296,8 +296,104 @@ var DiyCommon = {
         if (DiyCommon.IsNull(apiBase)) {
             return false;
         }
-        var value = String(apiBase).trim().replace(/\/+$/, "").toLowerCase();
+        var value = DiyCommon.NormalizeApiBase(apiBase);
         return value === "https://api.itdos.com" || value === "https://api-china.itdos.com";
+    },
+    NormalizeApiBase(apiBase) {
+        if (DiyCommon.IsNull(apiBase)) {
+            return "";
+        }
+        return String(apiBase).trim().replace(/\/+$/, "").toLowerCase();
+    },
+    IsSameApiBase(left, right) {
+        var leftValue = DiyCommon.NormalizeApiBase(left);
+        var rightValue = DiyCommon.NormalizeApiBase(right);
+        return !DiyCommon.IsNull(leftValue) && !DiyCommon.IsNull(rightValue) && leftValue === rightValue;
+    },
+    GetAppStoreSourceApiBase(row) {
+        row = row || {};
+        var fields = [
+            "AppStoreApiBase",
+            "StoreApiBase",
+            "StoreSourceApiBase",
+            "SourceApiBase",
+            "QueryApiBase",
+            "_ApiReplaceSelectApiBase",
+            "_AppStoreApiBase",
+            "_StoreApiBase",
+            "ApiBase"
+        ];
+        for (var i = 0; i < fields.length; i++) {
+            var value = row[fields[i]];
+            if (!DiyCommon.IsNull(value)) {
+                return String(value).trim().replace(/\/+$/, "");
+            }
+        }
+        return "https://api.itdos.com";
+    },
+    IsCurrentAppStoreSource(row) {
+        return DiyCommon.IsSameApiBase(DiyCommon.GetApiBase(), DiyCommon.GetAppStoreSourceApiBase(row));
+    },
+    CompareVersion(left, right) {
+        var normalize = function (value) {
+            var text = DiyCommon.IsNull(value) ? "" : String(value).trim().replace(/^v/i, "");
+            if (!text) {
+                return [0];
+            }
+            var parts = text.split(".");
+            var result = [];
+            for (var i = 0; i < parts.length; i++) {
+                var num = parseInt(String(parts[i]).replace(/[^0-9]/g, "") || "0", 10);
+                result.push(isNaN(num) ? 0 : num);
+            }
+            return result;
+        };
+        var leftParts = normalize(left);
+        var rightParts = normalize(right);
+        var len = Math.max(leftParts.length, rightParts.length);
+        for (var i = 0; i < len; i++) {
+            var leftValue = leftParts[i] || 0;
+            var rightValue = rightParts[i] || 0;
+            if (leftValue > rightValue) {
+                return 1;
+            }
+            if (leftValue < rightValue) {
+                return -1;
+            }
+        }
+        return 0;
+    },
+    GetAppStoreInstallStatus(row) {
+        row = row || {};
+        var status = row.StoreInstallStatus || row.InstallStatus || row.AppInstallStatus || "";
+        var map = {
+            "未安装": "Uninstalled",
+            "安装": "Uninstalled",
+            "可更新": "Outdated",
+            "更新": "Outdated",
+            "版本异常": "Abnormal",
+            "异常": "Abnormal",
+            "已安装": "Installed",
+            "重新安装": "Installed"
+        };
+        if (!DiyCommon.IsNull(status)) {
+            status = String(status).trim();
+            return map[status] || status;
+        }
+
+        var latestVersion = row.AppVersion || row.StoreVersion || row.Version || "";
+        var installedVersion = row.AppVersionInstall || row.InstalledVersion || row.CurrentVersion || "";
+        if (DiyCommon.IsNull(installedVersion)) {
+            return "Uninstalled";
+        }
+        var compare = DiyCommon.CompareVersion(latestVersion, installedVersion);
+        if (compare > 0) {
+            return "Outdated";
+        }
+        if (compare < 0) {
+            return "Abnormal";
+        }
+        return "Installed";
     },
     GetApiBase: function () {
         //如果index.html指定了ApiBase，这个权力最大
@@ -4259,11 +4355,23 @@ var DiyCommon = {
     _RefreshV8DynamicContext(V8) {
         try {
             var diyStore = getDiyStore();
+            var currentApiBase = DiyCommon.GetApiBase();
             // CurrentUser 来自 Pinia getter，必须通过 useDiyStore() 触发，$state 取不到 getter
             V8.CurrentUser = diyStore.GetCurrentUser;
             V8.SysConfig = diyStore.SysConfig;
             V8.OsClient = DiyCommon.GetOsClient();
             V8.CurrentToken = DiyCommon.getToken ? DiyCommon.getToken() : getToken();
+            V8.CurrentApiBase = currentApiBase;
+            V8.ApiBase = currentApiBase;
+            V8.CurrentApiBaseNormalized = DiyCommon.NormalizeApiBase(currentApiBase);
+            V8.NormalizeApiBase = DiyCommon.NormalizeApiBase;
+            V8.ApiBaseEquals = function (apiBase) {
+                return DiyCommon.IsSameApiBase(currentApiBase, apiBase);
+            };
+            V8.GetAppStoreSourceApiBase = DiyCommon.GetAppStoreSourceApiBase;
+            V8.IsCurrentAppStoreSource = DiyCommon.IsCurrentAppStoreSource;
+            V8.GetAppStoreInstallStatus = DiyCommon.GetAppStoreInstallStatus;
+            V8.CompareVersion = DiyCommon.CompareVersion;
         } catch (e) {
             // 极早期调用（store 未就绪）时容错
             V8.CurrentUser = V8.CurrentUser || {};

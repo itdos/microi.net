@@ -187,6 +187,9 @@ var base64 = System.Convert.ToBase64String(bytes);
     "ImportAutoFillFk": true,
     "ImportRelations": [
       { "Parent": "Code", "Child": "XiangmuBM" }
+    ],
+    "ImportBackfillFields": [
+      { "Parent": "Name", "Child": "XiangmuMC" }
     ]
   }
 }
@@ -196,14 +199,19 @@ var base64 = System.Convert.ToBase64String(bytes);
 
 - `ImportAutoFillFk`：是否在导入子表时自动补齐 `TableChildFkFieldName`；默认建议开启。
 - `ImportRelations`：主表字段与子表/Excel 字段的匹配关系，`Parent` 和 `Child` 可填字段名或字段标题。可配置多组，作为组合条件匹配。
+- `ImportBackfillFields`：主表字段回填到子表字段的映射。用于 Excel 没有项目编号、项目名称、客户名称等冗余展示列时，在找到主表后自动把主表值写入子表列。
 - 兼容旧配置：`ImportParentMatchFieldName` + `ImportChildMatchFieldName` 仍可使用，但新配置优先使用 `ImportRelations`。
+- 兼容旧回写配置：根节点 `Config.TableChildCallbackField` 可保存同样的 JSON 数组；新导入逻辑会与 `Config.TableChild.ImportBackfillFields` 合并处理。
 
 运行规则：
 
 - 只有子表外键为空时才补齐；Excel 已传外键时不覆盖。
+- `ImportBackfillFields` 只有在子表对应字段为空时才写入；Excel 已传该字段值时不覆盖。
 - 导入前按业务字段批量查询主表，避免逐行查询。
+- 从主表表单内或 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有匹配字段，也可以通过固定主表 Id 查询主表并回填子表外键和 `ImportBackfillFields`。
 - 如果业务字段为空、主表找不到或匹配到多条主表，当前行不自动补齐，并写入导入进度/后台日志，避免错误关联。
 - 示例：项目主表 `xiangmuguanli.Code` 匹配用料清单 `yongliaoqqingdan.XiangmuBM`，自动写入 `yongliaoqqingdan.XiangmuID`。
+- 示例：项目主表 `xiangmuguanli.Name` 回填成品清单 `xiangmugoujianqd.XiangmuMC`，保证导入模板缺少项目名称列时列表仍显示正常。
 
 ## 安全 / 性能注意
 
