@@ -7,7 +7,7 @@ export enum ResultEnum {
   SERVER_ERROR = 500,
   SERVER_FORBIDDEN = 403,
   NOT_FOUND = 404,
-  TIMEOUT = 60000
+  TIMEOUT = 10 * 60 * 1000
 }
 
 // 数据相关

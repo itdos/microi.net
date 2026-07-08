@@ -314,6 +314,7 @@ app.UseMicroiMQ();    // 启用消息队列
 app.UseMicroiUpgrade();// 启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
 BackgroundTaskService.ConfigureHubContext(app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>());
+OnlineTerminalService.ConfigureHubContext(app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>());
 
 // 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
 var osClientName = OsClient.GetConfigOsClient();

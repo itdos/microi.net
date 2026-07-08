@@ -839,6 +839,14 @@ namespace Microi.net
         public string _CaptchaId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _CaptchaValue { get; set; }
+        /// <summary>
+        /// 自动化测试登录标记。sys_config.AutoTestSkipCaptcha=true 时可跳过验证码，但仍必须校验真实账号密码。
+        /// </summary>
+        public bool _AutomationTestLogin { get; set; }
+        /// <summary>
+        /// _AutomationTestLogin 的兼容别名。仅跳过验证码，不跳过密码。
+        /// </summary>
+        public bool _SkipCaptchaForAutomation { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _token { get; set; }
@@ -893,8 +901,7 @@ namespace Microi.net
         public string _EncodePwd { get; set; }
         public string _EncodeNewPwd { get; set; }
         /// <summary>
-        /// 自动化测试旁路：当请求头 X-Microi-Dev-Key 与环境变量 MICROI_DEV_TEST_KEY 匹配且 Pwd="_DEV_BYPASS_" 时，
-        /// 控制器会设置该标志为 true，登录逻辑跳过密码校验。生产环境不要设置该环境变量。
+        /// 历史兼容字段：登录逻辑不再允许通过任何自动化参数跳过密码校验。
         /// </summary>
         public bool _DevBypassPwd { get; set; }
 

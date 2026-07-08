@@ -352,7 +352,15 @@ namespace Microi.net.Api
 
                 #region 从jwt中获取身份认证信息
                 var claims = new List<Claim>();
-                var token = currentToken.Token;
+                var token = context.HttpContext.Request.Headers["Authorization"].ToString();
+                if (token.DosIsNullOrWhiteSpace() && context.HttpContext.Request?.HasFormContentType == true)
+                {
+                    token = context.HttpContext.Request?.Form["authorization"].ToString();
+                }
+                if (token.DosIsNullOrWhiteSpace())
+                {
+                    token = currentToken.Token;
+                }
                 token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
@@ -433,6 +441,17 @@ namespace Microi.net.Api
                         
                         // 从token中提取claims
                         claims = jwtToken.Claims?.ToList();
+                        if (!DiyToken.IsCurrentAuthVersion(claims))
+                        {
+                            context.Result = new JsonResult(new DosResult(
+                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                                null,
+                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                                0,
+                                new { AppendMsg = "Token安全版本已失效，请重新登录" }
+                            ));
+                            return;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -484,13 +503,27 @@ namespace Microi.net.Api
                     ));
                     return;
                 }
+                if (!string.Equals(tokenOsClient, osClient, StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Result = new JsonResult(new DosResult(
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                        null,
+                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                        null,
+                        new
+                        {
+                            AppendMsg = $"Token租户与当前请求租户不一致。TokenOsClient：{tokenOsClient}, RequestOsClient：{osClient}"
+                        }
+                    ));
+                    return;
+                }
                 else
                 {
                     //获取身份信息
                     try
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
-                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}");
                     }
                     catch (Exception ex)
                     {
@@ -506,6 +539,20 @@ namespace Microi.net.Api
                             new
                             {
                                 AppendMsg = $"Token对应的用户信息未找到，可能是因为Redis缓存被清空了。UserId：{userId}, OsClient：{tokenOsClient}"
+                            }
+                        ));
+                        return;
+                    }
+                    if (!DiyToken.IsActiveCachedToken(tokenModel, token))
+                    {
+                        context.Result = new JsonResult(new DosResult(
+                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                            null,
+                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                            null,
+                            new
+                            {
+                                AppendMsg = "Token不在当前有效登录列表中，请重新登录"
                             }
                         ));
                         return;

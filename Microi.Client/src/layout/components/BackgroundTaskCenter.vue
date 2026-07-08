@@ -1,19 +1,49 @@
 <template>
-    <el-popover placement="bottom-end" trigger="click" width="520" popper-class="microi-task-popover" @show="refreshAll">
-        <template #reference>
-            <div class="right-menu-item hover-effect task-entry" :title="$t('Msg.NotificationCenter')">
-                <el-badge :value="badgeCount" :max="99" :hidden="badgeCount === 0" :class="{ 'task-badge-flash': badgeCount > 0 }">
-                    <el-icon class="task-icon"><Bell /></el-icon>
-                </el-badge>
-            </div>
-        </template>
+    <div class="right-menu-item hover-effect task-entry" :title="$t('Msg.NotificationCenter')" @click="openCenter">
+        <el-badge :value="badgeCount" :max="99" :hidden="badgeCount === 0" :class="{ 'task-badge-flash': badgeCount > 0 }">
+            <el-icon class="task-icon"><Bell /></el-icon>
+        </el-badge>
+    </div>
 
-        <div class="task-panel">
-            <div class="task-panel-header">
-                <span>{{ $t("Msg.NotificationCenter") }}</span>
-                <div class="task-panel-actions">
-                    <el-button link size="small" :icon="Refresh" :loading="loading || storeLoading" @click="refreshAll">{{ $t("Msg.Refresh") }}</el-button>
+    <el-dialog
+        v-model="visible"
+        class="microi-notification-dialog"
+        :title="$t('Msg.NotificationCenter')"
+        width="min(1080px, calc(100vw - 32px))"
+        align-center
+        draggable
+        destroy-on-close
+        @open="refreshAll"
+    >
+        <div class="notification-shell">
+            <div class="notification-summary">
+                <div class="summary-card">
+                    <el-icon><Bell /></el-icon>
+                    <span>{{ $t("Msg.BackgroundTasks") }}</span>
+                    <strong>{{ runningCount }}</strong>
                 </div>
+                <div v-if="isAdmin" class="summary-card warning">
+                    <el-icon><Monitor /></el-icon>
+                    <span>{{ $t("Msg.OfficialApps") }}</span>
+                    <strong>{{ appNoticeCount }}</strong>
+                </div>
+                <div class="summary-card success">
+                    <el-icon><Monitor /></el-icon>
+                    <span>{{ $t("Msg.MyOnlineTerminals") }}</span>
+                    <strong>{{ myTerminals.length }}</strong>
+                </div>
+                <div v-if="isSuperAdmin" class="summary-card admin">
+                    <el-icon><UserFilled /></el-icon>
+                    <span>{{ $t("Msg.CurrentOnlineUsers") }}</span>
+                    <strong>{{ onlineUsers.length }}</strong>
+                </div>
+            </div>
+
+            <div class="notification-toolbar">
+                <span class="notification-tip">{{ $t("Msg.NotificationCenterTip") }}</span>
+                <el-button size="small" :icon="Refresh" :loading="loading || storeLoading || terminalLoading" @click="refreshAll">
+                    {{ $t("Msg.Refresh") }}
+                </el-button>
             </div>
 
             <el-tabs v-model="activeTab" class="notification-tabs">
@@ -26,14 +56,14 @@
                     <div class="task-sub-actions">
                         <el-button link size="small" :icon="Delete" @click="clearCompleted">{{ $t("Msg.ClearCompleted") }}</el-button>
                     </div>
-                    <div v-if="tasks.length === 0" class="task-empty">{{ $t("Msg.NoBackgroundTasks") }}</div>
+                    <el-empty v-if="tasks.length === 0" :description="$t('Msg.NoBackgroundTasks')" />
                     <div v-else class="task-list">
                         <div v-for="item in tasks" :key="item.Id" class="task-item">
                             <div class="task-main">
                                 <span class="task-title">{{ item.Title || item.Type || $t("Msg.BackgroundTasks") }}</span>
                                 <span class="task-status" :class="'status-' + item.Status">{{ item.StatusText || item.Status }}</span>
                             </div>
-                            <el-progress :percentage="Number(item.Progress || 0)" :stroke-width="6" :show-text="false" />
+                            <el-progress :percentage="Number(item.Progress || 0)" :stroke-width="7" :show-text="false" />
                             <div class="task-meta">
                                 <span>{{ formatTime(item.CreateTime) }}</span>
                                 <span v-if="item.ElapsedText">{{ $t("Msg.Elapsed") }} {{ item.ElapsedText }}</span>
@@ -56,8 +86,8 @@
                         <span class="app-panel-tip">{{ $t("Msg.OfficialAppUpdateTip") }}</span>
                         <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
                     </div>
-                    <div v-if="storeLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
-                    <div v-else-if="storeNotices.length === 0" class="task-empty">{{ $t("Msg.NoOfficialAppUpdates") }}</div>
+                    <el-empty v-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
+                    <div v-else-if="storeLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
                     <div v-else class="app-notice-list">
                         <div v-for="item in storeNotices" :key="(item.AppId || item.StoreId || item.AppName) + item.Status" class="app-notice-item">
                             <div class="app-notice-main">
@@ -75,15 +105,73 @@
                         </div>
                     </div>
                 </el-tab-pane>
+
+                <el-tab-pane name="myTerminals">
+                    <template #label>
+                        <span>{{ $t("Msg.MyOnlineTerminals") }}</span>
+                        <span v-if="myTerminals.length > 0" class="tab-count success">{{ myTerminals.length }}</span>
+                    </template>
+                    <el-empty v-if="!terminalLoading && myTerminals.length === 0" :description="$t('Msg.NoOnlineTerminals')" />
+                    <el-table v-else :data="myTerminals" size="small" class="online-table" max-height="420">
+                        <el-table-column prop="ClientType" :label="$t('Msg.TerminalType')" min-width="110" />
+                        <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
+                        <el-table-column prop="UserAgent" :label="$t('Msg.TerminalInfo')" min-width="260" show-overflow-tooltip />
+                        <el-table-column :label="$t('Msg.LastActiveTime')" min-width="150">
+                            <template #default="{ row }">{{ formatDateTime(row.LastActiveTime || row.ConnectedTime) }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Operation')" width="120" fixed="right">
+                            <template #default="{ row }">
+                                <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(row, currentUser.Id)">
+                                    {{ $t("Msg.KickOffline") }}
+                                </el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-tab-pane>
+
+                <el-tab-pane v-if="isSuperAdmin" name="onlineUsers">
+                    <template #label>
+                        <span>{{ $t("Msg.CurrentOnlineUsers") }}</span>
+                        <span v-if="onlineUsers.length > 0" class="tab-count admin">{{ onlineUsers.length }}</span>
+                    </template>
+                    <el-empty v-if="!terminalLoading && onlineUsers.length === 0" :description="$t('Msg.NoOnlineUsers')" />
+                    <el-table v-else :data="onlineUsers" size="small" class="online-table" row-key="UserId" max-height="420">
+                        <el-table-column type="expand">
+                            <template #default="{ row }">
+                                <div class="terminal-list">
+                                    <div v-for="terminal in row.Terminals" :key="terminal.ConnectionId" class="terminal-card">
+                                        <div>
+                                            <strong>{{ terminal.ClientType || "PC" }}</strong>
+                                            <span>{{ terminal.Ip || "-" }}</span>
+                                            <p>{{ terminal.UserAgent || terminal.DeviceClientId || "-" }}</p>
+                                        </div>
+                                        <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(terminal, row.UserId)">
+                                            {{ $t("Msg.KickOffline") }}
+                                        </el-button>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="UserName" :label="$t('Msg.Name')" min-width="140" />
+                        <el-table-column prop="Account" :label="$t('Msg.Account')" min-width="140" />
+                        <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
+                        <el-table-column prop="OnlineCount" :label="$t('Msg.TerminalCount')" width="100" />
+                        <el-table-column :label="$t('Msg.LastActiveTime')" min-width="150">
+                            <template #default="{ row }">{{ formatDateTime(row.LastActiveTime) }}</template>
+                        </el-table-column>
+                    </el-table>
+                </el-tab-pane>
             </el-tabs>
         </div>
-    </el-popover>
+    </el-dialog>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { Bell, CircleClose, Delete, Refresh } from "@element-plus/icons-vue";
+import { Bell, CircleClose, Delete, Monitor, Refresh, SwitchButton, UserFilled } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { useDiyStore } from "@/pinia";
+import { useUserStore } from "@/pinia/modules/user";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
 const MASTER_STORE_ENGINE_URL = "https://api.itdos.com/api/ApiEngine/Run";
@@ -91,33 +179,47 @@ const MASTER_STORE_ENGINE_URL = "https://api.itdos.com/api/ApiEngine/Run";
 export default {
     name: "BackgroundTaskCenter",
     components: {
-        Bell
+        Bell,
+        Monitor,
+        UserFilled
     },
     setup() {
         const diyStore = useDiyStore();
-        return { diyStore };
+        const userStore = useUserStore();
+        return { diyStore, userStore };
     },
     data() {
         return {
+            visible: false,
             activeTab: "tasks",
             tasks: [],
             storeNotices: [],
+            myTerminals: [],
+            onlineUsers: [],
             loading: false,
             storeLoading: false,
+            terminalLoading: false,
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
             Delete,
             Refresh,
-            CircleClose
+            CircleClose,
+            SwitchButton
         };
     },
     computed: {
+        currentUser() {
+            return this.diyStore?.GetCurrentUser || {};
+        },
         isAdmin() {
-            const user = this.diyStore?.GetCurrentUser || {};
+            const user = this.currentUser;
             return user._IsAdmin === true
                 || user._IsAdmin === 1
                 || user._IsAdmin === "1"
                 || user._IsAdmin === "true";
+        },
+        isSuperAdmin() {
+            return Number(this.currentUser?.Level || 0) >= 9999;
         },
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;
@@ -141,6 +243,8 @@ export default {
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
             ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
+            ws.off("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
+            ws.off("ReceiveForceLogout", this.handleForceLogout);
         }
     },
     watch: {
@@ -154,9 +258,18 @@ export default {
                     this.activeTab = "tasks";
                 }
             }
+        },
+        isSuperAdmin(value) {
+            if (!value && this.activeTab === "onlineUsers") {
+                this.activeTab = "tasks";
+            }
         }
     },
     methods: {
+        openCenter() {
+            this.visible = true;
+            this.refreshAll();
+        },
         getWebsocket() {
             return this.$websocket || window?.app?.config?.globalProperties?.$websocket;
         },
@@ -165,18 +278,36 @@ export default {
             if (!ws || typeof ws.on !== "function") return;
             if (typeof ws.off === "function") {
                 ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
+                ws.off("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
+                ws.off("ReceiveForceLogout", this.handleForceLogout);
             }
             ws.on("ReceiveBackgroundTaskList", this.handleTaskList);
+            ws.on("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
+            ws.on("ReceiveForceLogout", this.handleForceLogout);
         },
         handleWebSocketConnected() {
             this.bindWebsocket();
             this.requestTaskListByWebsocket();
+            if (this.visible) {
+                this.loadTerminals();
+            }
         },
         handleTaskList(data) {
             this.tasks = Array.isArray(data) ? data : [];
         },
+        handleOnlineTerminalChanged() {
+            if (this.visible) {
+                this.loadTerminals();
+            }
+        },
+        async handleForceLogout(data) {
+            ElMessage.warning(data?.Reason || this.$t("Msg.TerminalKickedOffline"));
+            await this.userStore.logout();
+            this.$router.push(`/login?redirect=${this.$route.fullPath}`);
+        },
         refreshAll() {
             this.refreshTasks();
+            this.loadTerminals();
             if (this.isAdmin) {
                 this.checkOfficialApps(true);
             }
@@ -226,6 +357,48 @@ export default {
                 }
             } finally {
                 this.loading = false;
+            }
+        },
+        async loadTerminals() {
+            if (this.terminalLoading) return;
+            this.terminalLoading = true;
+            try {
+                const mine = await DiyCommon.PostAsync("/api/OnlineTerminal/Mine", {}, null, null, "json");
+                if (mine && mine.Code === 1) {
+                    this.myTerminals = Array.isArray(mine.Data?.Terminals) ? mine.Data.Terminals : [];
+                }
+                if (this.isSuperAdmin) {
+                    const list = await DiyCommon.PostAsync("/api/OnlineTerminal/List", {}, null, null, "json");
+                    if (list && list.Code === 1) {
+                        this.onlineUsers = Array.isArray(list.Data) ? list.Data : [];
+                    }
+                } else {
+                    this.onlineUsers = [];
+                }
+            } catch (error) {
+                console.warn("Load online terminals failed", error);
+            } finally {
+                this.terminalLoading = false;
+            }
+        },
+        async kickTerminal(row, userId) {
+            if (!row?.ConnectionId) return;
+            try {
+                await ElMessageBox.confirm(this.$t("Msg.ConfirmKickOffline"), this.$t("Msg.Tips"), {
+                    type: "warning",
+                    confirmButtonText: this.$t("Msg.Ok"),
+                    cancelButtonText: this.$t("Msg.Cancel")
+                });
+            } catch (_) {
+                return;
+            }
+            const result = await DiyCommon.PostAsync("/api/OnlineTerminal/Kick", {
+                UserId: userId,
+                ConnectionId: row.ConnectionId
+            }, null, null, "json");
+            if (result && result.Code === 1) {
+                ElMessage.success(result.Msg || this.$t("Msg.Success"));
+                this.loadTerminals();
             }
         },
         async loadInstalledVersions() {
@@ -283,6 +456,7 @@ export default {
             }
         },
         goAppStore() {
+            this.visible = false;
             this.$router.push({ path: "/microi-store" });
         },
         async clearCompleted() {
@@ -310,6 +484,16 @@ export default {
             } catch (_) {
                 return value;
             }
+        },
+        formatDateTime(value) {
+            if (!value) return "-";
+            try {
+                const date = new Date(value);
+                const pad = (n) => String(n).padStart(2, "0");
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+            } catch (_) {
+                return value;
+            }
         }
     }
 };
@@ -323,6 +507,7 @@ export default {
     align-items: center;
     justify-content: center;
     position: relative;
+    cursor: pointer;
 }
 
 .task-entry :deep(.el-badge) {
@@ -351,11 +536,64 @@ export default {
     animation: microi-task-badge-pulse 1s ease-in-out infinite;
 }
 
-.task-panel {
-    width: 100%;
+.notification-shell {
+    min-height: 560px;
 }
 
-.task-panel-header,
+.notification-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.summary-card {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--mci-border-color, #ebeef5);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(var(--mci-primary-rgb, 255, 90, 40), 0.09), rgba(255, 255, 255, 0.88));
+    color: var(--mci-text-color, #303133);
+
+    .el-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(var(--mci-primary-rgb, 255, 90, 40), 0.12);
+        color: var(--mci-primary-color, #ff5a28);
+    }
+
+    span {
+        min-width: 0;
+        font-size: 13px;
+        color: var(--mci-text-color-secondary, #606266);
+    }
+
+    strong {
+        font-size: 24px;
+        color: var(--mci-text-color, #303133);
+    }
+
+    &.warning .el-icon {
+        background: rgba(230, 162, 60, 0.14);
+        color: #e6a23c;
+    }
+
+    &.success .el-icon {
+        background: rgba(103, 194, 58, 0.14);
+        color: #67c23a;
+    }
+
+    &.admin .el-icon {
+        background: rgba(64, 158, 255, 0.14);
+        color: #409eff;
+    }
+}
+
+.notification-toolbar,
 .task-sub-actions,
 .app-panel-toolbar {
     display: flex;
@@ -364,20 +602,22 @@ export default {
     gap: 10px;
 }
 
-.task-panel-header {
-    font-weight: 600;
-    color: #303133;
+.notification-toolbar {
     margin-bottom: 8px;
 }
 
-.task-panel-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.notification-tip,
+.app-panel-tip {
+    min-width: 0;
+    color: var(--mci-text-color-secondary, #909399);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .notification-tabs :deep(.el-tabs__header) {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .tab-count {
@@ -397,6 +637,14 @@ export default {
     &.warning {
         background: #e6a23c;
     }
+
+    &.success {
+        background: #67c23a;
+    }
+
+    &.admin {
+        background: #409eff;
+    }
 }
 
 .task-sub-actions {
@@ -409,24 +657,23 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #909399;
+    color: var(--mci-text-color-secondary, #909399);
     font-size: 13px;
 }
 
 .task-list,
 .app-notice-list {
-    max-height: 380px;
+    max-height: 420px;
     overflow: auto;
 }
 
 .task-item,
 .app-notice-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #ebeef5;
-
-    &:last-child {
-        border-bottom: 0;
-    }
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--mci-border-color, #ebeef5);
+    border-radius: 8px;
+    background: var(--mci-bg-color-overlay, #fff);
 }
 
 .task-main,
@@ -443,7 +690,7 @@ export default {
 .app-name {
     min-width: 0;
     font-size: 13px;
-    color: #303133;
+    color: var(--mci-text-color, #303133);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -452,7 +699,7 @@ export default {
 .task-status {
     flex-shrink: 0;
     font-size: 12px;
-    color: #909399;
+    color: var(--mci-text-color-secondary, #909399);
 
     &.status-Succeeded {
         color: #67c23a;
@@ -471,27 +718,66 @@ export default {
 
 .task-meta,
 .app-notice-meta {
-    margin-top: 6px;
+    margin-top: 8px;
     font-size: 12px;
-    color: #909399;
+    color: var(--mci-text-color-secondary, #909399);
 }
 
 .task-msg {
-    margin-top: 4px;
+    margin-top: 6px;
     font-size: 12px;
-    color: #909399;
+    color: var(--mci-text-color-secondary, #909399);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.app-panel-tip {
-    min-width: 0;
-    color: #909399;
-    font-size: 12px;
+.online-table {
+    width: 100%;
+    border-radius: 8px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+}
+
+.terminal-list {
+    display: grid;
+    gap: 8px;
+    padding: 8px 18px 8px 52px;
+}
+
+.terminal-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--mci-bg-color-page, #f6f7fb);
+
+    span {
+        margin-left: 10px;
+        color: var(--mci-text-color-secondary, #909399);
+    }
+
+    p {
+        margin: 4px 0 0;
+        color: var(--mci-text-color-secondary, #909399);
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .notification-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .summary-card {
+        grid-template-columns: 30px 1fr;
+
+        strong {
+            grid-column: 2;
+            font-size: 20px;
+        }
+    }
 }
 
 @keyframes microi-task-badge-pulse {
