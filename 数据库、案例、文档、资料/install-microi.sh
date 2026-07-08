@@ -13,14 +13,15 @@
 #   microi-install-minio      - MinIO 对象存储
 #   microi-install-app        - 平台应用（API + Web）
 #   microi-install-watchtower - 自动更新服务
-#   microi-install-ollama     - Ollama AI 服务
-#   microi-install-qdrant     - Qdrant 向量数据库
+#   microi-install-ollama     - Ollama AI 服务（可选：在线 AI 引擎）
+#   microi-install-qdrant     - Qdrant 向量数据库（可选：在线 AI 引擎）
 # ============================================================
 # 端口分配规则：
-#   从 7000 开始顺序 +1 分配 10 个端口（7000-7009）
+#   默认从 7000 开始顺序 +1 分配 7 个端口；如安装在线 AI 引擎则分配 10 个端口
 #   若存在端口被占用，则自动从 7100 开始重新检测，以此类推
-#   端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console,
-#            Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
+#   基础端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console, API, Web
+#   在线 AI 端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console,
+#                  Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
 # ============================================================
 
 set -e
@@ -103,26 +104,29 @@ else
   exit 1
 fi
 
-# === 选择数据库类型 ===
+# === 在线 AI 引擎依赖安装选择 ===
 echo ''
-echo 'Microi：请选择要安装的数据库类型：'
-echo '  1) Demo示例数据库（包含示例数据，适合体验和学习）'
-echo '  2) 空数据库（干净数据库，适合正式项目）'
-echo 'Microi：请输入 1 或 2：'
-read -r db_type
+echo 'Microi：是否安装 Ollama、向量数据库以支持在线 AI 引擎？'
+echo 'Microi：该能力用于在线 AI 数据分析、在线 AI 编程等功能，不影响本地 AI 编程。'
+echo 'Microi：输入 1 安装，输入 0 不安装：'
+read -r install_online_ai
 
-if [ "$db_type" == "1" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/microi_demo_temp.sql.zip"
-  SQL_FILE_NAME="microi_demo_temp.sql"
-  echo 'Microi：将安装Demo示例数据库 ✓'
-elif [ "$db_type" == "2" ]; then
-  SQL_ZIP_URL="https://static.itdos.com/install/microi_empty_temp.sql.zip"
-  SQL_FILE_NAME="microi_empty_temp.sql"
-  echo 'Microi：将安装空数据库 ✓'
+if [ "${install_online_ai}" == "1" ]; then
+  INSTALL_ONLINE_AI=1
+  echo 'Microi：将安装 Ollama 与 Qdrant 向量数据库 ✓'
+elif [ "${install_online_ai}" == "0" ]; then
+  INSTALL_ONLINE_AI=0
+  echo 'Microi：将跳过 Ollama 与 Qdrant 向量数据库安装 ✓'
 else
   echo 'Microi：错误：无效的输入，脚本退出。'
   exit 1
 fi
+
+# === 数据库类型：固定安装空数据库 ===
+echo ''
+SQL_ZIP_URL="https://static.itdos.com/install/microi_empty_temp.sql.zip"
+SQL_FILE_NAME="microi_empty_temp.sql"
+echo 'Microi：将安装空数据库（干净数据库，适合正式项目）✓'
 
 echo ''
 echo '[步骤1/11] 环境检测完成 ✓'
@@ -190,16 +194,64 @@ install_docker() {
     echo "Microi：错误：不支持的操作系统 ${OS_ID}，请手动安装Docker后重试。"
     exit 1
   fi
-  sudo systemctl start docker
-  sudo systemctl enable docker
-  echo 'Microi：Docker 已成功安装 ✓'
+  if command -v systemctl > /dev/null 2>&1; then
+    sudo systemctl daemon-reload > /dev/null 2>&1 || true
+    sudo systemctl enable docker > /dev/null 2>&1 || true
+    sudo systemctl start docker || true
+  elif command -v service > /dev/null 2>&1; then
+    sudo service docker start || true
+  fi
+  echo 'Microi：Docker 安装命令已执行，正在验证服务状态...'
 }
 
+ensure_docker_daemon() {
+  if ! command -v docker > /dev/null 2>&1; then
+    echo 'Microi：错误：Docker 安装后仍未检测到 docker 命令，请检查上方安装日志后重试。'
+    exit 1
+  fi
+
+  echo 'Microi：正在检查 Docker daemon...'
+  if docker info > /dev/null 2>&1; then
+    echo 'Microi：Docker daemon 已运行 ✓'
+    return 0
+  fi
+
+  echo 'Microi：Docker 命令已安装，但 daemon 未运行，正在尝试启动...'
+  if command -v systemctl > /dev/null 2>&1; then
+    sudo systemctl daemon-reload > /dev/null 2>&1 || true
+    sudo systemctl enable docker > /dev/null 2>&1 || true
+    sudo systemctl start containerd > /dev/null 2>&1 || true
+    sudo systemctl start docker > /dev/null 2>&1 || true
+  elif command -v service > /dev/null 2>&1; then
+    sudo service docker start > /dev/null 2>&1 || true
+  elif command -v dockerd > /dev/null 2>&1; then
+    echo 'Microi：未检测到 systemctl/service，尝试后台启动 dockerd...'
+    sudo nohup dockerd > /tmp/microi-dockerd.log 2>&1 &
+  fi
+
+  for i in $(seq 1 30); do
+    if docker info > /dev/null 2>&1; then
+      echo 'Microi：Docker daemon 启动成功 ✓'
+      return 0
+    fi
+    echo "Microi：等待 Docker daemon 启动中... (${i}/30)"
+    sleep 1
+  done
+
+  echo 'Microi：错误：无法连接 Docker daemon。Docker 命令已安装，但服务未能启动。'
+  echo 'Microi：请在服务器上执行以下命令查看原因：'
+  echo '  systemctl status docker -l'
+  echo '  journalctl -u docker -n 100 --no-pager'
+  echo 'Microi：如果不是 systemd 环境，请查看 /tmp/microi-dockerd.log。'
+  echo 'Microi：常见原因：Docker 服务未启动、containerd 异常、内核/iptables 配置异常、磁盘空间不足。'
+  exit 1
+}
 if ! command -v docker > /dev/null 2>&1; then
   install_docker
 else
   echo "Microi：Docker 已安装: $(docker --version) ✓"
 fi
+ensure_docker_daemon
 
 # === 检查并安装 Docker Compose V2 ===
 if docker compose version > /dev/null 2>&1; then
@@ -231,9 +283,12 @@ else
 fi
 
 # === 检查已有容器/编排 ===
-if docker ps -a --format '{{.Names}}' | grep -q '^microi-install-'; then
+EXISTING_MICROI_CONTAINERS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^microi-install-' || true)
+if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   echo ''
   echo 'Microi：错误：检测到已有 microi-install 相关容器，请先清理后再运行此脚本。'
+  echo 'Microi：已检测到以下容器：'
+  echo "${EXISTING_MICROI_CONTAINERS}"
   echo 'Microi：清理方式一（推荐）：进入各编排目录执行 docker compose down'
   echo 'Microi：清理方式二：执行以下命令强制删除所有相关容器：'
   echo '  docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f'
@@ -307,8 +362,13 @@ generate_random_data_dir() {
 }
 
 # === 端口检测 ===
-PORT_COUNT=10
-PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  PORT_COUNT=10
+  PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
+else
+  PORT_COUNT=7
+  PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "API" "Web")
+fi
 
 check_port_in_use() {
   local port="$1"
@@ -330,7 +390,7 @@ check_port_in_use() {
   return 1
 }
 
-echo 'Microi：开始按规则分配端口（从 7000 开始顺序 +1，共 10 个端口）'
+echo "Microi：开始按规则分配端口（从 7000 开始顺序 +1，共 ${PORT_COUNT} 个端口）"
 echo ''
 
 PORT_BASE=7000
@@ -371,11 +431,19 @@ REDIS_PORT=$((PORT_BASE + 1))
 MONGO_PORT=$((PORT_BASE + 2))
 MINIO_PORT=$((PORT_BASE + 3))
 MINIO_CONSOLE_PORT=$((PORT_BASE + 4))
-OLLAMA_PORT=$((PORT_BASE + 5))
-QDRANT_HTTP_PORT=$((PORT_BASE + 6))
-QDRANT_GRPC_PORT=$((PORT_BASE + 7))
-API_PORT=$((PORT_BASE + 8))
-VUE_PORT=$((PORT_BASE + 9))
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  OLLAMA_PORT=$((PORT_BASE + 5))
+  QDRANT_HTTP_PORT=$((PORT_BASE + 6))
+  QDRANT_GRPC_PORT=$((PORT_BASE + 7))
+  API_PORT=$((PORT_BASE + 8))
+  VUE_PORT=$((PORT_BASE + 9))
+else
+  OLLAMA_PORT=""
+  QDRANT_HTTP_PORT=""
+  QDRANT_GRPC_PORT=""
+  API_PORT=$((PORT_BASE + 5))
+  VUE_PORT=$((PORT_BASE + 6))
+fi
 
 echo ''
 echo 'Microi：端口分配方案：'
@@ -385,14 +453,20 @@ printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
 printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
 printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
-printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
-printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
-printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
+  printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
+  printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
+fi
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT} ${API_PORT} ${VUE_PORT}"
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT} ${API_PORT} ${VUE_PORT}"
+else
+  ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${API_PORT} ${VUE_PORT}"
+fi
 
 echo ''
 echo '[步骤3/11] 端口分配完成 ✓'
@@ -409,10 +483,18 @@ REDIS_PASSWORD=$(generate_random_password)
 MONGO_ROOT_PASSWORD=$(generate_random_password)
 MINIO_ACCESS_KEY=$(generate_random_password)
 MINIO_SECRET_KEY=$(generate_random_password)
-QDRANT_API_KEY=$(generate_random_password)
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  QDRANT_API_KEY=$(generate_random_password)
+else
+  QDRANT_API_KEY=""
+fi
 
 # 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
-for _pw_var in MYSQL_ROOT_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY QDRANT_API_KEY; do
+_REQUIRED_PW_VARS="MYSQL_ROOT_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  _REQUIRED_PW_VARS="${_REQUIRED_PW_VARS} QDRANT_API_KEY"
+fi
+for _pw_var in ${_REQUIRED_PW_VARS}; do
   eval _pw_val="\${${_pw_var}}"
   if [ -z "${_pw_val}" ]; then
     echo "Microi：错误：密码生成失败（${_pw_var}为空），请检查 openssl 是否安装正确。"
@@ -1317,9 +1399,11 @@ printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
 printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
 printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
-printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
-printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
-printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
+  printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
+  printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
+fi
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo ''
