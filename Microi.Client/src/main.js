@@ -338,7 +338,8 @@ function InitDiyWebcoket() {
         console.log('[WebSocket] 当前连接状态:', currentWebsocket?.state || 'null');
         
         if (currentWebsocket == null || (currentWebsocket.state != "Connected" && currentWebsocket.state != "Connecting")) {
-            const url = DiyCommon.GetApiBase() + `/diy-websocket`;
+            const deviceClientId = DiyCommon.GetDid();
+            const url = DiyCommon.GetApiBase() + `/diy-websocket?DeviceClientId=${encodeURIComponent(deviceClientId)}`;
             const token = DiyCommon.getToken();
             
             console.log('[WebSocket] 开始连接:', url);

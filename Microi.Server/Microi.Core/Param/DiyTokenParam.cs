@@ -14,5 +14,6 @@ namespace Microi.net
         public JObject CurrentUser { get; set; }
         public string OsClient { get; set; }
         public string _ClientType { get; set; }
+        public string Did { get; set; }
     }
 }

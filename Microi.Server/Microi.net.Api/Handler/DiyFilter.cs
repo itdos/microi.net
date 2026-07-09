@@ -571,7 +571,7 @@ namespace Microi.net.Api
                 {
                     //登陆身份已失效，因为redis被清了
                     context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
                         null, 
                         DiyMessage.GetLang(osClient, "NoLogin", _Lang),
                         null,
@@ -603,6 +603,26 @@ namespace Microi.net.Api
                         }
                     ));
                     return;
+                }
+                try
+                {
+                    await OnlineTerminalService.TrackTokenActiveAsync(
+                        tokenOsClient,
+                        tokenModel,
+                        activeTokenEntry,
+                        context.HttpContext,
+                        claims,
+                        token).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                    {
+                        Type = "在线终端",
+                        Title = "同步Token终端失败",
+                        Content = ex.Message,
+                        OsClient = tokenOsClient
+                    });
                 }
                 var refreshThreshold = tokenLifetime > TimeSpan.FromMinutes(5)
                     ? tokenLifetime - TimeSpan.FromMinutes(5)
