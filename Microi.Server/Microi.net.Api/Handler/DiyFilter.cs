@@ -503,6 +503,7 @@ namespace Microi.net.Api
                     ));
                     return;
                 }
+                TokensModel activeTokenEntry = null;
                 if (!string.Equals(tokenOsClient, osClient, StringComparison.OrdinalIgnoreCase))
                 {
                     context.Result = new JsonResult(new DosResult(
@@ -543,7 +544,8 @@ namespace Microi.net.Api
                         ));
                         return;
                     }
-                    if (!DiyToken.IsActiveCachedToken(tokenModel, token))
+                    activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(tokenModel, token);
+                    if (activeTokenEntry == null)
                     {
                         context.Result = new JsonResult(new DosResult(
                             int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
@@ -582,33 +584,31 @@ namespace Microi.net.Api
                 }
 
                 #region 若token已过期或快过期，则重新获取
-                var sessionAuthTimeout = 20;
-                if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
-                {
-                    int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
-                }
-                if (sessionAuthTimeout <= 0)
-                {
-                    sessionAuthTimeout = 20;
-                }
+                var tokenLifetime = DiyToken.ResolveClientTokenLifetime(clientModel, clientType);
+                var tokenLifetimeText = DiyToken.DescribeClientTokenLifetime(clientModel, clientType);
+                var activeTokenUpdateTime = activeTokenEntry?.UpdateTime == default ? tokenModel.UpdateTime : activeTokenEntry.UpdateTime;
+                var activeTokenAge = DateTime.Now - activeTokenUpdateTime;
 
                 //如果token已过期，直接返回退出登录
-                if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
+                if (activeTokenAge > tokenLifetime)
                 {
                     context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
                         null, 
                         DiyMessage.GetLang(osClient, "NoLogin", _Lang),
                         null,
                         new
                         {
-                            AppendMsg = $"Token已过期，最后更新时间：{tokenModel.UpdateTime}, 当前时间：{DateTime.Now}, 超过SessionAuthTimeout设置的过期时间：{sessionAuthTimeout}分钟"
+                            AppendMsg = $"Token已过期，ClientType：{clientType}, 最后更新时间：{activeTokenUpdateTime}, 当前时间：{DateTime.Now}, 超过当前终端配置的过期时间：{tokenLifetimeText}"
                         }
                     ));
                     return;
                 }
+                var refreshThreshold = tokenLifetime > TimeSpan.FromMinutes(5)
+                    ? tokenLifetime - TimeSpan.FromMinutes(5)
+                    : TimeSpan.FromTicks(Math.Max(1, tokenLifetime.Ticks / 2));
                 if (sysUser != null &&
-                    (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
+                    (tokenModel.Token.DosIsNullOrWhiteSpace() || activeTokenAge > refreshThreshold)
                 )
                 {
                     var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()

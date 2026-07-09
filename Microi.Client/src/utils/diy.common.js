@@ -310,6 +310,17 @@ var DiyCommon = {
         var rightValue = DiyCommon.NormalizeApiBase(right);
         return !DiyCommon.IsNull(leftValue) && !DiyCommon.IsNull(rightValue) && leftValue === rightValue;
     },
+    NormalizeOsClient(osClient) {
+        if (DiyCommon.IsNull(osClient)) {
+            return "";
+        }
+        return String(osClient).trim().toLowerCase();
+    },
+    IsSameOsClient(left, right) {
+        var leftValue = DiyCommon.NormalizeOsClient(left);
+        var rightValue = DiyCommon.NormalizeOsClient(right);
+        return !DiyCommon.IsNull(leftValue) && !DiyCommon.IsNull(rightValue) && leftValue === rightValue;
+    },
     GetAppStoreSourceApiBase(row) {
         row = row || {};
         var fields = [
@@ -331,8 +342,30 @@ var DiyCommon = {
         }
         return "https://api.itdos.com";
     },
+    GetAppStoreSourceOsClient(row) {
+        row = row || {};
+        var fields = [
+            "AppStoreOsClient",
+            "StoreOsClient",
+            "StoreSourceOsClient",
+            "SourceOsClient",
+            "QueryOsClient",
+            "_ApiReplaceSelectOsClient",
+            "_AppStoreOsClient",
+            "_StoreOsClient",
+            "OsClient"
+        ];
+        for (var i = 0; i < fields.length; i++) {
+            var value = row[fields[i]];
+            if (!DiyCommon.IsNull(value)) {
+                return String(value).trim();
+            }
+        }
+        return "iTdos";
+    },
     IsCurrentAppStoreSource(row) {
-        return DiyCommon.IsSameApiBase(DiyCommon.GetApiBase(), DiyCommon.GetAppStoreSourceApiBase(row));
+        return DiyCommon.IsSameApiBase(DiyCommon.GetApiBase(), DiyCommon.GetAppStoreSourceApiBase(row))
+            && DiyCommon.IsSameOsClient(DiyCommon.GetOsClient(), DiyCommon.GetAppStoreSourceOsClient(row));
     },
     CompareVersion(left, right) {
         var normalize = function (value) {
@@ -4356,19 +4389,27 @@ var DiyCommon = {
         try {
             var diyStore = getDiyStore();
             var currentApiBase = DiyCommon.GetApiBase();
+            var currentOsClient = DiyCommon.GetOsClient();
             // CurrentUser 来自 Pinia getter，必须通过 useDiyStore() 触发，$state 取不到 getter
             V8.CurrentUser = diyStore.GetCurrentUser;
             V8.SysConfig = diyStore.SysConfig;
-            V8.OsClient = DiyCommon.GetOsClient();
+            V8.OsClient = currentOsClient;
+            V8.CurrentOsClient = currentOsClient;
             V8.CurrentToken = DiyCommon.getToken ? DiyCommon.getToken() : getToken();
             V8.CurrentApiBase = currentApiBase;
             V8.ApiBase = currentApiBase;
             V8.CurrentApiBaseNormalized = DiyCommon.NormalizeApiBase(currentApiBase);
+            V8.CurrentOsClientNormalized = DiyCommon.NormalizeOsClient(currentOsClient);
             V8.NormalizeApiBase = DiyCommon.NormalizeApiBase;
+            V8.NormalizeOsClient = DiyCommon.NormalizeOsClient;
             V8.ApiBaseEquals = function (apiBase) {
                 return DiyCommon.IsSameApiBase(currentApiBase, apiBase);
             };
+            V8.OsClientEquals = function (osClient) {
+                return DiyCommon.IsSameOsClient(currentOsClient, osClient);
+            };
             V8.GetAppStoreSourceApiBase = DiyCommon.GetAppStoreSourceApiBase;
+            V8.GetAppStoreSourceOsClient = DiyCommon.GetAppStoreSourceOsClient;
             V8.IsCurrentAppStoreSource = DiyCommon.IsCurrentAppStoreSource;
             V8.GetAppStoreInstallStatus = DiyCommon.GetAppStoreInstallStatus;
             V8.CompareVersion = DiyCommon.CompareVersion;

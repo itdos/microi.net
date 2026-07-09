@@ -293,6 +293,13 @@ import { getFirstValidRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import config from "@/config.json";
 
+const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
+XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
+1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
+1DsI9VJ7gTHGL3R7sQIDAQAB
+-----END PUBLIC KEY-----`;
+
 export default {
     name: "Login",
     components: {
@@ -409,8 +416,10 @@ export default {
                 Pwd2: "",
                 SmsCaptchaValue: ""
             },
-            // 登录RSA公钥：默认不内置固定密钥。如需启用，请通过 config.json 的 LoginRsaPublicKey 或 window.MicroiLoginPublicKey 配置。
-            publicKey: (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || ""
+            // 登录RSA公钥：优先使用 config.json / window 覆盖；如需本地明文兼容，可将 LoginRsaPublicKey 显式配置为 false。
+            publicKey: config && config.LoginRsaPublicKey === false
+                ? ""
+                : (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY
             // TokenLoginCount : 0
         };
     },

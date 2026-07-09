@@ -1097,7 +1097,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_get_event_code',
-    `Get V8 event JavaScript code by table name and event type (OsClient: ${osClient}).`,
+    `Get form/table V8 event JavaScript code by table name and event type (OsClient: ${osClient}). Use this for 表单V8事件 such as SubmitBeforeServerV8, SubmitAfterServerV8 and DataFilterV8.`,
     {
       formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
       eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
@@ -1133,7 +1133,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_event_code',
-    `Save (update) V8 event code on Microi server (OsClient: ${osClient}). Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code.`,
+    `Save (update) form/table V8 event code on Microi server (OsClient: ${osClient}). This is the MCP tool for submitting 表单V8事件 code. Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code.`,
     {
       formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
       eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),

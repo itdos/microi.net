@@ -170,6 +170,21 @@ export default {
         _EnableTrash() {
             return !!(this.CurrentDiyTableModel && this.CurrentDiyTableModel.EnableTrash);
         },
+        _IsMicroiStoreMenu() {
+            var self = this;
+            var tableName = String((self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name) || '').toLowerCase();
+            var menuUrl = String((self.SysMenuModel && self.SysMenuModel.Url) || '').toLowerCase();
+            var moduleKey = String((self.SysMenuModel && self.SysMenuModel.ModuleEngineKey) || '').toLowerCase();
+            return tableName === 'sys_microistore'
+                || moduleKey === 'sys_microistore'
+                || menuUrl === '/microi-store';
+        },
+        _CanManageMicroiStoreSource() {
+            var self = this;
+            if (!self._IsMicroiStoreMenu) return true;
+            var sourceRow = self.DiyTableRowList && self.DiyTableRowList.length > 0 ? self.DiyTableRowList[0] : null;
+            return self.DiyCommon.IsCurrentAppStoreSource(sourceRow);
+        },
         _LimitAdd() {
             var self = this;
             if (self.IsTrashMode) return false;

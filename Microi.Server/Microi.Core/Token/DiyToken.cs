@@ -46,6 +46,59 @@ namespace Microi.net
             return jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
         }
 
+        private static int ReadPositiveInt(OsClientSecret clientModel, params string[] keys)
+        {
+            if (clientModel?.OsClientModel == null || keys == null)
+            {
+                return 0;
+            }
+
+            foreach (var key in keys)
+            {
+                var raw = clientModel.OsClientModel[key]?.Val<string>();
+                if (!raw.DosIsNullOrWhiteSpace() && int.TryParse(raw, out var value) && value > 0)
+                {
+                    return value;
+                }
+            }
+
+            return 0;
+        }
+
+        public static TimeSpan ResolveClientTokenLifetime(OsClientSecret clientModel, string clientType)
+        {
+            var normalizedClientType = (clientType ?? "").Trim();
+            if (normalizedClientType.Equals("PC", StringComparison.OrdinalIgnoreCase))
+            {
+                var minutes = ReadPositiveInt(clientModel, "SessionAuthTimeout");
+                return TimeSpan.FromMinutes(minutes > 0 ? minutes : 20);
+            }
+
+            var days = 0;
+            if (normalizedClientType.Equals("VSCode", StringComparison.OrdinalIgnoreCase))
+            {
+                days = ReadPositiveInt(clientModel, "VSCodeAccessTokenLifetime", "AccessTokenLifetime");
+            }
+            else if (normalizedClientType.Equals("MCP", StringComparison.OrdinalIgnoreCase))
+            {
+                days = ReadPositiveInt(clientModel, "McpAccessTokenLifetime", "AccessTokenLifetime");
+            }
+            else
+            {
+                days = ReadPositiveInt(clientModel, "AccessTokenLifetime");
+            }
+
+            return TimeSpan.FromDays(days > 0 ? days : 30);
+        }
+
+        public static string DescribeClientTokenLifetime(OsClientSecret clientModel, string clientType)
+        {
+            var lifetime = ResolveClientTokenLifetime(clientModel, clientType);
+            return lifetime.TotalDays >= 1
+                ? $"{lifetime.TotalDays:0.##}天"
+                : $"{lifetime.TotalMinutes:0.##}分钟";
+        }
+
         private static string NormalizeBearerToken(string token)
         {
             return token.DosTrim().DosReplace("Bearer ", "");
@@ -57,28 +110,45 @@ namespace Microi.net
             return string.Equals(authVersion, CurrentAuthVersion, StringComparison.Ordinal);
         }
 
-        public static bool IsActiveCachedToken(CurrentToken tokenModel, string requestToken)
+        public static TokensModel GetActiveCachedTokenEntry(CurrentToken tokenModel, string requestToken)
         {
             var normalizedToken = NormalizeBearerToken(requestToken);
             if (tokenModel == null || normalizedToken.DosIsNullOrWhiteSpace())
             {
-                return false;
+                return null;
             }
 
             if (!string.Equals(tokenModel.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal))
             {
-                return false;
+                return null;
+            }
+
+            var tokenEntry = tokenModel.Tokens?.FirstOrDefault(d =>
+                string.Equals(d.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal)
+                && string.Equals(NormalizeBearerToken(d.Token), normalizedToken, StringComparison.Ordinal));
+
+            if (tokenEntry != null)
+            {
+                return tokenEntry;
             }
 
             if (string.Equals(NormalizeBearerToken(tokenModel.Token), normalizedToken, StringComparison.Ordinal))
             {
-                return true;
+                return new TokensModel
+                {
+                    Token = tokenModel.Token,
+                    AuthVersion = tokenModel.AuthVersion,
+                    CreateTime = tokenModel.CreateTime,
+                    UpdateTime = tokenModel.UpdateTime
+                };
             }
 
-            return tokenModel.Tokens != null
-                && tokenModel.Tokens.Any(d =>
-                    string.Equals(d.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal)
-                    && string.Equals(NormalizeBearerToken(d.Token), normalizedToken, StringComparison.Ordinal));
+            return null;
+        }
+
+        public static bool IsActiveCachedToken(CurrentToken tokenModel, string requestToken)
+        {
+            return GetActiveCachedTokenEntry(tokenModel, requestToken) != null;
         }
 
         /// <summary>
@@ -352,32 +422,7 @@ namespace Microi.net
                         }
                     }
                     #endregion
-                    var sessionAuthTimeout = 20;
-                    var tokenExpires = DateTime.Now;
-                    if (clientType == "PC")
-                    {
-                        if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
-                        {
-                            int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
-                        }
-                        if (sessionAuthTimeout <= 0)
-                        {
-                            sessionAuthTimeout = 20;
-                        }
-                        tokenExpires = tokenExpires.AddMinutes(sessionAuthTimeout);
-                    }
-                    else
-                    {
-                        if (!clientModel.OsClientModel["AccessTokenLifetime"].Val<string>().DosIsNullOrWhiteSpace())
-                        {
-                            int.TryParse(clientModel.OsClientModel["AccessTokenLifetime"].Val<string>(), out sessionAuthTimeout);
-                        }
-                        if (sessionAuthTimeout <= 0)
-                        {
-                            sessionAuthTimeout = 30;
-                        }
-                        tokenExpires = tokenExpires.AddDays(sessionAuthTimeout);
-                    }
+                    var tokenExpires = DateTime.Now.Add(ResolveClientTokenLifetime(clientModel, clientType));
 
                     var handler = new JwtSecurityTokenHandler();
 
@@ -520,14 +565,25 @@ namespace Microi.net
                 {
                     var jwtHandler = new JwtSecurityTokenHandler();
                     var claims = new List<Claim>();
+                    JwtSecurityToken jwtToken = null;
 
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims.ToList();
+                        jwtToken = jwtHandler.ReadJwtToken(token);
+                        claims = jwtToken?.Claims.ToList();
                     }
                     catch (System.Exception)
                     {
 
+                    }
+
+                    if (jwtToken == null || claims == null || claims.Count == 0)
+                    {
+                        return null;
+                    }
+                    if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
+                    {
+                        return null;
                     }
 
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
