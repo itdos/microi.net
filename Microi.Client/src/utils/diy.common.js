@@ -365,6 +365,203 @@ var DiyCommon = {
         return DiyCommon.IsSameApiBase(DiyCommon.GetApiBase(), DiyCommon.GetAppStoreSourceApiBase(row))
             && DiyCommon.IsSameOsClient(DiyCommon.GetOsClient(), DiyCommon.GetAppStoreSourceOsClient(row));
     },
+    _AppStoresCache: null,
+    _AppStoreMapCache: {},
+    _AppStoresCacheKey: "",
+    _AppStoresCacheTime: 0,
+    _AppStoresLoadingPromise: null,
+    GetAppStoresCacheKey() {
+        return DiyCommon.NormalizeApiBase(DiyCommon.GetApiBase()) + "|" + DiyCommon.NormalizeOsClient(DiyCommon.GetOsClient());
+    },
+    BuildAppStoreMap(rows) {
+        var map = {};
+        var addKey = function (prefix, value, row) {
+            if (DiyCommon.IsNull(value)) {
+                return;
+            }
+            map[prefix + ":" + String(value).trim().toLowerCase()] = row;
+        };
+        (rows || []).forEach(function (row) {
+            if (!row) {
+                return;
+            }
+            addKey("storeid", row.StoreId || row.StoreID, row);
+            addKey("appid", row.AppId || row.AppID || row.AppKey, row);
+            addKey("appname", row.AppName || row.Name || row.Title, row);
+        });
+        return map;
+    },
+    GetAppStoreLookupKeys(row) {
+        row = row || {};
+        var keys = [];
+        var addKey = function (prefix, value) {
+            if (DiyCommon.IsNull(value)) {
+                return;
+            }
+            keys.push(prefix + ":" + String(value).trim().toLowerCase());
+        };
+        addKey("storeid", row.StoreId || row.StoreID || row.Id);
+        addKey("appid", row.AppId || row.AppID || row.AppKey);
+        addKey("appname", row.AppName || row.Name || row.Title);
+        return keys;
+    },
+    GetAppStoreLocal(row) {
+        if (row && row._LocalAppStore) {
+            return row._LocalAppStore;
+        }
+        if (DiyCommon._AppStoresCacheKey !== DiyCommon.GetAppStoresCacheKey()) {
+            return null;
+        }
+        var map = DiyCommon._AppStoreMapCache || {};
+        var keys = DiyCommon.GetAppStoreLookupKeys(row);
+        for (var i = 0; i < keys.length; i++) {
+            if (map[keys[i]]) {
+                return map[keys[i]];
+            }
+        }
+        return null;
+    },
+    async EnsureAppStores(option) {
+        option = option || {};
+        var cacheKey = DiyCommon.GetAppStoresCacheKey();
+        var now = Date.now();
+        var ttl = option.Ttl || 30000;
+        if (!option.force
+            && Array.isArray(DiyCommon._AppStoresCache)
+            && DiyCommon._AppStoresCacheKey === cacheKey
+            && now - DiyCommon._AppStoresCacheTime < ttl) {
+            return DiyCommon._AppStoresCache;
+        }
+        if (!option.force && DiyCommon._AppStoresLoadingPromise) {
+            return await DiyCommon._AppStoresLoadingPromise;
+        }
+        DiyCommon._AppStoresLoadingPromise = (async function () {
+            var rows = [];
+            try {
+                var result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
+                    _PageIndex: 1,
+                    _PageSize: 5000,
+                    _SelectFields: [
+                        "Id",
+                        "StoreId",
+                        "AppId",
+                        "AppName",
+                        "AppVersion",
+                        "AppVersionInstall",
+                        "InstallStatus",
+                        "InstallTime",
+                        "UpdateTime",
+                        "LastCheckTime",
+                        "PackageName",
+                        "PackageVersion",
+                        "PackageOsClient",
+                        "InstallResult",
+                        "Remark"
+                    ],
+                    _OrderBy: "UpdateTime",
+                    _OrderByType: "DESC"
+                });
+                if (result && result.Code === 1 && Array.isArray(result.Data)) {
+                    rows = result.Data;
+                }
+            } catch (error) {
+                console.warn("[AppStore] load local installed versions failed", error);
+            }
+            DiyCommon._AppStoresCache = rows;
+            DiyCommon._AppStoreMapCache = DiyCommon.BuildAppStoreMap(rows);
+            DiyCommon._AppStoresCacheKey = cacheKey;
+            DiyCommon._AppStoresCacheTime = Date.now();
+            return rows;
+        })();
+        try {
+            return await DiyCommon._AppStoresLoadingPromise;
+        } finally {
+            DiyCommon._AppStoresLoadingPromise = null;
+        }
+    },
+    async RefreshAppStores() {
+        return await DiyCommon.EnsureAppStores({ force: true });
+    },
+    NormalizeAppStoreInstallStatus(status) {
+        var map = {
+            "未安装": "Uninstalled",
+            "安装": "Uninstalled",
+            "可更新": "Outdated",
+            "更新": "Outdated",
+            "版本异常": "Abnormal",
+            "异常": "Abnormal",
+            "已安装": "Installed",
+            "重新安装": "Installed"
+        };
+        if (DiyCommon.IsNull(status)) {
+            return "";
+        }
+        status = String(status).trim();
+        return map[status] || status;
+    },
+    ResolveAppStoreInstallStatus(latestVersion, installedVersion, installStatus) {
+        var status = DiyCommon.NormalizeAppStoreInstallStatus(installStatus);
+        if (status === "Uninstalled") {
+            return "Uninstalled";
+        }
+        if (DiyCommon.IsNull(installedVersion)) {
+            return status === "Abnormal" ? "Abnormal" : "Uninstalled";
+        }
+        if (status === "Abnormal") {
+            return "Abnormal";
+        }
+        if (!DiyCommon.IsNull(latestVersion)) {
+            var compare = DiyCommon.CompareVersion(latestVersion, installedVersion);
+            if (compare > 0) {
+                return "Outdated";
+            }
+            if (compare < 0) {
+                return "Abnormal";
+            }
+        }
+        return "Installed";
+    },
+    GetAppStoreStatusText(status) {
+        var map = {
+            Uninstalled: "安装",
+            Outdated: "更新",
+            Installed: "重新安装",
+            Abnormal: "异常"
+        };
+        return map[status] || status || "";
+    },
+    ApplyAppStoreInstallState(row) {
+        row = row || {};
+        var local = DiyCommon.GetAppStoreLocal(row);
+        var hasLocalCache = Array.isArray(DiyCommon._AppStoresCache)
+            && DiyCommon._AppStoresCacheKey === DiyCommon.GetAppStoresCacheKey();
+        if (local) {
+            row._LocalAppStore = local;
+            var localVersion = local.AppVersionInstall || local.InstalledVersion || local.CurrentVersion || local.AppVersion || "";
+            row._LocalAppVersionInstall = localVersion;
+            row._LocalStoreInstallStatus = local.InstallStatus || local.StoreInstallStatus || local.AppInstallStatus || "";
+            row.AppVersionInstall = localVersion;
+            row.InstalledVersion = localVersion;
+            row.CurrentVersion = localVersion;
+            row.InstallStatus = local.InstallStatus || row.InstallStatus || "";
+            row.InstallTime = local.InstallTime || row.InstallTime || "";
+            row.LastCheckTime = local.LastCheckTime || row.LastCheckTime || "";
+        } else if (hasLocalCache) {
+            row._LocalAppStore = null;
+            row._LocalAppVersionInstall = "";
+            row._LocalStoreInstallStatus = "";
+            row.AppVersionInstall = "";
+            row.InstalledVersion = "";
+            row.CurrentVersion = "";
+            row.InstallStatus = "";
+        }
+        var status = DiyCommon.GetAppStoreInstallStatus(row);
+        row.StoreInstallStatus = status;
+        row.AppInstallStatus = status;
+        row.StoreInstallStatusText = DiyCommon.GetAppStoreStatusText(status);
+        row.StoreInstallActionName = row.StoreInstallStatusText;
+        return row;
+    },
     CompareVersion(left, right) {
         var normalize = function (value) {
             var text = DiyCommon.IsNull(value) ? "" : String(value).trim().replace(/^v/i, "");
@@ -396,35 +593,23 @@ var DiyCommon = {
     },
     GetAppStoreInstallStatus(row) {
         row = row || {};
-        var status = row.StoreInstallStatus || row.InstallStatus || row.AppInstallStatus || "";
-        var map = {
-            "未安装": "Uninstalled",
-            "安装": "Uninstalled",
-            "可更新": "Outdated",
-            "更新": "Outdated",
-            "版本异常": "Abnormal",
-            "异常": "Abnormal",
-            "已安装": "Installed",
-            "重新安装": "Installed"
-        };
-        if (!DiyCommon.IsNull(status)) {
-            status = String(status).trim();
-            return map[status] || status;
-        }
-
         var latestVersion = row.AppVersion || row.StoreVersion || row.Version || "";
-        var installedVersion = row.AppVersionInstall || row.InstalledVersion || row.CurrentVersion || "";
-        if (DiyCommon.IsNull(installedVersion)) {
+        var local = DiyCommon.GetAppStoreLocal(row);
+        if (local) {
+            return DiyCommon.ResolveAppStoreInstallStatus(
+                latestVersion,
+                local.AppVersionInstall || local.InstalledVersion || local.CurrentVersion || local.AppVersion || "",
+                local.InstallStatus || local.StoreInstallStatus || local.AppInstallStatus || ""
+            );
+        }
+        if (Array.isArray(DiyCommon._AppStoresCache)
+            && DiyCommon._AppStoresCacheKey === DiyCommon.GetAppStoresCacheKey()) {
             return "Uninstalled";
         }
-        var compare = DiyCommon.CompareVersion(latestVersion, installedVersion);
-        if (compare > 0) {
-            return "Outdated";
-        }
-        if (compare < 0) {
-            return "Abnormal";
-        }
-        return "Installed";
+
+        var status = row.StoreInstallStatus || row.InstallStatus || row.AppInstallStatus || "";
+        var installedVersion = row.AppVersionInstall || row.InstalledVersion || row.CurrentVersion || "";
+        return DiyCommon.ResolveAppStoreInstallStatus(latestVersion, installedVersion, status);
     },
     GetApiBase: function () {
         //如果index.html指定了ApiBase，这个权力最大
@@ -4410,6 +4595,12 @@ var DiyCommon = {
             V8.GetAppStoreSourceOsClient = DiyCommon.GetAppStoreSourceOsClient;
             V8.IsCurrentAppStoreSource = DiyCommon.IsCurrentAppStoreSource;
             V8.GetAppStoreInstallStatus = DiyCommon.GetAppStoreInstallStatus;
+            V8.GetAppStoreLocal = DiyCommon.GetAppStoreLocal;
+            V8.ApplyAppStoreInstallState = DiyCommon.ApplyAppStoreInstallState;
+            V8.EnsureAppStores = DiyCommon.EnsureAppStores;
+            V8.RefreshAppStores = DiyCommon.RefreshAppStores;
+            V8.AppStores = DiyCommon._AppStoresCache || [];
+            V8.AppStoreMap = DiyCommon._AppStoreMapCache || {};
             V8.CompareVersion = DiyCommon.CompareVersion;
         } catch (e) {
             // 极早期调用（store 未就绪）时容错

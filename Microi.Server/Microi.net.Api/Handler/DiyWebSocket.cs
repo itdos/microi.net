@@ -159,6 +159,8 @@ namespace Microi.net
             // httpContext.Request.Query.TryGetValue("IP", out var ip);
             // httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
+            httpContext.Request.Query.TryGetValue("access_token", out var accessToken);
+            var requestToken = accessToken.ToString().DosIsNullOrWhiteSpace(currentToken.Token);
 
             if (!string.IsNullOrEmpty(userId))
             {
@@ -201,7 +203,7 @@ namespace Microi.net
                     groupName.ToString(),
                     otherInfo.ToString(),
                     deviceClientId.ToString(),
-                    currentToken.Token).ConfigureAwait(false);
+                    requestToken).ConfigureAwait(false);
                 try
                 {
                     await SendLastContacts(new MessageChatContactListParam
