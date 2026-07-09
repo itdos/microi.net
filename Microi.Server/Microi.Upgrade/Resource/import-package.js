@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.0.2
+ * Version: v1.0.3
  * Function:
  * - 请补充该 V8 代码的完整功能说明。
  */
@@ -14,11 +14,84 @@ var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪�
 // 执行日志收集（用于最终构建中文报告）
 var debugLog = {};
 
+var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var reportProgress = function (progress, msg) {
+    if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
+    try {
+        V8.Method.UpdateBackgroundTask({
+            _BackgroundTaskId: backgroundTaskId,
+            Progress: progress,
+            Msg: msg,
+            Message: msg,
+            Current: progress,
+            Total: 100
+        });
+    } catch (progressError) {
+        debugLog['background_progress_error_' + progress] = progressError.message;
+    }
+};
+
+var firstTextParam = function (values) {
+    if (!values || !values.length) return '';
+    for (var i = 0; i < values.length; i++) {
+        var item = values[i];
+        if (item === null || item === undefined) continue;
+        var text = String(item);
+        if (text.replace(/^\s+|\s+$/g, '') !== '') return text;
+    }
+    return '';
+};
+
+var trimRightSlash = function (url) {
+    return firstTextParam([url]).replace(/\/+$/g, '');
+};
+
+var syncStoreMetaFromRow = function () {
+    var row = V8.Param.Form || V8.Param.Row || V8.Param.StoreRow || {};
+    if (!row) row = {};
+    if (!V8.Param.StoreId) V8.Param.StoreId = firstTextParam([row.StoreId, row.Id]);
+    if (!V8.Param.AppId) V8.Param.AppId = firstTextParam([row.AppId, row.AppKey, row.Id]);
+    if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([row.AppName, row.Name]);
+    if (!V8.Param.AppVersion) V8.Param.AppVersion = firstTextParam([row.AppVersion, row.Version]);
+    if (!V8.Param.AppAuthor) V8.Param.AppAuthor = firstTextParam([row.AppAuthor, row.Author]);
+    if (!V8.Param.StoreApiBase) V8.Param.StoreApiBase = firstTextParam([row.StoreApiBase, row.AppStoreApiBase]);
+    if (!V8.Param.StoreOsClient) V8.Param.StoreOsClient = firstTextParam([row.StoreOsClient, row.AppStoreOsClient, row.SourceOsClient]);
+    return row;
+};
+
+var storeRow = syncStoreMetaFromRow();
+if (!Package && storeRow && storeRow.AppPakcet) {
+    Package = storeRow.AppPakcet;
+}
+if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
+    reportProgress(3, '正在从应用商城源获取应用数据包');
+    var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
+    var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
+    var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
+    var storeModelResult = V8.Http.Post({
+        Url: storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
+        PostParam: { Id: storeId },
+        ParamType: 'json',
+        Timeout: 120
+    });
+    if (typeof (storeModelResult) == 'string') {
+        storeModelResult = JSON.parse(storeModelResult);
+    }
+    if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
+        var storeModel = storeModelResult.Data;
+        Package = storeModel.AppPakcet;
+        if (!V8.Param.AppId) V8.Param.AppId = firstTextParam([storeModel.AppId, storeModel.AppKey, storeModel.Id]);
+        if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
+        if (!V8.Param.AppVersion) V8.Param.AppVersion = firstTextParam([storeModel.AppVersion, storeModel.Version]);
+        if (!V8.Param.AppAuthor) V8.Param.AppAuthor = firstTextParam([storeModel.AppAuthor, storeModel.Author]);
+    }
+}
+
 // 参数校验
 if (!Package) {
     return {
         Code: 0,
-        Msg: '参数错误：Package不能为空'
+        Msg: '参数错误：Package不能为空，且未能从应用商城源获取应用数据包'
     };
 }
 if (typeof (Package) == 'string') {
@@ -35,19 +108,6 @@ if (!Package.PackageInfo) {
 try {
     debugLog.startTime = new Date().toISOString();
     debugLog.packageInfo = Package.PackageInfo;
-    var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
-    var reportProgress = function (progress, msg) {
-        if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
-        try {
-            V8.Method.UpdateBackgroundTask({
-                _BackgroundTaskId: backgroundTaskId,
-                Progress: progress,
-                Msg: msg
-            });
-        } catch (progressError) {
-            debugLog['background_progress_error_' + progress] = progressError.message;
-        }
-    };
     reportProgress(5, '开始导入应用数据包');
 
     // ==================== 辅助函数：判断数据是否存在 ====================
@@ -158,7 +218,7 @@ try {
                 InstallUserName: V8.CurrentUser ? firstText([V8.CurrentUser.Name, V8.CurrentUser.Account]) : '',
                 PackageName: firstText([pkgInfoForVersion.Name, appName]),
                 PackageVersion: firstText([pkgInfoForVersion.Version, appVersion]),
-                PackageOsClient: firstText([pkgInfoForVersion.OsClient]),
+                PackageOsClient: firstText([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, pkgInfoForVersion.OsClient]),
                 InstallResult: JSON.stringify({
                     TableInserted: stats.TableInserted,
                     TableUpdated: stats.TableUpdated,

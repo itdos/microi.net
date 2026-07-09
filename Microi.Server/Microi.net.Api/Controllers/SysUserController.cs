@@ -39,6 +39,24 @@ namespace Microi.net.Api
                 as Microsoft.AspNetCore.Hosting.IWebHostEnvironment;
         }
 
+        private static string ReadTokenClaim(string authorization, string claimType)
+        {
+            try
+            {
+                var token = authorization.DosTrim().DosReplace("Bearer ", "");
+                if (token.DosIsNullOrWhiteSpace())
+                {
+                    return "";
+                }
+                var jwtToken = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(token);
+                return jwtToken?.Claims?.FirstOrDefault(d => d.Type == claimType)?.Value ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         private bool IsDevTestKeyMatched()
         {
             var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
@@ -765,7 +783,7 @@ namespace Microi.net.Api
             {
                 CurrentUser = tokenModelJobj.CurrentUser,
                 OsClient = tokenModelJobj.OsClient,
-                // _ClientType = tokenModelJobj._ClientType
+                _ClientType = ReadTokenClaim(param.authorization, "ClientType").DosIsNullOrWhiteSpace(param._ClientType)
             });
             if (getTokenResult.Code != 1)
             {

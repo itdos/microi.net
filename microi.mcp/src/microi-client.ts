@@ -1,11 +1,18 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { API } from './api-paths.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const NO_LOGIN_CODE = 1001;
+const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
+XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
+1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
+1DsI9VJ7gTHGL3R7sQIDAQAB
+-----END PUBLIC KEY-----`;
 
 export interface MicroiConfig {
   apiBaseUrl: string;
@@ -185,12 +192,14 @@ export class MicroiClient {
   private token = '';
   private refreshTimer?: ReturnType<typeof setInterval>;
   private rsaPublicKey: string;
+  private readonly did: string;
   /** 同一时刻只允许一个刷新请求在飞 */
   private inflightRefresh?: Promise<boolean>;
 
   constructor(config: MicroiConfig) {
     this.config = config;
-    this.rsaPublicKey = config.rsaPublicKey || '';
+    this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
+    this.did = process.env.MICROI_MCP_DID || `MCP:${os.hostname() || 'Unknown'}`;
     // 如果直接传入 token，跳过登录流程
     if (config.token) {
       this.token = config.token;
@@ -241,6 +250,7 @@ export class MicroiClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        did: this.did,
         ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
       },
       body: loginBody.toString(),
@@ -291,11 +301,14 @@ export class MicroiClient {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${this.token}`,
+            did: this.did,
+            ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
           },
           // 同时把旧 token 放在 body 里（后端 SysUserController.RefreshToken 兼容两种位置）
           body: JSON.stringify({
             authorization: this.token,
             OsClient: this.config.osClient || undefined,
+            _ClientType: 'MCP',
           }),
         });
         const newToken = res.headers.get('authorization');
@@ -416,7 +429,8 @@ export class MicroiClient {
       if (qs) url += `?${qs}`;
     }
 
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}`, did: this.did };
+    if (this.config.osClient) headers.OsClient = this.config.osClient;
     if (method === 'POST') headers['Content-Type'] = 'application/json';
 
     const res = await fetch(url, {

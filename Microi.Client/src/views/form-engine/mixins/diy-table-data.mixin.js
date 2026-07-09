@@ -920,9 +920,20 @@ export default {
                         } catch (e) {
                             apiReplaceSelectApiBase = self.DiyCommon.GetApiBase();
                         }
+                        var apiReplaceSelectOsClient = self.DiyCommon.GetOsClient();
+                        try {
+                            var apiReplaceUrlText = String(url || "");
+                            var osClientMatch = apiReplaceUrlText.match(/[?&]OsClient=([^&]+)/i);
+                            if (osClientMatch && osClientMatch[1]) {
+                                apiReplaceSelectOsClient = decodeURIComponent(osClientMatch[1]);
+                            }
+                        } catch (e) {
+                            apiReplaceSelectOsClient = self.DiyCommon.GetOsClient();
+                        }
                         for (var i = 0; i < result.Data.length; i++) {
                             // 默认都显示，后续异步更新
                             result.Data[i]._ApiReplaceSelectApiBase = apiReplaceSelectApiBase;
+                            result.Data[i]._ApiReplaceSelectOsClient = apiReplaceSelectOsClient;
                             result.Data[i].IsVisibleDetail = true;
                             result.Data[i].IsVisibleEdit = true;
                             result.Data[i].IsVisibleDel = true;
@@ -961,6 +972,9 @@ export default {
                             sharedV8.EventName = "V8BtnLimit";
                             sharedV8._cachedRoleLimit = cachedRoleLimit;
                             self.SetV8DefaultValue(sharedV8);
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
+                                self.IsVisibleAdd = self.LimitMoreBtn1Sync(self.SysMenuModel.AddCodeShowV8, {}, "AddCodeShowV8");
+                            }
 
                             for (var i = 0; i < result.Data.length; i++) {
                                 if (self._paginationVersion !== currentVersion) break;
