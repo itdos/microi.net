@@ -1167,6 +1167,22 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
+        private const string DefaultLoginRsaPrivateKey = @"-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQC7q21EG3HiSFNO9XFUJoMeyz2RXaFX8UgCFE4d4pvK6IvQsWun
+m+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ1rS/MVn4i6CsPgP9Q7nFV6dZ
+vbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg1DsI9VJ7gTHGL3R7sQIDAQAB
+AoGAX0s22oSNGXfcRZXADBjaL8LH6o5+pOcxx0yENgyhSzE1/ax5m8w/luVDu2gc
+iEEfMbXoK0l03rT3WvZoxQ8rgAGd9fT4tSyusChEIbo2meS5ildJLtChe4k2JTam
+iFf7uhw3a1MPXcGdM982157/EHwnGodlT9URf88IJjYKObkCQQDbV07MvAdxZLA5
+12cyJYkMMRPEoTs5e2kDplFj8tdViJvSEjqICdBlqi7Xq9EP2dRfVHbMzmN8w+NU
+8bD/Em9nAkEA2wkH64ip7EUBAAplkZj42HC2+9GH2PL1R3jCe+4iav1U6w55i52U
+wwRBSRnLzlsL8ImuCXTeQYsgPQ05V/OFJwJARgu2tXkio1q1UHNymDgWcRdHKdcX
+c77uhWTavyFxFPagVFDP8lu3+o+DkAplpDs7MApoOfV7Hf/snFbm4D5B5wJAPUq6
+p6M3gYERtZQzNdnrkI2B9td8Py5Firl1Gr7ZbLz1HU2Qn4v6C9RN/Im2aUk6/xVX
+2ReV9htbaxofOMhRMwJBALxMseOT5HnYThuju6v6c4VIzP1prTWkaZ0AAx+gEBhV
+o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
+-----END RSA PRIVATE KEY-----";
+
         private static string GetLoginRsaPrivateKey()
         {
             var privateKey = ConfigHelper.GetEnvOrConfiguration("MICROI_LOGIN_RSA_PRIVATE_KEY", "Security:LoginRsaPrivateKey");
@@ -1181,7 +1197,7 @@ namespace Microi.net
                 return System.IO.File.ReadAllText(privateKeyPath).Trim();
             }
 
-            return "";
+            return DefaultLoginRsaPrivateKey;
         }
 
         public async Task<DosResult<dynamic>> Login(SysUserParam param)
