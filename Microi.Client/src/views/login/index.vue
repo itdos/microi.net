@@ -824,7 +824,7 @@ export default {
                 Pwd: encryptedPwd, // 使用RSA加密后的密码
                 // Pwd: self.Base64.encode(self.Pwd),
                 OsClient: self.OsClient,
-                _ClientType: "PC"
+                _ClientType: self.diyStore.IsPhoneView ? "Mobile" : "PC"
             };
             if (self.EnableCaptcha) {
                 loginParam._CaptchaId = self.CaptchaId;

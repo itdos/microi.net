@@ -179,12 +179,6 @@ export default {
                 || moduleKey === 'sys_microistore'
                 || menuUrl === '/microi-store';
         },
-        _CanManageMicroiStoreSource() {
-            var self = this;
-            if (!self._IsMicroiStoreMenu) return true;
-            var sourceRow = self.DiyTableRowList && self.DiyTableRowList.length > 0 ? self.DiyTableRowList[0] : null;
-            return self.DiyCommon.IsCurrentAppStoreSource(sourceRow);
-        },
         _LimitAdd() {
             var self = this;
             if (self.IsTrashMode) return false;
@@ -611,6 +605,8 @@ export default {
             CurrentSelectedRowModel: {},
             SearchWhere: [],
             IsVisibleAdd: false, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
+            IsVisibleImport: true, //是否允许导入按钮显示，支持模块V8动态控制
+            IsVisibleExport: true, //是否允许导出按钮显示，支持模块V8动态控制
             // ========== 内存优化相关 ==========
             _isDestroyed: false, // 组件销毁标志
             _paginationVersion: 0, // 分页版本号，用于取消旧请求的异步操作
