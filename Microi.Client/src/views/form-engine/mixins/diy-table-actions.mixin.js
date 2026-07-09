@@ -282,11 +282,29 @@ IsPermission(type) {
                     if ((btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
                         && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey)) {
                         var backgroundApiEngineKey = btn.ApiEngineKey || btn.BackgroundApiEngineKey;
-                        await V8.ApiEngine.RunBackground(backgroundApiEngineKey, {
-                            Form: row,
-                            Id: row && row.Id,
-                            Btn: btn
-                        }, btn.Name || backgroundApiEngineKey, function () {
+                        var backgroundParam = {};
+                        if (row && typeof row === "object") {
+                            Object.keys(row).forEach(function (key) {
+                                backgroundParam[key] = row[key];
+                            });
+                        }
+                        backgroundParam.Form = row;
+                        backgroundParam.Id = row && row.Id;
+                        backgroundParam.StoreId = row && (row.StoreId || row.Id);
+                        backgroundParam.AppId = row && (row.AppId || row.AppKey || row.Id);
+                        backgroundParam.AppName = row && (row.AppName || row.Name || row.Title);
+                        backgroundParam.AppVersion = row && (row.AppVersion || row.Version);
+                        backgroundParam.StoreApiBase = row && (row.StoreApiBase || row.AppStoreApiBase);
+                        backgroundParam.AppStoreApiBase = row && (row.AppStoreApiBase || row.StoreApiBase);
+                        backgroundParam.StoreOsClient = row && (row.StoreOsClient || row.AppStoreOsClient);
+                        backgroundParam.AppStoreOsClient = row && (row.AppStoreOsClient || row.StoreOsClient);
+                        backgroundParam.Btn = btn;
+
+                        var backgroundTitle = btn.Name || backgroundApiEngineKey;
+                        if (backgroundParam.AppName) {
+                            backgroundTitle += "应用：" + backgroundParam.AppName;
+                        }
+                        await V8.ApiEngine.RunBackground(backgroundApiEngineKey, backgroundParam, backgroundTitle, function () {
                             self.BtnV8Loading = false;
                         });
                         return;

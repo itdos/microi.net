@@ -12,13 +12,25 @@
 
 <iframe src="https://meeting.tencent.com/crm/lvDYAP1Dff" width="100%" height="500" frameborder="0" allowfullscreen style="border-radius: 8px; margin: 8px 0;"></iframe>
 
+
+- 录制: Microi吾码-AI本地编程环境搭建
+- 日期: 2026-06-08 05:50:29
+- 录制文件：[https://meeting.tencent.com/crm/lvDYAP1D09](https://meeting.tencent.com/crm/lvDYAP1D09)
+
+
 ---
 
-## 🎬 视频演示：20 分钟快速开发一套进销存系统
+## 🎬 视频演示：AI快速搭建进销存系统
 
 > 利用 AI + Microi吾码低代码平台，在约 20 分钟内从零搭建一套完整的进销存系统（含建表、菜单、接口引擎、表单事件）。
 
 <iframe src="https://meeting.tencent.com/cw/NLLyRZ4ne1" width="100%" height="500" frameborder="0" allowfullscreen style="border-radius: 8px; margin: 8px 0;"></iframe>
+
+
+- 录制: Microi吾码-AI快速搭建进销存系统
+- 日期: 2026-04-20 03:42:04
+- 录制文件：[https://meeting.tencent.com/crm/NLLyRZ4n83](https://meeting.tencent.com/crm/NLLyRZ4n83)
+
 
 ---
 

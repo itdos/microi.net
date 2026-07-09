@@ -162,6 +162,7 @@ export declare class MicroiClient {
     private token;
     private refreshTimer?;
     private rsaPublicKey;
+    private readonly did;
     /** 同一时刻只允许一个刷新请求在飞 */
     private inflightRefresh?;
     constructor(config: MicroiConfig);
