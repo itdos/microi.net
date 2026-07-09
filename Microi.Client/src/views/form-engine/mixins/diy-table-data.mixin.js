@@ -910,25 +910,76 @@ export default {
                         }
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
+                        var isMicroiStoreMenu = self._IsMicroiStoreMenu === true;
+                        var rawSelectApiText = self.SysMenuModel && self.SysMenuModel.SelectApi ? String(self.SysMenuModel.SelectApi || "") : "";
+                        var apiReplaceUrlText = String(url || "");
+                        var getQueryValue = function (text, names, ignoreTemplate) {
+                            text = String(text || "");
+                            for (var i = 0; i < names.length; i++) {
+                                var reg = new RegExp("[?&]" + names[i] + "=([^&]+)", "i");
+                                var match = text.match(reg);
+                                if (match && match[1]) {
+                                    var value = decodeURIComponent(match[1]).trim();
+                                    if (ignoreTemplate && /^\$.*\$$/.test(value)) {
+                                        continue;
+                                    }
+                                    return value;
+                                }
+                            }
+                            return "";
+                        };
+                        var getRouteOsClient = function (text) {
+                            text = String(text || "");
+                            var match = text.match(/--OsClient--(.+?)--/i);
+                            if (match && match[1]) {
+                                var value = decodeURIComponent(match[1]).trim();
+                                if (!/^\$.*\$$/.test(value)) {
+                                    return value;
+                                }
+                            }
+                            return "";
+                        };
+                        var getOrigin = function (text) {
+                            text = String(text || "").trim();
+                            if (!/^https?:\/\//i.test(text)) {
+                                return "";
+                            }
+                            try {
+                                return new URL(text).origin;
+                            } catch (e) {
+                                return "";
+                            }
+                        };
                         var apiReplaceSelectApiBase = "";
+                        var apiReplaceSelectOsClient = "";
                         try {
-                            if (/^https?:\/\//i.test(url)) {
-                                apiReplaceSelectApiBase = new URL(url).origin;
-                            } else {
-                                apiReplaceSelectApiBase = self.DiyCommon.GetApiBase();
+                            apiReplaceSelectApiBase = getQueryValue(rawSelectApiText, [
+                                "AppStoreApiBase",
+                                "StoreApiBase",
+                                "StoreSourceApiBase",
+                                "SourceApiBase",
+                                "QueryApiBase",
+                                "ApiBase",
+                                "ApiBaseUrl"
+                            ], true) || getOrigin(rawSelectApiText) || getOrigin(apiReplaceUrlText);
+                            apiReplaceSelectOsClient = getQueryValue(rawSelectApiText, [
+                                "AppStoreOsClient",
+                                "StoreOsClient",
+                                "StoreSourceOsClient",
+                                "SourceOsClient",
+                                "QueryOsClient",
+                                "OsClient"
+                            ], true) || getRouteOsClient(rawSelectApiText) || getQueryValue(apiReplaceUrlText, ["OsClient"], true) || getRouteOsClient(apiReplaceUrlText);
+
+                            if (self.DiyCommon.IsNull(apiReplaceSelectApiBase)) {
+                                apiReplaceSelectApiBase = isMicroiStoreMenu ? self.DiyCommon.GetAppStoreSourceApiBase({}) : self.DiyCommon.GetApiBase();
+                            }
+                            if (self.DiyCommon.IsNull(apiReplaceSelectOsClient)) {
+                                apiReplaceSelectOsClient = isMicroiStoreMenu ? self.DiyCommon.GetAppStoreSourceOsClient({}) : self.DiyCommon.GetOsClient();
                             }
                         } catch (e) {
-                            apiReplaceSelectApiBase = self.DiyCommon.GetApiBase();
-                        }
-                        var apiReplaceSelectOsClient = self.DiyCommon.GetOsClient();
-                        try {
-                            var apiReplaceUrlText = String(url || "");
-                            var osClientMatch = apiReplaceUrlText.match(/[?&]OsClient=([^&]+)/i);
-                            if (osClientMatch && osClientMatch[1]) {
-                                apiReplaceSelectOsClient = decodeURIComponent(osClientMatch[1]);
-                            }
-                        } catch (e) {
-                            apiReplaceSelectOsClient = self.DiyCommon.GetOsClient();
+                            apiReplaceSelectApiBase = isMicroiStoreMenu ? self.DiyCommon.GetAppStoreSourceApiBase({}) : self.DiyCommon.GetApiBase();
+                            apiReplaceSelectOsClient = isMicroiStoreMenu ? self.DiyCommon.GetAppStoreSourceOsClient({}) : self.DiyCommon.GetOsClient();
                         }
                         for (var i = 0; i < result.Data.length; i++) {
                             // 默认都显示，后续异步更新
@@ -953,6 +1004,8 @@ export default {
                         if (!self._isDestroyed && self._paginationVersion === currentVersion) {
                             // 处理按钮显示条件
                             self.IsVisibleAdd = true;
+                            self.IsVisibleImport = true;
+                            self.IsVisibleExport = true;
                             var moreBtns = self.SysMenuModel.MoreBtns || [];
                             var moreBtnsOutTemplate = moreBtns.filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
                             var moreBtnsInTemplate = moreBtns.filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
@@ -975,6 +1028,16 @@ export default {
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
                                 self.IsVisibleAdd = self.LimitMoreBtn1Sync(self.SysMenuModel.AddCodeShowV8, {}, "AddCodeShowV8");
                             }
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.ImportCodeShowV8)) {
+                                self.IsVisibleImport = self.LimitMoreBtn1Sync(self.SysMenuModel.ImportCodeShowV8, {}, "ImportCodeShowV8");
+                            } else if (isMicroiStoreMenu) {
+                                self.IsVisibleImport = self.IsVisibleAdd;
+                            }
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.ExportCodeShowV8)) {
+                                self.IsVisibleExport = self.LimitMoreBtn1Sync(self.SysMenuModel.ExportCodeShowV8, {}, "ExportCodeShowV8");
+                            } else if (isMicroiStoreMenu) {
+                                self.IsVisibleExport = self.IsVisibleAdd;
+                            }
 
                             for (var i = 0; i < result.Data.length; i++) {
                                 if (self._paginationVersion !== currentVersion) break;
@@ -990,6 +1053,22 @@ export default {
                                 sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
                                 sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
                                 sharedV8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
+
+                                if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
+                                    row.IsVisibleDetail = self.LimitMoreBtn1Sync(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
+                                } else {
+                                    row.IsVisibleDetail = true;
+                                }
+                                if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+                                    row.IsVisibleEdit = self.LimitMoreBtn1Sync(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
+                                } else {
+                                    row.IsVisibleEdit = true;
+                                }
+                                if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+                                    row.IsVisibleDel = self.LimitMoreBtn1Sync(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
+                                } else {
+                                    row.IsVisibleDel = true;
+                                }
 
                                 // 同步执行按钮处理
                                 self.HandlerBtns(rowBtnsOut, row, sharedV8);
