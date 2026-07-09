@@ -991,6 +991,16 @@ export default {
                             result.Data[i]._RowMoreBtnsOut = [];
                             result.Data[i]._RowMoreBtnsIn = [];
                         }
+                        if (isMicroiStoreMenu) {
+                            try {
+                                await self.DiyCommon.EnsureAppStores({ force: true });
+                                for (var appStoreIndex = 0; appStoreIndex < result.Data.length; appStoreIndex++) {
+                                    self.DiyCommon.ApplyAppStoreInstallState(result.Data[appStoreIndex]);
+                                }
+                            } catch (error) {
+                                console.warn("[AppStore] apply local install state failed", error);
+                            }
+                        }
 
                         // 先设置总数（但不设置数据，等V8处理完再一次性显示）
                         // 如果不是追加模式，更新总数

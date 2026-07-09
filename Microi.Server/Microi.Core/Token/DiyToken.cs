@@ -389,10 +389,14 @@ namespace Microi.net
             try
             {
                 //客户端设备Id
-                var did = currentToken.Token;
+                var did = param.Did;
                 if (context != null)
                 {
-                    did = context.Request.Headers["did"].ToString();
+                    var headerDid = context.Request.Headers["did"].ToString();
+                    if (!headerDid.DosIsNullOrWhiteSpace())
+                    {
+                        did = headerDid;
+                    }
                 }
                 did = did.DosIsNullOrWhiteSpace() ? "Empty" : did;
                 var ip = IPHelper.GetClientIP(context).Data ?? "";

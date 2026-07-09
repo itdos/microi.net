@@ -2214,6 +2214,8 @@ export default {
             V8.TableId = self.TableId;
             V8.TableName = self.CurrentDiyTableModel.Name;
             V8.TableModel = self.CurrentDiyTableModel;
+            V8.SysMenuId = self.SysMenuId;
+            V8.SysMenuModel = self.SysMenuModel;
             V8.DataAppend = self.DataAppend;
             V8.HideFormBtn = self.CallbackHideFormBtn;
             V8.TableRowSelected = self.TableMultipleSelection;

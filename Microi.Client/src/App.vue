@@ -271,7 +271,19 @@ export default {
                         const store = useDiyStore(pinia);
                         store.setCurrentUser(result.Data);
                     }
+                    self.TryConnectWebSocketAfterCurrentUser();
                 }
+            });
+        },
+        TryConnectWebSocketAfterCurrentUser() {
+            var self = this;
+            self.$nextTick(function () {
+                if (typeof window.tryConnectWebSocket !== "function") {
+                    return;
+                }
+                setTimeout(function () {
+                    window.tryConnectWebSocket();
+                }, 500);
             });
         },
         RefreshToken() {

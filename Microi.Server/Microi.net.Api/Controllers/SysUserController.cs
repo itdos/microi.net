@@ -783,7 +783,8 @@ namespace Microi.net.Api
             {
                 CurrentUser = tokenModelJobj.CurrentUser,
                 OsClient = tokenModelJobj.OsClient,
-                _ClientType = ReadTokenClaim(param.authorization, "ClientType").DosIsNullOrWhiteSpace(param._ClientType)
+                _ClientType = ReadTokenClaim(param.authorization, "ClientType").DosIsNullOrWhiteSpace(param._ClientType),
+                Did = ReadTokenClaim(param.authorization, "Did")
             });
             if (getTokenResult.Code != 1)
             {
