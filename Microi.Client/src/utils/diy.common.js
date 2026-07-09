@@ -331,8 +331,7 @@ var DiyCommon = {
             "QueryApiBase",
             "_ApiReplaceSelectApiBase",
             "_AppStoreApiBase",
-            "_StoreApiBase",
-            "ApiBase"
+            "_StoreApiBase"
         ];
         for (var i = 0; i < fields.length; i++) {
             var value = row[fields[i]];
@@ -352,8 +351,7 @@ var DiyCommon = {
             "QueryOsClient",
             "_ApiReplaceSelectOsClient",
             "_AppStoreOsClient",
-            "_StoreOsClient",
-            "OsClient"
+            "_StoreOsClient"
         ];
         for (var i = 0; i < fields.length; i++) {
             var value = row[fields[i]];

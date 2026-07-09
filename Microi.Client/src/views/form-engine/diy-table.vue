@@ -164,9 +164,9 @@
                         </template>
                         <!--如果子表是只读状态或预览模式，不显示导入导出按钮-->
                         <template v-if="!diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
-                            <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
+                            <el-button v-if="_LimitImport && IsVisibleImport == true && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
-                                v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
+                                v-if="_LimitExport && IsVisibleExport == true && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
                                 :icon="Download"
                                 :loading="BtnExportLoading"
                                 @click="ExportDiyTableRow()"
@@ -175,7 +175,7 @@
                             <!-- @click="ExportDiyTableRow()" -->
                             <!-- split-button -->
                             <el-dropdown
-                                v-if="_LimitExport && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
+                                v-if="_LimitExport && IsVisibleExport == true && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
                                 trigger="click"
                                 style="margin-left: 10px"
                             >

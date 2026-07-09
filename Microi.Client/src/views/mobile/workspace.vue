@@ -17,6 +17,18 @@
                 </div>
                 <!-- <span class="mci-navbar__action ws-hero__theme"></span> -->
             </div>
+            <div class="ws-search">
+                <el-input
+                    v-model="searchKeyword"
+                    class="ws-search__input"
+                    placeholder="搜索菜单 / 功能"
+                    clearable
+                >
+                    <template #prefix>
+                        <el-icon><Search /></el-icon>
+                    </template>
+                </el-input>
+            </div>
         </header>
 
         <!-- 骨架屏 -->
@@ -37,45 +49,84 @@
 
         <!-- 菜单列表 -->
         <div v-else class="menu-list">
-            <!-- 空状态 -->
-            <div v-if="menuList.length === 0" class="empty-state mci-card">
-                <span class="empty-state__icon">📁</span>
-                <span class="empty-state__title">暂无菜单</span>
-                <span class="empty-state__sub">请联系管理员开通权限</span>
-            </div>
-
-            <article
-                v-for="(menu, idx) in menuList"
-                :key="menu.Id"
-                class="menu-card mci-card mci-stagger-item"
-                :style="{ '--mci-index': idx }"
-            >
-                <header class="menu-card__head">
-                    <div class="menu-card__head-icon">
-                        <fa-icon v-if="menu.meta?.icon" :icon="menu.meta.icon" />
-                        <el-icon v-else><Folder /></el-icon>
+            <section v-if="hasSearchKeyword" class="search-panel mci-card">
+                <header class="search-panel__head">
+                    <div>
+                        <span class="search-panel__eyebrow">快速定位</span>
+                        <h2 class="search-panel__title">搜索结果</h2>
                     </div>
-                    <span class="menu-card__title">{{ menu.meta?.title || menu.name }}</span>
+                    <span class="search-panel__count">{{ searchResults.length }} 项</span>
                 </header>
-                <div class="menu-card__grid">
-                    <div
-                        v-for="child in getVisibleChildren(menu.children)"
-                        :key="child.Id"
-                        class="menu-item"
-                        @click="handleMenuClick(child)"
+
+                <div v-if="searchResults.length > 0" class="search-results">
+                    <button
+                        v-for="item in searchResults"
+                        :key="item.key"
+                        type="button"
+                        class="search-result-item"
+                        @click="handleMenuClick(item.menu)"
                     >
-                        <div class="menu-item__icon">
-                            <fa-icon v-if="child.meta?.icon" :icon="child.meta.icon" />
+                        <span class="search-result-item__icon">
+                            <fa-icon v-if="item.menu.meta?.icon" :icon="item.menu.meta.icon" />
+                            <el-icon v-else-if="hasVisibleChildMenus(item.menu)"><Folder /></el-icon>
                             <el-icon v-else><Document /></el-icon>
-                        </div>
-                        <span class="menu-item__name">{{ child.meta?.title || child.name }}</span>
-                        <el-icon
-                            v-if="hasVisibleChildMenus(child) && !isPhoneView"
-                            class="menu-item__arrow"
-                        ><ArrowRight /></el-icon>
-                    </div>
+                        </span>
+                        <span class="search-result-item__body">
+                            <span class="search-result-item__title">{{ item.title }}</span>
+                            <span class="search-result-item__sub">{{ item.subtitle || item.path }}</span>
+                        </span>
+                        <el-icon class="search-result-item__arrow"><ArrowRight /></el-icon>
+                    </button>
                 </div>
-            </article>
+
+                <div v-else class="empty-state empty-state--search">
+                    <el-icon class="empty-state__search-icon"><Search /></el-icon>
+                    <span class="empty-state__title">未找到相关菜单</span>
+                    <span class="empty-state__sub">换个关键词试试</span>
+                </div>
+            </section>
+
+            <template v-else>
+                <!-- 空状态 -->
+                <div v-if="menuList.length === 0" class="empty-state mci-card">
+                    <span class="empty-state__icon">📁</span>
+                    <span class="empty-state__title">暂无菜单</span>
+                    <span class="empty-state__sub">请联系管理员开通权限</span>
+                </div>
+
+                <article
+                    v-for="(menu, idx) in menuList"
+                    :key="menu.Id"
+                    class="menu-card mci-card mci-stagger-item"
+                    :style="{ '--mci-index': idx }"
+                >
+                    <header class="menu-card__head">
+                        <div class="menu-card__head-icon">
+                            <fa-icon v-if="menu.meta?.icon" :icon="menu.meta.icon" />
+                            <el-icon v-else><Folder /></el-icon>
+                        </div>
+                        <span class="menu-card__title">{{ menu.meta?.title || menu.name }}</span>
+                    </header>
+                    <div class="menu-card__grid">
+                        <div
+                            v-for="child in getVisibleChildren(menu.children)"
+                            :key="child.Id"
+                            class="menu-item"
+                            @click="handleMenuClick(child)"
+                        >
+                            <div class="menu-item__icon">
+                                <fa-icon v-if="child.meta?.icon" :icon="child.meta.icon" />
+                                <el-icon v-else><Document /></el-icon>
+                            </div>
+                            <span class="menu-item__name">{{ child.meta?.title || child.name }}</span>
+                            <el-icon
+                                v-if="hasVisibleChildMenus(child) && !isPhoneView"
+                                class="menu-item__arrow"
+                            ><ArrowRight /></el-icon>
+                        </div>
+                    </div>
+                </article>
+            </template>
 
             <!-- Footer -->
             <footer class="ws-footer">
@@ -119,7 +170,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
-import { Folder, Document, ArrowRight } from '@element-plus/icons-vue';
+import { Folder, Document, ArrowRight, Search } from '@element-plus/icons-vue';
 import { DiyCommon } from '@/utils/diy.common';
 
 defineOptions({
@@ -131,6 +182,7 @@ const permissionStore = usePermissionStore();
 const diyStore = useDiyStore();
 
 const loading = ref(true);
+const searchKeyword = ref('');
 
 const isPhoneView = computed(() => diyStore.IsPhoneView);
 const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 工作台');
@@ -240,6 +292,58 @@ const hasVisibleChildMenus = (menu) => {
     return getVisibleChildren(menu?.children).length > 0;
 };
 
+const getMenuTitle = (menu) => {
+    return menu?.meta?.title || menu?.title || menu?.name || menu?.path || '';
+};
+
+const getMenuKey = (menu, fallback) => {
+    return menu?.Id || menu?.id || menu?.name || menu?.path || fallback;
+};
+
+const flattenVisibleMenus = (menus, ancestors = []) => {
+    if (!Array.isArray(menus)) return [];
+    const result = [];
+
+    menus.forEach((menu, index) => {
+        const title = getMenuTitle(menu);
+        const children = getVisibleChildren(menu.children);
+        const subtitle = ancestors.filter(Boolean).join(' / ');
+        const pathText = menu.path || menu.fullPath || '';
+        const searchText = [
+            title,
+            subtitle,
+            pathText,
+            menu.name,
+            menu.Link
+        ].filter(Boolean).join(' ').toLocaleLowerCase();
+
+        result.push({
+            key: `${getMenuKey(menu, index)}-${index}-${ancestors.length}`,
+            menu,
+            title,
+            subtitle: subtitle || (children.length ? '目录菜单' : pathText),
+            path: pathText,
+            searchText
+        });
+
+        if (children.length > 0) {
+            result.push(...flattenVisibleMenus(children, [...ancestors, title]));
+        }
+    });
+
+    return result;
+};
+
+const normalizedSearchKeyword = computed(() => searchKeyword.value.trim().toLocaleLowerCase());
+const hasSearchKeyword = computed(() => normalizedSearchKeyword.value.length > 0);
+const searchableMenus = computed(() => flattenVisibleMenus(menuList.value));
+const searchResults = computed(() => {
+    const keywords = normalizedSearchKeyword.value.split(/\s+/).filter(Boolean);
+    if (keywords.length === 0) return [];
+    return searchableMenus.value
+        .filter(item => keywords.every(keyword => item.searchText.includes(keyword)))
+        .slice(0, 80);
+});
 
 </script>
 
@@ -312,6 +416,36 @@ const hasVisibleChildMenus = (menu) => {
         color: #fff;
         background: rgba(255, 255, 255, 0.15);
         border-radius: var(--mci-radius-full);
+    }
+}
+
+.ws-search {
+    position: relative;
+    z-index: 1;
+    margin-top: var(--mci-space-4);
+
+    &__input {
+        :deep(.el-input__wrapper) {
+            min-height: 44px;
+            border-radius: var(--mci-radius-full);
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.42);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+            padding: 0 var(--mci-space-4);
+        }
+
+        :deep(.el-input__inner) {
+            color: #1f2937;
+            font-size: var(--mci-text-sm);
+        }
+
+        :deep(.el-input__prefix) {
+            color: var(--mci-color-primary);
+        }
+
+        :deep(.el-input__clear) {
+            color: #64748b;
+        }
     }
 }
 
@@ -455,6 +589,129 @@ const hasVisibleChildMenus = (menu) => {
     }
 }
 
+/* === 搜索结果 === */
+.search-panel {
+    padding: var(--mci-space-4);
+    overflow: hidden;
+
+    &__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--mci-space-3);
+        margin-bottom: var(--mci-space-3);
+    }
+
+    &__eyebrow {
+        display: block;
+        font-size: var(--mci-text-xs);
+        color: var(--mci-color-primary-light);
+        font-weight: var(--mci-font-medium);
+        margin-bottom: 2px;
+    }
+
+    &__title {
+        margin: 0;
+        font-size: var(--mci-text-lg);
+        line-height: 1.35;
+        color: var(--mci-text-primary);
+        font-weight: var(--mci-font-bold);
+    }
+
+    &__count {
+        flex-shrink: 0;
+        min-width: 48px;
+        border-radius: var(--mci-radius-full);
+        background: rgba(114, 43, 255, 0.12);
+        color: var(--mci-color-primary-light);
+        font-size: var(--mci-text-xs);
+        font-weight: var(--mci-font-medium);
+        text-align: center;
+        padding: 4px var(--mci-space-2);
+    }
+}
+
+.search-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mci-space-2);
+}
+
+.search-result-item {
+    width: 100%;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: var(--mci-space-3);
+    border: 1px solid var(--mci-border-color);
+    border-radius: var(--mci-radius-lg);
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.06),
+        rgba(114, 43, 255, 0.06));
+    color: inherit;
+    text-align: left;
+    padding: var(--mci-space-3);
+    cursor: pointer;
+    transition: transform var(--mci-duration-fast) var(--mci-ease-out),
+                background var(--mci-duration-fast) var(--mci-ease-out);
+
+    &:active {
+        transform: scale(0.98);
+        background: var(--mci-bg-card-hover);
+    }
+
+    &__icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border-radius: var(--mci-radius-md);
+        background: var(--mci-gradient-primary);
+        color: var(--mci-text-on-primary);
+        box-shadow: 0 4px 14px var(--mci-color-primary-glow);
+
+        :deep(svg),
+        :deep(.el-icon) {
+            color: #fff;
+            font-size: 16px;
+        }
+    }
+
+    &__body {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    &__title {
+        color: var(--mci-text-primary);
+        font-size: var(--mci-text-sm);
+        font-weight: var(--mci-font-semibold);
+        line-height: 1.35;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__sub {
+        color: var(--mci-text-tertiary);
+        font-size: var(--mci-text-xs);
+        line-height: 1.4;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__arrow {
+        flex-shrink: 0;
+        color: var(--mci-text-tertiary);
+    }
+}
+
 /* === 空状态 === */
 .empty-state {
     display: flex;
@@ -478,6 +735,18 @@ const hasVisibleChildMenus = (menu) => {
     &__sub {
         font-size: var(--mci-text-xs);
         color: var(--mci-text-tertiary);
+    }
+
+    &__search-icon {
+        font-size: 38px;
+        color: var(--mci-color-primary-light);
+        margin-bottom: var(--mci-space-3);
+    }
+
+    &--search {
+        border: 1px dashed var(--mci-border-color);
+        background: rgba(255, 255, 255, 0.04);
+        box-shadow: none;
     }
 }
 

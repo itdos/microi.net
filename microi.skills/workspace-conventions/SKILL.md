@@ -50,6 +50,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 skills / 知识库 | `microi.skills/` |
 | 吾码 VS Code 插件项目 | `Microi.VSCode/` |
 | 吾码低代码平台后台系统前端源码 | `Microi.Client/` |
+| 吾码后台系统前端移动端自适应源码 | `Microi.Client/src/views/mobile/` |
 | 吾码低代码后端源码 | `Microi.Server/` |
 | 吾码表单引擎源码 | `Microi.Client/src/views/form-engine/` |
 | 吾码界面引擎源码 | `Microi.Client/src/views/page-engine/` |
