@@ -143,6 +143,372 @@ var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
 ```
 
+## Image processing V8.Image
+
+`V8.Image` provides cross-platform server-side image generation, composition, and editing. Every method accepts an options object and only processes in-memory Base64, data URIs, or byte arrays. It does not read local paths or fetch URLs by itself.
+
+### Image sources and results
+
+The following source forms are supported:
+
+```javascript
+// Top-level Base64
+{ FileByteBase64: '<base64>' }
+
+// Equivalent source fields
+{ Base64: '<base64>' }
+{ DataUrl: 'data:image/png;base64,...' }
+{ Bytes: response.RawBytes }
+
+// Single-image methods also accept nested Image / Source values as objects or strings
+{ Image: { FileByteBase64: '<base64>' } }
+{ Source: '<base64>' }
+```
+
+Except for `GetInfo`, a successful operation returns a standard `DosResult`:
+
+```javascript
+{
+  Code: 1,
+  Data: {
+    FileName: 'image.png',
+    ContentType: 'image/png',
+    FileByteBase64: '<base64>',
+    Width: 800,
+    Height: 600,
+    Size: 12345,
+    Format: 'png'
+  },
+  Msg: ''
+}
+```
+
+Always check `Code` before reading `Data`. If the API Engine has Response File enabled, return this result directly to preview or download the image in a browser.
+
+Common output options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `OutputFormat` / `Format` | `png` | Supports `png`, `jpeg` / `jpg`, `webp`, and `bmp`; `OutputFormat` takes precedence |
+| `Quality` | `90` | Encoding quality, clamped to 1 through 100 |
+| `BackgroundColor` | Transparent; white for JPEG | Canvas background color |
+| `FileName` | `image.<extension>` | Output file name; its extension is corrected to the actual format |
+
+Common compatibility aliases are `ImageFormat` / `OutputType` → `OutputFormat`, `Background` / `BgColor` → `BackgroundColor`, and `ImageBase64` → `FileByteBase64` for single-image methods.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `V8.Image.Create(param)` | Create a solid, gradient, text, or basic-shape image |
+| `V8.Image.Merge(param)` | Compose images horizontally, vertically, in a grid, or as layers |
+| `V8.Image.Overlay(param)` | Overlay shortcut; defaults to `overlay` when no mode is supplied |
+| `V8.Image.Resize(param)` | Resize an image |
+| `V8.Image.Crop(param)` | Crop a rectangular region |
+| `V8.Image.Rotate(param)` | Rotate an image |
+| `V8.Image.Flip(param)` | Flip horizontally or vertically |
+| `V8.Image.Convert(param)` | Convert the encoded image format |
+| `V8.Image.Draw(param)` | Draw text and shapes on an existing image |
+| `V8.Image.Watermark(param)` | Add an image watermark |
+| `V8.Image.CreateQRCode(param)` | Create a QR code |
+| `V8.Image.GetInfo(param)` | Read dimensions, format, frames, and other metadata |
+
+Options specific to `Create`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Width` / `Height` | `800` / `600` | New canvas dimensions |
+| `CanvasWidth` / `CanvasHeight` | Not set | Override `Width` / `Height`, respectively |
+| `BackgroundColorEnd` | Not set | Enables a linear gradient from `BackgroundColor` |
+| `GradientDirection` | `left-to-right` | Horizontal, `top-to-bottom` / `vertical`, or `diagonal` |
+| `Text` / `TextColor` / `FontSize` / `FontFamily` | Not set / `#111827` / `32` / default font | Append shortcut text at the center of the canvas |
+| `Elements` | Not set | Text, rectangle, ellipse, circle, and line elements |
+
+### Create images and overlay layers
+
+The following example creates a large image and a small badge, then places the badge at explicit coordinates. Overlay mode draws from the lowest to the highest `ZIndex`, so a larger value appears on top. For equal values, a later array item appears on top.
+
+```javascript
+var baseResult = V8.Image.Create({
+  Width: 1200,
+  Height: 700,
+  BackgroundColor: '#2563eb',
+  BackgroundColorEnd: '#0f172a',
+  GradientDirection: 'left-to-right',
+  Text: 'Microi',
+  TextColor: '#ffffff',
+  FontSize: 72,
+  FileName: 'poster.png'
+});
+if (baseResult.Code !== 1) return baseResult;
+
+var badgeResult = V8.Image.Create({
+  Width: 240,
+  Height: 120,
+  BackgroundColor: '#f97316',
+  Text: 'NEW',
+  TextColor: '#ffffff',
+  FontSize: 42
+});
+if (badgeResult.Code !== 1) return badgeResult;
+
+var result = V8.Image.Overlay({
+  CanvasWidth: 1200,
+  CanvasHeight: 700,
+  Images: [
+    {
+      FileByteBase64: baseResult.Data.FileByteBase64,
+      Width: 1200,
+      Height: 700,
+      Fit: 'fill',
+      ZIndex: 0
+    },
+    {
+      FileByteBase64: badgeResult.Data.FileByteBase64,
+      X: 900,
+      Y: 80,
+      Scale: 0.75,
+      Opacity: 0.95,
+      CornerRadius: 16,
+      ZIndex: 10
+    }
+  ],
+  OutputFormat: 'png',
+  FileName: 'poster-with-badge.png'
+});
+return result;
+```
+
+A two-image shorthand is also available:
+
+```javascript
+return V8.Image.Overlay({
+  BaseImage: baseResult.Data.FileByteBase64,
+  OverlayImage: badgeResult.Data.FileByteBase64,
+  X: 900,
+  Y: 80,
+  OverlayWidth: 180,
+  OverlayHeight: 90,
+  Opacity: 0.9
+});
+```
+
+Base-image aliases are `BaseImage`, `BackgroundImage`, `FirstImage`, and `Base`. Overlay-image aliases are `OverlayImage`, `ForegroundImage`, `SecondImage`, and `Overlay`. Top-level `X`, `Y`, `Position`, `Opacity`, `OverlayWidth`, `OverlayHeight`, and `Scale` apply to the overlay image in this shorthand.
+
+### Merge modes
+
+```javascript
+// Horizontal composition
+var horizontal = V8.Image.Merge({
+  Mode: 'horizontal',
+  Direction: 'ltr',
+  Gap: 20,
+  Padding: 20,
+  Alignment: 'center',
+  Images: [
+    { FileByteBase64: firstBase64, Height: 320 },
+    { FileByteBase64: secondBase64, Height: 320 }
+  ]
+});
+
+// Vertical composition
+var vertical = V8.Image.Merge({
+  Mode: 'vertical',
+  Direction: 'ttb',
+  Gap: 16,
+  Alignment: 'left',
+  Images: [firstBase64, secondBase64]
+});
+
+// Grid composition
+var grid = V8.Image.Merge({
+  Mode: 'grid',
+  Columns: 3,
+  Gap: 12,
+  Padding: 12,
+  Images: imageBase64List
+});
+```
+
+| Option | Description |
+|--------|-------------|
+| `Mode` | `horizontal`, `vertical`, `grid`, or `overlay` |
+| `Layout` | Takes precedence over `Mode`; accepts `row`, `column`, `canvas`, `cover`, and the directional shortcuts `left/right/top/bottom/up/down` |
+| `Direction` | `ltr`, `rtl`, `ttb`, or `btt`; full forms such as `left-to-right` are also accepted |
+| `Images` / `Layers` | Image or layer array; an item may be a raw Base64 or data URI string |
+| `CanvasWidth` / `CanvasHeight` | Fixed canvas dimensions; otherwise calculated from the layout |
+| `Padding` / `Gap` | Canvas padding / space between images; negative values become zero |
+| `Alignment` | Cross-axis alignment for rows and columns, or alignment inside a grid cell |
+| `Columns` | Number of grid columns |
+
+Merge aliases are `MergeType` / `Type` → `Mode` and `Items` → `Images`.
+
+### Layer options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Width` / `Height` | Source dimensions | When only one is set, the other is calculated proportionally |
+| `Scale` | `1` | Additional proportional scaling after width/height calculation; greater than 0 and no more than 100 |
+| `Fit` | `contain` | With both dimensions set: `contain`, `cover`, `fill` / `stretch`, or `none` |
+| `X` / `Y` | Not set | Absolute overlay coordinates; if either is set, the other defaults to `Padding` |
+| `Position` / `Anchor` | `top-left` | Anchor used when coordinates are absent; `Position` takes precedence |
+| `OffsetX` / `OffsetY` | `0` | Offset added after coordinate or anchor positioning |
+| `Opacity` | `1` | Opacity, clamped to 0 through 1 |
+| `Rotation` | `0` | Clockwise rotation in degrees |
+| `ZIndex` | `0` | Overlay order; a larger value appears on top |
+| `FlipHorizontal` / `FlipVertical` | `false` | Flip this layer |
+| `CropX` / `CropY` / `CropWidth` / `CropHeight` | Entire source | Crop the source before resizing |
+| `CornerRadius` | `0` | Corner radius |
+| `BorderColor` / `BorderWidth` | Not set / `0` | Layer border |
+| `BlendMode` | `src-over` | Layer blend mode |
+
+`contain` preserves the complete image while scaling proportionally; `cover` center-crops to fill the requested dimensions; `fill` / `stretch` forces the requested dimensions; `none` keeps the source size. `Scale` is applied after this calculation.
+
+Common anchors are `top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, and `bottom-right`. Blend modes are `src-over`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `plus` / `add`, `src`, and `dst-over`.
+
+Layer aliases are `Order` → `ZIndex`, `Alpha` → `Opacity`, `Rotate` → `Rotation`, and `Left` / `Top` → `X` / `Y`.
+
+### Other image operations
+
+```javascript
+// Resize: set at least Width or Height; Pad=true retains the full requested canvas
+var resized = V8.Image.Resize({
+  Image: sourceBase64,
+  Width: 800,
+  Height: 600,
+  Fit: 'cover',
+  Pad: false,
+  AllowUpscale: true,
+  Alignment: 'center'
+});
+
+// Crop; Clamp=true shrinks a partly out-of-bounds rectangle to the image
+var cropped = V8.Image.Crop({
+  Image: sourceBase64,
+  X: 100,
+  Y: 80,
+  Width: 640,
+  Height: 360,
+  Clamp: false
+});
+
+// Rotate; Expand=false keeps the original canvas and may clip edges
+var rotated = V8.Image.Rotate({
+  Image: sourceBase64,
+  Degrees: 30,
+  Expand: true
+});
+
+// Horizontal / vertical flip; Horizontal defaults to true, Vertical to false
+var flipped = V8.Image.Flip({
+  Image: sourceBase64,
+  Horizontal: true,
+  Vertical: false
+});
+
+// Format conversion
+var converted = V8.Image.Convert({
+  Image: sourceBase64,
+  OutputFormat: 'webp',
+  Quality: 85,
+  FileName: 'converted.webp'
+});
+
+// Image watermark
+var watermarked = V8.Image.Watermark({
+  BaseImage: sourceBase64,
+  Watermark: logoBase64,
+  Width: 180,
+  Height: 90,
+  Scale: 1,
+  Position: 'bottom-right',
+  Margin: 24,
+  OffsetX: 0,
+  OffsetY: 0,
+  Opacity: 0.7,
+  Rotation: 0
+});
+
+// QR code; Content takes precedence over Text, and Size defaults to 300
+var qr = V8.Image.CreateQRCode({
+  Content: 'https://microi.net/',
+  Size: 420,
+  FileName: 'qrcode.png'
+});
+
+// Read source image information
+var info = V8.Image.GetInfo({ Image: sourceBase64 });
+// Data: Width, Height, Format, ContentType, Size, FrameCount,
+// RepetitionCount, Origin, HasAlpha
+```
+
+For `Watermark`, `Image` may be used instead of `BaseImage`. It also accepts `Base` → `BaseImage` and `Overlay` → `Watermark`.
+
+### Draw text and shapes
+
+`Create` and `Draw` use the same `Elements` structure. `Create` draws on a new canvas; `Draw` draws over the input image and preserves its dimensions.
+
+```javascript
+var result = V8.Image.Draw({
+  Image: sourceBase64,
+  Elements: [
+    {
+      Type: 'text',
+      X: 40,
+      Y: 40,
+      Text: 'CONFIDENTIAL',
+      Color: 'rgba(239,68,68,0.75)',
+      FontSize: 36,
+      FontFamily: 'Arial',
+      FontStyle: 'bold-italic',
+      Align: 'left',
+      VerticalAlign: 'top',
+      Rotation: -8
+    },
+    {
+      Type: 'round-rect',
+      X: 40,
+      Y: 90,
+      Width: 320,
+      Height: 100,
+      FillColor: '#ffffff88',
+      StrokeColor: '#ef4444',
+      StrokeWidth: 3,
+      CornerRadius: 16,
+      Opacity: 0.9
+    },
+    {
+      Type: 'line',
+      X: 40,
+      Y: 220,
+      X2: 360,
+      Y2: 220,
+      StrokeColor: '#ef4444',
+      StrokeWidth: 3
+    }
+  ]
+});
+```
+
+| Element type | Parameters |
+|--------------|------------|
+| `text` | `Text`, `Color`, `FontSize`, `FontFamily`, `FontStyle`, `Align`, `VerticalAlign` |
+| `rectangle` / `rect` / `round-rect` | `X`, `Y`, `Width`, `Height`, fill, stroke, and corner radius |
+| `ellipse` / `circle` | `X`, `Y`, `Width`, `Height`, fill, and stroke |
+| `line` | `X`, `Y`, `X2`, `Y2` or `Width`, `Height`, plus stroke options |
+
+Every element also accepts `Opacity` and `Rotation`. At most 500 elements may be drawn in one call.
+
+### Colors, security, and resource limits
+
+Colors accept common English color names, `transparent`, `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, `rgb(...)`, and `rgba(...)`. A color's own alpha is multiplied by `Opacity`.
+
+Built-in limits are: at most 50 images per merge; no dimension above 16,384 pixels; no single input or output canvas above 25,000,000 pixels; no more than 50,000,000 decoded pixels and 50,000,000 post-resize layer pixels per call; at most 25 MB per source image; at most 100 MB total input; and at most 50 MB output.
+
+These are protective ceilings, not recommended business limits. Anonymous APIs should enforce stricter count, dimension, concurrency, and permission limits. Fetch remote images with `V8.Http` first and validate user-controlled URLs against protocol, host, and destination-address allowlists. Never pass a URL or server path directly to `V8.Image`.
+
+Text rendering depends on operating-system fonts. Install the required fonts in Linux or minimal containers (for example, Noto Sans CJK for Chinese) and pass `FontFamily` explicitly; missing glyphs may otherwise be absent.
+
 ## Current User V8.CurrentUser
 > * The information of the current login user, including the role and organization of the user, and the information of the fields added to the sys_user table by using the form engine.
 > * The value accessed when not logged in is {}

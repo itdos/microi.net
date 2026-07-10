@@ -1,0 +1,4 @@
+interface:
+  display_name: "V8 图像处理"
+  short_description: "编写安全、可验证的 V8.Image 图像处理与合并代码"
+  default_prompt: "使用 $v8-image-processing 编写一个将水印按指定位置叠加到主图并返回图片的 V8 接口引擎。"

@@ -26,6 +26,7 @@ namespace Microi.net
             var needUptServerVersion = false;
             var uptVersion = "";
 
+            EnsureAuthSecretColumns(osClientSecret);
             EnsureMicroServiceColumns(osClientSecret);
 
             #region 升级AppDisplay、AppVisible  --2024-09-19【必须】
@@ -425,6 +426,89 @@ namespace Microi.net
             }
         }
 
+        private void EnsureAuthSecretColumns(OsClientSecret osClientSecret)
+        {
+            try
+            {
+                if (osClientSecret?.Db == null || !TableExists(osClientSecret, "sys_osclients"))
+                {
+                    return;
+                }
+
+                EnsureStringColumnCapacity(osClientSecret, "sys_osclients", "AuthSecret", 100);
+                EnsureColumn(osClientSecret, "sys_osclients", "AuthSecretRotateVersion", "varchar(100)");
+
+                var rotateVersion = ConfigHelper
+                    .GetEnvOrConfiguration("MICROI_AUTH_SECRET_ROTATE_VERSION", "Security:AuthSecretRotateVersion")
+                    .DosIsNullOrWhiteSpace(DiyToken.CurrentAuthVersion)
+                    .Trim();
+                var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+                var sql = dbType == "MySql"
+                    ? @"UPDATE `sys_osclients`
+                        SET `AuthSecretRotateVersion` = @p0
+                        WHERE (`AuthSecretRotateVersion` IS NULL OR `AuthSecretRotateVersion` = '')
+                          AND `AuthSecret` IS NOT NULL
+                          AND CHAR_LENGTH(`AuthSecret`) >= 32
+                          AND LOWER(`AuthSecret`) <> LOWER(`OsClient`)"
+                    : @"UPDATE [sys_osclients]
+                        SET [AuthSecretRotateVersion] = @p0
+                        WHERE ([AuthSecretRotateVersion] IS NULL OR [AuthSecretRotateVersion] = '')
+                          AND [AuthSecret] IS NOT NULL
+                          AND LEN([AuthSecret]) >= 32
+                          AND LOWER([AuthSecret]) <> LOWER([OsClient])";
+                osClientSecret.Db.FromSql(sql)
+                    .AddInParameter("p0", rotateVersion)
+                    .ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret?.OsClient}】【检查JWT密钥字段】失败：{ex.Message}");
+            }
+        }
+
+        private void EnsureStringColumnCapacity(
+            OsClientSecret osClientSecret,
+            string tableName,
+            string columnName,
+            int minimumLength)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            int currentLength;
+            if (dbType == "MySql")
+            {
+                currentLength = osClientSecret.Db.FromSql(@"SELECT COALESCE(CHARACTER_MAXIMUM_LENGTH, 0)
+                        FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @p0 AND COLUMN_NAME = @p1")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>();
+            }
+            else if (dbType == "SqlServer")
+            {
+                currentLength = osClientSecret.Db.FromSql(@"SELECT COALESCE(CHARACTER_MAXIMUM_LENGTH, 0)
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = @p0 AND COLUMN_NAME = @p1")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>();
+            }
+            else
+            {
+                return;
+            }
+
+            if (currentLength >= minimumLength)
+            {
+                return;
+            }
+
+            var sql = dbType == "MySql"
+                ? $"ALTER TABLE `{tableName}` MODIFY COLUMN `{columnName}` varchar({minimumLength}) NULL"
+                : $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL";
+            osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
+            Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【扩容表字段】{tableName}.{columnName} -> varchar({minimumLength})");
+        }
+
         private bool TableExists(OsClientSecret osClientSecret, string tableName)
         {
             var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
@@ -460,7 +544,7 @@ namespace Microi.net
             try
             {
                 osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
-                Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐微前端服务表字段】{tableName}.{columnName}");
+                Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐表字段】{tableName}.{columnName}");
             }
             catch (Exception ex)
             {
