@@ -82,7 +82,7 @@ namespace Dos.Common
     /// <summary>
     /// 图片水印处理类
     /// </summary>
-    public class ImageHelper
+    public partial class ImageHelper
     {
         public static class ContentType
         {

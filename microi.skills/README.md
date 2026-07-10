@@ -22,6 +22,7 @@
 | **v8-workflow** | 工作流（审批流程）V8 事件 | `v8-workflow/SKILL.md` |
 | **v8-api-config** | 接口引擎配置（匿名/锁/StopHttp/响应文件） | `v8-api-config/SKILL.md` |
 | **v8-saas-multi-tenant** | SaaS 多租户（OsClient/OsClientModel） | `v8-saas-multi-tenant/SKILL.md` |
+| **v8-image-processing** | 服务端图片生成、合并、覆盖、水印、缩放、裁剪、绘制与二维码 | `v8-image-processing/SKILL.md` |
 | **v8-file-upload** | 文件上传/下载/响应（HDFS、私有桶 URL） | `v8-file-upload/SKILL.md` |
 | **v8-export-import** | Excel 自定义导入导出（含进度跟踪） | `v8-export-import/SKILL.md` |
 | **v8-debugging** | 调试模式、异常捕获、系统日志 | `v8-debugging/SKILL.md` |
