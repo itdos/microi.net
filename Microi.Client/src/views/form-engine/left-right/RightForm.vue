@@ -848,8 +848,9 @@ export default {
                 
                 return result;
             }
-            
-            return false;
+
+            // 没有配置角色按钮权限时，显示条件未明确返回 false 则默认显示。
+            return self.TableChildFormMode != "View";
         },
         SetV8DefaultValue(V8, field) {
             var self = this;

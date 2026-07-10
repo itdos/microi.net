@@ -1548,6 +1548,11 @@ import PanThumb from "@/components/PanThumb";
 import DiyCardSelect from "@/views/form-engine/diy-card-select.vue";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
 import { initV8Print } from "@/utils/v8-print.js";
+import {
+    resolveV8ButtonVisibility,
+    runV8ButtonVisibilityCode,
+    runV8ButtonVisibilityCodeAsync
+} from "@/utils/v8-button-visibility";
 import bodyBgSvg from "@/assets/img/body-bg.svg";
 // Mixins
 import {
@@ -2551,42 +2556,52 @@ export default {
             // if (self.GetCurrentUser._IsAdmin === true) {
             //   return true;
             // }
-            var result = false;
+            V8.Result = null;
+            var returnValue;
             try {
                 // V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
                 V8.Form = row; // 当前Form表单所有字段值
                 V8.EventName = EventName;
                 self.SetV8DefaultValue(V8);
-                await eval("(async () => {\n " + btn + " \n})()");
-                result = V8.Result;
+                returnValue = await runV8ButtonVisibilityCodeAsync(btn, {
+                    V8,
+                    row,
+                    btn,
+                    self,
+                    v8: V8
+                });
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
-                result = false;
             } finally {
                 // 内存优化：清理V8对象引用
 
             }
-            return result;
+            return resolveV8ButtonVisibility(V8, returnValue, true);
         },
 
         // 同步版本：避免异步V8引擎带来的渲染阻塞
         LimitMoreBtn1Sync(btn, row, EventName) {
             var self = this;
             var V8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
-            var result = false;
+            V8.Result = null;
+            var returnValue;
             try {
                 V8.Form = row;
                 V8.EventName = EventName;
                 self.SetV8DefaultValue(V8);
-                eval("(function () {\n " + btn + " \n})()");
-                result = V8.Result;
+                returnValue = runV8ButtonVisibilityCode(btn, {
+                    V8,
+                    row,
+                    btn,
+                    self,
+                    v8: V8
+                });
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
-                result = false;
             } finally {
 
             }
-            return result;
+            return resolveV8ButtonVisibility(V8, returnValue, true);
         },
 
         async FormSubmitAction(actionType, tableRowId, rowModel) {

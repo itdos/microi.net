@@ -47,6 +47,11 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
 
 ### V8CodeShow（显隐控制）—— 支持 `return` 和 `V8.Result`
 
+未配置 `V8CodeShow`，或代码执行后既没有 `return true/false`、也没有设置
+`V8.Result = true/false` 时，显示条件默认按“显示”处理；只有明确
+`return false` 或 `V8.Result = false` 才由显示条件隐藏按钮。角色按钮权限仍是
+独立约束，不应通过省略显示条件绕过。
+
 推荐写法：直接返回布尔值。
 
 ```js
@@ -356,8 +361,8 @@ V8.ConfirmTips(html, function () {
 ❌ 把所有业务逻辑塞进 `V8Code`，不创建接口引擎
 ✅ 前端 `V8Code` 只负责弹窗/确认/刷新；业务逻辑写在接口引擎
 
-❌ `V8CodeShow` 中返回非布尔值，导致按钮显隐继续走默认权限判断
-✅ 显式 `return true/false;`，或兼容写法 `V8.Result = true/false;`
+❌ 依赖非布尔返回值隐藏按钮
+✅ 需要隐藏时显式 `return false;` 或 `V8.Result = false;`；未返回布尔值默认显示
 
 ❌ `MoreBtns` 不写 `ShowRow:true`，按钮看不见
 ✅ 行内必须 `ShowRow:true`

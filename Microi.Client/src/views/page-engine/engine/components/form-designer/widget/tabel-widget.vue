@@ -164,6 +164,7 @@ const selectedValues = ref({})
 const dateRange = ref([])
 const loading = ref(false)
 let periodSearchTimer = null
+let periodSyncTimer = null
 let syncingPeriodRange = false
 
 const dataJson = computed(
@@ -240,8 +241,10 @@ const applyPeriod = period => {
   syncingPeriodRange = true
   dateRange.value = [range.start, range.end]
   syncPeriodToSearchData()
-  setTimeout(() => {
+  if (periodSyncTimer) clearTimeout(periodSyncTimer)
+  periodSyncTimer = setTimeout(() => {
     syncingPeriodRange = false
+    periodSyncTimer = null
   }, 0)
 }
 
@@ -549,6 +552,8 @@ let scrollDataJsonTemplate = null
 let scrollNextPage = 1
 let scrollPreviousPage = 1
 let scrollPrefetchPromise = null
+let runtimeDisposed = false
+let runtimeTaskRunId = 0
 
 const getDataJson = () =>
   props.widgetObj.widgetParams[0].typeOptions.dataJson || {}
@@ -699,35 +704,48 @@ const fillScrollBuffer = async () => {
   if (scrollPrefetchPromise) return scrollPrefetchPromise
 
   scrollPrefetchPromise = (async () => {
-    while (
-      runId === scrollBufferRunId &&
-      isAutoScroll.value &&
-      scrollSegments.length < scrollMaxSegments
-    ) {
-      const pageNumber = scrollNextPage
-      const dataJson = await fetchTablePage(pageNumber, getActivePageSize())
+    try {
+      while (
+        !runtimeDisposed &&
+        runId === scrollBufferRunId &&
+        isAutoScroll.value &&
+        scrollSegments.length < scrollMaxSegments
+      ) {
+        const pageNumber = scrollNextPage
+        const dataJson = await fetchTablePage(pageNumber, getActivePageSize())
 
-      if (runId !== scrollBufferRunId || !isAutoScroll.value) return
+        if (
+          runtimeDisposed ||
+          runId !== scrollBufferRunId ||
+          !isAutoScroll.value
+        ) return
 
-      let appended = appendScrollSegment(pageNumber, dataJson)
-      if (!appended && pageNumber !== 1) {
-        scrollNextPage = 1
-        continue
+        const appended = appendScrollSegment(pageNumber, dataJson)
+        if (!appended && pageNumber !== 1) {
+          scrollNextPage = 1
+          continue
+        }
+        if (!appended) return
+
+        await nextTick()
+        tableRef.value?.doLayout?.()
       }
-      if (!appended) return
-
-      await nextTick()
-      tableRef.value?.doLayout?.()
-    }
-
-    if (
-      runId === scrollBufferRunId &&
-      isAutoScroll.value &&
-      scrollSegments.length < scrollMaxSegments
-    ) {
-      padScrollSegmentsForLoop()
-      await nextTick()
-      tableRef.value?.doLayout?.()
+    } catch (error) {
+      // 一次分页预取失败不能终止 requestAnimationFrame 滚动链。
+      console.error('[PageEngineTable] 自动滚动分页预取失败：', error)
+    } finally {
+      // 远程分页临时失败或数据不足时复用现有段，保证仍可循环滚动；
+      // 始终最多保留 scrollMaxSegments 段，避免页面长时间打开后持续增长。
+      if (
+        !runtimeDisposed &&
+        runId === scrollBufferRunId &&
+        isAutoScroll.value &&
+        scrollSegments.length < scrollMaxSegments
+      ) {
+        padScrollSegmentsForLoop()
+        await nextTick()
+        tableRef.value?.doLayout?.()
+      }
     }
   })()
 
@@ -799,7 +817,21 @@ const getAverageRowHeight = () => {
   return totalHeight / visibleRows.length
 }
 
+const getHeadSegmentHeight = (rowCount) => {
+  const tableEl = tableRef.value?.$el
+  const rows = tableEl
+    ? Array.from(tableEl.querySelectorAll('.el-table__body tbody tr'))
+    : []
+  const renderedHeight = rows
+    .slice(0, rowCount)
+    .reduce((sum, row) => sum + row.getBoundingClientRect().height, 0)
+
+  if (renderedHeight > 0) return renderedHeight
+  return rowCount * getAverageRowHeight()
+}
+
 const trimScrolledHeadSegment = async () => {
+  if (runtimeDisposed) return false
   if (scrollSegments.length <= 1) {
     if (!padScrollSegmentsForLoop()) return false
     await nextTick()
@@ -808,10 +840,8 @@ const trimScrolledHeadSegment = async () => {
   }
 
   const firstSegment = scrollSegments[0]
-  const averageRowHeight = getAverageRowHeight()
-  if (!averageRowHeight) return false
-
-  const firstSegmentHeight = firstSegment.rows.length * averageRowHeight
+  const firstSegmentHeight = getHeadSegmentHeight(firstSegment.rows.length)
+  if (!firstSegmentHeight) return false
   const { maxScrollTop } = getTableScrollState()
   const isAtScrollableEnd =
     scrollDirection.value === 'up' &&
@@ -831,7 +861,8 @@ const trimScrolledHeadSegment = async () => {
   tableRef.value?.doLayout?.()
   await nextTick()
   setTableScrollTop(scrollPosition)
-  await fillScrollBuffer()
+  // 不等待远程分页请求，滚动帧可以立刻续约；缓冲区会在后台补齐。
+  void fillScrollBuffer()
   return true
 }
 
@@ -939,14 +970,21 @@ const stopAutoPage = () => {
 }
 
 const loadNextRuntimePage = async () => {
-  if (scrollPageLoading || autoPageLoading || loading.value) return
+  if (
+    runtimeDisposed ||
+    scrollPageLoading ||
+    autoPageLoading ||
+    loading.value
+  ) return
 
+  const taskRunId = runtimeTaskRunId
   runtimePageChanging = true
   scrollPageLoading = true
   autoPageLoading = true
   try {
     currentPage.value = getNextPageNumber()
     await reloadRoadRemoteData()
+    if (runtimeDisposed || taskRunId !== runtimeTaskRunId) return
     await nextTick()
     tableRef.value?.doLayout?.()
     await nextTick()
@@ -959,7 +997,7 @@ const loadNextRuntimePage = async () => {
 }
 
 const startAutoScroll = async () => {
-  if (!isAutoScroll.value) return
+  if (runtimeDisposed || !isAutoScroll.value) return
 
   const runId = ++scrollRunId
   await nextTick()
@@ -971,52 +1009,57 @@ const startAutoScroll = async () => {
     const { scrollTop } = getTableScrollState()
     scrollPosition = scrollTop
   }
+  if (runtimeDisposed || runId !== scrollRunId || !isAutoScroll.value) return
 
   const scrollFrame = async (timestamp) => {
-    if (runId !== scrollRunId || !isAutoScroll.value) return
+    if (runtimeDisposed || runId !== scrollRunId || !isAutoScroll.value) return
 
-    const { maxScrollTop, scrollTop, clientHeight } = getTableScrollState()
-    if (maxScrollTop <= 0) {
-      fillScrollBuffer()
-      scrollAnimationId = requestAnimationFrame(scrollFrame)
-      return
-    }
+    try {
+      const { maxScrollTop, scrollTop, clientHeight } = getTableScrollState()
+      if (maxScrollTop <= 0) {
+        void fillScrollBuffer()
+        return
+      }
 
-    if (scrollPosition > maxScrollTop || Math.abs(scrollPosition - scrollTop) > 2) {
-      scrollPosition = scrollTop
-    }
+      if (scrollPosition > maxScrollTop || Math.abs(scrollPosition - scrollTop) > 2) {
+        scrollPosition = scrollTop
+      }
 
-    if (!lastScrollFrameTime) lastScrollFrameTime = timestamp
-    const deltaSeconds = Math.min((timestamp - lastScrollFrameTime) / 1000, 0.2)
-    lastScrollFrameTime = timestamp
+      if (!lastScrollFrameTime) lastScrollFrameTime = timestamp
+      const deltaSeconds = Math.min((timestamp - lastScrollFrameTime) / 1000, 0.2)
+      lastScrollFrameTime = timestamp
 
-    if (!scrollPageLoading) {
-      const distance = scrollSpeed.value * deltaSeconds
-      const edgeThreshold = Math.max(
-        clientHeight * 1.5,
-        scrollSpeed.value * 2,
-        scrollEdgeThreshold
-      )
-      if (scrollDirection.value === 'down') {
-        scrollPosition = Math.max(0, scrollPosition - distance)
-        setTableScrollTop(scrollPosition)
-        if (scrollPosition <= edgeThreshold) {
-          await prependScrollBuffer()
-        }
-      } else {
-        scrollPosition = Math.min(maxScrollTop, scrollPosition + distance)
-        setTableScrollTop(scrollPosition)
-        if (maxScrollTop - scrollPosition <= edgeThreshold) {
-          fillScrollBuffer()
-        }
-        if (await trimScrolledHeadSegment()) {
-          fillScrollBuffer()
+      if (!scrollPageLoading) {
+        const distance = scrollSpeed.value * deltaSeconds
+        const edgeThreshold = Math.max(
+          clientHeight * 1.5,
+          scrollSpeed.value * 2,
+          scrollEdgeThreshold
+        )
+        if (scrollDirection.value === 'down') {
+          scrollPosition = Math.max(0, scrollPosition - distance)
+          setTableScrollTop(scrollPosition)
+          if (scrollPosition <= edgeThreshold) {
+            await prependScrollBuffer()
+          }
+        } else {
+          scrollPosition = Math.min(maxScrollTop, scrollPosition + distance)
+          setTableScrollTop(scrollPosition)
+          if (maxScrollTop - scrollPosition <= edgeThreshold) {
+            void fillScrollBuffer()
+          }
+          if (await trimScrolledHeadSegment()) {
+            void fillScrollBuffer()
+          }
         }
       }
-    }
-
-    if (runId === scrollRunId && isAutoScroll.value) {
-      scrollAnimationId = requestAnimationFrame(scrollFrame)
+    } catch (error) {
+      // DOM 更新或分页请求的单帧异常不应打断后续滚动。
+      console.error('[PageEngineTable] 自动滚动帧执行失败：', error)
+    } finally {
+      if (!runtimeDisposed && runId === scrollRunId && isAutoScroll.value) {
+        scrollAnimationId = requestAnimationFrame(scrollFrame)
+      }
     }
   }
 
@@ -1032,12 +1075,14 @@ const startAutoPage = () => {
 }
 
 const restartRuntimeTasks = async (reloadData = false) => {
+  const taskRunId = ++runtimeTaskRunId
   stopAutoScroll()
   stopAutoPage()
+  if (runtimeDisposed) return
 
-  if (reloadData) {
-    runtimePageChanging = true
-    try {
+  try {
+    if (reloadData) {
+      runtimePageChanging = true
       currentPage.value = 1
       if (isAutoScroll.value) {
         await initializeScrollBuffer()
@@ -1047,13 +1092,17 @@ const restartRuntimeTasks = async (reloadData = false) => {
       }
       await nextTick()
       tableRef.value?.doLayout?.()
-    } finally {
-      runtimePageChanging = false
+    } else if (isAutoScroll.value && !scrollSegments.length) {
+      await initializeScrollBuffer()
     }
-  } else if (isAutoScroll.value && !scrollSegments.length) {
-    await initializeScrollBuffer()
+  } catch (error) {
+    console.error('[PageEngineTable] 运行任务初始化失败：', error)
+    return
+  } finally {
+    runtimePageChanging = false
   }
 
+  if (runtimeDisposed || taskRunId !== runtimeTaskRunId) return
   await nextTick()
   if (isAutoScroll.value) {
     await startAutoScroll()
@@ -1063,6 +1112,7 @@ const restartRuntimeTasks = async (reloadData = false) => {
 }
 
 onMounted(async () => {
+  runtimeDisposed = false
   await restartRuntimeTasks(true)
 })
 
@@ -1083,9 +1133,13 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  runtimeDisposed = true
+  runtimeTaskRunId++
   if (periodSearchTimer) clearTimeout(periodSearchTimer)
+  if (periodSyncTimer) clearTimeout(periodSyncTimer)
   stopAutoScroll()
   stopAutoPage()
+  resetScrollBuffer()
 })
 
 // 递归生成表头

@@ -54,6 +54,7 @@
 |-------|------|------|
 | **business-blueprint** | 从需求生成业务蓝图、模块边界、数据模型与接口清单 | `business-blueprint/SKILL.md` |
 | **microi-system-delivery** | 自然语言到完整系统交付的总控、MCP 编排、验收和复盘 | `microi-system-delivery/SKILL.md` |
+| **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
 | **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
 | **microi-uniapp-frontend** | Microi UniApp/H5 通用前端规范、安全区、资源解析、骨架屏、主题与页面质量 | `microi-uniapp-frontend/SKILL.md` |
 | **microi-mobile-app-quality** | 移动端质量门禁：登录、验证码、图标、菜单层级、主题、动效、截图验收 | `microi-mobile-app-quality/SKILL.md` |
