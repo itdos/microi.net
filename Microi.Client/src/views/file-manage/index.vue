@@ -19,6 +19,9 @@
           :folders="folders"
           :current-folder-id="currentFolderId"
           @select="handleFolderSelect"
+          @expand="handleFolderExpand"
+          @create-folder="handleCreateFolder"
+          @context-action="handleFolderContextAction"
         />
       </div>
 
@@ -31,19 +34,63 @@
           :files="currentItems"
           :breadcrumb="breadcrumb"
           :loading="fileLoading"
+          :preview-enabled="previewEnabled"
+          :thumbnail-urls="thumbnailUrls"
+          :recycle-mode="recycleMode"
           @open="handleFileOpen"
           @contextmenu="handleContextMenuAction"
           @navigate="handleBreadcrumbNavigate"
           @select="handleFileSelect"
+          @upload="openUploadPicker"
+          @create-folder="handleCreateFolder"
+          @refresh="refreshCurrentFolder"
+          @sync="syncDialogVisible = true"
+          @toggle-trash="toggleTrashMode"
+          @preview-toggle="handlePreviewToggle"
+          @batch-delete="handleBatchDelete"
+          @batch-move="handleBatchMove"
+          @batch-restore="handleBatchRestore"
+          @area-action="handleFileAreaAction"
         />
       </div>
     </template>
+
+    <input
+      ref="fileInputRef"
+      class="hidden-file-input"
+      type="file"
+      multiple
+      @change="handleUploadChange"
+    />
+
+    <el-dialog
+      v-model="uploadProgressVisible"
+      title="上传文件"
+      width="420px"
+      align-center
+      draggable
+      :close-on-click-modal="false"
+    >
+      <div class="upload-progress">
+        <div>{{ uploadProgressText }}</div>
+        <el-progress :percentage="uploadProgress" />
+      </div>
+    </el-dialog>
+
+    <FileSyncDialog
+      v-model="syncDialogVisible"
+      :current-folder-id="currentFolderId"
+      :current-limit="isPrivateBucket"
+      @finished="refreshCurrentFolder"
+    />
 
     <!-- 文件属性弹窗 -->
     <el-dialog
       v-model="propertiesVisible"
       title="文件属性"
       width="420px"
+      align-center
+      draggable
       :close-on-click-modal="false"
       class="properties-dialog"
     >
@@ -83,6 +130,8 @@
       v-model="previewVisible"
       :title="'文件预览 - ' + (previewFile?.name || '')"
       width="85%"
+      align-center
+      draggable
       :close-on-click-modal="true"
       class="preview-dialog"
       destroy-on-close
@@ -216,6 +265,7 @@ import FolderTree from './components/FolderTree.vue'
 import FileList from './components/FileList.vue'
 import FileIcon from './components/FileIcon.vue'
 import CadViewer from './components/CadViewer.vue'
+import FileSyncDialog from './components/FileSyncDialog.vue'
 import { fileManageApi } from './api'
 import { DiyCommon } from '@/utils/microi.net.import'
 
@@ -236,6 +286,23 @@ const currentFolderId = ref('')
 const breadcrumb = shallowRef([])
 // 选中的文件ID列表
 const selectedFileIds = ref([])
+// 是否开启图片缩略图预览
+const previewEnabled = ref(true)
+// 当前文件夹软删除路径映射
+const deletedPathMap = shallowRef({})
+// 回收站列表
+const trashRows = shallowRef([])
+// 回收站模式
+const recycleMode = ref(false)
+// 缩略图地址缓存
+const thumbnailUrls = shallowRef({})
+const thumbnailLoading = new Set()
+// 上传与同步状态
+const fileInputRef = ref(null)
+const uploadProgressVisible = ref(false)
+const uploadProgress = ref(0)
+const uploadProgressText = ref('')
+const syncDialogVisible = ref(false)
 // 文件加载状态
 const fileLoading = ref(false)
 // 初始化加载状态
@@ -257,6 +324,8 @@ const getCadPreviewPath = (file) => {
 
 // 记录已加载过的文件夹（使用路径作为key）
 const loadedFolders = ref(new Set())
+// 文件夹树按需加载标记
+const loadedTreeFolders = ref(new Set())
 // 当前正在加载的请求ID
 let currentLoadingRequest = null
 
@@ -280,6 +349,55 @@ const isVideoType = (type) => videoTypes.includes(type?.toLowerCase())
 const isAudioType = (type) => audioTypes.includes(type?.toLowerCase())
 const isTextType = (type) => textTypes.includes(type?.toLowerCase())
 const isBrowserPreviewable = (type) => isImageType(type) || isVideoType(type) || isAudioType(type) || isTextType(type) || type?.toLowerCase() === 'pdf'
+
+const normalizeObjectPath = (path = '') => String(path || '').replace(/^\/+/, '')
+const normalizeFolderPath = (path = '') => {
+  const normalized = normalizeObjectPath(path).replace(/\/+$/, '')
+  return normalized ? normalized + '/' : ''
+}
+const joinObjectPath = (folder = '', name = '') => normalizeFolderPath(folder) + String(name || '').replace(/^\/+/, '')
+const getObjectPath = (file) => normalizeObjectPath(file?.filePath || file?.fullPath || file?.Path || file?.id || '')
+const getBucketScope = () => isPrivateBucket.value ? 'private' : 'public'
+const stripRootPrefix = (path = '') => {
+  let value = normalizeFolderPath(path).replace(/\/+$/, '')
+  const prefix = String(rootPrefix.value || '').toLowerCase()
+  if (prefix && value.toLowerCase().startsWith(prefix)) {
+    value = value.substring(prefix.length)
+  }
+  return value || 'upload'
+}
+const resolveTargetFolder = (path = '') => {
+  let value = normalizeFolderPath(path)
+  if (!value) return normalizeFolderPath(rootPrefix.value)
+  const prefix = String(rootPrefix.value || '').toLowerCase()
+  if (prefix && !value.toLowerCase().startsWith(prefix)) {
+    value = normalizeFolderPath(rootPrefix.value + value)
+  }
+  return value
+}
+const getParentFolderPath = (path = '') => {
+  const normalized = normalizeObjectPath(path)
+  const source = normalized.endsWith('/') ? normalized.slice(0, -1) : normalized
+  const index = source.lastIndexOf('/')
+  return index >= 0 ? source.substring(0, index + 1) : ''
+}
+const isDeletedPath = (path = '', isFolder = false) => {
+  const deleted = deletedPathMap.value || {}
+  const normalized = isFolder ? normalizeFolderPath(path) : normalizeObjectPath(path)
+  return !!deleted[normalized] || !!deleted[normalizeFolderPath(path)]
+}
+const buildDeletedPathMap = (rows = []) => {
+  const map = {}
+  rows.forEach(row => {
+    const path = normalizeObjectPath(row.Path || row.FilePathName || row.FullPath || '')
+    if (!path) return
+    map[path] = true
+    if (row.IsFolder === 1 || row.IsFolder === true || path.endsWith('/')) {
+      map[normalizeFolderPath(path)] = true
+    }
+  })
+  return map
+}
 
 // 监听预览弹窗打开/关闭，自动加载预览URL
 watch(previewVisible, async (visible) => {
@@ -358,33 +476,23 @@ const getFileTypeName = (type) => {
 
 // 格式化文件大小
 const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 B'
+  if (!bytes || Number(bytes) <= 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 // 当前选中的文件夹对象
 const currentFolder = computed(() => {
   if (!currentFolderId.value) return null
-  const findFolder = (list, id) => {
-    for (const folder of list) {
-      if (folder.id === id) return folder
-      if (folder.children && folder.children.length > 0) {
-        const found = findFolder(folder.children, id)
-        if (found) return found
-      }
-    }
-    return null
-  }
-  return findFolder(folders.value, currentFolderId.value)
+  return findFolderById(currentFolderId.value)
 })
 
 // 当前文件夹下的子文件夹列表
 const currentSubFolders = computed(() => {
   if (!currentFolder.value) return []
-  return currentFolder.value.children || []
+  return (currentFolder.value.children || []).filter(folder => !isDeletedPath(folder.fullPath || folder.id, true))
 })
 
 // 当前文件夹下的文件列表
@@ -399,9 +507,38 @@ let cachedItems = []
 
 const currentItems = computed(() => {
   const folderId = currentFolderId.value
-  
-  if (folderId === cachedFolderId && cachedItems.length > 0) {
+  const cacheKey = [
+    folderId,
+    recycleMode.value ? 'trash' : 'files',
+    currentFiles.value.length,
+    currentSubFolders.value.length,
+    trashRows.value.length,
+    Object.keys(deletedPathMap.value || {}).length
+  ].join('|')
+
+  if (cacheKey === cachedFolderId && cachedItems.length > 0) {
     return cachedItems
+  }
+
+  if (recycleMode.value) {
+    const result = trashRows.value.map(row => Object.freeze({
+      id: row.Id,
+      trashId: row.Id,
+      name: row.Name,
+      type: row.FileType || (row.IsFolder ? 'folder' : ''),
+      size: row.Size || 0,
+      createTime: row.DeletedTime,
+      updateTime: row.OriginalLastModified,
+      folderId: row.FolderPath,
+      filePath: row.Path,
+      fullPath: row.Path,
+      isFolder: row.IsFolder === 1 || row.IsFolder === true,
+      isTrash: true
+    }))
+
+    cachedFolderId = cacheKey
+    cachedItems = result
+    return result
   }
   
   const folderItems = currentSubFolders.value.map(folder => 
@@ -415,14 +552,119 @@ const currentItems = computed(() => {
     })
   )
   
-  const files = currentFiles.value
+  const files = currentFiles.value.filter(file => !isDeletedPath(file.filePath || file.id, false))
   const result = [...folderItems, ...files]
   
-  cachedFolderId = folderId
+  cachedFolderId = cacheKey
   cachedItems = result
   
   return result
 })
+
+const clearItemsCache = () => {
+  cachedFolderId = ''
+  cachedItems = []
+}
+
+function findFolderById(id, folderList = folders.value) {
+  for (const folder of folderList || []) {
+    if (folder.id === id) return folder
+    const found = findFolderById(id, folder.children || [])
+    if (found) return found
+  }
+  return null
+}
+
+const mapFolderRows = (rows = [], parentId = null) => (rows || [])
+  .filter(f => !isDeletedPath(f.FullPath, true))
+  .map(f => ({
+    id: f.FullPath,
+    name: f.Name,
+    fullPath: f.FullPath,
+    parentId,
+    children: []
+  }))
+
+const applyFolderChildren = (folderId, folderRows = []) => {
+  const folder = findFolderById(folderId)
+  if (!folder) return
+  folder.children = mapFolderRows(folderRows, folder.id)
+  loadedTreeFolders.value.add(folder.id)
+  folders.value = [...folders.value]
+  clearItemsCache()
+}
+
+const loadTrashRecords = async (folderId = currentFolderId.value, options = {}) => {
+  const { setRows = true, mergeMap = true } = options
+  const prefix = normalizeFolderPath(folderId || rootPrefix.value)
+
+  try {
+    const result = await fileManageApi.trashQuery({
+      path: prefix,
+      limit: isPrivateBucket.value,
+      pageSize: 5000
+    })
+
+    if (result.Code !== 1) {
+      if (setRows) trashRows.value = []
+      return []
+    }
+
+    const rows = Array.isArray(result.Data) ? result.Data : []
+    const pathMap = result.DataAppend?.PathMap || buildDeletedPathMap(rows)
+    const nextMap = mergeMap ? { ...(deletedPathMap.value || {}) } : {}
+    if (mergeMap && prefix) {
+      Object.keys(nextMap).forEach(key => {
+        if (key.startsWith(prefix)) delete nextMap[key]
+      })
+    }
+    deletedPathMap.value = { ...nextMap, ...pathMap }
+    if (setRows) trashRows.value = rows
+    clearItemsCache()
+    return rows
+  } catch (error) {
+    console.error('加载回收站记录失败:', error)
+    if (setRows) trashRows.value = []
+    return []
+  }
+}
+
+const ensureThumbnails = (items = []) => {
+  if (!previewEnabled.value) return
+
+  items
+    .filter(file => !file.isFolder && isImageType(file.type))
+    .forEach(file => {
+      const path = getObjectPath(file)
+      if (!path || thumbnailUrls.value[file.id] || thumbnailUrls.value[path] || thumbnailLoading.has(path)) return
+
+      thumbnailLoading.add(path)
+      fileManageApi.getPrivateFileUrl(path, isPrivateBucket.value)
+        .then(result => {
+          if (result.Code === 1 && result.Data) {
+            thumbnailUrls.value = {
+              ...thumbnailUrls.value,
+              [file.id]: result.Data,
+              [path]: result.Data
+            }
+          }
+        })
+        .catch(error => {
+          console.error('加载图片缩略图失败:', path, error)
+        })
+        .finally(() => {
+          thumbnailLoading.delete(path)
+        })
+    })
+}
+
+watch(
+  () => [previewEnabled.value, currentItems.value],
+  ([enabled, items]) => {
+    if (enabled) ensureThumbnails(items)
+  },
+  { deep: false }
+)
 
 // 初始化数据
 onMounted(async () => {
@@ -433,9 +675,14 @@ onMounted(async () => {
 const handleBucketSwitch = () => {
   // 清除所有缓存
   loadedFolders.value = new Set()
+  loadedTreeFolders.value = new Set()
   filesMap.value = {}
-  cachedFolderId = ''
-  cachedItems = []
+  clearItemsCache()
+  deletedPathMap.value = {}
+  trashRows.value = []
+  thumbnailUrls.value = {}
+  recycleMode.value = false
+  selectedFileIds.value = []
   currentFolderId.value = ''
   breadcrumb.value = []
   folders.value = []
@@ -450,18 +697,13 @@ const loadFolders = async () => {
     // 获取当前OsClient作为根路径
     const osClient = (DiyCommon.GetOsClient() || '').toLowerCase()
     rootPrefix.value = osClient ? osClient + '/' : ''
+    await loadTrashRecords(rootPrefix.value, { setRows: false, mergeMap: false })
 
     // 列出根目录下的文件夹
     const result = await fileManageApi.listObjects(rootPrefix.value, isPrivateBucket.value)
     
     if (result.Code === 1 && result.Data) {
-      const rootFolders = (result.Data.Folders || []).map(f => ({
-        id: f.FullPath,
-        name: f.Name,
-        fullPath: f.FullPath,
-        parentId: null,
-        children: [] // 子文件夹需要按需加载
-      }))
+      const rootFolders = mapFolderRows(result.Data.Folders || [], null)
 
       // 如果没有文件夹，创建一个虚拟根节点
       if (rootFolders.length === 0) {
@@ -474,11 +716,6 @@ const loadFolders = async () => {
         }]
       } else {
         folders.value = rootFolders
-      }
-
-      // 异步加载每个根文件夹的子文件夹
-      for (const folder of folders.value) {
-        loadSubFolders(folder)
       }
     } else {
       // 回退到默认根目录
@@ -506,29 +743,16 @@ const loadFolders = async () => {
   }
 }
 
-// 递归加载子文件夹结构
-const loadSubFolders = async (folder) => {
+// 按需加载一层子文件夹结构
+const loadSubFolders = async (folder, force = false) => {
+  if (!folder?.fullPath || (!force && loadedTreeFolders.value.has(folder.id))) {
+    return
+  }
+
   try {
     const result = await fileManageApi.listObjects(folder.fullPath, isPrivateBucket.value)
     if (result.Code === 1 && result.Data && result.Data.Folders) {
-      const children = result.Data.Folders.map(f => ({
-        id: f.FullPath,
-        name: f.Name,
-        fullPath: f.FullPath,
-        parentId: folder.id,
-        children: []
-      }))
-      
-      if (children.length > 0) {
-        folder.children = children
-        // 触发响应式更新
-        folders.value = [...folders.value]
-        
-        // 继续递归加载下级文件夹
-        for (const child of children) {
-          loadSubFolders(child)
-        }
-      }
+      applyFolderChildren(folder.id, result.Data.Folders || [])
     }
   } catch (error) {
     console.error('加载子文件夹失败:', folder.fullPath, error)
@@ -537,8 +761,23 @@ const loadSubFolders = async (folder) => {
 
 // 加载文件夹下的文件
 const loadFolderFiles = async (folderId) => {
-  // 如果已经加载过，直接返回
+  if (!folderId) return
+
+  // 回收站模式只加载软删除记录
+  if (recycleMode.value) {
+    fileLoading.value = true
+    try {
+      await loadTrashRecords(folderId, { setRows: true, mergeMap: true })
+    } finally {
+      fileLoading.value = false
+    }
+    return
+  }
+
+  // 如果已经加载过，刷新软删除标记后直接返回
   if (loadedFolders.value.has(folderId)) {
+    await loadTrashRecords(folderId, { setRows: true, mergeMap: true })
+    ensureThumbnails(currentItems.value)
     return
   }
   
@@ -552,21 +791,26 @@ const loadFolderFiles = async (folderId) => {
   fileLoading.value = true
   
   try {
+    await loadTrashRecords(folderId, { setRows: true, mergeMap: true })
     const result = await fileManageApi.listObjects(folderId, isPrivateBucket.value)
     
     if (requestId.cancelled) return
     
     if (result.Code === 1 && result.Data) {
-      const fileList = (result.Data.Files || []).map(f => ({
-        id: f.FullPath,
-        name: f.Name,
-        type: f.Type,
-        size: f.Size,
-        createTime: f.LastModified,
-        updateTime: f.LastModified,
-        folderId: folderId,
-        filePath: f.FullPath
-      }))
+      applyFolderChildren(folderId, result.Data.Folders || [])
+
+      const fileList = (result.Data.Files || [])
+        .filter(f => !isDeletedPath(f.FullPath, false))
+        .map(f => ({
+          id: f.FullPath,
+          name: f.Name,
+          type: f.Type,
+          size: f.Size,
+          createTime: f.LastModified,
+          updateTime: f.LastModified,
+          folderId: folderId,
+          filePath: f.FullPath
+        }))
       
       // 更新filesMap
       const newMap = { ...filesMap.value }
@@ -574,8 +818,8 @@ const loadFolderFiles = async (folderId) => {
       filesMap.value = newMap
       
       // 清除缓存以触发重新计算
-      cachedFolderId = ''
-      cachedItems = []
+      clearItemsCache()
+      ensureThumbnails(fileList)
     }
     
     loadedFolders.value.add(folderId)
@@ -615,6 +859,7 @@ const handleFolderSelect = (folder, node) => {
   
   // 立即更新选中状态，不等待数据加载
   currentFolderId.value = folder.id
+  selectedFileIds.value = []
   
   // 构建面包屑（使用shallowRef需要替换整个对象）
   const path = findFolderPath(folder.id, folders.value)
@@ -624,8 +869,51 @@ const handleFolderSelect = (folder, node) => {
   loadFolderFiles(folder.id)
 }
 
+const handleFolderExpand = (folder) => {
+  loadSubFolders(folder)
+}
+
+const handleFileAreaAction = (action) => {
+  switch (action) {
+    case 'upload':
+      openUploadPicker()
+      break
+    case 'create-folder':
+      handleCreateFolder()
+      break
+    case 'refresh':
+      refreshCurrentFolder()
+      break
+    case 'sync':
+      syncDialogVisible.value = true
+      break
+    case 'toggle-trash':
+      toggleTrashMode()
+      break
+    default:
+      break
+  }
+}
+
+const handleFolderContextAction = ({ action, folder }) => {
+  if (folder && currentFolderId.value !== folder.id) {
+    handleFolderSelect(folder)
+  }
+  handleFileAreaAction(action)
+}
+
 // 处理文件打开
 const handleFileOpen = (file) => {
+  if (recycleMode.value) {
+    if (file.isFolder) {
+      ElMessage.info('请先还原文件夹再打开')
+      return
+    }
+    previewFile.value = file
+    previewVisible.value = true
+    return
+  }
+
   // 如果是文件夹，进入该文件夹
   if (file.isFolder) {
     handleFolderSelect(file)
@@ -653,6 +941,263 @@ const handleBreadcrumbNavigate = (item) => {
 // 处理文件选择
 const handleFileSelect = (fileIds) => {
   selectedFileIds.value = fileIds
+}
+
+const handlePreviewToggle = (value) => {
+  previewEnabled.value = value
+  if (value) ensureThumbnails(currentItems.value)
+}
+
+const toggleTrashMode = async () => {
+  recycleMode.value = !recycleMode.value
+  selectedFileIds.value = []
+  clearItemsCache()
+  await loadFolderFiles(currentFolderId.value)
+}
+
+const openUploadPicker = () => {
+  if (recycleMode.value) {
+    ElMessage.warning('请先退出回收站再上传文件')
+    return
+  }
+  fileInputRef.value?.click()
+}
+
+const handleUploadChange = async (event) => {
+  const files = Array.from(event.target.files || [])
+  event.target.value = ''
+  if (files.length === 0) return
+
+  const folderId = currentFolderId.value || rootPrefix.value
+  if (!folderId) {
+    ElMessage.warning('请先选择上传目录')
+    return
+  }
+
+  uploadProgressVisible.value = true
+  uploadProgress.value = 0
+  uploadProgressText.value = `正在上传 ${files.length} 个文件...`
+
+  try {
+    const result = await fileManageApi.uploadFiles(
+      files,
+      stripRootPrefix(folderId),
+      isPrivateBucket.value,
+      (percent) => {
+        uploadProgress.value = percent
+      }
+    )
+
+    if (result.Code !== 1) {
+      throw new Error(result.Msg || '上传失败')
+    }
+
+    const uploadedRows = Array.isArray(result.Data) ? result.Data : (result.Data ? [result.Data] : [])
+    uploadProgressText.value = '正在整理文件到当前目录...'
+
+    for (const row of uploadedRows) {
+      const source = normalizeObjectPath(row.Path || row.FilePathName || row.FullPath || '')
+      const name = row.Name || row.FileName || (source ? source.split('/').pop() : '')
+      const target = joinObjectPath(folderId, name)
+      if (source && target && source !== target) {
+        await fileManageApi.moveObject(source, target, isPrivateBucket.value)
+      }
+    }
+
+    uploadProgress.value = 100
+    uploadProgressText.value = '上传完成'
+    ElMessage.success(`已上传 ${files.length} 个文件`)
+    await refreshCurrentFolder()
+  } catch (error) {
+    console.error('上传文件失败:', error)
+    ElMessage.error(error.message || '上传文件失败')
+  } finally {
+    setTimeout(() => {
+      uploadProgressVisible.value = false
+    }, 500)
+  }
+}
+
+const handleCreateFolder = () => {
+  if (recycleMode.value) {
+    ElMessage.warning('请先退出回收站再新建文件夹')
+    return
+  }
+
+  ElMessageBox.prompt('请输入文件夹名称', '新建文件夹', {
+    confirmButtonText: '创建',
+    cancelButtonText: '取消',
+    inputPattern: /^[^/\\:*?"<>|]+$/,
+    inputErrorMessage: '名称不能为空且不能包含 / \\ : * ? " < > |'
+  }).then(async ({ value }) => {
+    const folderPath = normalizeFolderPath(joinObjectPath(currentFolderId.value || rootPrefix.value, value))
+    const result = await fileManageApi.createFolder(folderPath, isPrivateBucket.value)
+    if (result.Code === 1) {
+      ElMessage.success('文件夹创建成功')
+      await refreshCurrentFolder()
+    } else {
+      ElMessage.error(result.Msg || '文件夹创建失败')
+    }
+  }).catch(() => {})
+}
+
+const getSelectedItems = (ids = selectedFileIds.value) => {
+  const idSet = new Set(ids)
+  return currentItems.value.filter(item => idSet.has(item.id))
+}
+
+const removeDeletedFoldersFromTree = (items = []) => {
+  const deletedFolders = new Set(
+    items
+      .filter(item => item.IsFolder === 1 || item.IsFolder === true || item.isFolder)
+      .map(item => normalizeFolderPath(item.Path || getObjectPath(item)))
+  )
+
+  if (deletedFolders.size === 0) return
+
+  const prune = (list = []) => list
+    .filter(folder => !deletedFolders.has(normalizeFolderPath(folder.fullPath || folder.id)))
+    .map(folder => ({
+      ...folder,
+      children: prune(folder.children || [])
+    }))
+
+  folders.value = prune(folders.value)
+}
+
+const toTrashPayload = (file) => {
+  const objectPath = file.isFolder ? normalizeFolderPath(getObjectPath(file)) : getObjectPath(file)
+  return {
+    Path: objectPath,
+    Name: file.name,
+    BucketScope: getBucketScope(),
+    Limit: isPrivateBucket.value,
+    IsFolder: file.isFolder ? 1 : 0,
+    FolderPath: file.folderId || getParentFolderPath(objectPath),
+    Size: Number(file.size) || 0,
+    FileType: file.isFolder ? 'folder' : (file.type || ''),
+    OriginalLastModified: file.updateTime || file.createTime || ''
+  }
+}
+
+const softDeleteItems = async (items = []) => {
+  const payload = items.map(toTrashPayload).filter(item => item.Path)
+  if (payload.length === 0) {
+    ElMessage.warning('没有可删除的文件')
+    return
+  }
+
+  const result = await fileManageApi.trashMark(payload, isPrivateBucket.value)
+  if (result.Code === 1) {
+    deletedPathMap.value = {
+      ...(deletedPathMap.value || {}),
+      ...buildDeletedPathMap(payload)
+    }
+    removeDeletedFoldersFromTree(payload)
+    selectedFileIds.value = []
+    clearItemsCache()
+    ElMessage.success('已移入回收站')
+    await refreshCurrentFolder()
+  } else {
+    ElMessage.error(result.Msg || '移入回收站失败')
+  }
+}
+
+const restoreItems = async (items = []) => {
+  const payload = items
+    .map(file => ({
+      Id: file.trashId || file.Id,
+      Path: getObjectPath(file),
+      BucketScope: getBucketScope(),
+      Limit: isPrivateBucket.value
+    }))
+    .filter(item => item.Id || item.Path)
+
+  if (payload.length === 0) {
+    ElMessage.warning('没有可还原的文件')
+    return
+  }
+
+  const result = await fileManageApi.trashRestore(payload, isPrivateBucket.value)
+  if (result.Code === 1) {
+    const nextMap = { ...(deletedPathMap.value || {}) }
+    payload.forEach(item => {
+      delete nextMap[normalizeObjectPath(item.Path)]
+      delete nextMap[normalizeFolderPath(item.Path)]
+    })
+    deletedPathMap.value = nextMap
+    selectedFileIds.value = []
+    clearItemsCache()
+    ElMessage.success('还原成功')
+    await refreshCurrentFolder()
+  } else {
+    ElMessage.error(result.Msg || '还原失败')
+  }
+}
+
+const moveItems = async (items = []) => {
+  if (recycleMode.value) {
+    ElMessage.warning('回收站文件请先还原后再移动')
+    return
+  }
+
+  if (items.length === 0) {
+    ElMessage.warning('请先选择要移动的文件')
+    return
+  }
+
+  ElMessageBox.prompt('请输入目标目录（相对当前租户根目录，如 upload/img）', '移动到', {
+    confirmButtonText: '移动',
+    cancelButtonText: '取消',
+    inputValue: stripRootPrefix(currentFolderId.value || rootPrefix.value),
+    inputPattern: /^[^:*?"<>|]*$/,
+    inputErrorMessage: '目录不能包含 : * ? " < > |'
+  }).then(async ({ value }) => {
+    const targetFolder = resolveTargetFolder(value)
+    let successCount = 0
+
+    for (const item of items) {
+      const source = item.isFolder ? normalizeFolderPath(getObjectPath(item)) : getObjectPath(item)
+      const sourceName = item.isFolder
+        ? source.replace(/\/$/, '').split('/').pop()
+        : item.name
+      const target = item.isFolder
+        ? normalizeFolderPath(joinObjectPath(targetFolder, sourceName))
+        : joinObjectPath(targetFolder, item.name)
+
+      if (!source || !target || source === target) continue
+      const result = await fileManageApi.moveObject(source, target, isPrivateBucket.value)
+      if (result.Code === 1) successCount++
+    }
+
+    ElMessage.success(`已移动 ${successCount} 项`)
+    selectedFileIds.value = []
+    await refreshCurrentFolder()
+  }).catch(() => {})
+}
+
+const handleBatchDelete = (ids) => {
+  const items = getSelectedItems(ids)
+  if (items.length === 0) return
+
+  ElMessageBox.confirm(
+    `确定将选中的 ${items.length} 项移入回收站吗？源文件不会从 OSS/MinIO 物理删除。`,
+    '移入回收站',
+    {
+      confirmButtonText: '移入回收站',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    }
+  ).then(() => softDeleteItems(items)).catch(() => {})
+}
+
+const handleBatchMove = (ids) => {
+  moveItems(getSelectedItems(ids))
+}
+
+const handleBatchRestore = (ids) => {
+  restoreItems(getSelectedItems(ids))
 }
 
 // 处理下载
@@ -685,6 +1230,9 @@ const handleIframeError = () => {
 // 处理右键菜单操作
 const handleContextMenuAction = ({ action, file }) => {
   switch (action) {
+    case 'restore':
+      restoreItems([file])
+      break
     case 'open':
       handleFileOpen(file)
       break
@@ -708,7 +1256,7 @@ const handleContextMenuAction = ({ action, file }) => {
       ElMessage.success('已剪切')
       break
     case 'move':
-      ElMessage.info('选择目标文件夹（功能待实现）')
+      moveItems([file])
       break
     case 'delete':
       handleDelete(file)
@@ -766,50 +1314,27 @@ const handleDelete = (file) => {
   const displayName = file.name
   
   ElMessageBox.confirm(
-    `确定要删除${isFolder ? '文件夹' : ''} "${displayName}" 吗？${isFolder ? '文件夹内所有文件将被一起删除，' : ''}此操作不可撤销。`,
-    '删除确认',
+    `确定将${isFolder ? '文件夹' : '文件'} "${displayName}" 移入回收站吗？源文件不会从 OSS/MinIO 物理删除，可在回收站还原。`,
+    '移入回收站',
     {
-      confirmButtonText: '删除',
+      confirmButtonText: '移入回收站',
       cancelButtonText: '取消',
       type: 'warning',
       confirmButtonClass: 'el-button--danger'
     }
-  ).then(async () => {
-    try {
-      let deletePath = file.filePath || file.fullPath || file.id
-      // 如果是文件夹，确保路径以"/"结尾
-      if (isFolder && !deletePath.endsWith('/')) {
-        deletePath += '/'
-      }
-      
-      const result = await fileManageApi.deleteObject(deletePath, isPrivateBucket.value)
-      if (result.Code === 1) {
-        ElMessage.success('删除成功')
-        refreshCurrentFolder()
-      } else {
-        ElMessage.error(result.Msg || '删除失败')
-      }
-    } catch (error) {
-      ElMessage.error('删除失败')
-    }
-  }).catch(() => {})
+  ).then(() => softDeleteItems([file])).catch(() => {})
 }
 
 // 刷新当前文件夹
-const refreshCurrentFolder = () => {
+const refreshCurrentFolder = async () => {
   const folderId = currentFolderId.value
   if (folderId) {
     // 清除该文件夹的缓存
     loadedFolders.value.delete(folderId)
-    cachedFolderId = ''
-    cachedItems = []
+    loadedTreeFolders.value.delete(folderId)
+    clearItemsCache()
     // 重新加载
-    loadFolderFiles(folderId)
-    // 也刷新子文件夹
-    const folder = currentFolder.value
-    if (folder) {
-      loadSubFolders(folder)
-    }
+    await loadFolderFiles(folderId)
   }
 }
 
@@ -894,22 +1419,47 @@ onUnmounted(() => {
   }
 
   .bucket-switcher {
-    padding: 10px 12px;
+    padding: 16px;
     border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0);
     display: flex;
     justify-content: center;
-    background: var(--el-fill-color-light, #f8fafc);
+    background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
     flex-shrink: 0;
     
     .el-radio-group {
       width: 100%;
       display: flex;
+      padding: 5px;
+      border: 1px solid #dbe5ef;
+      border-radius: 8px;
+      background: #eef3f7;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 18px rgba(15, 23, 42, 0.05);
       
       .el-radio-button {
         flex: 1;
         
         :deep(.el-radio-button__inner) {
           width: 100%;
+          height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: #526475;
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: 0;
+          line-height: 1;
+          box-shadow: none;
+          transition: all 0.18s ease;
+        }
+
+        :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+          background: linear-gradient(135deg, #20b26b 0%, #15935c 100%);
+          color: #fff;
+          box-shadow: 0 8px 18px rgba(32, 178, 107, 0.28);
         }
       }
     }
@@ -939,9 +1489,20 @@ onUnmounted(() => {
     background: var(--el-bg-color, #fff);
     margin: 8px;
     margin-left: 0;
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.upload-progress {
+  display: grid;
+  gap: 12px;
+  color: #334155;
+  font-size: 13px;
 }
 
 // 属性弹窗样式

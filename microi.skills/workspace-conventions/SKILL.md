@@ -117,7 +117,9 @@ AI 通过 MCP、Manifest、V8 或平台 API 创建/修复 Microi 后台菜单时
 Microi 平台级长任务和安全防护属于系统能力，AI 修改框架、MCP 或 V8 示例时必须同步考虑：
 
 - 应用安装、初始化多语言、批量导入、批量修复、跨系统同步等长任务优先接入后台任务中心，进度通过吾码标准 WebSocket/SignalR 推送，不要默认用前端轮询接口。
-- 菜单按钮可使用 `RunBackground` / `BackgroundTask` / `IsBackgroundTask` 配合 `ApiEngineKey` 启动后台任务；接口引擎内用 `V8.Method.UpdateBackgroundTask` 上报进度。
+- 菜单按钮可使用 `RunBackground` / `BackgroundTask` / `IsBackgroundTask` 配合 `ApiEngineKey` 启动后台任务；接口引擎内必须用 `V8.Method.UpdateBackgroundTask` 上报进度。
+- 后台任务按钮创建后，平台会向接口引擎参数注入 `_BackgroundTaskId`。V8 代码应读取 `_BackgroundTaskId` / `BackgroundTaskId` / `TaskId`，按真实阶段或处理条数上报 `Current`、`Total`、`Progress`、`Msg` / `Message`。不要写假进度、不要只在结束时写 100%，成功返回 `Code:1` 后由平台统一置为 100%。
+- 后台任务运行态会写入 Redis 并推送通知中心；清除已完成应同时清理内存态和 Redis 态。新增类似能力时要验证刷新页面后任务仍可见、进度百分比正确、完成后可清除。
 - 平台级安全、访问审计、后台任务、运行态监控等系统表统一使用 `mci_` 前缀；普通业务系统表不要使用 `mci_` 前缀，避免与平台能力混淆。
 - 恶意攻击防护只能根据短时间高频、异常状态码爆发、扫描不存在路径、封禁后继续访问等行为判断，不能因为接口执行时间长或排队时间长就封禁用户。
 - 攻击事件、IP 封禁/解封记录应异步写入 MySQL `mci_` 表并写系统日志；同一 IP、同一原因、同一时间窗必须去重合并，不要重复写大量相同失败原因。

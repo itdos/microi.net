@@ -1,9 +1,11 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.0.3
+ * Version: v1.0.6
  * Function:
- * - 请补充该 V8 代码的完整功能说明。
+ * - 导入应用商城离线/在线应用数据包，创建或更新表、字段、菜单、工作流、接口引擎等元数据。
+ * - 运行在后台任务按钮中时，通过 V8.Method.UpdateBackgroundTask 按阶段写入 Redis 进度，通知中心显示真实百分比。
+ * - 支持自定义商城源传入 StoreOsClient/AppStoreOsClient，安装完成后写入当前租户 sys_microistoreversion。
  */
 
 // ==================== 参数接收与校验 ====================

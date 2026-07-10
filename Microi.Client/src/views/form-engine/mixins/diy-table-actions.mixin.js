@@ -245,6 +245,83 @@ IsPermission(type) {
             // 如果没有配置任何角色权限限制（roleLimitModel为空），与LimitEdit等保持一致
             return false;
         },
+        IsMicroiStoreInstallButton(btn, row) {
+            var self = this;
+            var tableName = String(self.CurrentDiyTableModel?.Name || self.TableName || "").toLowerCase();
+            var menuUrl = String(self.SysMenuModel?.Url || self.$route?.path || "").toLowerCase();
+            var btnName = String(btn?.Name || row?.StoreInstallActionName || "").trim();
+            var v8Code = String(btn?.V8Code || "");
+            var isStoreMenu = tableName === "sys_microistore" || menuUrl === "/microi-store" || menuUrl.indexOf("microi-store") > -1;
+            var isInstallAction = ["安装", "更新", "重新安装", "异常"].indexOf(btnName) > -1
+                || v8Code.indexOf("import-microi-store-package") > -1
+                || v8Code.indexOf("get-microi-store-model") > -1
+                || btn?.ApiEngineKey === "import-microi-store-package";
+            return isStoreMenu && isInstallAction;
+        },
+        BuildMicroiStoreInstallParam(btn, row) {
+            var self = this;
+            var param = {};
+            if (row && typeof row === "object") {
+                Object.keys(row).forEach(function (key) {
+                    param[key] = row[key];
+                });
+            }
+            param.Form = row;
+            param.Row = row;
+            param.Id = row && row.Id;
+            param.StoreId = row && (row.StoreId || row.Id);
+            param.AppId = row && (row.AppId || row.AppKey || row.Id);
+            param.AppName = row && (row.AppName || row.Name || row.Title);
+            param.AppVersion = row && (row.AppVersion || row.Version);
+            param.StoreApiBase = row && (row.StoreApiBase || row.AppStoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row));
+            param.AppStoreApiBase = row && (row.AppStoreApiBase || row.StoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row));
+            param.StoreOsClient = row && (row.StoreOsClient || row.AppStoreOsClient || self.DiyCommon.GetAppStoreSourceOsClient(row));
+            param.AppStoreOsClient = row && (row.AppStoreOsClient || row.StoreOsClient || self.DiyCommon.GetAppStoreSourceOsClient(row));
+            param.Btn = btn;
+            return param;
+        },
+        NotifyBackgroundTaskStarted(result) {
+            var self = this;
+            try {
+                window.dispatchEvent(new CustomEvent("microi-background-task-started", {
+                    detail: result || {}
+                }));
+            } catch (_) { }
+            if (self.$websocket && self.$websocket.state === "Connected" && typeof self.$websocket.invoke === "function") {
+                self.$websocket.invoke("SendBackgroundTaskList").catch(function () { });
+            }
+        },
+        async RunMicroiStoreInstallButton(btn, row, V8) {
+            var self = this;
+            var actionName = String(btn?.Name || row?.StoreInstallActionName || "安装");
+            var appName = row?.AppName || row?.Name || row?.Title || "应用";
+            var confirmText = "确认" + actionName + "【" + appName + "】？安装前建议确认数据库已备份。";
+            await new Promise(function (resolve, reject) {
+                self.DiyCommon.OsConfirm(confirmText, resolve, reject);
+            }).catch(function () {
+                self.BtnV8Loading = false;
+                return Promise.reject(new Error("__MICROI_USER_CANCEL__"));
+            });
+
+            var backgroundParam = self.BuildMicroiStoreInstallParam(btn, row);
+            var backgroundTitle = actionName + "应用：" + appName;
+            var result = await V8.ApiEngine.RunBackground("import-microi-store-package", backgroundParam, backgroundTitle, function () {
+                self.BtnV8Loading = false;
+            });
+            if (!result || result.Code !== 1) {
+                self.DiyCommon.Tips((result && (result.Msg || result.Message)) || (actionName + "任务创建失败"), false);
+                self.BtnV8Loading = false;
+                return;
+            }
+            self.DiyCommon.Tips(actionName + "任务已提交，请在右上角通知中心查看进度。");
+            self.NotifyBackgroundTaskStarted(result);
+            if (typeof self.DiyCommon.RefreshAppStores === "function") {
+                await self.DiyCommon.RefreshAppStores();
+            }
+            if (typeof self.GetDiyTableRow === "function") {
+                self.GetDiyTableRow({ _PageIndex: self.DiyTableRowPageIndex || 1 });
+            }
+        },
         async RunMoreBtn(btn, row, v8) {
           // console.log("RunMoreBtn",btn, row, v8);
             var self = this;
@@ -253,7 +330,8 @@ IsPermission(type) {
             try {
                 var hasBackgroundApiEngine = (btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
                     && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey);
-                if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine) {
+                var hasBuiltInAppStoreInstall = self.IsMicroiStoreInstallButton(btn, row);
+                if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine || hasBuiltInAppStoreInstall) {
                     if (self.SysConfig.EnableUserClickLog) {
                         self.DiyCommon.AddSysLog({
                             Type: `点击V8按钮`,
@@ -278,6 +356,11 @@ IsPermission(type) {
                     };
                     V8.EventName = "V8BtnRun";
                     self.SetV8DefaultValue(V8);
+
+                    if (hasBuiltInAppStoreInstall) {
+                        await self.RunMicroiStoreInstallButton(btn, row, V8);
+                        return;
+                    }
 
                     if ((btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
                         && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey)) {
@@ -304,9 +387,15 @@ IsPermission(type) {
                         if (backgroundParam.AppName) {
                             backgroundTitle += "应用：" + backgroundParam.AppName;
                         }
-                        await V8.ApiEngine.RunBackground(backgroundApiEngineKey, backgroundParam, backgroundTitle, function () {
+                        var backgroundResult = await V8.ApiEngine.RunBackground(backgroundApiEngineKey, backgroundParam, backgroundTitle, function () {
                             self.BtnV8Loading = false;
                         });
+                        if (!backgroundResult || backgroundResult.Code !== 1) {
+                            self.DiyCommon.Tips((backgroundResult && (backgroundResult.Msg || backgroundResult.Message)) || "后台任务创建失败", false);
+                            return;
+                        }
+                        self.DiyCommon.Tips("后台任务已提交，请在右上角通知中心查看进度。");
+                        self.NotifyBackgroundTaskStarted(backgroundResult);
                         return;
                     }
 
@@ -321,6 +410,10 @@ IsPermission(type) {
                     self.BtnV8Loading = false;
                 }
             } catch (error) {
+                if (error && error.message === "__MICROI_USER_CANCEL__") {
+                    self.BtnV8Loading = false;
+                    return;
+                }
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
                 self.BtnV8Loading = false;
             } finally {

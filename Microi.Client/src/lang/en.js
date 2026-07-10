@@ -25,6 +25,7 @@ export default {
         NoOnlineTerminals: "No active terminals",
         NoOnlineUsers: "No online users",
         TerminalType: "Terminal",
+        TerminalDid: "Terminal DID",
         TerminalInfo: "Terminal info",
         LoginIp: "Login IP",
         LastActiveTime: "Last active",
