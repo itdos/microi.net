@@ -547,6 +547,17 @@ namespace Microi.net.Api
                     activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(tokenModel, token);
                     if (activeTokenEntry == null)
                     {
+                        try
+                        {
+                            await OnlineTerminalService.PruneExpiredLoginTokensAsync(
+                                tokenOsClient,
+                                userId,
+                                tokenModel,
+                                OsClient.GetClient(tokenOsClient)).ConfigureAwait(false);
+                        }
+                        catch (Exception)
+                        {
+                        }
                         context.Result = new JsonResult(new DosResult(
                             int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
                             null,
@@ -592,9 +603,20 @@ namespace Microi.net.Api
                 //如果token已过期，直接返回退出登录
                 if (activeTokenAge > tokenLifetime)
                 {
+                    try
+                    {
+                        await OnlineTerminalService.PruneExpiredLoginTokensAsync(
+                            tokenOsClient,
+                            userId,
+                            tokenModel,
+                            clientModel).ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                    }
                     context.Result = new JsonResult(new DosResult(
                         int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null, 
+                        null,
                         DiyMessage.GetLang(osClient, "NoLogin", _Lang),
                         null,
                         new

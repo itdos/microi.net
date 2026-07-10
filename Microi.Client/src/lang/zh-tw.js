@@ -29,6 +29,7 @@ const Msg = {
     NoOnlineTerminals: "暫無線上終端",
     NoOnlineUsers: "暫無線上使用者",
     TerminalType: "終端類型",
+    TerminalDid: "終端DID",
     TerminalInfo: "終端資訊",
     LoginIp: "登入IP",
     LastActiveTime: "最後活躍",

@@ -1,6 +1,203 @@
 import { DiyCommon } from '@/utils/microi.net.import'
+import JSEncrypt from 'jsencrypt'
+import config from '@/config.json'
 
 const API_BASE = '/api/HDFS'
+const API_ENGINE_RUN = '/api/ApiEngine/Run'
+const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
+XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
+1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
+1DsI9VJ7gTHGL3R7sQIDAQAB
+-----END PUBLIC KEY-----`
+
+const normalizeApiBase = (apiBase = '') => String(apiBase || '').replace(/\/+$/, '')
+
+const getBucketScope = (limit = true) => limit ? 'private' : 'public'
+
+const getUploadHeaders = () => ({
+  authorization: 'Bearer ' + DiyCommon.Authorization()
+})
+
+const encryptPassword = (password) => {
+  const publicKey = config && config.LoginRsaPublicKey === false
+    ? ''
+    : (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY
+  if (!publicKey || !String(publicKey).trim()) return password
+  const encrypt = new JSEncrypt()
+  encrypt.setPublicKey(publicKey)
+  return encrypt.encrypt(password)
+}
+
+const postByDiyCommon = (url, param) => new Promise((resolve, reject) => {
+  DiyCommon.Post(
+    url,
+    param,
+    (result, headers) => resolve({ result, headers }),
+    (error) => reject(error)
+  )
+})
+
+const uploadByXhr = ({ url, files, path, limit, osClient = '', headers = {}, onProgress }) => new Promise((resolve, reject) => {
+  const formData = new FormData()
+  formData.append('Path', path || '')
+  formData.append('Limit', limit)
+  formData.append('Preview', false)
+  formData.append('Multiple', true)
+  if (osClient) {
+    formData.append('OsClient', osClient)
+  }
+
+  Array.from(files || []).forEach(file => {
+    formData.append('files', file, file.name)
+  })
+
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', url, true)
+  Object.keys(headers || {}).forEach(key => {
+    if (headers[key]) xhr.setRequestHeader(key, headers[key])
+  })
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable && typeof onProgress === 'function') {
+      onProgress(Math.round((event.loaded / event.total) * 100), event)
+    }
+  }
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState !== 4) return
+    if (xhr.status >= 200 && xhr.status < 300) {
+      try {
+        resolve(JSON.parse(xhr.responseText))
+      } catch (e) {
+        resolve(xhr.responseText)
+      }
+    } else {
+      reject(new Error(xhr.responseText || `HTTP ${xhr.status}`))
+    }
+  }
+  xhr.onerror = () => reject(new Error('上传请求失败'))
+  xhr.send(formData)
+})
+
+export const fileSyncApi = {
+  getCurrentPlatform() {
+    return {
+      apiBase: normalizeApiBase(DiyCommon.GetApiBase()),
+      osClient: DiyCommon.GetOsClient()
+    }
+  },
+
+  async runApiEngine(apiEngineKey, param = {}, platform = null) {
+    if (!platform || platform.platformType === 'current') {
+      return DiyCommon.ApiEngine.Run(apiEngineKey, param)
+    }
+
+    const apiBase = normalizeApiBase(platform.apiBase)
+    const token = platform.token || platform.authorization || ''
+    const headers = {
+      'Content-Type': 'application/json',
+      OsClient: platform.osClient || '',
+      authorization: token && !token.startsWith('Bearer ') ? `Bearer ${token}` : token
+    }
+    const resp = await fetch(`${apiBase}${API_ENGINE_RUN}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ApiEngineKey: apiEngineKey, ...param })
+    })
+    return resp.json()
+  },
+
+  async loginRemote(platform) {
+    const apiBase = normalizeApiBase(platform.apiBase)
+    const encryptedPwd = encryptPassword(platform.password)
+    if (!encryptedPwd) {
+      return { result: { Code: 0, Msg: '密码加密失败' }, authorization: '' }
+    }
+    const resp = await fetch(`${apiBase}/api/SysUser/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        OsClient: platform.osClient || ''
+      },
+      body: JSON.stringify({
+        Account: platform.account,
+        Pwd: encryptedPwd,
+        OsClient: platform.osClient
+      })
+    })
+    const result = await resp.json()
+    const authorization = resp.headers.get('authorization') || result?.DataAppend?.Token || result?.Data?.Token || ''
+    return { result, authorization }
+  },
+
+  async postHdfs(platform, url, param = {}) {
+    if (!platform || platform.platformType === 'current') {
+      const { result } = await postByDiyCommon(url, param)
+      return result
+    }
+
+    const apiBase = normalizeApiBase(platform.apiBase)
+    const headers = {
+      'Content-Type': 'application/json',
+      OsClient: platform.osClient || '',
+      authorization: platform.authorization || ''
+    }
+    const resp = await fetch(`${apiBase}${url}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...param, OsClient: platform.osClient })
+    })
+    return resp.json()
+  },
+
+  listObjects(platform, path, limit = true, keyword = '') {
+    return this.postHdfs(platform, `${API_BASE}/ListObjects`, {
+      Path: path || '',
+      Limit: limit,
+      _Keyword: keyword
+    })
+  },
+
+  createFolder(platform, fullPath, limit = true) {
+    return this.postHdfs(platform, `${API_BASE}/CreateFolder`, {
+      FilePathName: fullPath,
+      Limit: limit
+    })
+  },
+
+  moveObject(platform, sourcePath, destPath, limit = true) {
+    return this.postHdfs(platform, `${API_BASE}/MoveObject`, {
+      FilePathName: sourcePath,
+      Path: destPath,
+      Limit: limit
+    })
+  },
+
+  getPrivateFileUrl(platform, filePathName, limit = true) {
+    return this.postHdfs(platform, `${API_BASE}/GetPrivateFileUrl`, {
+      FilePathName: filePathName,
+      Limit: limit
+    })
+  },
+
+  uploadFiles(platform, files, path, limit = true, onProgress) {
+    const apiBase = platform?.platformType === 'remote'
+      ? normalizeApiBase(platform.apiBase)
+      : normalizeApiBase(DiyCommon.GetApiBase())
+    const headers = platform?.platformType === 'remote'
+      ? { authorization: platform.authorization || '', OsClient: platform.osClient || '' }
+      : getUploadHeaders()
+
+    return uploadByXhr({
+      url: `${apiBase}${API_BASE}/FileManageUpload`,
+      files,
+      path,
+      limit,
+      osClient: platform?.platformType === 'remote' ? platform.osClient : '',
+      headers,
+      onProgress
+    })
+  }
+}
 
 /**
  * 文件管理 API
@@ -110,5 +307,62 @@ export const fileManageApi = {
    */
   getUploadUrl() {
     return DiyCommon.GetApiBase() + `${API_BASE}/FileManageUpload`
+  },
+
+  getUploadHeaders,
+
+  uploadFiles(files, path, limit = true, onProgress) {
+    return uploadByXhr({
+      url: this.getUploadUrl(),
+      files,
+      path,
+      limit,
+      headers: getUploadHeaders(),
+      onProgress
+    })
+  },
+
+  runEngine(apiEngineKey, param = {}) {
+    return DiyCommon.ApiEngine.Run(apiEngineKey, param)
+  },
+
+  trashQuery({ path = '', paths = [], limit = true, pageSize = 1000 } = {}) {
+    return this.runEngine('mci_file_trash_query', {
+      Prefix: path,
+      Paths: paths,
+      Limit: limit,
+      BucketScope: getBucketScope(limit),
+      PageSize: pageSize
+    })
+  },
+
+  trashMark(items, limit = true) {
+    return this.runEngine('mci_file_trash_mark', {
+      Items: items,
+      Limit: limit,
+      BucketScope: getBucketScope(limit)
+    })
+  },
+
+  trashRestore(items, limit = true) {
+    return this.runEngine('mci_file_trash_restore', {
+      Items: items,
+      Limit: limit,
+      BucketScope: getBucketScope(limit)
+    })
+  },
+
+  recordSyncTask(param = {}) {
+    return this.runEngine('mci_file_sync_record', param)
+  },
+
+  getSyncTasks(param = {}) {
+    return DiyCommon.FormEngine.GetTableData('mci_file_sync_task', {
+      _PageIndex: 1,
+      _PageSize: 20,
+      _OrderBy: 'CreateTime',
+      _OrderByType: 'DESC',
+      ...param
+    })
   }
 }

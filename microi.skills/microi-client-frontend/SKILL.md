@@ -235,6 +235,18 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
   - `V8CodeShow: return true;` 是否显示。
   - `V8CodeShow: V8.Result = false;` 是否仍兼容。
 
+### Element Plus 弹窗默认交互
+
+新增或改造 `Microi.Client` 的 `el-dialog` 时，默认必须上下左右居中并支持 PC 端标题栏拖动。除非有明确的移动端抽屉/全屏业务理由，否则不要让弹窗贴在左上角、底部或跟随内容自然流偏移。
+
+落地规则：
+
+- `el-dialog` 默认添加 `align-center` 和 `draggable`；复杂弹窗建议 `append-to-body`，避免被局部容器裁切。
+- 弹窗宽度用响应式约束，如 `width="min(1280px, calc(100vw - 48px))"`，避免宽屏过窄、窄屏溢出。
+- 标题栏应保持清晰的拖动热区，可给 `.el-dialog__header` 设置 `cursor: move`，但不能遮挡关闭按钮。
+- 弹窗内部的表格、树、编辑区要设置稳定高度或最大高度，避免内容撑出视口导致默认居中失效。
+- 修改后验收默认打开态和拖动后状态：弹窗仍在可视区域内，标题/按钮/输入框不被导航、遮罩或浏览器边缘遮挡。
+
 ## 7.1 登录验证码与 Sys_Config
 
 修改 `Microi.Client/src/views/login/index.vue` 或任何 PC 端登录扩展时，必须遵守平台登录验证码契约：

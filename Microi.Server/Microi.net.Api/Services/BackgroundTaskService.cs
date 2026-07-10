@@ -21,6 +21,8 @@ namespace Microi.net.Api
         public string Status { get; set; }
         public string StatusText { get; set; }
         public int Progress { get; set; }
+        public int Current { get; set; }
+        public int Total { get; set; }
         public string Msg { get; set; }
         public DateTime CreateTime { get; set; }
         public DateTime? StartTime { get; set; }
@@ -56,6 +58,8 @@ namespace Microi.net.Api
                 Status = "Pending",
                 StatusText = "排队中",
                 Progress = 0,
+                Current = 0,
+                Total = 100,
                 Msg = "",
                 CreateTime = DateTime.Now
             };
@@ -63,6 +67,7 @@ namespace Microi.net.Api
             var cts = new CancellationTokenSource();
             Tasks[item.Id] = item;
             CancellationTokens[item.Id] = cts;
+            SaveTask(item);
             NotifyUser(item);
             _ = Task.Run(() => RunApiEngineTask(item, apiParam ?? new JObject(), cts.Token));
             return ApplyRuntimeFields(item);
@@ -70,9 +75,7 @@ namespace Microi.net.Api
 
         public static List<BackgroundTaskItem> List(string osClient, string userKey)
         {
-            return Tasks.Values
-                .Where(item => string.Equals(item.OsClient, osClient ?? "", StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(item.UserKey, userKey ?? "", StringComparison.OrdinalIgnoreCase))
+            return ListAllTasks(osClient, userKey)
                 .OrderByDescending(item => item.CreateTime)
                 .Take(100)
                 .Select(ApplyRuntimeFields)
@@ -81,19 +84,23 @@ namespace Microi.net.Api
 
         public static int ClearCompleted(string osClient, string userKey)
         {
-            var ids = Tasks.Values
-                .Where(item => string.Equals(item.OsClient, osClient ?? "", StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(item.UserKey, userKey ?? "", StringComparison.OrdinalIgnoreCase)
-                               && IsTerminal(item.Status))
-                .Select(item => item.Id)
+            var items = ListAllTasks(osClient, userKey)
+                .Where(item => IsTerminal(item.Status))
                 .ToList();
 
             var count = 0;
-            foreach (var id in ids)
+            foreach (var item in items)
             {
-                CancellationTokens.TryRemove(id, out var cts);
+                if (item == null || item.Id.DosIsNullOrWhiteSpace())
+                {
+                    continue;
+                }
+
+                CancellationTokens.TryRemove(item.Id, out var cts);
                 cts?.Dispose();
-                if (Tasks.TryRemove(id, out _))
+                var removedMemory = Tasks.TryRemove(item.Id, out _);
+                var removedCache = DeleteTask(item.OsClient, item.UserKey, item.Id);
+                if (removedMemory || removedCache)
                 {
                     count++;
                 }
@@ -119,6 +126,8 @@ namespace Microi.net.Api
                 item.Status = "Canceled";
                 item.StatusText = "已停止";
                 item.Progress = 100;
+                item.Current = item.Total <= 0 ? 100 : item.Total;
+                item.Total = item.Total <= 0 ? 100 : item.Total;
                 item.EndTime = DateTime.Now;
             }
             else
@@ -134,7 +143,7 @@ namespace Microi.net.Api
             return true;
         }
 
-        public static bool UpdateProgress(string taskId, int? progress, string msg)
+        public static bool UpdateProgress(string taskId, int? progress, string msg, int? current, int? total)
         {
             if (taskId.DosIsNullOrWhiteSpace()
                 || !Tasks.TryGetValue(taskId, out var item)
@@ -146,6 +155,19 @@ namespace Microi.net.Api
             if (progress.HasValue)
             {
                 item.Progress = Math.Max(0, Math.Min(99, progress.Value));
+            }
+            if (total.HasValue && total.Value > 0)
+            {
+                item.Total = total.Value;
+            }
+            if (current.HasValue)
+            {
+                item.Current = Math.Max(0, current.Value);
+                if (!progress.HasValue && item.Total > 0)
+                {
+                    var calculated = Convert.ToInt32(Math.Floor(item.Current * 100m / item.Total));
+                    item.Progress = Math.Max(0, Math.Min(99, calculated));
+                }
             }
             if (!msg.DosIsNullOrWhiteSpace())
             {
@@ -193,6 +215,8 @@ namespace Microi.net.Api
                 item.Status = "Running";
                 item.StatusText = "执行中";
                 item.Progress = 10;
+                item.Current = Math.Max(item.Current, 10);
+                item.Total = item.Total <= 0 ? 100 : item.Total;
                 item.StartTime = DateTime.Now;
                 NotifyUser(item);
 
@@ -202,6 +226,8 @@ namespace Microi.net.Api
                 item.Result = SafeToJObject(result);
                 item.Msg = item.Result?["Msg"]?.ToString() ?? "";
                 item.Progress = 100;
+                item.Current = item.Total <= 0 ? 100 : item.Total;
+                item.Total = item.Total <= 0 ? 100 : item.Total;
                 if (item.CancelRequested)
                 {
                     item.Status = "Canceled";
@@ -218,6 +244,8 @@ namespace Microi.net.Api
                 item.Status = "Canceled";
                 item.StatusText = "已停止";
                 item.Progress = 100;
+                item.Current = item.Total <= 0 ? 100 : item.Total;
+                item.Total = item.Total <= 0 ? 100 : item.Total;
                 item.Msg = item.Msg.DosIsNullOrWhiteSpace() ? "任务已停止。" : item.Msg;
                 item.Result = JObject.FromObject(new { Code = 0, Msg = item.Msg });
             }
@@ -226,6 +254,8 @@ namespace Microi.net.Api
                 item.Status = "Failed";
                 item.StatusText = "执行失败";
                 item.Progress = 100;
+                item.Current = item.Total <= 0 ? 100 : item.Total;
+                item.Total = item.Total <= 0 ? 100 : item.Total;
                 item.Msg = ex.Message;
                 item.Result = JObject.FromObject(new { Code = 0, Msg = ex.Message });
             }
@@ -252,7 +282,126 @@ namespace Microi.net.Api
                 return;
             }
 
+            SaveTask(item);
             _ = Task.Run(() => SendTaskListToUserAsync(item.OsClient, item.UserKey));
+        }
+
+        private static List<BackgroundTaskItem> ListAllTasks(string osClient, string userKey)
+        {
+            var normalizedOsClient = osClient ?? "";
+            var normalizedUserKey = userKey ?? "";
+            var map = new Dictionary<string, BackgroundTaskItem>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var cache = MicroiEngine.CacheTenant.Cache(normalizedOsClient);
+                var cached = cache.HashGetAllValues<BackgroundTaskItem>(GetTaskHashKey(normalizedOsClient, normalizedUserKey))
+                             ?? new List<BackgroundTaskItem>();
+                foreach (var item in cached)
+                {
+                    if (item?.Id.DosIsNullOrWhiteSpace() == false)
+                    {
+                        map[item.Id] = item;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【后台任务】读取Redis任务列表失败：{ex.Message}");
+            }
+
+            foreach (var item in Tasks.Values
+                         .Where(item => string.Equals(item.OsClient, normalizedOsClient, StringComparison.OrdinalIgnoreCase)
+                                        && string.Equals(item.UserKey, normalizedUserKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (item?.Id.DosIsNullOrWhiteSpace() == false)
+                {
+                    map[item.Id] = item;
+                }
+            }
+
+            return map.Values.ToList();
+        }
+
+        private static void SaveTask(BackgroundTaskItem item)
+        {
+            if (item == null
+                || item.Id.DosIsNullOrWhiteSpace()
+                || item.OsClient.DosIsNullOrWhiteSpace()
+                || item.UserKey.DosIsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            try
+            {
+                var cache = MicroiEngine.CacheTenant.Cache(item.OsClient);
+                cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey), item.Id, ApplyRuntimeFields(item));
+                PruneTaskHash(cache, item.OsClient, item.UserKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【后台任务】保存Redis任务失败：{ex.Message}");
+            }
+        }
+
+        private static bool DeleteTask(string osClient, string userKey, string taskId)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace() || taskId.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            try
+            {
+                var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                cache.HashDelete(GetTaskHashKey(osClient, userKey), taskId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【后台任务】删除Redis任务失败：{ex.Message}");
+                return false;
+            }
+        }
+
+        private static void PruneTaskHash(IMicroiCache cache, string osClient, string userKey)
+        {
+            if (cache == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var key = GetTaskHashKey(osClient, userKey);
+                var list = cache.HashGetAllValues<BackgroundTaskItem>(key) ?? new List<BackgroundTaskItem>();
+                if (list.Count <= 100)
+                {
+                    return;
+                }
+
+                var removeIds = list
+                    .Where(item => item?.Id.DosIsNullOrWhiteSpace() == false)
+                    .OrderByDescending(item => IsTerminal(item.Status))
+                    .ThenBy(item => item.CreateTime)
+                    .Take(list.Count - 100)
+                    .Select(item => item.Id)
+                    .ToArray();
+                if (removeIds.Length > 0)
+                {
+                    cache.HashDelete(key, removeIds);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【后台任务】修剪Redis任务失败：{ex.Message}");
+            }
+        }
+
+        private static string GetTaskHashKey(string osClient, string userKey)
+        {
+            return $"Microi:{osClient}:BackgroundTasks:{userKey}";
         }
 
         private static bool IsTerminal(string status)

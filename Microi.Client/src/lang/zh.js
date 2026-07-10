@@ -25,6 +25,7 @@ export default {
         NoOnlineTerminals: "暂无在线终端",
         NoOnlineUsers: "暂无在线用户",
         TerminalType: "终端类型",
+        TerminalDid: "终端DID",
         TerminalInfo: "终端信息",
         LoginIp: "登录IP",
         LastActiveTime: "最后活跃",

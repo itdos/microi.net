@@ -234,18 +234,31 @@ V8.ApiEngine.RunBackground('import-microi-store-package', {
 }, '安装应用：' + (V8.Form.Name || ''));
 ```
 
-接口引擎中需要定期上报进度：
+接口引擎中必须上报真实进度。平台创建后台任务时会自动把 `_BackgroundTaskId` 注入 `V8.Param`，V8 代码不要自己生成任务 Id，也不要只在结束时写一个固定百分比。
 
 ```js
-V8.Method.UpdateBackgroundTask({
-  Progress: 35,
-  Current: 35,
-  Total: 100,
-  Message: '正在导入表单配置'
-});
+var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var reportProgress = function(current, total, msg) {
+  if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
+  V8.Method.UpdateBackgroundTask({
+    _BackgroundTaskId: backgroundTaskId,
+    Current: current,
+    Total: total,
+    Progress: Math.floor(current * 100 / total),
+    Msg: msg,
+    Message: msg
+  });
+};
+
+reportProgress(1, 5, '正在读取数据');
+// ...执行第 1 阶段
+reportProgress(2, 5, '正在写入表结构');
+// ...执行第 2 阶段
 ```
 
-后台任务不能隐藏真实失败。失败时返回 `Code:0` 和清晰 `Msg`，并把关键阶段写入任务进度或系统日志。
+推荐用“阶段数”或“已处理条数 / 总条数”上报 `Current/Total`，平台会同步写入 Redis 并推送通知中心百分比。耗时循环中每处理一批数据都应调用一次 `reportProgress`，例如每 50 或 100 条更新一次，避免用户看到长期停留。
+
+后台任务不能隐藏真实失败。失败时返回 `Code:0` 和清晰 `Msg`，并把关键阶段写入任务进度或系统日志。接口引擎成功返回 `Code:1` 时平台会把任务置为 100%；不要在中途把 `Progress` 写到 100。
 
 ---
 
