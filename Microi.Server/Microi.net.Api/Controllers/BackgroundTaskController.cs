@@ -79,7 +79,14 @@ namespace Microi.net.Api
 
             try { osClient = token?.OsClient; } catch { }
             try { currentUser = token?.CurrentUser; } catch { }
-            try { userKey = token?.CurrentUser?.Id; } catch { }
+            if (currentUser is JObject currentUserJObject)
+            {
+                userKey = currentUserJObject["Id"]?.Val<string>();
+                if (userKey.DosIsNullOrWhiteSpace())
+                {
+                    userKey = currentUserJObject["Account"]?.Val<string>();
+                }
+            }
             if (userKey.DosIsNullOrWhiteSpace())
             {
                 try { userKey = token?.CurrentUser?.Account; } catch { }

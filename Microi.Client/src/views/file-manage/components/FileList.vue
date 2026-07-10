@@ -3,19 +3,51 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-breadcrumb separator="/">
-          <el-breadcrumb-item v-for="(item, index) in breadcrumb" :key="item.id">
-            <span
-              class="breadcrumb-item"
-              :class="{ 'is-link': index < breadcrumb.length - 1 }"
-              @click="index < breadcrumb.length - 1 && $emit('navigate', item)"
-            >
-              {{ item.name }}
-            </span>
-          </el-breadcrumb-item>
-        </el-breadcrumb>
+        <div class="breadcrumb-wrap">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item v-for="(item, index) in breadcrumb" :key="item.id">
+              <span
+                class="breadcrumb-item"
+                :class="{ 'is-link': index < breadcrumb.length - 1 }"
+                @click="index < breadcrumb.length - 1 && $emit('navigate', item)"
+              >
+                {{ item.name }}
+              </span>
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <div class="toolbar-actions">
+          <el-button type="primary" :icon="Upload" @click="$emit('upload')">
+            上传
+          </el-button>
+          <el-button :icon="FolderOpened" @click="$emit('create-folder')">
+            新建文件夹
+          </el-button>
+          <el-tooltip content="刷新" placement="top">
+            <el-button :icon="Refresh" circle @click="$emit('refresh')" />
+          </el-tooltip>
+        </div>
       </div>
       <div class="toolbar-right">
+        <el-button :icon="Connection" @click="$emit('sync')">
+          文件同步
+        </el-button>
+        <el-button
+          :type="recycleMode ? 'warning' : 'default'"
+          :icon="Delete"
+          @click="$emit('toggle-trash')"
+        >
+          回收站
+        </el-button>
+        <div class="preview-switch">
+          <span>图片预览</span>
+          <el-switch
+            :model-value="previewEnabled"
+            size="small"
+            @change="$emit('preview-toggle', $event)"
+          />
+        </div>
+        
         <!-- 搜索 -->
         <div class="search-box">
           <el-input
@@ -97,8 +129,35 @@
       </div>
     </div>
 
+    <div v-if="selectedFiles.length > 0" class="batch-bar">
+      <div class="batch-info">
+        已选 {{ selectedFiles.length }} 项
+      </div>
+      <div class="batch-actions">
+        <el-button v-if="recycleMode" type="success" :icon="RefreshLeft" @click="handleBatch('restore')">
+          还原
+        </el-button>
+        <template v-else>
+          <el-button :icon="Rank" @click="handleBatch('move')">
+            移动
+          </el-button>
+          <el-button type="danger" :icon="Delete" @click="handleBatch('delete')">
+            移入回收站
+          </el-button>
+        </template>
+        <el-button text :icon="Close" @click="clearSelection">
+          取消选择
+        </el-button>
+      </div>
+    </div>
+
     <!-- 文件列表内容 -->
-    <el-scrollbar ref="scrollbarRef" class="file-content" @scroll="handleScroll">
+    <el-scrollbar
+      ref="scrollbarRef"
+      class="file-content"
+      @scroll="handleScroll"
+      @contextmenu.prevent="handleAreaContextMenu"
+    >
       <!-- 网格视图 -->
       <div v-if="viewMode === 'grid'" class="grid-view" ref="gridViewRef">
         <div
@@ -114,16 +173,54 @@
           @dblclick="handleOpen(file)"
           @contextmenu.prevent="handleContextMenu(file, $event)"
         >
+          <el-checkbox
+            class="grid-checkbox"
+            :model-value="selectedFiles.includes(file.id)"
+            @click.stop
+            @change="handleCheckboxChange(file, $event)"
+          />
           <template v-if="file.isFolder">
-            <el-icon class="folder-icon-large" :size="iconSize">
-              <Folder />
-            </el-icon>
+            <div class="thumb-box" :style="{ width: iconSize + 'px', height: iconSize + 'px' }">
+              <el-icon class="folder-icon-large" :size="iconSize">
+                <Folder />
+              </el-icon>
+            </div>
           </template>
           <template v-else>
-            <FileIcon :type="file.type" :size="iconSize" />
+            <div class="thumb-box" :style="{ width: iconSize + 'px', height: iconSize + 'px' }">
+              <img
+                v-if="getThumbnailUrl(file)"
+                class="file-thumbnail"
+                :src="getThumbnailUrl(file)"
+                :alt="file.name"
+                loading="lazy"
+              />
+              <FileIcon v-else :type="file.type" :size="iconSize" />
+            </div>
           </template>
           <div class="file-name" :title="file.name">
             {{ file.name }}
+          </div>
+          <div class="file-size">
+            {{ file.isFolder ? '文件夹' : formatFileSize(file.size) }}
+          </div>
+          <div class="item-actions">
+            <template v-if="recycleMode">
+              <el-tooltip content="还原" placement="top">
+                <el-button :icon="RefreshLeft" circle text @click.stop="emitFileAction('restore', file)" />
+              </el-tooltip>
+            </template>
+            <template v-else>
+              <el-tooltip v-if="!file.isFolder" content="下载" placement="top">
+                <el-button :icon="Download" circle text @click.stop="emitFileAction('download', file)" />
+              </el-tooltip>
+              <el-tooltip v-if="!file.isFolder" content="预览" placement="top">
+                <el-button :icon="View" circle text @click.stop="emitFileAction('preview', file)" />
+              </el-tooltip>
+              <el-tooltip content="更多" placement="top">
+                <el-button :icon="MoreFilled" circle text @click.stop="handleContextMenu(file, $event)" />
+              </el-tooltip>
+            </template>
           </div>
         </div>
         
@@ -192,6 +289,28 @@
           </el-table-column>
           <el-table-column label="创建时间" width="180" sortable prop="createTime" />
           <el-table-column label="修改时间" width="180" sortable prop="updateTime" />
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <div class="row-actions">
+                <template v-if="recycleMode">
+                  <el-tooltip content="还原" placement="top">
+                    <el-button :icon="RefreshLeft" link type="success" @click.stop="emitFileAction('restore', row)" />
+                  </el-tooltip>
+                </template>
+                <template v-else>
+                  <el-tooltip v-if="!row.isFolder" content="下载" placement="top">
+                    <el-button :icon="Download" link @click.stop="emitFileAction('download', row)" />
+                  </el-tooltip>
+                  <el-tooltip content="移动" placement="top">
+                    <el-button :icon="Rank" link @click.stop="emitFileAction('move', row)" />
+                  </el-tooltip>
+                  <el-tooltip content="删除" placement="top">
+                    <el-button :icon="Delete" link type="danger" @click.stop="emitFileAction('delete', row)" />
+                  </el-tooltip>
+                </template>
+              </div>
+            </template>
+          </el-table-column>
         </el-table>
         
         <!-- 加载更多提示 -->
@@ -222,6 +341,40 @@
       </span>
     </div>
 
+    <!-- 文件列表空白区右键菜单 -->
+    <el-dropdown
+      ref="areaContextMenuRef"
+      trigger="contextmenu"
+      :teleported="true"
+      @command="handleAreaContextCommand"
+    >
+      <span class="context-menu-trigger" ref="areaContextMenuTriggerRef"></span>
+      <template #dropdown>
+        <el-dropdown-menu class="file-context-menu">
+          <el-dropdown-item v-if="!recycleMode" command="upload">
+            <el-icon><Upload /></el-icon>
+            <span>上传文件</span>
+          </el-dropdown-item>
+          <el-dropdown-item v-if="!recycleMode" command="create-folder">
+            <el-icon><FolderOpened /></el-icon>
+            <span>新建文件夹</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="refresh">
+            <el-icon><Refresh /></el-icon>
+            <span>刷新目录</span>
+          </el-dropdown-item>
+          <el-dropdown-item v-if="!recycleMode" divided command="sync">
+            <el-icon><Connection /></el-icon>
+            <span>文件同步</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="toggle-trash">
+            <el-icon><Delete /></el-icon>
+            <span>{{ recycleMode ? '退出回收站' : '打开回收站' }}</span>
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
+
     <!-- 列表视图右键菜单 -->
     <el-dropdown
       ref="listContextMenuRef"
@@ -232,39 +385,43 @@
       <span class="context-menu-trigger" ref="listContextMenuTriggerRef"></span>
       <template #dropdown>
         <el-dropdown-menu class="file-context-menu">
+          <el-dropdown-item v-if="recycleMode" command="restore">
+            <el-icon><RefreshLeft /></el-icon>
+            <span>还原</span>
+          </el-dropdown-item>
           <el-dropdown-item command="open">
             <el-icon><FolderOpened /></el-icon>
             <span>打开</span>
           </el-dropdown-item>
-          <el-dropdown-item command="preview">
+          <el-dropdown-item v-if="!recycleMode" command="preview">
             <el-icon><View /></el-icon>
             <span>预览</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="download">
+          <el-dropdown-item v-if="!recycleMode" divided command="download">
             <el-icon><Download /></el-icon>
             <span>下载</span>
           </el-dropdown-item>
-          <el-dropdown-item command="share">
+          <el-dropdown-item v-if="!recycleMode" command="share">
             <el-icon><Share /></el-icon>
             <span>分享</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="rename">
+          <el-dropdown-item v-if="!recycleMode" divided command="rename">
             <el-icon><Edit /></el-icon>
             <span>重命名</span>
           </el-dropdown-item>
-          <el-dropdown-item command="copy">
+          <el-dropdown-item v-if="!recycleMode" command="copy">
             <el-icon><CopyDocument /></el-icon>
             <span>复制</span>
           </el-dropdown-item>
-          <el-dropdown-item command="cut">
+          <el-dropdown-item v-if="!recycleMode" command="cut">
             <el-icon><DocumentRemove /></el-icon>
             <span>剪切</span>
           </el-dropdown-item>
-          <el-dropdown-item command="move">
+          <el-dropdown-item v-if="!recycleMode" command="move">
             <el-icon><Rank /></el-icon>
             <span>移动到...</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="delete">
+          <el-dropdown-item v-if="!recycleMode" divided command="delete">
             <el-icon color="#f56c6c"><Delete /></el-icon>
             <span style="color: #f56c6c;">删除</span>
           </el-dropdown-item>
@@ -286,39 +443,43 @@
       <span class="context-menu-trigger" ref="contextMenuTriggerRef"></span>
       <template #dropdown>
         <el-dropdown-menu class="file-context-menu">
+          <el-dropdown-item v-if="recycleMode" command="restore">
+            <el-icon><RefreshLeft /></el-icon>
+            <span>还原</span>
+          </el-dropdown-item>
           <el-dropdown-item command="open">
             <el-icon><FolderOpened /></el-icon>
             <span>打开</span>
           </el-dropdown-item>
-          <el-dropdown-item command="preview">
+          <el-dropdown-item v-if="!recycleMode" command="preview">
             <el-icon><View /></el-icon>
             <span>预览</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="download">
+          <el-dropdown-item v-if="!recycleMode" divided command="download">
             <el-icon><Download /></el-icon>
             <span>下载</span>
           </el-dropdown-item>
-          <el-dropdown-item command="share">
+          <el-dropdown-item v-if="!recycleMode" command="share">
             <el-icon><Share /></el-icon>
             <span>分享</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="rename">
+          <el-dropdown-item v-if="!recycleMode" divided command="rename">
             <el-icon><Edit /></el-icon>
             <span>重命名</span>
           </el-dropdown-item>
-          <el-dropdown-item command="copy">
+          <el-dropdown-item v-if="!recycleMode" command="copy">
             <el-icon><CopyDocument /></el-icon>
             <span>复制</span>
           </el-dropdown-item>
-          <el-dropdown-item command="cut">
+          <el-dropdown-item v-if="!recycleMode" command="cut">
             <el-icon><DocumentRemove /></el-icon>
             <span>剪切</span>
           </el-dropdown-item>
-          <el-dropdown-item command="move">
+          <el-dropdown-item v-if="!recycleMode" command="move">
             <el-icon><Rank /></el-icon>
             <span>移动到...</span>
           </el-dropdown-item>
-          <el-dropdown-item divided command="delete">
+          <el-dropdown-item v-if="!recycleMode" divided command="delete">
             <el-icon color="#f56c6c"><Delete /></el-icon>
             <span style="color: #f56c6c;">删除</span>
           </el-dropdown-item>
@@ -346,6 +507,7 @@ import {
   FolderOpened,
   Folder,
   Loading,
+  Upload,
   View,
   Download,
   Share,
@@ -354,7 +516,12 @@ import {
   Rank,
   Delete,
   InfoFilled,
-  DocumentRemove
+  DocumentRemove,
+  Refresh,
+  RefreshLeft,
+  Connection,
+  Close,
+  MoreFilled
 } from '@element-plus/icons-vue'
 import FileIcon from './FileIcon.vue'
 
@@ -370,10 +537,37 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  previewEnabled: {
+    type: Boolean,
+    default: true
+  },
+  thumbnailUrls: {
+    type: Object,
+    default: () => ({})
+  },
+  recycleMode: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['open', 'contextmenu', 'navigate', 'select'])
+const emit = defineEmits([
+  'open',
+  'contextmenu',
+  'navigate',
+  'select',
+  'upload',
+  'create-folder',
+  'refresh',
+  'sync',
+  'toggle-trash',
+  'preview-toggle',
+  'batch-delete',
+  'batch-move',
+  'batch-restore',
+  'area-action'
+])
 
 // 视图模式：grid / list
 const viewMode = ref('grid')
@@ -410,6 +604,10 @@ const contextMenuFile = ref(null)
 const listContextMenuRef = ref(null)
 const listContextMenuTriggerRef = ref(null)
 const listContextMenuFile = ref(null)
+
+// 空白区右键菜单
+const areaContextMenuRef = ref(null)
+const areaContextMenuTriggerRef = ref(null)
 
 const sortOptions = {
   name: '名称',
@@ -458,12 +656,20 @@ const getFileTypeName = (type) => {
   return fileTypeNameMap[type?.toLowerCase()] || type?.toUpperCase()
 }
 
+const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico']
+const isImageType = (type) => imageTypes.includes(type?.toLowerCase())
+
+const getThumbnailUrl = (file) => {
+  if (!props.previewEnabled || file?.isFolder || !isImageType(file?.type)) return ''
+  return props.thumbnailUrls[file.id] || props.thumbnailUrls[file.filePath] || ''
+}
+
 // 格式化文件大小
 const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 B'
+  if (!bytes || Number(bytes) <= 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
@@ -478,7 +684,7 @@ const filteredFiles = computed(() => {
   const order = sortOrder.value
   
   // 生成缓存键
-  const cacheKey = `${files.length}_${keyword}_${sort}_${order}`
+  const cacheKey = `${files.map(file => file.id).join('|')}_${keyword}_${sort}_${order}`
   
   // 如果缓存键相同，返回缓存结果
   if (cacheKey === cachedFilterKey && cachedFilteredFiles.length > 0) {
@@ -616,6 +822,22 @@ const handleCheckboxChange = (file, checked) => {
   emit('select', selectedFiles.value)
 }
 
+const clearSelection = () => {
+  selectedFiles.value = []
+  emit('select', [])
+}
+
+const handleBatch = (action) => {
+  const ids = selectedFiles.value.slice()
+  if (action === 'delete') emit('batch-delete', ids)
+  if (action === 'move') emit('batch-move', ids)
+  if (action === 'restore') emit('batch-restore', ids)
+}
+
+const emitFileAction = (action, file) => {
+  emit('contextmenu', { action, file })
+}
+
 // 获取行的类名
 const getRowClassName = ({ row }) => {
   return selectedFiles.value.includes(row.id) ? 'is-selected' : ''
@@ -627,6 +849,7 @@ const handleContextMenu = (file, event) => {
   if (!selectedFiles.value.includes(file.id)) {
     selectedFiles.value = [file.id]
   }
+  emit('select', selectedFiles.value)
   contextMenuFile.value = file
   
   nextTick(() => {
@@ -660,6 +883,7 @@ const handleRowContextMenu = (row, column, event) => {
   if (!selectedFiles.value.includes(row.id)) {
     selectedFiles.value = [row.id]
   }
+  emit('select', selectedFiles.value)
   listContextMenuFile.value = row
   
   nextTick(() => {
@@ -677,6 +901,22 @@ const handleListContextMenuCommand = (command) => {
   if (listContextMenuFile.value) {
     emit('contextmenu', { action: command, file: listContextMenuFile.value })
   }
+}
+
+const handleAreaContextMenu = (event) => {
+  if (event.target?.closest?.('.file-item, .el-table__row, .file-context-menu, .el-dropdown-menu')) return
+
+  nextTick(() => {
+    if (!areaContextMenuTriggerRef.value) return
+    areaContextMenuTriggerRef.value.style.position = 'fixed'
+    areaContextMenuTriggerRef.value.style.left = event.clientX + 'px'
+    areaContextMenuTriggerRef.value.style.top = event.clientY + 'px'
+    areaContextMenuRef.value?.handleOpen()
+  })
+}
+
+const handleAreaContextCommand = (command) => {
+  emit('area-action', command)
 }
 
 // 处理滚动加载更多
@@ -747,9 +987,32 @@ onUnmounted(() => {
     gap: 16px;
 
     .toolbar-left {
-      flex-shrink: 0;
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+
+      .breadcrumb-wrap {
+        min-width: 180px;
+        max-width: 520px;
+        overflow: hidden;
+        padding: 7px 12px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+
+      .toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
       
       :deep(.el-breadcrumb) {
+        white-space: nowrap;
+
         .el-breadcrumb__item {
           .el-breadcrumb__inner {
             .breadcrumb-item {
@@ -774,6 +1037,22 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+
+      .preview-switch {
+        height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-size: 12px;
+        white-space: nowrap;
+      }
 
       .search-box {
         :deep(.el-input) {
@@ -886,6 +1165,28 @@ onUnmounted(() => {
     }
   }
 
+  .batch-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid #dbeafe;
+    background: #eff6ff;
+
+    .batch-info {
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .batch-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
   .file-content {
     flex: 1;
     overflow: hidden;
@@ -899,23 +1200,38 @@ onUnmounted(() => {
       align-content: flex-start;
 
       .file-item {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 12px 8px;
-        border-radius: 12px;
+        padding: 12px 8px 10px;
+        border-radius: 8px;
         cursor: pointer;
         transition: all 0.2s ease;
         border: 2px solid transparent;
+        min-height: 188px;
 
         &:hover {
           background: #f8fafc;
           border-color: #e2e8f0;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+
+          .item-actions {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+          }
         }
 
         &.is-selected {
           background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
           border-color: #3b82f6;
+
+          .item-actions {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+          }
         }
         
         &.is-folder {
@@ -926,6 +1242,56 @@ onUnmounted(() => {
           .file-name {
             font-weight: 500;
           }
+        }
+
+        .grid-checkbox {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          z-index: 2;
+        }
+
+        .item-actions {
+          display: flex;
+          justify-content: center;
+          gap: 4px;
+          width: 100%;
+          height: 28px;
+          margin-top: 8px;
+          opacity: 0;
+          transform: translateY(4px);
+          pointer-events: none;
+          transition: all 0.16s ease;
+
+          :deep(.el-button) {
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            color: #334155;
+            background: #f1f5f9;
+
+            &:hover {
+              color: #2563eb;
+              background: #e0ecff;
+            }
+          }
+        }
+
+        .thumb-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border-radius: 8px;
+          background: #f8fafc;
+          overflow: hidden;
+        }
+
+        .file-thumbnail {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         .file-name {
@@ -941,6 +1307,18 @@ onUnmounted(() => {
           word-break: break-all;
           line-height: 1.4;
           margin-top: 8px;
+        }
+
+        .file-size {
+          width: 100%;
+          margin-top: 4px;
+          text-align: center;
+          color: #94a3b8;
+          font-size: 12px;
+          line-height: 18px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       }
 
@@ -1032,6 +1410,12 @@ onUnmounted(() => {
             font-weight: 500;
           }
         }
+      }
+
+      .row-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
       .load-more-tip {

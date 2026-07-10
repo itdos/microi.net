@@ -9,7 +9,7 @@
         v-model="visible"
         class="microi-notification-dialog"
         :title="$t('Msg.NotificationCenter')"
-        width="min(1080px, calc(100vw - 32px))"
+        width="min(920px, calc(100vw - 24px))"
         align-center
         draggable
         destroy-on-close
@@ -63,7 +63,7 @@
                                 <span class="task-title">{{ item.Title || item.Type || $t("Msg.BackgroundTasks") }}</span>
                                 <span class="task-status" :class="'status-' + item.Status">{{ item.StatusText || item.Status }}</span>
                             </div>
-                            <el-progress :percentage="Number(item.Progress || 0)" :stroke-width="7" :show-text="false" />
+                            <el-progress class="task-progress" :percentage="Number(item.Progress || 0)" :stroke-width="5" :show-text="true" />
                             <div class="task-meta">
                                 <span>{{ formatTime(item.CreateTime) }}</span>
                                 <span v-if="item.ElapsedText">{{ $t("Msg.Elapsed") }} {{ item.ElapsedText }}</span>
@@ -115,6 +115,7 @@
                     <el-table v-else :data="myTerminals" size="small" class="online-table" max-height="420">
                         <el-table-column prop="ClientType" :label="$t('Msg.TerminalType')" min-width="110" />
                         <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
+                        <el-table-column prop="Did" :label="$t('Msg.TerminalDid')" min-width="180" show-overflow-tooltip />
                         <el-table-column prop="UserAgent" :label="$t('Msg.TerminalInfo')" min-width="260" show-overflow-tooltip />
                         <el-table-column :label="$t('Msg.LastActiveTime')" min-width="150">
                             <template #default="{ row }">{{ formatDateTime(row.LastActiveTime || row.ConnectedTime) }}</template>
@@ -143,6 +144,7 @@
                                         <div>
                                             <strong>{{ terminal.ClientType || "PC" }}</strong>
                                             <span>{{ terminal.Ip || "-" }}</span>
+                                            <p class="terminal-did">DID: {{ terminal.Did || terminal.DeviceClientId || "-" }}</p>
                                             <p>{{ terminal.UserAgent || terminal.DeviceClientId || "-" }}</p>
                                         </div>
                                         <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(terminal, row.UserId)">
@@ -174,7 +176,7 @@ import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
-const MASTER_STORE_ENGINE_URL = "https://api.itdos.com/api/ApiEngine/Run";
+const MASTER_STORE_LIST_URL = "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos";
 
 export default {
     name: "BackgroundTaskCenter",
@@ -236,9 +238,11 @@ export default {
         this.refreshTasks();
         this.startOfficialAppChecker();
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
+        window.addEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
     },
     beforeUnmount() {
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
+        window.removeEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
         this.stopOfficialAppChecker();
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
@@ -292,6 +296,12 @@ export default {
                 this.loadTerminals();
             }
         },
+        handleBackgroundTaskStarted() {
+            this.refreshTasks(true);
+            if (this.isAdmin) {
+                this.checkOfficialApps(true);
+            }
+        },
         handleTaskList(data) {
             this.tasks = Array.isArray(data) ? data : [];
         },
@@ -327,10 +337,10 @@ export default {
                 this.storeCheckTimer = null;
             }
         },
-        async refreshTasks() {
+        async refreshTasks(forceHttp = false) {
             this.bindWebsocket();
-            const requested = await this.requestTaskListByWebsocket();
-            if (!requested) {
+            const requested = forceHttp ? false : await this.requestTaskListByWebsocket();
+            if (!requested || forceHttp) {
                 await this.loadTasks();
             }
         },
@@ -401,31 +411,25 @@ export default {
                 this.loadTerminals();
             }
         },
-        async loadInstalledVersions() {
+        async loadInstalledVersions(force = false) {
             if (!this.isAdmin) return [];
             try {
-                const result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
-                    _PageIndex: 1,
-                    _PageSize: 5000,
-                    _SelectFields: [
-                        "Id",
-                        "StoreId",
-                        "AppId",
-                        "AppName",
-                        "AppVersion",
-                        "AppVersionInstall",
-                        "InstallStatus",
-                        "InstallTime",
-                        "UpdateTime"
-                    ]
-                });
-                if (result && result.Code === 1 && Array.isArray(result.Data)) {
-                    return result.Data;
-                }
+                return await DiyCommon.EnsureAppStores({ force });
             } catch (error) {
                 console.warn("[BackgroundTask] load installed app versions failed", error);
             }
             return [];
+        },
+        normalizeOfficialAppNotice(row) {
+            const item = DiyCommon.ApplyAppStoreInstallState({ ...(row || {}) });
+            item.Status = item.StoreInstallStatus || item.AppInstallStatus || DiyCommon.GetAppStoreInstallStatus(item);
+            if (!item.AppVersionInstall && item._LocalAppVersionInstall) {
+                item.AppVersionInstall = item._LocalAppVersionInstall;
+            }
+            if (!item.InstalledVersion && item.AppVersionInstall) {
+                item.InstalledVersion = item.AppVersionInstall;
+            }
+            return item;
         },
         async checkOfficialApps(force) {
             if (!this.isAdmin) return;
@@ -436,17 +440,16 @@ export default {
             if (this.storeLoading) return;
             this.storeLoading = true;
             try {
-                const installedVersions = await this.loadInstalledVersions();
-                const result = await DiyCommon.PostAsync(MASTER_STORE_ENGINE_URL, {
-                    ApiEngineKey: "get-microi-store",
-                    OsClient: "iTdos",
-                    Action: "CheckOfficialUpdates",
-                    TargetOsClient: DiyCommon.GetOsClient(),
-                    InstalledVersions: installedVersions
+                await this.loadInstalledVersions(force);
+                const result = await DiyCommon.PostAsync(MASTER_STORE_LIST_URL, {
+                    _PageIndex: 1,
+                    _PageSize: 5000
                 }, null, null, "json");
                 if (result && result.Code === 1) {
-                    const data = result.Data || {};
-                    this.storeNotices = Array.isArray(data.Notices) ? data.Notices : [];
+                    const rows = Array.isArray(result.Data) ? result.Data : [];
+                    this.storeNotices = rows
+                        .map(this.normalizeOfficialAppNotice)
+                        .filter((item) => ["Uninstalled", "Outdated", "Abnormal"].includes(item.Status));
                     this.lastStoreCheckTime = now;
                 }
             } catch (error) {
@@ -462,7 +465,7 @@ export default {
         async clearCompleted() {
             const result = await DiyCommon.PostAsync("/api/BackgroundTask/ClearCompleted", {}, null, null, "json");
             if (result && result.Code === 1) {
-                this.refreshTasks();
+                this.refreshTasks(true);
             }
         },
         async cancelTask(item) {
@@ -537,43 +540,43 @@ export default {
 }
 
 .notification-shell {
-    min-height: 560px;
+    min-height: 460px;
 }
 
 .notification-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 .summary-card {
     display: grid;
-    grid-template-columns: 36px 1fr auto;
+    grid-template-columns: 30px 1fr auto;
     align-items: center;
-    gap: 10px;
-    padding: 14px 16px;
+    gap: 8px;
+    padding: 8px 10px;
     border: 1px solid var(--mci-border-color, #ebeef5);
-    border-radius: 8px;
+    border-radius: 6px;
     background: linear-gradient(135deg, rgba(var(--mci-primary-rgb, 255, 90, 40), 0.09), rgba(255, 255, 255, 0.88));
     color: var(--mci-text-color, #303133);
 
     .el-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
         background: rgba(var(--mci-primary-rgb, 255, 90, 40), 0.12);
         color: var(--mci-primary-color, #ff5a28);
     }
 
     span {
         min-width: 0;
-        font-size: 13px;
+        font-size: 12px;
         color: var(--mci-text-color-secondary, #606266);
     }
 
     strong {
-        font-size: 24px;
+        font-size: 18px;
         color: var(--mci-text-color, #303133);
     }
 
@@ -617,7 +620,7 @@ export default {
 }
 
 .notification-tabs :deep(.el-tabs__header) {
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 .tab-count {
@@ -649,7 +652,7 @@ export default {
 
 .task-sub-actions {
     justify-content: flex-end;
-    min-height: 24px;
+    min-height: 22px;
 }
 
 .task-empty {
@@ -663,16 +666,16 @@ export default {
 
 .task-list,
 .app-notice-list {
-    max-height: 420px;
+    max-height: 460px;
     overflow: auto;
 }
 
 .task-item,
 .app-notice-item {
-    padding: 12px;
-    margin-bottom: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
     border: 1px solid var(--mci-border-color, #ebeef5);
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--mci-bg-color-overlay, #fff);
 }
 
@@ -689,7 +692,7 @@ export default {
 .task-title,
 .app-name {
     min-width: 0;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--mci-text-color, #303133);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -698,7 +701,7 @@ export default {
 
 .task-status {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--mci-text-color-secondary, #909399);
 
     &.status-Succeeded {
@@ -718,18 +721,28 @@ export default {
 
 .task-meta,
 .app-notice-meta {
-    margin-top: 8px;
-    font-size: 12px;
+    margin-top: 5px;
+    font-size: 11px;
     color: var(--mci-text-color-secondary, #909399);
 }
 
 .task-msg {
-    margin-top: 6px;
-    font-size: 12px;
+    margin-top: 4px;
+    font-size: 11px;
     color: var(--mci-text-color-secondary, #909399);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.task-progress {
+    margin-top: 5px;
+}
+
+.task-progress :deep(.el-progress__text) {
+    min-width: 34px;
+    font-size: 11px !important;
+    color: var(--mci-text-color-secondary, #909399);
 }
 
 .online-table {
@@ -762,6 +775,11 @@ export default {
         margin: 4px 0 0;
         color: var(--mci-text-color-secondary, #909399);
         font-size: 12px;
+    }
+
+    .terminal-did {
+        color: var(--mci-text-color, #303133);
+        word-break: break-all;
     }
 }
 

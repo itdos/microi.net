@@ -1,8 +1,13 @@
 <template>
-  <div class="folder-tree">
+  <div class="folder-tree" @contextmenu.prevent="handleTreeAreaContextMenu">
     <div class="tree-header">
-      <el-icon class="header-icon"><FolderOpened /></el-icon>
-      <span>文件夹</span>
+      <div class="tree-title">
+        <el-icon class="header-icon"><FolderOpened /></el-icon>
+        <span>文件夹</span>
+      </div>
+      <el-tooltip content="新建文件夹" placement="top">
+        <el-button class="header-action" circle text :icon="Plus" @click.stop="$emit('create-folder')" />
+      </el-tooltip>
     </div>
     <el-scrollbar class="tree-scrollbar">
       <el-tree
@@ -19,6 +24,7 @@
         @node-click="handleNodeClick"
         @node-expand="handleNodeExpand"
         @node-collapse="handleNodeCollapse"
+        @node-contextmenu="handleNodeContextMenu"
       >
         <template #default="{ node }">
           <div class="custom-tree-node" @dblclick.stop="handleNodeDblClick(node)">
@@ -31,12 +37,41 @@
         </template>
       </el-tree>
     </el-scrollbar>
+
+    <el-dropdown
+      ref="contextMenuRef"
+      trigger="contextmenu"
+      :teleported="true"
+      @command="handleContextCommand"
+    >
+      <span ref="contextMenuTriggerRef" class="context-menu-trigger"></span>
+      <template #dropdown>
+        <el-dropdown-menu class="folder-context-menu">
+          <el-dropdown-item command="upload">
+            <el-icon><Upload /></el-icon>
+            <span>上传文件</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="create-folder">
+            <el-icon><Plus /></el-icon>
+            <span>新建文件夹</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="refresh">
+            <el-icon><Refresh /></el-icon>
+            <span>刷新目录</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="sync">
+            <el-icon><Connection /></el-icon>
+            <span>文件同步</span>
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { Folder, FolderOpened } from '@element-plus/icons-vue'
+import { Connection, Folder, FolderOpened, Plus, Refresh, Upload } from '@element-plus/icons-vue'
 
 const props = defineProps({
   folders: {
@@ -49,10 +84,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'create-folder', 'expand', 'context-action'])
 
 const treeRef = ref(null)
 const expandedKeys = ref([])
+const contextMenuRef = ref(null)
+const contextMenuTriggerRef = ref(null)
+const contextFolder = ref(null)
 
 const defaultProps = {
   children: 'children',
@@ -78,6 +116,7 @@ const handleNodeExpand = (data, node) => {
   if (!expandedKeys.value.includes(data.id)) {
     expandedKeys.value.push(data.id)
   }
+  emit('expand', data, node)
 }
 
 // 处理节点收起
@@ -86,6 +125,34 @@ const handleNodeCollapse = (data, node) => {
   if (index > -1) {
     expandedKeys.value.splice(index, 1)
   }
+}
+
+const openContextMenu = (event) => {
+  nextTick(() => {
+    if (!contextMenuTriggerRef.value) return
+    contextMenuTriggerRef.value.style.position = 'fixed'
+    contextMenuTriggerRef.value.style.left = event.clientX + 'px'
+    contextMenuTriggerRef.value.style.top = event.clientY + 'px'
+    contextMenuRef.value?.handleOpen()
+  })
+}
+
+const handleNodeContextMenu = (event, data) => {
+  contextFolder.value = data
+  openContextMenu(event)
+}
+
+const handleTreeAreaContextMenu = (event) => {
+  if (event.target?.closest?.('.el-tree-node')) return
+  contextFolder.value = null
+  openContextMenu(event)
+}
+
+const handleContextCommand = (action) => {
+  emit('context-action', {
+    action,
+    folder: contextFolder.value
+  })
 }
 
 // 监听当前文件夹变化，展开父节点
@@ -137,6 +204,7 @@ watch(
   .tree-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 16px 20px;
     font-size: 15px;
     font-weight: 600;
@@ -144,10 +212,27 @@ watch(
     border-bottom: 1px solid #e2e8f0;
     background: linear-gradient(90deg, #f1f5f9 0%, #ffffff 100%);
 
-    .header-icon {
-      margin-right: 10px;
-      font-size: 20px;
-      color: #3b82f6;
+    .tree-title {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+
+      .header-icon {
+        margin-right: 10px;
+        font-size: 20px;
+        color: #3b82f6;
+      }
+    }
+
+    .header-action {
+      width: 30px;
+      height: 30px;
+      color: #475569;
+
+      &:hover {
+        color: #2563eb;
+        background: #e0ecff;
+      }
     }
   }
 
@@ -232,6 +317,27 @@ watch(
       font-size: 13px;
       color: #475569;
       transition: color 0.2s ease;
+    }
+  }
+
+  .context-menu-trigger {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    visibility: hidden;
+  }
+}
+
+.folder-context-menu {
+  min-width: 160px;
+
+  :deep(.el-dropdown-menu__item) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .el-icon {
+      font-size: 15px;
     }
   }
 }

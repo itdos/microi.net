@@ -45,6 +45,7 @@ namespace Microi.net.Api
             }
 
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var clientModel = OsClient.GetClient(osClient);
             var onlineKey = GetOnlineHashKey(osClient);
             var chatKey = GetChatOnlineKey(osClient, userId);
             var clientInfo = await cache.GetAsync<ClientInfo>(chatKey).ConfigureAwait(false)
@@ -84,19 +85,31 @@ namespace Microi.net.Api
             clientInfo.ConnectionIds = clientInfo.ConnectionIds.Take(20).ToList();
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
             var tokenHash = HashToken(token);
+            var clientTypeValue = clientType.DosIsNullOrWhiteSpace("PC");
+            var didValue = did.DosIsNullOrWhiteSpace(deviceClientId.DosIsNullOrWhiteSpace("Empty"));
             if (!tokenHash.DosIsNullOrWhiteSpace())
             {
+                clientInfo.Terminals.RemoveAll(d => string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase));
+            }
+            if (IsMeaningfulDid(didValue))
+            {
                 clientInfo.Terminals.RemoveAll(d =>
-                    string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
-                    && IsTokenConnectionId(d.ConnectionId));
+                    string.Equals(d.Did, didValue, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientTypeValue, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!deviceClientId.DosIsNullOrWhiteSpace())
+            {
+                clientInfo.Terminals.RemoveAll(d =>
+                    string.Equals(d.DeviceClientId, deviceClientId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientTypeValue, StringComparison.OrdinalIgnoreCase));
             }
             clientInfo.Terminals.RemoveAll(d => d.ConnectionId == connectionId);
             clientInfo.Terminals.Insert(0, new ClientTerminalInfo
             {
                 ConnectionId = connectionId,
                 DeviceClientId = deviceClientId,
-                ClientType = clientType.DosIsNullOrWhiteSpace("PC"),
-                Did = did.DosIsNullOrWhiteSpace(deviceClientId.DosIsNullOrWhiteSpace("Empty")),
+                ClientType = clientTypeValue,
+                Did = didValue,
                 Ip = ip,
                 UserAgent = httpContext?.Request?.Headers["User-Agent"].ToString() ?? "",
                 OtherInfo = otherInfo,
@@ -104,7 +117,7 @@ namespace Microi.net.Api
                 ConnectedTime = DateTime.Now,
                 LastActiveTime = DateTime.Now,
             });
-            clientInfo.Terminals = clientInfo.Terminals.Take(20).ToList();
+            NormalizeTerminalList(clientInfo, clientModel);
 
             await SaveClientInfoAsync(cache, osClient, clientInfo).ConfigureAwait(false);
             await NotifyOnlineChangedAsync(osClient, clientInfo.UserId).ConfigureAwait(false);
@@ -178,12 +191,32 @@ namespace Microi.net.Api
             {
                 tokenEntries.Add(activeTokenEntry);
             }
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var clientModel = OsClient.GetClient(osClient);
             if (tokenEntries.Count == 0)
             {
+                await cache.RemoveAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}").ConfigureAwait(false);
                 return;
             }
-
-            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            tokenEntries = tokenEntries
+                .Where(d => IsTokenEntryStillActive(d, clientModel))
+                .ToList();
+            if (tokenEntries.Count == 0)
+            {
+                await cache.RemoveAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}").ConfigureAwait(false);
+                return;
+            }
+            if (tokenModel.Tokens == null
+                || tokenModel.Tokens.Count != tokenEntries.Count
+                || tokenModel.Tokens.Any(d => d == null
+                                              || !string.Equals(d.AuthVersion, DiyToken.CurrentAuthVersion, StringComparison.Ordinal)
+                                              || !tokenEntries.Any(x => string.Equals(x.Token, d.Token, StringComparison.Ordinal))))
+            {
+                tokenModel.Tokens = tokenEntries;
+                tokenModel.Token = tokenEntries[0].Token;
+                tokenModel.UpdateTime = DateTime.Now;
+                await cache.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModel).ConfigureAwait(false);
+            }
             var onlineKey = GetOnlineHashKey(osClient);
             var chatKey = GetChatOnlineKey(osClient, userId);
             var clientInfo = await cache.GetAsync<ClientInfo>(chatKey).ConfigureAwait(false)
@@ -231,15 +264,18 @@ namespace Microi.net.Api
                     continue;
                 }
 
-                var liveTerminal = clientInfo.Terminals.FirstOrDefault(d =>
-                    !IsTokenConnectionId(d.ConnectionId)
-                    && string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase));
                 var isCurrentRequest = string.Equals(tokenHash, requestTokenHash, StringComparison.OrdinalIgnoreCase);
                 var clientType = tokenEntry.ClientType.DosIsNullOrWhiteSpace(claimClientType.DosIsNullOrWhiteSpace("PC"));
                 var did = tokenEntry.Did.DosIsNullOrWhiteSpace(
                     (isCurrentRequest ? requestDid : "").DosIsNullOrWhiteSpace(claimDid.DosIsNullOrWhiteSpace("Empty")));
                 var ip = tokenEntry.IP.DosIsNullOrWhiteSpace(isCurrentRequest ? requestIp.DosIsNullOrWhiteSpace(claimIp) : "");
                 var lastActiveTime = isCurrentRequest ? DateTime.Now : (tokenEntry.UpdateTime == default ? tokenEntry.CreateTime : tokenEntry.UpdateTime);
+                var liveTerminal = clientInfo.Terminals.FirstOrDefault(d =>
+                    !IsTokenConnectionId(d.ConnectionId)
+                    && (string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
+                        || (IsMeaningfulDid(did)
+                            && string.Equals(d.Did, did, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(d.ClientType.DosIsNullOrWhiteSpace("PC"), clientType, StringComparison.OrdinalIgnoreCase))));
 
                 if (liveTerminal != null)
                 {
@@ -256,6 +292,11 @@ namespace Microi.net.Api
                 }
 
                 var tokenConnectionId = GetTokenConnectionId(tokenHash);
+                if (!IsMeaningfulDid(did))
+                {
+                    clientInfo.Terminals.RemoveAll(d => d.ConnectionId == tokenConnectionId);
+                    continue;
+                }
                 var tokenTerminal = clientInfo.Terminals.FirstOrDefault(d => d.ConnectionId == tokenConnectionId);
                 if (tokenTerminal == null)
                 {
@@ -276,12 +317,26 @@ namespace Microi.net.Api
                 tokenTerminal.LastActiveTime = lastActiveTime;
             }
 
-            clientInfo.Terminals = clientInfo.Terminals
-                .OrderByDescending(d => d.LastActiveTime)
-                .Take(20)
-                .ToList();
+            NormalizeTerminalList(clientInfo, clientModel);
 
             await SaveClientInfoAsync(cache, osClient, clientInfo).ConfigureAwait(false);
+        }
+
+        public static async Task PruneExpiredLoginTokensAsync(
+            string osClient,
+            string userId,
+            CurrentToken tokenModel = null,
+            OsClientSecret clientModel = null)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            tokenModel ??= await cache.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}").ConfigureAwait(false);
+            clientModel ??= OsClient.GetClient(osClient);
+            PruneExpiredLoginTokens(cache, osClient, userId, clientModel, null, tokenModel);
         }
 
         public static List<object> ListOnlineUsers(string osClient)
@@ -292,7 +347,14 @@ namespace Microi.net.Api
             }
 
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var clientModel = OsClient.GetClient(osClient);
             var list = cache.HashGetAllValues<ClientInfo>(GetOnlineHashKey(osClient)) ?? new List<ClientInfo>();
+            foreach (var clientInfo in list)
+            {
+                PruneExpiredLoginTokens(cache, osClient, clientInfo?.UserId, clientModel, clientInfo);
+                NormalizeTerminalList(clientInfo, clientModel);
+                SaveClientInfo(cache, osClient, clientInfo);
+            }
             return list
                 .Where(d => d != null && !d.UserId.DosIsNullOrWhiteSpace() && (d.ConnectionIds?.Count > 0 || d.Terminals?.Count > 0))
                 .OrderByDescending(d => d.Terminals?.Max(t => t.LastActiveTime) ?? d.ConnectedTime)
@@ -308,8 +370,15 @@ namespace Microi.net.Api
             }
 
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var clientModel = OsClient.GetClient(osClient);
             var clientInfo = cache.Get<ClientInfo>(GetChatOnlineKey(osClient, userId))
                              ?? cache.HashGet<ClientInfo>(GetOnlineHashKey(osClient), userId);
+            if (clientInfo != null)
+            {
+                PruneExpiredLoginTokens(cache, osClient, userId, clientModel, clientInfo);
+                NormalizeTerminalList(clientInfo, clientModel);
+                SaveClientInfo(cache, osClient, clientInfo);
+            }
             return clientInfo == null
                 ? new { Terminals = new List<object>() }
                 : ToUserView(clientInfo);
@@ -379,10 +448,197 @@ namespace Microi.net.Api
             return new DosResult(1, null, "已踢掉该终端");
         }
 
+        private static void NormalizeTerminalList(ClientInfo clientInfo)
+        {
+            NormalizeTerminalList(clientInfo, null);
+        }
+
+        private static void NormalizeTerminalList(ClientInfo clientInfo, OsClientSecret clientModel)
+        {
+            if (clientInfo?.Terminals == null)
+            {
+                return;
+            }
+
+            clientInfo.Terminals = clientInfo.Terminals
+                .Where(d => d != null
+                            && !d.ConnectionId.DosIsNullOrWhiteSpace()
+                            && !IsAnonymousTerminal(d)
+                            && !IsTerminalExpired(d, clientModel))
+                .OrderBy(d => IsTokenConnectionId(d.ConnectionId) ? 1 : 0)
+                .ThenByDescending(d => d.LastActiveTime == default ? d.ConnectedTime : d.LastActiveTime)
+                .GroupBy(GetTerminalIdentity, StringComparer.OrdinalIgnoreCase)
+                .Select(d => d.First())
+                .OrderByDescending(d => d.LastActiveTime == default ? d.ConnectedTime : d.LastActiveTime)
+                .Take(20)
+                .ToList();
+        }
+
+        private static bool PruneExpiredLoginTokens(
+            IMicroiCache cache,
+            string osClient,
+            string userId,
+            OsClientSecret clientModel,
+            ClientInfo clientInfo = null,
+            CurrentToken tokenModel = null)
+        {
+            if (cache == null || osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            var key = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
+            tokenModel ??= cache.Get<CurrentToken>(key);
+            var before = tokenModel?.Tokens?.Count ?? 0;
+            var activeTokens = tokenModel?.Tokens?
+                .Where(d => d != null
+                            && string.Equals(d.AuthVersion, DiyToken.CurrentAuthVersion, StringComparison.Ordinal)
+                            && !d.Token.DosIsNullOrWhiteSpace()
+                            && IsTokenEntryStillActive(d, clientModel))
+                .ToList() ?? new List<TokensModel>();
+
+            if (before > 0 && activeTokens.Count != before)
+            {
+                if (activeTokens.Count == 0)
+                {
+                    cache.Remove(key);
+                }
+                else
+                {
+                    tokenModel.Tokens = activeTokens;
+                    tokenModel.Token = activeTokens[0].Token;
+                    tokenModel.UpdateTime = DateTime.Now;
+                    cache.Set(key, tokenModel);
+                }
+            }
+
+            if (clientInfo?.Terminals != null)
+            {
+                var activeHashes = activeTokens
+                    .Select(d => HashToken(d.Token))
+                    .Where(d => !d.DosIsNullOrWhiteSpace())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                clientInfo.Terminals.RemoveAll(d =>
+                    d == null
+                    || IsAnonymousTerminal(d)
+                    || IsTerminalExpired(d, clientModel)
+                    || (!d.TokenHash.DosIsNullOrWhiteSpace()
+                        && (activeHashes.Count == 0 || !activeHashes.Contains(d.TokenHash))));
+            }
+
+            return activeTokens.Count != before;
+        }
+
+        private static string GetTerminalIdentity(ClientTerminalInfo terminal)
+        {
+            if (terminal == null)
+            {
+                return Guid.NewGuid().ToString("N");
+            }
+
+            var clientType = terminal.ClientType.DosIsNullOrWhiteSpace("PC");
+            if (IsMeaningfulDid(terminal.Did))
+            {
+                return $"did:{clientType}:{terminal.Did}";
+            }
+            if (IsMeaningfulDeviceId(terminal.DeviceClientId))
+            {
+                return $"device:{clientType}:{terminal.DeviceClientId}";
+            }
+            if (!terminal.TokenHash.DosIsNullOrWhiteSpace())
+            {
+                return $"token:{terminal.TokenHash}";
+            }
+            return $"connection:{terminal.ConnectionId}";
+        }
+
+        private static bool IsMeaningfulDid(string did)
+        {
+            return !did.DosIsNullOrWhiteSpace()
+                   && !string.Equals(did, "Empty", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsMeaningfulDeviceId(string deviceClientId)
+        {
+            return !deviceClientId.DosIsNullOrWhiteSpace()
+                   && !string.Equals(deviceClientId, "Empty", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsAnonymousTerminal(ClientTerminalInfo terminal)
+        {
+            return terminal != null
+                   && (IsTokenConnectionId(terminal.ConnectionId) || terminal.TokenHash.DosIsNullOrWhiteSpace())
+                   && !IsMeaningfulDid(terminal.Did)
+                   && !IsMeaningfulDeviceId(terminal.DeviceClientId);
+        }
+
+        private static bool IsTerminalExpired(ClientTerminalInfo terminal, OsClientSecret clientModel)
+        {
+            if (terminal == null)
+            {
+                return true;
+            }
+
+            var lastActive = terminal.LastActiveTime == default ? terminal.ConnectedTime : terminal.LastActiveTime;
+            if (lastActive == default)
+            {
+                return false;
+            }
+
+            var clientType = terminal.ClientType.DosIsNullOrWhiteSpace("PC");
+            var tokenLifetime = DiyToken.ResolveClientTokenLifetime(clientModel, clientType);
+            return tokenLifetime > TimeSpan.Zero && DateTime.Now - lastActive > tokenLifetime;
+        }
+
+        private static bool IsTokenEntryStillActive(TokensModel tokenEntry, OsClientSecret clientModel)
+        {
+            if (tokenEntry == null)
+            {
+                return false;
+            }
+
+            var clientType = tokenEntry.ClientType.DosIsNullOrWhiteSpace("Empty");
+            var updateTime = tokenEntry.UpdateTime == default ? tokenEntry.CreateTime : tokenEntry.UpdateTime;
+            if (updateTime == default)
+            {
+                return true;
+            }
+
+            var tokenLifetime = DiyToken.ResolveClientTokenLifetime(clientModel, clientType);
+            return DateTime.Now - updateTime <= tokenLifetime;
+        }
+
+        private static void SaveClientInfo(IMicroiCache cache, string osClient, ClientInfo clientInfo)
+        {
+            if (cache == null || clientInfo?.UserId.DosIsNullOrWhiteSpace() != false)
+            {
+                return;
+            }
+
+            if ((clientInfo.ConnectionIds == null || clientInfo.ConnectionIds.Count == 0)
+                && (clientInfo.Terminals == null || clientInfo.Terminals.Count == 0))
+            {
+                cache.Remove(GetChatOnlineKey(osClient, clientInfo.UserId));
+                cache.HashDelete(GetOnlineHashKey(osClient), clientInfo.UserId);
+                return;
+            }
+
+            cache.Set(GetChatOnlineKey(osClient, clientInfo.UserId), clientInfo);
+            cache.HashSet(GetOnlineHashKey(osClient), clientInfo.UserId, clientInfo);
+        }
+
         private static async Task SaveClientInfoAsync(IMicroiCache cache, string osClient, ClientInfo clientInfo)
         {
-            if (clientInfo?.UserId.DosIsNullOrWhiteSpace() != false)
+            if (cache == null || clientInfo?.UserId.DosIsNullOrWhiteSpace() != false)
             {
+                return;
+            }
+            if ((clientInfo.ConnectionIds == null || clientInfo.ConnectionIds.Count == 0)
+                && (clientInfo.Terminals == null || clientInfo.Terminals.Count == 0))
+            {
+                await cache.RemoveAsync(GetChatOnlineKey(osClient, clientInfo.UserId)).ConfigureAwait(false);
+                cache.HashDelete(GetOnlineHashKey(osClient), clientInfo.UserId);
                 return;
             }
             await cache.SetAsync(GetChatOnlineKey(osClient, clientInfo.UserId), clientInfo).ConfigureAwait(false);
@@ -482,6 +738,7 @@ namespace Microi.net.Api
 
         private static object ToUserView(ClientInfo clientInfo)
         {
+            NormalizeTerminalList(clientInfo);
             return new
             {
                 clientInfo.UserId,
