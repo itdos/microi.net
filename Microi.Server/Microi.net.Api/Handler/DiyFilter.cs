@@ -646,11 +646,13 @@ namespace Microi.net.Api
                         OsClient = tokenOsClient
                     });
                 }
-                var refreshThreshold = tokenLifetime > TimeSpan.FromMinutes(5)
-                    ? tokenLifetime - TimeSpan.FromMinutes(5)
-                    : TimeSpan.FromTicks(Math.Max(1, tokenLifetime.Ticks / 2));
+                var shouldRotateToken = DiyToken.ShouldRotateClientToken(
+                    token,
+                    clientModel,
+                    clientType,
+                    activeTokenUpdateTime);
                 if (sysUser != null &&
-                    (tokenModel.Token.DosIsNullOrWhiteSpace() || activeTokenAge > refreshThreshold)
+                    (tokenModel.Token.DosIsNullOrWhiteSpace() || shouldRotateToken)
                 )
                 {
                     var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()

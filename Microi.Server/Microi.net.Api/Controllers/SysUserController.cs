@@ -777,21 +777,70 @@ namespace Microi.net.Api
             var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
             if (tokenModelJobj == null)
             {
-                return Json(new DosResult(0, null, "无效的Token."));
-            }
-            var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
-            {
-                CurrentUser = tokenModelJobj.CurrentUser,
-                OsClient = tokenModelJobj.OsClient,
-                _ClientType = ReadTokenClaim(param.authorization, "ClientType").DosIsNullOrWhiteSpace(param._ClientType),
-                Did = ReadTokenClaim(param.authorization, "Did")
-            });
-            if (getTokenResult.Code != 1)
-            {
-                return Json(getTokenResult);
+                var reasonCode = await DiyToken.DiagnoseInactiveToken(param.authorization, param.OsClient);
+                return Json(new DosResult(0, null, "无效的Token.", 0, new
+                {
+                    ReasonCode = reasonCode
+                }));
             }
 
-            tokenModelJobj = getTokenResult.Data;
+            var tokenClientType = ReadTokenClaim(param.authorization, "ClientType");
+            var requestedClientType = param._ClientType;
+            var clientTypeNeedsMigration = (tokenClientType.DosIsNullOrWhiteSpace()
+                    || tokenClientType.Equals("Empty", StringComparison.OrdinalIgnoreCase))
+                && !requestedClientType.DosIsNullOrWhiteSpace()
+                && !requestedClientType.Equals("Empty", StringComparison.OrdinalIgnoreCase);
+            var clientType = clientTypeNeedsMigration ? requestedClientType : tokenClientType;
+            clientType = clientType.DosIsNullOrWhiteSpace("Empty");
+
+            var tokenDid = ReadTokenClaim(param.authorization, "Did");
+            var requestDid = HttpContext.Request.Headers["did"].ToString();
+            var didNeedsMigration = !requestDid.DosIsNullOrWhiteSpace()
+                && !requestDid.Equals("Empty", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(tokenDid, requestDid, StringComparison.OrdinalIgnoreCase);
+            var activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(tokenModelJobj, param.authorization);
+            var activeTokenUpdateTime = activeTokenEntry?.UpdateTime == default
+                ? tokenModelJobj.UpdateTime
+                : activeTokenEntry.UpdateTime;
+            var clientModel = OsClient.GetClient(tokenModelJobj.OsClient);
+            var shouldRotateToken = clientTypeNeedsMigration
+                || didNeedsMigration
+                || DiyToken.ShouldRotateClientToken(
+                    param.authorization,
+                    clientModel,
+                    clientType,
+                    activeTokenUpdateTime);
+
+            if (shouldRotateToken)
+            {
+                var previousToken = param.authorization.DosTrim().DosReplace("Bearer ", "");
+                var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
+                {
+                    CurrentUser = tokenModelJobj.CurrentUser,
+                    OsClient = tokenModelJobj.OsClient,
+                    _ClientType = clientType,
+                    Did = tokenDid
+                });
+                if (getTokenResult.Code != 1)
+                {
+                    return Json(getTokenResult);
+                }
+
+                tokenModelJobj = getTokenResult.Data;
+                if ((clientTypeNeedsMigration || didNeedsMigration) && tokenModelJobj?.Tokens != null)
+                {
+                    tokenModelJobj.Tokens.RemoveAll(d => string.Equals(
+                        d.Token.DosTrim().DosReplace("Bearer ", ""),
+                        previousToken,
+                        StringComparison.Ordinal));
+                }
+            }
+            else
+            {
+                HttpContext.Response.Headers["authorization"] = param.authorization
+                    .DosTrim()
+                    .DosReplace("Bearer ", "");
+            }
 
             var osClient = tokenModelJobj.OsClient;
 

@@ -17,6 +17,7 @@ globs: ["**/*.{vue,js,ts,jsx,tsx,css,scss,json,md,mdc,cs,csproj,xml,yml,yaml}", 
 - @microi.skills/v8-workflow/SKILL.md — Microi V8 工作流事件开发
 - @microi.skills/v8-api-config/SKILL.md — Microi V8 接口引擎配置
 - @microi.skills/v8-saas-multi-tenant/SKILL.md — Microi V8 SaaS 多租户引擎
+- @microi.skills/v8-image-processing/SKILL.md — Microi V8 图像处理
 - @microi.skills/v8-file-upload/SKILL.md — Microi V8 文件上传下载
 - @microi.skills/v8-export-import/SKILL.md — Microi V8 Excel 导入导出
 - @microi.skills/v8-debugging/SKILL.md — Microi V8 调试与日志

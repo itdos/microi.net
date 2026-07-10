@@ -145,6 +145,372 @@ var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
 ```
 
+## 图像处理 V8.Image
+
+`V8.Image` 提供跨平台的服务端图片生成、合并和编辑能力。所有方法都以对象形式传参，只处理内存中的 `Base64`、Data URI 或字节数组，不直接读取本地路径，也不会主动访问 URL。
+
+### 图片来源与返回值
+
+图片来源支持以下形式：
+
+```javascript
+// 顶层 Base64
+{ FileByteBase64: '<base64>' }
+
+// 等价字段
+{ Base64: '<base64>' }
+{ DataUrl: 'data:image/png;base64,...' }
+{ Bytes: response.RawBytes }
+
+// 单图方法也支持 Image / Source 嵌套，值可以是对象或字符串
+{ Image: { FileByteBase64: '<base64>' } }
+{ Source: '<base64>' }
+```
+
+处理成功时，除 `GetInfo` 外均返回标准 `DosResult`：
+
+```javascript
+{
+  Code: 1,
+  Data: {
+    FileName: 'image.png',
+    ContentType: 'image/png',
+    FileByteBase64: '<base64>',
+    Width: 800,
+    Height: 600,
+    Size: 12345,
+    Format: 'png'
+  },
+  Msg: ''
+}
+```
+
+每次调用后必须先判断 `Code`。接口引擎开启“响应文件”后，可以直接返回这个结果，在浏览器中预览或下载图片。
+
+公共输出参数：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `OutputFormat` / `Format` | `png` | 支持 `png`、`jpeg` / `jpg`、`webp`、`bmp`；`OutputFormat` 优先 |
+| `Quality` | `90` | 编码质量，运行时限制到 1 至 100 |
+| `BackgroundColor` | 透明；JPEG 为白色 | 画布背景色 |
+| `FileName` | `image.<扩展名>` | 输出文件名，扩展名会按真实格式修正 |
+
+兼容公共别名：`ImageFormat` / `OutputType` → `OutputFormat`，`Background` / `BgColor` → `BackgroundColor`，单图方法的 `ImageBase64` → `FileByteBase64`。
+
+### 方法列表
+
+| 方法 | 说明 |
+|------|------|
+| `V8.Image.Create(param)` | 生成纯色、渐变、文字或基础图形图片 |
+| `V8.Image.Merge(param)` | 横向、纵向、网格或覆盖合并图片 |
+| `V8.Image.Overlay(param)` | 覆盖合并快捷方法，未设置模式时自动使用 `overlay` |
+| `V8.Image.Resize(param)` | 调整宽高 |
+| `V8.Image.Crop(param)` | 裁剪矩形区域 |
+| `V8.Image.Rotate(param)` | 旋转图片 |
+| `V8.Image.Flip(param)` | 水平或垂直翻转 |
+| `V8.Image.Convert(param)` | 转换图片编码格式 |
+| `V8.Image.Draw(param)` | 在已有图片上绘制文字和图形 |
+| `V8.Image.Watermark(param)` | 添加图片水印 |
+| `V8.Image.CreateQRCode(param)` | 生成二维码 |
+| `V8.Image.GetInfo(param)` | 读取宽高、格式、帧数等信息 |
+
+`Create` 的专用参数：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `Width` / `Height` | `800` / `600` | 新画布宽高 |
+| `CanvasWidth` / `CanvasHeight` | 未设置 | 设置后分别覆盖 `Width` / `Height` |
+| `BackgroundColorEnd` | 未设置 | 设置后与 `BackgroundColor` 形成线性渐变 |
+| `GradientDirection` | `left-to-right` | 支持横向、`top-to-bottom` / `vertical`、`diagonal` |
+| `Text` / `TextColor` / `FontSize` / `FontFamily` | 未设置 / `#111827` / `32` / 默认字体 | 在画布中心追加快捷文字 |
+| `Elements` | 未设置 | 文字、矩形、椭圆、圆形和线段列表 |
+
+### 生成图片并覆盖合并
+
+下面示例先生成大图和小图，再把小图覆盖到大图的指定坐标。覆盖模式按 `ZIndex` 从小到大绘制，数值更大的图层位于上方；相同 `ZIndex` 时数组中靠后的图层位于上方。
+
+```javascript
+var baseResult = V8.Image.Create({
+  Width: 1200,
+  Height: 700,
+  BackgroundColor: '#2563eb',
+  BackgroundColorEnd: '#0f172a',
+  GradientDirection: 'left-to-right',
+  Text: 'Microi',
+  TextColor: '#ffffff',
+  FontSize: 72,
+  FileName: 'poster.png'
+});
+if (baseResult.Code !== 1) return baseResult;
+
+var badgeResult = V8.Image.Create({
+  Width: 240,
+  Height: 120,
+  BackgroundColor: '#f97316',
+  Text: 'NEW',
+  TextColor: '#ffffff',
+  FontSize: 42
+});
+if (badgeResult.Code !== 1) return badgeResult;
+
+var result = V8.Image.Overlay({
+  CanvasWidth: 1200,
+  CanvasHeight: 700,
+  Images: [
+    {
+      FileByteBase64: baseResult.Data.FileByteBase64,
+      Width: 1200,
+      Height: 700,
+      Fit: 'fill',
+      ZIndex: 0
+    },
+    {
+      FileByteBase64: badgeResult.Data.FileByteBase64,
+      X: 900,
+      Y: 80,
+      Scale: 0.75,
+      Opacity: 0.95,
+      CornerRadius: 16,
+      ZIndex: 10
+    }
+  ],
+  OutputFormat: 'png',
+  FileName: 'poster-with-badge.png'
+});
+return result;
+```
+
+也可以使用双图简写：
+
+```javascript
+return V8.Image.Overlay({
+  BaseImage: baseResult.Data.FileByteBase64,
+  OverlayImage: badgeResult.Data.FileByteBase64,
+  X: 900,
+  Y: 80,
+  OverlayWidth: 180,
+  OverlayHeight: 90,
+  Opacity: 0.9
+});
+```
+
+主图兼容 `BaseImage`、`BackgroundImage`、`FirstImage`、`Base`；覆盖图兼容 `OverlayImage`、`ForegroundImage`、`SecondImage`、`Overlay`。简写结构中的顶层 `X`、`Y`、`Position`、`Opacity`、`OverlayWidth`、`OverlayHeight`、`Scale` 会应用到覆盖图。
+
+### 合并模式
+
+```javascript
+// 左右拼接
+var horizontal = V8.Image.Merge({
+  Mode: 'horizontal',
+  Direction: 'ltr',
+  Gap: 20,
+  Padding: 20,
+  Alignment: 'center',
+  Images: [
+    { FileByteBase64: firstBase64, Height: 320 },
+    { FileByteBase64: secondBase64, Height: 320 }
+  ]
+});
+
+// 上下拼接
+var vertical = V8.Image.Merge({
+  Mode: 'vertical',
+  Direction: 'ttb',
+  Gap: 16,
+  Alignment: 'left',
+  Images: [firstBase64, secondBase64]
+});
+
+// 网格拼接
+var grid = V8.Image.Merge({
+  Mode: 'grid',
+  Columns: 3,
+  Gap: 12,
+  Padding: 12,
+  Images: imageBase64List
+});
+```
+
+| 参数 | 说明 |
+|------|------|
+| `Mode` | `horizontal`、`vertical`、`grid`、`overlay` |
+| `Layout` | 优先于 `Mode`；支持 `row`、`column`、`canvas`、`cover`，以及 `left/right/top/bottom/up/down` 方向快捷值 |
+| `Direction` | `ltr`、`rtl`、`ttb`、`btt`，也支持 `left-to-right` 等完整写法 |
+| `Images` / `Layers` | 图片或图层数组；数组项可以直接是 Base64 / Data URI 字符串 |
+| `CanvasWidth` / `CanvasHeight` | 固定画布尺寸；未设置时按布局自动计算 |
+| `Padding` / `Gap` | 内边距 / 图片间距，负数按 0 处理 |
+| `Alignment` | 横向时控制上下对齐，纵向时控制左右对齐，网格时控制单元格内对齐 |
+| `Columns` | 网格列数 |
+
+合并兼容别名：`MergeType` / `Type` → `Mode`，`Items` → `Images`。
+
+### 图层参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `Width` / `Height` | 原尺寸 | 只设置一个时按比例计算另一个 |
+| `Scale` | `1` | 在宽高计算后再次按比例缩放，范围大于 0 且不超过 100 |
+| `Fit` | `contain` | 同时设置宽高时支持 `contain`、`cover`、`fill` / `stretch`、`none` |
+| `X` / `Y` | 未设置 | 覆盖模式绝对坐标；设置其中一个后，另一个默认使用 `Padding` |
+| `Position` / `Anchor` | `top-left` | 未设置坐标时的锚点；`Position` 优先 |
+| `OffsetX` / `OffsetY` | `0` | 坐标或锚点定位后的偏移 |
+| `Opacity` | `1` | 透明度，限制到 0 至 1 |
+| `Rotation` | `0` | 顺时针旋转角度 |
+| `ZIndex` | `0` | 覆盖顺序，数值越大越靠上 |
+| `FlipHorizontal` / `FlipVertical` | `false` | 翻转当前图层 |
+| `CropX` / `CropY` / `CropWidth` / `CropHeight` | 原图范围 | 缩放前裁剪源图 |
+| `CornerRadius` | `0` | 圆角半径 |
+| `BorderColor` / `BorderWidth` | 未设置 / `0` | 图层边框 |
+| `BlendMode` | `src-over` | 混合模式 |
+
+`contain` 保持完整内容并等比缩放；`cover` 居中裁剪并填满目标宽高；`fill` / `stretch` 强制拉伸；`none` 使用原尺寸。`Scale` 在上述计算后继续生效。
+
+常用锚点：`top-left`、`top`、`top-right`、`left`、`center`、`right`、`bottom-left`、`bottom`、`bottom-right`。混合模式支持 `src-over`、`multiply`、`screen`、`overlay`、`darken`、`lighten`、`plus` / `add`、`src`、`dst-over`。
+
+图层兼容别名：`Order` → `ZIndex`、`Alpha` → `Opacity`、`Rotate` → `Rotation`、`Left` / `Top` → `X` / `Y`。
+
+### 其它图片操作
+
+```javascript
+// 缩放：Width、Height 至少设置一个；Pad=true 时保留完整目标画布
+var resized = V8.Image.Resize({
+  Image: sourceBase64,
+  Width: 800,
+  Height: 600,
+  Fit: 'cover',
+  Pad: false,
+  AllowUpscale: true,
+  Alignment: 'center'
+});
+
+// 裁剪；Clamp=true 时把部分越界区域收缩到图片范围
+var cropped = V8.Image.Crop({
+  Image: sourceBase64,
+  X: 100,
+  Y: 80,
+  Width: 640,
+  Height: 360,
+  Clamp: false
+});
+
+// 旋转；Expand=false 时保持原画布，边缘可能被裁掉
+var rotated = V8.Image.Rotate({
+  Image: sourceBase64,
+  Degrees: 30,
+  Expand: true
+});
+
+// 水平、垂直翻转；Horizontal 默认 true，Vertical 默认 false
+var flipped = V8.Image.Flip({
+  Image: sourceBase64,
+  Horizontal: true,
+  Vertical: false
+});
+
+// 格式转换
+var converted = V8.Image.Convert({
+  Image: sourceBase64,
+  OutputFormat: 'webp',
+  Quality: 85,
+  FileName: 'converted.webp'
+});
+
+// 图片水印
+var watermarked = V8.Image.Watermark({
+  BaseImage: sourceBase64,
+  Watermark: logoBase64,
+  Width: 180,
+  Height: 90,
+  Scale: 1,
+  Position: 'bottom-right',
+  Margin: 24,
+  OffsetX: 0,
+  OffsetY: 0,
+  Opacity: 0.7,
+  Rotation: 0
+});
+
+// 二维码；Content 优先于 Text，Size 默认 300
+var qr = V8.Image.CreateQRCode({
+  Content: 'https://microi.net/',
+  Size: 420,
+  FileName: 'qrcode.png'
+});
+
+// 读取原始图片信息
+var info = V8.Image.GetInfo({ Image: sourceBase64 });
+// Data: Width、Height、Format、ContentType、Size、FrameCount、
+// RepetitionCount、Origin、HasAlpha
+```
+
+`Watermark` 的 `BaseImage` 也可写为 `Image`，兼容 `Base` → `BaseImage`、`Overlay` → `Watermark`。
+
+### 绘制文字和图形
+
+`Create` 和 `Draw` 使用相同的 `Elements`。`Create` 在新画布上绘制；`Draw` 在输入图片上绘制，输出宽高与原图相同。
+
+```javascript
+var result = V8.Image.Draw({
+  Image: sourceBase64,
+  Elements: [
+    {
+      Type: 'text',
+      X: 40,
+      Y: 40,
+      Text: 'CONFIDENTIAL',
+      Color: 'rgba(239,68,68,0.75)',
+      FontSize: 36,
+      FontFamily: 'Arial',
+      FontStyle: 'bold-italic',
+      Align: 'left',
+      VerticalAlign: 'top',
+      Rotation: -8
+    },
+    {
+      Type: 'round-rect',
+      X: 40,
+      Y: 90,
+      Width: 320,
+      Height: 100,
+      FillColor: '#ffffff88',
+      StrokeColor: '#ef4444',
+      StrokeWidth: 3,
+      CornerRadius: 16,
+      Opacity: 0.9
+    },
+    {
+      Type: 'line',
+      X: 40,
+      Y: 220,
+      X2: 360,
+      Y2: 220,
+      StrokeColor: '#ef4444',
+      StrokeWidth: 3
+    }
+  ]
+});
+```
+
+| 元素类型 | 参数 |
+|----------|------|
+| `text` | `Text`、`Color`、`FontSize`、`FontFamily`、`FontStyle`、`Align`、`VerticalAlign` |
+| `rectangle` / `rect` / `round-rect` | `X`、`Y`、`Width`、`Height`、填充、描边、圆角 |
+| `ellipse` / `circle` | `X`、`Y`、`Width`、`Height`、填充、描边 |
+| `line` | `X`、`Y`、`X2`、`Y2` 或 `Width`、`Height`、描边 |
+
+所有元素还支持 `Opacity` 和 `Rotation`。单次最多绘制 500 个元素。
+
+### 颜色、安全与资源限制
+
+颜色支持常用英文颜色名、`transparent`、`#RGB`、`#RGBA`、`#RRGGBB`、`#RRGGBBAA`、`rgb(...)`、`rgba(...)`。颜色自身的 Alpha 会与 `Opacity` 相乘。
+
+运行时内置限制：单次最多合并 50 张图；单边不超过 16,384 像素；单张输入或输出画布不超过 25,000,000 像素；单次解码和单次缩放后图层分别不超过 50,000,000 像素；单张输入不超过 25 MB；单次输入总量不超过 100 MB；输出不超过 50 MB。
+
+这些限制是保护上限，不是业务推荐值。匿名接口应增加更严格的数量、尺寸、并发和权限限制。远程图片必须先通过 `V8.Http` 下载，并对用户可控 URL 做协议、域名和目标地址白名单校验，不能把 URL 或服务器路径直接传给 `V8.Image`。
+
+文字绘制依赖操作系统字体。Linux / 精简容器部署时应安装所需字体（中文建议 Noto Sans CJK 等），并显式传 `FontFamily`；否则缺失字形可能无法显示。
+
 ## 当前用户 V8.CurrentUser
 >* 当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
 >* 未登录时访问到的值为{}

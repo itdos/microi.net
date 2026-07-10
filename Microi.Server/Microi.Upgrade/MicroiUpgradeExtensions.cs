@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Dos.Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
@@ -27,6 +28,15 @@ namespace Microi.net
         {
             try
             {
+                var disabledText = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_DISABLE_AUTO_UPGRADE",
+                    "MicroiUpgrade:Disabled");
+                if (bool.TryParse(disabledText, out var disabled) && disabled)
+                {
+                    Console.WriteLine("Microi：【信息】服务器端自动升级已通过配置禁用。");
+                    return app;
+                }
+
                 var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiUpgrade>();
                 var _formEngine = app.ApplicationServices.GetRequiredService<IFormEngine>();
                 if (scheduledTask != null)

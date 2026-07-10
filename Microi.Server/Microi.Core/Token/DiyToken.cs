@@ -99,6 +99,53 @@ namespace Microi.net
                 : $"{lifetime.TotalMinutes:0.##}分钟";
         }
 
+        public static TimeSpan ResolveClientTokenRefreshLeadTime(OsClientSecret clientModel, string clientType)
+        {
+            var lifetime = ResolveClientTokenLifetime(clientModel, clientType);
+            var leadTime = TimeSpan.FromTicks(Math.Max(1, lifetime.Ticks / 10));
+            if (leadTime < TimeSpan.FromMinutes(5))
+            {
+                leadTime = TimeSpan.FromMinutes(5);
+            }
+            if (leadTime > TimeSpan.FromDays(1))
+            {
+                leadTime = TimeSpan.FromDays(1);
+            }
+            if (leadTime >= lifetime)
+            {
+                leadTime = TimeSpan.FromTicks(Math.Max(1, lifetime.Ticks / 2));
+            }
+            return leadTime;
+        }
+
+        public static bool ShouldRotateClientToken(
+            string token,
+            OsClientSecret clientModel,
+            string clientType,
+            DateTime activeTokenUpdateTime)
+        {
+            var refreshLeadTime = ResolveClientTokenRefreshLeadTime(clientModel, clientType);
+            try
+            {
+                var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(NormalizeBearerToken(token));
+                if (jwtToken.ValidTo != DateTime.MinValue)
+                {
+                    return jwtToken.ValidTo <= DateTime.UtcNow.Add(refreshLeadTime);
+                }
+            }
+            catch
+            {
+                return true;
+            }
+
+            if (activeTokenUpdateTime == default)
+            {
+                return true;
+            }
+            var refreshAge = ResolveClientTokenLifetime(clientModel, clientType) - refreshLeadTime;
+            return DateTime.Now - activeTokenUpdateTime >= refreshAge;
+        }
+
         private static string NormalizeBearerToken(string token)
         {
             return token.DosTrim().DosReplace("Bearer ", "");
@@ -788,6 +835,75 @@ namespace Microi.net
                 });
             }
             return null;
+        }
+
+        public static async Task<string> DiagnoseInactiveToken(string token, string osClient = "")
+        {
+            try
+            {
+                var normalizedToken = NormalizeBearerToken(token);
+                if (normalizedToken.DosIsNullOrWhiteSpace())
+                {
+                    return "MissingToken";
+                }
+
+                JwtSecurityToken jwtToken;
+                try
+                {
+                    jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(normalizedToken);
+                }
+                catch
+                {
+                    return "MalformedToken";
+                }
+
+                var claims = jwtToken.Claims?.ToList();
+                var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace())
+                {
+                    return "MissingClaims";
+                }
+                if (!osClient.DosIsNullOrWhiteSpace()
+                    && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
+                {
+                    return "TenantMismatch";
+                }
+                if (!IsCurrentAuthVersion(claims))
+                {
+                    return "AuthVersionChanged";
+                }
+                if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
+                {
+                    return "JwtExpired";
+                }
+
+                CurrentToken tokenModel;
+                try
+                {
+                    var cache = MicroiEngine.CacheTenant.Cache(tokenOsClient);
+                    tokenModel = await cache.GetAsync<CurrentToken>($"Microi:{tokenOsClient}:LoginTokenSysUser:{userId}");
+                }
+                catch
+                {
+                    return "CacheUnavailable";
+                }
+                if (tokenModel == null || tokenModel.CurrentUser == null)
+                {
+                    return "SessionMissing";
+                }
+                if (!string.Equals(tokenModel.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal))
+                {
+                    return "AuthVersionChanged";
+                }
+                return IsActiveCachedToken(tokenModel, normalizedToken)
+                    ? "Unknown"
+                    : "TokenReplaced";
+            }
+            catch
+            {
+                return "Unknown";
+            }
         }
 
     }
