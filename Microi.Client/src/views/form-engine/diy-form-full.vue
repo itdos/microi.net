@@ -1472,7 +1472,8 @@ export default {
                 });
                 return result;
             }
-            return false;
+            // 没有配置角色按钮权限时，显示条件未明确返回 false 则默认显示。
+            return true;
         },
 
         // ========== V8引擎相关 ==========
@@ -1732,7 +1733,8 @@ export default {
                 });
                 return result;
             }
-            return false;
+            // 没有配置角色按钮权限时，显示条件未明确返回 false 则默认显示。
+            return true;
         },
 
 }

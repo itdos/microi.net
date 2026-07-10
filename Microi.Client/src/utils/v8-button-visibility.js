@@ -14,12 +14,12 @@ export async function runV8ButtonVisibilityCodeAsync(code, context) {
     return await runner.call(context.self || null, context.V8, context.row, context.btn, context.self, context.v8, context._);
 }
 
-export function resolveV8ButtonVisibility(V8, returnValue) {
+export function resolveV8ButtonVisibility(V8, returnValue, defaultValue = null) {
     if (returnValue === false || (V8 && V8.Result === false)) {
         return false;
     }
     if (returnValue === true || (V8 && V8.Result === true)) {
         return true;
     }
-    return null;
+    return defaultValue;
 }

@@ -242,8 +242,8 @@ IsPermission(type) {
                 return result;
             }
 
-            // 如果没有配置任何角色权限限制（roleLimitModel为空），与LimitEdit等保持一致
-            return false;
+            // 没有配置角色按钮权限时，显示条件未明确返回 false 则默认显示。
+            return true;
         },
         IsMicroiStoreInstallButton(btn, row) {
             var self = this;

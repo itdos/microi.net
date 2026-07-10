@@ -1,0 +1,4 @@
+interface:
+  display_name: "Microi吾码解决方案与报价"
+  short_description: "生成紧凑专业的吾码解决方案、周期与总价报价 Word"
+  default_prompt: "使用 $microi-solution-quotation 生成一份紧凑的一页 Microi吾码系统解决方案与报价 Word。"
