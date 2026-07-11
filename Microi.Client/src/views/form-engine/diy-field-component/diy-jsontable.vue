@@ -806,6 +806,10 @@ export default {
             columnConfig.value.forEach(col => {
                 newRow[col.Key] = col.DefaultValue !== undefined ? col.DefaultValue : '';
             });
+            // Id 列通常也在 Columns 中，空默认值不能覆盖前面生成的 ULID。
+            if (!newRow.Id) {
+                newRow.Id = DiyCommon.NewGuid();
+            }
             tableData.value.push(newRow);
             syncToParent();
         };
@@ -999,6 +1003,9 @@ export default {
                             newRow[key] = col?.DefaultValue !== undefined ? col.DefaultValue : '';
                         }
                     });
+                    if (!newRow.Id) {
+                        newRow.Id = DiyCommon.NewGuid();
+                    }
                     tableData.value.push(newRow);
                     addCount++;
                 }

@@ -233,26 +233,43 @@ export default {
             }
             return result;
         },
-        PageInit() {
+        async RefreshTokenWithLock() {
             var self = this;
-            var authorization = self.$localStorageManager.get("Token");
-            var expires = self.$localStorageManager.get("TokenExpires");
-            // 如果Token已过期（如长时间关闭浏览器/App后重新打开），先刷新Token再获取用户信息，避免401
-            if (authorization && expires && new Date() >= new Date(expires)) {
-                self.DiyCommon.Post(
-                    "/api/SysUser/refreshToken",
-                    { authorization: authorization },
-                    function (result) {
-                        self.GetCurrentUserApp();
-                    },
-                    function (error) {
-                        // 刷新失败仍尝试获取用户信息（会触发登录弹窗）
-                        self.GetCurrentUserApp();
-                    }
+            var refresh = async function () {
+                // 获得锁后必须重读共享存储；另一个标签页可能已经完成续签。
+                var authorization = self.$localStorageManager.get("Token");
+                var expires = self.$localStorageManager.get("TokenExpires");
+                if (!authorization || !expires || new Date() < new Date(expires)) return false;
+                await new Promise(function (resolve) {
+                    self.DiyCommon.Post(
+                        "/api/SysUser/refreshToken",
+                        { authorization: authorization },
+                        function () { resolve(); },
+                        function () { resolve(); }
+                    );
+                });
+                return true;
+            };
+
+            // Edge/Chrome 支持 Web Locks，同一租户的多个浏览器 Tab 只允许一个执行续签。
+            if (navigator.locks && typeof navigator.locks.request === "function") {
+                return await navigator.locks.request(
+                    "microi-auth-refresh:" + self.DiyCommon.GetOsClient(),
+                    refresh
                 );
-            } else {
-                self.GetCurrentUserApp();
             }
+            // 非 Web Locks 环境至少保证当前 Tab 内不会重复续签。
+            if (!window.__MicroiRefreshTokenPromise) {
+                window.__MicroiRefreshTokenPromise = refresh().finally(function () {
+                    window.__MicroiRefreshTokenPromise = null;
+                });
+            }
+            return await window.__MicroiRefreshTokenPromise;
+        },
+        async PageInit() {
+            var self = this;
+            await self.RefreshTokenWithLock();
+            self.GetCurrentUserApp();
             // 保存定时器引用，防止内存泄漏
             var refreshTokenTimer = window.setInterval(self.RefreshToken, 1000 * 60);
             self.timers.push(refreshTokenTimer);
@@ -286,20 +303,9 @@ export default {
                 }, 500);
             });
         },
-        RefreshToken() {
+        async RefreshToken() {
             var self = this;
-            var authorization = self.$localStorageManager.get("Token");
-            var expires = self.$localStorageManager.get("TokenExpires");
-            if (authorization && expires && new Date() >= new Date(expires)) {
-                self.DiyCommon.Post(
-                    "/api/SysUser/refreshToken",
-                    {
-                        authorization: authorization
-                        // _ClientType : 'PC'//这里不再传入，因为authorization包含了ClientType --by anderson 2025-06-19
-                    },
-                    function (result) {}
-                );
-            }
+            await self.RefreshTokenWithLock();
         },
         SwitchDiyChatShow() {
             var self = this;
