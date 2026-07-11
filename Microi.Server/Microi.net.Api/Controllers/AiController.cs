@@ -330,6 +330,7 @@ namespace Microi.net.Api
             [FromQuery] string SystemChatMsg = null,
             [FromQuery] string AiModel = null,
             [FromQuery] string AiModelId = null,
+            [FromQuery] string ReasoningEffort = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new AiParam();
@@ -337,6 +338,7 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
+            if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
 
@@ -361,6 +363,7 @@ namespace Microi.net.Api
             [FromQuery] string SystemChatMsg = null,
             [FromQuery] string AiModel = null,
             [FromQuery] string AiModelId = null,
+            [FromQuery] string ReasoningEffort = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new AiParam();
@@ -368,6 +371,7 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
+            if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
 
@@ -428,12 +432,14 @@ namespace Microi.net.Api
             [FromQuery] string Question = null,
             [FromQuery] string AiModel = null,
             [FromQuery] string AiModelId = null,
+            [FromQuery] string ReasoningEffort = null,
             [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new NL2SQLParam();
             if (!string.IsNullOrWhiteSpace(Question)) param.Question = Question;
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
+            if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
             var result = await _microiAi.NL2SQL(param);
@@ -463,11 +469,12 @@ namespace Microi.net.Api
         /// 自然语言转V8引擎代码（SSE流式输出）
         /// </summary>
         [HttpPost, HttpGet]
-        public async Task NL2V8Engine([FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2V8Param bodyParam, [FromQuery] string Question = null, [FromQuery] string AiModel = null, [FromQuery] string OsClient = null)
+        public async Task NL2V8Engine([FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2V8Param bodyParam, [FromQuery] string Question = null, [FromQuery] string AiModel = null, [FromQuery] string ReasoningEffort = null, [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new NL2V8Param();
             if (!string.IsNullOrEmpty(Question)) param.Question = Question;
             if (!string.IsNullOrEmpty(AiModel)) param.AiModel = AiModel;
+            if (!string.IsNullOrEmpty(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrEmpty(OsClient)) param.OsClient = OsClient;
 
             Response.ContentType = "text/event-stream; charset=utf-8";

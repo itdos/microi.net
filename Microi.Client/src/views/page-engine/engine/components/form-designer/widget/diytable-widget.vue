@@ -1,5 +1,5 @@
 <template>
-  <div class="diytable-widget" :style="{ width: '100%', height: autoHeight }">
+  <div class="diytable-widget" :class="{ 'is-design-mode': isDesignMode }" :style="{ width: '100%', height: autoHeight }">
     <div v-if="!tableId" class="widget-placeholder">
       <el-icon :size="32"><Grid /></el-icon>
       <span>DIY表格 - 请配置模块ID</span>
@@ -12,6 +12,8 @@
       :PropsSysMenuId="sysMenuId"
       :ContainerClass="containerClass"
       :LoadMode="loadMode"
+      :PageSizeList="pageSizeList"
+      :PropsEmbedded="!isDesignMode"
     />
   </div>
 </template>
@@ -34,8 +36,10 @@ const diyTableComp = shallowRef(
 )
 
 const autoHeight = computed(() => {
-  return props.widgetObj.widgetOption.height + 'px'
+  return isDesignMode.value ? props.widgetObj.widgetOption.height + 'px' : 'auto'
 })
+
+const isDesignMode = computed(() => route.path.startsWith('/mic/autopage'))
 
 const tableId = computed(() => {
   return props.widgetObj.widgetParams[0]?.value || ''
@@ -49,7 +53,24 @@ const containerClass = computed(() => {
   return props.widgetObj.widgetParams[2]?.value || ''
 })
 
-const loadMode = computed(() => route.path.startsWith('/mic/autopage') ? 'Design' : '')
+const pageSizeList = computed(() => {
+  const value = props.widgetObj.widgetParams[3]?.value
+  if (Array.isArray(value)) {
+    return Array.from(new Set(value.map(Number).filter(size => size > 0))).sort((a, b) => a - b)
+  }
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) {
+      return Array.from(new Set(parsed.map(Number).filter(size => size > 0))).sort((a, b) => a - b)
+    }
+  } catch (error) {
+    return Array.from(new Set(value.split(',').map(Number).filter(size => size > 0))).sort((a, b) => a - b)
+  }
+  return []
+})
+
+const loadMode = computed(() => isDesignMode.value ? 'Design' : '')
 
 onBeforeUnmount(() => {
   diyTableComp.value = null
@@ -58,7 +79,47 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .diytable-widget {
+  min-height: 0;
+  overflow: visible;
+}
+.diytable-widget.is-design-mode {
   overflow: auto;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .keyword-search) {
+  min-height: 32px;
+  padding: 2px 4px;
+  margin-bottom: 3px !important;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table .el-table__cell) {
+  padding: 3px 0;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table .cell) {
+  line-height: 19px;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table__body .cell > div) {
+  min-height: 0 !important;
+  height: auto !important;
+  line-height: 22px !important;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table),
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table__inner-wrapper),
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table__body-wrapper),
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table__body-wrapper .el-scrollbar),
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table__body-wrapper .el-scrollbar__wrap) {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-table .el-button) {
+  min-height: 26px;
+  height: 26px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.diytable-widget:not(.is-design-mode) :deep(.home-notice-table .el-pagination) {
+  min-height: 36px;
+  padding: 5px 8px;
+  margin: 2px 0 0 !important;
 }
 .widget-placeholder {
   display: flex;

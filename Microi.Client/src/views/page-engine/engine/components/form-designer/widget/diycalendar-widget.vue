@@ -1,14 +1,16 @@
 <template>
-  <div class="diycalendar-widget" :style="{ width: '100%', height: autoHeight }">
+  <div class="diycalendar-widget" :class="{ 'is-design-mode': isDesignMode }" :style="{ width: '100%', height: autoHeight }">
     <component
       :is="calendarComp"
       :key="'diycalendar_' + widgetObj.widgetOption.number"
+      embedded
     />
   </div>
 </template>
 
 <script setup name="diycalendar-widget">
 import { computed, defineAsyncComponent, onBeforeUnmount, shallowRef } from 'vue'
+import { useRoute } from 'vue-router'
 
 const props = defineProps({
   widgetObj: {
@@ -16,14 +18,17 @@ const props = defineProps({
     required: true,
   },
 })
+const route = useRoute()
 
 const calendarComp = shallowRef(
   defineAsyncComponent(() => import('@/views/fullcalendar/fullcalendar.vue'))
 )
 
 const autoHeight = computed(() => {
-  return props.widgetObj.widgetOption.height + 'px'
+  return isDesignMode.value ? props.widgetObj.widgetOption.height + 'px' : 'auto'
 })
+
+const isDesignMode = computed(() => route.path.startsWith('/mic/autopage'))
 
 onBeforeUnmount(() => {
   calendarComp.value = null
@@ -32,6 +37,10 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .diycalendar-widget {
+  min-height: 0;
+  overflow: visible;
+}
+.diycalendar-widget.is-design-mode {
   overflow: auto;
 }
 </style>

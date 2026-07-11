@@ -266,6 +266,7 @@ V8.MongoDb.DelFormData({ DbName:'mydb', TableName:'users', Id:'xxx' });
 ```js
 var token = V8.Method.GetCurrentToken(token, osClient);   // 返回 {OsClient,CurrentUser,Token}
 V8.Method.RefreshLoginUser(userId, osClient);
+V8.Method.ClearUserLoginInfo(userId, osClient); // 管理员清除全部终端登录信息并吊销所有Token
 var url = V8.Method.GetPrivateFileUrl({ FilePathName:'...' });
 V8.Method.AddSysLog({ Type:'', Title:'', Content:'', Level:1 });
 var guid = V8.Method.NewGuid();
@@ -511,6 +512,7 @@ console.log('调试信息')                                  // 控制台输出�
 - 绑定 `diyTableId` 的菜单默认补齐列表列、搜索列、隐藏列、排序列、统计列、移动端/卡片列和默认排序；用户显式传入的 `sys_menu` JSON 优先。
 - 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
 - 字段较多的表单默认优先生成 `diy_table.Tabs`，并给字段写入 `Tab`；整行控件才使用 `FormWidth=24`。
+
 
 ## MCP 在线应用默认发现与复杂页面规则
 

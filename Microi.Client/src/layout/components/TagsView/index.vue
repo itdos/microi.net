@@ -50,6 +50,9 @@
             <li v-if="canShowModuleDesign(selectedTag)" @click="openModuleDesign(selectedTag)">
                 <el-icon><QuestionFilled /></el-icon> {{ $t("Msg.ModuleDesign") }}
             </li>
+            <li v-if="canShowPageEngineDesign(selectedTag)" @click="openPageEngineDesign(selectedTag)">
+                <el-icon><EditPen /></el-icon> 界面设计
+            </li>
             <!-- <li @click="closeAllTags(selectedTag)"><el-icon><CircleCloseFilled /></el-icon> {{ $t('tagsView.closeAll') }}</li> -->
         </ul>
         <DiyFormFull v-if="showModuleDesignDialog" ref="refTagsViewMenuDesignDialog" />
@@ -256,7 +259,8 @@ export default {
             activeTab: "", //当前页签
             fullscreenTipVisible: false,
             fullscreenTipTimer: null,
-            showModuleDesignDialog: false
+            showModuleDesignDialog: false,
+            pageEngineDesignMap: {}
         };
     },
     watch: {
@@ -313,6 +317,15 @@ export default {
             });
         };
         window.addEventListener("microi:lang-routes-reloaded", this._langRoutesHandler);
+        this._pageEngineDesignHandler = (event) => {
+            const detail = event && event.detail ? event.detail : {};
+            if (!detail.routeFullPath || !detail.pageId) return;
+            this.pageEngineDesignMap[detail.routeFullPath] = {
+                pageId: detail.pageId,
+                title: detail.title || "界面引擎"
+            };
+        };
+        window.addEventListener("microi:page-engine-design-context", this._pageEngineDesignHandler);
     },
     beforeUnmount() {
         if (this._keyHandler) {
@@ -320,6 +333,9 @@ export default {
         }
         if (this._langRoutesHandler) {
             window.removeEventListener("microi:lang-routes-reloaded", this._langRoutesHandler);
+        }
+        if (this._pageEngineDesignHandler) {
+            window.removeEventListener("microi:page-engine-design-context", this._pageEngineDesignHandler);
         }
         if (this.fullscreenTipTimer) {
             clearTimeout(this.fullscreenTipTimer);
@@ -533,7 +549,8 @@ export default {
             if (!tag) return;
 
             const menuMinWidth = 105;
-            const menuHeight = this.canShowModuleDesign(tag) ? 195 : 155; // 预估菜单高度
+            const extraMenuItems = Number(this.canShowModuleDesign(tag)) + Number(this.canShowPageEngineDesign(tag));
+            const menuHeight = 155 + extraMenuItems * 40; // 预估菜单高度
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
             
@@ -556,7 +573,10 @@ export default {
         },
         isAdminUser() {
             const user = this.diyStore && this.diyStore.GetCurrentUser;
-            return !!(user && (user._IsAdmin || user.Level === 999 || user.Level === "999"));
+            if (!user) return false;
+            const adminValue = String(user._IsAdmin ?? "").toLowerCase();
+            const isAdmin = user._IsAdmin === true || Number(user._IsAdmin) === 1 || adminValue === "true";
+            return isAdmin || Number(user.Level || 0) >= 9999;
         },
         getSysMenuIdFromTag(tag = {}) {
             const meta = tag.meta || {};
@@ -566,6 +586,23 @@ export default {
         },
         canShowModuleDesign(tag) {
             return this.isAdminUser() && !!this.getSysMenuIdFromTag(tag);
+        },
+        getPageEngineIdFromTag(tag = {}) {
+            const meta = tag.meta || {};
+            const mapped = this.pageEngineDesignMap[tag.fullPath] || {};
+            return meta.PageEngineId || mapped.pageId || "";
+        },
+        canShowPageEngineDesign(tag) {
+            return this.isAdminUser() && !!this.getPageEngineIdFromTag(tag);
+        },
+        openPageEngineDesign(tag) {
+            const pageId = this.getPageEngineIdFromTag(tag);
+            this.closeMenu();
+            if (!pageId) {
+                this.DiyCommon.Tips("当前标签未绑定界面引擎，无法打开界面设计！", false);
+                return;
+            }
+            this.$router.push({ path: "/mic/autopage", query: { Id: pageId } });
         },
         openModuleDesign(tag) {
             const sysMenuId = this.getSysMenuIdFromTag(tag);

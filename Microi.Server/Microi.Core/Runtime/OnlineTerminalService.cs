@@ -687,6 +687,71 @@ namespace Microi.net
             return new DosResult(1, null, "已踢掉该终端");
         }
 
+        /// <summary>
+        /// 清除指定用户的全部终端登录信息，立即吊销其所有 Token，并向在线终端推送强制退出事件。
+        /// </summary>
+        public static async Task<DosResult> ClearUserLoginInfoAsync(
+            string osClient,
+            JObject operatorUser,
+            string targetUserId,
+            string reason = null)
+        {
+            var operatorUserId = operatorUser?["Id"]?.Val<string>() ?? "";
+            var operatorLevel = operatorUser?["Level"]?.Val<int>() ?? 0;
+            var isAdmin = operatorLevel >= 9999 || (operatorUser?["_IsAdmin"]?.Val<bool>() ?? false);
+            if (operatorUserId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(1001, null, "登录身份已过期");
+            }
+            if (!isAdmin)
+            {
+                return new DosResult(0, null, "仅系统管理员可清除用户登录信息");
+            }
+            if (osClient.DosIsNullOrWhiteSpace() || targetUserId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "租户和用户Id不能为空");
+            }
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var loginTokenKey = GetLoginTokenKey(osClient, targetUserId);
+            var tokenModel = await cache.GetAsync<CurrentToken>(loginTokenKey).ConfigureAwait(false);
+            var revokedTokenCount = tokenModel?.Tokens?.Count ?? (tokenModel?.Token.DosIsNullOrWhiteSpace() == false ? 1 : 0);
+            var clientInfo = await cache.GetAsync<ClientInfo>(GetChatOnlineKey(osClient, targetUserId)).ConfigureAwait(false)
+                             ?? cache.HashGet<ClientInfo>(GetOnlineHashKey(osClient), targetUserId);
+            var connectionIds = (clientInfo?.ConnectionIds ?? new List<string>())
+                .Concat(clientInfo?.Terminals?.Select(d => d?.ConnectionId) ?? Enumerable.Empty<string>())
+                .Where(d => !d.DosIsNullOrWhiteSpace() && !IsTokenConnectionId(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // 先删除用户级 Token 集合。旧 Token、轮换宽限 Token 和 RefreshToken 都会立即失去 Redis 事实源。
+            await cache.RemoveAsync(loginTokenKey).ConfigureAwait(false);
+
+            var logoutReason = reason.DosIsNullOrWhiteSpace("登录信息已被管理员清除，请重新登录。");
+            if (RealtimePushRuntime.IsConfigured && connectionIds.Count > 0)
+            {
+                await RealtimePushRuntime.SendAsync(
+                    connectionIds,
+                    "ReceiveForceLogout",
+                    new
+                    {
+                        Reason = logoutReason,
+                        Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    }).ConfigureAwait(false);
+            }
+
+            await cache.RemoveAsync(GetChatOnlineKey(osClient, targetUserId)).ConfigureAwait(false);
+            cache.HashDelete(GetOnlineHashKey(osClient), targetUserId);
+            await NotifyOnlineChangedAsync(osClient, targetUserId).ConfigureAwait(false);
+
+            return new DosResult(1, new
+            {
+                UserId = targetUserId,
+                RevokedTokenCount = revokedTokenCount,
+                ForcedTerminalCount = connectionIds.Count
+            }, "用户所有终端登录信息已清除");
+        }
+
         private static void NormalizeTerminalList(ClientInfo clientInfo)
         {
             NormalizeTerminalList(clientInfo, null);
