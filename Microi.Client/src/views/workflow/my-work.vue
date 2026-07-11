@@ -11,7 +11,7 @@
             </div>
         </div>
         <!-- 三个主Tab：我的工作 / 日历 / 公告 -->
-        <el-tabs v-model="MainTab" class="main-tabs" @tab-click="MainTabChange">
+        <el-tabs v-model="MainTab" class="main-tabs" :class="{ 'is-embedded': embedded }" @tab-click="MainTabChange">
             <!-- ====== Tab 1: 我的工作 ====== -->
             <el-tab-pane name="work" :lazy="true">
                 <template #label>
@@ -61,8 +61,27 @@
                         </div>
                     </div>
 
+                    <DiyTable
+                        v-if="useFormEngineWorkTable"
+                        ref="refWorkflowDiyTable"
+                        :key="'workflow_diy_table_' + WorkType + '_' + currentWorkflowMenuId"
+                        :PropsSysMenuId="currentWorkflowMenuId"
+                        :PropsSelectApi="workflowSelectApi"
+                        :PropsRequestParams="{ WorkType: WorkType }"
+                        :PropsVirtualFields="workflowVirtualFields"
+                        :PropsSelectFields="workflowSelectFields"
+                        :PropsSearchFields="workflowSearchFields"
+                        :PropsMenuModelPatch="workflowMenuPatch"
+                        :EnableMultipleSelect="WorkType === 'Todo'"
+                        :ParentV8="workflowParentV8"
+                        PropsHideImportExport
+                        PropsHideMoreFunctions
+                        PropsHideAdminDesign
+                        ContainerClass="workflow-form-engine-table"
+                    />
+
                     <!-- 工具栏 —— PC端 -->
-                    <div class="work-toolbar" v-if="!diyStore.IsPhoneView">
+                    <div class="work-toolbar" v-if="!useFormEngineWorkTable && !diyStore.IsPhoneView">
                         <el-button v-if="WorkType == 'Todo'" :type="SelectList.length > 0 ? 'primary' : ''" @click="BatchApproval()">
                             <el-icon class="more-btn mr-1"><CircleCheck /></el-icon> 批量审批
                         </el-button>
@@ -77,7 +96,7 @@
 
                     <!-- 我的待办表格（wf_work）—— PC端 -->
                     <el-table
-                        v-show="WorkType == 'Todo' && !diyStore.IsPhoneView"
+                        v-show="!useFormEngineWorkTable && WorkType == 'Todo' && !diyStore.IsPhoneView"
                         v-loading="TableLoading"
                         :data="MyWorkList"
                         @selection-change="TableRowSelectionChange"
@@ -136,7 +155,7 @@
 
                     <!-- 我发起的/我处理的/抄送我的/我相关的表格（wf_flow）—— PC端 -->
                     <el-table
-                        v-show="WorkType != 'Todo' && !diyStore.IsPhoneView"
+                        v-show="!useFormEngineWorkTable && WorkType != 'Todo' && !diyStore.IsPhoneView"
                         v-loading="TableLoading"
                         :data="MyWorkList"
                         style="width: 100%"
@@ -199,7 +218,7 @@
 
                     <!-- 分页 —— PC端 -->
                     <el-pagination
-                        v-if="!diyStore.IsPhoneView"
+                        v-if="!useFormEngineWorkTable && !diyStore.IsPhoneView"
                         class="work-pagination"
                         background
                         layout="total, sizes, prev, pager, next, jumper"
@@ -212,7 +231,7 @@
                     />
 
                     <!-- ====== 移动端卡片列表 ====== -->
-                    <div v-if="diyStore.IsPhoneView" class="wf-mobile-cards" v-loading="TableLoading && MyWorkList.length === 0">
+                    <div v-if="!useFormEngineWorkTable && diyStore.IsPhoneView" class="wf-mobile-cards" v-loading="TableLoading && MyWorkList.length === 0">
                         <!-- 移动端搜索 -->
                         <div class="wf-mobile-search">
                             <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })" clearable>
@@ -363,14 +382,38 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import MicroiCalendar from "@/views/fullcalendar/fullcalendar.vue";
 
 export default {
     name: "diy_my_work",
-    components: { MicroiCalendar },
+    components: {
+        MicroiCalendar,
+        DiyTable: defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"))
+    },
+    props: {
+        initialTab: {
+            type: String,
+            default: "work",
+            validator: function (value) {
+                return ["work", "calendar", "notice"].includes(value);
+            }
+        },
+        embedded: {
+            type: Boolean,
+            default: false
+        },
+        workMenuId: {
+            type: String,
+            default: ""
+        },
+        flowMenuId: {
+            type: String,
+            default: ""
+        }
+    },
     setup() {
         const diyStore = useDiyStore();
         const OsClient = computed(() => diyStore.OsClient);
@@ -381,10 +424,142 @@ export default {
             GetCurrentUser
         };
     },
+    computed: {
+        useFormEngineWorkTable() {
+            return !!(this.workMenuId && this.flowMenuId);
+        },
+        currentWorkflowMenuId() {
+            return this.WorkType === "Todo" ? this.workMenuId : this.flowMenuId;
+        },
+        workflowSelectApi() {
+            return this.WorkType === "Todo" ? "/api/WorkFlow/getWFWork" : "/api/WorkFlow/getWFFlow";
+        },
+        workflowSelectFields() {
+            var names = this.WorkType === "Todo"
+                ? ["FlowTitle", "NoticeFields", "Sender", "NodeName", "FirstSender", "CreateTime"]
+                : ["FlowTitle", "NoticeFields"].concat(this.WorkType === "Sender" ? [] : ["NodeName"]).concat(["FirstSender", "FlowState", "CreateTime"]);
+            return names.map(function (name) { return { Name: name }; });
+        },
+        workflowSearchFields() {
+            return [{ Name: "FlowTitle" }];
+        },
+        workflowVirtualFields() {
+            return [
+                { Name: "FlowTitle", Label: "标题", Component: "Text", TableWidth: 200, Sort: 10 },
+                {
+                    Name: "NoticeFields",
+                    Label: "内容",
+                    Component: "Text",
+                    TableWidth: 280,
+                    Sort: 20,
+                    V8TmpEngineTable: "return V8.ParentV8 && V8.ParentV8.RenderNotice ? V8.ParentV8.RenderNotice(V8.Form) : '';"
+                },
+                { Name: "Sender", Label: "发送人", Component: "Text", TableWidth: 100, Sort: 30 },
+                {
+                    Name: "NodeName",
+                    Label: "节点名称",
+                    Component: "Text",
+                    TableWidth: 120,
+                    Sort: 40,
+                    V8TmpEngineTable: "return V8.ParentV8 && V8.ParentV8.RenderNodeName ? V8.ParentV8.RenderNodeName(V8.Form) : (V8.Form.NodeName || '');"
+                },
+                { Name: "FirstSender", Label: "发起人", Component: "Text", TableWidth: 100, Sort: 50 },
+                {
+                    Name: "FlowState",
+                    Label: "流程状态",
+                    Component: "Text",
+                    TableWidth: 100,
+                    Sort: 60,
+                    V8TmpEngineTable: "return V8.ParentV8 && V8.ParentV8.RenderFlowState ? V8.ParentV8.RenderFlowState(V8.Form.FlowState) : V8.Form.FlowState;"
+                },
+                { Name: "CreateTime", Label: "创建时间", Component: "DateTime", TableWidth: 150, Sort: 70 }
+            ];
+        },
+        workflowMenuPatch() {
+            var buttons = this.WorkType === "Todo"
+                ? [
+                    {
+                        Id: "home_work_handle",
+                        Name: "去处理",
+                        Icon: "far fa-clipboard-check",
+                        ShowRow: true,
+                        Sort: 10,
+                        V8Code: "return V8.ParentV8.OpenWork(V8.Form, 'Edit');"
+                    },
+                    {
+                        Id: "home_work_cancel",
+                        Name: "作废",
+                        Icon: "fas fa-ban",
+                        ShowRow: false,
+                        Sort: 20,
+                        V8Code: "return V8.ParentV8.OpenWork(V8.Form, 'View', 'Cancel');"
+                    }
+                ]
+                : [
+                    {
+                        Id: "home_work_view",
+                        Name: "查看",
+                        Icon: "far fa-eye",
+                        ShowRow: true,
+                        Sort: 10,
+                        V8Code: "return V8.ParentV8.OpenWork(V8.Form, 'View');"
+                    },
+                    {
+                        Id: "home_work_recall",
+                        Name: "撤回",
+                        Icon: "fas fa-rotate-left",
+                        ShowRow: false,
+                        Sort: 20,
+                        V8CodeShow: "return V8.ParentV8.CanRecall(V8.Form);",
+                        V8Code: "return V8.ParentV8.OpenWork(V8.Form, 'View', 'Recall');"
+                    }
+                ];
+            return {
+                MoreBtns: buttons,
+                PageTabs: [],
+                PageBtns: [],
+                ExportMoreBtns: [],
+                NotShowFields: ["UserName", "UpdateTime"],
+                BatchSelectMoreBtns: this.WorkType === "Todo" ? [
+                    {
+                        Id: "home_work_batch_approval",
+                        Name: "批量审批",
+                        Icon: "far fa-circle-check",
+                        Sort: 10,
+                        V8Code: "return V8.ParentV8.BatchApproval(V8.SelectedData);"
+                    }
+                ] : [],
+                AddCodeShowV8: "return false;",
+                EditCodeShowV8: "return false;",
+                DelCodeShowV8: "return false;",
+                DetailCodeShowV8: "return false;",
+                IsShowImport: false,
+                IsShowExport: false
+            };
+        },
+        workflowParentV8() {
+            var self = this;
+            return {
+                OpenWork: function (row, mode, action) { return self.OpenWork(row, mode, action); },
+                BatchApproval: function (rows) {
+                    self.SelectList = Array.isArray(rows) ? rows.slice() : [];
+                    return self.BatchApproval();
+                },
+                CanRecall: function (row) {
+                    return (self.WorkType === "Done" || self.WorkType === "Sender")
+                        && row.FlowState !== "End"
+                        && row.FlowState !== "Cancel";
+                },
+                RenderNotice: function (row) { return self.GetNotice(row); },
+                RenderNodeName: function (row) { return self.GetNodeName(row); },
+                RenderFlowState: function (state) { return self.GetFlowState(state); }
+            };
+        }
+    },
     watch: {},
     data() {
         return {
-            MainTab: "work",
+            MainTab: this.initialTab,
             TabsModel: "mywork",
             OpenFormType: "Diy", //Diy、Custom
             OpenFormMode: "",
@@ -419,9 +594,17 @@ export default {
     },
     mounted() {
         var self = this;
-        self.GetList();
-        self.loadWFStats();
-        self.loadUnreadCount();
+        if (self.MainTab === "work") {
+            if (!self.useFormEngineWorkTable) {
+                self.GetList();
+            }
+            self.loadWFStats();
+        } else if (self.MainTab === "notice") {
+            self.loadNoticeList();
+        }
+        if (!self.embedded) {
+            self.loadUnreadCount();
+        }
         // 移动端无限滚动
         if (self.diyStore.IsPhoneView) {
             self._mobileScrollHandler = function () {
@@ -508,7 +691,9 @@ export default {
             var self = this;
             self.PageIndex = 1;
             self.WorkType = type;
-            self.GetList({ PageIndex: 1 });
+            if (!self.useFormEngineWorkTable) {
+                self.GetList({ PageIndex: 1 });
+            }
         },
         toggleNoticeExpand(item) {
             item._expanded = !item._expanded;
@@ -521,6 +706,10 @@ export default {
         // ====== 工作流（保留所有原有功能） ======
         GetList(param) {
             var self = this;
+            if (self.useFormEngineWorkTable) {
+                self.refreshWorkTable(param);
+                return;
+            }
             if (self.WorkType == "Todo") {
                 self.GetWFWork(param);
             } else {
@@ -577,9 +766,22 @@ export default {
             var self = this;
             if (param.Code === 1) {
                 self.ShowFieldFormDrawer = false;
-                self.GetList({ PageIndex: 1 });
+                self.refreshWorkTable({ _PageIndex: 1 });
                 self.loadWFStats();
             }
+        },
+        refreshWorkTable(param) {
+            var self = this;
+            if (self.useFormEngineWorkTable) {
+                self.$nextTick(function () {
+                    var table = self.$refs.refWorkflowDiyTable;
+                    if (table && typeof table.GetDiyTableRow === "function") {
+                        table.GetDiyTableRow(param || { _PageIndex: 1 });
+                    }
+                });
+                return;
+            }
+            self.GetList(param || { PageIndex: 1 });
         },
         GetNodeName(model) {
             var self = this;
@@ -950,7 +1152,7 @@ export default {
                     }
                     self.DiyCommon.Tips("批量审批失败明细：<br>" + failMsg, false, 15);
                 }
-                self.GetWFWork({ PageIndex: 1 });
+                self.refreshWorkTable({ _PageIndex: 1 });
                 self.loadWFStats();
             });
         },
@@ -1057,10 +1259,33 @@ export default {
     }
 }
 
+.main-tabs.is-embedded {
+    border-radius: 0;
+    box-shadow: none;
+
+    :deep(> .el-tabs__header) {
+        display: none;
+    }
+
+    :deep(> .el-tabs__content) {
+        padding: 0;
+    }
+}
+
 .main-tab-label {
     display: inline-flex;
     align-items: center;
     gap: 2px;
+}
+
+:deep(.workflow-form-engine-table .box-card-table-row-list) {
+    border: 0;
+    box-shadow: none;
+}
+
+:deep(.workflow-form-engine-table .el-card__body) {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 // ====== 统计卡片 ======

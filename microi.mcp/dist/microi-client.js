@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { API } from './api-paths.js';
+import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const NO_LOGIN_CODE = 1001;
@@ -31,7 +32,7 @@ export class MicroiClient {
         this.did = process.env.MICROI_MCP_DID || `MCP:${os.hostname() || 'Unknown'}`;
         // 如果直接传入 token，跳过登录流程
         if (config.token) {
-            this.token = config.token;
+            this.token = normalizeAuthorizationToken(config.token);
         }
     }
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
@@ -45,7 +46,7 @@ export class MicroiClient {
     }
     /** 外部更新 token（由 VS Code 扩展 token 文件同步） */
     updateToken(newToken) {
-        this.token = newToken;
+        this.token = normalizeAuthorizationToken(newToken);
     }
     /** 登录并获取 JWT token（若已有 token 则直接启动刷新）
      *  注意：即便传入了 token（来自 VS Code 扩展的 token 文件），也始终启动 MCP 自身的自动刷新作为兜底，
@@ -93,17 +94,19 @@ export class MicroiClient {
         if (!token) {
             throw new Error('Login succeeded but no token in response header');
         }
-        this.token = token;
+        this.token = normalizeAuthorizationToken(token);
         this.startAutoRefresh();
         console.error('[microi-mcp] Login successful');
     }
-    /** 每 12 分钟自动刷新 token（token 有效期通常 15 分钟） */
+    /** 每小时检查一次长效 Token，仅在临近到期时换新，避免多 MCP 进程竞争刷新。 */
     startAutoRefresh() {
         if (this.refreshTimer)
             clearInterval(this.refreshTimer);
         this.refreshTimer = setInterval(() => {
-            this.refreshTokenNow().catch((e) => console.error('[microi-mcp] Token refresh failed:', e));
-        }, 12 * 60 * 1000);
+            if (shouldRefreshAuthorizationToken(this.token)) {
+                this.refreshTokenNow().catch((e) => console.error('[microi-mcp] Token refresh failed:', e));
+            }
+        }, 60 * 60 * 1000);
     }
     /** 立即调用 /api/SysUser/RefreshToken 以旧换新；成功后回写 token 文件。
      *  并发请求会复用同一个 in-flight Promise。
@@ -138,7 +141,7 @@ export class MicroiClient {
                 }
                 catch { /* ignore */ }
                 if (newToken && json?.Code === 1) {
-                    this.token = newToken;
+                    this.token = normalizeAuthorizationToken(newToken);
                     this.writeTokenToFile();
                     console.error('[microi-mcp] Token refreshed');
                     return true;
@@ -166,8 +169,9 @@ export class MicroiClient {
             const apiUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
             const osClient = this.config.osClient || '';
             const fileToken = osClient ? tokens[`${apiUrl}|${osClient}`] : tokens[apiUrl];
-            if (fileToken && fileToken !== this.token) {
-                this.token = fileToken;
+            const normalizedFileToken = normalizeAuthorizationToken(fileToken);
+            if (normalizedFileToken && normalizedFileToken !== this.token) {
+                this.token = normalizedFileToken;
                 return true;
             }
         }
@@ -262,7 +266,7 @@ export class MicroiClient {
         });
         const newToken = res.headers.get('authorization');
         if (newToken) {
-            this.token = newToken;
+            this.token = normalizeAuthorizationToken(newToken);
             this.writeTokenToFile();
         }
         const text = await res.text();
@@ -398,8 +402,32 @@ export class MicroiClient {
             MsKey: msKey,
         });
     }
+    async listApplications(data = {}) {
+        return this.post(API.LIST_APPLICATIONS, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async getApplicationContext(data) {
+        return this.post(API.GET_APPLICATION_CONTEXT, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async getApplicationFile(data) {
+        return this.post(API.GET_APPLICATION_FILE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
     async createMicroService(data) {
         return this.post(API.CREATE_MICRO_SERVICE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async syncMicroServiceSource(data) {
+        return this.post(API.SYNC_MICRO_SERVICE_SOURCE, {
             OsClient: this.config.osClient,
             ...data,
         });

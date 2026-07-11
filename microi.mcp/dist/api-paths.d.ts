@@ -14,8 +14,12 @@ export declare const API: {
     readonly CREATE_ENGINE: "/api/V8Engine/CreateApiEngine";
     readonly EXECUTE_ENGINE: "/api/V8Engine/ExecuteApiEngine";
     readonly UPLOAD_FILE_BASE64: "/api/V8Engine/UploadFileBase64";
+    readonly LIST_APPLICATIONS: "/api/V8Engine/ListApplications";
+    readonly GET_APPLICATION_CONTEXT: "/api/V8Engine/GetApplicationContext";
+    readonly GET_APPLICATION_FILE: "/api/V8Engine/GetApplicationFile";
     readonly GET_MICRO_SERVICE: "/api/V8Engine/GetMicroService";
     readonly CREATE_MICRO_SERVICE: "/api/V8Engine/CreateMicroService";
+    readonly SYNC_MICRO_SERVICE_SOURCE: "/api/V8Engine/SyncMicroServiceSource";
     readonly PUBLISH_MICRO_SERVICE: "/api/V8Engine/PublishMicroService";
     readonly GET_EVENT_LIST: "/api/V8Engine/GetV8EventList";
     readonly GET_EVENT_CODE: "/api/V8Engine/GetV8EventCode";

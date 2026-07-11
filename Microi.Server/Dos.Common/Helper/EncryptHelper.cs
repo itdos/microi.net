@@ -181,6 +181,142 @@ namespace Dos.Common
             }
         }
 
+        /// <summary>
+        /// AES-256-CBC encryption with HMAC-SHA256 integrity protection.
+        /// The caller-provided key is expanded into independent encryption and MAC keys.
+        /// </summary>
+        public static string AESEncrypt(string plainText, string key)
+        {
+            if (plainText == null)
+            {
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("AES key cannot be empty.", nameof(key));
+            }
+
+            byte[] keyMaterial;
+            using (var sha512 = System.Security.Cryptography.SHA512.Create())
+            {
+                keyMaterial = sha512.ComputeHash(Encoding.UTF8.GetBytes(key));
+            }
+
+            var encryptionKey = new byte[32];
+            var macKey = new byte[32];
+            Buffer.BlockCopy(keyMaterial, 0, encryptionKey, 0, encryptionKey.Length);
+            Buffer.BlockCopy(keyMaterial, encryptionKey.Length, macKey, 0, macKey.Length);
+
+            byte[] iv = new byte[16];
+            using (var random = RandomNumberGenerator.Create())
+            {
+                random.GetBytes(iv);
+            }
+
+            byte[] cipherBytes;
+            using (var aes = Aes.Create())
+            {
+                aes.Key = encryptionKey;
+                aes.IV = iv;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+                using (var encryptor = aes.CreateEncryptor())
+                {
+                    var plainBytes = Encoding.UTF8.GetBytes(plainText);
+                    cipherBytes = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+                }
+            }
+
+            var authenticatedBytes = new byte[1 + iv.Length + cipherBytes.Length];
+            authenticatedBytes[0] = 1;
+            Buffer.BlockCopy(iv, 0, authenticatedBytes, 1, iv.Length);
+            Buffer.BlockCopy(cipherBytes, 0, authenticatedBytes, 1 + iv.Length, cipherBytes.Length);
+
+            byte[] mac;
+            using (var hmac = new HMACSHA256(macKey))
+            {
+                mac = hmac.ComputeHash(authenticatedBytes);
+            }
+
+            var payload = new byte[authenticatedBytes.Length + mac.Length];
+            Buffer.BlockCopy(authenticatedBytes, 0, payload, 0, authenticatedBytes.Length);
+            Buffer.BlockCopy(mac, 0, payload, authenticatedBytes.Length, mac.Length);
+            return "aes1:" + Convert.ToBase64String(payload);
+        }
+
+        /// <summary>
+        /// Decrypts values produced by AESEncrypt and rejects modified ciphertext.
+        /// </summary>
+        public static string AESDecrypt(string encryptedText, string key)
+        {
+            if (encryptedText == null)
+            {
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("AES key cannot be empty.", nameof(key));
+            }
+            if (!encryptedText.StartsWith("aes1:", StringComparison.Ordinal))
+            {
+                throw new CryptographicException("Unsupported AES payload format.");
+            }
+
+            var payload = Convert.FromBase64String(encryptedText.Substring(5));
+            const int versionAndIvLength = 17;
+            const int macLength = 32;
+            if (payload.Length <= versionAndIvLength + macLength || payload[0] != 1)
+            {
+                throw new CryptographicException("Invalid AES payload.");
+            }
+
+            byte[] keyMaterial;
+            using (var sha512 = System.Security.Cryptography.SHA512.Create())
+            {
+                keyMaterial = sha512.ComputeHash(Encoding.UTF8.GetBytes(key));
+            }
+
+            var encryptionKey = new byte[32];
+            var macKey = new byte[32];
+            Buffer.BlockCopy(keyMaterial, 0, encryptionKey, 0, encryptionKey.Length);
+            Buffer.BlockCopy(keyMaterial, encryptionKey.Length, macKey, 0, macKey.Length);
+
+            var authenticatedLength = payload.Length - macLength;
+            var authenticatedBytes = new byte[authenticatedLength];
+            var suppliedMac = new byte[macLength];
+            Buffer.BlockCopy(payload, 0, authenticatedBytes, 0, authenticatedLength);
+            Buffer.BlockCopy(payload, authenticatedLength, suppliedMac, 0, macLength);
+
+            byte[] expectedMac;
+            using (var hmac = new HMACSHA256(macKey))
+            {
+                expectedMac = hmac.ComputeHash(authenticatedBytes);
+            }
+            if (!CryptographicOperations.FixedTimeEquals(expectedMac, suppliedMac))
+            {
+                throw new CryptographicException("AES payload integrity check failed.");
+            }
+
+            var iv = new byte[16];
+            Buffer.BlockCopy(authenticatedBytes, 1, iv, 0, iv.Length);
+            var cipherLength = authenticatedLength - versionAndIvLength;
+            var cipherBytes = new byte[cipherLength];
+            Buffer.BlockCopy(authenticatedBytes, versionAndIvLength, cipherBytes, 0, cipherLength);
+
+            using (var aes = Aes.Create())
+            {
+                aes.Key = encryptionKey;
+                aes.IV = iv;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+                using (var decryptor = aes.CreateDecryptor())
+                {
+                    var plainBytes = decryptor.TransformFinalBlock(cipherBytes, 0, cipherBytes.Length);
+                    return Encoding.UTF8.GetString(plainBytes);
+                }
+            }
+        }
+
         public static string MD5Encrypt(string str, int code)
         {
             using (var md5 = MD5.Create())

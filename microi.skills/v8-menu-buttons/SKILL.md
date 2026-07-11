@@ -84,6 +84,7 @@ if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
 | `V8.RefreshTable({_PageIndex:1})` | 刷新列表 |
 | `V8.SearchSet({Field:value})` | 设置/重置筛选条件（PageTabs 常用）|
 | `V8.OpenAnyForm({...})` | 弹出任意表单（核心：可替换提交事件）|
+| `V8.OpenAppDialog({...})` | 按 AppKey 打开已发布在线微服务定制页 |
 | `V8.FormSubmit({...})` | 提交当前表单 |
 | `V8.FormSet(field, val)` | 修改表单字段 |
 | `V8.ApiEngine.Run({...})` | 调用接口引擎（业务逻辑必走）|
@@ -162,6 +163,62 @@ V8.ConfirmTips('确认领取该任务？', function () {
   });
 });
 ```
+
+## 4.1 模式 B2：在线微服务定制页（OpenAppDialog）
+
+当弹窗包含复杂布局、多步骤交互、实时校验或后续需要 AI 在线维护时，优先把页面实现为在线微服务，按钮 V8 代码只负责打开页面、传入上下文和接收结果。不要把长篇 HTML/CSS 写进 `V8Code`。
+
+```js
+V8.OpenAppDialog({
+  AppKey: 'order_batch_processor',
+  RoutePath: '/execute',
+  Title: '批量处理订单',
+  TitleIcon: 'fas fa-layer-group',
+  Width: 'min(960px, calc(100vw - 32px))',
+  OpenType: 'Dialog',
+  Data: {
+    ids: (V8.TableRowSelected || []).map(function (row) { return row.Id; }),
+    source: 'order-list'
+  },
+  OnSuccess: function (data) {
+    V8.Tips(data.message || '处理成功', true);
+    V8.RefreshTable({ _PageIndex: -1 });
+  },
+  OnCancel: function () {},
+  OnError: function (error) {
+    V8.Tips(error.message || '应用执行失败', false);
+  }
+});
+```
+
+参数规则：
+
+| 参数 | 必传 | 默认值 | 用法 |
+|------|------|--------|------|
+| `AppKey` | 是 | - | `sys_microiservice.MsKey`，目标微服务必须已经编译发布。 |
+| `RoutePath` | 否 | `/` | 子应用内部路由；`MicroRoute` 是兼容别名，优先取 `RoutePath`。 |
+| `Version` | 否 | 当前 `BuildVersion` | 固定加载某个发布版本；通常省略以使用当前版本。 |
+| `Title` | 否 | `应用` | Dialog/Drawer 标题。 |
+| `TitleIcon` | 否 | `fas fa-window-maximize` | 标题图标 class。 |
+| `Width` | 否 | `min(920px, calc(100vw - 32px))` | CSS 宽度值，推荐带移动端安全边距。 |
+| `OpenType` | 否 | `Dialog` | `Dialog` 或 `Drawer`。 |
+| `Data` | 否 | `{}` | 业务参数，子应用从 `window.microApp.getData().dialogData` 获取；只放普通可序列化数据。 |
+| `OnSuccess(data)` | 否 | - | 子应用成功回调，回调后自动关闭。 |
+| `OnCancel(data)` | 否 | - | 子应用取消回调，回调后自动关闭。 |
+| `OnError(error)` | 否 | - | 加载或执行错误回调，不自动关闭。 |
+
+宿主还会自动传入 `apiBase`、`osClient`、`token`、`appKey`、`version`、`microRoute`、`dialog:true`。子应用返回协议：
+
+```js
+window.microApp.dispatch({ type: 'app-dialog:success', data: { message: '已提交' } });
+window.microApp.dispatch({ type: 'app-dialog:cancel', data: {} });
+window.microApp.dispatch({ type: 'app-dialog:error', data: { message: '校验失败' } });
+```
+
+- `success` / `cancel` 会自动关闭，`error` 保持页面打开。
+- 禁止把回调函数放进 `Data`；回调必须使用 `OnSuccess` / `OnCancel` / `OnError`。
+- 不要把 Token 拼接到 URL；使用宿主自动下发的 `token`。
+- `OpenAppDialog` 加载在线微服务；`OpenDialog` 加载 Microi.Client 内已注册的 Vue 组件，两者不要混用。
 
 ## 5. 模式 C：状态机推进（无需弹窗）
 
@@ -372,6 +429,37 @@ V8.ConfirmTips(html, function () {
 
 ❌ `BatchSelectMoreBtns` 用 `V8.Form` 取数据
 ✅ 必须用 `V8.TableRowSelected`
+
+❌ 在 `V8.ConfirmTips` 中拼接复杂 HTML、表单、列表、Tab、代码编辑器或多步骤向导
+✅ 先用 `microi_list_applications` / `microi_get_application_context` 查找现有微服务；优先在已有微服务新增页面，否则通过 MCP 创建微服务，再用 `V8.OpenAppDialog` 打开
+
+## 10.2 复杂定制弹窗必须使用微服务
+
+`V8.ConfirmTips` 只适合纯文本确认或极少量一次性输入。出现以下任一情况即视为复杂页面：三个以上字段、响应式布局、联动校验、上传、表格、Tab、步骤条、代码编辑器、需要复用、后续会持续迭代。
+
+复杂页面标准流程：
+
+1. `microi_list_applications({ appType: 'MicroService' })` 获取现有微服务及文件清单。
+2. `microi_get_application_context({ appIdOrKey: '<AppKey>' })` 读取完整源码，判断应新增页面还是新建应用。
+3. 新建时使用 `microi_create_microservice` 注册元数据，`microi_sync_microservice_source` 上传私有源码，`microi_publish_microservice` 上传公有编译产物和页面路由。
+4. 菜单按钮只负责调用 `V8.OpenAppDialog`，把业务数据放入 `Data`，通过 `OnSuccess / OnError / OnClose` 与宿主交互。
+
+```js
+V8.OpenAppDialog({
+  AppKey: 'official-admin-app',
+  RoutePath: '/tenant/create',
+  Title: '创建租户',
+  Width: 'min(960px, calc(100vw - 32px))',
+  Data: { Source: 'SaaSMenu' },
+  OnSuccess: function (result) {
+    V8.Tips((result && result.message) || '处理成功', true);
+    V8.RefreshTable({ _PageIndex: -1 });
+  },
+  OnError: function (error) {
+    V8.Tips((error && error.message) || '页面处理失败', false);
+  }
+});
+```
 
 ---
 

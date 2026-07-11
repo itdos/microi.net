@@ -659,7 +659,8 @@ namespace Microi.net.Api
                     {
                         CurrentUser = sysUser,
                         OsClient = tokenOsClient,
-                        _ClientType = clientType
+                        _ClientType = clientType,
+                        RotateFromToken = token
                     });
                     if (getTokenResult.Code != 1)
                     {

@@ -34,6 +34,10 @@ namespace Microi.net
         /// </summary>
         public int MaxKeys { get; set; } = 1000;
         /// <summary>
+        /// 是否递归列出全部子目录。
+        /// </summary>
+        public bool? Recursive { get; set; }
+        /// <summary>
         /// 搜索关键字
         /// </summary>
         public string Keyword { get; set; }

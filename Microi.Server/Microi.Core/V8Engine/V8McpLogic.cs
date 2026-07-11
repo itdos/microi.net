@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -3971,6 +3972,231 @@ namespace Microi.net
 
         #endregion
 
+        #region AI Applications
+
+        private static readonly HashSet<string> AiApplicationTextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".vue", ".js", ".jsx", ".ts", ".tsx", ".json", ".html", ".htm", ".css", ".scss", ".sass", ".less",
+            ".md", ".txt", ".xml", ".yaml", ".yml", ".toml", ".ini", ".env", ".cs", ".csproj", ".sln",
+            ".java", ".kt", ".go", ".py", ".php", ".rb", ".rs", ".sql", ".sh", ".ps1", ".bat", ".cmd"
+        };
+
+        private static async Task<JObject> FindAiApplication(string osClient, string appIdOrKey)
+        {
+            if (IsBlank(appIdOrKey)) return null;
+            var byId = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+            {
+                OsClient = osClient,
+                Id = appIdOrKey
+            });
+            if (byId.Code == 1 && byId.Data != null) return JObject.FromObject(byId.Data);
+
+            var byKey = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+            {
+                OsClient = osClient,
+                _Where = new List<object> { new List<object> { "AppKey", "=", appIdOrKey } }
+            });
+            return byKey.Code == 1 && byKey.Data != null ? JObject.FromObject(byKey.Data) : null;
+        }
+
+        private static async Task<JArray> GetAiApplicationFiles(string osClient, string appId)
+        {
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mci_ai_app_file", new
+            {
+                OsClient = osClient,
+                _Where = new List<object> { new List<object> { "AppId", "=", appId } },
+                _OrderBy = "FilePath",
+                _OrderByType = "ASC",
+                _PageSize = 5000
+            });
+            return result.Code == 1 && result.Data != null ? JArray.FromObject(result.Data) : new JArray();
+        }
+
+        private static async Task<JObject> ReadAiApplicationFile(string osClient, JObject file, bool includeContents, long maxFileBytes)
+        {
+            var item = (JObject)file.DeepClone();
+            if (!includeContents || item["IsDirectory"]?.Val<int?>() == 1) return item;
+
+            var hdfsPath = SafeJString(item, "HdfsPath");
+            if (IsBlank(hdfsPath))
+            {
+                item["Content"] = "";
+                item["ContentReadError"] = "HdfsPath 为空";
+                return item;
+            }
+
+            var size = item["Size"]?.Val<long?>() ?? 0L;
+            if (maxFileBytes > 0 && size > maxFileBytes)
+            {
+                item["ContentSkipped"] = true;
+                item["ContentReadError"] = $"文件超过单文件读取限制 {maxFileBytes} bytes";
+                return item;
+            }
+
+            var fileResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
+            {
+                OsClient = osClient,
+                FilePathName = hdfsPath,
+                Limit = true
+            });
+            if (fileResult.Code != 1)
+            {
+                item["ContentReadError"] = fileResult.Msg ?? "读取 HDFS 文件失败";
+                return item;
+            }
+
+            var bytes = fileResult.Data as byte[];
+            if (bytes == null)
+            {
+                if (fileResult.Data == null)
+                {
+                    item["Content"] = "";
+                    return item;
+                }
+                bytes = Encoding.UTF8.GetBytes(Convert.ToString(fileResult.Data));
+            }
+            item["ActualSize"] = bytes.LongLength;
+            var extension = Path.GetExtension(SafeJString(item, "FilePath", SafeJString(item, "FileName")));
+            if (AiApplicationTextExtensions.Contains(extension) || IsBlank(extension))
+            {
+                item["Content"] = Encoding.UTF8.GetString(bytes);
+                item["ContentEncoding"] = "utf-8";
+            }
+            else
+            {
+                item["FileByteBase64"] = Convert.ToBase64String(bytes);
+                item["ContentEncoding"] = "base64";
+            }
+            return item;
+        }
+
+        /// <summary>
+        /// 获取当前租户全部在线 AI 应用（Web、UniApp、MicroService）及文件清单。
+        /// </summary>
+        public static async Task<DosResult<object>> ListApplications(string osClient, string appType = "", string keyword = "", bool includeFiles = true)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mci_ai_app", new
+                {
+                    OsClient = osClient,
+                    _OrderBy = "UpdateTime",
+                    _OrderByType = "DESC",
+                    _PageSize = 5000
+                });
+                if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
+
+                var apps = result.Data == null ? new JArray() : JArray.FromObject(result.Data);
+                var filtered = new JArray();
+                foreach (var token in apps)
+                {
+                    if (!(token is JObject app)) continue;
+                    var type = SafeJString(app, "AppType");
+                    if (!IsBlank(appType) && !string.Equals(type, appType, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!IsBlank(keyword))
+                    {
+                        var haystack = string.Join(" ", SafeJString(app, "Name"), SafeJString(app, "AppKey"), type, SafeJString(app, "Description"));
+                        if (haystack.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    }
+                    if (includeFiles)
+                    {
+                        var files = await GetAiApplicationFiles(osClient, SafeJString(app, "Id"));
+                        app["Files"] = files;
+                        app["FileCount"] = files.Count;
+                    }
+                    filtered.Add(app);
+                }
+                return new DosResult<object>(1, new { Applications = filtered, Count = filtered.Count }, "已获取当前租户在线应用及文件清单");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取在线应用列表失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 获取单个在线 AI 应用的元数据、完整文件清单与源码内容。
+        /// </summary>
+        public static async Task<DosResult<object>> GetApplicationContext(string osClient, string appIdOrKey, bool includeContents = true, long maxFileBytes = 2 * 1024 * 1024, long maxTotalBytes = 50 * 1024 * 1024)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                if (IsBlank(appIdOrKey)) return new DosResult<object>(0, null, "AppIdOrKey 不能为空");
+                var app = await FindAiApplication(osClient, appIdOrKey);
+                if (app == null) return new DosResult<object>(2, null, "在线应用不存在");
+
+                var files = await GetAiApplicationFiles(osClient, SafeJString(app, "Id"));
+                var outputFiles = new JArray();
+                long scheduledBytes = 0;
+                foreach (var token in files)
+                {
+                    if (!(token is JObject file)) continue;
+                    var fileSize = file["Size"]?.Val<long?>() ?? 0L;
+                    var canRead = includeContents && (maxTotalBytes <= 0 || scheduledBytes + fileSize <= maxTotalBytes);
+                    var output = await ReadAiApplicationFile(osClient, file, canRead, maxFileBytes);
+                    if (includeContents && !canRead)
+                    {
+                        output["ContentSkipped"] = true;
+                        output["ContentReadError"] = $"应用源码超过总读取限制 {maxTotalBytes} bytes";
+                    }
+                    if (canRead) scheduledBytes += fileSize;
+                    outputFiles.Add(output);
+                }
+
+                JObject runtime = null;
+                if (string.Equals(SafeJString(app, "AppType"), "MicroService", StringComparison.OrdinalIgnoreCase))
+                {
+                    var msResult = await GetMicroService(osClient, SafeJString(app, "AppKey"));
+                    if (msResult.Code == 1 && msResult.Data != null) runtime = JObject.FromObject(msResult.Data);
+                }
+                return new DosResult<object>(1, new
+                {
+                    Application = app,
+                    Files = outputFiles,
+                    FileCount = outputFiles.Count,
+                    IncludedContents = includeContents,
+                    Runtime = runtime
+                }, "已获取在线应用上下文");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取在线应用上下文失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> GetApplicationFile(string osClient, string appIdOrKey, string filePath, bool includeContents = true, long maxFileBytes = 10 * 1024 * 1024)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                if (IsBlank(appIdOrKey)) return new DosResult<object>(0, null, "AppIdOrKey 不能为空");
+                filePath = NormalizeMicroServiceSourcePath(filePath);
+                if (IsBlank(filePath)) return new DosResult<object>(0, null, "FilePath 不合法");
+                var app = await FindAiApplication(osClient, appIdOrKey);
+                if (app == null) return new DosResult<object>(2, null, "在线应用不存在");
+                var fileResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_file", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "AppId", "=", SafeJString(app, "Id") },
+                        new List<object> { "AND", "FilePath", "=", filePath }
+                    }
+                });
+                if (fileResult.Code != 1 || fileResult.Data == null) return new DosResult<object>(2, null, "应用文件不存在");
+                var file = await ReadAiApplicationFile(osClient, JObject.FromObject(fileResult.Data), includeContents, maxFileBytes);
+                return new DosResult<object>(1, new { Application = app, File = file }, "已获取应用文件");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取应用文件失败：" + ex.Message);
+            }
+        }
+
+        #endregion
+
         #region MicroService
 
         private static string NormalizeMicroServiceKey(string value)
@@ -4082,7 +4308,7 @@ namespace Microi.net
                 var service = JObject.FromObject(serviceResult.Data);
                 var serviceId = SafeJString(service, "Id");
                 object pages = new List<object>();
-                if (!serviceId.DosIsNullOrWhiteSpace())
+                if (!string.IsNullOrWhiteSpace(serviceId))
                 {
                     var pageResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice_page", new
                     {
@@ -4124,6 +4350,170 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return new DosResult<object>(0, null, "创建微服务失败：" + ex.Message);
+            }
+        }
+
+        private static string NormalizeMicroServiceSourcePath(string value)
+        {
+            var normalized = SafeString(value).Trim().Replace("\\", "/").TrimStart('/');
+            var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0 || parts.Any(part => part == "." || part == "..")) return "";
+            return string.Join("/", parts.Select(part => Regex.Replace(part, "[:*?\"<>|]", "_")));
+        }
+
+        private static string HashMicroServiceSource(byte[] bytes)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                return BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// 将本地微服务源码同步到在线 AI 应用。源码存私有桶，发布产物仍由 PublishMicroService 管理。
+        /// </summary>
+        public static async Task<DosResult<object>> SyncMicroServiceSource(string osClient, JObject param, dynamic currentToken)
+        {
+            try
+            {
+                if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                var source = UnwrapMicroServiceParam(param);
+                var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
+                if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");
+
+                var files = GetArrayParam(param, "SourceFiles", "sourceFiles", "Files", "files");
+                if (files.Count == 0) return new DosResult<object>(0, null, "SourceFiles 不能为空");
+                if (files.Count > 1000) return new DosResult<object>(0, null, "单次最多同步 1000 个源码文件");
+
+                var msName = source?["MsName"]?.Val<string>() ?? source?["Name"]?.Val<string>() ?? msKey;
+                var appResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object> { new List<object> { "AppKey", "=", msKey } }
+                });
+
+                var appId = appResult.Code == 1 && appResult.Data != null ? Convert.ToString(appResult.Data.Id) : Ulid.NewUlid().ToString();
+                var appData = new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["Id"] = appId,
+                    ["Name"] = msName,
+                    ["AppKey"] = msKey,
+                    ["AppType"] = "MicroService",
+                    ["Description"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
+                    ["Status"] = "Draft",
+                    ["BuildStatus"] = "Changed",
+                    ["PrivateSourcePath"] = $"ai-app-source/{appId}",
+                    ["PublicPublishPath"] = $"micro-app/{msKey}/"
+                };
+                try
+                {
+                    var currentUser = JObject.FromObject(currentToken.CurrentUser);
+                    appData["OwnerUserId"] = SafeJString(currentUser, "Id");
+                    appData["OwnerName"] = SafeJString(currentUser, "Name", SafeJString(currentUser, "Account"));
+                }
+                catch { }
+                if (appResult.Code != 1 || appResult.Data == null) appData["CurrentVersion"] = 1;
+
+                var appUpsert = await UpsertRecordByIdOrKey(osClient, "mci_ai_app", appData, "AppKey", "在线 AI 微服务");
+                if (appUpsert.Code != 1) return appUpsert;
+
+                var syncedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var uploaded = new JArray();
+                long totalSize = 0;
+                for (var i = 0; i < files.Count; i++)
+                {
+                    if (!(files[i] is JObject file)) continue;
+                    var relativePath = NormalizeMicroServiceSourcePath(file["Path"]?.Val<string>() ?? file["RelativePath"]?.Val<string>() ?? file["FilePath"]?.Val<string>());
+                    if (relativePath.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"SourceFiles[{i}].Path 不合法");
+                    if (!syncedPaths.Add(relativePath)) return new DosResult<object>(0, null, $"源码路径重复：{relativePath}");
+
+                    var base64 = file["FileByteBase64"]?.Val<string>() ?? file["ContentBase64"]?.Val<string>() ?? file["Base64"]?.Val<string>();
+                    if (base64.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"SourceFiles[{i}].FileByteBase64 不能为空");
+                    byte[] bytes;
+                    try { bytes = Convert.FromBase64String(NormalizeBase64Payload(base64)); }
+                    catch { return new DosResult<object>(0, null, $"SourceFiles[{i}] 不是有效的 base64：{relativePath}"); }
+                    if (bytes.LongLength > 10 * 1024 * 1024) return new DosResult<object>(0, null, $"单个源码文件不能超过 10MB：{relativePath}");
+                    totalSize += bytes.LongLength;
+                    if (totalSize > 100 * 1024 * 1024) return new DosResult<object>(0, null, "单次同步源码总大小不能超过 100MB");
+
+                    var fileName = Path.GetFileName(relativePath);
+                    var relativeDir = Path.GetDirectoryName(relativePath)?.Replace("\\", "/");
+                    var uploadDir = $"ai-app-source/{appId}/{relativeDir}".TrimEnd('/');
+                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, true, false, "", "", "", currentToken);
+                    if (uploadResult.Code != 1) return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"同步源码失败：{relativePath}，{uploadResult.Msg}");
+
+                    var uploadObj = JObject.FromObject(uploadResult.Data);
+                    var hdfsPath = SafeJString(uploadObj, "FilePathName");
+                    var oldFile = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_file", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object>
+                        {
+                            new List<object> { "AppId", "=", appId },
+                            new List<object> { "AND", "FilePath", "=", relativePath }
+                        }
+                    });
+                    var fileData = new JObject
+                    {
+                        ["OsClient"] = osClient,
+                        ["AppId"] = appId,
+                        ["AppName"] = msName,
+                        ["FilePath"] = relativePath,
+                        ["FileName"] = fileName,
+                        ["FileType"] = Path.GetExtension(fileName).TrimStart('.').ToLowerInvariant(),
+                        ["HdfsPath"] = hdfsPath,
+                        ["StorageScope"] = "Private",
+                        ["ContentHash"] = file["Sha256"]?.Val<string>() ?? file["Hash"]?.Val<string>() ?? HashMicroServiceSource(bytes),
+                        ["Size"] = bytes.LongLength,
+                        ["IsDirectory"] = 0,
+                        ["Version"] = 1
+                    };
+                    if (oldFile.Code == 1 && oldFile.Data != null)
+                    {
+                        fileData["Id"] = Convert.ToString(oldFile.Data.Id);
+                        try { fileData["Version"] = Convert.ToInt32(oldFile.Data.Version ?? 1) + 1; } catch { fileData["Version"] = 2; }
+                    }
+                    var fileUpsert = await UpsertRecordByIdOrKey(osClient, "mci_ai_app_file", fileData, "", "在线 AI 微服务源码");
+                    if (fileUpsert.Code != 1) return fileUpsert;
+                    uploaded.Add(new JObject { ["Path"] = relativePath, ["HdfsPath"] = hdfsPath, ["Size"] = bytes.LongLength, ["Hash"] = fileData["ContentHash"] });
+                }
+
+                var removed = 0;
+                if (param?["Replace"]?.Val<bool?>() == true)
+                {
+                    var oldFiles = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mci_ai_app_file", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object> { new List<object> { "AppId", "=", appId } },
+                        _PageSize = 5000
+                    });
+                    if (oldFiles.Code == 1 && oldFiles.Data != null)
+                    {
+                        foreach (var old in oldFiles.Data)
+                        {
+                            var oldPath = Convert.ToString(old.FilePath);
+                            if (syncedPaths.Contains(oldPath)) continue;
+                            var deleteResult = await MicroiEngine.FormEngine.DelFormDataAsync("mci_ai_app_file", new JObject { ["OsClient"] = osClient, ["Id"] = Convert.ToString(old.Id) });
+                            if (deleteResult.Code == 1) removed++;
+                        }
+                    }
+                }
+
+                return new DosResult<object>(1, new
+                {
+                    AppId = appId,
+                    AppKey = msKey,
+                    AppType = "MicroService",
+                    FileCount = uploaded.Count,
+                    TotalSize = totalSize,
+                    RemovedFileCount = removed,
+                    Files = uploaded
+                }, "微服务源码已同步到在线 AI 应用");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "同步微服务源码失败：" + ex.Message);
             }
         }
 

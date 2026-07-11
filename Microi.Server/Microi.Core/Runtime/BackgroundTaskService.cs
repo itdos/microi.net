@@ -6,10 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microi.net;
-using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     public sealed class BackgroundTaskItem
     {
@@ -38,11 +37,8 @@ namespace Microi.net.Api
         private static readonly ConcurrentDictionary<string, BackgroundTaskItem> Tasks = new ConcurrentDictionary<string, BackgroundTaskItem>();
         private static readonly ConcurrentDictionary<string, CancellationTokenSource> CancellationTokens = new ConcurrentDictionary<string, CancellationTokenSource>();
         private static readonly SemaphoreSlim RunnerGate = new SemaphoreSlim(64, 64);
-        private static IHubContext<DiyWebSocket> HubContext;
-
-        public static void ConfigureHubContext(IHubContext<DiyWebSocket> hubContext)
+        static BackgroundTaskService()
         {
-            HubContext = hubContext;
             BackgroundTaskRuntime.UpdateProgressHandler = UpdateProgress;
         }
 
@@ -179,7 +175,7 @@ namespace Microi.net.Api
 
         public static async Task SendTaskListToUserAsync(string osClient, string userKey)
         {
-            if (HubContext == null || osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
+            if (!RealtimePushRuntime.IsConfigured || osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace())
             {
                 return;
             }
@@ -193,8 +189,10 @@ namespace Microi.net.Api
                     return;
                 }
 
-                await HubContext.Clients.Clients(clientInfo.ConnectionIds)
-                    .SendAsync("ReceiveBackgroundTaskList", List(osClient, userKey))
+                await RealtimePushRuntime.SendAsync(
+                        clientInfo.ConnectionIds,
+                        "ReceiveBackgroundTaskList",
+                        List(osClient, userKey))
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -295,13 +293,20 @@ namespace Microi.net.Api
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(normalizedOsClient);
-                var cached = cache.HashGetAllValues<BackgroundTaskItem>(GetTaskHashKey(normalizedOsClient, normalizedUserKey))
-                             ?? new List<BackgroundTaskItem>();
-                foreach (var item in cached)
+                var taskHashKey = GetTaskHashKey(normalizedOsClient, normalizedUserKey);
+                foreach (var entry in cache.HashGetAll(taskHashKey))
                 {
-                    if (item?.Id.DosIsNullOrWhiteSpace() == false)
+                    try
                     {
-                        map[item.Id] = item;
+                        var item = JsonHelper.Deserialize<BackgroundTaskItem>(entry.Value.ToString());
+                        if (item?.Id.DosIsNullOrWhiteSpace() == false)
+                        {
+                            map[item.Id] = item;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Microi：【后台任务】读取Redis任务失败，TaskId={entry.Name}：{ex.Message}");
                     }
                 }
             }

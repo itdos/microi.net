@@ -20,27 +20,99 @@
                   <strong>源文件系统</strong>
                   <span>{{ platformSummary(form.source) }}</span>
                 </div>
-                <el-button :icon="Refresh" :loading="loadingSource" @click="loadSourceTree">
+                <el-button
+                  :icon="Refresh"
+                  :loading="loadingSource"
+                  :disabled="form.source.platformType === 'remote' && !form.source.isLoggedIn"
+                  @click="loadSourceTree"
+                >
                   加载源树
                 </el-button>
               </div>
               <el-radio-group v-model="form.source.platformType" class="platform-toggle">
-                <el-radio-button label="current">当前平台</el-radio-button>
-                <el-radio-button label="remote">远程平台</el-radio-button>
+                <el-radio-button value="current">当前平台</el-radio-button>
+                <el-radio-button value="remote">远程平台</el-radio-button>
               </el-radio-group>
-              <div v-if="form.source.platformType === 'remote'" class="credential-grid">
-                <el-input v-model="form.source.apiBase" placeholder="ApiBase" />
-                <el-input v-model="form.source.osClient" placeholder="OsClient" />
-                <el-input v-model="form.source.account" placeholder="帐号" />
-                <el-input v-model="form.source.password" placeholder="密码" type="password" show-password />
+              <div v-if="form.source.platformType === 'remote'" class="remote-session">
+                <div class="connection-toolbar">
+                  <el-select
+                    v-model="form.source.connectionId"
+                    placeholder="选择历史连接"
+                    clearable
+                    filterable
+                    :loading="savedConnectionsLoading"
+                    @update:model-value="handleSavedConnectionChange(form.source, $event, 'source')"
+                  >
+                    <el-option
+                      v-for="item in savedConnections"
+                      :key="item.Id"
+                      :label="connectionOptionLabel(item)"
+                      :value="item.Id"
+                    />
+                  </el-select>
+                  <el-button
+                    :icon="Delete"
+                    circle
+                    title="删除历史连接"
+                    :disabled="!form.source.connectionId"
+                    @click="deleteSavedConnection(form.source)"
+                  />
+                </div>
+                <div v-if="form.source.isLoggedIn" class="login-identity">
+                  <el-avatar :size="36" :src="form.source.remoteUser.Avatar || ''" :icon="UserFilled" />
+                  <div class="identity-copy">
+                    <strong>{{ remoteUserLabel(form.source) }}</strong>
+                    <span>{{ form.source.apiBase }} · {{ form.source.osClient }}</span>
+                  </div>
+                  <el-tag type="success" effect="light">已登录</el-tag>
+                  <el-button :icon="SwitchButton" plain @click="logoutRemotePlatform(form.source)">退出</el-button>
+                </div>
+                <template v-else>
+                  <div class="credential-grid">
+                    <el-input v-model="form.source.apiBase" placeholder="ApiBase" @blur="handleRemoteEndpointBlur(form.source)" />
+                    <el-input v-model="form.source.osClient" placeholder="OsClient" @blur="handleRemoteEndpointBlur(form.source)" />
+                    <el-input v-model="form.source.account" placeholder="帐号" />
+                    <el-input v-model="form.source.password" placeholder="密码" type="password" show-password />
+                    <div v-if="form.source.captchaRequired" class="captcha-field">
+                      <el-input
+                        v-model="form.source.captchaValue"
+                        placeholder="验证码"
+                        maxlength="8"
+                        @keyup.enter="loginRemotePlatform(form.source, 'source')"
+                      />
+                      <button
+                        type="button"
+                        class="captcha-image"
+                        title="刷新验证码"
+                        @click="refreshRemoteCaptcha(form.source)"
+                      >
+                        <img v-if="form.source.captchaImage && !form.source.loadingCaptcha" :src="form.source.captchaImage" alt="登录验证码" />
+                        <el-icon v-else class="is-loading"><Loading /></el-icon>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="login-actions">
+                    <span>登录成功后才能加载远程文件树</span>
+                    <el-button
+                      type="primary"
+                      :icon="Key"
+                      :loading="form.source.loggingIn"
+                      @click="loginRemotePlatform(form.source, 'source')"
+                    >登录</el-button>
+                  </div>
+                </template>
+                <el-alert
+                  v-if="form.source.capabilityError"
+                  :title="form.source.capabilityError"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                />
               </div>
-              <div class="path-grid">
-                <el-select v-model="form.source.limit" placeholder="源桶">
-                  <el-option label="私有桶" :value="true" />
-                  <el-option label="公有桶" :value="false" />
-                </el-select>
-                <el-input v-model="form.source.path" placeholder="源起点目录，如 itdos/upload/" />
-              </div>
+              <el-radio-group v-model="form.source.limit" class="bucket-switch">
+                <el-radio-button :value="true">私有桶</el-radio-button>
+                <el-radio-button :value="false">公有桶</el-radio-button>
+              </el-radio-group>
             </section>
 
             <div class="sync-direction">
@@ -53,38 +125,114 @@
                   <strong>目标文件系统</strong>
                   <span>{{ platformSummary(form.target) }}</span>
                 </div>
-                <el-button :icon="Refresh" :loading="loadingTarget" @click="loadTargetTree">
+                <el-button
+                  :icon="Refresh"
+                  :loading="loadingTarget"
+                  :disabled="form.target.platformType === 'remote' && !form.target.isLoggedIn"
+                  @click="loadTargetTree"
+                >
                   加载目标树
                 </el-button>
               </div>
               <el-radio-group v-model="form.target.platformType" class="platform-toggle">
-                <el-radio-button label="current">当前平台</el-radio-button>
-                <el-radio-button label="remote">远程平台</el-radio-button>
+                <el-radio-button value="current">当前平台</el-radio-button>
+                <el-radio-button value="remote">远程平台</el-radio-button>
               </el-radio-group>
-              <div v-if="form.target.platformType === 'remote'" class="credential-grid">
-                <el-input v-model="form.target.apiBase" placeholder="ApiBase" />
-                <el-input v-model="form.target.osClient" placeholder="OsClient" />
-                <el-input v-model="form.target.account" placeholder="帐号" />
-                <el-input v-model="form.target.password" placeholder="密码" type="password" show-password />
+              <div v-if="form.target.platformType === 'remote'" class="remote-session">
+                <div class="connection-toolbar">
+                  <el-select
+                    v-model="form.target.connectionId"
+                    placeholder="选择历史连接"
+                    clearable
+                    filterable
+                    :loading="savedConnectionsLoading"
+                    @update:model-value="handleSavedConnectionChange(form.target, $event, 'target')"
+                  >
+                    <el-option
+                      v-for="item in savedConnections"
+                      :key="item.Id"
+                      :label="connectionOptionLabel(item)"
+                      :value="item.Id"
+                    />
+                  </el-select>
+                  <el-button
+                    :icon="Delete"
+                    circle
+                    title="删除历史连接"
+                    :disabled="!form.target.connectionId"
+                    @click="deleteSavedConnection(form.target)"
+                  />
+                </div>
+                <div v-if="form.target.isLoggedIn" class="login-identity">
+                  <el-avatar :size="36" :src="form.target.remoteUser.Avatar || ''" :icon="UserFilled" />
+                  <div class="identity-copy">
+                    <strong>{{ remoteUserLabel(form.target) }}</strong>
+                    <span>{{ form.target.apiBase }} · {{ form.target.osClient }}</span>
+                  </div>
+                  <el-tag type="success" effect="light">已登录</el-tag>
+                  <el-button :icon="SwitchButton" plain @click="logoutRemotePlatform(form.target)">退出</el-button>
+                </div>
+                <template v-else>
+                  <div class="credential-grid">
+                    <el-input v-model="form.target.apiBase" placeholder="ApiBase" @blur="handleRemoteEndpointBlur(form.target)" />
+                    <el-input v-model="form.target.osClient" placeholder="OsClient" @blur="handleRemoteEndpointBlur(form.target)" />
+                    <el-input v-model="form.target.account" placeholder="帐号" />
+                    <el-input v-model="form.target.password" placeholder="密码" type="password" show-password />
+                    <div v-if="form.target.captchaRequired" class="captcha-field">
+                      <el-input
+                        v-model="form.target.captchaValue"
+                        placeholder="验证码"
+                        maxlength="8"
+                        @keyup.enter="loginRemotePlatform(form.target, 'target')"
+                      />
+                      <button
+                        type="button"
+                        class="captcha-image"
+                        title="刷新验证码"
+                        @click="refreshRemoteCaptcha(form.target)"
+                      >
+                        <img v-if="form.target.captchaImage && !form.target.loadingCaptcha" :src="form.target.captchaImage" alt="登录验证码" />
+                        <el-icon v-else class="is-loading"><Loading /></el-icon>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="login-actions">
+                    <span>登录后将校验目标平台文件柜版本</span>
+                    <el-button
+                      type="primary"
+                      :icon="Key"
+                      :loading="form.target.loggingIn"
+                      @click="loginRemotePlatform(form.target, 'target')"
+                    >登录</el-button>
+                  </div>
+                </template>
+                <el-alert
+                  v-if="form.target.capabilityError"
+                  :title="form.target.capabilityError"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                />
               </div>
-              <div class="path-grid">
-                <el-select v-model="form.target.limit" placeholder="目标桶">
-                  <el-option label="私有桶" :value="true" />
-                  <el-option label="公有桶" :value="false" />
-                </el-select>
-                <el-input v-model="form.target.path" placeholder="目标落点目录，如 itdos/upload/" />
-              </div>
+              <el-radio-group
+                v-model="form.target.limit"
+                class="bucket-switch"
+                @change="handleTargetBucketChange"
+              >
+                <el-radio-button :value="true">私有桶</el-radio-button>
+                <el-radio-button :value="false">公有桶</el-radio-button>
+              </el-radio-group>
             </section>
           </div>
 
           <div class="sync-rule-bar">
             <el-radio-group v-model="form.rule" class="rule-toggle">
-              <el-radio-button label="ignore">重名忽略</el-radio-button>
-              <el-radio-button label="overwrite">文件重名覆盖</el-radio-button>
+              <el-radio-button value="ignore">重名忽略</el-radio-button>
+              <el-radio-button value="overwrite">文件重名覆盖</el-radio-button>
             </el-radio-group>
             <div class="target-path">
               <span>目标位置</span>
-              <strong>{{ selectedTargetPath || normalizeFolder(form.target.path) || '根目录' }}</strong>
+              <strong>{{ bucketLabel(form.target.limit) }} / {{ selectedTargetPath || targetRootPath || '根目录' }}</strong>
             </div>
             <el-button
               type="primary"
@@ -137,7 +285,7 @@
               <div class="tree-panel-head">
                 <div>
                   <strong>目标文件系统树</strong>
-                  <span>选择同步落点</span>
+                  <span>{{ bucketLabel(form.target.limit) }} · 选择同步落点</span>
                 </div>
               </div>
               <el-scrollbar v-loading="loadingTarget" class="tree-body">
@@ -248,14 +396,19 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowRight,
+  Delete,
   Document,
   FolderOpened,
+  Key,
+  Loading,
   Refresh,
-  Switch
+  Switch,
+  SwitchButton,
+  UserFilled
 } from '@element-plus/icons-vue'
 import { fileManageApi, fileSyncApi } from '../api'
 
@@ -277,8 +430,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'finished'])
 
 const currentPlatform = fileSyncApi.getCurrentPlatform()
-const MAX_TREE_NODES = 1600
-const MAX_TREE_DEPTH = 18
+const MAX_TREE_NODES = 10000
 
 const activeTab = ref('sync')
 const sourceTreeRef = ref(null)
@@ -294,6 +446,8 @@ const logsLoading = ref(false)
 const syncing = ref(false)
 const results = ref([])
 const syncLogs = ref([])
+const savedConnections = ref([])
+const savedConnectionsLoading = ref(false)
 
 const treeProps = {
   children: 'children',
@@ -308,8 +462,21 @@ const form = reactive({
     account: '',
     password: '',
     authorization: '',
-    limit: true,
-    path: ''
+    connectionId: '',
+    isLoggedIn: false,
+    loggingIn: false,
+    remoteUser: {},
+    capability: {},
+    capabilityError: '',
+    suspendEndpointReset: false,
+    loginConfigLoaded: false,
+    checkingLoginConfig: false,
+    captchaRequired: false,
+    captchaId: '',
+    captchaValue: '',
+    captchaImage: '',
+    loadingCaptcha: false,
+    limit: true
   },
   target: {
     platformType: 'current',
@@ -318,8 +485,21 @@ const form = reactive({
     account: '',
     password: '',
     authorization: '',
+    connectionId: '',
+    isLoggedIn: false,
+    loggingIn: false,
+    remoteUser: {},
+    capability: {},
+    capabilityError: '',
+    suspendEndpointReset: false,
+    loginConfigLoaded: false,
+    checkingLoginConfig: false,
+    captchaRequired: false,
+    captchaId: '',
+    captchaValue: '',
+    captchaImage: '',
+    loadingCaptcha: false,
     limit: true,
-    path: ''
   },
   rule: 'ignore'
 })
@@ -336,52 +516,98 @@ const task = reactive({
 })
 
 let targetListCache = new Map()
+const loginConfigRequests = new WeakMap()
 
-const hasTargetSelection = computed(() => !!selectedTargetNodeKey.value)
-const canStartSync = computed(() => checkedSourceRows.value.length > 0 && hasTargetSelection.value)
-
-const defaultRootPath = computed(() => {
-  if (props.currentFolderId) return normalizeFolder(props.currentFolderId)
-  const osClient = String(currentPlatform.osClient || '').toLowerCase()
-  return osClient ? `${osClient}/` : ''
+const targetRootPath = computed(() => {
+  const osClient = form.target.platformType === 'current'
+    ? currentPlatform.osClient
+    : form.target.osClient
+  return normalizeFolder(String(osClient || '').toLowerCase())
 })
+const hasTargetSelection = computed(() => targetTree.value.length > 0 && !!selectedTargetNodeKey.value)
+const canStartSync = computed(() => checkedSourceRows.value.length > 0 && hasTargetSelection.value)
 
 watch(
   () => props.modelValue,
   (visible) => {
     if (!visible) return
-    const rootPath = defaultRootPath.value
     activeTab.value = 'sync'
     form.source.limit = props.currentLimit
     form.target.limit = props.currentLimit
-    form.source.path = rootPath
-    form.target.path = rootPath
-    selectedTargetPath.value = normalizeFolder(rootPath)
-    selectedTargetNodeKey.value = folderNodeId(selectedTargetPath.value)
+    selectedTargetPath.value = ''
+    selectedTargetNodeKey.value = ''
     checkedSourceRows.value = []
     sourceTree.value = []
     targetTree.value = []
     results.value = []
     resetTask()
     loadSyncLogs()
+    loadRemoteConnections()
+  }
+)
+
+const resetRemoteLoginState = (platformConfig) => {
+  platformConfig.authorization = ''
+  platformConfig.connectionId = ''
+  platformConfig.isLoggedIn = false
+  platformConfig.remoteUser = {}
+  platformConfig.capability = {}
+  platformConfig.capabilityError = ''
+  platformConfig.loginConfigLoaded = false
+  platformConfig.captchaRequired = false
+  platformConfig.captchaId = ''
+  platformConfig.captchaValue = ''
+  platformConfig.captchaImage = ''
+}
+
+watch(
+  () => [form.source.platformType, form.source.apiBase, form.source.osClient],
+  () => {
+    if (form.source.suspendEndpointReset) return
+    resetRemoteLoginState(form.source)
+    sourceTree.value = []
+    checkedSourceRows.value = []
   }
 )
 
 watch(
-  () => [form.source.apiBase, form.source.osClient, form.source.account, form.source.password],
+  () => [form.target.platformType, form.target.apiBase, form.target.osClient],
   () => {
+    if (form.target.suspendEndpointReset) return
+    resetRemoteLoginState(form.target)
+    targetTree.value = []
+    selectedTargetPath.value = ''
+    selectedTargetNodeKey.value = ''
+    targetListCache = new Map()
+  }
+)
+
+watch(
+  () => [form.source.account, form.source.password, form.source.captchaValue],
+  () => {
+    if (form.source.suspendEndpointReset || form.source.isLoggedIn) return
     form.source.authorization = ''
   }
 )
 
 watch(
-  () => [form.target.apiBase, form.target.osClient, form.target.account, form.target.password],
+  () => [form.target.account, form.target.password, form.target.captchaValue],
   () => {
+    if (form.target.suspendEndpointReset || form.target.isLoggedIn) return
     form.target.authorization = ''
   }
 )
 
-const normalizeObjectPath = (path = '') => String(path || '').replace(/^\/+/, '')
+const normalizeObjectPath = (path = '') => String(path || '')
+  .replace(/\\/g, '/')
+  .replace(/^\/+/, '')
+
+const canonicalObjectPath = (path = '') => normalizeObjectPath(path).replace(/\/{2,}/g, '/')
+
+const canonicalFolderPath = (path = '') => {
+  const value = canonicalObjectPath(path).replace(/\/+$/, '')
+  return value ? `${value}/` : ''
+}
 
 function normalizeFolder(path = '') {
   const value = normalizeObjectPath(path).replace(/\/+$/, '')
@@ -397,7 +623,7 @@ const getParentFolderPath = (path = '') => {
 
 const joinPath = (folder, name) => normalizeFolder(folder) + String(name || '').replace(/^\/+/, '')
 
-const folderNodeId = (path = '') => `folder:${normalizeFolder(path) || '/'}`
+const folderNodeId = (path = '') => `folder:${canonicalFolderPath(path) || '/'}`
 
 const fileNodeId = (path = '') => `file:${normalizeObjectPath(path)}`
 
@@ -434,10 +660,334 @@ const platformSummary = (platformConfig) => {
   if (platformConfig.platformType === 'current') {
     return currentPlatform.osClient || '当前租户'
   }
+  if (platformConfig.isLoggedIn) {
+    return `${platformConfig.osClient || '远程平台'} · ${remoteUserLabel(platformConfig)}`
+  }
   return platformConfig.osClient || '远程平台'
 }
 
-const preparePlatform = async (platformConfig) => {
+const bucketLabel = (limit) => limit ? '私有桶' : '公有桶'
+const REQUIRED_FILE_CABINET_PROTOCOL = 2
+
+const remoteUserLabel = (platformConfig) => {
+  const user = platformConfig.remoteUser || {}
+  return user.Name || user.Account || platformConfig.account || '远程用户'
+}
+
+const connectionOptionLabel = (item) => {
+  let host = item.ApiBase || ''
+  try {
+    host = new URL(item.ApiBase).host
+  } catch (error) {}
+  return `${item.ConnectionName || `${item.RemoteOsClient} / ${item.Account}`} · ${host}`
+}
+
+const toRemotePlatform = (platformConfig) => ({
+  platformType: 'remote',
+  apiBase: platformConfig.apiBase,
+  osClient: platformConfig.osClient,
+  authorization: platformConfig.authorization
+})
+
+const targetUpgradeMessage = () => '目标平台未安装文件同步接口或文件柜版本过低，请让目标平台更新【文件柜】应用后重试（缺少接口：mci_file_sync_capability）。'
+
+const loadRemoteConnections = async (showError = true) => {
+  savedConnectionsLoading.value = true
+  try {
+    const result = await fileSyncApi.listRemoteConnections()
+    if (result?.Code !== 1) {
+      throw new Error(result?.Msg || '加载历史连接失败')
+    }
+    savedConnections.value = result.Data || []
+  } catch (error) {
+    savedConnections.value = []
+    if (showError) ElMessage.error(error.message || '加载历史连接失败')
+  } finally {
+    savedConnectionsLoading.value = false
+  }
+}
+
+const validateRemoteCapability = async (platformConfig, role) => {
+  try {
+    const capability = await fileSyncApi.getFileCabinetCapability(toRemotePlatform(platformConfig))
+    const protocolVersion = Number(capability.ProtocolVersion || 0)
+    if (role === 'target' && protocolVersion < REQUIRED_FILE_CABINET_PROTOCOL) {
+      throw new Error(targetUpgradeMessage())
+    }
+    platformConfig.capability = capability
+    platformConfig.capabilityError = ''
+    return capability
+  } catch (error) {
+    if (error?.code === 1001) throw error
+    if (role === 'target') {
+      const upgradeError = new Error(targetUpgradeMessage())
+      upgradeError.code = error?.code
+      throw upgradeError
+    }
+    platformConfig.capability = {}
+    platformConfig.capabilityError = ''
+    return {}
+  }
+}
+
+const saveRemoteConnection = async (platformConfig) => {
+  const result = await fileSyncApi.saveRemoteConnection({
+    Id: platformConfig.connectionId || '',
+    ApiBase: platformConfig.apiBase,
+    RemoteOsClient: platformConfig.osClient,
+    Account: platformConfig.account,
+    Password: platformConfig.password,
+    Authorization: platformConfig.authorization,
+    RemoteUser: platformConfig.remoteUser || {},
+    Capability: platformConfig.capability || {}
+  })
+  if (result?.Code !== 1) {
+    throw new Error(result?.Msg || '保存远程连接失败')
+  }
+  platformConfig.connectionId = result.Data?.Id || platformConfig.connectionId || ''
+  await loadRemoteConnections(false)
+}
+
+const loginRemotePlatform = async (platformConfig, role, force = false) => {
+  if (platformConfig.loggingIn && !force) return false
+  platformConfig.loggingIn = true
+  platformConfig.capabilityError = ''
+  try {
+    if (!platformConfig.apiBase || !platformConfig.osClient || !platformConfig.account || !platformConfig.password) {
+      throw new Error('请完整填写远程平台 ApiBase、OsClient、帐号、密码')
+    }
+    await detectRemoteLoginConfig(platformConfig)
+    if (platformConfig.captchaRequired && (!platformConfig.captchaId || !platformConfig.captchaImage)) {
+      await refreshRemoteCaptcha(platformConfig)
+    }
+    if (platformConfig.captchaRequired && !platformConfig.captchaValue) {
+      throw new Error('远程平台已开启验证码，请输入验证码')
+    }
+
+    const login = await fileSyncApi.loginRemote(platformConfig)
+    if (login.result?.Code !== 1) {
+      if (platformConfig.captchaRequired) await refreshRemoteCaptcha(platformConfig)
+      throw new Error(login.result?.Msg || '远程平台登录失败')
+    }
+    platformConfig.authorization = login.authorization || ''
+    if (!platformConfig.authorization) {
+      throw new Error('远程平台登录成功但未返回授权令牌')
+    }
+    platformConfig.remoteUser = login.result?.Data || { Account: platformConfig.account }
+    platformConfig.isLoggedIn = true
+
+    try {
+      await validateRemoteCapability(platformConfig, role)
+    } catch (error) {
+      platformConfig.capabilityError = error.message || targetUpgradeMessage()
+    }
+
+    try {
+      await saveRemoteConnection(platformConfig)
+    } catch (error) {
+      ElMessage.error(`远程平台已登录，但连接记录保存失败：${error.message || '未知错误'}`)
+      return false
+    }
+
+    if (platformConfig.capabilityError) {
+      ElMessage.error(platformConfig.capabilityError)
+      return false
+    }
+    ElMessage.success(`已登录：${remoteUserLabel(platformConfig)}`)
+    return true
+  } catch (error) {
+    platformConfig.authorization = ''
+    platformConfig.isLoggedIn = false
+    platformConfig.remoteUser = {}
+    ElMessage.error(error.message || '远程平台登录失败')
+    return false
+  } finally {
+    platformConfig.loggingIn = false
+  }
+}
+
+const invalidateRemoteLogin = async (platformConfig, message) => {
+  if (platformConfig.connectionId) {
+    try {
+      await fileSyncApi.logoutRemoteConnection(platformConfig.connectionId, message || '远程登录已失效')
+    } catch (error) {}
+  }
+  platformConfig.authorization = ''
+  platformConfig.isLoggedIn = false
+  platformConfig.remoteUser = {}
+  platformConfig.capability = {}
+  await loadRemoteConnections(false)
+}
+
+const logoutRemotePlatform = async (platformConfig) => {
+  const connectionId = platformConfig.connectionId
+  try {
+    if (connectionId) {
+      const result = await fileSyncApi.logoutRemoteConnection(connectionId)
+      if (result?.Code !== 1) throw new Error(result?.Msg || '退出远程平台失败')
+    }
+    platformConfig.authorization = ''
+    platformConfig.connectionId = ''
+    platformConfig.isLoggedIn = false
+    platformConfig.remoteUser = {}
+    platformConfig.capability = {}
+    platformConfig.capabilityError = ''
+    platformConfig.loginConfigLoaded = false
+    await detectRemoteLoginConfig(platformConfig)
+    await loadRemoteConnections(false)
+    ElMessage.success('已退出远程平台')
+  } catch (error) {
+    ElMessage.error(error.message || '退出远程平台失败')
+  }
+}
+
+const handleSavedConnectionChange = async (platformConfig, connectionId, role) => {
+  if (!connectionId) {
+    resetRemoteLoginState(platformConfig)
+    return
+  }
+  platformConfig.loggingIn = true
+  try {
+    const result = await fileSyncApi.getRemoteConnection(connectionId)
+    if (result?.Code !== 1 || !result.Data) {
+      throw new Error(result?.Msg || '读取历史连接失败')
+    }
+    const connection = result.Data
+    platformConfig.suspendEndpointReset = true
+    Object.assign(platformConfig, {
+      connectionId: connection.Id,
+      apiBase: connection.ApiBase || '',
+      osClient: connection.RemoteOsClient || '',
+      account: connection.Account || '',
+      password: connection.Password || '',
+      authorization: connection.Authorization || '',
+      isLoggedIn: !!connection.Authorization && Number(connection.IsLoggedIn || 0) === 1,
+      remoteUser: {
+        Id: connection.RemoteUserId || '',
+        Account: connection.RemoteUserAccount || connection.Account || '',
+        Name: connection.RemoteUserName || '',
+        Avatar: connection.RemoteUserAvatar || ''
+      },
+      capability: {},
+      capabilityError: '',
+      loginConfigLoaded: false,
+      captchaRequired: false,
+      captchaId: '',
+      captchaValue: '',
+      captchaImage: ''
+    })
+    await nextTick()
+    platformConfig.suspendEndpointReset = false
+
+    if (platformConfig.isLoggedIn && role === 'target') {
+      try {
+        await validateRemoteCapability(platformConfig, role)
+      } catch (error) {
+        if (error?.code === 1001) {
+          await invalidateRemoteLogin(platformConfig, '远程 Token 已失效')
+        } else {
+          platformConfig.capabilityError = error.message || targetUpgradeMessage()
+          ElMessage.error(platformConfig.capabilityError)
+          return
+        }
+      }
+    }
+
+    if (platformConfig.isLoggedIn) {
+      ElMessage.success(`已恢复登录：${remoteUserLabel(platformConfig)}`)
+      return
+    }
+
+    await detectRemoteLoginConfig(platformConfig)
+    if (!platformConfig.captchaRequired && platformConfig.password) {
+      platformConfig.loggingIn = false
+      await loginRemotePlatform(platformConfig, role, true)
+    } else if (platformConfig.captchaRequired) {
+      ElMessage.info('历史连接已载入，请输入验证码后登录')
+    }
+  } catch (error) {
+    platformConfig.suspendEndpointReset = false
+    ElMessage.error(error.message || '载入历史连接失败')
+  } finally {
+    platformConfig.loggingIn = false
+  }
+}
+
+const deleteSavedConnection = async (platformConfig) => {
+  if (!platformConfig.connectionId) return
+  try {
+    await ElMessageBox.confirm('删除后将清除该远程平台保存的帐号、密码和 Token，确定继续？', '删除历史连接', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+    const connectionId = platformConfig.connectionId
+    const result = await fileSyncApi.deleteRemoteConnection(connectionId)
+    if (result?.Code !== 1) throw new Error(result?.Msg || '删除历史连接失败')
+    ;[form.source, form.target].forEach(config => {
+      if (config.connectionId === connectionId) resetRemoteLoginState(config)
+    })
+    await loadRemoteConnections(false)
+    ElMessage.success('历史连接已删除')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error.message || '删除历史连接失败')
+  }
+}
+
+const refreshRemoteCaptcha = async (platformConfig) => {
+  if (platformConfig.platformType !== 'remote' || !platformConfig.apiBase || !platformConfig.osClient) return
+  platformConfig.loadingCaptcha = true
+  try {
+    const captcha = await fileSyncApi.getRemoteCaptcha(platformConfig)
+    platformConfig.captchaId = captcha.captchaId
+    platformConfig.captchaImage = captcha.image
+    platformConfig.captchaValue = ''
+  } finally {
+    platformConfig.loadingCaptcha = false
+  }
+}
+
+const detectRemoteLoginConfig = async (platformConfig) => {
+  if (platformConfig.platformType !== 'remote') return
+  if (!platformConfig.apiBase || !platformConfig.osClient) {
+    throw new Error('请先填写远程平台 ApiBase 和 OsClient')
+  }
+  if (platformConfig.loginConfigLoaded) return
+  if (loginConfigRequests.has(platformConfig)) return loginConfigRequests.get(platformConfig)
+
+  const request = (async () => {
+    platformConfig.checkingLoginConfig = true
+    try {
+      const loginConfig = await fileSyncApi.getRemoteLoginConfig(platformConfig)
+      platformConfig.loginConfigLoaded = true
+      platformConfig.captchaRequired = loginConfig.captchaRequired
+      if (loginConfig.captchaRequired) {
+        await refreshRemoteCaptcha(platformConfig)
+      } else {
+        platformConfig.captchaId = ''
+        platformConfig.captchaValue = ''
+        platformConfig.captchaImage = ''
+      }
+    } finally {
+      platformConfig.checkingLoginConfig = false
+      loginConfigRequests.delete(platformConfig)
+    }
+  })()
+  loginConfigRequests.set(platformConfig, request)
+  return request
+}
+
+const handleRemoteEndpointBlur = async (platformConfig) => {
+  if (!platformConfig.apiBase || !platformConfig.osClient || platformConfig.loginConfigLoaded) return
+  try {
+    await detectRemoteLoginConfig(platformConfig)
+  } catch (error) {
+    ElMessage.error(error.message || '检测远程登录配置失败')
+  }
+}
+
+const preparePlatform = async (platformConfig, role = 'source') => {
   if (platformConfig.platformType === 'current') {
     return {
       platformType: 'current',
@@ -447,16 +997,16 @@ const preparePlatform = async (platformConfig) => {
     }
   }
 
-  if (!platformConfig.apiBase || !platformConfig.osClient || !platformConfig.account || !platformConfig.password) {
-    throw new Error('请完整填写远程平台 ApiBase、OsClient、帐号、密码')
+  if (!platformConfig.isLoggedIn || !platformConfig.authorization) {
+    throw new Error('请先登录远程平台')
   }
-
-  if (!platformConfig.authorization) {
-    const login = await fileSyncApi.loginRemote(platformConfig)
-    if (login.result?.Code !== 1) {
-      throw new Error(login.result?.Msg || '远程平台登录失败')
+  if (role === 'target' && !platformConfig.capability?.ProtocolVersion) {
+    try {
+      await validateRemoteCapability(platformConfig, role)
+    } catch (error) {
+      platformConfig.capabilityError = error.message || targetUpgradeMessage()
+      throw error
     }
-    platformConfig.authorization = login.authorization || ''
   }
 
   return {
@@ -469,40 +1019,110 @@ const preparePlatform = async (platformConfig) => {
 
 const normalizeRows = (result, folderPath, includeFiles = true) => {
   if (result?.Code !== 1 || !result.Data) return []
-  const folders = (result.Data.Folders || []).map(item => {
-    const fullPath = normalizeFolder(item.FullPath || joinPath(folderPath, item.Name))
-    return {
+  const parentPath = normalizeFolder(folderPath)
+  const canonicalParentPath = canonicalFolderPath(parentPath)
+  const rows = new Map()
+
+  const getDirectChildName = (fullPath, isFolder) => {
+    const normalized = isFolder ? canonicalFolderPath(fullPath) : canonicalObjectPath(fullPath)
+    if (!normalized || normalized === canonicalParentPath) return ''
+    if (canonicalParentPath && !normalized.toLowerCase().startsWith(canonicalParentPath.toLowerCase())) return ''
+    let relative = canonicalParentPath ? normalized.substring(canonicalParentPath.length) : normalized
+    if (isFolder) relative = relative.replace(/\/+$/, '')
+    return relative && !relative.includes('/') ? relative : ''
+  }
+
+  ;(result.Data.Folders || []).forEach(item => {
+    const fullPath = normalizeFolder(item.FullPath || joinPath(parentPath, item.Name))
+    const directName = getDirectChildName(fullPath, true)
+    if (!directName) return
+    const row = {
       id: folderNodeId(fullPath),
-      name: item.Name || displayNameFromPath(fullPath),
+      name: item.Name || directName,
       isFolder: true,
       type: 'folder',
       size: 0,
       filePath: fullPath,
       children: []
     }
+    rows.set(row.id, row)
   })
-  const files = includeFiles
-    ? (result.Data.Files || []).map(item => {
-        const fullPath = normalizeObjectPath(item.FullPath || joinPath(folderPath, item.Name))
-        return {
-          id: fileNodeId(fullPath),
-          name: item.Name || displayNameFromPath(fullPath, '文件'),
-          isFolder: false,
-          type: item.Type || '',
-          size: Number(item.Size || 0),
-          filePath: fullPath,
-          children: []
-        }
-      })
-    : []
-  return [...folders, ...files]
+
+  if (includeFiles) {
+    ;(result.Data.Files || []).forEach(item => {
+      const fullPath = normalizeObjectPath(item.FullPath || joinPath(parentPath, item.Name))
+      const directName = getDirectChildName(fullPath, false)
+      if (!directName) return
+      const row = {
+        id: fileNodeId(fullPath),
+        name: item.Name || directName,
+        isFolder: false,
+        type: item.Type || '',
+        size: Number(item.Size || 0),
+        filePath: fullPath,
+        children: []
+      }
+      rows.set(row.id, row)
+    })
+  }
+
+  return Array.from(rows.values())
+}
+
+const loadListData = async (platform, folderPath, limit, recursive = false) => {
+  const folders = new Map()
+  const files = new Map()
+  let marker = ''
+  let pageCount = 0
+  let completed = false
+
+  while (pageCount < 100) {
+    const result = await fileSyncApi.listObjects(platform, folderPath, limit, '', marker, recursive)
+    if (result.Code !== 1) {
+      const error = new Error(result.Msg || '加载文件树失败')
+      error.code = result.Code
+      throw error
+    }
+    ;(result.Data?.Folders || []).forEach(item => {
+      const path = canonicalFolderPath(item.FullPath || joinPath(folderPath, item.Name))
+      if (path) folders.set(path, item)
+    })
+    ;(result.Data?.Files || []).forEach(item => {
+      const path = normalizeObjectPath(item.FullPath || joinPath(folderPath, item.Name))
+      if (path) files.set(path, item)
+    })
+
+    pageCount++
+    if (!result.Data?.IsTruncated) {
+      completed = true
+      break
+    }
+    const nextMarker = String(result.Data.NextMarker || '')
+    if (!nextMarker || nextMarker === marker) {
+      throw new Error('目录分页标识异常，已停止加载')
+    }
+    marker = nextMarker
+  }
+
+  if (!completed) {
+    throw new Error('目录数据量过大，已停止加载')
+  }
+  return {
+    Folders: Array.from(folders.values()),
+    Files: Array.from(files.values())
+  }
+}
+
+const loadDirectoryRows = async (platform, folderPath, limit, includeFiles = true) => {
+  const data = await loadListData(platform, folderPath, limit, false)
+  return normalizeRows({ Code: 1, Data: data }, folderPath, includeFiles)
 }
 
 const buildFileTree = async (platform, rootPath, limit, includeFiles = true) => {
-  const rootFolder = normalizeFolder(rootPath)
+  const rootFolder = canonicalFolderPath(rootPath)
   const rootNode = {
     id: folderNodeId(rootFolder),
-    name: rootFolder || '根目录',
+    name: displayNameFromPath(rootFolder, '根目录'),
     isFolder: true,
     type: 'folder',
     size: 0,
@@ -511,34 +1131,79 @@ const buildFileTree = async (platform, rootPath, limit, includeFiles = true) => 
     children: []
   }
 
+  const data = await loadListData(platform, rootFolder, limit, true)
+  const folderNodes = new Map([[rootFolder, rootNode]])
   let nodeCount = 1
   let clipped = false
-  const loadChildren = async (node, depth) => {
-    if (depth > MAX_TREE_DEPTH || nodeCount >= MAX_TREE_NODES) {
+
+  const ensureFolderNode = (path) => {
+    const folderPath = canonicalFolderPath(path)
+    if (!folderPath || folderPath === rootFolder) return rootNode
+    if (rootFolder && !folderPath.toLowerCase().startsWith(rootFolder.toLowerCase())) return null
+    if (folderNodes.has(folderPath)) return folderNodes.get(folderPath)
+    if (nodeCount >= MAX_TREE_NODES) {
       clipped = true
-      return
+      return null
     }
 
-    const result = await fileSyncApi.listObjects(platform, node.filePath, limit)
-    if (result.Code !== 1) {
-      throw new Error(result.Msg || '加载文件树失败')
-    }
+    const parentPath = getParentFolderPath(folderPath)
+    if (parentPath === folderPath) return null
+    const parentNode = ensureFolderNode(parentPath)
+    if (!parentNode) return null
 
-    const rows = normalizeRows(result, node.filePath, includeFiles)
-    node.children = rows
-    nodeCount += rows.length
-
-    for (const child of rows) {
-      if (!child.isFolder) continue
-      if (nodeCount >= MAX_TREE_NODES) {
-        clipped = true
-        break
-      }
-      await loadChildren(child, depth + 1)
+    const node = {
+      id: folderNodeId(folderPath),
+      name: displayNameFromPath(folderPath),
+      isFolder: true,
+      type: 'folder',
+      size: 0,
+      filePath: folderPath,
+      children: []
     }
+    folderNodes.set(folderPath, node)
+    parentNode.children.push(node)
+    nodeCount++
+    return node
   }
 
-  await loadChildren(rootNode, 0)
+  data.Folders.forEach(item => {
+    ensureFolderNode(item.FullPath || joinPath(rootFolder, item.Name))
+  })
+
+  if (includeFiles) {
+    data.Files.forEach(item => {
+      if (nodeCount >= MAX_TREE_NODES) {
+        clipped = true
+        return
+      }
+      const actualPath = normalizeObjectPath(item.FullPath || joinPath(rootFolder, item.Name))
+      const logicalPath = canonicalObjectPath(actualPath)
+      if (!logicalPath || (rootFolder && !logicalPath.toLowerCase().startsWith(rootFolder.toLowerCase()))) return
+      const parentNode = ensureFolderNode(getParentFolderPath(logicalPath))
+      if (!parentNode) return
+      parentNode.children.push({
+        id: fileNodeId(actualPath),
+        name: item.Name || displayNameFromPath(logicalPath, '文件'),
+        isFolder: false,
+        type: item.Type || '',
+        size: Number(item.Size || 0),
+        filePath: actualPath,
+        logicalPath,
+        children: []
+      })
+      nodeCount++
+    })
+  }
+
+  const sortChildren = (node) => {
+    node.children.sort((left, right) => {
+      if (left.isFolder !== right.isFolder) return left.isFolder ? -1 : 1
+      return String(left.name || '').localeCompare(String(right.name || ''), 'zh-CN', { numeric: true })
+    })
+    node.children.filter(child => child.isFolder).forEach(sortChildren)
+  }
+  sortChildren(rootNode)
+
   if (clipped) {
     ElMessage.warning(`文件树较大，已加载前 ${MAX_TREE_NODES} 个节点`)
   }
@@ -549,11 +1214,15 @@ const loadSourceTree = async () => {
   loadingSource.value = true
   checkedSourceRows.value = []
   try {
-    const sourcePlatform = await preparePlatform(form.source)
-    sourceTree.value = await buildFileTree(sourcePlatform, form.source.path, form.source.limit, true)
+    const sourcePlatform = await preparePlatform(form.source, 'source')
+    const sourceRoot = normalizeFolder(String(sourcePlatform.osClient || '').toLowerCase())
+    sourceTree.value = await buildFileTree(sourcePlatform, sourceRoot, form.source.limit, true)
     ElMessage.success('源文件树加载完成')
   } catch (error) {
     sourceTree.value = []
+    if (form.source.platformType === 'remote' && error?.code === 1001) {
+      await invalidateRemoteLogin(form.source, '远程 Token 已失效')
+    }
     ElMessage.error(error.message || '加载源文件树失败')
   } finally {
     loadingSource.value = false
@@ -563,13 +1232,17 @@ const loadSourceTree = async () => {
 const loadTargetTree = async () => {
   loadingTarget.value = true
   try {
-    const targetPlatform = await preparePlatform(form.target)
-    targetTree.value = await buildFileTree(targetPlatform, form.target.path, form.target.limit, true)
-    selectedTargetPath.value = normalizeFolder(form.target.path)
+    const targetPlatform = await preparePlatform(form.target, 'target')
+    const rootPath = normalizeFolder(String(targetPlatform.osClient || '').toLowerCase())
+    targetTree.value = await buildFileTree(targetPlatform, rootPath, form.target.limit, true)
+    selectedTargetPath.value = rootPath
     selectedTargetNodeKey.value = folderNodeId(selectedTargetPath.value)
     ElMessage.success('目标文件树加载完成')
   } catch (error) {
     targetTree.value = []
+    if (form.target.platformType === 'remote' && error?.code === 1001) {
+      await invalidateRemoteLogin(form.target, '远程 Token 已失效')
+    }
     ElMessage.error(error.message || '加载目标文件树失败')
   } finally {
     loadingTarget.value = false
@@ -590,16 +1263,24 @@ const handleTargetNodeClick = (node) => {
     selectedTargetNodeKey.value = folderNodeId(selectedTargetPath.value)
     ElMessage.info('已选择该文件所在目录')
   }
-  form.target.path = selectedTargetPath.value
+}
+
+const handleTargetBucketChange = () => {
+  const shouldReload = targetTree.value.length > 0
+  targetTree.value = []
+  selectedTargetPath.value = ''
+  selectedTargetNodeKey.value = ''
+  targetListCache = new Map()
+  if (shouldReload) loadTargetTree()
 }
 
 const hasCheckedAncestor = (row, checkedFolderPaths) => {
   let parentPath = row.isFolder
-    ? getParentFolderPath(normalizeFolder(row.filePath))
-    : getParentFolderPath(row.filePath)
+    ? getParentFolderPath(canonicalFolderPath(row.filePath))
+    : getParentFolderPath(row.logicalPath || canonicalObjectPath(row.filePath))
 
   while (parentPath) {
-    if (checkedFolderPaths.has(normalizeFolder(parentPath))) return true
+    if (checkedFolderPaths.has(canonicalFolderPath(parentPath))) return true
     parentPath = getParentFolderPath(parentPath)
   }
   return false
@@ -609,7 +1290,7 @@ const getSelectedRootRows = () => {
   const checkedFolderPaths = new Set(
     checkedSourceRows.value
       .filter(row => row.isFolder)
-      .map(row => normalizeFolder(row.filePath))
+      .map(row => canonicalFolderPath(row.filePath))
   )
   return checkedSourceRows.value.filter(row => !hasCheckedAncestor(row, checkedFolderPaths))
 }
@@ -629,8 +1310,7 @@ const getTargetRows = async (targetPlatform, targetFolder) => {
   ].join('|')
   if (targetListCache.has(key)) return targetListCache.get(key)
 
-  const list = await fileSyncApi.listObjects(targetPlatform, normalizeFolder(targetFolder), form.target.limit)
-  const rows = normalizeRows(list, normalizeFolder(targetFolder), true)
+  const rows = await loadDirectoryRows(targetPlatform, normalizeFolder(targetFolder), form.target.limit, true)
   targetListCache.set(key, rows)
   return rows
 }
@@ -809,8 +1489,8 @@ const startSync = async () => {
   })
 
   try {
-    const sourcePlatform = await preparePlatform(form.source)
-    const targetPlatform = await preparePlatform(form.target)
+    const sourcePlatform = await preparePlatform(form.source, 'source')
+    const targetPlatform = await preparePlatform(form.target, 'target')
     const record = await createTaskRecord(sourcePlatform, targetPlatform, selectedRows)
     task.taskId = record.TaskId || ''
     task.taskNo = record.TaskNo || ''
@@ -910,6 +1590,8 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   .el-dialog__body {
     padding: 14px 18px 18px;
     background: #f5f8fb;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
   }
 
   .el-dialog__footer {
@@ -1012,10 +1694,125 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   gap: 10px;
 }
 
-.path-grid {
+.remote-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mci-space-3, 10px);
+}
+
+.connection-toolbar {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: var(--mci-space-2, 8px);
+
+  .el-select {
+    width: 100%;
+  }
+}
+
+.login-identity {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--mci-space-3, 10px);
+  padding: var(--mci-space-3, 10px) var(--mci-space-4, 12px);
+  border: 1px solid var(--mci-color-success-border, #bce8d1);
+  border-radius: var(--mci-shape-panel, 8px);
+  background: var(--mci-color-success-soft, #eefaf4);
+}
+
+.identity-copy {
+  min-width: 0;
+
+  strong,
+  span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--mci-text-primary, #183247);
+    font-size: 14px;
+  }
+
+  span {
+    margin-top: 3px;
+    color: var(--mci-text-secondary, #687b8d);
+    font-size: 12px;
+  }
+}
+
+.login-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mci-space-3, 10px);
+
+  span {
+    color: var(--mci-text-tertiary, #7b8b9b);
+    font-size: 12px;
+  }
+}
+
+.captcha-field {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
   gap: 10px;
+}
+
+.captcha-image {
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mci-border-color, #d8e2ec);
+  border-radius: var(--mci-shape-input, 6px);
+  background: var(--mci-bg-elevated, #ffffff);
+  color: var(--mci-color-primary, #20b26b);
+  cursor: pointer;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.bucket-switch {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid var(--mci-border-color, #dfe8f1);
+  border-radius: var(--mci-shape-panel, 8px);
+  background: var(--mci-bg-surface, #edf2f7);
+
+  :deep(.el-radio-button__inner) {
+    width: 100%;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mci-text-secondary, #536579);
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: none;
+  }
+
+  :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+    background: var(--mci-color-primary, #20b26b);
+    color: var(--mci-text-on-primary, #ffffff);
+    box-shadow: var(--mci-shadow-button, 0 7px 16px rgba(32, 178, 107, 0.22));
+  }
 }
 
 .sync-direction {
@@ -1170,6 +1967,34 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
 
   .sync-rule-bar {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .credential-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .captcha-field {
+    grid-template-columns: minmax(0, 1fr) 112px;
+  }
+
+  .login-identity {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+
+    .el-avatar {
+      grid-row: 1 / 3;
+    }
+
+    .el-tag {
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    .el-button {
+      grid-column: 3;
+      grid-row: 1 / 3;
+    }
   }
 }
 </style>

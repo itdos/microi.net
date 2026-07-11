@@ -331,13 +331,25 @@ namespace Microi.net
                 };
                 var ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
 
-                var prefix = (param.Prefix ?? "").TrimStart('/');
+                static string NormalizeFolderPath(string value)
+                {
+                    var normalized = (value ?? "").Replace('\\', '/').TrimStart('/');
+                    while (normalized.Contains("//"))
+                    {
+                        normalized = normalized.Replace("//", "/");
+                    }
+                    normalized = normalized.TrimEnd('/');
+                    return normalized.Length > 0 ? normalized + "/" : "";
+                }
+
+                var prefix = NormalizeFolderPath(param.Prefix);
+                var isRecursive = param.Recursive == true;
                 var delimiter = param.Delimiter ?? "/";
 
                 var listRequest = new ListObjectsRequest(bucketName)
                 {
                     Prefix = prefix,
-                    Delimiter = delimiter,
+                    Delimiter = isRecursive ? null : delimiter,
                     MaxKeys = param.MaxKeys > 0 ? param.MaxKeys : 1000
                 };
                 if (!param.Marker.DosIsNullOrWhiteSpace())
@@ -349,13 +361,53 @@ namespace Microi.net
 
                 var folders = new List<object>();
                 var files = new List<object>();
+                var seenPrefixes = new HashSet<string>();
+
+                void AddFolderHierarchy(string objectKey, bool isFolderObject)
+                {
+                    var normalizedKey = (objectKey ?? "").Replace('\\', '/');
+                    var folderPath = isFolderObject
+                        ? NormalizeFolderPath(normalizedKey)
+                        : NormalizeFolderPath(normalizedKey.Contains("/")
+                            ? normalizedKey.Substring(0, normalizedKey.LastIndexOf('/') + 1)
+                            : "");
+                    if (folderPath.Length == 0 || (prefix.Length > 0 && !folderPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return;
+                    }
+
+                    var relativePath = prefix.Length > 0 ? folderPath.Substring(prefix.Length) : folderPath;
+                    var currentPath = prefix;
+                    foreach (var segment in relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        currentPath += segment + "/";
+                        if (currentPath == prefix || !seenPrefixes.Add(currentPath)) continue;
+                        folders.Add(new { Name = segment, FullPath = currentPath, IsFolder = true });
+                    }
+                }
 
                 // 公共前缀 = 子文件夹
                 if (listing.CommonPrefixes != null)
                 {
                     foreach (var commonPrefix in listing.CommonPrefixes)
                     {
-                        var folderName = commonPrefix.TrimEnd('/');
+                        var folderPath = NormalizeFolderPath(commonPrefix);
+                        if (folderPath == prefix)
+                        {
+                            continue;
+                        }
+
+                        if (!seenPrefixes.Add(folderPath)) continue;
+
+                        var relativePath = prefix.Length > 0 && folderPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                            ? folderPath.Substring(prefix.Length).TrimEnd('/')
+                            : folderPath.TrimEnd('/');
+                        if (relativePath.Length == 0 || relativePath.Contains("/"))
+                        {
+                            continue;
+                        }
+
+                        var folderName = folderPath.TrimEnd('/');
                         if (folderName.Contains("/"))
                         {
                             folderName = folderName.Substring(folderName.LastIndexOf('/') + 1);
@@ -363,7 +415,7 @@ namespace Microi.net
                         folders.Add(new
                         {
                             Name = folderName,
-                            FullPath = commonPrefix,
+                            FullPath = folderPath,
                             IsFolder = true
                         });
                     }
@@ -375,8 +427,15 @@ namespace Microi.net
                     foreach (var obj in listing.ObjectSummaries)
                     {
                         // 排除文件夹自身的空对象
-                        if (obj.Key == prefix || obj.Key.EndsWith("/"))
+                        if (obj.Key == prefix)
                             continue;
+
+                        var isFolderObject = obj.Key.EndsWith("/");
+                        if (isRecursive)
+                        {
+                            AddFolderHierarchy(obj.Key, isFolderObject);
+                        }
+                        if (isFolderObject) continue;
 
                         var fileName = obj.Key;
                         if (fileName.Contains("/"))

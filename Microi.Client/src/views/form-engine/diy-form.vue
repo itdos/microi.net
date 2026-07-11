@@ -814,6 +814,7 @@ export default {
                     ClientType: self.DiyCommon.GetClientType(),
                     OpenAnyForm: self.OpenAnyForm,
                     OpenDialog: self.OpenDialog,
+                    OpenAppDialog: self.OpenAppDialog,
                     ReloadForm: (row, type) => self.$emit("CallbackReloadForm", row, type),
                     HideFormBtn: self.HideFormBtn,
                     FormSet: self.FormSet,

@@ -242,6 +242,32 @@ export default {
                 }
             });
 
+            if (Array.isArray(self.PropsVirtualFields) && self.PropsVirtualFields.length > 0) {
+                self.PropsVirtualFields.forEach((virtualField, virtualIndex) => {
+                    var field = JSON.parse(JSON.stringify(virtualField || {}));
+                    var hasExplicitId = !!field.Id;
+                    field.Id = field.Id || "__runtime_field_" + (field.Name || virtualIndex);
+                    field.Name = field.Name || field.Id;
+                    field.Label = field.Label || field.Name;
+                    field.Component = field.Component || "Text";
+                    field.Visible = field.Visible === undefined ? 1 : field.Visible;
+                    field.TableWidth = field.TableWidth || 120;
+                    field.Sort = field.Sort === undefined ? 10000 + virtualIndex : field.Sort;
+                    self.DiyCommon.DiyFieldConfigStrToJson(field);
+                    self.DiyCommon.Base64DecodeDiyField(field);
+                    self.DiyCommon.EnsureFieldProperties(field);
+                    var fieldIndex = result.Data.findIndex((item) => item.Id === field.Id || item.Name === field.Name);
+                    if (fieldIndex > -1) {
+                        if (!hasExplicitId) {
+                            field.Id = result.Data[fieldIndex].Id;
+                        }
+                        result.Data[fieldIndex] = Object.assign({}, result.Data[fieldIndex], field);
+                    } else {
+                        result.Data.push(field);
+                    }
+                });
+            }
+
             self.DiyFieldList = result.Data;
             // self.$emit("CallbackGetDiyField", self.DiyFieldList)
         },
@@ -633,6 +659,18 @@ export default {
         async GetSysMenuModelAfter(result) {
             var self = this;
             self.DiyCommon.ForConvertSysMenu(result.Data);
+            if (self.PropsMenuModelPatch && typeof self.PropsMenuModelPatch === "object") {
+                var menuPatch = JSON.parse(JSON.stringify(self.PropsMenuModelPatch));
+                Object.keys(menuPatch).forEach(function (key) {
+                    result.Data[key] = menuPatch[key];
+                });
+            }
+            if (Array.isArray(self.PropsSelectFields) && self.PropsSelectFields.length > 0) {
+                result.Data.SelectFields = JSON.parse(JSON.stringify(self.PropsSelectFields));
+            }
+            if (Array.isArray(self.PropsSearchFields) && self.PropsSearchFields.length > 0) {
+                result.Data.SearchFieldIds = JSON.parse(JSON.stringify(self.PropsSearchFields));
+            }
             //2021-09-02 提前渲染 页面更多按钮(PageBtns)、页面多Tab（PageTabs）、批量选择更多按钮BatchSelectMoreBtns、更多导出按钮(ExportMoreBtns)
             self.HandlerBtns(result.Data.PageBtns);
             //注意：表单按钮，一定要先打开表单后再进行判断IsVisible

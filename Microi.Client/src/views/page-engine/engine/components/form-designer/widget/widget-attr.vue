@@ -271,6 +271,32 @@
                 </template>
               </template>
 
+              <template v-else-if="item.type === 'pageengine'">
+                <el-select
+                  class="attr-control"
+                  size="small"
+                  :model-value="getLocalValue(index, item.value)"
+                  @update:model-value="handleInputChange(index, $event)"
+                  placeholder="请选择界面引擎"
+                  filterable
+                  clearable
+                  :loading="pageEngineLoading"
+                  @visible-change="(visible) => visible && loadPageEngineList()"
+                >
+                  <el-option
+                    v-for="page in pageEngineList"
+                    :key="page.Id"
+                    :label="page.Title || page.Number"
+                    :value="page.Id"
+                  >
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span>{{ page.Title || page.Number }}</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px;margin-left:8px">{{ page.Number || page.Id }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </template>
+
               <template v-else-if="item.type === 'input'">
                 <el-input
                   class="attr-control"
@@ -617,6 +643,32 @@ const handleApiEngineSelect = (index, apiEngineKey) => {
   }
   const url = `${API_ENGINE_URL_PREFIX}${apiEngineKey}${API_ENGINE_URL_SUFFIX}`
   handleInputChange(index, url)
+}
+
+// ===== 界面引擎选择 =====
+const pageEngineList = ref([])
+const pageEngineLoading = ref(false)
+let pageEngineLoaded = false
+
+const loadPageEngineList = async () => {
+  if (pageEngineLoaded && pageEngineList.value.length > 0) return
+  pageEngineLoading.value = true
+  try {
+    const res = await DiyCommon.FormEngine.GetTableData({
+      FormEngineKey: 'mic_page',
+      _PageSize: 500,
+      _SelectFields: ['Id', 'Title', 'Number', 'RoutePath'],
+      _OrderBy: 'Title'
+    })
+    if (res && res.Code === 1 && res.Data) {
+      pageEngineList.value = res.Data
+      pageEngineLoaded = true
+    }
+  } catch (e) {
+    console.error('加载界面引擎列表失败:', e)
+  } finally {
+    pageEngineLoading.value = false
+  }
 }
 
 // ===== 系统菜单树选择（SysMenuId） =====

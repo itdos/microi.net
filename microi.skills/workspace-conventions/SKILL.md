@@ -135,6 +135,30 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 新增 C# Controller 前必须能说明为什么不能用接口引擎实现，并在交付说明中列出原因、影响范围和版本升级要求。
 - 从 C# Controller 迁移到接口引擎时，前端不得继续调用旧 `/api/<Controller>/<Action>`；应统一改为 `DiyCommon.ApiEngine.Run('<ApiEngineKey>', params)`，并保留 DosResult 返回格式。
 
+## 在线 AI 应用上下文默认发现规则（强制）
+
+AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城任务时，不能只搜索本地目录。只要当前 MCP 已连接到目标 `OsClient`，必须先读取在线 AI 应用上下文：
+
+1. 调用 `microi_list_applications` 获取当前租户全部 `Web / UniApp / MicroService` 应用和完整文件清单。
+2. 找到候选应用后调用 `microi_get_application_context`，默认 `includeContents=true`，读取所有可读源码内容以及微服务运行页面。
+3. 只需核对单个大文件或二进制文件时，再调用 `microi_get_application_file` 精确读取。
+4. 已存在合适微服务时优先在原应用内新增页面/路由；不存在时才调用 `microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_microservice` 创建并发布。
+
+三个读取工具的关键参数：
+
+| 工具 | 参数 | 说明 |
+|---|---|---|
+| `microi_list_applications` | `appType` | 可选：`Web`、`UniApp`、`MicroService`；省略表示全部类型 |
+|  | `keyword` | 可选：按名称、`AppKey`、类型、描述筛选 |
+|  | `includeFiles` | 默认 `true`，返回每个应用完整文件清单 |
+| `microi_get_application_context` | `appIdOrKey` | 必填，支持 `mci_ai_app.Id` 或 `AppKey` |
+|  | `includeContents` | 默认 `true`；读取私有 HDFS 源码内容 |
+|  | `maxFileBytes` | 可选，默认单文件 2MB |
+|  | `maxTotalBytes` | 可选，默认单应用 50MB |
+| `microi_get_application_file` | `appIdOrKey`、`filePath` | 必填；`filePath` 必须来自文件清单 |
+
+如果 MCP 返回登录过期，必须先修复或刷新目标 MCP 身份，再继续把 MCP 读取结果当作当前事实；不能因为读取失败就假设在线应用不存在并重复创建。
+
 ## VS Code 插件空目录生成规则
 
 Microi.VSCode 面向普通用户时，用户本地可能只是一个空工作区。插件生成 AI 指令文件时不能假设用户已经有 `microi.skills/`、`Microi-V8-Engine/`、`AI-Project/` 或某个固定前端项目目录。

@@ -13,6 +13,35 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
 const normalizeApiBase = (apiBase = '') => String(apiBase || '').replace(/\/+$/, '')
 
+const isEnabledFlag = (value) => {
+  if (value === true || value === 1) return true
+  if (typeof value !== 'string') return false
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
+
+const responseJson = async (response, fallbackMessage) => {
+  let result = null
+  try {
+    result = await response.json()
+  } catch (error) {
+    throw new Error(fallbackMessage)
+  }
+  if (!response.ok) {
+    throw new Error(result?.Msg || fallbackMessage)
+  }
+  return result
+}
+
+const arrayBufferToDataUrl = (buffer, contentType = 'image/png') => {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 8192
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return `data:${contentType};base64,${btoa(binary)}`
+}
+
 const getBucketScope = (limit = true) => limit ? 'private' : 'public'
 
 const getUploadHeaders = () => ({
@@ -103,7 +132,7 @@ export const fileSyncApi = {
       headers,
       body: JSON.stringify({ ApiEngineKey: apiEngineKey, ...param })
     })
-    return resp.json()
+    return responseJson(resp, `远程接口 ${apiEngineKey} 调用失败`)
   },
 
   async loginRemote(platform) {
@@ -112,21 +141,110 @@ export const fileSyncApi = {
     if (!encryptedPwd) {
       return { result: { Code: 0, Msg: '密码加密失败' }, authorization: '' }
     }
+    const loginParam = {
+      Account: platform.account,
+      Pwd: encryptedPwd,
+      OsClient: platform.osClient,
+      _ClientType: 'PC'
+    }
+    if (platform.captchaRequired) {
+      loginParam._CaptchaId = platform.captchaId || ''
+      loginParam._CaptchaValue = platform.captchaValue || ''
+    }
+
     const resp = await fetch(`${apiBase}/api/SysUser/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         OsClient: platform.osClient || ''
       },
+      body: JSON.stringify(loginParam)
+    })
+    const result = await responseJson(resp, '远程平台登录请求失败')
+    const authorization = resp.headers.get('authorization') || result?.DataAppend?.Token || result?.Data?.Token || ''
+    return { result, authorization }
+  },
+
+  async getRemoteLoginConfig(platform) {
+    const apiBase = normalizeApiBase(platform.apiBase)
+    const resp = await fetch(`${apiBase}/api/FormEngine/GetSysConfig`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        OsClient: platform.osClient || ''
+      },
       body: JSON.stringify({
-        Account: platform.account,
-        Pwd: encryptedPwd,
+        _SearchEqual: { IsEnable: 1 },
         OsClient: platform.osClient
       })
     })
-    const result = await resp.json()
-    const authorization = resp.headers.get('authorization') || result?.DataAppend?.Token || result?.Data?.Token || ''
-    return { result, authorization }
+    const result = await responseJson(resp, '获取远程登录配置失败')
+    if (result.Code !== 1 || !result.Data) {
+      throw new Error(result.Msg || '获取远程登录配置失败')
+    }
+    return {
+      sysConfig: result.Data,
+      captchaRequired: isEnabledFlag(result.Data.EnableCaptcha)
+    }
+  },
+
+  async getRemoteCaptcha(platform) {
+    const apiBase = normalizeApiBase(platform.apiBase)
+    const query = new URLSearchParams({ OsClient: platform.osClient || '' })
+    const resp = await fetch(`${apiBase}/api/Captcha/GetCaptcha?${query.toString()}`, {
+      method: 'GET',
+      headers: { OsClient: platform.osClient || '' },
+      cache: 'no-store'
+    })
+    if (!resp.ok) {
+      throw new Error('获取远程登录验证码失败')
+    }
+    const captchaId = resp.headers.get('captchaid') || ''
+    if (!captchaId) {
+      throw new Error('远程平台未返回验证码标识')
+    }
+    return {
+      captchaId,
+      image: arrayBufferToDataUrl(
+        await resp.arrayBuffer(),
+        resp.headers.get('content-type') || 'image/png'
+      )
+    }
+  },
+
+  async getFileCabinetCapability(platform) {
+    const result = await this.runApiEngine('mci_file_sync_capability', {}, platform)
+    if (result?.Code !== 1 || !result.Data) {
+      const error = new Error(result?.Msg || '远程平台未返回文件柜同步能力')
+      error.code = result?.Code
+      error.engineKey = 'mci_file_sync_capability'
+      throw error
+    }
+    return result.Data
+  },
+
+  listRemoteConnections() {
+    return DiyCommon.ApiEngine.Run('mci_file_remote_connection', { Action: 'list' })
+  },
+
+  getRemoteConnection(id) {
+    return DiyCommon.ApiEngine.Run('mci_file_remote_connection', { Action: 'get', Id: id })
+  },
+
+  saveRemoteConnection(param = {}) {
+    return DiyCommon.ApiEngine.Run('mci_file_remote_connection', { Action: 'save', ...param })
+  },
+
+  logoutRemoteConnection(id, error = '') {
+    return DiyCommon.ApiEngine.Run('mci_file_remote_connection', {
+      Action: error ? 'invalidate' : 'logout',
+      Id: id,
+      Error: error
+    })
+  },
+
+  deleteRemoteConnection(id) {
+    return DiyCommon.ApiEngine.Run('mci_file_remote_connection', { Action: 'delete', Id: id })
   },
 
   async postHdfs(platform, url, param = {}) {
@@ -146,14 +264,16 @@ export const fileSyncApi = {
       headers,
       body: JSON.stringify({ ...param, OsClient: platform.osClient })
     })
-    return resp.json()
+    return responseJson(resp, '远程文件系统请求失败')
   },
 
-  listObjects(platform, path, limit = true, keyword = '') {
+  listObjects(platform, path, limit = true, keyword = '', marker = '', recursive = false) {
     return this.postHdfs(platform, `${API_BASE}/ListObjects`, {
       Path: path || '',
       Limit: limit,
-      _Keyword: keyword
+      _Keyword: keyword,
+      Marker: marker,
+      Recursive: recursive
     })
   },
 

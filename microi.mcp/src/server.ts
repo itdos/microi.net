@@ -1931,6 +1931,89 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 查询全部在线应用与文件清单
+  // ========================
+  server.tool(
+    'microi_list_applications',
+    `List every online AI application for OsClient "${osClient}" across Web, UniApp and MicroService, including each app's complete source-file manifest by default. AI agents should call this at the beginning of application/page work so they understand existing apps before creating duplicates. For complex custom dialogs/pages, prefer extending an existing MicroService or creating one with microi_create_microservice + microi_sync_microservice_source; do not embed large HTML in V8.ConfirmTips.`,
+    {
+      appType: z.enum(['Web', 'UniApp', 'MicroService']).optional().describe('Optional exact application type filter.'),
+      keyword: z.string().optional().describe('Optional case-insensitive search across name, AppKey, type and description.'),
+      includeFiles: z.boolean().optional().default(true).describe('Include the complete file manifest for every app. Defaults to true.'),
+    },
+    async ({ appType, keyword, includeFiles }) => {
+      try {
+        const result = await client.listApplications({ AppType: appType, Keyword: keyword, IncludeFiles: includeFiles !== false });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 获取应用完整源码上下文
+  // ========================
+  server.tool(
+    'microi_get_application_context',
+    `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}", with its full file manifest and all readable source-code contents by default. MicroService responses also include sys_microiservice runtime/pages. Use this after microi_list_applications before editing an existing app.`,
+    {
+      appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+      includeContents: z.boolean().optional().default(true).describe('Read private HDFS source contents. Defaults to true.'),
+      maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read per source file. Default 2MB.'),
+      maxTotalBytes: z.number().int().positive().optional().describe('Maximum total bytes read for this app. Default 50MB.'),
+    },
+    async ({ appIdOrKey, includeContents, maxFileBytes, maxTotalBytes }) => {
+      try {
+        const result = await client.getApplicationContext({
+          AppIdOrKey: appIdOrKey,
+          IncludeContents: includeContents !== false,
+          ...(maxFileBytes ? { MaxFileBytes: maxFileBytes } : {}),
+          ...(maxTotalBytes ? { MaxTotalBytes: maxTotalBytes } : {}),
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 获取单个应用文件
+  // ========================
+  server.tool(
+    'microi_get_application_file',
+    `Read one exact source file from a Web, UniApp or MicroService online AI application for OsClient "${osClient}". Text code is returned as UTF-8 Content; binary files are returned as FileByteBase64.`,
+    {
+      appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+      filePath: z.string().describe('Exact relative source path from the application file manifest.'),
+      maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read. Default 10MB.'),
+    },
+    async ({ appIdOrKey, filePath, maxFileBytes }) => {
+      try {
+        const result = await client.getApplicationFile({
+          AppIdOrKey: appIdOrKey,
+          FilePath: filePath,
+          IncludeContents: true,
+          ...(maxFileBytes ? { MaxFileBytes: maxFileBytes } : {}),
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 查询微服务 / 微应用
   // ========================
   server.tool(
@@ -1970,6 +2053,36 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       }
       try {
         const result = await client.createMicroService(microService);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 同步微服务源码到在线 AI 应用
+  // ========================
+  server.tool(
+    'microi_sync_microservice_source',
+    `Sync local microservice source files into the online AI Application for OsClient "${osClient}". The app is created/upserted as AppType=MicroService; source files are private and remain separate from published assets.`,
+    {
+      microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
+      sourceFiles: z.array(jsonRecordSchema).describe('Source files. Each item needs Path/FilePath and FileByteBase64/ContentBase64. Optional: Size and Sha256.'),
+      replace: z.boolean().optional().describe('When true, remove stale online source metadata not present in this manifest.'),
+      confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
+    },
+    async ({ microService, sourceFiles, replace, confirmExecution }) => {
+      if (!confirmExecution) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, sourceFileCount: sourceFiles.length, replace: replace === true }, null, 2) }],
+        };
+      }
+      try {
+        const result = await client.syncMicroServiceSource({ microService, sourceFiles, Replace: replace === true });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }

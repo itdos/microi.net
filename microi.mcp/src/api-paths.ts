@@ -23,8 +23,12 @@ export const API = {
   UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
 
   // 微服务 / 微应用
+  LIST_APPLICATIONS: '/api/V8Engine/ListApplications',
+  GET_APPLICATION_CONTEXT: '/api/V8Engine/GetApplicationContext',
+  GET_APPLICATION_FILE: '/api/V8Engine/GetApplicationFile',
   GET_MICRO_SERVICE: '/api/V8Engine/GetMicroService',
   CREATE_MICRO_SERVICE: '/api/V8Engine/CreateMicroService',
+  SYNC_MICRO_SERVICE_SOURCE: '/api/V8Engine/SyncMicroServiceSource',
   PUBLISH_MICRO_SERVICE: '/api/V8Engine/PublishMicroService',
 
   // V8 事件

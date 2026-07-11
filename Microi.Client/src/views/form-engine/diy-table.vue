@@ -163,7 +163,7 @@
                             </template>
                         </template>
                         <!--如果子表是只读状态或预览模式，不显示导入导出按钮-->
-                        <template v-if="!diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
+                        <template v-if="!PropsHideImportExport && !diyStore.IsPhoneView && (! _IsTableChild || (_IsTableChild && !TableChildField.Readonly))">
                             <el-button v-if="_LimitImport && IsVisibleImport == true && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
                                 v-if="_LimitExport && IsVisibleExport == true && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
@@ -277,7 +277,7 @@
                             >
                         </el-popover>
                     </div>
-                    <el-dropdown v-if="!diyStore.IsPhoneView" trigger="click">
+                    <el-dropdown v-if="!PropsHideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
                         <el-button type="primary" :loading="BusinessDataTranslateLoading">
                             <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </el-button>
@@ -292,7 +292,7 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
-                    <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
+                    <div class="admin-action-group" v-if="!PropsHideAdminDesign && GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
                         <el-dropdown trigger="click">
                             <el-button type="primary">
                                 <el-icon style="margin-right: 4px"><Setting /></el-icon>{{ $t('Msg.DevDesign') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -1629,6 +1629,21 @@ export default {
             }
         },
         PropsWhere: { type: Array, default: () => [] },
+        // 自定义列表接口需要附加的请求参数（如工作流 WorkType）
+        PropsRequestParams: { type: Object, default: () => ({}) },
+        // 自定义列表接口地址；为空时继续使用 sys_menu.SelectApi / FormEngine 默认地址
+        PropsSelectApi: { type: String, default: "" },
+        // 接口返回但物理表中不存在，或需要覆盖显示配置的运行时字段
+        PropsVirtualFields: { type: Array, default: () => [] },
+        // 嵌入场景按字段 Name/Id 指定显示列和搜索列
+        PropsSelectFields: { type: Array, default: () => [] },
+        PropsSearchFields: { type: Array, default: () => [] },
+        // 嵌入场景按需覆盖菜单配置（按钮、内置增删改显隐等），不会写回 sys_menu
+        PropsMenuModelPatch: { type: Object, default: () => ({}) },
+        // 嵌入定制页可隐藏标准表格中原业务没有的辅助工具
+        PropsHideImportExport: { type: Boolean, default: false },
+        PropsHideMoreFunctions: { type: Boolean, default: false },
+        PropsHideAdminDesign: { type: Boolean, default: false },
         PropsIsJoinTable: { type: Boolean, default: false },
         ContainerClass: { type: String, default: "" },
         // 子表Field对象
@@ -2214,6 +2229,7 @@ export default {
             V8.OpenAnyForm = self.OpenAnyForm;
             V8.OpenAnyTable = self.OpenAnyTable;
             V8.OpenDialog = self.OpenDialog;
+            V8.OpenAppDialog = self.OpenAppDialog;
             self.FormWF = self.GetFormWF();
             V8.FormWF = self.FormWF;
             V8.TableId = self.TableId;

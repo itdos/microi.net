@@ -512,6 +512,13 @@ console.log('调试信息')                                  // 控制台输出�
 - 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
 - 字段较多的表单默认优先生成 `diy_table.Tabs`，并给字段写入 `Tab`；整行控件才使用 `FormWidth=24`。
 
+## MCP 在线应用默认发现与复杂页面规则
+
+- 处理 Web、UniApp、MicroService、定制弹窗或复杂页面前，先调用 `microi_list_applications` 获取当前租户所有在线应用及完整文件清单，再对目标应用调用 `microi_get_application_context`（默认读取全部源码内容）；单文件按需使用 `microi_get_application_file`。
+- 已有合适 MicroService 时优先新增页面/路由；没有时使用 `microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_microservice` 创建、同步私有源码并发布公有编译产物。
+- `V8.ConfirmTips` 只用于纯文本确认或极少量一次性输入。三个以上字段、联动校验、上传、表格、Tab、步骤条、代码编辑器或需长期维护的弹窗，必须使用微服务页面并通过 `V8.OpenAppDialog` 打开，禁止在 V8 代码里拼接大段 HTML。
+- 应用商城历史字段 `AppType` 表示官方/社区分类；运行应用类型使用 `ApplicationType`，值为 `Regular / MicroService / UniApp / Web`。
+
 
 ---
 
@@ -545,7 +552,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
-- `microi.skills/microi-solution-quotation/SKILL.md` — Microi吾码解决方案与报价 Word 生成规范
+- `microi.skills/microi-solution-quotation/SKILL.md` — Microi吾码解决方案与报价
 - `microi.skills/microi-frontend-sdk/SKILL.md` — Microi 前端 SDK
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
 - `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi 移动端质量门禁

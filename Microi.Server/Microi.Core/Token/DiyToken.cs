@@ -16,6 +16,7 @@ namespace Microi.net
         public const string AuthVersionClaimType = "MicroiAuthVersion";
         public const string TokenIssuedAtClaimType = "MicroiTokenIssuedAt";
         public const string CurrentAuthVersion = "2026-07-09-official-security-v2";
+        public static readonly TimeSpan TokenRotationGracePeriod = TimeSpan.FromMinutes(2);
 
         public static bool IsWeakJwtSecret(string secret, string osClient)
         {
@@ -151,6 +152,19 @@ namespace Microi.net
             return token.DosTrim().DosReplace("Bearer ", "");
         }
 
+        public static bool IsTokenEntryWithinRotationGrace(TokensModel tokenEntry, DateTime? now = null)
+        {
+            if (tokenEntry == null)
+            {
+                return false;
+            }
+            if (!tokenEntry.RetiredTime.HasValue)
+            {
+                return true;
+            }
+            return (now ?? DateTime.Now) - tokenEntry.RetiredTime.Value <= TokenRotationGracePeriod;
+        }
+
         public static bool IsCurrentAuthVersion(IEnumerable<Claim> claims)
         {
             var authVersion = claims?.FirstOrDefault(d => d.Type == AuthVersionClaimType)?.Value;
@@ -172,6 +186,7 @@ namespace Microi.net
 
             var tokenEntry = tokenModel.Tokens?.FirstOrDefault(d =>
                 string.Equals(d.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal)
+                && IsTokenEntryWithinRotationGrace(d)
                 && string.Equals(NormalizeBearerToken(d.Token), normalizedToken, StringComparison.Ordinal));
 
             if (tokenEntry != null)
@@ -498,28 +513,100 @@ namespace Microi.net
                     var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
 
                     CurrentToken tokenModel = null;
-                    try
+                    var rotateFromToken = NormalizeBearerToken(param.RotateFromToken);
+                    var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
                     {
-                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
-                    }
-                    catch (Exception ex)
+                        Key = $"{userTokenCacheKey}:Rotate",
+                        OsClient = osClient,
+                        Expiry = TimeSpan.FromSeconds(10),
+                        RetryIntervalMs = 10,
+                        UseExponentialBackoff = true
+                    }, async () =>
                     {
-
-                    }
-                    if (tokenModel == null)
-                    {
-                        //如果为空，则新建
-                        tokenModel = new CurrentToken()
+                        try
                         {
-                            CurrentUser = currentUser,
-                            CreateTime = dateTimeNow,
-                            UpdateTime = dateTimeNow,
-                            Token = access_token,
-                            AuthVersion = CurrentAuthVersion,
-                            OsClient = osClient,
-                            Tokens = new List<TokensModel>()
+                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
+                        }
+                        catch
+                        {
+                            tokenModel = null;
+                        }
+
+                        if (tokenModel == null)
+                        {
+                            tokenModel = new CurrentToken
                             {
-                                new TokensModel()
+                                CurrentUser = currentUser,
+                                CreateTime = dateTimeNow,
+                                UpdateTime = dateTimeNow,
+                                Token = access_token,
+                                AuthVersion = CurrentAuthVersion,
+                                OsClient = osClient,
+                                Tokens = new List<TokensModel>
+                                {
+                                    new TokensModel
+                                    {
+                                        Token = access_token,
+                                        AuthVersion = CurrentAuthVersion,
+                                        ClientType = clientType,
+                                        Did = did,
+                                        IP = ip,
+                                        CreateTime = dateTimeNow,
+                                        UpdateTime = dateTimeNow
+                                    }
+                                }
+                            };
+                        }
+                        else
+                        {
+                            tokenModel.CurrentUser = currentUser;
+                            tokenModel.UpdateTime = dateTimeNow;
+                            tokenModel.AuthVersion = CurrentAuthVersion;
+                            tokenModel.OsClient = osClient;
+                            tokenModel.Tokens = tokenModel.Tokens?
+                                .Where(d => d != null
+                                            && string.Equals(d.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal)
+                                            && IsTokenEntryWithinRotationGrace(d, dateTimeNow))
+                                .ToList() ?? new List<TokensModel>();
+
+                            var currentTerminalToken = tokenModel.Tokens.FirstOrDefault(d =>
+                                !d.RetiredTime.HasValue
+                                && string.Equals(d.Did, did, StringComparison.Ordinal)
+                                && string.Equals(d.ClientType, clientType, StringComparison.Ordinal));
+
+                            // 同一终端已有另一个并发请求完成了续签时，复用它的新 Token，避免连续轮换和响应乱序。
+                            var reuseConcurrentRotation = !rotateFromToken.DosIsNullOrWhiteSpace()
+                                && currentTerminalToken != null
+                                && !string.Equals(
+                                    NormalizeBearerToken(currentTerminalToken.Token),
+                                    rotateFromToken,
+                                    StringComparison.Ordinal);
+                            if (reuseConcurrentRotation)
+                            {
+                                access_token = currentTerminalToken.Token;
+                                currentTerminalToken.IP = ip;
+                                currentTerminalToken.UpdateTime = dateTimeNow;
+                            }
+                            else
+                            {
+                                if (rotateFromToken.DosIsNullOrWhiteSpace())
+                                {
+                                    // 主动登录/换号应立即替换同终端旧登录态，不应用自动续签的兼容窗口。
+                                    tokenModel.Tokens.RemoveAll(d =>
+                                        string.Equals(d.Did, did, StringComparison.Ordinal)
+                                        && string.Equals(d.ClientType, clientType, StringComparison.Ordinal));
+                                }
+                                else
+                                {
+                                    foreach (var oldToken in tokenModel.Tokens.Where(d =>
+                                                 !d.RetiredTime.HasValue
+                                                 && string.Equals(d.Did, did, StringComparison.Ordinal)
+                                                 && string.Equals(d.ClientType, clientType, StringComparison.Ordinal)))
+                                    {
+                                        oldToken.RetiredTime = dateTimeNow;
+                                    }
+                                }
+                                tokenModel.Tokens.Insert(0, new TokensModel
                                 {
                                     Token = access_token,
                                     AuthVersion = CurrentAuthVersion,
@@ -528,52 +615,25 @@ namespace Microi.net
                                     IP = ip,
                                     CreateTime = dateTimeNow,
                                     UpdateTime = dateTimeNow
-                                }
+                                });
                             }
-                        };
-                    }
-                    else
-                    {
-                        //如果已经登录过，则更新
-                        tokenModel.CurrentUser = currentUser;
-                        tokenModel.UpdateTime = dateTimeNow;
-                        tokenModel.Token = access_token;
-                        tokenModel.AuthVersion = CurrentAuthVersion;
-                        tokenModel.OsClient = osClient;
-                        if (tokenModel.Tokens == null)
-                        {
-                            tokenModel.Tokens = new List<TokensModel>();
+                            tokenModel.Token = access_token;
                         }
-                        if (tokenModel.Tokens.Any(d => d.Did == did && d.ClientType == clientType))
-                        {
-                            var firstToken = tokenModel.Tokens.First(d => d.Did == did && d.ClientType == clientType);
-                            firstToken.Token = access_token;
-                            firstToken.AuthVersion = CurrentAuthVersion;
-                            firstToken.IP = ip;
-                            firstToken.UpdateTime = dateTimeNow;
-                        }
-                        else
-                        {
-                            tokenModel.Tokens.Add(new TokensModel()
-                            {
-                                Token = access_token,
-                                AuthVersion = CurrentAuthVersion,
-                                ClientType = clientType,
-                                Did = did,
-                                IP = ip,
-                                CreateTime = dateTimeNow,
-                                UpdateTime = dateTimeNow
-                            });
-                        }
-                    }
 
-                    // 统一存储为 CurrentToken
-                    await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
+                        await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
+                    });
+                    if (lockResult.Code != 1 || tokenModel == null)
+                    {
+                        return new DosResult<CurrentToken>(
+                            lockResult.Code == 1 ? 0 : lockResult.Code,
+                            null,
+                            lockResult.Msg.DosIsNullOrWhiteSpace() ? "Token续签繁忙，请稍后重试。" : lockResult.Msg);
+                    }
                     if (context != null && !context.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
                     {
                         try
                         {
-                            context.Response.Headers.Add("authorization", tokenModel.Token);
+                            context.Response.Headers.Add("authorization", access_token);
                         }
                         catch (Exception)
                         {

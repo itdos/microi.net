@@ -1,12 +1,13 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.0.7
+ * Version: v1.0.8
  * Function:
  * - 导入应用商城离线/在线应用数据包，创建或更新表、字段、菜单、工作流、接口引擎等元数据。
  * - 运行在后台任务按钮中时，通过 V8.Method.UpdateBackgroundTask 按阶段写入 Redis 进度，通知中心显示真实百分比。
  * - 前端调用时仅允许 Level >= 9999 的用户安装应用；后端升级程序调用时按 V8.InvokeType=Server 放行。
  * - 支持自定义商城源传入 StoreOsClient/AppStoreOsClient，安装完成后写入当前租户 sys_microistoreversion。
+ * - 支持 Web、UniApp、MicroService 统一应用包，先安装基础表字段，再将私有源码与公有编译文件写入目标租户 HDFS。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -156,7 +157,242 @@ try {
         LineUpdated: 0,
         ApiEngineInserted: 0,
         ApiEngineUpdated: 0,
-        VersionRecordUpdated: 0
+        VersionRecordUpdated: 0,
+        ApplicationInstalled: 0,
+        ApplicationSourceFiles: 0,
+        ApplicationBuildAssets: 0,
+        MicroServicePages: 0
+    };
+
+    // ==================== Web / UniApp / MicroService 应用资产安装 ====================
+
+    var normalizeApplicationPath = function (value) {
+        var path = firstTextParam([value]).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        var parts = path.split('/');
+        var safe = [];
+        for (var i = 0; i < parts.length; i++) {
+            var part = parts[i];
+            if (!part || part == '.' || part == '..') continue;
+            safe.push(part.replace(/[:*?"<>|]/g, '_'));
+        }
+        return safe.join('/');
+    };
+
+    var applicationFileName = function (path) {
+        var normalized = normalizeApplicationPath(path);
+        var parts = normalized.split('/');
+        return parts[parts.length - 1] || 'file';
+    };
+
+    var applicationFileDir = function (path) {
+        var normalized = normalizeApplicationPath(path);
+        var index = normalized.lastIndexOf('/');
+        return index > -1 ? normalized.substring(0, index) : '';
+    };
+
+    var applicationFileType = function (path) {
+        var fileName = applicationFileName(path);
+        var index = fileName.lastIndexOf('.');
+        return index > -1 ? fileName.substring(index + 1).toLowerCase() : 'bin';
+    };
+
+    var getUploadedHdfsPath = function (uploadResult) {
+        var data = uploadResult && uploadResult.Data ? uploadResult.Data : {};
+        if (data && data.length && data[0]) data = data[0];
+        return firstTextParam([data.FilePathName, data.FilePath, data.Path, data.Url, data.url]);
+    };
+
+    var uploadApplicationAsset = function (rootPath, file, limit) {
+        var relativePath = normalizeApplicationPath(file.Path || file.FilePath || file.RelativePath || file.FileName);
+        if (!relativePath) throw new Error('应用资产路径不能为空');
+        var base64 = firstTextParam([file.FileByteBase64, file.ContentBase64, file.Base64]);
+        if (!base64 && file.Content !== undefined && file.Content !== null) {
+            base64 = V8.Base64.StringToBase64(String(file.Content));
+        }
+        if (!base64) throw new Error('应用资产缺少文件内容：' + relativePath);
+        var dir = applicationFileDir(relativePath);
+        var files = {};
+        files[applicationFileName(relativePath)] = base64;
+        var result = V8.Method.Upload({
+            OsClient: V8.OsClient,
+            Path: rootPath + (dir ? '/' + dir : ''),
+            Limit: limit === true,
+            Preview: false,
+            FilesByteBase64: files
+        });
+        if (!result || result.Code != 1) {
+            throw new Error('HDFS 存储不可用或上传失败：' + relativePath + '，' + ((result && result.Msg) || '接口无返回'));
+        }
+        var hdfsPath = getUploadedHdfsPath(result);
+        if (!hdfsPath) throw new Error('HDFS 上传成功但未返回文件路径：' + relativePath);
+        return { Path: relativePath, HdfsPath: hdfsPath, FilePathName: hdfsPath, Size: file.Size || 0, Hash: file.Sha256 || file.Hash || file.ContentHash || '' };
+    };
+
+    var upsertApplicationRow = function (tableName, where, row) {
+        var existing = V8.FormEngine.GetFormData(tableName, { _Where: where, _PageSize: 1 });
+        if (existing && existing.Code == 1 && existing.Data && existing.Data.Id) {
+            row.Id = existing.Data.Id;
+            return V8.FormEngine.UptFormData(tableName, row);
+        }
+        return V8.FormEngine.AddFormData(tableName, row);
+    };
+
+    var installApplicationBundle = function () {
+        var bundle = Package.ApplicationBundle || Package.AiApplication || Package.FrontendApplication;
+        if (!bundle) return;
+
+        var app = bundle.Application || bundle.App || {};
+        var appType = firstTextParam([bundle.ApplicationType, app.AppType, Package.PackageInfo.ApplicationType, 'Web']);
+        if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) {
+            throw new Error('不支持的应用类型：' + appType);
+        }
+        var appKey = firstTextParam([app.AppKey, app.MsKey, V8.Param.AppId, Package.PackageInfo.AppId]);
+        if (!appKey) throw new Error('ApplicationBundle.Application.AppKey 不能为空');
+        var appId = firstTextParam([app.Id, bundle.AppId, V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid()]);
+        var appName = firstTextParam([app.Name, app.MsName, Package.PackageInfo.Name, appKey]);
+        var sourceRoot = 'ai-app-source/' + appId;
+        var sourceFiles = bundle.SourceFiles || bundle.Files || [];
+        var uploadedSource = [];
+        reportProgress(60, '正在写入' + appType + '应用私有源码');
+        for (var i = 0; i < sourceFiles.length; i++) {
+            var sourceUpload = uploadApplicationAsset(sourceRoot, sourceFiles[i], true);
+            uploadedSource.push(sourceUpload);
+            var sourceFile = sourceFiles[i] || {};
+            var sourceRow = {
+                AppId: appId,
+                AppName: appName,
+                FilePath: sourceUpload.Path,
+                FileName: applicationFileName(sourceUpload.Path),
+                FileType: applicationFileType(sourceUpload.Path),
+                HdfsPath: sourceUpload.HdfsPath,
+                StorageScope: 'Private',
+                ContentHash: sourceUpload.Hash,
+                Size: sourceUpload.Size,
+                IsDirectory: 0,
+                Version: parseInt(sourceFile.Version || 1, 10) || 1
+            };
+            var sourceResult = upsertApplicationRow('mci_ai_app_file', [
+                ['AppId', '=', appId],
+                ['AND', 'FilePath', '=', sourceUpload.Path]
+            ], sourceRow);
+            if (!sourceResult || sourceResult.Code != 1) throw new Error('写入应用源码元数据失败：' + sourceUpload.Path + '，' + ((sourceResult && sourceResult.Msg) || ''));
+            stats.ApplicationSourceFiles++;
+        }
+
+        var versionNo = firstTextParam([bundle.VersionNo, app.BuildVersion, Package.PackageInfo.Version, 'v1.0.0']);
+        if (versionNo.charAt(0).toLowerCase() != 'v') versionNo = 'v' + versionNo;
+        var buildRoot = appType == 'MicroService'
+            ? 'micro-app/' + appKey + '/' + versionNo
+            : 'ai-app-publish/' + appKey + '/versions/' + versionNo;
+        var buildAssets = bundle.BuildAssets || bundle.Assets || [];
+        var uploadedBuild = [];
+        reportProgress(65, '正在写入' + appType + '应用公有编译文件');
+        for (var b = 0; b < buildAssets.length; b++) {
+            var buildUpload = uploadApplicationAsset(buildRoot, buildAssets[b], false);
+            uploadedBuild.push(buildUpload);
+            stats.ApplicationBuildAssets++;
+        }
+
+        var entryPath = firstTextParam([bundle.EntryPath, app.EntryPath, 'index.html']);
+        var entryHdfsPath = '';
+        for (var ep = 0; ep < uploadedBuild.length; ep++) {
+            if (normalizeApplicationPath(uploadedBuild[ep].Path).toLowerCase() == normalizeApplicationPath(entryPath).toLowerCase()) {
+                entryHdfsPath = uploadedBuild[ep].HdfsPath;
+                break;
+            }
+        }
+        if (!entryHdfsPath && uploadedBuild.length) entryHdfsPath = uploadedBuild[0].HdfsPath;
+        var previewUrl = entryHdfsPath;
+        if (entryHdfsPath && V8.Method.GetPrivateFileUrl) {
+            var urlResult = V8.Method.GetPrivateFileUrl({ OsClient: V8.OsClient, FilePathName: entryHdfsPath, Limit: false });
+            if (urlResult && urlResult.Code == 1) {
+                var urlData = urlResult.Data || {};
+                previewUrl = typeof urlData == 'string' ? urlData : firstTextParam([urlData.Url, urlData.url, urlData.FileUrl, urlData.Path, entryHdfsPath]);
+            }
+        }
+
+        var appRow = {
+            Id: appId,
+            Name: appName,
+            AppKey: appKey,
+            AppType: appType,
+            Description: firstTextParam([app.Description, app.Remark, Package.PackageInfo.Description]),
+            Status: uploadedBuild.length ? 'Published' : 'Draft',
+            BuildStatus: uploadedBuild.length ? 'Success' : 'Changed',
+            CurrentVersion: parseInt(app.CurrentVersion || 1, 10) || 1,
+            PreviewUrl: previewUrl,
+            PrivateSourcePath: sourceRoot,
+            PublicPublishPath: buildRoot
+        };
+        var appResult = upsertApplicationRow('mci_ai_app', [['AppKey', '=', appKey]], appRow);
+        if (!appResult || appResult.Code != 1) throw new Error('写入在线 AI 应用失败：' + ((appResult && appResult.Msg) || ''));
+
+        if (uploadedBuild.length) {
+            var versionRow = {
+                AppId: appId,
+                AppName: appName,
+                VersionNo: versionNo,
+                VersionName: versionNo,
+                Status: 'Published',
+                PublishPath: buildRoot,
+                PreviewUrl: previewUrl,
+                BuildLog: '',
+                ChangeSummary: '从应用商城安装',
+                FileCount: uploadedBuild.length,
+                TotalSize: 0
+            };
+            upsertApplicationRow('mci_ai_app_version', [['AppId', '=', appId], ['AND', 'VersionNo', '=', versionNo]], versionRow);
+        }
+
+        if (appType == 'MicroService') {
+            var ms = bundle.MicroService || {};
+            var serviceRow = {
+                MsKey: appKey,
+                MsName: appName,
+                MsType: firstTextParam([ms.MsType, '前端']),
+                Runtime: firstTextParam([ms.Runtime, 'micro-app']),
+                StorageMode: firstTextParam([ms.StorageMode, 'file']),
+                IsEnable: ms.IsEnable === 0 ? 0 : 1,
+                SourceDirName: firstTextParam([ms.SourceDirName, appKey]),
+                EntryPath: entryPath,
+                BuildVersion: versionNo,
+                AssetCount: uploadedBuild.length,
+                AssetsJson: JSON.stringify(uploadedBuild),
+                AssetManifestJson: JSON.stringify({ MsKey: appKey, BuildVersion: versionNo, EntryPath: entryPath, Assets: uploadedBuild }),
+                PublishTime: DateNow('yyyy-MM-dd HH:mm:ss')
+            };
+            var serviceResult = upsertApplicationRow('sys_microiservice', [['MsKey', '=', appKey]], serviceRow);
+            if (!serviceResult || serviceResult.Code != 1) throw new Error('写入微服务运行元数据失败：' + ((serviceResult && serviceResult.Msg) || ''));
+            var serviceData = V8.FormEngine.GetFormData('sys_microiservice', { _Where: [['MsKey', '=', appKey]] });
+            var serviceId = serviceData && serviceData.Code == 1 && serviceData.Data ? serviceData.Data.Id : '';
+            var routes = bundle.Routes || bundle.Pages || [];
+            if (!routes.length) routes = [{ PageKey: 'home', PageName: '首页', PageTitle: '首页', RoutePath: '/', EntryPath: entryPath, Sort: 0, IsHome: 1 }];
+            for (var r = 0; r < routes.length; r++) {
+                var route = routes[r] || {};
+                var routePath = firstTextParam([route.RoutePath, route.Path, '/']);
+                var pageRow = {
+                    MicroServiceId: serviceId,
+                    MicroServiceKey: appKey,
+                    PageKey: firstTextParam([route.PageKey, route.Key, 'page-' + (r + 1)]),
+                    PageName: firstTextParam([route.PageName, route.Name, route.PageTitle, '页面' + (r + 1)]),
+                    PageTitle: firstTextParam([route.PageTitle, route.Title, route.PageName, '页面' + (r + 1)]),
+                    RoutePath: routePath,
+                    EntryPath: firstTextParam([route.EntryPath, entryPath]),
+                    MenuUrl: firstTextParam([route.MenuUrl, '/micro-app/' + appKey + routePath]),
+                    Sort: route.Sort || r,
+                    IsHome: route.IsHome === 0 ? 0 : (route.IsHome || (r == 0 ? 1 : 0)),
+                    IsEnable: route.IsEnable === 0 ? 0 : 1,
+                    BuildVersion: versionNo,
+                    RouteMetaJson: JSON.stringify(route)
+                };
+                var pageResult = upsertApplicationRow('sys_microiservice_page', [['MicroServiceId', '=', serviceId], ['AND', 'RoutePath', '=', routePath]], pageRow);
+                if (!pageResult || pageResult.Code != 1) throw new Error('写入微服务页面失败：' + routePath + '，' + ((pageResult && pageResult.Msg) || ''));
+                stats.MicroServicePages++;
+            }
+        }
+
+        stats.ApplicationInstalled++;
+        debugLog.application_bundle_result = appType + '应用安装完成：' + appName + '，源码' + uploadedSource.length + '个，编译文件' + uploadedBuild.length + '个';
     };
 
     // ==================== 辅助函数：导入 Id 对齐和引用修复 ====================
@@ -1505,6 +1741,9 @@ try {
 
     // ==================== 步骤3：处理sys_menu数据 ====================
 
+    // 应用资产依赖 mci_ai_app / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
+    installApplicationBundle();
+
     reportProgress(70, '正在导入菜单和按钮配置');
     debugLog.step3 = '开始处理sys_menu数据';
 
@@ -1968,6 +2207,7 @@ try {
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条',
+            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码' + stats.ApplicationSourceFiles + '个，公有编译文件' + stats.ApplicationBuildAssets + '个，微服务页面' + stats.MicroServicePages + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };

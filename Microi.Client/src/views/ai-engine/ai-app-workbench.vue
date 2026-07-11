@@ -20,6 +20,7 @@
                     <el-button size="small" @click="loadApps">刷新</el-button>
                     <el-button type="primary" size="small" @click="openCreate('Web')">新建Web应用</el-button>
                     <el-button size="small" @click="openCreate('UniApp')">新建UniApp应用</el-button>
+                    <el-button size="small" @click="openCreate('MicroService')">新建微服务</el-button>
                 </div>
             </header>
             <div class="app-gallery-grid" v-loading="appLoading">
@@ -258,6 +259,8 @@
                     <el-button :disabled="!currentApp" @click="downloadZip('source')">下载源码ZIP</el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('build')">下载编译ZIP</el-button>
                     <el-button :disabled="!currentApp" :loading="building" type="primary" @click="buildApp">运行/发布</el-button>
+                    <el-button :disabled="!currentApp" :loading="packaging" @click="makeOfflinePackage">制作离线包</el-button>
+                    <el-button :disabled="!currentApp" :loading="publishingStore" type="success" @click="publishToStore">发布应用商城</el-button>
                     <el-button v-if="previewUrl" @click="copyPreviewUrl">复制预览地址</el-button>
                     <el-button v-if="previewUrl" tag="a" :href="previewUrl" target="_blank">打开预览</el-button>
                 </div>
@@ -294,6 +297,9 @@
                             <p v-if="currentApp.AppType === 'UniApp'">
                                 UniApp应用已生成源码，点击“运行/发布”后，服务端会生成 H5 预览版本并在这里展示。
                             </p>
+                            <p v-else-if="currentApp.AppType === 'MicroService'">
+                                微服务源码可由在线 AI、MCP 或 VS Code 共同维护；点击“运行/发布”会生成在线预览并同步 MicroApp 运行元数据。
+                            </p>
                             <p v-else>点击“运行/发布”后，Web应用会发布到公有桶并在这里预览。</p>
                         </div>
                     </div>
@@ -327,7 +333,7 @@
 
             <div v-else class="empty-stage">
                 <h3>开始创建第一个 AI 应用</h3>
-                <p>Web应用可直接发布到公有桶预览；UniApp应用会在服务端生成 H5 预览版本，并保留完整源码和版本记录。</p>
+                <p>支持 Web、UniApp 和微服务三类在线应用；微服务源码还可与 VS Code 双向衔接，并作为页面或弹窗运行。</p>
                 <el-button type="primary" @click="openCreate('UniApp')">创建美容美发预约UniApp应用</el-button>
             </div>
         </main>
@@ -339,6 +345,7 @@
                     <el-radio-group v-model="createForm.AppType">
                         <el-radio-button label="Web">Web网站</el-radio-button>
                         <el-radio-button label="UniApp">UniApp移动端</el-radio-button>
+                        <el-radio-button label="MicroService">微服务</el-radio-button>
                     </el-radio-group>
                 </el-form-item>
                 <el-form-item label="应用名称">
@@ -371,7 +378,7 @@
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import { Back, CircleClose, Cpu, Document, EditPen, Folder, Grid, Paperclip, Top, View } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { css as beautifyCss, html as beautifyHtml, js as beautifyJs } from "js-beautify";
 
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
@@ -409,6 +416,8 @@ const activeView = ref("source");
 const selectedVersionKey = ref("");
 const fileSaving = ref(false);
 const building = ref(false);
+const packaging = ref(false);
+const publishingStore = ref(false);
 const previewUrl = ref("");
 const previewHtml = ref("");
 const previewLoading = ref(false);
@@ -954,11 +963,13 @@ function getEditorLanguage(filePath) {
 
 function openCreate(type) {
     createForm.AppType = type;
-    createForm.Name = type === "UniApp" ? "美容美发预约UniApp应用" : "AI Web应用";
+    createForm.Name = type === "UniApp" ? "美容美发预约UniApp应用" : type === "MicroService" ? "AI 微服务" : "AI Web应用";
     createForm.AppKey = makeAppKey(createForm.Name);
     createForm.Description = type === "UniApp"
         ? "面向美容美发门店的技师预约移动端应用，包含首页服务推荐、服务项目、技师列表、预约下单、个人中心等基础功能，接口统一预留吾码接口引擎调用。"
-        : "";
+        : type === "MicroService"
+            ? "可通过 OpenAppDialog 或后台菜单加载的 Vue 微服务，源码支持在线 AI 与 VS Code 协同维护。"
+            : "";
     createForm.WithStarter = true;
     createVisible.value = true;
 }
@@ -1029,6 +1040,51 @@ async function buildApp() {
         ElMessage.error(error.message || "运行/发布失败");
     } finally {
         building.value = false;
+    }
+}
+
+async function makeOfflinePackage() {
+    if (!currentApp.value) return;
+    packaging.value = true;
+    try {
+        const data = await runAiAppEngine("ai_app_publish_store", {
+            Action: "OfflinePackage",
+            AppId: currentApp.value.Id
+        });
+        const payload = normalizeDownloadPayload(data);
+        if (!payload.FileByteBase64) throw new Error("接口未返回离线包内容");
+        const fileName = payload.FileName || `${safeFileName(currentApp.value.Name || currentApp.value.Id)}.microi-app.json`;
+        downloadBase64File(payload.FileByteBase64, fileName, payload.ContentType || "application/json; charset=utf-8");
+        ElMessage.success("应用离线包已生成");
+    } catch (error) {
+        ElMessage.error(error.message || "制作离线包失败");
+    } finally {
+        packaging.value = false;
+    }
+}
+
+async function publishToStore() {
+    if (!currentApp.value) return;
+    try {
+        await ElMessageBox.confirm(
+            `确认将【${currentApp.value.Name}】的私有源码与最新编译产物发布到应用商城？`,
+            "发布应用商城",
+            { type: "warning", confirmButtonText: "开始发布", cancelButtonText: "取消" }
+        );
+    } catch {
+        return;
+    }
+    publishingStore.value = true;
+    try {
+        const data = await runAiAppEngine("ai_app_publish_store", {
+            Action: "Publish",
+            AppId: currentApp.value.Id
+        });
+        ElMessage.success(data?.Message || "应用已发布到应用商城");
+    } catch (error) {
+        ElMessage.error(error.message || "发布应用商城失败");
+    } finally {
+        publishingStore.value = false;
     }
 }
 

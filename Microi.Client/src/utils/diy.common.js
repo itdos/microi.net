@@ -1755,6 +1755,25 @@ var DiyCommon = {
         // 	skin: 'dos-ui-os-tips',
         // });
     },
+    NormalizeAuthorizationToken: function (token) {
+        return String(token || "").replace(/^Bearer\s+/i, "").trim();
+    },
+    HasTokenChangedSinceRequest: function (requestToken) {
+        var requested = DiyCommon.NormalizeAuthorizationToken(requestToken);
+        var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
+        return !DiyCommon.IsNull(requested) && !DiyCommon.IsNull(current) && requested !== current;
+    },
+    MarkAuthRequestToken: function (result, requestToken) {
+        if (!result || typeof result !== "object") return result;
+        try {
+            Object.defineProperty(result, "__MicroiRequestToken", {
+                value: DiyCommon.NormalizeAuthorizationToken(requestToken),
+                enumerable: false,
+                configurable: true
+            });
+        } catch (e) {}
+        return result;
+    },
     Result: function (result) {
         var self = this;
         if (!result) {
@@ -1764,6 +1783,12 @@ var DiyCommon = {
             return true;
         } else {
             if (result.Code == 1001 || result.Code == 1002) {
+                // 多 Tab/并发请求场景：旧请求失败返回时，另一个请求可能已经完成续签并写入新 Token。
+                // 此时不能让旧响应清空共享的新登录态。
+                if (DiyCommon.HasTokenChangedSinceRequest(result.__MicroiRequestToken)) {
+                    console.warn("[Auth] 忽略旧 Token 请求返回的登录失效结果。");
+                    return false;
+                }
                 // if (DiyCommon.IsNull(store.getters['DiyStore/GetCurrentUser'].Id) && (window.location.href.indexOf('www.itdos.com') > -1 || process.env.NODE_ENV === 'development')) {
                 // 	var demoData = {"_Child":null,"ParentId":"00000000-0000-0000-0000-000000000000","GroupName":null,"IsAdmin":false,"Authorization":null,"Id":"95b3bc3f-caeb-4feb-9f7e-cc7e922e6032","No":"Hr2018#0003","Account":"demo","Pwd":"O+OC8oCmsBk=","RealName":null,"MobilePhone":null,"CreateTime":"2018-07-07 06:23","State":1,"Avatar":null,"Remark":null,"InitCalendar":false,"Sex":null,"IDNo":null,"Tel":null,"Address":null,"Notes":null,"Email":null,"WrokAge":0.0,"Territory":null,"Emergency":null,"EmergencyTel":null,"JoinTime":null,"LeaveTime":null,"IsDelete":false,"Class":null};
                 // 	DiyCommon.SetCurrentUser({ Data: demoData});
@@ -2025,12 +2050,13 @@ var DiyCommon = {
     UseAxios: function (params) {
         var self = this;
         var { url, param, callback, errorCallback, method, sync, other, resolve, paramType, header } = params;
+        var requestToken = DiyCommon.getToken();
         if (!header) {
             header = {};
         }
         header.did = DiyCommon.GetDid();
-        if (!DiyCommon.IsNull(DiyCommon.getToken())) {
-            header.authorization = "Bearer " + DiyCommon.getToken();
+        if (!DiyCommon.IsNull(requestToken)) {
+            header.authorization = "Bearer " + requestToken;
         }
         header.macaddress = LocalStorageManager.get("MacAddress") || "";
         var currentLang = DiyCommon.GetCurrentLang();
@@ -2076,6 +2102,7 @@ var DiyCommon = {
                     DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
                     // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
                 }
+                DiyCommon.MarkAuthRequestToken(req.data, requestToken);
                 if (!DiyCommon.IsNull(callback)) {
                     callback(req.data, req.headers);
                 }
@@ -2090,6 +2117,10 @@ var DiyCommon = {
                 if (error.response) {
                     if (error.response.status == 401) {
                         console.log(error);
+                        if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
+                            console.warn("[Auth] 忽略旧 Token 请求返回的 401。");
+                            throw error;
+                        }
                         DiyCommon.setToken("");
                         removeToken();
                         // 弹出登录（并发节流：多个请求同时 401 只弹一次）
@@ -2117,10 +2148,11 @@ var DiyCommon = {
     UseAxiosAll: function (params) {
         var self = this;
         const { allParams, callback, errorCallback, method, resolve, paramType } = params;
+        var requestToken = DiyCommon.getToken();
         var headers = {};
         headers.did = DiyCommon.GetDid();
-        if (!DiyCommon.IsNull(DiyCommon.getToken())) {
-            headers.authorization = "Bearer " + DiyCommon.getToken();
+        if (!DiyCommon.IsNull(requestToken)) {
+            headers.authorization = "Bearer " + requestToken;
         }
         headers.macaddress = LocalStorageManager.get("MacAddress") || "";
         var currentLang = DiyCommon.GetCurrentLang();
@@ -2182,6 +2214,7 @@ var DiyCommon = {
                     }
                 }
                 results.forEach((result) => {
+                    DiyCommon.MarkAuthRequestToken(result.data, requestToken);
                     returnData.push(result.data);
                 });
                 callback(returnData);
@@ -2197,6 +2230,11 @@ var DiyCommon = {
                     if (error.response.status == 401) {
                         console.log("iTdos -------------error.response.status == 401----------------");
                         console.log(error);
+
+                        if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
+                            console.warn("[Auth] 忽略旧 Token 批量请求返回的 401。");
+                            throw error;
+                        }
 
                         //2020-12-05注释，使用DiyCommon
                         // store.dispatch('user/resetToken').then(() => {

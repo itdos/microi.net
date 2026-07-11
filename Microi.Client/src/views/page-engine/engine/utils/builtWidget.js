@@ -28,7 +28,10 @@ import {
   office,
   areamap,
   html,
-  descriptions
+  descriptions,
+  aiengine,
+  pageengine,
+  workcenter
 } from './builtWidget/index.js';
 
 
@@ -67,7 +70,10 @@ export const widgetList = [
   office,
   areamap,
   html,
-  descriptions
+  descriptions,
+  aiengine,
+  pageengine,
+  workcenter
 ]
 
 //组件配置 四级
