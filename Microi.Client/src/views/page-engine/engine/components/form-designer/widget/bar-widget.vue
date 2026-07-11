@@ -207,7 +207,7 @@ const setData = () => {
 
 const handleResize = () => {
   nextTick(() => {
-    if (chartRef.value) {
+    if (chartRef.value && chartInstance) {
       chartInstance.resize()
     }
   })

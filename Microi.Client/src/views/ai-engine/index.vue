@@ -140,8 +140,11 @@
                                 <span>{{ message.time }}</span>
                                 <el-tag v-if="message.modelId" size="small" effect="plain">{{ message.modelId }}</el-tag>
                                 <el-tag v-if="message.mode" size="small" effect="plain">{{ modeName(message.mode) }}</el-tag>
+                                <el-tag v-if="message.reasoningEffort && message.reasoningEffort !== 'auto'" size="small" effect="plain">
+                                    {{ reasoningEffortName(message.reasoningEffort) }}
+                                </el-tag>
                                 <button
-                                    v-if="message.role === 'assistant' && (message.content || message.code)"
+                                    v-if="message.content || message.code"
                                     type="button"
                                     class="message-copy-btn"
                                     @click="copyText([message.content, message.code].filter(Boolean).join('\n\n'))"
@@ -295,6 +298,25 @@
                                     :value="item.value"
                                 />
                             </el-select>
+                            <el-tooltip
+                                :content="reasoningEffortTooltip"
+                                placement="top"
+                            >
+                                <span class="semantic-label reasoning-label">推理强度</span>
+                            </el-tooltip>
+                            <el-select
+                                v-model="reasoningEffort"
+                                size="small"
+                                class="reasoning-select"
+                                :disabled="sending || !selectedModelSupportsReasoning"
+                            >
+                                <el-option
+                                    v-for="item in reasoningEffortOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
                         </div>
                         <div class="composer-right">
                             <el-select
@@ -351,7 +373,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref } from "vue";
+import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import {
     CircleClose,
@@ -420,6 +442,7 @@ const messageWrapRef = ref(null);
 const fileInputRef = ref(null);
 const selectedFiles = ref([]);
 const semanticMode = ref("auto");
+const reasoningEffort = ref(readSavedReasoningEffort());
 const resolvedMode = ref("chat");
 const aiSysMenuId = ref("");
 const aiModelTableId = ref("");
@@ -443,6 +466,13 @@ const semanticModeOptions = [
     { label: "AI对话", value: "chat" },
     { label: "数据分析", value: "data" },
     { label: "低代码建模", value: "builder" }
+];
+
+const reasoningEffortOptions = [
+    { label: "模型默认", value: "auto" },
+    { label: "低", value: "low" },
+    { label: "中", value: "medium" },
+    { label: "高", value: "high" }
 ];
 
 const quickPrompts = computed(() => [
@@ -473,6 +503,25 @@ const filteredConversations = computed(() => {
 });
 
 const sendDisabled = computed(() => sending.value || (!inputText.value.trim() && selectedFiles.value.length === 0));
+const selectedModelSupportsReasoning = computed(() => {
+    const model = selectedAiModel.value || {};
+    if (model.SupportReasoning === true || Number(model.SupportReasoning || 0) === 1) return true;
+    const modelText = [model.Name, model.AiModel, model.ModelType, model.Provider]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+    return /(^|[^a-z0-9])(o1|o3|o4)([^a-z0-9]|$)|gpt[-_. ]?5|reason|thinking|deepseek[-_. ]?r1|qwen[-_. ]?3/.test(modelText);
+});
+const effectiveReasoningEffort = computed(() =>
+    selectedModelSupportsReasoning.value && reasoningEffort.value !== "auto"
+        ? reasoningEffort.value
+        : "auto"
+);
+const reasoningEffortTooltip = computed(() =>
+    selectedModelSupportsReasoning.value
+        ? "推理模型可选择低、中、高；模型默认不会额外传递参数。强度越高通常越慢、消耗的推理 Token 越多。"
+        : "当前模型未声明推理强度能力，将使用模型默认设置。"
+);
 const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 999;
@@ -498,6 +547,16 @@ onMounted(async () => {
     await Promise.all([loadAiModels(), loadHistory(), loadAiEngineMeta(), loadPlatformStats()]);
 });
 
+watch(reasoningEffort, (value) => {
+    try {
+        window.localStorage.setItem("microi-ai-reasoning-effort", value || "auto");
+    } catch {}
+});
+
+watch(selectedAiModel, () => {
+    if (!selectedModelSupportsReasoning.value) reasoningEffort.value = "auto";
+});
+
 function makeId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -517,6 +576,20 @@ function modeName(mode) {
         builder: "低代码建模"
     };
     return map[mode] || mode;
+}
+
+function readSavedReasoningEffort() {
+    try {
+        const value = window.localStorage.getItem("microi-ai-reasoning-effort") || "auto";
+        return ["auto", "low", "medium", "high"].includes(value) ? value : "auto";
+    } catch {
+        return "auto";
+    }
+}
+
+function reasoningEffortName(value) {
+    const item = reasoningEffortOptions.find((option) => option.value === value);
+    return item ? `推理${item.label}` : "模型默认";
 }
 
 function formatModelName(model) {
@@ -713,6 +786,7 @@ function selectConversation(item) {
             queryRows: record.QueryRows || [],
             attachments: record.Attachments || [],
             modelId: record.ModelId || record.AiModel || "",
+            reasoningEffort: record.ReasoningEffort || "auto",
             time: record.Time || ""
         };
     });
@@ -805,6 +879,7 @@ async function sendMessage() {
         rawContent: visibleText,
         attachments: attachmentMeta,
         modelId: selectedAiModel.value?.AiModel || "",
+        reasoningEffort: effectiveReasoningEffort.value,
         time: nowText()
     });
     messages.value.push(userMessage);
@@ -827,6 +902,7 @@ async function sendMessage() {
         queryRows: [],
         attachments: [],
         modelId: selectedAiModel.value?.AiModel || "",
+        reasoningEffort: effectiveReasoningEffort.value,
         time: nowText()
     });
     messages.value.push(assistantMessage);
@@ -1096,7 +1172,8 @@ async function sendChatQuestion(text, assistantMessage, attachments = []) {
         Attachments: attachments,
         ConversationId: currentConversationId.value,
         Source: SOURCE,
-        Mode: "chat"
+        Mode: "chat",
+        ReasoningEffort: effectiveReasoningEffort.value
     }, assistantMessage);
 }
 
@@ -1143,7 +1220,8 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
         Attachments: attachments,
         ConversationId: currentConversationId.value,
         Source: SOURCE,
-        Mode: "builder"
+        Mode: "builder",
+        ReasoningEffort: effectiveReasoningEffort.value
     }, assistantMessage, { extractActions: true });
     assistantMessage.actions = extractMcpActions(assistantMessage.rawContent || assistantMessage.content);
     assistantMessage.content = stripActionJson(assistantMessage.content || "");
@@ -1170,7 +1248,8 @@ async function sendDataQuestion(text, assistantMessage) {
         Question: text,
         AiModel: selectedAiModel.value.AiModel,
         AiModelId: selectedAiModel.value.Id || "",
-        OsClient: osClient.value
+        OsClient: osClient.value,
+        ReasoningEffort: effectiveReasoningEffort.value
     }, null, null, "json");
     if (!isOk(result)) throw new Error(result?.Msg || "数据分析失败");
     const data = result.Data || {};
@@ -1200,7 +1279,8 @@ async function sendCodeQuestion(text, assistantMessage) {
             CurrentCode: "",
             ConversationId: currentConversationId.value,
             Source: SOURCE,
-            Mode: "code"
+            Mode: "code",
+            ReasoningEffort: effectiveReasoningEffort.value
         }),
         signal: abortController.signal
     });
@@ -1535,6 +1615,7 @@ async function saveMessage(message) {
                 ModelId: message.modelId || selectedAiModel.value?.AiModel || "",
                 AiModel: selectedAiModel.value?.AiModel || "",
                 Thinking: message.thinking || "",
+                ReasoningEffort: message.reasoningEffort || effectiveReasoningEffort.value,
                 Code: message.code || "",
                 Error: message.error || "",
                 Attachments: message.attachments || [],
@@ -1581,10 +1662,37 @@ function scrollToBottom() {
 async function copyText(text) {
     if (!text) return;
     try {
-        await navigator.clipboard.writeText(text);
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            if (!copied) throw new Error("copy command failed");
+        }
         ElMessage.success("已复制");
     } catch {
-        ElMessage.warning("复制失败");
+        try {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            if (!copied) throw new Error("copy command failed");
+            ElMessage.success("已复制");
+        } catch {
+            ElMessage.warning("复制失败，请手动选择文本");
+        }
     }
 }
 </script>
@@ -1635,9 +1743,9 @@ async function copyText(text) {
 }
 
 .ai-engine-page.is-compact .empty-state {
-    justify-content: flex-start;
+    justify-content: center;
     gap: 8px;
-    padding: 12px 8px;
+    padding: 8px;
 }
 
 .ai-engine-page.is-compact .empty-hero {
@@ -1700,7 +1808,7 @@ async function copyText(text) {
 }
 
 .ai-engine-page.is-compact .quick-prompt {
-    min-height: 70px;
+    min-height: 58px;
     gap: 4px;
     padding: 8px 9px;
 }
@@ -2416,13 +2524,20 @@ async function copyText(text) {
 }
 
 .composer-box {
+    position: relative;
+    isolation: isolate;
     max-width: 980px;
     margin: 0 auto;
     border: 1px solid #dfe3eb;
     border-radius: 14px;
     background: #fff;
     box-shadow: 0 14px 38px rgba(25, 32, 44, .08);
-    overflow: hidden;
+    overflow: visible;
+}
+
+.composer-box > * {
+    position: relative;
+    z-index: 1;
 }
 
 .composer-box :deep(.el-textarea__inner) {
@@ -2430,6 +2545,12 @@ async function copyText(text) {
     box-shadow: none;
     padding: 16px 18px 8px;
     font-size: 15px;
+    border-radius: 13px 13px 0 0;
+}
+
+.composer-box :deep(.el-textarea) {
+    border-radius: 13px 13px 0 0;
+    overflow: hidden;
 }
 
 .composer-footer {
@@ -2439,6 +2560,7 @@ async function copyText(text) {
     justify-content: space-between;
     gap: 12px;
     padding: 4px 10px 10px 12px;
+    border-radius: 0 0 13px 13px;
 }
 
 .composer-left,
@@ -2456,6 +2578,15 @@ async function copyText(text) {
 
 .semantic-select {
     width: 132px;
+}
+
+.reasoning-select {
+    width: 102px;
+}
+
+.reasoning-label {
+    margin-left: 2px;
+    cursor: help;
 }
 
 .semantic-select :deep(.el-input__wrapper) {
@@ -2663,6 +2794,47 @@ body.dark .ai-engine-page,
 .composer-box {
     border-color: var(--ai-border);
     background: var(--ai-panel);
+}
+
+.composer-box::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    z-index: -1;
+    border-radius: 18px;
+    background: linear-gradient(
+        115deg,
+        color-mix(in srgb, var(--ai-primary) 72%, transparent),
+        rgba(77, 171, 247, .64),
+        color-mix(in srgb, var(--ai-primary) 62%, transparent)
+    );
+    filter: blur(10px);
+    opacity: .46;
+    transform: scale(.995);
+    pointer-events: none;
+    animation: ai-composer-glow 2.8s ease-in-out infinite;
+}
+
+.composer-box::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border: 1px solid color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
+    border-radius: inherit;
+    box-shadow: inset 0 0 18px color-mix(in srgb, var(--ai-primary) 9%, transparent);
+    pointer-events: none;
+}
+
+@keyframes ai-composer-glow {
+    0%, 100% {
+        opacity: .4;
+        transform: scale(.995);
+    }
+    50% {
+        opacity: .78;
+        transform: scale(1.008);
+    }
 }
 
 .composer-box :deep(.el-textarea__inner),
@@ -2929,6 +3101,7 @@ body.dark .ai-engine-page,
 @media (prefers-reduced-motion: reduce) {
     .ai-engine-main:not(.is-apps)::before,
     .ai-engine-main:not(.is-apps)::after,
+    .composer-box::before,
     .quick-prompt:hover::before {
         animation: none;
     }
@@ -3027,6 +3200,21 @@ body.dark .ai-engine-page,
         flex-direction: column;
     }
 
+    .composer-left {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .semantic-select {
+        flex: 1 1 120px;
+        width: auto;
+    }
+
+    .reasoning-select {
+        flex: 1 1 86px;
+        width: auto;
+    }
+
     .composer-right {
         justify-content: flex-end;
         width: 100%;
@@ -3035,6 +3223,58 @@ body.dark .ai-engine-page,
     .composer-model-select {
         flex: 1;
         width: auto;
+    }
+
+    .ai-engine-page.is-embedded.is-compact {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .ai-engine-main {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+        grid-template-rows: auto auto auto;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .message-wrap {
+        min-height: 0;
+        overflow: visible;
+        padding: 10px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .empty-state {
+        min-height: 0;
+        padding: 10px 4px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .empty-state h1 {
+        font-size: 22px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .platform-stats,
+    .ai-engine-page.is-embedded.is-compact .quick-prompts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-embedded.is-compact .platform-stat {
+        min-height: 66px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .quick-prompt:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-tools {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-tools .el-button {
+        flex: 1 1 auto;
+        margin-left: 0;
     }
 }
 </style>

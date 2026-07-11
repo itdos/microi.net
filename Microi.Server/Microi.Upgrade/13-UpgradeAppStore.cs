@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.Http;
-using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -19,12 +16,33 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.2.0.0";
+        public static string Version = "6.2.1.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(8)
+            Timeout = TimeSpan.FromSeconds(30)
         };
-        private const string DefaultResourceBaseUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
+        private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
+        private const string ImportPackageResourceName = "import-package.js";
+        private const string PublishAiAppResourceName = "ai-app-publish-store.js";
+        private const string FormEnginePackageResourceName = "app.microi.form-engine.json";
+        private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
+        private const string AppStorePackageResourceName = "app.microi.store.json";
+
+        private static readonly string[] RequiredResourceNames =
+        {
+            ImportPackageResourceName,
+            PublishAiAppResourceName,
+            FormEnginePackageResourceName,
+            ModuleEnginePackageResourceName,
+            AppStorePackageResourceName
+        };
+
+        private static readonly Dictionary<string, string> ExpectedPackageNames = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { FormEnginePackageResourceName, "表单引擎" },
+            { ModuleEnginePackageResourceName, "模块引擎" },
+            { AppStorePackageResourceName, "应用商城" }
+        };
 
         private static readonly string[] CoreNullableTables =
         {
@@ -36,162 +54,120 @@ namespace Microi.net
             "sys_osclients"
         };
         
-        /// <summary>
-        /// 从嵌入资源读取文件内容
-        /// </summary>
-        private static string ReadEmbeddedResource(string resourceName)
+        private static async Task<Dictionary<string, string>> DownloadRequiredResourcesAsync()
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            var fullResourceName = $"Microi.Upgrade.Resource.{resourceName}";
-            
-            using (Stream stream = assembly.GetManifestResourceStream(fullResourceName))
+            var resources = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var resourceName in RequiredResourceNames)
             {
-                if (stream == null)
-                {
-                    throw new Exception($"嵌入资源未找到: {fullResourceName}");
-                }
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    return reader.ReadToEnd();
-                }
-            }
-        }
-
-        private static string ReadUpgradeResource(string resourceName)
-        {
-            var remoteResource = TryReadRemoteResource(resourceName);
-            if (!remoteResource.DosIsNullOrWhiteSpace())
-            {
-                Console.WriteLine($"Microi：【基础应用升级】已从远端获取升级资源：{resourceName}");
-                return remoteResource;
+                resources[resourceName] = await DownloadOfficialResourceAsync(resourceName);
             }
 
-            Console.WriteLine($"Microi：【基础应用升级】远端资源不可用，使用内置资源：{resourceName}");
-            return ReadEmbeddedResource(resourceName);
+            return resources;
         }
 
-        private static string TryReadRemoteResource(string resourceName)
+        private static async Task<string> DownloadOfficialResourceAsync(string resourceName)
         {
-            try
+            var url = OfficialResourceApiUrl + "&Name=" + Uri.EscapeDataString(resourceName);
+            using (var response = await ResourceHttpClient.GetAsync(url))
             {
-                var baseUrl = ConfigHelper.GetEnvOrConfiguration("MICROI_UPGRADE_RESOURCE_BASE_URL", "MicroiUpgrade:ResourceBaseUrl");
-                if (baseUrl.DosIsNullOrWhiteSpace())
-                {
-                    baseUrl = DefaultResourceBaseUrl;
-                }
-
-                var url = BuildResourceUrl(baseUrl, resourceName);
-                var response = ResourceHttpClient.GetAsync(url).GetAwaiter().GetResult();
+                var body = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"Microi：【基础应用升级】远端资源[{resourceName}]获取失败，状态码：{(int)response.StatusCode}");
-                    return "";
+                    throw new InvalidOperationException($"从吾码官方数据库获取升级资源[{resourceName}]失败，HTTP状态码：{(int)response.StatusCode}");
                 }
 
-                var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                return NormalizeRemoteResourceContent(resourceName, body);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Microi：【基础应用升级】远端资源[{resourceName}]获取异常，将使用内置资源：{ex.Message}");
-                return "";
+                var content = ParseOfficialResourceResponse(resourceName, body);
+                ValidateResourceContent(resourceName, content);
+                Console.WriteLine($"Microi：【基础应用升级】已从吾码官方数据库获取并校验升级资源：{resourceName}");
+                return content;
             }
         }
 
-        private static string BuildResourceUrl(string baseUrl, string resourceName)
-        {
-            var encodedName = Uri.EscapeDataString(resourceName);
-            if (baseUrl.Contains("{name}"))
-            {
-                return baseUrl.Replace("{name}", encodedName);
-            }
-            if (baseUrl.Contains("{file}"))
-            {
-                return baseUrl.Replace("{file}", encodedName);
-            }
-            if (baseUrl.EndsWith("/", StringComparison.Ordinal))
-            {
-                return baseUrl + encodedName;
-            }
-            if (baseUrl.Contains("?"))
-            {
-                var joiner = baseUrl.EndsWith("?", StringComparison.Ordinal) || baseUrl.EndsWith("&", StringComparison.Ordinal) ? "" : "&";
-                return baseUrl + joiner + "Name=" + encodedName;
-            }
-            return baseUrl + "?Name=" + encodedName;
-        }
-
-        private static string NormalizeRemoteResourceContent(string resourceName, string body)
+        private static string ParseOfficialResourceResponse(string resourceName, string body)
         {
             if (body.DosIsNullOrWhiteSpace())
             {
-                return "";
+                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]为空。");
             }
 
-            var trimBody = body.TrimStart();
-            if (!trimBody.StartsWith("{"))
-            {
-                return body;
-            }
-
+            JObject response;
             try
             {
-                var json = JObject.Parse(body);
-                var code = json["Code"]?.ToString();
-                if (!code.DosIsNullOrWhiteSpace() && code != "1")
-                {
-                    Console.WriteLine($"Microi：【基础应用升级】远端资源[{resourceName}]返回失败：{json["Msg"]}");
-                    return "";
-                }
-
-                var candidates = new[]
-                {
-                    json["Data"]?["Content"],
-                    json["Data"]?["Package"],
-                    json["Data"]?["FileContent"],
-                    json["Data"]?["FileByteBase64"],
-                    json["Data"],
-                    json["Content"],
-                    json["Package"],
-                    json["FileContent"],
-                    json["FileByteBase64"]
-                };
-
-                foreach (var token in candidates)
-                {
-                    if (token == null)
-                    {
-                        continue;
-                    }
-
-                    if (token.Type == JTokenType.String)
-                    {
-                        var value = token.ToString();
-                        if (token.Path.EndsWith("FileByteBase64", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return Encoding.UTF8.GetString(Convert.FromBase64String(value));
-                        }
-                        return value;
-                    }
-
-                    if (resourceName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                        && (token.Type == JTokenType.Object || token.Type == JTokenType.Array))
-                    {
-                        return token.ToString(Formatting.None);
-                    }
-                }
+                response = JObject.Parse(body);
             }
-            catch
+            catch (Exception ex)
             {
-                // 远端也可以直接返回 JSON 文件内容；解析成 DosResult 失败时按原文使用。
+                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]不是标准JSON响应。", ex);
             }
 
-            return body;
+            if (response["Code"]?.Value<int>() != 1)
+            {
+                throw new InvalidOperationException($"吾码官方数据库返回升级资源[{resourceName}]失败：{response["Msg"]}");
+            }
+
+            var returnedResourceName = response["Data"]?["ResourceName"]?.ToString();
+            if (!string.Equals(returnedResourceName, resourceName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"吾码官方数据库返回的资源名不匹配，期望[{resourceName}]，实际[{returnedResourceName}]。");
+            }
+
+            var contentToken = response["Data"]?["Content"];
+            if (contentToken == null)
+            {
+                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]缺少Data.Content。");
+            }
+
+            return contentToken.Type == JTokenType.String
+                ? contentToken.ToString()
+                : contentToken.ToString(Formatting.None);
         }
 
-        private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName)
+        private static void ValidateResourceContent(string resourceName, string content)
         {
-            var packageContent = ReadUpgradeResource(resourceName);
+            if (content.DosIsNullOrWhiteSpace())
+            {
+                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]内容为空。");
+            }
+
+            if (string.Equals(resourceName, ImportPackageResourceName, StringComparison.Ordinal))
+            {
+                if (!content.Contains("import-microi-store-package"))
+                {
+                    throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                }
+                return;
+            }
+
+            if (string.Equals(resourceName, PublishAiAppResourceName, StringComparison.Ordinal))
+            {
+                if (!content.Contains("ai_app_publish_store"))
+                {
+                    throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                }
+                return;
+            }
+
+            JObject package;
+            try
+            {
+                package = JObject.Parse(content);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"升级资源[{resourceName}]不是有效的应用数据包JSON。", ex);
+            }
+
+            var expectedPackageName = ExpectedPackageNames[resourceName];
+            var actualPackageName = package["PackageInfo"]?["Name"]?.ToString();
+            if (!string.Equals(actualPackageName, expectedPackageName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。");
+            }
+        }
+
+        private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName, IReadOnlyDictionary<string, string> resources)
+        {
+            var packageContent = resources[resourceName];
             Console.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
             var installResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
@@ -214,6 +190,10 @@ namespace Microi.net
         {
             var msgs = new List<string>();
 
+            // 必须先完整下载并校验全部资源。任意资源不可用时直接终止，避免部分升级，
+            // 更不能再使用随安装包发布的旧资源覆盖客户数据库。
+            var resources = await DownloadRequiredResourcesAsync();
+
             var nullableMessages = new List<string>();
             EnsureCoreTableColumnsNullable(osClient, nullableMessages);
             foreach (var nullableMessage in nullableMessages)
@@ -234,7 +214,7 @@ namespace Microi.net
                     }
                 },
             });
-            var importV8 = ReadUpgradeResource("import-package.js");
+            var importV8 = resources[ImportPackageResourceName];
             if (importMicroiStorePackageResult.Code != 1)
             {
                 var addImportMicroiStorePackageResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
@@ -277,7 +257,7 @@ namespace Microi.net
             #endregion
 
             #region AI应用发布到商城V8
-            var publishAiAppV8 = ReadEmbeddedResource("ai-app-publish-store.js");
+            var publishAiAppV8 = resources[PublishAiAppResourceName];
             var publishAiAppEngine = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
             {
                 OsClient = osClient,
@@ -326,15 +306,15 @@ namespace Microi.net
             #endregion
             
             #region 表单引擎 数据包
-            await InstallUpgradePackage(osClient, msgs, "app.microi.form-engine.json", "表单引擎数据包");
+            await InstallUpgradePackage(osClient, msgs, FormEnginePackageResourceName, "表单引擎数据包", resources);
             #endregion
 
             #region 模块引擎 数据包
-            await InstallUpgradePackage(osClient, msgs, "app.microi.module-engine.json", "模块引擎数据包");
+            await InstallUpgradePackage(osClient, msgs, ModuleEnginePackageResourceName, "模块引擎数据包", resources);
             #endregion
 
             #region 应用商城 数据包
-            await InstallUpgradePackage(osClient, msgs, "app.microi.store.json", "应用商城数据包");
+            await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
             #endregion
 
             #region 修正sys_menu的DiyTableId关联值

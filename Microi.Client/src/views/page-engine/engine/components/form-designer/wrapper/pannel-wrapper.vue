@@ -1,5 +1,6 @@
 <template>
   <el-col
+    class="page-engine-wrapper-col"
     :span="dynamicSpan"
     :offset="
       formData.JsonObj.formConfig?.mobile == true
@@ -29,7 +30,7 @@
       :shadow="formData.JsonObj.formConfig.shadow == true ? 'always' : 'never'"
       :body-style="wrapperObj.wrapperOption.dynamicStyle"
       class="box-card"
-      :class="isShowBorder"
+      :class="[isShowBorder, { 'is-ai-engine-panel': hasAiEngineWidget }]"
       @drop="handleDrop"
       @dragover="handleDragOver"
     >
@@ -73,77 +74,61 @@
           :style="wrapperObj.wrapperOption.titleOption.dynamicStyle"
           class="clearfix"
         >
-          <span>{{ displayWrapperTitle }}</span>
+          <span class="wrapper-title">{{ displayWrapperTitle }}</span>
 
-          <el-link
-            v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden !== true"
-            @click="handleMoreClick"
-            :style="
-              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
-            "
-            class="linkmore"
-            :underline="false"
-            :target="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.linktype"
-            >{{ wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.text }}
-            <el-icon
-              v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.iconShow"
-              :size="20"
-            >
-              <component :is="dynamicIcon" />
-            </el-icon>
-          </el-link>
-          <el-link
-            class="linkmore"
-            :underline="false"
-            @click="callGrandchildMethod"
-            v-show="
-              wrapperObj.wrapperOption.titleOption.moreOption &&wrapperObj.wrapperOption.titleOption.moreOption.refresh != '0'
-            "
-            style="margin-right: 5px"
-            :style="
-              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
-            "
-          >
-            <span
+          <div class="wrapper-actions">
+            <el-link
+              class="linkmore"
+              :underline="false"
               v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
-                  '1' ||
-                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
+                wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.datetime == '1' ||
+                wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2')
               "
-              >刷新</span
+              :style="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle"
             >
-            <el-icon
-              v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh ==
-                  '2' ||
-                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3'
-              "
-              size="20"
-            >
-              <Refresh />
-            </el-icon>
-          </el-link>
+              <span>{{ formattedDate }}</span>
+              <span v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2'">
+                {{ formattedTime }}
+              </span>
+            </el-link>
 
-          <el-link
-            class="linkmore"
-            :underline="false"
-            v-show="
-              wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.datetime == '1' ||
-              wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2')
-            "
-            style="margin-right: 5px"
-            :style="
-              wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle
-            "
-          >
-            <span style="margin-right: 5px">{{ formattedDate }}</span>
-            <span
-              v-show="
-                wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.datetime == '2'
-              "
-              >{{ formattedTime }}</span
+            <el-link
+              class="linkmore"
+              :underline="false"
+              @click="callGrandchildMethod"
+              v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh != '0'"
+              :style="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle"
             >
-          </el-link>
+              <span v-show="wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.refresh == '1' || wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3')">刷新</span>
+              <el-icon v-show="wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.refresh == '2' || wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3')" size="20">
+                <Refresh />
+              </el-icon>
+            </el-link>
+
+            <el-link
+              v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.hidden !== true"
+              @click="handleMoreClick"
+              :style="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle"
+              class="linkmore"
+              :underline="false"
+              :target="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.linktype"
+            >
+              <span>{{ wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.text }}</span>
+              <el-icon v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.iconShow" :size="20">
+                <component :is="dynamicIcon" />
+              </el-icon>
+            </el-link>
+
+            <el-link
+              v-if="showPageDesignAction"
+              class="linkmore page-design-link"
+              :underline="false"
+              @click.stop="openPageDesigner"
+            >
+              <el-icon><EditPen /></el-icon>
+              <span>界面设计</span>
+            </el-link>
+          </div>
         </div>
       </template>
 
@@ -286,6 +271,26 @@ const designScrollHeight = computed(() => {
 })
 
 const wrapperTitleOption = computed(() => props.wrapperObj.wrapperOption.titleOption || {})
+
+const hasAiEngineWidget = computed(() => {
+  const widgets = Array.isArray(props.wrapperObj.widgetList) ? props.wrapperObj.widgetList : []
+  return widgets.some(widget => widget?.type === 'aiengine')
+})
+
+const isFirstWrapper = computed(() => {
+  const wrappers = Array.isArray(formData.value.JsonObj?.wrapperList)
+    ? formData.value.JsonObj.wrapperList
+    : []
+  return wrappers.findIndex(item => item?.wrapperOption?.number === props.wrapperObj.wrapperOption?.number) === 0
+})
+
+const showPageDesignAction = computed(() =>
+  !isDesignMode.value &&
+  isFirstWrapper.value &&
+  formData.value.CanDesign === true &&
+  formData.value.IsEmbedded !== true &&
+  !!formData.value.Id
+)
 
 const wrapperPeriod = computed(() => {
   const widgets = Array.isArray(props.wrapperObj.widgetList) ? props.wrapperObj.widgetList : []
@@ -440,6 +445,10 @@ const handleMoreClick = () => {
   } else {
     console.log('链接跳转已禁用')
   }
+}
+
+const openPageDesigner = () => {
+  EventBus.emit('openPageDesigner', formData.value.Id)
 }
 //右键删除
 const handleDelClick = () => {
@@ -600,7 +609,93 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
     margin-left: 60px;
   }
   .linkmore {
-    float: right;
+    float: none;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .clearfix {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .wrapper-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wrapper-actions {
+    min-width: 0;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .page-design-link {
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 0;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 28%, var(--el-border-color-lighter));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--el-color-primary) 7%, var(--el-bg-color));
+    color: var(--el-color-primary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 22px;
+    text-decoration: none;
+    transition: background-color .18s ease, border-color .18s ease, transform .18s ease;
+  }
+
+  .page-design-link:hover {
+    border-color: color-mix(in srgb, var(--el-color-primary) 52%, var(--el-border-color));
+    background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color));
+    transform: translateY(-1px);
+  }
+
+  @media screen and (max-width: 768px) {
+    .clearfix {
+      min-height: 30px;
+      gap: 8px;
+    }
+
+    .wrapper-title {
+      flex-basis: 34%;
+      font-size: 16px;
+    }
+
+    .wrapper-actions {
+      flex: 1 1 60%;
+      flex-wrap: wrap;
+      gap: 5px 8px;
+    }
+
+    .linkmore,
+    .page-design-link {
+      min-height: 28px;
+      height: 28px;
+      margin: 0;
+      padding: 0 7px;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .box-card > .el-card__header {
+      padding: 10px 12px;
+    }
   }
 
   .effect {
@@ -713,5 +808,60 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
 
 .runtime-scroll-area {
   overflow: visible;
+}
+
+.box-card.is-ai-engine-panel {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.box-card.is-ai-engine-panel :deep(> .el-card__body) {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.box-card.is-ai-engine-panel .card-body,
+.box-card.is-ai-engine-panel .runtime-scroll-area,
+.box-card.is-ai-engine-panel .runtime-scroll-area > .el-row,
+.box-card.is-ai-engine-panel .runtime-scroll-area > .el-row > .el-col {
+  height: 100%;
+  min-height: 0;
+}
+
+.box-card.is-ai-engine-panel :deep(.common-widget-body),
+.box-card.is-ai-engine-panel :deep(.aiengine-widget),
+.box-card.is-ai-engine-panel :deep(.ai-engine-page.is-embedded) {
+  height: 100% !important;
+  min-height: 0;
+}
+
+@media screen and (max-width: 768px) {
+  .page-engine-wrapper-col {
+    padding: 6px !important;
+    margin-top: 0 !important;
+  }
+
+  .box-card {
+    height: auto !important;
+  }
+
+  .box-card :deep(> .el-card__body) {
+    height: auto !important;
+    min-height: 0;
+    padding: 10px !important;
+  }
+
+  .box-card.is-ai-engine-panel .card-body,
+  .box-card.is-ai-engine-panel .runtime-scroll-area,
+  .box-card.is-ai-engine-panel .runtime-scroll-area > .el-row,
+  .box-card.is-ai-engine-panel .runtime-scroll-area > .el-row > .el-col,
+  .box-card.is-ai-engine-panel :deep(.common-widget-body),
+  .box-card.is-ai-engine-panel :deep(.aiengine-widget),
+  .box-card.is-ai-engine-panel :deep(.ai-engine-page.is-embedded) {
+    height: auto !important;
+  }
 }
 </style>

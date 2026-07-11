@@ -41,7 +41,7 @@
 
 
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
-                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && ShowAddByRoute" class="mobile-header">
+                <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && !PropsEmbedded && ShowAddByRoute" class="mobile-header">
                     <div class="mobile-header-left">
                         <el-icon class="back-icon" @click="$router.back()">
                             <ArrowLeft />
@@ -69,7 +69,7 @@
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
                                     && IsVisibleAdd == true
-                                    && (!diyStore.IsPhoneView || _IsTableChild)
+                                    && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
                                 "
                             :loading="BtnLoading"
                             type="primary"
@@ -87,7 +87,7 @@
                                     && !TableChildField.Readonly
                                     && PropsIsJoinTable !== true
                                     && IsVisibleAdd == true
-                                    && (!diyStore.IsPhoneView || _IsTableChild)
+                                    && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
                                 "
                             :loading="BtnLoading"
                             type="primary"
@@ -120,7 +120,7 @@
                         </template>
                         <!-- 更多页面按钮 PageBtns -->
                         <template v-if="!IsTrashMode
-                                        && (!diyStore.IsPhoneView || _IsTableChild)
+                                        && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
                                         && SysMenuModel.PageBtns
                                         && SysMenuModel.PageBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
@@ -140,7 +140,7 @@
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
 
                         <template v-if="!IsTrashMode
-                                        && (!diyStore.IsPhoneView || _IsTableChild)
+                                        && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
                                         && SysMenuModel
                                         && SysMenuModel.BatchSelectMoreBtns
                                         && SysMenuModel.BatchSelectMoreBtns.length > 0">
@@ -336,7 +336,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && ShowAddByRoute && !IsTrashMode" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -1644,6 +1644,10 @@ export default {
         PropsHideImportExport: { type: Boolean, default: false },
         PropsHideMoreFunctions: { type: Boolean, default: false },
         PropsHideAdminDesign: { type: Boolean, default: false },
+        // 界面引擎/工作台嵌入态：移动端不渲染全屏页头和固定 FAB，操作按钮留在当前容器内
+        PropsEmbedded: { type: Boolean, default: false },
+        // 调用方可追加分页条数选项；会与系统/菜单配置合并、去重并升序排列
+        PageSizeList: { type: Array, default: () => [] },
         PropsIsJoinTable: { type: Boolean, default: false },
         ContainerClass: { type: String, default: "" },
         // 子表Field对象
@@ -1750,6 +1754,9 @@ export default {
             if ((!pageSizes || pageSizes.length == 0) && self.DiyCommon && Array.isArray(self.DiyCommon.PageSizes)) {
                 pageSizes = self.DiyCommon.PageSizes.slice();
             }
+            if (Array.isArray(self.PageSizeList) && self.PageSizeList.length > 0) {
+                pageSizes = pageSizes.concat(self.PageSizeList);
+            }
             pageSizes = pageSizes.map(Number).filter((size) => size > 0);
             var menuDefault = self.GetMenuDefaultPageSize(options);
             if (menuDefault > 0 && !pageSizes.includes(menuDefault)) {
@@ -1825,15 +1832,15 @@ export default {
             if (menuDefault > 0) {
                 return menuDefault;
             }
-            var sysDefault = Number(self.DiyCommon && self.DiyCommon.DefaultPageSize);
-            if (sysDefault > 0 && (pageSizes.length == 0 || pageSizes.includes(sysDefault))) {
-                return sysDefault;
-            }
             return pageSizes.length > 0 ? pageSizes[0] : 15;
         },
         NormalizeTablePageSize(size, options = {}) {
             var self = this;
             var pageSizes = self.GetConfiguredPageSizes(options);
+            var menuDefault = self.GetMenuDefaultPageSize(options);
+            if (menuDefault <= 0 && Array.isArray(self.PageSizeList) && self.PageSizeList.length > 0) {
+                return self.GetDefaultTablePageSize(options);
+            }
             var pageSize = Number(size);
             if (pageSize > 0 && (pageSizes.length == 0 || pageSizes.includes(pageSize))) {
                 return pageSize;

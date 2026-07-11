@@ -1,5 +1,5 @@
 <template>
-    <div class="my-work-page">
+    <div class="my-work-page" :class="{ 'is-embedded': embedded }">
         <!-- 移动端渐变头部 -->
         <div v-if="diyStore.IsPhoneView" class="wf-header">
             <div class="wf-header-bg">
@@ -77,6 +77,8 @@
                         PropsHideImportExport
                         PropsHideMoreFunctions
                         PropsHideAdminDesign
+                        :PropsEmbedded="embedded"
+                        :PageSizeList="[10]"
                         ContainerClass="workflow-form-engine-table"
                     />
 
@@ -1214,6 +1216,12 @@ export default {
     height: 100%;
 }
 
+.my-work-page.is-embedded {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
 // ====== 主Tab样式 ======
 .main-tabs {
     background: #fff;
@@ -1260,6 +1268,7 @@ export default {
 }
 
 .main-tabs.is-embedded {
+    min-height: 0;
     border-radius: 0;
     box-shadow: none;
 
@@ -1284,8 +1293,93 @@ export default {
 }
 
 :deep(.workflow-form-engine-table .el-card__body) {
-    padding-left: 0;
-    padding-right: 0;
+    padding: 0 !important;
+}
+
+.my-work-page.is-embedded {
+    .work-section {
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .stats-cards {
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .stat-card {
+        min-height: 42px;
+        gap: 7px;
+        padding: 5px 8px;
+        border-width: 1px;
+        border-radius: 8px;
+        box-shadow: none;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-1px);
+    }
+
+    .stat-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .stat-count {
+        font-size: 17px;
+        line-height: 1.05;
+    }
+
+    .stat-label {
+        margin-top: 1px;
+        font-size: 10px;
+    }
+
+    :deep(.workflow-form-engine-table .keyword-search) {
+        min-height: 32px;
+        padding: 2px 0;
+        margin-bottom: 3px !important;
+        border-radius: 8px;
+    }
+
+    :deep(.workflow-form-engine-table .el-table .el-table__cell) {
+        padding: 3px 0;
+    }
+
+    :deep(.workflow-form-engine-table .el-table .cell) {
+        line-height: 19px;
+    }
+
+    :deep(.workflow-form-engine-table .el-table__body .cell > div) {
+        min-height: 0 !important;
+        height: auto !important;
+        line-height: 22px !important;
+    }
+
+    :deep(.workflow-form-engine-table .el-table),
+    :deep(.workflow-form-engine-table .el-table__inner-wrapper),
+    :deep(.workflow-form-engine-table .el-table__body-wrapper),
+    :deep(.workflow-form-engine-table .el-table__body-wrapper .el-scrollbar),
+    :deep(.workflow-form-engine-table .el-table__body-wrapper .el-scrollbar__wrap) {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+    }
+
+    :deep(.workflow-form-engine-table .el-table .el-button) {
+        min-height: 26px;
+        height: 26px;
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    :deep(.workflow-form-engine-table .el-pagination) {
+        min-height: 36px;
+        padding: 5px 8px;
+        margin: 2px 0 0 !important;
+    }
 }
 
 // ====== 统计卡片 ======
