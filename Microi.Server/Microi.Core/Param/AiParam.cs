@@ -41,6 +41,11 @@ namespace Microi.net
         /// 对话模式，如 chat、data、code、builder、project。
         /// </summary>
         public string? Mode { get; set; }
+        /// <summary>
+        /// 推理强度：auto / low / medium / high。auto 表示不向模型传 reasoning_effort。
+        /// 仅对支持该参数的推理模型生效。
+        /// </summary>
+        public string? ReasoningEffort { get; set; }
         public List<AiAttachmentParam>? Attachments { get; set; }
         /// <summary>
         /// 对话历史。推荐仅由后端上下文压缩逻辑填充，前端不要长期传入大量历史。
@@ -91,6 +96,10 @@ namespace Microi.net
         /// 当前登录用户名称，由 Controller 从 Token 注入。
         /// </summary>
         public string? CurrentUserName { get; set; }
+        /// <summary>
+        /// 推理强度：auto / low / medium / high。
+        /// </summary>
+        public string? ReasoningEffort { get; set; }
         
         /// <summary>
         /// 租户标识
@@ -190,6 +199,11 @@ namespace Microi.net
         /// 用户编辑器中的当前代码（为空表示编辑器无代码，AI应生成新代码；有值表示用户在询问已有代码相关问题）
         /// </summary>
         public string? CurrentCode { get; set; }
+
+        /// <summary>
+        /// 推理强度：auto / low / medium / high。
+        /// </summary>
+        public string? ReasoningEffort { get; set; }
 
         /// <summary>
         /// 对话历史（用于多轮对话上下文），按时间正序排列，最多传最近10条

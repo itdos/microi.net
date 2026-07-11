@@ -41,8 +41,8 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .workcenter-widget {
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 </style>

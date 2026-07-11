@@ -46,6 +46,11 @@ namespace Microi.net
         DosResult<dynamic> RefreshLoginUser(string userId, string osClient = null);
 
         /// <summary>
+        /// 清除指定用户全部终端的登录信息，立即吊销所有 Token。仅系统管理员可调用。
+        /// </summary>
+        DosResult ClearUserLoginInfo(string userId, string osClient = null);
+
+        /// <summary>
         /// 获取当前token
         /// </summary>
         CurrentToken GetCurrentToken(string token = null, string osClient = null);

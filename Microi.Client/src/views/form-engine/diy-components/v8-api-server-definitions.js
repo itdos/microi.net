@@ -327,6 +327,13 @@ export const V8ServerApiDefinitions = {
                         insertText: "RefreshLoginUser",
                         snippet: 'RefreshLoginUser("${1:userId}", "${2:osClient}")'
                     },
+                    ClearUserLoginInfo: {
+                        label: "ClearUserLoginInfo",
+                        kind: "Method",
+                        documentation: "清除指定用户全部终端的登录信息，立即吊销所有Token并推送强制退出。仅系统管理员可调用。\n\n必传: userId；osClient 可选，且禁止跨租户。",
+                        insertText: "ClearUserLoginInfo",
+                        snippet: 'ClearUserLoginInfo("${1:userId}", "${2:osClient}")'
+                    },
                     GetPrivateFileUrl: {
                         label: "GetPrivateFileUrl",
                         kind: "Method",

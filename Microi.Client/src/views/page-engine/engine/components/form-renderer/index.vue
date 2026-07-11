@@ -147,6 +147,13 @@ const isMobile = () => {
   return window.innerWidth < 768
 }
 
+const syncRuntimeMobileMode = () => {
+  const formConfig = formData.value?.JsonObj?.formConfig
+  if (!formConfig) return
+  const nextMobile = isMobile()
+  if (formConfig.mobile !== nextMobile) formConfig.mobile = nextMobile
+}
+
 //获取页面数据
 const loadFormData = () => {
   //本地数据模拟
@@ -198,6 +205,7 @@ onActivated(() => {
 })
 
 onMounted(() => {
+  window.addEventListener('resize', syncRuntimeMobileMode, { passive: true })
   //加载暗黑模式
   isDark.value = formData.value.JsonObj?.formConfig?.dark
 
@@ -282,6 +290,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncRuntimeMobileMode)
   // 取消监听事件
   window.removeEventListener('message', messageHandler)
 

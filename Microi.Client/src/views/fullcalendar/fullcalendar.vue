@@ -1,5 +1,5 @@
 <template>
-    <div class="microi-calendar" ref="calendarRoot">
+    <div class="microi-calendar" :class="{ 'is-embedded': embedded }" ref="calendarRoot">
         <!-- 日历统计卡片 -->
         <div class="cal-stats">
             <div class="cal-stat-card today-card">
@@ -118,6 +118,9 @@ const COLOR_DONE = "#10b981";
 export default {
     name: "MicroiCalendar",
     components: { FullCalendar },
+    props: {
+        embedded: { type: Boolean, default: false }
+    },
     data() {
         return {
             dialogVisible: false,
@@ -190,6 +193,11 @@ export default {
             self.$nextTick(function () {
                 var calApi = self.$refs.calendarRef && self.$refs.calendarRef.getApi();
                 if (calApi) {
+                    if (self.embedded) {
+                        calApi.setOption("height", "auto");
+                        calApi.setOption("contentHeight", "auto");
+                        return;
+                    }
                     var calEl = self.$refs.calendarRoot && self.$refs.calendarRoot.querySelector(".fc");
                     if (calEl) {
                         var rect = calEl.getBoundingClientRect();
@@ -577,6 +585,84 @@ export default {
         .fc-event:hover .fc-event-resizer {
             opacity: 1;
         }
+    }
+}
+
+.microi-calendar.is-embedded {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+
+    :deep(.fc) {
+        flex: none;
+
+        .fc-toolbar {
+            gap: 5px;
+            margin-bottom: 8px !important;
+        }
+
+        .fc-toolbar-title {
+            font-size: 1.05em;
+        }
+
+        .fc-button-group {
+            gap: 4px !important;
+        }
+
+        .fc-button {
+            padding: 4px 9px;
+            font-size: 11px;
+            border-radius: 6px !important;
+        }
+
+        .fc-col-header-cell {
+            padding: 5px 0;
+            font-size: 11px;
+        }
+
+        .fc-daygrid-day-number {
+            padding: 3px 6px;
+            font-size: 11px;
+        }
+
+        .fc-daygrid-day-frame {
+            min-height: 80px;
+        }
+
+        .fc-daygrid-event {
+            padding: 1px 4px;
+            font-size: 10px;
+        }
+    }
+
+    .cal-stats {
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .cal-stat-card {
+        min-height: 42px;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        box-shadow: none;
+    }
+
+    .cal-stat-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .cal-stat-value {
+        font-size: 17px;
+        line-height: 1.05;
+    }
+
+    .cal-stat-label {
+        margin-top: 1px;
+        font-size: 10px;
     }
 }
 

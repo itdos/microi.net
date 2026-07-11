@@ -1,14 +1,5 @@
 <template>
-    <div class="home" :class="{ 'is-embedded': isEmbedded, 'has-design-entry': canDesignPage && remoteObj.Id }">
-        <el-button
-            v-if="canDesignPage && remoteObj.Id"
-            class="pe-design-fab"
-            type="primary"
-            @click="openPageDesigner"
-        >
-            <el-icon><EditPen /></el-icon>
-            <span>界面设计</span>
-        </el-button>
+    <div class="home" :class="{ 'is-embedded': isEmbedded }">
         <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
         <div v-else class="pe-page-skeleton">
             <div class="pe-page-skeleton__header"></div>
@@ -52,7 +43,9 @@ export default {
                 Number: "",
                 Desc: "",
                 JsonObj: {},
-                filePath: ""
+                filePath: "",
+                CanDesign: false,
+                IsEmbedded: false
             },
             pageEngineStore: null
         };
@@ -103,12 +96,36 @@ export default {
         }
     },
     methods: {
-        openPageDesigner() {
-            if (!this.remoteObj.Id) return;
+        openPageDesigner(pageId) {
+            var targetPageId = pageId || this.remoteObj.Id;
+            if (!targetPageId || !this.canDesignPage) return;
+            if (this.isEmbedded && window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    key: "openPageDesigner",
+                    pageId: targetPageId
+                }, window.location.origin);
+                return;
+            }
             this.$router.push({
                 path: "/mic/autopage",
-                query: { Id: this.remoteObj.Id }
+                query: { Id: targetPageId }
             });
+        },
+        handlePageDesignerMessage(event) {
+            if (event.origin && event.origin !== window.location.origin && event.origin !== "null") return;
+            var data = event.data || {};
+            if (data.key !== "openPageDesigner" || !data.pageId) return;
+            this.openPageDesigner(data.pageId);
+        },
+        publishPageDesignContext() {
+            if (!this.remoteObj.Id || !this.canDesignPage) return;
+            var detail = {
+                pageId: this.remoteObj.Id,
+                routeFullPath: this.$route.fullPath,
+                title: this.remoteObj.Title || "界面引擎"
+            };
+            this.$route.meta.PageEngineId = this.remoteObj.Id;
+            window.dispatchEvent(new CustomEvent("microi:page-engine-design-context", { detail: detail }));
         },
         async loadFormData() {
             // 使用 postMessage 发送数据给 iframe
@@ -150,8 +167,11 @@ export default {
                     Number: res.Data.Number || "",
                     Desc: res.Data.Desc || "",
                     JsonObj: JsonObj,
-                    filePath: this.filePath
+                    filePath: this.filePath,
+                    CanDesign: this.canDesignPage,
+                    IsEmbedded: this.isEmbedded
                 };
+                this.publishPageDesignContext();
             }
         },
         registerEventListeners() {
@@ -220,6 +240,10 @@ export default {
             EventBus.on("fullCalendarClick", (item) => {
                 console.log("监听fullCalendarClick", item);
             });
+            EventBus.on("openPageDesigner", (pageId) => {
+                this.openPageDesigner(pageId);
+            });
+            window.addEventListener("message", this.handlePageDesignerMessage);
         },
         removeEventListeners() {
             EventBus.off("saveFormJson");
@@ -231,6 +255,8 @@ export default {
             EventBus.off("mapMarkerClick");
             EventBus.off("areaMapClick");
             EventBus.off("fullCalendarClick");
+            EventBus.off("openPageDesigner");
+            window.removeEventListener("message", this.handlePageDesignerMessage);
         }
     }
 };
@@ -268,43 +294,6 @@ body.pe-embedded-document #app {
     height: auto;
     min-height: 0;
     overflow: visible;
-}
-
-.home.has-design-entry {
-    padding-top: 56px;
-    box-sizing: border-box;
-}
-
-.home.is-embedded.has-design-entry {
-    padding-top: 48px;
-}
-
-.pe-design-fab {
-    position: absolute;
-    top: 12px;
-    right: 22px;
-    z-index: 80;
-    min-height: 38px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 0;
-    border-radius: var(--mci-shape-button, 999px);
-    background: var(--mci-gradient-primary, linear-gradient(135deg, #6c2bd9, #2196f3));
-    color: var(--mci-text-on-primary, #fff);
-    box-shadow: var(--mci-shadow-button, 0 8px 24px rgba(108, 43, 217, .22));
-    transition: transform .18s ease, box-shadow .18s ease;
-}
-
-.pe-design-fab:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--mci-shadow-button-hover, 0 12px 30px rgba(108, 43, 217, .3));
-}
-
-.home.is-embedded .pe-design-fab {
-    top: 8px;
-    right: 14px;
 }
 
 .pe-page-skeleton {

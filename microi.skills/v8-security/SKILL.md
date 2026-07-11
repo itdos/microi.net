@@ -246,6 +246,26 @@ V8.Method.AddSysLog({
 });
 ```
 
+### 管理员吊销用户全部登录态
+
+需要让某个用户所有终端立即退出时，接口引擎必须调用平台统一能力，不要只删除前端 Token，也不要只修改用户状态：
+
+```javascript
+if (!V8.CurrentUser || (!V8.CurrentUser._IsAdmin && Number(V8.CurrentUser.Level || 0) < 9999)) {
+  return { Code: 0, Msg: '仅系统管理员可执行此操作' };
+}
+
+var clearResult = V8.Method.ClearUserLoginInfo(V8.Param.UserId, V8.OsClient);
+if (clearResult.Code != 1) {
+  return clearResult;
+}
+```
+
+- `ClearUserLoginInfo` 会删除该用户 Redis 中的全部终端 Token，旧 Token 随即失效且不能继续以旧换新。
+- 已建立实时连接的终端会收到 `ReceiveForceLogout` 并立即退出；没有实时连接的终端在下一次请求时收到 Token 失效。
+- “禁用用户”必须先吊销全部登录态，再把 `sys_user.State` 更新为 `0`，并记录安全审计日志。
+- 接口引擎和底层方法都必须校验管理员权限、目标用户 Id 和租户边界，禁止跨租户吊销。
+
 ## 8. 错误处理
 
 不要把内部错误信息暴露给前端：

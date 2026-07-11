@@ -1,23 +1,15 @@
-# 注意
+# 基础应用升级资源
 
-## 基础应用升级资源读取顺序
+`13-UpgradeAppStore.cs` 不再携带或读取本地应用数据包。每次执行升级时，会先从吾码官方匿名接口一次性下载并校验以下 5 个最新资源：
 
-`13-UpgradeAppStore.cs` 会优先从官方远端接口获取以下资源；如果远端不可用（例如离线服务器、无外网、接口失败），才使用本目录内置资源兜底。内置资源只作为离线兜底，不应被当成长期最新事实源。
+1. `import-package.js`：接口引擎 `import-microi-store-package` 的当前代码。
+2. `ai-app-publish-store.js`：接口引擎 `ai_app_publish_store` 的当前代码。
+3. `app.microi.form-engine.json`：应用商城中 `AppId=app.microi.form-engine` 的当前数据包。
+4. `app.microi.module-engine.json`：应用商城中 `AppId=app.microi.module-engine` 的当前数据包。
+5. `app.microi.store.json`：应用商城中 `AppId=app.microi.store` 的当前数据包。
 
-导入顺序必须保持：
+官方接口固定为 `https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos`，并且只允许匿名读取上述白名单资源。它不接受任意接口 Key、表名或查询条件。
 
-1. `import-package.js`：先更新应用商城导入接口引擎 `import-microi-store-package`。
-2. `app.microi.form-engine.json`：再安装/更新表单引擎基础包。
-3. `app.microi.module-engine.json`：再安装/更新模块引擎基础包。
-4. `app.microi.store.json`：最后安装/更新应用商城包。
+只有 5 个资源全部下载并校验成功后，升级程序才会修改目标租户数据库。任意资源获取失败都会终止本次升级，不再使用本地旧文件兜底，也不会更新服务器版本号。
 
-应用商城包通常会依赖前面的基础元数据和导入接口能力，不要随意调换顺序。
-
-## 当修改了【import-package.js】后
->* 一定要去【os.itdos.com】同步接口引擎【import-microi-store-package】，然后应用商城重新打包【应用商城】，复制数据包，覆盖到【app.microi.store.json】
->* 然后修改【13-UpgradeAppStore.cs】中的【Version】为最新版本号
-
->* 【app.microi.store.json】对应应用商城中的【应用商城】这个应用的数据包内容
->* 【app.microi.module-engine.json】对应应用商城中的【模块引擎】这个应用的数据包内容
->* 【app.microi.form-engine.json】对应应用商城中的【表单引擎】这个应用的数据包内容
->* 【import-package.js】对应接口引擎中的【import-microi-store-package】这个接口引擎代码
+日常维护只需更新 iTdos 官方数据库中的两个接口引擎代码或三个应用商城数据包；不需要再复制文件到 `Microi.Upgrade/Resource`。

@@ -202,7 +202,15 @@ const autoHeight = computed(() => {
   return toPositiveHeight(widgetHeightValue.value, 'auto')
 })
 
-const autoContentWidgetTypes = new Set(['statistic', 'progress', 'html', 'pageengine'])
+const autoContentWidgetTypes = new Set([
+  'statistic',
+  'progress',
+  'html',
+  'pageengine',
+  'workcenter',
+  'diytable',
+  'diycalendar',
+])
 
 const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap'])
 const tableWidgetTypes = new Set(['tabel', 'gantt', 'diytable'])

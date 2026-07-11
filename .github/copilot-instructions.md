@@ -266,6 +266,7 @@ V8.MongoDb.DelFormData({ DbName:'mydb', TableName:'users', Id:'xxx' });
 ```js
 var token = V8.Method.GetCurrentToken(token, osClient);   // 返回 {OsClient,CurrentUser,Token}
 V8.Method.RefreshLoginUser(userId, osClient);
+V8.Method.ClearUserLoginInfo(userId, osClient); // 管理员清除全部终端登录信息并吊销所有Token
 var url = V8.Method.GetPrivateFileUrl({ FilePathName:'...' });
 V8.Method.AddSysLog({ Type:'', Title:'', Content:'', Level:1 });
 var guid = V8.Method.NewGuid();
@@ -511,6 +512,14 @@ console.log('调试信息')                                  // 控制台输出�
 - 绑定 `diyTableId` 的菜单默认补齐列表列、搜索列、隐藏列、排序列、统计列、移动端/卡片列和默认排序；用户显式传入的 `sys_menu` JSON 优先。
 - 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
 - 字段较多的表单默认优先生成 `diy_table.Tabs`，并给字段写入 `Tab`；整行控件才使用 `FormWidth=24`。
+
+
+## MCP 在线应用默认发现与复杂页面规则
+
+- 处理 Web、UniApp、MicroService、定制弹窗或复杂页面前，先调用 `microi_list_applications` 获取当前租户所有在线应用及完整文件清单，再对目标应用调用 `microi_get_application_context`（默认读取全部源码内容）；单文件按需使用 `microi_get_application_file`。
+- 已有合适 MicroService 时优先新增页面/路由；没有时使用 `microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_microservice` 创建、同步私有源码并发布公有编译产物。
+- `V8.ConfirmTips` 只用于纯文本确认或极少量一次性输入。三个以上字段、联动校验、上传、表格、Tab、步骤条、代码编辑器或需长期维护的弹窗，必须使用微服务页面并通过 `V8.OpenAppDialog` 打开，禁止在 V8 代码里拼接大段 HTML。
+- 应用商城历史字段 `AppType` 表示官方/社区分类；运行应用类型使用 `ApplicationType`，值为 `Regular / MicroService / UniApp / Web`。
 
 
 ---

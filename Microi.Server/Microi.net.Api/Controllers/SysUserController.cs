@@ -819,7 +819,8 @@ namespace Microi.net.Api
                     CurrentUser = tokenModelJobj.CurrentUser,
                     OsClient = tokenModelJobj.OsClient,
                     _ClientType = clientType,
-                    Did = tokenDid
+                    Did = didNeedsMigration ? requestDid : tokenDid,
+                    RotateFromToken = previousToken
                 });
                 if (getTokenResult.Code != 1)
                 {
