@@ -1,5 +1,5 @@
 <template>
-  <div class="pageengine-widget" :style="{ height: iframeHeight }">
+  <div class="pageengine-widget">
     <button
       v-if="pageId && canDesignPage"
       type="button"
@@ -14,26 +14,37 @@
       <el-icon :size="34"><DataBoard /></el-icon>
       <span>请选择要嵌入的界面引擎</span>
     </div>
-    <iframe
-      v-else
-      ref="iframeRef"
+    <div v-else-if="loading" class="pageengine-widget__placeholder">
+      <el-icon class="is-loading" :size="30"><Loading /></el-icon>
+      <span>正在加载界面引擎...</span>
+    </div>
+    <el-alert
+      v-else-if="error"
+      :title="error"
+      type="error"
+      show-icon
+      :closable="false"
+    />
+    <nested-form-renderer
+      v-else-if="nestedPage"
       :key="'pageengine_' + widgetObj.widgetOption.number + '_' + pageId"
-      :src="embedUrl"
-      :title="'界面引擎 ' + pageId"
-      frameborder="0"
-      loading="lazy"
-      scrolling="no"
-      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
-      :style="{ height: iframeHeight }"
-      @load="handleIframeLoad"
-    ></iframe>
+      :remoteObj="nestedPage"
+    />
   </div>
 </template>
 
 <script setup name="pageengine-widget">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, inject, provide, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDiyStore } from '@/pinia'
+import { DiyCommon } from '@/utils/diy.common'
+import {
+  createIsolatedPageEngineStore,
+  PAGE_ENGINE_RENDER_CONTEXT_KEY,
+  PAGE_ENGINE_STORE_KEY,
+} from '../../../stores/pageEngine'
+
+const NestedFormRenderer = defineAsyncComponent(() => import('../../form-renderer/index.vue'))
 
 const props = defineProps({
   widgetObj: {
@@ -45,11 +56,18 @@ const props = defineProps({
 const pageId = computed(() => props.widgetObj.widgetParams?.[0]?.value || '')
 const router = useRouter()
 const diyStore = useDiyStore()
-const iframeRef = ref(null)
-const iframeHeight = ref('360px')
-let resizeObserver = null
-let mutationObserver = null
-let resizeTimer = null
+const loading = ref(false)
+const error = ref('')
+const nestedPage = ref(null)
+const parentPageIds = inject(PAGE_ENGINE_RENDER_CONTEXT_KEY, computed(() => []))
+const isolatedStore = createIsolatedPageEngineStore()
+
+provide(PAGE_ENGINE_STORE_KEY, isolatedStore)
+provide(PAGE_ENGINE_RENDER_CONTEXT_KEY, computed(() => {
+  const ids = Array.isArray(parentPageIds.value) ? parentPageIds.value.slice() : []
+  if (pageId.value && ids.indexOf(pageId.value) < 0) ids.push(pageId.value)
+  return ids
+}))
 
 const canDesignPage = computed(() => {
   const user = diyStore.GetCurrentUser || {}
@@ -63,71 +81,41 @@ const openNestedPageDesigner = () => {
   router.push({ path: '/mic/autopage', query: { Id: pageId.value } })
 }
 
-const handlePageDesignerMessage = (event) => {
-  if (event.origin && event.origin !== window.location.origin && event.origin !== 'null') return
-  const data = event.data || {}
-  if (data.key !== 'openPageDesigner' || !data.pageId || !canDesignPage.value) return
-  router.push({ path: '/mic/autopage', query: { Id: data.pageId } })
-}
-
-const clearObservers = () => {
-  if (resizeObserver) resizeObserver.disconnect()
-  if (mutationObserver) mutationObserver.disconnect()
-  if (resizeTimer) clearInterval(resizeTimer)
-  resizeObserver = null
-  mutationObserver = null
-  resizeTimer = null
-}
-
-const syncIframeHeight = () => {
-  const frame = iframeRef.value
-  if (!frame) return
+const parseNestedPage = (row) => {
+  if (!row) return null
+  const result = { ...row }
   try {
-    const doc = frame.contentDocument
-    if (!doc) return
-    const bodyHeight = doc.body?.scrollHeight || 0
-    const documentHeight = doc.documentElement?.scrollHeight || 0
-    const nextHeight = Math.max(240, bodyHeight, documentHeight)
-    iframeHeight.value = `${nextHeight}px`
-  } catch (error) {
-    console.warn('[PageEngineWidget] 自动同步嵌套页面高度失败:', error?.message || error)
+    if (typeof result.JsonObj === 'string') result.JsonObj = JSON.parse(result.JsonObj || '{}')
+  } catch (parseError) {
+    throw new Error('嵌套界面引擎 JSON 配置无效：' + (parseError?.message || parseError))
+  }
+  return result
+}
+
+const loadNestedPage = async () => {
+  nestedPage.value = null
+  error.value = ''
+  if (!pageId.value) return
+  const ancestorIds = Array.isArray(parentPageIds.value) ? parentPageIds.value : []
+  if (ancestorIds.indexOf(pageId.value) >= 0) {
+    error.value = '检测到界面引擎循环嵌套，请检查页面配置。'
+    return
+  }
+  loading.value = true
+  try {
+    const result = await DiyCommon.FormEngine.GetFormData('mic_page', { Id: pageId.value })
+    if (!result || result.Code !== 1 || !result.Data) {
+      throw new Error((result && result.Msg) || '界面引擎不存在')
+    }
+    nestedPage.value = parseNestedPage(result.Data)
+  } catch (loadError) {
+    error.value = '加载嵌套界面失败：' + (loadError?.message || loadError)
+  } finally {
+    loading.value = false
   }
 }
 
-const handleIframeLoad = async () => {
-  clearObservers()
-  await nextTick()
-  syncIframeHeight()
-  try {
-    const doc = iframeRef.value?.contentDocument
-    if (!doc) return
-    resizeObserver = new ResizeObserver(syncIframeHeight)
-    if (doc.documentElement) resizeObserver.observe(doc.documentElement)
-    if (doc.body) resizeObserver.observe(doc.body)
-    mutationObserver = new MutationObserver(syncIframeHeight)
-    mutationObserver.observe(doc.body || doc.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      characterData: true,
-    })
-    resizeTimer = setInterval(syncIframeHeight, 1200)
-  } catch (error) {
-    console.warn('[PageEngineWidget] 嵌套页面高度监听初始化失败:', error?.message || error)
-  }
-}
-
-const embedUrl = computed(() => {
-  if (!pageId.value || typeof window === 'undefined') return ''
-  const baseUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
-  return `${baseUrl}#/mic/renderer-embed/${encodeURIComponent(pageId.value)}?embedded=1`
-})
-
-onMounted(() => window.addEventListener('message', handlePageDesignerMessage))
-onBeforeUnmount(() => {
-  clearObservers()
-  window.removeEventListener('message', handlePageDesignerMessage)
-})
+watch(pageId, loadNestedPage, { immediate: true })
 </script>
 
 <style lang="scss" scoped>
@@ -136,7 +124,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: auto;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: var(--el-bg-color);
 }
 
@@ -178,13 +166,6 @@ onBeforeUnmount(() => {
   }
 }
 
-.pageengine-widget iframe {
-  display: block;
-  width: 100%;
-  min-height: 240px;
-  overflow: hidden;
-}
-
 .pageengine-widget__placeholder {
   display: flex;
   height: 100%;
@@ -196,5 +177,11 @@ onBeforeUnmount(() => {
   color: var(--el-text-color-secondary);
   border: 1px dashed var(--el-border-color);
   border-radius: var(--mci-shape-panel, 8px);
+}
+
+.pageengine-widget :deep(.microi-page-engine) {
+  width: 100%;
+  min-height: 0;
+  padding-top: 0;
 }
 </style>

@@ -248,9 +248,9 @@ $ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--
 | `workcenter` | 工作中心 | `[0]` 内容；`[1]` 待办模块；`[2]` 流程模块 | 展示“我的工作”时可用两个隐藏 `sys_menu` 模块让 `diy-table` 承载待办与流程列表；日历/公告为兼容模式 |
 | `pageengine` | 界面引擎 | `widgetParams[0].type = "pageengine"`，`value` 为 `mic_page.Id` | 嵌入另一个界面引擎页面，设计器提供图形化页面下拉选择 |
 
-界面引擎嵌套必须通过无 `Layout` 的独立路由 `/mic/renderer-embed/:Id` 和同源 iframe 渲染，不得直接在父页面递归挂载 `renderer.vue`。父子页面共享同一个应用实例时会复用单例 Pinia `pageEngine` store，子页面加载会覆盖父页面的 `formData`。iframe 负责隔离 store；嵌入页不得再次显示菜单栏或顶部导航。运行态 `pageengine` 使用 `scrolling="no"`，通过同源 `ResizeObserver + MutationObserver` 同步内容高度；父容器和组件高度设为 `0` 表示自动高度，由最外层页面统一滚动。
+界面引擎嵌套必须使用 `pageengine-widget.vue` 直接加载 `form-renderer` 组件，不得使用 iframe。每个嵌套页面由 `PAGE_ENGINE_STORE_KEY` 注入独立的 Pinia store，避免子页面覆盖父页面 `formData`；递归页面 Id 通过 `PAGE_ENGINE_RENDER_CONTEXT_KEY` 检测并阻止循环嵌套。父容器和组件高度设为 `0` 表示自动高度，由最外层页面统一滚动。
 
-界面引擎渲染页会为 `_IsAdmin` 或 `Level >= 9999` 的用户提供“界面设计”入口，跳转 `/mic/autopage?Id={mic_page.Id}`。入口优先放入后台 TagsView 页签右键菜单，并在页面第一个容器标题栏右侧提供紧凑快捷入口，与 `moreOption` 等操作使用同一个 flex 操作区垂直居中、右对齐；不得额外占用页面高度、增加顶部空白或覆盖标题，非管理员不显示。嵌套 `pageengine` 的第一个容器也必须显示其自身页面的设计入口，点击后由父页面打开对应子页面设计器，不能把设计器困在 iframe 内。
+界面引擎渲染页会为 `_IsAdmin` 或 `Level >= 9999` 的用户提供“界面设计”入口，跳转 `/mic/autopage?Id={mic_page.Id}`。入口优先放入后台 TagsView 页签右键菜单，并在页面第一个容器标题栏右侧提供紧凑快捷入口，与 `moreOption` 等操作使用同一个 flex 操作区垂直居中、右对齐；不得额外占用页面高度、增加顶部空白或覆盖标题，非管理员不显示。嵌套 `pageengine` 也必须显示其自身页面的设计入口，并由父页面直接打开对应子页面设计器。
 
 首页编排可以组合 `aiengine`、`workcenter`、`diycalendar`、`diytable` 和一个占大区域的 `pageengine`。公告应优先通过绑定 `diy_notice` 的 `diytable` 渲染，使增删改权限继续由 `sys_menu + _RoleLimits` 控制；统计子页面由客户独立替换时，只需修改被嵌入的 `mic_page`，无需重做首页布局。
 

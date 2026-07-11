@@ -205,10 +205,15 @@ router.beforeEach(async (to, from, next) => {
                     });
                     next({ ...to, replace: true });
                 } catch (error) {
-                    console.log("iTdos permission error：", error);
-                    console.log("Token was:", DiyCommon.getToken());
-                    await userStore.resetToken();
-                    next({ path: "/login", query: { redirect: to.fullPath } });
+                    console.error("[permission] 动态路由初始化失败：", error);
+                    // 路由构建异常不等于登录失效。Token 存在时清空它会让同域的所有标签页一起退出。
+                    // 真正的 1001/1002 由统一请求层负责处理。
+                    if (!DiyCommon.getToken()) {
+                        await userStore.resetToken();
+                        next({ path: "/login", query: { redirect: to.fullPath } });
+                    } else {
+                        next(false);
+                    }
                 }
             }
         }

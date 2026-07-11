@@ -1,6 +1,11 @@
-import { defineStore } from 'pinia'
+import { getCurrentInstance, inject } from 'vue'
+import { createPinia, defineStore } from 'pinia'
 import { generateId, deepClone, } from '../utils/util'
-export const usePageEngineStore = defineStore('pageEngine', {
+
+export const PAGE_ENGINE_STORE_KEY = Symbol('microi-page-engine-store')
+export const PAGE_ENGINE_RENDER_CONTEXT_KEY = Symbol('microi-page-engine-render-context')
+
+const useDefaultPageEngineStore = defineStore('pageEngine', {
   // 定义状态
   state: () => ({
     //页面数据
@@ -135,3 +140,17 @@ export const usePageEngineStore = defineStore('pageEngine', {
     }
   }
 })
+
+// 嵌套界面引擎必须拥有独立状态，不能复用宿主页面的 formData。
+// 普通页面仍使用应用级 Pinia；pageengine-widget 会为子渲染树 provide 独立 store。
+export const usePageEngineStore = (pinia) => {
+  if (!pinia && getCurrentInstance()) {
+    const isolatedStore = inject(PAGE_ENGINE_STORE_KEY, null)
+    if (isolatedStore) return isolatedStore
+  }
+  return useDefaultPageEngineStore(pinia)
+}
+
+export const createIsolatedPageEngineStore = () => {
+  return useDefaultPageEngineStore(createPinia())
+}

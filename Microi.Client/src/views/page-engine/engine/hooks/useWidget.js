@@ -3,10 +3,11 @@ import { get } from '../utils/axiosInstance'
 import { storeToRefs } from 'pinia'
 import { usePageEngineStore } from '../stores/pageEngine'
 import { useDebounceFn } from '@vueuse/core'
-const pageEngineStore = usePageEngineStore()
-const { formData } = storeToRefs(pageEngineStore)
 
 export function useWidget(widgetObj, dynamicData, dateRange = ref(), loading = ref(false), currentPage = ref(-1), requestPageSize = ref(), activePeriod = ref()) {
+  // 必须在组件 setup 调用期间取 store，才能命中嵌套页面 provide 的独立实例。
+  const pageEngineStore = usePageEngineStore()
+  const { formData } = storeToRefs(pageEngineStore)
   const readMaybeRef = value =>
     value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')
       ? value.value

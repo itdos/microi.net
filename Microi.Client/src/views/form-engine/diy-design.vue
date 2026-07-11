@@ -167,6 +167,7 @@
 
                                         :FormData="CurrentDiyFieldModel"
                                         @CallbackForm="CallbackForm_Field"
+                                        @CallbackGetDiyField="CallbackGetDiyField_FieldProperties"
                                         @CallbackFormValueChange="CallbackFormValueChange_DiyField"
                                     ></DiyForm>
                                 </div>
@@ -472,8 +473,21 @@ export default {
     },
     methods: {
         CallbackForm_Field(){
+            this.RefreshDiyFieldTabDataSource();
+        },
+        CallbackGetDiyField_FieldProperties() {
             var self = this;
-            console.log("CallbackForm_Field");
+            self.$nextTick(function () {
+                self.RefreshDiyFieldTabDataSource();
+            });
+        },
+        RefreshDiyFieldTabDataSource() {
+            var self = this;
+            var fieldPropertyForm = self.$refs.diyform_diy_field;
+            if (!fieldPropertyForm || typeof fieldPropertyForm.UptDiyFieldDataSource !== "function") {
+                return;
+            }
+            fieldPropertyForm.UptDiyFieldDataSource("Tab", self.GetCurrentDiyTableTabs());
         },
         CallbackFormValueChange_DiyField(field, value) {
             var self = this;
@@ -1267,18 +1281,9 @@ export default {
                     // 因此这里没必要调用.Init()初始化，直接改变FormData值即可
                     // self.$refs.diyform_diy_field.Init(false);
                     self.$refs.diyform_diy_field.SetFormData(self.CurrentDiyFieldModel);
-                    // 还得让 表单进入V8事件 触发1次？
-
-                    // 2026-02-06 Anderson：字段的表单分组数据源，正确做法是通过diy_field表的表单进入事件来实现，这里先硬编码实现了
-                    if(self.CurrentDiyTableModel.Tabs){
-                        var tabData = [];
-                        if(typeof self.CurrentDiyTableModel.Tabs == 'string'){
-                            tabData = JSON.parse(self.CurrentDiyTableModel.Tabs);
-                        }else{
-                            tabData = self.CurrentDiyTableModel.Tabs;
-                        }
-                        self.$refs.diyform_diy_field.UptDiyFieldDataSource("Tab", tabData);
-                    }
+                    // 右侧本身也是表单引擎。若其字段元数据已经加载完成，立即注入；
+                    // 首次挂载的异步场景由 CallbackGetDiyField_FieldProperties 再补一次。
+                    self.RefreshDiyFieldTabDataSource();
                 // }, 300);
             });
         },
