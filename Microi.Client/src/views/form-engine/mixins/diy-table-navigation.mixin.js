@@ -276,6 +276,30 @@ export default {
                 self.$refs.refDiyCustomDialog.Show();
             }
         },
+        OpenAppDialog(param) {
+            var self = this;
+            param = param || {};
+            if (!param.AppKey) {
+                self.DiyCommon.Tips("AppKey必传！", false);
+                return;
+            }
+            self.OpenDialog({
+                ComponentName: "MicroAppDialog",
+                Title: param.Title || "应用",
+                TitleIcon: param.TitleIcon || "fas fa-window-maximize",
+                Width: param.Width || "min(920px, calc(100vw - 32px))",
+                OpenType: param.OpenType || "Dialog",
+                DataAppend: {
+                    AppKey: param.AppKey,
+                    Version: param.Version || "",
+                    RoutePath: param.RoutePath || param.MicroRoute || "/",
+                    Data: param.Data || {},
+                    OnSuccess: param.OnSuccess,
+                    OnCancel: param.OnCancel,
+                    OnError: param.OnError
+                }
+            });
+        },
         OpenPrivatePhone(model) {
             var self = this;
             if (self.DiyCommon.IsNull(model)) {

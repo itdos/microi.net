@@ -19,7 +19,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.1.5.0";
+        public static string Version = "6.2.0.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -273,6 +273,55 @@ namespace Microi.net
                     await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{(string)importMicroiStorePackageResult.Data.Id}");
                     await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
                 }
+            }
+            #endregion
+
+            #region AI应用发布到商城V8
+            var publishAiAppV8 = ReadEmbeddedResource("ai-app-publish-store.js");
+            var publishAiAppEngine = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
+            {
+                OsClient = osClient,
+                _Where = new List<object>()
+                {
+                    new List<object>() { "ApiEngineKey", "=", "ai_app_publish_store" }
+                }
+            });
+            DosResult publishAiAppResult;
+            if (publishAiAppEngine.Code == 1)
+            {
+                publishAiAppResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
+                {
+                    Id = (string)publishAiAppEngine.Data.Id,
+                    OsClient = osClient,
+                    ApiName = "[AI应用]制作离线包并发布应用商城",
+                    ApiEngineKey = "ai_app_publish_store",
+                    ApiAddress = "/apiengine/ai_app_publish_store",
+                    IsEnable = 1,
+                    StopHttp = 1,
+                    ApiV8Code = publishAiAppV8
+                });
+            }
+            else
+            {
+                publishAiAppResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
+                {
+                    OsClient = osClient,
+                    ApiName = "[AI应用]制作离线包并发布应用商城",
+                    ApiEngineKey = "ai_app_publish_store",
+                    ApiAddress = "/apiengine/ai_app_publish_store",
+                    IsEnable = 1,
+                    StopHttp = 1,
+                    ApiV8Code = publishAiAppV8
+                });
+            }
+            if (publishAiAppResult.Code != 1)
+            {
+                msgs.Add("AI应用发布商城接口升级失败：" + publishAiAppResult.Msg);
+            }
+            else
+            {
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:ai_app_publish_store");
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:/apiengine/ai_app_publish_store");
             }
             #endregion
             

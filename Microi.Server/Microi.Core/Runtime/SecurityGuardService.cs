@@ -10,7 +10,7 @@ using Microi.net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     public static class SecurityGuardService
     {

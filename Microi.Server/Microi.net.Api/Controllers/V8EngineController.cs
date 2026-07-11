@@ -220,6 +220,53 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        public async Task<IActionResult> ListApplications([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            param ??= new JObject();
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.ListApplications(
+                osClient,
+                param["AppType"]?.Val<string>(),
+                param["Keyword"]?.Val<string>() ?? param["_SearchKey"]?.Val<string>(),
+                param["IncludeFiles"]?.Val<bool?>() ?? true);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GetApplicationContext([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.GetApplicationContext(
+                osClient,
+                param["AppIdOrKey"]?.Val<string>() ?? param["AppId"]?.Val<string>() ?? param["AppKey"]?.Val<string>(),
+                param["IncludeContents"]?.Val<bool?>() ?? true,
+                param["MaxFileBytes"]?.Val<long?>() ?? 2 * 1024 * 1024,
+                param["MaxTotalBytes"]?.Val<long?>() ?? 50 * 1024 * 1024);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GetApplicationFile([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.GetApplicationFile(
+                osClient,
+                param["AppIdOrKey"]?.Val<string>() ?? param["AppId"]?.Val<string>() ?? param["AppKey"]?.Val<string>(),
+                param["FilePath"]?.Val<string>() ?? param["Path"]?.Val<string>(),
+                param["IncludeContents"]?.Val<bool?>() ?? true,
+                param["MaxFileBytes"]?.Val<long?>() ?? 10 * 1024 * 1024);
+            return Ok(result);
+        }
+
+        [HttpPost]
         public async Task<IActionResult> CreateMicroService([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -227,6 +274,17 @@ namespace Microi.net.Api
             if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
             var result = await V8McpLogic.CreateMicroService(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SyncMicroServiceSource([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.SyncMicroServiceSource(osClient, param, token);
             return Ok(result);
         }
 

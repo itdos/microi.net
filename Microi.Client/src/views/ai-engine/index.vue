@@ -1,5 +1,5 @@
 <template>
-    <div class="ai-engine-page" :class="{ 'is-app-workspace': activeWorkspace === 'apps' }">
+    <div class="ai-engine-page" :class="{ 'is-app-workspace': activeWorkspace === 'apps', 'is-embedded': embedded, 'is-compact': compact }">
         <aside class="ai-engine-sidebar">
             <div class="workspace-tabs" :class="{ 'single-tab': !isAiAdmin }">
                 <button
@@ -373,6 +373,18 @@ import { ElMessage } from "element-plus";
 
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
 const AiAppWorkbench = defineAsyncComponent(() => import("./ai-app-workbench.vue"));
+const props = defineProps({
+    embedded: {
+        type: Boolean,
+        default: false
+    },
+    compact: {
+        type: Boolean,
+        default: false
+    }
+});
+const embedded = computed(() => props.embedded);
+const compact = computed(() => props.compact);
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
 const diyStore = useDiyStore();
@@ -1592,6 +1604,124 @@ async function copyText(text) {
     background: #f7f8fb;
     color: #20242c;
     box-shadow: 0 22px 56px rgba(20, 30, 55, .08);
+}
+
+.ai-engine-page.is-embedded {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    border-radius: var(--mci-shape-panel, 12px);
+}
+
+.ai-engine-page.is-compact {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ai-engine-page.is-compact .ai-engine-sidebar {
+    display: none;
+}
+
+.ai-engine-page.is-compact .ai-engine-main {
+    grid-template-rows: 50px minmax(0, 1fr) auto;
+}
+
+.ai-engine-page.is-compact .ai-engine-header {
+    padding: 0 14px;
+}
+
+.ai-engine-page.is-compact .message-wrap {
+    padding: 10px 14px;
+}
+
+.ai-engine-page.is-compact .empty-state {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px 8px;
+}
+
+.ai-engine-page.is-compact .empty-hero {
+    gap: 5px;
+}
+
+.ai-engine-page.is-compact .hero-kicker {
+    min-height: 20px;
+    padding: 0 8px;
+    font-size: 11px;
+}
+
+.ai-engine-page.is-compact .empty-state h1 {
+    font-size: clamp(19px, 1.7vw, 25px);
+}
+
+.ai-engine-page.is-compact .empty-state p {
+    max-width: 760px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.ai-engine-page.is-compact .empty-state .hero-local-tip {
+    min-height: 28px;
+    padding: 5px 9px;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.ai-engine-page.is-compact .platform-stats {
+    width: 100%;
+    gap: 7px;
+    margin-top: 2px;
+}
+
+.ai-engine-page.is-compact .platform-stat {
+    min-height: 58px;
+    padding: 7px 9px;
+}
+
+.ai-engine-page.is-compact .platform-stat::before {
+    width: 72px;
+    height: 72px;
+}
+
+.ai-engine-page.is-compact .platform-stat span,
+.ai-engine-page.is-compact .platform-stat small {
+    font-size: 10px;
+}
+
+.ai-engine-page.is-compact .platform-stat strong {
+    margin: 1px 0;
+    font-size: 19px;
+}
+
+.ai-engine-page.is-compact .quick-prompts {
+    width: 100%;
+    gap: 7px;
+    margin-top: 2px;
+}
+
+.ai-engine-page.is-compact .quick-prompt {
+    min-height: 70px;
+    gap: 4px;
+    padding: 8px 9px;
+}
+
+.ai-engine-page.is-compact .quick-prompt .el-icon {
+    width: 25px;
+    height: 25px;
+    font-size: 15px;
+}
+
+.ai-engine-page.is-compact .quick-prompt strong {
+    font-size: 12px;
+}
+
+.ai-engine-page.is-compact .quick-prompt span {
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+.ai-engine-page.is-compact .composer {
+    padding: 8px 12px 10px;
 }
 
 .ai-engine-page.is-app-workspace {

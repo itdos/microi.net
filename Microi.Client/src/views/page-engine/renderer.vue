@@ -1,5 +1,14 @@
 <template>
-    <div class="home">
+    <div class="home" :class="{ 'is-embedded': isEmbedded, 'has-design-entry': canDesignPage && remoteObj.Id }">
+        <el-button
+            v-if="canDesignPage && remoteObj.Id"
+            class="pe-design-fab"
+            type="primary"
+            @click="openPageDesigner"
+        >
+            <el-icon><EditPen /></el-icon>
+            <span>界面设计</span>
+        </el-button>
         <formRenderer v-if="remoteObj.Id" :remoteObj="remoteObj" />
         <div v-else class="pe-page-skeleton">
             <div class="pe-page-skeleton__header"></div>
@@ -20,10 +29,17 @@
 <script>
 import { DiyCommon } from "@/utils/diy.common";
 import { formRenderer, EventBus, usePageEngineStore } from "./index.js";
+import { computed } from "vue";
+import { useDiyStore } from "@/pinia";
 
 export default {
     components: {
         formRenderer
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const currentUser = computed(() => diyStore.GetCurrentUser || {});
+        return { currentUser };
     },
     data() {
         return {
@@ -41,6 +57,17 @@ export default {
             pageEngineStore: null
         };
     },
+    computed: {
+        isEmbedded() {
+            return this.$route.meta?.embedded === true || this.$route.query?.embedded === "1";
+        },
+        canDesignPage() {
+            var user = this.currentUser || {};
+            var adminValue = String(user._IsAdmin ?? "").toLowerCase();
+            var isAdmin = user._IsAdmin === true || Number(user._IsAdmin) === 1 || adminValue === "true";
+            return isAdmin || Number(user.Level || 0) >= 9999;
+        }
+    },
     async mounted() {
         // 初始化 store
         this.pageEngineStore = usePageEngineStore();
@@ -53,10 +80,17 @@ export default {
 
         // 加载表单数据
         await this.loadFormData();
+
+        if (this.isEmbedded) {
+            document.documentElement.classList.add("pe-embedded-document");
+            document.body.classList.add("pe-embedded-document");
+        }
     },
     beforeUnmount() {
         // 移除所有事件监听
         this.removeEventListeners();
+        document.documentElement.classList.remove("pe-embedded-document");
+        document.body.classList.remove("pe-embedded-document");
     },
     created: function () {
         //获取页面参数
@@ -69,6 +103,13 @@ export default {
         }
     },
     methods: {
+        openPageDesigner() {
+            if (!this.remoteObj.Id) return;
+            this.$router.push({
+                path: "/mic/autopage",
+                query: { Id: this.remoteObj.Id }
+            });
+        },
         async loadFormData() {
             // 使用 postMessage 发送数据给 iframe
             var _where = [];
@@ -205,13 +246,65 @@ export default {
 .microi.Classic .app-main-microi {
     padding-top: 0px !important;
 }
+
+html.pe-embedded-document,
+body.pe-embedded-document,
+body.pe-embedded-document #app {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
 </style>
 
 <style lang="scss" scoped>
 .home {
+    position: relative;
     width: 100%;
     height: 100%;
     // background-color: #fff;
+}
+
+.home.is-embedded {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.home.has-design-entry {
+    padding-top: 56px;
+    box-sizing: border-box;
+}
+
+.home.is-embedded.has-design-entry {
+    padding-top: 48px;
+}
+
+.pe-design-fab {
+    position: absolute;
+    top: 12px;
+    right: 22px;
+    z-index: 80;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: var(--mci-shape-button, 999px);
+    background: var(--mci-gradient-primary, linear-gradient(135deg, #6c2bd9, #2196f3));
+    color: var(--mci-text-on-primary, #fff);
+    box-shadow: var(--mci-shadow-button, 0 8px 24px rgba(108, 43, 217, .22));
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.pe-design-fab:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--mci-shadow-button-hover, 0 12px 30px rgba(108, 43, 217, .3));
+}
+
+.home.is-embedded .pe-design-fab {
+    top: 8px;
+    right: 14px;
 }
 
 .pe-page-skeleton {

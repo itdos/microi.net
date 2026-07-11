@@ -23,6 +23,13 @@ export const constantRoutes = [
         hidden: true
     },
     {
+        path: "/mic/renderer-embed/:Id",
+        name: "mic_renderer_embed_id",
+        component: () => import("@/views/page-engine/renderer.vue"),
+        hidden: true,
+        meta: { keepAlive: false, embedded: true }
+    },
+    {
         path: "/iframe/:Url(.*)",
         component: Layout,
         hidden: true,

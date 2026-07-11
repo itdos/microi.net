@@ -17,6 +17,7 @@ using Senparc.Weixin.AspNet;
 using Senparc.Weixin.RegisterServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Options;
@@ -313,8 +314,9 @@ app.UseMicroiJob();   // 启用任务计划
 app.UseMicroiMQ();    // 启用消息队列
 app.UseMicroiUpgrade();// 启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
-BackgroundTaskService.ConfigureHubContext(app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>());
-OnlineTerminalService.ConfigureHubContext(app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>());
+var realtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>();
+RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>
+    realtimeHubContext.Clients.Clients(connectionIds.ToList()).SendAsync(eventName, payload));
 
 // 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
 var osClientName = OsClient.GetConfigOsClient();

@@ -16,6 +16,7 @@ const DiyDesign = defineAsyncComponent(() => import("@/views/form-engine/diy-des
 const DiyFormPage = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full"));
 const DiyDesignList = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
 const DiyCustomDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog"));
+const MicroAppDialog = defineAsyncComponent(() => import("@/views/micro-app/dialog.vue"));
 const DiySearch = defineAsyncComponent(() => import("@/views/form-engine/diy-search"));
 const DiyModleSearch = defineAsyncComponent(() => import("@/views/form-engine/diy-mobile-search"));
 // 聊天模块
@@ -124,6 +125,7 @@ function RegMicroiComponents(app) {
     app.component("DiyFormPage", DiyFormPage);
     app.component("DiyDesignList", DiyDesignList);
     app.component("DiyCustomDialog", DiyCustomDialog);
+    app.component("MicroAppDialog", MicroAppDialog);
     app.component("DiySearch", DiySearch);
     app.component("DiyModleSearch", DiyModleSearch);
 
@@ -256,6 +258,7 @@ export {
     DiyAlert,
     DiyStaticText,
     DiyCustomDialog,
+    MicroAppDialog,
     Fontawesome,
     DiyCodeEditor,
     DiyLoadNonDiyTable

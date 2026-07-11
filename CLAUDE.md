@@ -545,7 +545,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/microi-db-schema/SKILL.md` — Microi DB Schema
 - `microi.skills/business-blueprint/SKILL.md` — Microi 业务架构蓝图（System Blueprint）
 - `microi.skills/microi-system-delivery/SKILL.md` — Microi 全系统交付复盘与总控规范
-- `microi.skills/microi-solution-quotation/SKILL.md` — Microi吾码解决方案与报价 Word 生成规范
+- `microi.skills/microi-solution-quotation/SKILL.md` — Microi吾码解决方案与报价
 - `microi.skills/microi-frontend-sdk/SKILL.md` — Microi 前端 SDK
 - `microi.skills/microi-uniapp-frontend/SKILL.md` — Microi UniApp 前端通用规范
 - `microi.skills/microi-mobile-app-quality/SKILL.md` — Microi 移动端质量门禁
