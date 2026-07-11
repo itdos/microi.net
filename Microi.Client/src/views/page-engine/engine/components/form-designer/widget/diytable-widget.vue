@@ -11,13 +11,14 @@
       :PropsTableId="tableId"
       :PropsSysMenuId="sysMenuId"
       :ContainerClass="containerClass"
-      LoadMode="Design"
+      :LoadMode="loadMode"
     />
   </div>
 </template>
 
 <script setup name="diytable-widget">
 import { computed, defineAsyncComponent, onBeforeUnmount, shallowRef } from 'vue'
+import { useRoute } from 'vue-router'
 
 const props = defineProps({
   widgetObj: {
@@ -25,6 +26,7 @@ const props = defineProps({
     required: true,
   },
 })
+const route = useRoute()
 
 // 使用 shallowRef + defineAsyncComponent 避免内存泄漏
 const diyTableComp = shallowRef(
@@ -46,6 +48,8 @@ const sysMenuId = computed(() => {
 const containerClass = computed(() => {
   return props.widgetObj.widgetParams[2]?.value || ''
 })
+
+const loadMode = computed(() => route.path.startsWith('/mic/autopage') ? 'Design' : '')
 
 onBeforeUnmount(() => {
   diyTableComp.value = null

@@ -169,6 +169,18 @@ namespace Microi.net
         public string FileId { get; set; }
         public string Path { get; set; }
         /// <summary>
+        /// 文件管理列表分页标记。
+        /// </summary>
+        public string Marker { get; set; }
+        /// <summary>
+        /// 文件管理列表单页最大数量。
+        /// </summary>
+        public int? MaxKeys { get; set; }
+        /// <summary>
+        /// 是否递归列出全部子目录，文件管理普通列表默认关闭。
+        /// </summary>
+        public bool? Recursive { get; set; }
+        /// <summary>
         /// 压缩后最大体积。单位：kb
         /// </summary>
         public int? CompressMaxSize { get; set; }
@@ -475,5 +487,9 @@ namespace Microi.net
         public string IP { get; set; }
         public DateTime CreateTime { get; set; }
         public DateTime UpdateTime { get; set; }
+        /// <summary>
+        /// Token 被同一终端的新 Token 替换的时间。短暂保留旧 Token，用于兼容多 Tab 并发请求。
+        /// </summary>
+        public DateTime? RetiredTime { get; set; }
     }
 }

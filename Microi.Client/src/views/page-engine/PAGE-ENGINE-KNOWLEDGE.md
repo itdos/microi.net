@@ -209,6 +209,18 @@ formData（页面）
 - `widgetOption.number`: 同上，确保唯一
 - `widgetOption.wrapperNumber`: 必须等于其所在容器的 `wrapperOption.number`
 
+### 5.3 平台内置业务组件
+
+| type | label | 关键参数 | 说明 |
+|------|-------|----------|------|
+| `aiengine` | AI引擎 | 无 | 以紧凑嵌入模式展示 AI 引擎定制首页 |
+| `workcenter` | 工作中心 | 内容类型、待办模块、流程模块 | “我的工作”可由两个隐藏模块驱动 `diy-table`；日历/公告为兼容模式 |
+| `pageengine` | 界面引擎 | `mic_page.Id` | 嵌入另一个界面引擎，设计器通过页面下拉框选择 |
+
+`pageengine` 必须通过无主框架的 `/mic/renderer-embed/:Id` 路由在同源 iframe 中渲染。界面引擎使用单例 Pinia store，直接递归挂载渲染器会让子页面覆盖父页面状态；iframe 用于隔离父子 store，同时避免嵌套菜单栏。运行态禁用 iframe 自身滚动并监听子文档高度；容器与组件高度为 `0` 时自动撑开，由外层页面统一滚动。
+
+界面引擎渲染页为 `_IsAdmin` 或 `Level >= 9999` 的用户显示“界面设计”悬浮入口并直达当前页面设计器。平台首页推荐把我的工作、紧凑 AI、FullCalendar、绑定公告表的 `diytable` 独立编排，并把大面积统计区域做成单独界面引擎后通过 `pageengine` 嵌入。客户只需替换统计子页面即可复用首页框架。
+
 ---
 
 ## 六、widgetParams 参数类型系统

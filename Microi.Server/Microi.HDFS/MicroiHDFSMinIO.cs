@@ -388,26 +388,106 @@ namespace Microi.net
                 var minioClient = CreateMinioClient(clientModel, isPrivate);
                 var bucketName = GetBucketName(clientModel, isPrivate);
 
-                var prefix = (param.Prefix ?? "").TrimStart('/');
+                static string NormalizeFolderPath(string value)
+                {
+                    var normalized = (value ?? "").Replace('\\', '/').TrimStart('/');
+                    while (normalized.Contains("//"))
+                    {
+                        normalized = normalized.Replace("//", "/");
+                    }
+                    normalized = normalized.TrimEnd('/');
+                    return normalized.Length > 0 ? normalized + "/" : "";
+                }
+
+                var prefix = NormalizeFolderPath(param.Prefix);
+                var isRecursive = param.Recursive == true;
 
                 var listArgs = new ListObjectsArgs()
                     .WithBucket(bucketName)
                     .WithPrefix(prefix)
-                    .WithRecursive(false);
+                    .WithRecursive(isRecursive);
 
                 var folders = new List<object>();
                 var files = new List<object>();
                 var seenPrefixes = new HashSet<string>();
 
+                void AddFolderHierarchy(string objectKey, bool isFolderObject)
+                {
+                    var normalizedKey = (objectKey ?? "").Replace('\\', '/');
+                    var folderPath = isFolderObject
+                        ? NormalizeFolderPath(normalizedKey)
+                        : NormalizeFolderPath(normalizedKey.Contains("/")
+                            ? normalizedKey.Substring(0, normalizedKey.LastIndexOf('/') + 1)
+                            : "");
+                    if (folderPath.Length == 0 || (prefix.Length > 0 && !folderPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return;
+                    }
+
+                    var relativePath = prefix.Length > 0 ? folderPath.Substring(prefix.Length) : folderPath;
+                    var currentPath = prefix;
+                    foreach (var segment in relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        currentPath += segment + "/";
+                        if (currentPath == prefix || !seenPrefixes.Add(currentPath)) continue;
+                        folders.Add(new { Name = segment, FullPath = currentPath, IsFolder = true });
+                    }
+                }
+
+                void AddFile(string key, long size, string lastModified)
+                {
+                    var fileName = key;
+                    if (fileName.Contains("/"))
+                    {
+                        fileName = fileName.Substring(fileName.LastIndexOf('/') + 1);
+                    }
+                    if (!param.Keyword.DosIsNullOrWhiteSpace() && !fileName.ToLower().Contains(param.Keyword.ToLower())) return;
+
+                    files.Add(new
+                    {
+                        Name = fileName,
+                        FullPath = key,
+                        Size = size,
+                        Type = Path.GetExtension(fileName).TrimStart('.').ToLower(),
+                        LastModified = lastModified,
+                        IsFolder = false
+                    });
+                }
+
                 await foreach (var item in minioClient.ListObjectsEnumAsync(listArgs))
                 {
                     var key = item.Key;
+                    if (isRecursive)
+                    {
+                        var isFolderObject = item.IsDir || key.EndsWith("/");
+                        AddFolderHierarchy(key, isFolderObject);
+                        if (!isFolderObject)
+                        {
+                            AddFile(key, (long)item.Size, item.LastModifiedDateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "");
+                        }
+                        continue;
+                    }
+
                     if (item.IsDir)
                     {
-                        if (!seenPrefixes.Contains(key))
+                        var folderPath = NormalizeFolderPath(key);
+                        if (folderPath == prefix || seenPrefixes.Contains(folderPath))
                         {
-                            seenPrefixes.Add(key);
-                            var folderName = key.TrimEnd('/');
+                            continue;
+                        }
+
+                        var relativePath = prefix.Length > 0 && folderPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                            ? folderPath.Substring(prefix.Length).TrimEnd('/')
+                            : folderPath.TrimEnd('/');
+                        if (relativePath.Length == 0 || relativePath.Contains("/"))
+                        {
+                            continue;
+                        }
+
+                        if (!seenPrefixes.Contains(folderPath))
+                        {
+                            seenPrefixes.Add(folderPath);
+                            var folderName = folderPath.TrimEnd('/');
                             if (folderName.Contains("/"))
                             {
                                 folderName = folderName.Substring(folderName.LastIndexOf('/') + 1);
@@ -415,7 +495,7 @@ namespace Microi.net
                             folders.Add(new
                             {
                                 Name = folderName,
-                                FullPath = key,
+                                FullPath = folderPath,
                                 IsFolder = true
                             });
                         }
@@ -425,30 +505,7 @@ namespace Microi.net
                         // 排除文件夹自身的空对象
                         if (key == prefix || key.EndsWith("/"))
                             continue;
-
-                        var fileName = key;
-                        if (fileName.Contains("/"))
-                        {
-                            fileName = fileName.Substring(fileName.LastIndexOf('/') + 1);
-                        }
-
-                        // 关键字过滤
-                        if (!param.Keyword.DosIsNullOrWhiteSpace())
-                        {
-                            if (!fileName.ToLower().Contains(param.Keyword.ToLower()))
-                                continue;
-                        }
-
-                        var ext = Path.GetExtension(fileName).TrimStart('.').ToLower();
-                        files.Add(new
-                        {
-                            Name = fileName,
-                            FullPath = key,
-                            Size = (long)item.Size,
-                            Type = ext,
-                            LastModified = item.LastModifiedDateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
-                            IsFolder = false
-                        });
+                        AddFile(key, (long)item.Size, item.LastModifiedDateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "");
                     }
                 }
 

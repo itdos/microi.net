@@ -42,6 +42,14 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 打开表单：通过 `refDiyTable_DiyFormDialog.Init({...})` 调用 `diy-form-full.vue`。
 - 权限：`SysMenuId`、`GetCurrentUser._RoleLimits`、`Permission` 控制增删改查和动态按钮。
 
+定制页嵌入标准列表时，优先复用 `diy-table` 的运行时 props，不要复制表格实现：
+
+- `PropsSelectApi`、`PropsRequestParams`：覆盖列表接口并追加业务参数；禁止透传 Token/Authorization。
+- `PropsVirtualFields`、`PropsSelectFields`、`PropsSearchFields`：补充接口虚拟字段并精确控制列和搜索项。
+- `PropsMenuModelPatch`：仅在当前实例覆盖 `MoreBtns`、`BatchSelectMoreBtns`、`PageTabs`、显隐代码等，不写回 `sys_menu`。
+- `PropsHideImportExport`、`PropsHideMoreFunctions`、`PropsHideAdminDesign`：嵌入页需要保持原业务工具边界时隐藏标准辅助工具。
+- 业务动作仍由 `ParentV8` 暴露给按钮/模板 V8；`diy-table` 只负责通用渲染、权限和分页。
+
 ### `diy-form-full.vue`
 
 表单外壳，不直接渲染字段。它负责：
@@ -151,6 +159,26 @@ Page 模式要特别注意：
 - `CallbackSetFormData` 到达后才能可靠评估 `FormBtns`，因为此时才有当前表单数据。
 - keep-alive 会触发 `activated/deactivated`，不要只在 `mounted` 里写一次性逻辑。
 
+### 在线微服务弹窗（OpenAppDialog）
+
+`V8.OpenAppDialog` 是 V8 定制页面的标准入口，宿主实现位于：
+
+| 文件 | 职责 |
+|------|------|
+| `views/micro-app/dialog.vue` | 按 `AppKey + Version` 解析 `/micro-app/{OsClient}/{AppKey}/{Version}/index.html`，挂载 micro-app 并处理结果协议。 |
+| `views/form-engine/mixins/diy-table-navigation.mixin.js` | 向列表、PageBtns、MoreBtns、BatchSelectMoreBtns 暴露 `OpenAppDialog`。 |
+| `views/form-engine/mixins/diy-form-navigation.mixin.js` | 向表单 V8 暴露同一套 `OpenAppDialog` 参数。 |
+| `views/form-engine/diy-table.vue`、`diy-form.vue` | 将方法挂到运行时 `V8` 对象并承载通用弹窗。 |
+
+扩展或修复时必须保持表格与表单两条入口的参数一致：`AppKey`、`RoutePath/MicroRoute`、`Version`、`Title`、`TitleIcon`、`Width`、`OpenType`、`Data`、`OnSuccess`、`OnCancel`、`OnError`。
+
+- `Data` 映射为子应用的 `dialogData`，必须是普通业务数据；函数回调保留在宿主，不放进 micro-app data。
+- 宿主自动下发 `apiBase`、`osClient`、`token`、`appKey`、`version`、`microRoute`、`dialog:true` 和 `route`。
+- 子应用发送 `app-dialog:success` 或 `app-dialog:cancel` 后自动关闭；`app-dialog:error` 只触发错误回调，不自动关闭。
+- `OpenAppDialog` 用于发布后的在线微服务；`OpenDialog` 用于前端源码中预注册的 Vue 组件。
+- Token 通过 micro-app data 下发，禁止拼进加载 URL，避免日志、历史记录和代理链路泄露。
+- 新增参数或修改返回协议时，必须同步更新 `microi.doc/docs/doc/v8-engine/v8-client.md`、`v8-menu-buttons/SKILL.md` 和 `v8-frontend-events/SKILL.md`。
+
 ---
 
 ### 系统子菜单入口页（MenuChildrenGrid）
@@ -257,6 +285,13 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - PC 端和移动端都调用同一个后端登录契约，不能只在某一端支持验证码。
 - 修改后要至少验证 `EnableCaptcha=1`、`EnableCaptcha='1'`、`EnableCaptcha=false` 三种情况。
 
+文件同步、跨平台导入等需要登录另一套 Microi API 的前端工具，也必须复用同一验证码契约：
+
+- 用户填写远程 `ApiBase` 和 `OsClient` 后，先请求远程 `/api/FormEngine/GetSysConfig`，按 `isEnabledFlag(EnableCaptcha)` 判断是否需要验证码，不能先盲目调用登录接口。
+- 需要验证码时，自动请求远程 `/api/Captcha/GetCaptcha?OsClient=<OsClient>`，读取响应头 `captchaid` 并显示验证码图片；用户输入后，远程 `/api/SysUser/login` 必须同时提交 `_CaptchaId/_CaptchaValue`。
+- 远程地址或租户变化时清空旧验证码和 Token；登录失败时刷新验证码。未开启验证码时不得显示验证码输入，也不得提交空验证码字段。
+- 远程响应头必须通过 CORS 暴露 `captchaid` 和 `authorization`；前端还应兼容登录响应体中的 Token，避免只依赖响应头。
+
 ## Microi 前端 SDK 约束
 
 当修改 `Microi.Client` 之外的 Vue3 前端、PC 官网、移动 H5 或定制微前端页面时，必须优先读取 `microi.skills/microi-frontend-sdk/SKILL.md` 并使用 `microi.skills/microi.v8.js`。`Microi.Client` 主后台已有平台请求与 Pinia 体系时，可以复用现有平台能力；但新增独立页面、外部站点、插件页、嵌入式页面不得再复制旧 Vue2/Vuex 版 `microi.v8.js`。
@@ -292,3 +327,13 @@ VS Code 插件执行前端微服务构建前必须先安全清理当前项目自
 ### 表单下拉 Data 动态对象选项
 
 表单 V8 通过 `V8.FieldSet('字段名', 'Data', objectRows)` 动态写入下拉数据时，如果 `objectRows` 是对象数组，即使 `diy_field.Config.DataSource='Data'`，前端也必须按对象数据源处理，并使用 `SelectLabel/SelectSaveField` 或常见字段兜底生成 label/value。禁止把对象数组按普通字符串 Data 源过滤，否则会出现接口已有数据但下拉显示“无数据”的回归。
+
+## 在线 AI 应用与微服务页面协作
+
+Microi 的在线 AI 应用统一使用 `mci_ai_app / mci_ai_app_file / mci_ai_app_version` 保存 Web、UniApp、MicroService 的应用、私有源码和版本。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
+
+- 开始改页面前先通过 MCP 的 `microi_list_applications` 和 `microi_get_application_context` 读取应用、文件树与源码，不得只看本地目录。
+- 在线 AI 工作台应允许三种应用在线编辑、保存、运行/预览、下载源码/编译包、制作离线包、发布应用商城；不能在前端单独拦截 `MicroService` 构建。
+- 源码一律上传当前租户私有 HDFS；最终编译文件一律上传公有 HDFS。应用包必须内嵌两类文件内容，安装时通过目标租户 HDFS 适配器重新上传，不能把发布者私有桶 URL 交给安装者。
+- 商城字段 `AppType` 是历史“应用类别（官方/社区）”；运行类型使用独立 `ApplicationType`，枚举为 `Regular / MicroService / UniApp / Web`，禁止复用 `AppType` 破坏旧筛选。
+- 三类前端应用可复用 `ApplicationBundle` 文件传输协议，但运行安装不同：MicroService 还要写 `sys_microiservice_page`，Web/UniApp 只维护 AI 应用与版本，因此商城必须保存明确类型，不能合并成一个含糊枚举。

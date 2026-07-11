@@ -863,10 +863,20 @@ export default {
             if (self.SysMenuModel && self.SysMenuModel.SelectApi) {
                 url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.SelectApi);
             }
+            if (self.PropsSelectApi) {
+                url = self.DiyCommon.RepalceUrlKey(self.PropsSelectApi);
+            }
             //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
             if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
                 url = "/api/DataSourceEngine/Run";
                 param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
+            }
+            if (self.PropsRequestParams && typeof self.PropsRequestParams === "object") {
+                Object.keys(self.PropsRequestParams).forEach((key) => {
+                    if (["Authorization", "Token", "_Token"].indexOf(key) === -1) {
+                        param[key] = self.PropsRequestParams[key];
+                    }
+                });
             }
             self.DiyCommon.Post(
                 url,

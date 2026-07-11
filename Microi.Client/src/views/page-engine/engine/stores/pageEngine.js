@@ -15,8 +15,6 @@ export const usePageEngineStore = defineStore('pageEngine', {
     curWidget: {},
     //token
     token: localStorage.getItem('page_token') || '',  // 初始化时从 localStorage 读取 token
-    //是否开启新手引导
-    tour: localStorage.getItem('page_tour') || true, // 初始化时从 localStorage 读取 tourOpen
     //是否开启暗黑模式
     dark: localStorage.getItem('page_dark') || false, // 初始化时从 localStorage 读取 isDark
     components: {},//注册组件
@@ -118,12 +116,6 @@ export const usePageEngineStore = defineStore('pageEngine', {
       localStorage.removeItem('page_token');  // 清除 localStorage 中的 token
     },
 
-    //设置引导
-    setTour(isOpen) {
-      this.tour = isOpen;
-      localStorage.setItem('page_tour', isOpen);
-    },
-
     //设置暗黑模式
     setDark(isDark) {
       this.dark = isDark;
@@ -137,7 +129,6 @@ export const usePageEngineStore = defineStore('pageEngine', {
 
     //初始化
     setIni() {
-      this.setTour(true)
       this.setDark(true)
       this.clearWrapper()
       localStorage.removeItem('page_formData');

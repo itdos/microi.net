@@ -240,6 +240,20 @@ $ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--
 | diytable | 传入模块ID和菜单ID，嵌入低代码表格 |
 | diyform | 传入表ID和记录ID，嵌入低代码表单 |
 
+### 平台内置业务组件
+
+| type | label | 关键参数 | 说明 |
+|------|-------|----------|------|
+| `aiengine` | AI引擎 | 无 | 嵌入 `Microi.Client/src/views/ai-engine/index.vue`；运行态使用紧凑嵌入模式，缩小英雄区、统计卡和快捷入口 |
+| `workcenter` | 工作中心 | `[0]` 内容；`[1]` 待办模块；`[2]` 流程模块 | 展示“我的工作”时可用两个隐藏 `sys_menu` 模块让 `diy-table` 承载待办与流程列表；日历/公告为兼容模式 |
+| `pageengine` | 界面引擎 | `widgetParams[0].type = "pageengine"`，`value` 为 `mic_page.Id` | 嵌入另一个界面引擎页面，设计器提供图形化页面下拉选择 |
+
+界面引擎嵌套必须通过无 `Layout` 的独立路由 `/mic/renderer-embed/:Id` 和同源 iframe 渲染，不得直接在父页面递归挂载 `renderer.vue`。父子页面共享同一个应用实例时会复用单例 Pinia `pageEngine` store，子页面加载会覆盖父页面的 `formData`。iframe 负责隔离 store；嵌入页不得再次显示菜单栏或顶部导航。运行态 `pageengine` 使用 `scrolling="no"`，通过同源 `ResizeObserver + MutationObserver` 同步内容高度；父容器和组件高度设为 `0` 表示自动高度，由最外层页面统一滚动。
+
+界面引擎渲染页会为 `_IsAdmin` 或 `Level >= 9999` 的用户显示“界面设计”悬浮入口，跳转 `/mic/autopage?Id={mic_page.Id}`。管理员首页要为该入口预留顶部空间，避免覆盖面板 `moreOption` 链接；非管理员不显示。
+
+首页编排可以组合 `aiengine`、`workcenter`、`diycalendar`、`diytable` 和一个占大区域的 `pageengine`。公告应优先通过绑定 `diy_notice` 的 `diytable` 渲染，使增删改权限继续由 `sys_menu + _RoleLimits` 控制；统计子页面由客户独立替换时，只需修改被嵌入的 `mic_page`，无需重做首页布局。
+
 ## Office/PDF 在线预览自然语言生成规则
 
 当用户用自然语言要求“界面引擎预览 PDF/Word/Excel/PPT”“接口引擎返回 PDF 文件”“打开时跳到第 N 页”“按角色显示不同页码”“每 5 秒/10 秒轮询，但只有文件变化才刷新”时，优先生成 `office` 组件，而不是 `iframe/html/browser` 拼接。
@@ -330,7 +344,7 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 
 ### 交付类首页例外与乱码验收
 
-- 如果用户明确说明首页是“项目交付看板、全量采集看板、客户交付状态看板”，并明确不要本日/本周/本月/本年筛选，则统计组件的 `searchData` 必须保持 `[]`，相关显示查询开关必须为 `false`，不要套用经营看板的周期筛选默认值。
+- 如果用户明确说明首页是“项目交付看板、全量采集看板、客户交付状态看板”，或统计的是表单数、模块数、接口引擎数、用户数等平台全量资源，并明确不要本日/本周/本月/本年筛选，则统计组件的 `searchData` 必须保持 `[]`，相关显示查询开关必须为 `false`，不要套用经营看板的周期筛选默认值。
 - 交付类首页优先使用 `statistic`、`progress`、`pie`、`bar`、`linebar`、`html` 等图形化组件，不要为了凑数据把明细表格放到首页；明细应放在低代码表单菜单里查看。
 - 使用脚本或 FormEngine 写入 `mic_page.JsonObj` 时，中文 JSON 必须做编码安全处理：可将最终 JSON 字符串中的非 ASCII 字符转为 `\uXXXX` 后写入，避免数据库或中间层把标题写成 `????`。
 - 写入界面引擎后必须回读 `mic_page.JsonObj` 并检查：不包含 `????`；用户要求无周期筛选时，不包含 `period`、`本日`、`本周`、`本月`、`本年`；`JSON.parse(JsonObj)` 后标题能还原为中文。

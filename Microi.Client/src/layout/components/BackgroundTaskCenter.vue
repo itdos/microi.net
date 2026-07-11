@@ -9,7 +9,7 @@
         v-model="visible"
         class="microi-notification-dialog"
         :title="$t('Msg.NotificationCenter')"
-        width="min(920px, calc(100vw - 24px))"
+        width="min(1080px, calc(100vw - 24px))"
         align-center
         draggable
         destroy-on-close
@@ -20,7 +20,7 @@
                 <div class="summary-card">
                     <el-icon><Bell /></el-icon>
                     <span>{{ $t("Msg.BackgroundTasks") }}</span>
-                    <strong>{{ runningCount }}</strong>
+                    <strong>{{ tasks.length }}</strong>
                 </div>
                 <div v-if="isAdmin" class="summary-card warning">
                     <el-icon><Monitor /></el-icon>
@@ -50,30 +50,69 @@
                 <el-tab-pane name="tasks">
                     <template #label>
                         <span>{{ $t("Msg.BackgroundTasks") }}</span>
-                        <span v-if="runningCount > 0" class="tab-count">{{ runningCount }}</span>
+                        <span v-if="tasks.length > 0" class="tab-count">{{ tasks.length }}</span>
                     </template>
 
                     <div class="task-sub-actions">
                         <el-button link size="small" :icon="Delete" @click="clearCompleted">{{ $t("Msg.ClearCompleted") }}</el-button>
                     </div>
                     <el-empty v-if="tasks.length === 0" :description="$t('Msg.NoBackgroundTasks')" />
-                    <div v-else class="task-list">
-                        <div v-for="item in tasks" :key="item.Id" class="task-item">
-                            <div class="task-main">
-                                <span class="task-title">{{ item.Title || item.Type || $t("Msg.BackgroundTasks") }}</span>
-                                <span class="task-status" :class="'status-' + item.Status">{{ item.StatusText || item.Status }}</span>
-                            </div>
-                            <el-progress class="task-progress" :percentage="Number(item.Progress || 0)" :stroke-width="5" :show-text="true" />
-                            <div class="task-meta">
-                                <span>{{ formatTime(item.CreateTime) }}</span>
-                                <span v-if="item.ElapsedText">{{ $t("Msg.Elapsed") }} {{ item.ElapsedText }}</span>
-                                <el-button v-if="canCancel(item)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(item)">
+                    <el-table
+                        v-else
+                        :data="tasks"
+                        size="small"
+                        row-key="Id"
+                        class="online-table notification-compact-table task-table"
+                        max-height="420"
+                    >
+                        <el-table-column type="expand" width="36">
+                            <template #default="{ row }">
+                                <div class="task-detail">
+                                    <div class="task-detail__row">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskMessage") }}</span>
+                                        <span class="task-detail__message">{{ row.Msg || "-" }}</span>
+                                    </div>
+                                    <div class="task-detail__row task-detail__row--result">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskResult") }}</span>
+                                        <pre>{{ formatTaskResult(row) }}</pre>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Name')" min-width="220" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.Title || row.Type || $t("Msg.BackgroundTasks") }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.BackgroundTaskStatus')" width="90">
+                            <template #default="{ row }">
+                                <el-tag size="small" :type="getTaskStatusType(row.Status)">{{ row.StatusText || row.Status }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.BackgroundTaskProgress')" min-width="150">
+                            <template #default="{ row }">
+                                <div class="task-progress-cell">
+                                    <el-progress :percentage="Number(row.Progress || 0)" :stroke-width="5" :show-text="false" />
+                                    <span>{{ Number(row.Progress || 0) }}%</span>
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="Msg" :label="$t('Msg.BackgroundTaskMessage')" min-width="220" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.Msg || "-" }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.CreateTime')" width="92">
+                            <template #default="{ row }">{{ formatTime(row.CreateTime) }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Elapsed')" width="78">
+                            <template #default="{ row }">{{ row.ElapsedText || "-" }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Operation')" width="68" fixed="right">
+                            <template #default="{ row }">
+                                <el-button v-if="canCancel(row)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(row)">
                                     {{ $t("Msg.Stop") }}
                                 </el-button>
-                            </div>
-                            <div v-if="item.Msg" class="task-msg" :title="item.Msg">{{ item.Msg }}</div>
-                        </div>
-                    </div>
+                                <span v-else>-</span>
+                            </template>
+                        </el-table-column>
+                    </el-table>
                 </el-tab-pane>
 
                 <el-tab-pane v-if="isAdmin" name="apps">
@@ -88,22 +127,29 @@
                     </div>
                     <el-empty v-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
                     <div v-else-if="storeLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
-                    <div v-else class="app-notice-list">
-                        <div v-for="item in storeNotices" :key="(item.AppId || item.StoreId || item.AppName) + item.Status" class="app-notice-item">
-                            <div class="app-notice-main">
-                                <span class="app-name">{{ item.AppName || item.AppId || $t("Msg.Unnamed") }}</span>
-                                <el-tag v-if="item.Status === 'Uninstalled'" size="small" type="danger">{{ $t("Msg.OfficialAppUninstalled") }}</el-tag>
-                                <el-tag v-else-if="item.Status === 'Abnormal'" size="small" type="danger">{{ $t("Msg.OfficialAppAbnormal") }}</el-tag>
-                                <el-tag v-else size="small" type="warning">{{ $t("Msg.OfficialAppOutdated") }}</el-tag>
-                            </div>
-                            <div class="app-notice-meta">
-                                <span v-if="item.AppVersionInstall || item.InstalledVersion">
-                                    {{ $t("Msg.OfficialAppInstalledVersion") }} {{ item.AppVersionInstall || item.InstalledVersion }}
-                                </span>
-                                <span>{{ $t("Msg.OfficialAppLatestVersion") }} {{ item.AppVersion || "-" }}</span>
-                            </div>
-                        </div>
-                    </div>
+                    <el-table v-else :data="storeNotices" size="small" class="online-table notification-compact-table app-notice-table" max-height="420">
+                        <el-table-column :label="$t('Msg.Name')" min-width="220" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.AppName || row.AppId || $t("Msg.Unnamed") }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.OfficialAppStatus')" width="110">
+                            <template #default="{ row }">
+                                <el-tag size="small" :type="getOfficialAppStatusType(row.Status)">
+                                    {{ getOfficialAppStatusText(row.Status) }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.OfficialAppInstalledVersion')" min-width="130" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.AppVersionInstall || row.InstalledVersion || "-" }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.OfficialAppLatestVersion')" min-width="120" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.AppVersion || "-" }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Operation')" width="100" fixed="right">
+                            <template #default>
+                                <el-button link type="primary" size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
                 </el-tab-pane>
 
                 <el-tab-pane name="myTerminals">
@@ -112,7 +158,7 @@
                         <span v-if="myTerminals.length > 0" class="tab-count success">{{ myTerminals.length }}</span>
                     </template>
                     <el-empty v-if="!terminalLoading && myTerminals.length === 0" :description="$t('Msg.NoOnlineTerminals')" />
-                    <el-table v-else :data="myTerminals" size="small" class="online-table" max-height="420">
+                    <el-table v-else :data="myTerminals" size="small" class="online-table notification-compact-table" max-height="420">
                         <el-table-column prop="ClientType" :label="$t('Msg.TerminalType')" min-width="110" />
                         <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
                         <el-table-column prop="Did" :label="$t('Msg.TerminalDid')" min-width="180" show-overflow-tooltip />
@@ -136,29 +182,36 @@
                         <span v-if="onlineUsers.length > 0" class="tab-count admin">{{ onlineUsers.length }}</span>
                     </template>
                     <el-empty v-if="!terminalLoading && onlineUsers.length === 0" :description="$t('Msg.NoOnlineUsers')" />
-                    <el-table v-else :data="onlineUsers" size="small" class="online-table" row-key="UserId" max-height="420">
+                    <el-table v-else :data="onlineUsers" size="small" class="online-table notification-compact-table online-users-table" row-key="UserId" max-height="420">
                         <el-table-column type="expand">
                             <template #default="{ row }">
                                 <div class="terminal-list">
-                                    <div v-for="terminal in row.Terminals" :key="terminal.ConnectionId" class="terminal-card">
-                                        <div>
-                                            <strong>{{ terminal.ClientType || "PC" }}</strong>
-                                            <span>{{ terminal.Ip || "-" }}</span>
-                                            <p class="terminal-did">DID: {{ terminal.Did || terminal.DeviceClientId || "-" }}</p>
-                                            <p>{{ terminal.UserAgent || terminal.DeviceClientId || "-" }}</p>
-                                        </div>
-                                        <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(terminal, row.UserId)">
-                                            {{ $t("Msg.KickOffline") }}
-                                        </el-button>
-                                    </div>
+                                    <el-table :data="row.Terminals || []" size="small" class="online-table notification-compact-table terminal-nested-table" max-height="240">
+                                        <el-table-column prop="ClientType" :label="$t('Msg.TerminalType')" min-width="90" />
+                                        <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="120" />
+                                        <el-table-column :label="$t('Msg.TerminalDid')" min-width="180" show-overflow-tooltip>
+                                            <template #default="{ row: terminal }">{{ terminal.Did || terminal.DeviceClientId || "-" }}</template>
+                                        </el-table-column>
+                                        <el-table-column prop="UserAgent" :label="$t('Msg.TerminalInfo')" min-width="240" show-overflow-tooltip />
+                                        <el-table-column :label="$t('Msg.LastActiveTime')" min-width="145">
+                                            <template #default="{ row: terminal }">{{ formatDateTime(terminal.LastActiveTime || terminal.ConnectedTime) }}</template>
+                                        </el-table-column>
+                                        <el-table-column :label="$t('Msg.Operation')" width="110" fixed="right">
+                                            <template #default="{ row: terminal }">
+                                                <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(terminal, row.UserId)">
+                                                    {{ $t("Msg.KickOffline") }}
+                                                </el-button>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="UserName" :label="$t('Msg.Name')" min-width="140" />
-                        <el-table-column prop="Account" :label="$t('Msg.Account')" min-width="140" />
-                        <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
-                        <el-table-column prop="OnlineCount" :label="$t('Msg.TerminalCount')" width="100" />
-                        <el-table-column :label="$t('Msg.LastActiveTime')" min-width="150">
+                        <el-table-column prop="UserName" :label="$t('Msg.Name')" min-width="120" show-overflow-tooltip />
+                        <el-table-column prop="Account" :label="$t('Msg.Account')" min-width="130" show-overflow-tooltip />
+                        <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="120" show-overflow-tooltip />
+                        <el-table-column prop="OnlineCount" :label="$t('Msg.TerminalCount')" width="88" />
+                        <el-table-column :label="$t('Msg.LastActiveTime')" min-width="145">
                             <template #default="{ row }">{{ formatDateTime(row.LastActiveTime) }}</template>
                         </el-table-column>
                     </el-table>
@@ -226,11 +279,14 @@ export default {
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;
         },
+        failedCount() {
+            return this.tasks.filter((item) => item.Status === "Failed").length;
+        },
         appNoticeCount() {
             return this.isAdmin ? this.storeNotices.length : 0;
         },
         badgeCount() {
-            return this.runningCount + this.appNoticeCount;
+            return this.runningCount + this.failedCount + this.appNoticeCount;
         }
     },
     mounted() {
@@ -291,13 +347,13 @@ export default {
         },
         handleWebSocketConnected() {
             this.bindWebsocket();
-            this.requestTaskListByWebsocket();
+            this.loadTasks();
             if (this.visible) {
                 this.loadTerminals();
             }
         },
         handleBackgroundTaskStarted() {
-            this.refreshTasks(true);
+            this.refreshTasks();
             if (this.isAdmin) {
                 this.checkOfficialApps(true);
             }
@@ -337,25 +393,9 @@ export default {
                 this.storeCheckTimer = null;
             }
         },
-        async refreshTasks(forceHttp = false) {
+        async refreshTasks() {
             this.bindWebsocket();
-            const requested = forceHttp ? false : await this.requestTaskListByWebsocket();
-            if (!requested || forceHttp) {
-                await this.loadTasks();
-            }
-        },
-        async requestTaskListByWebsocket() {
-            const ws = this.getWebsocket();
-            if (!ws || ws.state !== "Connected" || typeof ws.invoke !== "function") {
-                return false;
-            }
-            try {
-                await ws.invoke("SendBackgroundTaskList");
-                return true;
-            } catch (error) {
-                console.warn("[BackgroundTask] WebSocket request failed", error);
-                return false;
-            }
+            await this.loadTasks();
         },
         async loadTasks() {
             if (this.loading) return;
@@ -431,6 +471,18 @@ export default {
             }
             return item;
         },
+        getOfficialAppStatusType(status) {
+            return status === "Outdated" ? "warning" : "danger";
+        },
+        getOfficialAppStatusText(status) {
+            if (status === "Uninstalled") {
+                return this.$t("Msg.OfficialAppUninstalled");
+            }
+            if (status === "Abnormal") {
+                return this.$t("Msg.OfficialAppAbnormal");
+            }
+            return this.$t("Msg.OfficialAppOutdated");
+        },
         async checkOfficialApps(force) {
             if (!this.isAdmin) return;
             const now = Date.now();
@@ -465,7 +517,7 @@ export default {
         async clearCompleted() {
             const result = await DiyCommon.PostAsync("/api/BackgroundTask/ClearCompleted", {}, null, null, "json");
             if (result && result.Code === 1) {
-                this.refreshTasks(true);
+                this.refreshTasks();
             }
         },
         async cancelTask(item) {
@@ -477,6 +529,21 @@ export default {
         },
         canCancel(item) {
             return item && (item.Status === "Pending" || item.Status === "Running");
+        },
+        getTaskStatusType(status) {
+            if (status === "Succeeded") return "success";
+            if (status === "Failed" || status === "Canceled") return "danger";
+            if (status === "Running" || status === "Pending") return "warning";
+            return "info";
+        },
+        formatTaskResult(item) {
+            if (!item?.Result) return item?.Msg || "-";
+            try {
+                const text = JSON.stringify(item.Result, null, 2);
+                return text.length > 8000 ? `${text.slice(0, 8000)}\n...` : text;
+            } catch (_) {
+                return String(item.Result);
+            }
         },
         formatTime(value) {
             if (!value) return "";
@@ -664,123 +731,97 @@ export default {
     font-size: 13px;
 }
 
-.task-list,
-.app-notice-list {
-    max-height: 460px;
-    overflow: auto;
-}
-
-.task-item,
-.app-notice-item {
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    border: 1px solid var(--mci-border-color, #ebeef5);
-    border-radius: 6px;
-    background: var(--mci-bg-color-overlay, #fff);
-}
-
-.task-main,
-.task-meta,
-.app-notice-main,
-.app-notice-meta {
-    display: flex;
+.task-progress-cell {
+    display: grid;
+    grid-template-columns: minmax(72px, 1fr) 34px;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--mci-text-color-secondary, #909399);
 }
 
-.task-title,
-.app-name {
-    min-width: 0;
+.task-detail {
+    display: grid;
+    gap: 6px;
+    padding: 2px 8px 4px;
     font-size: 12px;
+}
+
+.task-detail__row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+}
+
+.task-detail__label {
+    color: var(--mci-text-color-secondary, #909399);
+}
+
+.task-detail__message {
     color: var(--mci-text-color, #303133);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 
-.task-status {
-    flex-shrink: 0;
-    font-size: 11px;
-    color: var(--mci-text-color-secondary, #909399);
-
-    &.status-Succeeded {
-        color: #67c23a;
-    }
-
-    &.status-Failed,
-    &.status-Canceled {
-        color: #f56c6c;
-    }
-
-    &.status-Running,
-    &.status-Pending {
-        color: #e6a23c;
-    }
-}
-
-.task-meta,
-.app-notice-meta {
-    margin-top: 5px;
-    font-size: 11px;
-    color: var(--mci-text-color-secondary, #909399);
-}
-
-.task-msg {
-    margin-top: 4px;
-    font-size: 11px;
-    color: var(--mci-text-color-secondary, #909399);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.task-progress {
-    margin-top: 5px;
-}
-
-.task-progress :deep(.el-progress__text) {
-    min-width: 34px;
-    font-size: 11px !important;
-    color: var(--mci-text-color-secondary, #909399);
+.task-detail pre {
+    max-height: 180px;
+    margin: 0;
+    padding: 6px 8px;
+    overflow: auto;
+    border: 1px solid var(--mci-border-color, #ebeef5);
+    border-radius: 4px;
+    background: var(--mci-bg-color-page, #f6f7fb);
+    color: var(--mci-text-color, #303133);
+    font: 11px/1.5 Consolas, Monaco, monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .online-table {
     width: 100%;
-    border-radius: 8px;
+    border-radius: 4px;
     overflow: hidden;
 }
 
-.terminal-list {
-    display: grid;
-    gap: 8px;
-    padding: 8px 18px 8px 52px;
+.notification-compact-table :deep(.el-table__cell) {
+    padding: 4px 0;
 }
 
-.terminal-card {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
+.notification-compact-table :deep(.cell) {
+    line-height: 18px;
+}
+
+.notification-compact-table :deep(.el-button--small) {
+    height: 22px;
+    padding: 0 4px;
+}
+
+.task-table :deep(.el-table__expanded-cell) {
+    padding: 5px 8px 7px 36px;
     background: var(--mci-bg-color-page, #f6f7fb);
+}
 
-    span {
-        margin-left: 10px;
-        color: var(--mci-text-color-secondary, #909399);
-    }
+.task-table :deep(.el-tag) {
+    height: 21px;
+    line-height: 19px;
+}
 
-    p {
-        margin: 4px 0 0;
-        color: var(--mci-text-color-secondary, #909399);
-        font-size: 12px;
-    }
+.online-users-table :deep(.el-table__expanded-cell) {
+    padding: 6px 8px 8px 42px;
+    background: var(--mci-bg-color-page, #f6f7fb);
+}
 
-    .terminal-did {
-        color: var(--mci-text-color, #303133);
-        word-break: break-all;
-    }
+.terminal-list {
+    padding: 0;
+}
+
+.terminal-nested-table {
+    border: 1px solid var(--mci-border-color, #ebeef5);
+}
+
+.app-notice-table :deep(.el-tag) {
+    height: 21px;
+    line-height: 19px;
 }
 
 @media (max-width: 768px) {

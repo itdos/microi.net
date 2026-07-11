@@ -202,11 +202,11 @@ const autoHeight = computed(() => {
   return toPositiveHeight(widgetHeightValue.value, 'auto')
 })
 
-const autoContentWidgetTypes = new Set(['statistic', 'progress', 'html'])
+const autoContentWidgetTypes = new Set(['statistic', 'progress', 'html', 'pageengine'])
 
 const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap'])
 const tableWidgetTypes = new Set(['tabel', 'gantt', 'diytable'])
-const mediaWidgetTypes = new Set(['image', 'video', 'browser', 'office', 'webgl', 'carousel'])
+const mediaWidgetTypes = new Set(['image', 'video', 'browser', 'office', 'webgl', 'carousel', 'aiengine', 'pageengine'])
 
 const widgetSkeletonType = computed(() => {
   const type = props.widgetObj.type
@@ -248,7 +248,7 @@ const selectedWidgetComponent = (type) => {
   return componentRaw[type + '-widget']
 }
 
-const isolatedPreviewWidgetTypes = new Set(['office', 'browser'])
+const isolatedPreviewWidgetTypes = new Set(['office', 'browser', 'pageengine'])
 
 const isDesignSelectMaskVisible = computed(() => {
   return (

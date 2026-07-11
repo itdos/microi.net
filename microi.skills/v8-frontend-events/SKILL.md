@@ -158,9 +158,36 @@ V8.RefreshTable({ _PageIndex: 1 });
 | `V8.OpenAnyForm({...})` | 打开任意表单（弹窗/抽屉） |
 | `V8.OpenAnyTable({...})` | 打开任意列表 |
 | `V8.OpenDialog({...})` | 打开自定义弹窗 |
+| `V8.OpenAppDialog({...})` | 按 AppKey 打开已发布在线微服务页面，支持 Dialog/Drawer 与结果回调 |
 | `V8.ApiEngine.Run({ApiEngineKey, ...})` | 调接口引擎（前端，参数对象格式） |
 | `V8.FormEngine.GetTableData(name, params, cb)` | 前端查列表（参数对象、回调或 await） |
 | `V8.Post(url, data, cb, errCb, headers, contentType)` | 通用 POST |
+
+### 在线微服务弹窗 V8.OpenAppDialog
+
+复杂定制页面使用 `V8.OpenAppDialog`，不要在 V8 事件中内嵌大量 HTML/CSS：
+
+```js
+V8.OpenAppDialog({
+  AppKey: 'customer_profile_editor',       // 必传：sys_microiservice.MsKey
+  RoutePath: '/edit',                      // 可选，默认 /
+  Version: '',                             // 可选，空值自动使用当前 BuildVersion
+  Title: '编辑客户资料',
+  TitleIcon: 'fas fa-user-edit',
+  Width: 'min(920px, calc(100vw - 32px))',
+  OpenType: 'Dialog',                      // Dialog / Drawer
+  Data: { id: V8.Form.Id },                // 子应用 dialogData，只放普通数据
+  OnSuccess: function (data) {
+    V8.RefreshTable({ _PageIndex: -1 });
+  },
+  OnCancel: function (data) {},
+  OnError: function (error) {
+    V8.Tips(error.message || '加载失败', false);
+  }
+});
+```
+
+子应用用 `window.microApp.getData()` 获取自动下发的 `apiBase`、`osClient`、`token`、`appKey`、`version`、`microRoute`、`dialog` 和 `dialogData`；用 `window.microApp.dispatch({type:'app-dialog:success', data:{...}})` 返回成功结果。完整参数表和结果协议见 `v8-menu-buttons/SKILL.md`。
 
 ## 异步写法（async/await vs 回调）
 

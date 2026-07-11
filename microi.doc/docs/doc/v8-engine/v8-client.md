@@ -566,6 +566,118 @@ V8.OpenDialog({
 });
 ```
 
+## V8.OpenAppDialog
+>* 在表格、表单、页面按钮等前端 V8 代码中，以标准 Dialog/Drawer 打开一个已经发布的在线微服务应用。适合复杂交互页面，可避免把大量 HTML、CSS、JavaScript 直接写进按钮 V8 代码。
+
+```js
+V8.OpenAppDialog({
+    AppKey: 'saas_tenant_creator',
+    RoutePath: '/create',
+    Title: '创建空数据库 SaaS 租户',
+    TitleIcon: 'fas fa-database',
+    Width: 'min(960px, calc(100vw - 32px))',
+    OpenType: 'Dialog',
+    Data: {
+        source: 'osclients',
+        osClientNetwork: 'Internal'
+    },
+    OnSuccess: function (data) {
+        V8.Tips('创建任务已提交', true);
+        V8.RefreshTable({ _PageIndex: -1 });
+    },
+    OnCancel: function (data) {
+        console.log('用户取消', data);
+    },
+    OnError: function (error) {
+        V8.Tips(error.message || '应用加载失败', false);
+    }
+});
+```
+
+### 参数说明
+
+| 参数 | 类型 | 必传 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `AppKey` | `string` | 是 | - | 在线微服务的唯一标识，对应 `sys_microiservice.MsKey`。应用必须已经编译发布。 |
+| `RoutePath` | `string` | 否 | `/` | 微服务内部路由，例如 `/create`。未以 `/` 开头时会自动补齐。 |
+| `MicroRoute` | `string` | 否 | `/` | `RoutePath` 的兼容别名；两者同时传入时优先使用 `RoutePath`。 |
+| `Version` | `string` | 否 | 当前发布版本 | 指定构建版本，例如 `v1.0.2`。不传时自动读取 `sys_microiservice.BuildVersion`。 |
+| `Title` | `string` | 否 | `应用` | 弹窗或抽屉标题。 |
+| `TitleIcon` | `string` | 否 | `fas fa-window-maximize` | 标题左侧图标 class。 |
+| `Width` | `string` | 否 | `min(920px, calc(100vw - 32px))` | 弹窗/抽屉宽度，支持 `px`、`%`、`vw`、`min(...)` 等 CSS 宽度值。 |
+| `OpenType` | `string` | 否 | `Dialog` | 打开方式：`Dialog` 或 `Drawer`。 |
+| `Data` | `object` | 否 | `{}` | 传给子应用的业务数据。应使用可序列化的普通对象，不要在其中放回调函数。 |
+| `OnSuccess` | `function(data)` | 否 | - | 子应用提交成功时执行；执行后宿主会自动关闭弹窗。 |
+| `OnCancel` | `function(data)` | 否 | - | 子应用主动取消时执行；执行后宿主会自动关闭弹窗。 |
+| `OnError` | `function(error)` | 否 | - | 应用加载失败或子应用上报错误时执行；错误不会自动关闭弹窗。 |
+
+### 子应用获取宿主参数
+
+宿主会自动向微服务传入当前环境，不需要把 Token 拼接到 URL：
+
+```js
+var hostData = window.microApp.getData();
+
+// 当前环境
+console.log(hostData.apiBase);
+console.log(hostData.osClient);
+console.log(hostData.token);
+
+// OpenAppDialog 参数
+console.log(hostData.appKey);
+console.log(hostData.version);
+console.log(hostData.microRoute);
+console.log(hostData.dialog);       // true
+console.log(hostData.dialogData);   // 即宿主传入的 Data
+```
+
+| 子应用字段 | 说明 |
+|------------|------|
+| `apiBase` | 当前吾码后端地址。 |
+| `osClient` | 当前租户标识。 |
+| `token` | 当前登录 Token，供子应用请求吾码接口时使用。 |
+| `appKey` | 当前微服务 AppKey。 |
+| `version` | 实际加载的构建版本。 |
+| `microRoute` | 实际打开的微服务内部路由。 |
+| `dialog` | 固定为 `true`，用于让应用识别弹窗运行模式。 |
+| `dialogData` | `V8.OpenAppDialog` 的 `Data` 参数。 |
+| `route` | 路由兼容对象，包含 `microRoute`、`microRoutePath`。 |
+
+### 子应用返回结果
+
+微服务通过 micro-app 的数据通信协议向宿主派发结果：
+
+```js
+// 成功：触发 OnSuccess，并自动关闭
+window.microApp.dispatch({
+    type: 'app-dialog:success',
+    data: { taskId: '01H...', osClient: 'customer_a' }
+});
+
+// 取消：触发 OnCancel，并自动关闭
+window.microApp.dispatch({
+    type: 'app-dialog:cancel',
+    data: { reason: 'user-cancel' }
+});
+
+// 失败：触发 OnError，弹窗保持打开，便于用户修改后重试
+window.microApp.dispatch({
+    type: 'app-dialog:error',
+    data: { message: 'OsClient 已存在' }
+});
+```
+
+同时兼容简写类型 `success`、`cancel`、`error`。
+
+### 与 V8.OpenDialog 的区别
+
+| API | 适用场景 |
+|-----|----------|
+| `V8.OpenAppDialog` | 按 `AppKey` 动态加载在线 AI 应用/微服务；应用可以独立维护、AI 生成、编译和发布。 |
+| `V8.OpenDialog` | 打开 Microi.Client 源码中已经注册的 Vue 组件，需要前端二次开发和重新发布主站。 |
+
+复杂定制界面优先使用 `V8.OpenAppDialog`；按钮 V8 代码只负责传参、接收结果和刷新页面，数据校验及业务事务仍应放在接口引擎或后端服务中。
+
 ## V8.NewGuid
 >* 生成一个前端Guid值
 ```js

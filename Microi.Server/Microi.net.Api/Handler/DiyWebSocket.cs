@@ -194,7 +194,7 @@ namespace Microi.net
                     };
                 }
                 await diyCacheBase.SetAsync($"Microi:{osClient}:ChatOnline:{userId}", clientInfo);
-                await Microi.net.Api.OnlineTerminalService.TrackConnectedAsync(
+                await OnlineTerminalService.TrackConnectedAsync(
                     osClient,
                     sysUser,
                     connid,
@@ -271,7 +271,7 @@ namespace Microi.net
                         Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
                     }
                 }
-                await Microi.net.Api.OnlineTerminalService.TrackDisconnectedAsync(osClient, userId, connid).ConfigureAwait(false);
+                await OnlineTerminalService.TrackDisconnectedAsync(osClient, userId, connid).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -308,7 +308,7 @@ namespace Microi.net
                     return;
                 }
 
-                await Microi.net.Api.BackgroundTaskService.SendTaskListToUserAsync(osClient, userKey).ConfigureAwait(false);
+                await BackgroundTaskService.SendTaskListToUserAsync(osClient, userKey).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -1,12 +1,11 @@
 <template>
   <div class="microi-page-engine pageengine">
     <el-container>
-      <el-header ref="ref1" height="50px">
+      <el-header height="50px">
         <layout-header></layout-header>
       </el-header>
       <el-container>
         <el-aside
-          ref="ref2"
           width="250px"
           v-show="formData?.JsonObj?.formConfig?.left"
         >
@@ -15,56 +14,16 @@
         <el-main>
           <layout-main></layout-main>
         </el-main>
-        <el-aside ref="ref3" width="280px">
+        <el-aside width="280px">
           <layout-right></layout-right>
         </el-aside>
       </el-container>
     </el-container>
   </div>
-  <el-tour
-    v-model="tourOpen"
-    @close="closeTour"
-    :mask="{
-      style: {
-        boxShadow: 'inset 0 0 15px #333',
-      },
-      color: 'rgba(121.3, 187.1, 255, .4)',
-    }"
-  >
-    <el-tour-step :target="ref1?.$el" title="功能导航区">
-      <div>
-        功能导航区主要包括收缩侧边栏,查看页面JSON和清空容器等.可以预览设计效果和保存持久化,可以切换主题风格
-      </div>
-    </el-tour-step>
-    <el-tour-step
-      :target="ref2?.$el"
-      title="组件容器区"
-      description="可以拖拽容器到操作面板中,也可以拖拽组件到容器中,容器和容器可以互换位置,组件和组件之间可以互换位置"
-      placement="left"
-      :mask="{
-        style: {
-          boxShadow: 'inset 0 0 15px rgba(255,255,255,0.5)',
-        },
-        color: 'rgba(121.3, 187.1, 255, .4)',
-      }"
-    />
-    <el-tour-step
-      :target="ref3?.$el"
-      title="属性面板区"
-      description="属性面板区包括页面属性,容器属性和组件属性,可以通过调节属性来实现效果呈现"
-      placement="right"
-      :mask="{
-        style: {
-          boxShadow: 'inset 0 0 15px rgba(255,255,255,0.5)',
-        },
-        color: 'rgba(121.3, 187.1, 255, .4)',
-      }"
-    />
-  </el-tour>
 </template>
 
 <script setup name="form-designer">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import LayoutHeader from './layout/layout-header.vue'
@@ -133,21 +92,6 @@ const loadOtherWidgets = () => {
 }
 
 loadOtherWidgets()
-
-//引导三剑客标识
-const ref1 = ref(null)
-const ref2 = ref(null)
-const ref3 = ref(null)
-const tourOpen = ref(false)
-if (pageEngineStore.tour == 'true' || pageEngineStore.tour == true) {
-  tourOpen.value = true
-}
-
-//关闭引导
-const closeTour = () => {
-  tourOpen.value = false
-  pageEngineStore.setTour(false) //说明已经不是第一次,下次打开不提示
-}
 
 let messageHandler = null
 onMounted(() => {

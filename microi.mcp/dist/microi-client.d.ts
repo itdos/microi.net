@@ -177,7 +177,7 @@ export declare class MicroiClient {
     login(_options?: {
         skipAutoRefresh?: boolean;
     }): Promise<void>;
-    /** 每 12 分钟自动刷新 token（token 有效期通常 15 分钟） */
+    /** 每小时检查一次长效 Token，仅在临近到期时换新，避免多 MCP 进程竞争刷新。 */
     private startAutoRefresh;
     /** 立即调用 /api/SysUser/RefreshToken 以旧换新；成功后回写 token 文件。
      *  并发请求会复用同一个 in-flight Promise。
@@ -231,7 +231,11 @@ export declare class MicroiClient {
         TargetField?: string;
     }): Promise<ApiResponse>;
     getMicroService(msKey: string): Promise<ApiResponse>;
+    listApplications(data?: Record<string, unknown>): Promise<ApiResponse>;
+    getApplicationContext(data: Record<string, unknown>): Promise<ApiResponse>;
+    getApplicationFile(data: Record<string, unknown>): Promise<ApiResponse>;
     createMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
+    syncMicroServiceSource(data: Record<string, unknown>): Promise<ApiResponse>;
     publishMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     getTableData(tableName: string, query?: Record<string, unknown>): Promise<ApiResponse>;
     addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;

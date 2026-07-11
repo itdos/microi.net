@@ -23,6 +23,7 @@ service.interceptors.request.use(
     (config) => {
         // do something before request is sent
         const userStore = getUserStore();
+        config.__microiRequestToken = DiyCommon.getToken();
         if (userStore.token) {
             // let each request carry token
             // ['X-Token'] is a custom headers key
@@ -56,6 +57,15 @@ service.interceptors.response.use(
         // 修复：适配 Microi 后端返回格式 { Code: 1, Data, Msg }
         // 原模板代码使用 res.code !== 20000 与实际不符，会导致所有请求被误报，且 Token 失效不能重登录。
         if (res && res.Code !== 1) {
+            const isAuthFailure = res.Code === 1001 || res.Code === 1002;
+            const requestToken = response.config && response.config.__microiRequestToken;
+            const tokenChanged = isAuthFailure
+                && DiyCommon
+                && typeof DiyCommon.HasTokenChangedSinceRequest === "function"
+                && DiyCommon.HasTokenChangedSinceRequest(requestToken);
+            if (tokenChanged) {
+                return Promise.reject(new Error(res.Msg || "Stale token request failed"));
+            }
             Message({
                 message: res.Msg || "Error",
                 type: "error",
@@ -63,7 +73,7 @@ service.interceptors.response.use(
             });
 
             // 1001: Token 失效; 1002: 身份验证失败
-            if (res.Code === 1001 || res.Code === 1002) {
+            if (isAuthFailure) {
                 if (DiyCommon && typeof DiyCommon.OpenLogin === "function") {
                     DiyCommon.OpenLogin();
                 }

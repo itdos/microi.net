@@ -829,6 +829,9 @@ namespace Microi.net
                 ClientModel = clientModel,
                 Limit = param.Limit,
                 Prefix = param.Path,
+                Marker = param.Marker,
+                MaxKeys = param.MaxKeys.GetValueOrDefault(1000),
+                Recursive = param.Recursive,
                 Keyword = param._Keyword
             });
         }
