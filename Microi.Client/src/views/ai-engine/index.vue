@@ -359,13 +359,14 @@
         >
             <div class="ai-model-drawer-content">
                 <DiyTable
-                    v-if="aiModelTableId && aiSysMenuId"
-                    :key="aiSysMenuId + '_' + aiModelTableId"
+                    v-if="aiModelTableId && aiModelSysMenuId"
+                    :key="aiModelSysMenuId + '_' + aiModelTableId"
                     :PropsTableId="aiModelTableId"
-                    :PropsSysMenuId="aiSysMenuId"
+                    :PropsSysMenuId="aiModelSysMenuId"
+                    :PropsSelectFields="[{ Name: 'Name' }, { Name: 'AiModel' }, { Name: 'Endpoint' }, { Name: 'IsEnable' }]"
                     ContainerClass="ai-engine-table-drawer"
                 />
-                <el-empty v-else description="未找到 mic_ai 表配置" />
+                <el-empty v-else description="未找到 mic_ai 对应的模块引擎配置" />
             </div>
         </el-drawer>
 
@@ -446,6 +447,7 @@ const reasoningEffort = ref(readSavedReasoningEffort());
 const resolvedMode = ref("chat");
 const aiSysMenuId = ref("");
 const aiModelTableId = ref("");
+const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
 const activeWorkspace = ref("chat");
 const statsLoading = ref(false);
@@ -620,6 +622,7 @@ function unwrapDosResult(result) {
 
 async function loadAiEngineMeta() {
     await Promise.all([loadAiMenuMeta(), loadAiModelTableId()]);
+    await loadAiModelMenuMeta();
 }
 
 async function loadAiMenuMeta() {
@@ -628,7 +631,6 @@ async function loadAiMenuMeta() {
             _Where: [
                 ["(", "Url", "=", "/mic-ai-engine"],
                 ["OR", "Url", "=", "mic-ai-engine"],
-                ["OR", "Name", "=", "AI引擎"],
                 ["OR", "Name", "=", "AI引擎", ")"]
             ],
             _SelectFields: ["Id", "Name", "Url", "ComponentPath", "PageBtns"],
@@ -657,6 +659,24 @@ async function loadAiModelTableId() {
         }
     } catch (error) {
         console.warn("[AiEngine] load mic_ai table id failed", error);
+    }
+}
+
+async function loadAiModelMenuMeta() {
+    aiModelSysMenuId.value = "";
+    if (!aiModelTableId.value) return;
+    try {
+        const result = await DiyCommon.FormEngine.GetFormData("Sys_Menu", {
+            _Where: [["DiyTableId", "=", aiModelTableId.value]],
+            _SelectFields: ["Id", "ModuleEngineKey", "DiyTableId"]
+        });
+        if (!isOk(result)) return;
+        const menu = getData(result) || {};
+        if (menu.Id && menu.ModuleEngineKey) {
+            aiModelSysMenuId.value = menu.Id;
+        }
+    } catch (error) {
+        console.warn("[AiEngine] load mic_ai module menu failed", error);
     }
 }
 
@@ -844,8 +864,11 @@ async function openModelDrawer() {
     if (!aiModelTableId.value) {
         await loadAiModelTableId();
     }
-    if (!aiSysMenuId.value) {
-        await loadAiMenuMeta();
+    if (!aiModelSysMenuId.value) {
+        await loadAiModelMenuMeta();
+    }
+    if (!aiModelSysMenuId.value) {
+        ElMessage.warning("mic_ai 尚未绑定包含 ModuleEngineKey 的模块引擎菜单");
     }
     modelDrawerVisible.value = true;
 }

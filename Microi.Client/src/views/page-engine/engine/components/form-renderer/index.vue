@@ -63,7 +63,7 @@
 <script setup name="from-renderer">
 import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
 import pannelTabs from '../form-designer/wrapper/pannel-tabs.vue'
-import { computed, onMounted, onBeforeUnmount, onActivated } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, onActivated, provide } from 'vue'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'
 import { DiyCommon } from '@/utils/diy.common';
@@ -75,7 +75,7 @@ import {
 
 import { widgetList, widgetOption } from '../../utils/builtWidget'
 
-import { usePageEngineStore } from '../../stores/pageEngine'
+import { PAGE_ENGINE_RENDER_CONTEXT_KEY, usePageEngineStore } from '../../stores/pageEngine'
 import { useDark } from '@vueuse/core'
 import { useDiyStore } from '@/pinia'
 
@@ -107,6 +107,14 @@ const props = defineProps({
   components: Array,
   widgets: Array,
 })
+
+const inheritedPageIds = inject(PAGE_ENGINE_RENDER_CONTEXT_KEY, computed(() => []))
+provide(PAGE_ENGINE_RENDER_CONTEXT_KEY, computed(() => {
+  const ids = Array.isArray(inheritedPageIds.value) ? inheritedPageIds.value.slice() : []
+  const currentPageId = props.remoteObj?.Id || ''
+  if (currentPageId && ids.indexOf(currentPageId) < 0) ids.push(currentPageId)
+  return ids
+}))
 
 //如果有自定义组件
 if (props.components instanceof Array && props.components.length > 0) {

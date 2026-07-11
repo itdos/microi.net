@@ -1763,6 +1763,29 @@ var DiyCommon = {
         var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
         return !DiyCommon.IsNull(requested) && !DiyCommon.IsNull(current) && requested !== current;
     },
+    ApplyAuthorizationToken: function (responseToken, requestToken) {
+        var response = DiyCommon.NormalizeAuthorizationToken(responseToken);
+        if (DiyCommon.IsNull(response)) return false;
+
+        var requested = DiyCommon.NormalizeAuthorizationToken(requestToken);
+        var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
+
+        // 多标签页共享 localStorage。某个旧请求可能在另一个标签页完成续签后才返回，
+        // 后端为普通请求回显的仍是旧 Token，绝不能让它覆盖已经写入的新 Token。
+        if (!DiyCommon.IsNull(current)
+            && !DiyCommon.IsNull(requested)
+            && current !== requested
+            && response === requested) {
+            console.warn("[Auth] 忽略旧请求回显的 Authorization，保留当前新 Token。");
+            return false;
+        }
+
+        store.commit("user/SET_TOKEN", response);
+        DiyCommon.setToken(response);
+        setToken(response);
+        DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
+        return true;
+    },
     MarkAuthRequestToken: function (result, requestToken) {
         if (!result || typeof result !== "object") return result;
         try {
@@ -2094,14 +2117,7 @@ var DiyCommon = {
         axios(axiosOption)
             .then(function (req, b, c) {
                 // 拿到token，存起来
-                var authorization = req.headers.authorization;
-                if (!DiyCommon.IsNull(authorization)) {
-                    store.commit("user/SET_TOKEN", authorization);
-                    DiyCommon.setToken(authorization);
-                    setToken(authorization);
-                    DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-                    // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
-                }
+                DiyCommon.ApplyAuthorizationToken(req.headers.authorization, requestToken);
                 DiyCommon.MarkAuthRequestToken(req.data, requestToken);
                 if (!DiyCommon.IsNull(callback)) {
                     callback(req.data, req.headers);
@@ -2199,19 +2215,9 @@ var DiyCommon = {
                 if (results.length > 0) {
                     // 拿到token，存起来
                     var result = results[0];
-                    var token = result.headers.token;
-                    if (!DiyCommon.IsNull(token)) {
-                        DiyCommon.setToken(token);
-                        // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
-                    }
                     var authorization = result.headers.authorization;
-                    if (!DiyCommon.IsNull(authorization)) {
-                        // store.commit('user/SET_TOKEN', authorization)
-                        DiyCommon.setToken(authorization);
-                        setToken(authorization);
-                        DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-                        // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
-                    }
+                    var token = result.headers.token;
+                    DiyCommon.ApplyAuthorizationToken(authorization || token, requestToken);
                 }
                 results.forEach((result) => {
                     DiyCommon.MarkAuthRequestToken(result.data, requestToken);
