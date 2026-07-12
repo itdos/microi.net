@@ -361,3 +361,10 @@ if (V8.Form.Phone) {
 - 后端事件中使用 `V8.FormEngine` 操作数据时，加 `_InvokeType: 'Client'` 避免递归触发事件
 - `V8.FormSubmitAction` 的值是 `'Insert'`/`'Update'`/`'Delete'`（非 Add/Upt/Del）
 - 在 DataFilterV8 中使用 `V8.CacheData` 缓存查询结果，避免每行执行 N+1 查询
+
+### 复盘：提交后事件误把增量表单当作完整记录
+
+- 触发场景：插件、MCP 或后端只更新代码等少数字段时，`SubmitAfterServerV8` 直接对 `V8.Form.Id`、业务 Key 调用 `toLowerCase()`，保存动作因字段未出现在增量参数中而异常。
+- 根因：事件假设 `V8.Form` 始终包含整行数据，没有兼容稀疏更新（sparse patch）。
+- 通用规则：提交后事件使用非本次必传字段前，必须从 `V8.OldForm` 合并兜底，或凭已有 `Id` 回查当前记录；调用字符串方法前先显式 `String(...)` 并校验空值。写缓存时应缓存合并后的完整模型，不能用稀疏对象覆盖整行缓存。
+- 自动化检查：分别只更新一个普通字段、只更新大文本代码字段并执行一次完整表单保存；事件均不得报错，按 Id、唯一 Key 和可选地址回读缓存都应得到完整记录。
