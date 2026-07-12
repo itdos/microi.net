@@ -32,6 +32,10 @@
   <ItemGroup>
     <None Include="Views\**\*.cshtml" CopyToPublishDirectory="PreserveNewest" />
     <None Include="wwwroot\**\*" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\AI-Project\microi\itdos数据库脱敏.sql"
+             Link="Resources\itdos数据库脱敏.sql"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- 排除 Development 配置文件，防止发布到生产环境 -->

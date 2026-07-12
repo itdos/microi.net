@@ -155,6 +155,8 @@ beforeUnmount() {
 
         // 选择状态
         self.TableMultipleSelection = [];
+        self.ContinuousSelection = false;
+        self._selectionSyncing = false;
         self.TableSelectedRow = {};
         self.TableSelectedRowLast = {};
 

@@ -1155,6 +1155,9 @@ export default {
 
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             // 移动端追加模式：将新数据追加到现有列表
+                            if (self.ContinuousSelection && !isAppendMode) {
+                                self._selectionSyncing = true;
+                            }
                             if (isAppendMode && self.diyStore.IsPhoneView && recParam._bidirectional) {
                                 // 🔥 双向无限滚动模式：维护30条窗口
                                 const newList = self.DiyTableRowList.concat(result.Data);
@@ -1209,13 +1212,14 @@ export default {
                             });
                         }
 
-                        if (self.PropTableMultipleSelection) {
-                            self.TableMultipleSelection = [];
-                            self.$nextTick(() => {
-                                if (self._paginationVersion === currentVersion) {
-                                    self.toggleSelection(self.PropTableMultipleSelection, "Y");
-                                }
-                            });
+                        var propSelection = Array.isArray(self.PropTableMultipleSelection)
+                            ? self.PropTableMultipleSelection
+                            : [];
+                        if (self.ContinuousSelection) {
+                            self.RestoreTableSelectionAfterDataLoad();
+                        } else if (propSelection.length > 0) {
+                            self.TableMultipleSelection = self.GetUniqueSelectedRows(propSelection);
+                            self.RestoreTableSelectionAfterDataLoad(self.TableMultipleSelection);
                         }
                         // 内存优化：只保存ID
                         self.OldDiyTableRowList = result.Data.map((row) => {

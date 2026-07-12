@@ -82,6 +82,7 @@ export default {
                 self.$emit("getOpenAnyTableParam", {
                     OldTableMultipleSelection: oldSelection || [],
                     TableMultipleSelection: self.TableMultipleSelection,
+                    ContinuousSelection: self.ContinuousSelection,
                     TableSelectedRow: self.TableSelectedRow,
                     ShowDiyFieldList: self.ShowDiyFieldList,
                     PageIndex: self.DiyTableRowPageIndex,
@@ -91,9 +92,99 @@ export default {
         },
         TableRowSelectionChange(val) {
             var self = this;
-            var OldTableMultipleSelection = self.TableMultipleSelection.flat();
-            self.TableMultipleSelection = val;
+            if (self._selectionSyncing) return;
+            var OldTableMultipleSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
+            var currentSelection = self.GetUniqueSelectedRows(val);
+            if (self.ContinuousSelection) {
+                var currentPageIds = {};
+                (self.DiyTableRowList || []).forEach(function(row) {
+                    if (row && row.Id) currentPageIds[row.Id] = true;
+                });
+                var retainedRows = OldTableMultipleSelection.filter(function(row) {
+                    return row && row.Id && !currentPageIds[row.Id];
+                });
+                self.TableMultipleSelection = self.GetUniqueSelectedRows(retainedRows.concat(currentSelection));
+            } else {
+                self.TableMultipleSelection = currentSelection;
+            }
+            self.cardSelection = currentSelection;
             self.EmitOpenTableSelectionChange(OldTableMultipleSelection, "Y");
+        },
+        GetUniqueSelectedRows(rows) {
+            var uniqueRows = [];
+            var selectedIds = {};
+            (Array.isArray(rows) ? rows.flat() : []).forEach(function(row) {
+                if (!row || !row.Id || selectedIds[row.Id]) return;
+                selectedIds[row.Id] = true;
+                uniqueRows.push(row);
+            });
+            return uniqueRows;
+        },
+        GetCurrentPageSelectedRows() {
+            var selectedIds = {};
+            this.GetUniqueSelectedRows(this.TableMultipleSelection).forEach(function(row) {
+                selectedIds[row.Id] = true;
+            });
+            return (this.DiyTableRowList || []).filter(function(row) {
+                return row && row.Id && selectedIds[row.Id];
+            });
+        },
+        ClearAllTableSelection(emitChange) {
+            var self = this;
+            var oldSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
+            self._selectionSyncing = true;
+            var tableRef = self.$refs["diy-table-" + self.TableId];
+            if (tableRef && tableRef.clearSelection) tableRef.clearSelection();
+            self.TableMultipleSelection = [];
+            self.cardSelection = [];
+            self.$nextTick(function() {
+                self._selectionSyncing = false;
+            });
+            if (emitChange !== false && oldSelection.length > 0) {
+                self.EmitOpenTableSelectionChange(oldSelection, "Y");
+            }
+        },
+        ResetTableSelection() {
+            this.ContinuousSelection = false;
+            this.ClearAllTableSelection();
+        },
+        ContinuousSelectionChange(enabled) {
+            var self = this;
+            self.ContinuousSelection = enabled === true;
+            self.TableMultipleSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
+            if (!self.ContinuousSelection) {
+                var oldSelection = self.TableMultipleSelection.slice();
+                self.TableMultipleSelection = self.GetCurrentPageSelectedRows();
+                self.cardSelection = self.TableMultipleSelection.slice();
+                self.RestoreTableSelectionAfterDataLoad();
+                self.EmitOpenTableSelectionChange(oldSelection, "Y");
+            } else {
+                self.EmitOpenTableSelectionChange([], "Y");
+            }
+        },
+        RestoreTableSelectionAfterDataLoad(rows) {
+            var self = this;
+            var selectedRows = self.GetUniqueSelectedRows(rows || self.TableMultipleSelection);
+            self.TableMultipleSelection = selectedRows;
+            var selectedIds = {};
+            selectedRows.forEach(function(row) { selectedIds[row.Id] = true; });
+            var currentRows = (self.DiyTableRowList || []).filter(function(row) {
+                return row && row.Id && selectedIds[row.Id];
+            });
+            self.cardSelection = currentRows.slice();
+            self._selectionSyncing = true;
+            self.$nextTick(function() {
+                var tableRef = self.$refs["diy-table-" + self.TableId];
+                if (tableRef && tableRef.clearSelection) tableRef.clearSelection();
+                if (tableRef && tableRef.toggleRowSelection) {
+                    currentRows.forEach(function(row) {
+                        tableRef.toggleRowSelection(row, true);
+                    });
+                }
+                self.$nextTick(function() {
+                    self._selectionSyncing = false;
+                });
+            });
         },
         HasBatchSelectMoreBtns(sysMenuModel) {
             var menu = sysMenuModel || this.SysMenuModel;
@@ -379,15 +470,24 @@ export default {
         // 卡片模式批量选择
         toggleCardSelection(model) {
             const self = this;
-            const oldSelection = self.TableMultipleSelection.flat();
+            const oldSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
             const index = self.cardSelection.findIndex(item => item.Id === model.Id);
             if (index > -1) {
                 self.cardSelection.splice(index, 1);
             } else {
                 self.cardSelection.push(model);
             }
-            // 同步到 TableMultipleSelection
-            self.TableMultipleSelection = [...self.cardSelection];
+            if (self.ContinuousSelection) {
+                var currentPageIds = {};
+                (self.DiyTableRowList || []).forEach(function(row) {
+                    if (row && row.Id) currentPageIds[row.Id] = true;
+                });
+                self.TableMultipleSelection = self.GetUniqueSelectedRows(
+                    oldSelection.filter(function(row) { return !currentPageIds[row.Id]; }).concat(self.cardSelection)
+                );
+            } else {
+                self.TableMultipleSelection = self.GetUniqueSelectedRows(self.cardSelection);
+            }
             self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },
         isCardSelected(model) {
@@ -396,14 +496,23 @@ export default {
         },
         toggleCardSelectAll(checked) {
             const self = this;
-            const oldSelection = self.TableMultipleSelection.flat();
+            const oldSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
             if (checked) {
                 self.cardSelection = [...self.DiyTableRowList];
             } else {
                 self.cardSelection = [];
             }
-            // 同步到 TableMultipleSelection
-            self.TableMultipleSelection = [...self.cardSelection];
+            if (self.ContinuousSelection) {
+                var currentPageIds = {};
+                (self.DiyTableRowList || []).forEach(function(row) {
+                    if (row && row.Id) currentPageIds[row.Id] = true;
+                });
+                self.TableMultipleSelection = self.GetUniqueSelectedRows(
+                    oldSelection.filter(function(row) { return !currentPageIds[row.Id]; }).concat(self.cardSelection)
+                );
+            } else {
+                self.TableMultipleSelection = self.GetUniqueSelectedRows(self.cardSelection);
+            }
             self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },
         toggleSelection(rows, type) {
@@ -412,34 +521,38 @@ export default {
                 if (!self.$refs["diy-table-" + self.TableId] || !self.$refs["diy-table-" + self.TableId].toggleRowSelection) {
                     // console.warn("表格 ref 未找到或 toggleRowSelection 方法不存在");
                 } else {
-                    // rows.forEach(row => {
-                    //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
-                    // });
-                    // 选中行
-
-                    // 遍历当前表格中显示的每一行数据
+                    var selectedRows = self.GetUniqueSelectedRows(rows);
+                    var selectedIds = {};
+                    selectedRows.forEach(function(row) { selectedIds[row.Id] = true; });
+                    self._selectionSyncing = true;
                     self.DiyTableRowList.forEach((tableRow) => {
-                        // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中
-                        const isSelectedInHistory = rows.some((historyRow) => {
-                            // 假定用 id 字段来比对是否是同一条数据
-                            return historyRow.Id === tableRow.Id;
-                        });
+                        const isSelectedInHistory = !!selectedIds[tableRow.Id];
                         if (isSelectedInHistory) {
-                            // 如果历史记录中存在，则默认勾选这一行
                             if (type == "Y") {
-                                self.$refs["diy-table-" + self.TableId].toggleRowSelection(tableRow, true); // ✅ 传入当前行的对象引用
-                                self.TableMultipleSelection.push(tableRow);
+                                self.$refs["diy-table-" + self.TableId].toggleRowSelection(tableRow, true);
                             } else {
                                 self.$refs["diy-table-" + self.TableId].toggleRowSelection(tableRow, false);
-                                self.TableMultipleSelection = self.TableMultipleSelection.filter((uns) => uns.Id !== tableRow.Id);
                             }
                         }
+                    });
+                    if (type == "Y") {
+                        self.TableMultipleSelection = selectedRows;
+                    } else {
+                        self.TableMultipleSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection).filter(function(row) {
+                            return !selectedIds[row.Id];
+                        });
+                    }
+                    self.$nextTick(function() {
+                        self._selectionSyncing = false;
                     });
                 }
             });
         },
         DiyTableRowCurrentChange(val) {
             var self = this;
+            if (!self.ContinuousSelection) {
+                self.ClearAllTableSelection();
+            }
             self.DiyTableRowPageIndex = val;
             // 翻页时清空卡片选择
             self.cardSelection = [];
@@ -454,6 +567,9 @@ export default {
         },
         DiyTableRowSizeChange(val) {
             var self = this;
+            if (!self.ContinuousSelection) {
+                self.ClearAllTableSelection();
+            }
             self.DiyTableRowPageSize = val;
             // 使用 LocalStorage 管理器，带自动清理
             if (self.$localStorageManager) {

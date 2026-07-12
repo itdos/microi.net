@@ -109,5 +109,11 @@ namespace Microi.net
         /// 更新当前后台任务的进度。接口引擎可选调用，不影响普通同步执行。
         /// </summary>
         DosResult UpdateBackgroundTask(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供主租户超级管理员生成脱敏空数据库发布包。
+        /// 固定使用主库、microi_empty_temp、内置脱敏脚本和公开发布路径，禁止调用方覆盖。
+        /// </summary>
+        DosResult BuildSanitizedEmptyDatabaseRelease(dynamic dynamicParam);
     }
 }

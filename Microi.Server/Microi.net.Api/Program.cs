@@ -126,6 +126,17 @@ services.AddMicroiSpider();//【可选】注入【采集引擎】插件
 services.AddMicroiMQ();//【可选】注入【MQ消息队列】插件
 services.AddMicroiSearchEngine();//【可选】注入【搜索引擎】插件
 services.AddMicroiAI();//【可选】注入【AI引擎】插件
+// 发布目录中如果残留旧 Microi.AI.dll，过去会出现 License.Verify=Enterprise，
+// 但 AI 插件仍按旧逻辑返回 OpenSource。启动时强制核对新授权契约，禁止静默混用 DLL。
+var aiLicenseContract = typeof(MicroiAI).GetMethod(nameof(IMicroiAI.GetOnlineAiLicenseState));
+if (aiLicenseContract == null)
+{
+    throw new InvalidOperationException(
+        "Microi.AI.dll 与 Microi.Core.dll 版本不一致：缺少统一授权契约 GetOnlineAiLicenseState。请清空发布目录后完整发布全部 DLL。");
+}
+Console.WriteLine(
+    $"Microi：【✅成功】AI统一授权契约已加载：Microi.AI={typeof(MicroiAI).Assembly.GetName().Version}，"
+    + $"Microi.Core={typeof(IMicroiAI).Assembly.GetName().Version}");
 services.AddMicroiMQTT();//【可选】注入【MQTT引擎】插件
 services.AddMicroiHDFS();//【可选】注入【分布式存储】插件
 services.AddMicroiCaptcha();//【可选】注入验证码插件
