@@ -18,7 +18,7 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/GetResp
 
 ## POST 请求（对象参数格式）
 
-> `V8.Http.Get/Post` 还支持简洁形式：`V8.Http.Get(url)` / `V8.Http.Post(url, body, headers)`，但**对象参数格式更明确、推荐**。
+> V8 接口引擎中必须使用对象参数格式。尤其禁止 `V8.Http.Get(url)`：当前 .NET 同名重载包含 `Task<string> Get(string)`，Jint 可能把字符串调用解析为异步重载，脚本最终拿到 `[object Promise]`。GET 必须写成 `V8.Http.Get({ Url: url })`；第三方登录、微信 `jscode2session`、AccessToken 等链路保存后必须用无效 code 烟测，确认返回的是第三方明确错误而不是 Promise。
 
 ```javascript
 // POST JSON（推荐使用对象参数格式）

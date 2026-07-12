@@ -169,27 +169,32 @@ async function load() {
 - `manifest.json` / H5 模板必须确保 viewport 含 `viewport-fit=cover`，否则 iOS 的 `env(safe-area-inset-*)` 不会完整生效。
 - 页面根节点使用 `min-height:100vh` 或固定视口布局时，顶部内容、底部固定栏和内部滚动容器必须一起考虑安全区，不能只给根节点加 padding。
 - 顶部自定义导航栏应结合 `uni.getSystemInfoSync().statusBarHeight` 和 CSS `env(safe-area-inset-top)`：状态栏占位负责不同系统高度，导航按钮和标题整体下移，返回按钮触摸区不能压到刘海/状态栏。
+- 不能只依赖 `env(safe-area-inset-*)`。微信小程序、部分 Android WebView 或开发者工具中该值可能为 `0`；项目必须通过 `uni.getWindowInfo()`（旧端回退 `uni.getSystemInfoSync()`）读取 `statusBarHeight`、`safeArea` / `safeAreaInsets`，注入统一的 `--mci-safe-top`、`--mci-safe-bottom` 等页面壳变量。
+- 微信小程序使用 `navigationStyle: custom` 时，必须读取 `uni.getMenuButtonBoundingClientRect()`（必要时回退 `wx.getMenuButtonBoundingClientRect()`），给顶部栏右侧预留 `windowWidth - capsule.left + gap`。登录、分享、状态角标、更多操作等任何按钮都不能进入右上角胶囊区域。
+- 安全区实现必须集中在 `MciPage`、页面壳 composable/runtime 或全局布局中；禁止每页各自猜测 `20px/44px`。`pages.json` 中每个 `navigationStyle: custom` 页面都必须接入同一个页面壳，新增路由时同步纳入检查。
 - 底部 `tabBar`、购买栏、提交栏、批量操作栏等 fixed 元素必须使用 `padding-bottom: env(safe-area-inset-bottom)`，主体内容必须额外预留底部高度，避免最后一条数据被按钮或 tabBar 遮挡。
+- 底部 fixed 元素应优先使用运行时 `--mci-safe-bottom`，以 CSS `env(safe-area-inset-bottom)` 作为 H5 兜底；底部导航、提交栏、弹出层和滚动容器必须引用同一变量，不能各算一套。
 - 双栏分类页、聊天页、详情页带底部按钮时，内部 `scroll-view` 要用 `flex:1; min-height:0` 承载滚动，并在滚动容器底部预留 `calc(fixedBarHeight + env(safe-area-inset-bottom))`。
 - H5 在 PC 手机壳模式下，fixed 顶栏/底栏仍要限制在手机壳宽度内；不能铺满整个桌面浏览器。
-- 验收必须至少覆盖一个 iPhone 刘海/灵动岛尺寸、一个 Android 高状态栏或虚拟导航栏尺寸、一个 PC H5 手机壳尺寸，截图检查顶部不被遮挡、底部按钮不贴边、列表最后一项可见。
+- 验收必须至少覆盖一个 iPhone 刘海/灵动岛尺寸、一个 Android 高状态栏或虚拟导航栏尺寸、一个微信开发者工具真机模拟尺寸、一个 PC H5 手机壳尺寸；逐项截图检查顶部不被状态栏/胶囊遮挡、底部按钮不贴边、列表最后一项可见。不能只截图首页，必须按 `pages.json` 路由清单覆盖登录、Tab 页、详情、表单、弹层和管理页。
 
 参考样式：
 
 ```scss
 .page-mobile {
   min-height: 100vh;
-  padding-bottom: calc(112rpx + env(safe-area-inset-bottom));
+  padding-top: calc(24rpx + var(--mci-safe-top, env(safe-area-inset-top)));
+  padding-bottom: calc(112rpx + var(--mci-safe-bottom, env(safe-area-inset-bottom)));
   box-sizing: border-box;
 }
 .mci-navbar {
-  padding-top: env(safe-area-inset-top);
+  padding-right: var(--mci-capsule-right, 0px);
 }
 .bottom-bar {
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  bottom: calc(24rpx + var(--mci-safe-bottom, env(safe-area-inset-bottom)));
 }
 ```
 

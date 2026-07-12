@@ -877,6 +877,8 @@ Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="round
 
 - HTML/H5 必须设置 `viewport-fit=cover`，否则 iOS 的 `env(safe-area-inset-*)` 不会按预期生效。
 - uni-app 页面需要结合 `uni.getSystemInfoSync().statusBarHeight` 或平台导航栏高度，状态栏高度用于占位，内容安全边距仍使用 `env(safe-area-inset-*)` 兜底。
+- 微信小程序中 `env()` 可能返回 `0`，不得把它作为唯一安全区来源；优先读取 `uni.getWindowInfo()` 并把真实值注入页面壳变量。
+- 自定义导航必须读取微信胶囊矩形并预留右侧空间，任何标题、登录、分享或状态按钮都不能与胶囊区域重叠。
 - 顶部 fixed/sticky 导航使用 `padding-top: max(var(--mci-safe-top), statusBarHeight)` 的等价实现；返回按钮触摸区域要随顶部安全区整体下移。
 - 底部 fixed 操作栏和 tabBar 使用 `padding-bottom: calc(var(--mci-safe-bottom) + 8px)` 或项目等价间距，页面主体同步预留底部高度，避免按钮遮挡列表最后一项。
 - 安卓三键导航、手势导航和 iOS Safari/PWA/WebView 都要截图验收；不能只在 PC 模拟器或单一 iPhone 尺寸上看起来正常。
