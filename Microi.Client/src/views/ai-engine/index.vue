@@ -35,23 +35,52 @@
                     />
                 </div>
 
-                <div class="sidebar-section-title">AI对话</div>
-                <div class="conversation-list" v-loading="historyLoading">
+                <div class="history-tabs" aria-label="对话状态">
                     <button
+                        type="button"
+                        :class="{ active: historyView === 'active' }"
+                        @click="historyView = 'active'"
+                    >
+                        AI对话
+                        <small>{{ activeConversationCount }}</small>
+                    </button>
+                    <button
+                        type="button"
+                        :class="{ active: historyView === 'archived' }"
+                        @click="historyView = 'archived'"
+                    >
+                        已归档
+                        <small>{{ archivedConversationCount }}</small>
+                    </button>
+                </div>
+                <div class="conversation-list" v-loading="historyLoading">
+                    <div
                         v-for="item in filteredConversations"
                         :key="item.id"
-                        type="button"
                         class="conversation-item"
                         :class="{ active: item.id === currentConversationId }"
-                        @click="selectConversation(item)"
                     >
-                        <span class="conversation-title">{{ item.title }}</span>
-                        <small>{{ item.lastTime || "-" }}</small>
-                    </button>
+                        <button type="button" class="conversation-select" @click="selectConversation(item)">
+                            <span class="conversation-title">{{ item.title }}</span>
+                            <small>{{ item.lastTime || "-" }}</small>
+                        </button>
+                        <el-tooltip :content="item.archived ? '还原对话' : '归档任务'" placement="right">
+                            <button
+                                type="button"
+                                class="conversation-action"
+                                :class="{ loading: historyActionLoading === item.id }"
+                                :disabled="historyActionLoading === item.id"
+                                :aria-label="item.archived ? '还原对话' : '归档任务'"
+                                @click.stop="setConversationArchived(item, !item.archived)"
+                            >
+                                <el-icon><component :is="item.archived ? RefreshLeft : Box" /></el-icon>
+                            </button>
+                        </el-tooltip>
+                    </div>
                     <el-empty
                         v-if="!filteredConversations.length && !historyLoading"
                         :image-size="70"
-                        description="暂无聊天"
+                        :description="historyView === 'archived' ? '暂无已归档对话' : '暂无聊天'"
                     />
                 </div>
             </template>
@@ -86,6 +115,7 @@
                 v-if="activeWorkspace === 'apps' && isAiAdmin"
                 class="inline-project-workbench"
                 :selected-ai-model="selectedAiModel"
+                :selected-relay-model="selectedRelayModel"
                 :ai-models="aiModelList"
                 :model-loading="modelLoading"
                 @update:selected-ai-model="selectedAiModel = $event"
@@ -320,6 +350,21 @@
                         </div>
                         <div class="composer-right">
                             <el-select
+                                v-if="isRelayStationSelected"
+                                v-model="selectedRelayModel"
+                                filterable
+                                :loading="relayModelsLoading"
+                                placeholder="选择中转模型"
+                                class="composer-model-select relay-model-select"
+                            >
+                                <el-option
+                                    v-for="model in relayModelList"
+                                    :key="model.id"
+                                    :label="model.id"
+                                    :value="model.id"
+                                />
+                            </el-select>
+                            <el-select
                                 v-model="selectedAiModel"
                                 value-key="Id"
                                 filterable
@@ -363,7 +408,6 @@
                     :key="aiModelSysMenuId + '_' + aiModelTableId"
                     :PropsTableId="aiModelTableId"
                     :PropsSysMenuId="aiModelSysMenuId"
-                    :PropsSelectFields="[{ Name: 'Name' }, { Name: 'AiModel' }, { Name: 'Endpoint' }, { Name: 'IsEnable' }]"
                     ContainerClass="ai-engine-table-drawer"
                 />
                 <el-empty v-else description="未找到 mic_ai 对应的模块引擎配置" />
@@ -377,6 +421,7 @@
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import {
+    Box,
     CircleClose,
     CopyDocument,
     Cpu,
@@ -387,6 +432,7 @@ import {
     MagicStick,
     Operation,
     Paperclip,
+    RefreshLeft,
     Search,
     ShoppingBag,
     Top,
@@ -431,9 +477,14 @@ const osClient = computed(() => DiyCommon.GetOsClient());
 const currentUser = computed(() => diyStore.GetCurrentUser || {});
 const aiModelList = ref([]);
 const selectedAiModel = ref(null);
+const relayModelList = ref([]);
+const selectedRelayModel = ref("");
+const relayModelsLoading = ref(false);
 const modelLoading = ref(false);
 const historyLoading = ref(false);
 const historyKeyword = ref("");
+const historyView = ref("active");
+const historyActionLoading = ref("");
 const conversations = ref([]);
 const messages = ref([]);
 const currentConversationId = ref(makeId("chat"));
@@ -500,11 +551,24 @@ const quickPrompts = computed(() => [
 
 const filteredConversations = computed(() => {
     const keyword = historyKeyword.value.trim().toLowerCase();
-    if (!keyword) return conversations.value;
-    return conversations.value.filter((item) => item.title.toLowerCase().includes(keyword));
+    const archived = historyView.value === "archived";
+    return conversations.value.filter((item) => {
+        if (Boolean(item.archived) !== archived) return false;
+        return !keyword || item.title.toLowerCase().includes(keyword);
+    });
 });
+const activeConversationCount = computed(() => conversations.value.filter((item) => !item.archived).length);
+const archivedConversationCount = computed(() => conversations.value.filter((item) => item.archived).length);
 
 const sendDisabled = computed(() => sending.value || (!inputText.value.trim() && selectedFiles.value.length === 0));
+const isRelayStationSelected = computed(() => /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(
+    `${selectedAiModel.value?.Name || ""} ${selectedAiModel.value?.AiModel || ""}`
+));
+const selectedRuntimeModelId = computed(() => (
+    isRelayStationSelected.value
+        ? String(selectedRelayModel.value || "").trim()
+        : String(selectedAiModel.value?.AiModel || "").trim()
+));
 const selectedModelSupportsReasoning = computed(() => {
     const model = selectedAiModel.value || {};
     if (model.SupportReasoning === true || Number(model.SupportReasoning || 0) === 1) return true;
@@ -557,7 +621,36 @@ watch(reasoningEffort, (value) => {
 
 watch(selectedAiModel, () => {
     if (!selectedModelSupportsReasoning.value) reasoningEffort.value = "auto";
+    if (isRelayStationSelected.value) loadRelayModels();
 });
+
+async function loadRelayModels() {
+    relayModelsLoading.value = true;
+    try {
+        // 中转模型是吾码官方公开目录，不依赖当前租户是否已填写中转 ApiKey。
+        const response = await fetch("https://api.itdos.com/apiengine/official_ai_relay_models?OsClient=iTdos");
+        const json = await response.json();
+        if (!response.ok || Number(json?.Code) !== 1) {
+            throw new Error(json?.Msg || `HTTP ${response.status}`);
+        }
+        const rows = Array.isArray(json?.Data) ? json.Data : Array.isArray(json?.Data?.Data) ? json.Data.Data : [];
+        relayModelList.value = rows
+            .map((item) => ({
+                ...item,
+                id: String(item?.id || item?.ModelId || "").trim(),
+                DisplayName: String(item?.DisplayName || item?.Name || item?.id || item?.ModelId || "").trim()
+            }))
+            .filter((item) => item.id);
+        if (!relayModelList.value.some((item) => item.id === selectedRelayModel.value)) {
+            selectedRelayModel.value = relayModelList.value[0]?.id || "";
+        }
+    } catch (error) {
+        relayModelList.value = [];
+        ElMessage.warning("中转模型列表加载失败：" + (error?.message || "未知错误"));
+    } finally {
+        relayModelsLoading.value = false;
+    }
+}
 
 function makeId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -733,16 +826,20 @@ async function loadHistory() {
         (getData(result) || []).forEach((row) => {
             const record = parseRecord(row.Content);
             if (!record || record.Source !== SOURCE || !record.ConversationId) return;
+            record.__rowId = row.Id;
+            record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
             if (!grouped.has(record.ConversationId)) {
                 grouped.set(record.ConversationId, {
                     id: record.ConversationId,
                     title: record.Title || firstLine(record.Content) || "新对话",
                     lastTime: record.Time || "",
+                    archived: false,
                     records: []
                 });
             }
             const group = grouped.get(record.ConversationId);
             group.records.push(record);
+            group.archived = group.archived || record.Archived;
             if (record.Role === "user" && (!group.title || group.title === "新对话")) {
                 group.title = firstLine(record.Content);
             }
@@ -776,12 +873,40 @@ function firstLine(text) {
 
 function newConversation() {
     cancelRequest();
+    historyView.value = "active";
     currentConversationId.value = makeId("chat");
     messages.value = [];
     inputText.value = "";
     selectedFiles.value = [];
     actionContext.lastTableId = "";
     actionContext.lastTableName = "";
+}
+
+async function setConversationArchived(item, archived) {
+    if (!item?.id || historyActionLoading.value) return;
+    const records = (item.records || []).filter((record) => record.__rowId);
+    if (!records.length) {
+        ElMessage.warning("该对话暂无可归档记录");
+        return;
+    }
+    historyActionLoading.value = item.id;
+    try {
+        const results = await Promise.all(records.map((record) => {
+            const { __rowId, ...content } = record;
+            return DiyCommon.FormEngine.UptFormData("mic_ai_record", {
+                Id: __rowId,
+                Content: JSON.stringify({ ...content, Archived: archived })
+            });
+        }));
+        const failed = results.find((result) => !isOk(result));
+        if (failed) throw new Error(unwrapDosResult(failed)?.Msg || "保存失败");
+        await loadHistory();
+        ElMessage.success(archived ? "对话已归档" : "对话已还原");
+    } catch (error) {
+        ElMessage.error(`${archived ? "归档" : "还原"}失败：${error?.message || "未知错误"}`);
+    } finally {
+        historyActionLoading.value = "";
+    }
 }
 
 function selectConversation(item) {
@@ -880,7 +1005,7 @@ function goMicroiStore() {
 async function sendMessage() {
     const text = inputText.value.trim();
     if (sendDisabled.value) return;
-    if (!selectedAiModel.value?.AiModel) {
+    if (!selectedAiModel.value?.Id || !selectedRuntimeModelId.value) {
         ElMessage.warning("请先选择 AI 模型");
         return;
     }
@@ -901,7 +1026,7 @@ async function sendMessage() {
         content: visibleText,
         rawContent: visibleText,
         attachments: attachmentMeta,
-        modelId: selectedAiModel.value?.AiModel || "",
+        modelId: selectedRuntimeModelId.value,
         reasoningEffort: effectiveReasoningEffort.value,
         time: nowText()
     });
@@ -924,7 +1049,7 @@ async function sendMessage() {
         actions: [],
         queryRows: [],
         attachments: [],
-        modelId: selectedAiModel.value?.AiModel || "",
+        modelId: selectedRuntimeModelId.value,
         reasoningEffort: effectiveReasoningEffort.value,
         time: nowText()
     });
@@ -1026,8 +1151,9 @@ async function resolveSemanticMode(text, attachments = []) {
     try {
         const result = await DiyCommon.PostAsync("/api/Ai/RecognizeIntent", {
             UserChatMsg: text || "请分析我上传的附件。",
-            AiModel: selectedAiModel.value?.AiModel || "",
+            AiModel: selectedRuntimeModelId.value,
             AiModelId: selectedAiModel.value?.Id || "",
+            RelayModel: isRelayStationSelected.value ? selectedRelayModel.value : "",
             OsClient: osClient.value,
             ConversationId: currentConversationId.value,
             Source: SOURCE,
@@ -1168,7 +1294,7 @@ function buildDataThinkingSummary(data, question) {
 
 function buildSystemPrompt(mode) {
     const modelName = selectedAiModel.value?.Name || "";
-    const modelKey = selectedAiModel.value?.AiModel || "";
+    const modelKey = selectedRuntimeModelId.value;
     const lines = [
         "你是平台内置 AI 助手。",
         `当前租户：${osClient.value}。`,
@@ -1189,7 +1315,7 @@ async function sendChatQuestion(text, assistantMessage, attachments = []) {
     await sendChatStream({
         UserChatMsg: text,
         SystemChatMsg: buildSystemPrompt("chat"),
-        AiModel: selectedAiModel.value.AiModel,
+        AiModel: selectedRuntimeModelId.value,
         AiModelId: selectedAiModel.value.Id || "",
         OsClient: osClient.value,
         Attachments: attachments,
@@ -1237,7 +1363,7 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
     await sendChatStream({
         UserChatMsg: prompt,
         SystemChatMsg: buildSystemPrompt("builder"),
-        AiModel: selectedAiModel.value.AiModel,
+        AiModel: selectedRuntimeModelId.value,
         AiModelId: selectedAiModel.value.Id || "",
         OsClient: osClient.value,
         Attachments: attachments,
@@ -1252,6 +1378,7 @@ async function sendBuilderQuestion(text, assistantMessage, attachments = []) {
 
 async function sendChatStream(payload, assistantMessage, options = {}) {
     abortController = new AbortController();
+    payload.RelayModel = isRelayStationSelected.value ? selectedRelayModel.value : "";
     const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/ChatStream`, {
         method: "POST",
         headers: {
@@ -1269,8 +1396,9 @@ async function sendChatStream(payload, assistantMessage, options = {}) {
 async function sendDataQuestion(text, assistantMessage) {
     const result = await DiyCommon.PostAsync("/api/Ai/NL2SQL", {
         Question: text,
-        AiModel: selectedAiModel.value.AiModel,
+        AiModel: selectedRuntimeModelId.value,
         AiModelId: selectedAiModel.value.Id || "",
+        RelayModel: isRelayStationSelected.value ? selectedRelayModel.value : "",
         OsClient: osClient.value,
         ReasoningEffort: effectiveReasoningEffort.value
     }, null, null, "json");
@@ -1296,8 +1424,9 @@ async function sendCodeQuestion(text, assistantMessage) {
         },
         body: JSON.stringify({
             Question: text,
-            AiModel: selectedAiModel.value.AiModel,
+            AiModel: selectedRuntimeModelId.value,
             AiModelId: selectedAiModel.value.Id || "",
+            RelayModel: isRelayStationSelected.value ? selectedRelayModel.value : "",
             OsClient: osClient.value,
             CurrentCode: "",
             ConversationId: currentConversationId.value,
@@ -1626,17 +1755,18 @@ async function saveMessage(message) {
     try {
         await DiyCommon.FormEngine.AddFormData("mic_ai_record", {
             AiModelId: selectedAiModel.value?.Id || "",
-            AiModel: selectedAiModel.value?.AiModel || "",
+            AiModel: selectedRuntimeModelId.value,
             Content: JSON.stringify({
                 Source: SOURCE,
                 ConversationId: currentConversationId.value,
+                Archived: Boolean(conversations.value.find((item) => item.id === currentConversationId.value)?.archived),
                 Title: firstLine(messages.value.find((item) => item.role === "user")?.content || message.content),
                 Role: message.role,
                 Mode: message.mode || resolvedMode.value,
                 Content: message.content || "",
                 RawContent: message.rawContent || message.content || "",
-                ModelId: message.modelId || selectedAiModel.value?.AiModel || "",
-                AiModel: selectedAiModel.value?.AiModel || "",
+                ModelId: message.modelId || selectedRuntimeModelId.value,
+                AiModel: selectedRuntimeModelId.value,
                 Thinking: message.thinking || "",
                 ReasoningEffort: message.reasoningEffort || effectiveReasoningEffort.value,
                 Code: message.code || "",
@@ -1669,6 +1799,7 @@ function refreshCurrentConversationTitle(userMessage) {
             id: currentConversationId.value,
             title: firstLine(userMessage.content),
             lastTime: userMessage.time,
+            archived: false,
             records: []
         });
     }
@@ -1945,10 +2076,45 @@ async function copyText(text) {
     line-height: 1.7;
 }
 
-.sidebar-section-title {
-    padding: 10px 18px 6px;
-    color: #8a918c;
+.history-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin: 0 16px 8px;
+    padding: 4px;
+    border: 1px solid rgba(145, 158, 171, .18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .46);
+}
+
+.history-tabs button {
+    min-width: 0;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #707a72;
+    cursor: pointer;
     font-size: 13px;
+}
+
+.history-tabs button.active {
+    background: #fff;
+    color: #ff5f2e;
+    box-shadow: 0 6px 16px rgba(43, 55, 78, .08);
+}
+
+.history-tabs small {
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, .14);
+    font-size: 11px;
+    line-height: 16px;
 }
 
 .conversation-list {
@@ -1962,16 +2128,60 @@ async function copyText(text) {
     width: 100%;
     min-height: 48px;
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-start;
+    align-items: center;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: #394139;
-    cursor: pointer;
-    padding: 9px 10px;
+    padding: 3px 5px 3px 8px;
     text-align: left;
+}
+
+.conversation-select {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 6px 2px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.conversation-action {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #8a918c;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .18s, background .18s, color .18s;
+}
+
+.conversation-item:hover .conversation-action,
+.conversation-item.active .conversation-action,
+.conversation-action:focus-visible {
+    opacity: 1;
+}
+
+.conversation-action:hover {
+    background: rgba(255, 95, 46, .1);
+    color: #ff5f2e;
+}
+
+.conversation-action.loading {
+    opacity: .55;
+    cursor: wait;
 }
 
 .conversation-item:hover,
@@ -2631,6 +2841,18 @@ async function copyText(text) {
     width: 260px;
 }
 
+.relay-model-select {
+    width: 190px;
+    flex: 0 0 190px;
+}
+
+.relay-model-select :deep(.el-select__selected-item),
+.relay-model-select :deep(.el-select__placeholder) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .send-btn {
     width: 40px;
     height: 40px;
@@ -3244,6 +3466,11 @@ body.dark .ai-engine-page,
     }
 
     .composer-model-select {
+        flex: 1;
+        width: auto;
+    }
+
+    .relay-model-select {
         flex: 1;
         width: auto;
     }

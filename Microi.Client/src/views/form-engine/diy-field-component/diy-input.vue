@@ -36,7 +36,7 @@
         <el-button
             #prepend
             :disabled="field.Config.ReadOnlyButton"
-            @click="OpenTableEventByInput(field)"
+            @click="RunSlotButtonV8($event, field)"
             :icon="field.Config.TextIcon"
             v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'left'"
             >{{ field.Config.TextApend }}</el-button
@@ -44,7 +44,7 @@
         <el-button
             #append
             :disabled="field.Config.ReadOnlyButton"
-            @click="OpenTableEventByInput(field)"
+            @click="RunSlotButtonV8($event, field)"
             :icon="field.Config.TextIcon"
             v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'right'"
             >{{ field.Config.TextApend }}</el-button
@@ -105,12 +105,20 @@
                 <div class="form-item-tip">开启后复合文字区域变为可点击按钮</div>
             </el-form-item>
 
-            <el-form-item label="插槽只读">
+            <el-form-item label="禁用插槽按钮">
                 <el-switch v-model="configForm.ReadOnlyButton" active-color="#ff6c04" inactive-color="#ccc" />
+                <div class="form-item-tip">仅禁用插槽按钮，不改变文本框本身的只读状态；可用于按权限或业务状态暂时禁止按钮操作</div>
             </el-form-item>
 
-            <el-form-item label="弹出表格Id">
-                <el-input v-model="configForm.OpenTableId" placeholder="关联弹出表格的Id" />
+            <el-form-item label="插槽按钮V8代码">
+                <el-button
+                    type="primary"
+                    :icon="Edit"
+                    @click="openCodeEditor('SlotButtonV8Code', '插槽按钮V8代码')"
+                >
+                    编辑代码{{ getCodeLength(configForm.SlotButtonV8Code) }}
+                </el-button>
+                <div class="form-item-tip">点击按钮时执行，可使用 V8.OpenAnyTable、V8.OpenAnyForm、V8.ApiEngine.Run 等前端 V8 能力</div>
             </el-form-item>
 
             <el-divider content-position="left">V8引擎代码</el-divider>
@@ -199,7 +207,7 @@ export default {
                 TextApendPosition: 'right',
                 ShowButton: false,
                 ReadOnlyButton: false,
-                OpenTableId: '',
+                SlotButtonV8Code: '',
                 V8CodeBlur: '',
                 KeyupV8Code: ''
             },
@@ -298,9 +306,15 @@ export default {
             self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         },
-        OpenTableEventByInput(field) {
+        RunSlotButtonV8(event, field) {
             var self = this;
-            self.$emit("OpenTableEventByInput", field.Config.OpenTableId);
+            self.$emit("CallbackRunV8Code", {
+                field: field,
+                thisValue: self.ModelValue,
+                v8codeKey: "SlotButtonV8Code",
+                eventName: "FieldSlotButtonClick",
+                event: event
+            });
         },
         GetFieldValue(field, form) {
             var self = this;
@@ -488,7 +502,7 @@ export default {
                 TextApendPosition: self.field.Config.TextApendPosition || 'right',
                 ShowButton: self.field.Config.ShowButton || false,
                 ReadOnlyButton: self.field.Config.ReadOnlyButton || false,
-                OpenTableId: self.field.Config.OpenTableId || '',
+                SlotButtonV8Code: self.field.Config.SlotButtonV8Code || '',
                 V8CodeBlur: self.field.Config.V8CodeBlur || '',
                 KeyupV8Code: self.field.KeyupV8Code || ''
             };
@@ -504,7 +518,7 @@ export default {
             self.field.Config.TextApendPosition = self.configForm.TextApendPosition;
             self.field.Config.ShowButton = self.configForm.ShowButton;
             self.field.Config.ReadOnlyButton = self.configForm.ReadOnlyButton;
-            self.field.Config.OpenTableId = self.configForm.OpenTableId;
+            self.field.Config.SlotButtonV8Code = self.configForm.SlotButtonV8Code;
             self.field.Config.V8CodeBlur = self.configForm.V8CodeBlur;
             self.field.KeyupV8Code = self.configForm.KeyupV8Code;
             self.configDialogVisible = false;
@@ -520,7 +534,9 @@ export default {
             var self = this;
             self.codeEditorType = type;
             self.codeEditorTitle = title;
-            if (type === 'V8CodeBlur') {
+            if (type === 'SlotButtonV8Code') {
+                self.codeEditorValue = self.configForm.SlotButtonV8Code || '';
+            } else if (type === 'V8CodeBlur') {
                 self.codeEditorValue = self.configForm.V8CodeBlur || '';
             } else if (type === 'KeyupV8Code') {
                 self.codeEditorValue = self.configForm.KeyupV8Code || '';
@@ -529,7 +545,9 @@ export default {
         },
         saveCodeEditor() {
             var self = this;
-            if (self.codeEditorType === 'V8CodeBlur') {
+            if (self.codeEditorType === 'SlotButtonV8Code') {
+                self.configForm.SlotButtonV8Code = self.codeEditorValue;
+            } else if (self.codeEditorType === 'V8CodeBlur') {
                 self.configForm.V8CodeBlur = self.codeEditorValue;
             } else if (self.codeEditorType === 'KeyupV8Code') {
                 self.configForm.KeyupV8Code = self.codeEditorValue;

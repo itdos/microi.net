@@ -168,3 +168,10 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 - [ ] 第三方密钥放 `V8.OsClientModel`，不硬编码
 - [ ] 跨租户操作前校验权限
 - [ ] 不向前端返回 `V8.OsClientModel`
+
+## Microi.AI 中转站租户凭据
+
+- `mic_ai` 的 `Microi.AI中转站.ApiKey` 是租户调用吾码官方中转站的用户凭据。运行时不得因为该字段为空而静默创建、回退到当前用户字段或绕过校验，否则管理员无法判断真实配置来源。
+- 老租户由用户在吾码官网个人中心复制 ApiKey 后填写到本租户的 `mic_ai` 中转站记录；空值应返回明确配置错误。
+- 官网创建新 SaaS 租户时，必须先取得当前官网账号的 ApiKey，再由租户初始化服务写入新库 `mic_ai` 的 `Microi.AI中转站` 记录。该自动写入只发生在受控开库流程，不得散落到普通 AI 对话请求中。
+- 中转模型公开目录只返回模型 Id、显示名、厂商等非敏感字段，可匿名读取；严禁把官方上游模型的 ApiKey、Endpoint 私密配置随模型列表返回前端。

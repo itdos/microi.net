@@ -32,7 +32,7 @@
                     @dblclick="enterDevelop(app)"
                 >
                     <div class="app-card-top">
-                        <el-tag size="small" effect="dark">{{ app.AppType || "Web" }}</el-tag>
+                        <el-tag size="small" effect="dark">{{ appTypeLabel(app.AppType || "Web") }}</el-tag>
                         <span>{{ formatVersionNo(getAppCurrentVersion(app)) }}</span>
                     </div>
                     <h4>{{ app.Name }}</h4>
@@ -69,7 +69,7 @@
                 <el-button class="back-gallery" text :icon="Back" @click="backToGallery">应用宫格</el-button>
                 <div>
                     <strong>{{ currentApp?.Name || "应用开发" }}</strong>
-                    <span>{{ currentApp?.AppType || "-" }} · {{ currentApp?.AppKey || currentApp?.Id || "-" }}</span>
+                    <span>{{ appTypeLabel(currentApp?.AppType || "") }} · {{ currentApp?.AppKey || currentApp?.Id || "-" }}</span>
                 </div>
             </div>
             <div v-if="currentApp" class="app-chat app-chat-in-panel">
@@ -200,18 +200,27 @@
 
         <section class="file-panel">
             <header>
-                <strong>源码树</strong>
-                <el-tag v-if="currentApp" size="small">{{ currentApp.AppType }}</el-tag>
+                <div class="file-tree-title">
+                    <strong>{{ fileTreeMode === 'build' ? '编译代码树' : '源码树' }}</strong>
+                    <el-tag v-if="currentApp" size="small">{{ appTypeLabel(currentApp.AppType) }}</el-tag>
+                </div>
+                <el-segmented
+                    v-if="currentApp"
+                    v-model="fileTreeMode"
+                    :options="fileTreeModeOptions"
+                    size="small"
+                    @change="switchFileTreeMode"
+                />
             </header>
             <div v-if="!currentApp" class="empty-area">
                 <span>请选择或创建一个AI应用</span>
             </div>
             <div v-else class="file-list source-tree-wrap">
                 <el-tree
-                    v-if="fileTreeData.length"
+                    v-if="visibleFileTreeData.length"
                     ref="fileTreeRef"
                     class="source-tree"
-                    :data="fileTreeData"
+                    :data="visibleFileTreeData"
                     node-key="key"
                     :props="{ children: 'children', label: 'label' }"
                     :expand-on-click-node="true"
@@ -219,7 +228,7 @@
                     @node-click="handleFileNodeClick"
                 >
                     <template #default="{ data }">
-                        <div class="source-tree-node" :class="{ active: activeFile?.FilePath === data.file?.FilePath }">
+                        <div class="source-tree-node" :class="{ active: currentTreeFile?.FilePath === data.file?.FilePath }">
                             <el-icon v-if="data.isDirectory"><Folder /></el-icon>
                             <el-icon v-else><Document /></el-icon>
                             <span class="source-tree-name">{{ data.label }}</span>
@@ -227,7 +236,7 @@
                         </div>
                     </template>
                 </el-tree>
-                <el-empty v-else :image-size="76" description="暂无源码文件" />
+                <el-empty v-else :image-size="76" :description="fileTreeMode === 'build' ? '暂无编译文件' : '暂无源码文件'" />
             </div>
         </section>
 
@@ -254,15 +263,13 @@
                             :value="versionKey(item)"
                         />
                     </el-select>
-                    <el-button :disabled="!currentEditorFile" @click="formatActiveFile">格式化</el-button>
                     <el-button :disabled="!currentEditorFile" :loading="fileSaving" @click="saveCurrentFile">
-                        {{ activeView === 'build' ? '保存编译文件' : '保存源码' }}
+                        {{ fileTreeMode === 'build' ? '保存编译文件' : '保存源码' }}
                     </el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('source')">下载源码ZIP</el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('build')">下载编译ZIP</el-button>
                     <el-button :disabled="!currentApp" :loading="building" type="primary" @click="buildApp">运行/发布</el-button>
                     <el-button :disabled="!currentApp" :loading="packaging" @click="makeOfflinePackage">制作离线包</el-button>
-                    <el-button :disabled="!currentApp" :loading="publishingStore" type="success" @click="publishToStore">发布应用商城</el-button>
                     <el-button v-if="previewUrl" @click="copyPreviewUrl">复制预览地址</el-button>
                     <el-button v-if="previewUrl" tag="a" :href="previewUrl" target="_blank">打开预览</el-button>
                 </div>
@@ -270,8 +277,8 @@
             <div v-if="currentEditorFile" class="active-file-meta">
                 <span class="path">{{ currentEditorFile.FilePath }}</span>
                 <span>{{ formatFileSize(currentEditorFileSize) }}</span>
-                <span v-if="activeView !== 'build'">创建：{{ formatMetaTime(currentEditorFile.CreateTime || currentEditorFile.CreateDate) }}</span>
-                <span v-if="activeView !== 'build'">修改：{{ formatMetaTime(currentEditorFile.UpdateTime || currentEditorFile.ModifyTime) }}</span>
+                <span v-if="fileTreeMode !== 'build'">创建：{{ formatMetaTime(currentEditorFile.CreateTime || currentEditorFile.CreateDate) }}</span>
+                <span v-if="fileTreeMode !== 'build'">修改：{{ formatMetaTime(currentEditorFile.UpdateTime || currentEditorFile.ModifyTime) }}</span>
             </div>
             <div v-if="currentApp" class="publish-meta">
                 <span>应用Key：{{ currentApp.AppKey || "未生成" }}</span>
@@ -284,11 +291,8 @@
                         <button type="button" :class="{ active: activeView === 'preview' }" @click="activeView = 'preview'">
                             预览视图
                         </button>
-                        <button type="button" :class="{ active: activeView === 'source' }" @click="activeView = 'source'">
-                            源码视图
-                        </button>
-                        <button type="button" :class="{ active: activeView === 'build' }" @click="openBuildView">
-                            编译视图
+                        <button type="button" :class="{ active: activeView === 'source' || activeView === 'build' }" @click="showCodeView">
+                            代码视图
                         </button>
                         <button type="button" :class="{ active: activeView === 'versions' }" @click="activeView = 'versions'">
                             版本记录
@@ -296,8 +300,26 @@
                     </div>
 
                     <div v-show="activeView === 'preview'" v-loading="previewLoading" class="preview-pane">
-                        <iframe v-if="previewHtml" :srcdoc="previewHtml" class="preview-frame"></iframe>
-                        <iframe v-else-if="previewUrl" :src="previewUrl" class="preview-frame"></iframe>
+                        <div v-if="previewUrl" class="preview-toolbar">
+                            <span>预览设备</span>
+                            <el-radio-group v-model="previewDeviceMode" size="small">
+                                <el-radio-button value="desktop">PC端</el-radio-button>
+                                <el-radio-button value="mobile">移动端</el-radio-button>
+                            </el-radio-group>
+                        </div>
+                        <div v-if="previewUrl" class="preview-canvas" :class="`is-${previewDeviceMode}`">
+                            <micro-app
+                                v-if="isMicroServicePreview"
+                                :key="previewMicroAppKey"
+                                class="preview-frame preview-micro-app"
+                                :name="previewMicroAppName"
+                                :url="previewMicroAppEntryUrl"
+                                :data="previewMicroAppData"
+                                :default-page="previewMicroRoute"
+                                router-mode="pure"
+                            />
+                            <iframe v-else :src="previewUrl" class="preview-frame"></iframe>
+                        </div>
                         <div v-else class="empty-area">
                             <p v-if="currentApp.AppType === 'UniApp'">
                                 UniApp应用已生成源码，点击“运行/发布”后，服务端会生成 H5 预览版本并在这里展示。
@@ -324,17 +346,6 @@
                     </div>
 
                     <div v-show="activeView === 'build'" class="source-pane build-pane">
-                        <div v-if="buildFiles.length" class="build-file-toolbar">
-                            <span>编译文件</span>
-                            <el-select v-model="buildFilePath" filterable placeholder="输入路径搜索编译文件" @change="openBuildFile">
-                                <el-option
-                                    v-for="file in buildFiles"
-                                    :key="file.FilePath"
-                                    :label="file.FilePath"
-                                    :value="file.FilePath"
-                                />
-                            </el-select>
-                        </div>
                         <DiyCodeEditor
                             v-if="activeBuildFile"
                             v-model="activeBuildContent"
@@ -344,13 +355,15 @@
                             v8CodeType="client"
                         />
                         <div v-else class="empty-area">
-                            <p>{{ buildFiles.length ? '请选择一个编译文件。' : '当前应用还没有可查看的编译产物。' }}</p>
+                            <p>{{ buildFiles.length ? '请在左侧编译代码树中选择文件。' : '当前应用还没有可查看的编译产物。' }}</p>
                         </div>
                     </div>
 
                     <div v-show="activeView === 'versions'" class="version-pane">
                         <el-table :data="sortedVersions" size="small" height="100%" border @row-click="selectVersion">
-                            <el-table-column prop="VersionNo" label="版本" width="90" />
+                            <el-table-column label="版本" width="100">
+                                <template #default="scope">{{ formatVersionNo(getAppCurrentVersion(scope.row)) }}</template>
+                            </el-table-column>
                             <el-table-column prop="Status" label="状态" width="120" />
                             <el-table-column prop="PreviewUrl" label="预览地址" min-width="220" show-overflow-tooltip />
                             <el-table-column prop="CreateTime" label="创建时间" width="170" />
@@ -408,14 +421,17 @@
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
 import { Back, CircleClose, Cpu, Document, EditPen, Folder, Grid, Paperclip, Top, View } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { css as beautifyCss, html as beautifyHtml, js as beautifyJs } from "js-beautify";
+import { ElMessage } from "element-plus";
 
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
 const props = defineProps({
     selectedAiModel: {
         type: Object,
         default: null
+    },
+    selectedRelayModel: {
+        type: String,
+        default: ""
     },
     aiModels: {
         type: Array,
@@ -445,16 +461,20 @@ const activeContent = ref("");
 const buildFiles = ref([]);
 const activeBuildFile = ref(null);
 const activeBuildContent = ref("");
-const buildFilePath = ref("");
+const fileTreeMode = ref("source");
+const fileTreeModeOptions = [
+    { label: "源码", value: "source" },
+    { label: "编译", value: "build" }
+];
 const activeView = ref("source");
 const selectedVersionKey = ref("");
 const fileSaving = ref(false);
 const building = ref(false);
 const packaging = ref(false);
-const publishingStore = ref(false);
 const previewUrl = ref("");
-const previewHtml = ref("");
 const previewLoading = ref(false);
+const previewDeviceMode = ref("desktop");
+const selectedPreviewRoute = ref("");
 const createVisible = ref(false);
 const creating = ref(false);
 const appPrompt = ref("");
@@ -496,15 +516,74 @@ const editorField = computed(() => ({
         }
     }
 }));
-const currentEditorFile = computed(() => activeView.value === "build" ? activeBuildFile.value : activeFile.value);
-const currentEditorContent = computed(() => activeView.value === "build" ? activeBuildContent.value : activeContent.value);
+const currentEditorFile = computed(() => fileTreeMode.value === "build" ? activeBuildFile.value : activeFile.value);
+const currentEditorContent = computed(() => fileTreeMode.value === "build" ? activeBuildContent.value : activeContent.value);
 const currentEditorFileSize = computed(() => getFileSize(currentEditorFile.value, currentEditorContent.value));
-const fileTreeData = computed(() => buildFileTree(files.value));
+const isMicroServicePreview = computed(() => currentApp.value?.AppType === "MicroService");
+const microServiceRoutes = computed(() => {
+    const routeFile = files.value.find((item) => /(^|\/)microi\.routes\.json$/i.test(String(item?.FilePath || item?.FileName || "")));
+    try {
+        const routes = JSON.parse(String(routeFile?.Content || routeFile?.FileContent || "[]"));
+        return (Array.isArray(routes) ? routes : routes?.routes || []).map((item) => ({
+            ...item,
+            path: normalizeMicroRoute(item?.path || item?.Path || item?.RoutePath || "/"),
+            name: String(item?.name || item?.Name || item?.PageKey || ""),
+            title: String(item?.title || item?.Title || item?.PageTitle || ""),
+            sourceFile: resolveRouteSourceFile(item)
+        }));
+    } catch {
+        return [];
+    }
+});
+const previewMicroRoute = computed(() => {
+    if (selectedPreviewRoute.value) return normalizeMicroRoute(selectedPreviewRoute.value);
+    const home = microServiceRoutes.value.find((item) => item?.isHome || item?.IsHome) || microServiceRoutes.value[0];
+    return normalizeMicroRoute(home?.path || "/");
+});
+const previewMicroAppName = computed(() => {
+    let name = String(currentApp.value?.AppKey || currentApp.value?.Id || "ai-app-preview")
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    if (!name || !/^[a-z]/.test(name)) name = `app-${name || "preview"}`;
+    return `${name.substring(0, 48)}-workbench`;
+});
+const previewMicroAppVersion = computed(() => {
+    const match = String(previewUrl.value || "").match(/\/(v\d+\.\d+\.\d+)(?:\/|$)/i);
+    return match?.[1] || formatVersionNo(getAppCurrentVersion(currentApp.value));
+});
+const previewMicroAppEntryUrl = computed(() => {
+    const apiBase = String(DiyCommon.GetApiBase ? DiyCommon.GetApiBase() : "").replace(/\/+$/, "");
+    const osClient = encodeURIComponent(String(DiyCommon.GetOsClient ? DiyCommon.GetOsClient() : ""));
+    const appKey = encodeURIComponent(String(currentApp.value?.AppKey || ""));
+    const version = encodeURIComponent(previewMicroAppVersion.value);
+    return `${apiBase}/micro-app/${osClient}/${appKey}/${version}/index.html`;
+});
+const previewMicroAppKey = computed(() => `${previewMicroAppName.value}@${previewMicroAppEntryUrl.value}@${previewMicroRoute.value}`);
+const previewMicroAppData = computed(() => ({
+    apiBase: DiyCommon.GetApiBase ? DiyCommon.GetApiBase() : "",
+    osClient: DiyCommon.GetOsClient ? DiyCommon.GetOsClient() : "",
+    token: DiyCommon.getToken ? DiyCommon.getToken() : "",
+    appKey: currentApp.value?.AppKey || "",
+    version: previewMicroAppVersion.value,
+    microRoute: previewMicroRoute.value,
+    dialog: false,
+    dialogData: {},
+    route: { microRoute: previewMicroRoute.value, microRoutePath: previewMicroRoute.value }
+}));
+const visibleFileTreeData = computed(() => buildFileTree(fileTreeMode.value === "build" ? buildFiles.value : files.value));
+const currentTreeFile = computed(() => fileTreeMode.value === "build" ? activeBuildFile.value : activeFile.value);
 const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
+const currentChatModelId = computed(() => (
+    /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(`${currentAiModel.value?.Name || ""} ${currentAiModel.value?.AiModel || ""}`)
+        ? String(props.selectedRelayModel || "").trim()
+        : String(currentAiModel.value?.AiModel || "").trim()
+));
 const canSendAppChat = computed(() => (
     !appChatSending.value
     && currentApp.value
-    && currentAiModel.value?.AiModel
+    && currentAiModel.value?.Id
+    && currentChatModelId.value
     && (appPrompt.value.trim() || appSelectedFiles.value.length)
 ));
 
@@ -597,9 +676,129 @@ function buildFileTree(fileRows = []) {
     return sortTree(root);
 }
 
+function appTypeLabel(value) {
+    const map = { MicroService: "微服务", Web: "Web应用", UniApp: "UniApp应用", Regular: "常规应用" };
+    return map[String(value || "")] || String(value || "应用");
+}
+
+function normalizeMicroRoute(value) {
+    const route = String(value || "/").trim();
+    return route.startsWith("/") ? route : `/${route}`;
+}
+
+function normalizeSourcePath(value) {
+    const parts = String(value || "").replace(/\\/g, "/").replace(/^\.\//, "").split("/");
+    const safe = [];
+    parts.forEach((part) => {
+        if (!part || part === ".") return;
+        if (part === "..") safe.pop();
+        else safe.push(part);
+    });
+    return safe.join("/");
+}
+
+function sourcePathFromImport(metadataPath, importPath) {
+    const value = String(importPath || "");
+    if (!value || !/\.(vue|jsx?|tsx?)$/i.test(value)) return "";
+    if (!value.startsWith(".")) return normalizeSourcePath(value);
+    const dir = normalizeSourcePath(metadataPath).split("/").slice(0, -1).join("/");
+    return normalizeSourcePath(`${dir}/${value}`);
+}
+
+function routeToken(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function existingSourcePath(candidate) {
+    const normalized = normalizeSourcePath(candidate).toLowerCase();
+    return files.value.find((item) => normalizeSourcePath(item?.FilePath || item?.FileName).toLowerCase() === normalized)?.FilePath || "";
+}
+
+function resolveRouteSourceFile(route) {
+    const explicit = route?.sourceFile || route?.SourceFile || route?.componentPath || route?.ComponentPath || route?.file || route?.File;
+    if (explicit) return existingSourcePath(explicit) || normalizeSourcePath(explicit);
+
+    const routePath = normalizeMicroRoute(route?.path || route?.Path || route?.RoutePath || "/");
+    const routeName = String(route?.name || route?.Name || route?.PageKey || "");
+    const metadataFiles = files.value.filter((item) => /(^|\/)(main|routes?)\.[cm]?[jt]s$/i.test(String(item?.FilePath || item?.FileName || "")) && item?.Content);
+    for (const metadata of metadataFiles) {
+        const content = String(metadata.Content || "");
+        const imports = new Map();
+        const importRegex = /import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+)["']/g;
+        let match;
+        while ((match = importRegex.exec(content))) {
+            imports.set(match[1], sourcePathFromImport(metadata.FilePath, match[2]));
+        }
+
+        const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const routeObjectRegex = new RegExp(`path\\s*:\\s*["']${escapedPath}["'][\\s\\S]{0,320}?component\\s*:\\s*([A-Za-z_$][\\w$]*)`, "i");
+        const routeObject = content.match(routeObjectRegex);
+        if (routeObject && imports.get(routeObject[1])) return existingSourcePath(imports.get(routeObject[1])) || imports.get(routeObject[1]);
+
+        const conditionRegex = /route\.includes\(\s*["']([^"']+)["']\s*\)\s*\?\s*([A-Za-z_$][\w$]*)/g;
+        while ((match = conditionRegex.exec(content))) {
+            const condition = String(match[1]);
+            if ((routePath.includes(condition) || routeName === condition) && imports.get(match[2])) {
+                return existingSourcePath(imports.get(match[2])) || imports.get(match[2]);
+            }
+        }
+
+        if (route?.isHome || route?.IsHome || routePath === "/") {
+            const defaultComponent = content.match(/:\s*([A-Za-z_$][\w$]*)\s*\r?\n\s*\r?\n\s*createApp\s*\(/);
+            if (defaultComponent && imports.get(defaultComponent[1])) {
+                return existingSourcePath(imports.get(defaultComponent[1])) || imports.get(defaultComponent[1]);
+            }
+        }
+    }
+
+    const wantedTokens = [routeName, routePath.split("/").filter(Boolean).pop()].map(routeToken).filter(Boolean);
+    const byConvention = files.value.find((item) => {
+        const path = normalizeSourcePath(item?.FilePath || "");
+        if (!/\.(vue|jsx?|tsx?)$/i.test(path)) return false;
+        const base = path.split("/").pop().replace(/\.[^.]+$/, "");
+        return wantedTokens.includes(routeToken(base));
+    });
+    return byConvention?.FilePath || "";
+}
+
+function findPreviewRouteForSourceFile(filePath) {
+    if (!isMicroServicePreview.value || !/\.(vue|jsx?|tsx?)$/i.test(String(filePath || ""))) return null;
+    const normalized = normalizeSourcePath(filePath).toLowerCase();
+    return microServiceRoutes.value.find((item) => normalizeSourcePath(item.sourceFile).toLowerCase() === normalized) || null;
+}
+
 function handleFileNodeClick(data) {
     if (!data || data.isDirectory || !data.file) return;
-    openFile(data.file);
+    if (fileTreeMode.value === "build") {
+        openBuildFile(data.file.FilePath);
+    } else {
+        const previewRoute = findPreviewRouteForSourceFile(data.file.FilePath);
+        const keepPreview = activeView.value === "preview" && !!previewRoute;
+        openFile(data.file, {
+            focusSource: !keepPreview,
+            previewRoute: previewRoute?.path || ""
+        });
+    }
+}
+
+async function switchFileTreeMode(mode) {
+    fileTreeMode.value = mode;
+    if (mode === "build") {
+        activeView.value = "build";
+        if (!activeBuildFile.value && buildFiles.value.length) {
+            await openBuildFile(buildFiles.value[0].FilePath);
+        }
+        return;
+    }
+    activeView.value = "source";
+    if (!activeFile.value) {
+        const firstFile = files.value.find((item) => Number(item.IsDirectory || 0) !== 1);
+        if (firstFile) await openFile(firstFile);
+    }
+}
+
+function showCodeView() {
+    activeView.value = fileTreeMode.value === "build" ? "build" : "source";
 }
 
 function getFileSize(file, content) {
@@ -752,7 +951,10 @@ function appSortScore(app) {
 }
 
 function getAppCurrentVersion(app) {
-    return app?.CurrentVersionNo || app?.VersionNo || app?.BuildVersion || app?.CurrentVersion || app?.Version || "v1.0.0";
+    const explicit = app?.CurrentVersionNo || app?.VersionNo || app?.BuildVersion || app?.Version;
+    if (explicit) return explicit;
+    const previewMatch = String(app?.PreviewUrl || app?.PublishUrl || app?.PublicUrl || "").match(/\/(v\d+\.\d+\.\d+)(?:\/|$)/i);
+    return previewMatch?.[1] || app?.CurrentVersion || "v1.0.0";
 }
 
 function parseVersionParts(value) {
@@ -818,21 +1020,27 @@ function selectVersionByKey(key) {
 
 async function selectApp(app) {
     currentApp.value = app;
+    previewDeviceMode.value = app?.AppType === "UniApp" ? "mobile" : "desktop";
     previewUrl.value = normalizePreviewUrl(app.PreviewUrl || "");
-    previewHtml.value = "";
     activeFile.value = null;
     activeContent.value = "";
     buildFiles.value = [];
     activeBuildFile.value = null;
     activeBuildContent.value = "";
-    buildFilePath.value = "";
+    selectedPreviewRoute.value = "";
     appChatMessages.value = [];
     try {
         const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
         const selected = detail?.App || app;
         currentApp.value = selected;
+        previewDeviceMode.value = selected?.AppType === "UniApp" ? "mobile" : "desktop";
         files.value = detail?.Files || [];
         versions.value = detail?.Versions || [];
+        if (selected?.AppType === "MicroService") {
+            await hydrateMicroServicePreviewMetadata(selected.Id);
+            const homeRoute = microServiceRoutes.value.find((item) => item?.isHome || item?.IsHome) || microServiceRoutes.value[0];
+            selectedPreviewRoute.value = normalizeMicroRoute(homeRoute?.path || "/");
+        }
         try {
             const buildDetail = await runAiAppEngine("ai_app_build_file", { Action: "List", AppId: app.Id });
             buildFiles.value = (buildDetail?.Files || []).map((item) => ({
@@ -846,7 +1054,9 @@ async function selectApp(app) {
         const latestVersion = sortedVersions.value[0];
         if (latestVersion) {
             selectedVersionKey.value = versionKey(latestVersion);
-            previewUrl.value = getVersionPreviewUrl(latestVersion) || normalizePreviewUrl(selected.PreviewUrl || "");
+            previewUrl.value = selected.AppType === "MicroService"
+                ? normalizePreviewUrl(selected.PreviewUrl || "") || getVersionPreviewUrl(latestVersion)
+                : getVersionPreviewUrl(latestVersion) || normalizePreviewUrl(selected.PreviewUrl || "");
         } else {
             selectedVersionKey.value = "";
             previewUrl.value = normalizePreviewUrl(selected.PreviewUrl || "");
@@ -854,7 +1064,7 @@ async function selectApp(app) {
         await refreshPreviewHtml();
         const firstFile = files.value.find((item) => Number(item.IsDirectory || 0) !== 1);
         if (firstFile) await openFile(firstFile, { focusSource: false });
-        if (previewUrl.value || previewHtml.value) {
+        if (previewUrl.value) {
             activeView.value = "preview";
         }
         await loadAppChatHistory(selected.Id);
@@ -866,7 +1076,7 @@ async function selectApp(app) {
 async function enterDevelop(app) {
     appViewMode.value = "develop";
     await selectApp(app);
-    if (previewUrl.value || previewHtml.value) {
+    if (previewUrl.value) {
         activeView.value = "preview";
     }
 }
@@ -941,14 +1151,15 @@ function parseChatRecord(content) {
 
 async function openFile(file, options = {}) {
     if (Number(file.IsDirectory || 0) === 1) return;
-    const { focusSource = true } = options;
+    const { focusSource = true, previewRoute = "" } = options;
+    if (previewRoute) selectedPreviewRoute.value = normalizeMicroRoute(previewRoute);
     activeFile.value = file;
     try {
         const data = await runAiAppEngine("ai_app_get_file", {
             AppId: currentApp.value.Id,
             FilePath: file.FilePath
         });
-        activeContent.value = formatSourceCode(data?.Content || "", file.FilePath);
+        activeContent.value = String(data?.Content || "");
         activeFile.value = {
             ...file,
             ...(data || {}),
@@ -961,68 +1172,32 @@ async function openFile(file, options = {}) {
     }
 }
 
-function formatActiveFile() {
-    if (!currentEditorFile.value) return;
-    if (activeView.value === "build") {
-        activeBuildContent.value = formatSourceCode(activeBuildContent.value, activeBuildFile.value.FilePath);
-    } else {
-        activeContent.value = formatSourceCode(activeContent.value, activeFile.value.FilePath);
-    }
-    ElMessage.success("代码已格式化");
-}
-
-async function openBuildView() {
-    activeView.value = "build";
-    if (!activeBuildFile.value && buildFiles.value.length) {
-        await openBuildFile(buildFiles.value[0].FilePath);
-    }
+async function hydrateMicroServicePreviewMetadata(appId) {
+    const indexes = files.value
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => /(^|\/)(microi\.routes\.json|main\.[cm]?[jt]s|routes?\.[cm]?[jt]s)$/i.test(String(item?.FilePath || item?.FileName || "")))
+        .filter(({ item }) => !item?.Content);
+    await Promise.all(indexes.map(async ({ item, index }) => {
+        try {
+            const data = await runAiAppEngine("ai_app_get_file", { AppId: appId, FilePath: item.FilePath });
+            files.value[index] = { ...item, ...(data || {}), FilePath: item.FilePath };
+        } catch (error) {
+            console.warn("[AiApp] load micro service preview metadata failed", item.FilePath, error);
+        }
+    }));
 }
 
 async function openBuildFile(path) {
     if (!currentApp.value || !path) return;
     try {
         const data = await runAiAppEngine("ai_app_build_file", { Action: "Get", AppId: currentApp.value.Id, Path: path });
-        activeBuildContent.value = formatSourceCode(data?.Content || "", path);
+        activeBuildContent.value = String(data?.Content || "");
         activeBuildFile.value = { ...(buildFiles.value.find((item) => item.FilePath === path) || {}), ...(data || {}), FilePath: path };
-        buildFilePath.value = path;
+        fileTreeMode.value = "build";
         activeView.value = "build";
     } catch (error) {
         ElMessage.error(error.message || "读取编译文件失败");
     }
-}
-
-function formatSourceCode(content, filePath) {
-    const value = String(content || "");
-    const name = String(filePath || "").toLowerCase();
-    const options = {
-        indent_size: 2,
-        indent_char: " ",
-        preserve_newlines: true,
-        max_preserve_newlines: 2,
-        wrap_line_length: 120,
-        end_with_newline: true
-    };
-    try {
-        if (name.endsWith(".json")) {
-            return JSON.stringify(JSON.parse(value), null, 2) + "\n";
-        }
-        if (name.endsWith(".css") || name.endsWith(".scss") || name.endsWith(".less")) {
-            return beautifyCss(value, options);
-        }
-        if (name.endsWith(".html") || name.endsWith(".vue") || name.endsWith(".xml")) {
-            return beautifyHtml(value, {
-                ...options,
-                wrap_attributes: "auto",
-                extra_liners: []
-            });
-        }
-        if (name.endsWith(".js") || name.endsWith(".ts") || name.endsWith(".mjs") || name.endsWith(".cjs")) {
-            return beautifyJs(value, options);
-        }
-    } catch (error) {
-        console.warn("[AiApp] format source failed", error);
-    }
-    return value;
 }
 
 function getEditorLanguage(filePath) {
@@ -1077,8 +1252,7 @@ async function saveActiveFile() {
     if (!currentApp.value || !activeFile.value) return;
     fileSaving.value = true;
     try {
-        const content = formatSourceCode(activeContent.value, activeFile.value.FilePath);
-        activeContent.value = content;
+        const content = String(activeContent.value || "");
         await runAiAppEngine("ai_app_save_file", {
             AppId: currentApp.value.Id,
             AppName: currentApp.value.Name,
@@ -1095,13 +1269,12 @@ async function saveActiveFile() {
 }
 
 async function saveCurrentFile() {
-    if (activeView.value !== "build") return saveActiveFile();
+    if (fileTreeMode.value !== "build") return saveActiveFile();
     if (!currentApp.value || !activeBuildFile.value) return;
     const filePath = activeBuildFile.value.FilePath;
     fileSaving.value = true;
     try {
-        const content = formatSourceCode(activeBuildContent.value, filePath);
-        activeBuildContent.value = content;
+        const content = String(activeBuildContent.value || "");
         await runAiAppEngine("ai_app_build_file", {
             Action: "Save",
             AppId: currentApp.value.Id,
@@ -1127,7 +1300,7 @@ async function buildApp() {
         });
         previewUrl.value = normalizePreviewUrl(data?.PreviewUrl || previewUrl.value);
         await refreshPreviewHtml();
-        if (previewUrl.value || previewHtml.value) activeView.value = "preview";
+        if (previewUrl.value) activeView.value = "preview";
         ElMessage.success(data?.Message || "应用发布任务已处理");
         await loadApps();
         if (currentApp.value?.Id) {
@@ -1158,31 +1331,6 @@ async function makeOfflinePackage() {
         ElMessage.error(error.message || "制作离线包失败");
     } finally {
         packaging.value = false;
-    }
-}
-
-async function publishToStore() {
-    if (!currentApp.value) return;
-    try {
-        await ElMessageBox.confirm(
-            `确认将【${currentApp.value.Name}】的最新编译 ZIP 发布到应用商城？默认不包含私有源码；需要源码包请在商城的【配置AI应用包】中勾选。`,
-            "发布应用商城",
-            { type: "warning", confirmButtonText: "开始发布", cancelButtonText: "取消" }
-        );
-    } catch {
-        return;
-    }
-    publishingStore.value = true;
-    try {
-        const data = await runAiAppEngine("ai_app_publish_store", {
-            Action: "Publish",
-            AppId: currentApp.value.Id
-        });
-        ElMessage.success(data?.Message || "应用已发布到应用商城");
-    } catch (error) {
-        ElMessage.error(error.message || "发布应用商城失败");
-    } finally {
-        publishingStore.value = false;
     }
 }
 
@@ -1274,29 +1422,9 @@ function normalizePreviewUrl(url) {
 }
 
 async function refreshPreviewHtml(url = previewUrl.value) {
-    previewHtml.value = "";
     const target = normalizePreviewUrl(url);
     previewUrl.value = target;
-    if (!target || /^data:|^blob:/i.test(target)) return;
-    previewLoading.value = true;
-    try {
-        const response = await fetch(target, {
-            headers: {
-                authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : "",
-                lang: DiyCommon.GetCurrentLang ? DiyCommon.GetCurrentLang() : "zh-CN"
-            }
-        });
-        const html = await response.text();
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        previewHtml.value = normalizePreviewHtml(html, target);
-    } catch (error) {
-        previewHtml.value = "";
-        console.warn("[AiApp] preview fetch failed, fallback to iframe src", error);
-    } finally {
-        previewLoading.value = false;
-    }
+    previewLoading.value = false;
 }
 
 async function copyPreviewUrl() {
@@ -1307,67 +1435,6 @@ async function copyPreviewUrl() {
     } catch {
         ElMessage.warning("复制失败，请手动复制预览地址");
     }
-}
-
-function buildPreviewMessageHtml(message) {
-    const text = escapeHtml(String(message || ""));
-    return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#344054;display:grid;place-items:center;min-height:100vh}.box{padding:22px 26px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;box-shadow:0 12px 32px rgba(15,23,42,.08)}</style></head><body><div class="box">${text}</div></body></html>`;
-}
-
-function normalizePreviewHtml(html, baseUrl) {
-    const raw = String(html || "").trim();
-    const content = isEncodedHtml(raw) ? decodeHtmlEntities(raw) : raw;
-    if (!content) return buildPreviewMessageHtml("预览内容为空");
-    const base = `<base href="${escapeHtml(getPreviewBaseHref(baseUrl))}">`;
-    const previewStyle = buildPreviewShellStyle(content);
-    if (/<head[^>]*>/i.test(content) && !/<base\s/i.test(content)) {
-        return content.replace(/<head([^>]*)>/i, `<head$1>${base}${previewStyle}`);
-    }
-    if (/<head[^>]*>/i.test(content)) {
-        return content.replace(/<head([^>]*)>/i, `<head$1>${previewStyle}`);
-    }
-    if (/<!doctype html>|<html[\s>]/i.test(content)) return content;
-    return `<!doctype html><html><head><meta charset="utf-8">${base}${previewStyle}</head><body>${content}</body></html>`;
-}
-
-function buildPreviewShellStyle(content) {
-    if (!/UniApp|uni-app|tabbar|tab-bar|pages\/|App\.vue/i.test(content || "")) return "";
-    return `<style data-microi-ai-preview>
-html,body{min-height:100%;background:#eef4f8!important;margin:0;}
-body{display:grid;place-items:center;padding:22px;box-sizing:border-box;}
-.preview-shell,.phone-shell,.uniapp-preview,.page{box-sizing:border-box;}
-.preview-shell,.phone-shell,.uniapp-preview{width:min(430px,100%);min-height:720px;margin:0 auto;background:#fff;border-radius:30px;overflow:hidden;box-shadow:0 22px 70px rgba(16,24,40,.18);position:relative;}
-.tabbar,.tab-bar,.bottom-nav,.bottom-tab,.nav-tabs{position:absolute!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;z-index:20;background:#fff!important;box-shadow:0 -8px 24px rgba(15,23,42,.08);}
-.page{min-height:720px!important;padding-bottom:78px!important;overflow:auto!important;}
-@media(max-width:520px){body{padding:0}.preview-shell,.phone-shell,.uniapp-preview{width:100%;min-height:100vh;border-radius:0;box-shadow:none}.page{min-height:100vh!important}}
-</style>`;
-}
-
-function isEncodedHtml(text) {
-    return /^&lt;!doctype/i.test(text) || /^&lt;html[\s&]/i.test(text) || /&lt;(head|body|style|script|div|view|template)[\s&>]/i.test(text);
-}
-
-function decodeHtmlEntities(text) {
-    const textarea = document.createElement("textarea");
-    textarea.innerHTML = text;
-    return textarea.value;
-}
-
-function getPreviewBaseHref(baseUrl) {
-    try {
-        return new URL(".", baseUrl).href;
-    } catch {
-        return baseUrl;
-    }
-}
-
-function escapeHtml(text) {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
 }
 
 function makeId(prefix) {
@@ -1389,7 +1456,7 @@ async function sendAppChat() {
         ContentType: file.type || "application/octet-stream",
         Size: file.size
     }));
-    const modelId = currentAiModel.value.AiModel;
+    const modelId = currentChatModelId.value;
     const time = new Date().toTimeString().slice(0, 5);
     const userMessage = {
         id: makeId("user"),
@@ -1430,6 +1497,8 @@ async function sendAppChat() {
                 UserChatMsg: userMessage.content,
                 SystemChatMsg: buildAppChatPrompt(),
                 AiModel: modelId,
+                AiModelId: currentAiModel.value?.Id || "",
+                RelayModel: props.selectedRelayModel || "",
                 OsClient: DiyCommon.GetOsClient(),
                 ConversationId: `ai_app_${currentApp.value.Id}`,
                 Source: "ai-app-workbench",
@@ -1529,7 +1598,7 @@ async function saveAppChatMessage(message) {
     try {
         await DiyCommon.FormEngine.AddFormData("mic_ai_record", {
             AiModelId: currentAiModel.value?.Id || "",
-            AiModel: currentAiModel.value?.AiModel || "",
+            AiModel: currentChatModelId.value,
             Content: JSON.stringify({
                 Source: "ai-app-workbench",
                 ConversationId: `ai_app_${currentApp.value.Id}`,
@@ -1541,8 +1610,8 @@ async function saveAppChatMessage(message) {
                 RawContent: message.rawContent || message.content || "",
                 Thinking: message.thinking || "",
                 Attachments: message.attachments || [],
-                ModelId: message.modelId || currentAiModel.value?.AiModel || "",
-                AiModel: currentAiModel.value?.AiModel || "",
+                ModelId: message.modelId || currentChatModelId.value,
+                AiModel: currentChatModelId.value,
                 Time: message.time || new Date().toTimeString().slice(0, 5),
                 CreatedAt: new Date().toISOString()
             })
@@ -1942,6 +2011,43 @@ function scrollAppChat() {
     flex: 1;
 }
 
+.file-panel header {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+.file-tree-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.file-tree-title strong,
+.file-tree-title :deep(.el-tag) {
+    white-space: nowrap;
+}
+
+.file-panel header :deep(.el-segmented) {
+    flex: 0 0 auto;
+    padding: 3px;
+    border: 1px solid #e5eaf2;
+    border-radius: 9px;
+    background: #f4f6fa;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.file-panel header :deep(.el-segmented__item) {
+    min-width: 42px;
+    border-radius: 7px;
+}
+
+.file-panel header :deep(.el-segmented__item.is-selected) {
+    color: #ff5f2e;
+    background: #fff;
+}
+
 .source-tree {
     --el-tree-node-hover-bg-color: #fff2ed;
     background: transparent;
@@ -2102,14 +2208,65 @@ function scrollAppChat() {
 }
 
 .build-pane { display: flex; flex-direction: column; }
-.build-file-toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #edf1f7; color: #667085; font-size: 12px; }
-.build-file-toolbar .el-select { width: min(620px, 80%); }
 
-.preview-frame {
+.preview-pane {
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-height: 48px;
+    padding: 7px 12px;
+    border-bottom: 1px solid #edf1f7;
+    background: #fff;
+    color: #667085;
+    font-size: 12px;
+}
+
+.preview-canvas {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    overflow: auto;
+    background: #eef2f7;
+}
+
+.preview-canvas.is-desktop .preview-frame {
     width: 100%;
     height: 100%;
+}
+
+.preview-canvas.is-mobile {
+    align-items: flex-start;
+    padding: 20px;
+}
+
+.preview-canvas.is-mobile .preview-frame {
+    flex: 0 0 430px;
+    width: 430px;
+    max-width: 100%;
+    height: min(780px, calc(100vh - 310px));
+    min-height: 620px;
+    border: 8px solid #202734;
+    border-radius: 28px;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, .22);
+}
+
+.preview-frame {
     border: 0;
+    border-radius: 0;
     background: #eef4f8;
+}
+
+.preview-micro-app {
+    display: block;
+    overflow: auto;
 }
 
 .empty-area,

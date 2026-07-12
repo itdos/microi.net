@@ -23,8 +23,8 @@
         </button>
       </nav>
       <div class="sidebar-footer">
-        <a href="/login.html">登录/注册</a>
-        <a href="/">返回官网</a>
+        <a href="/login.html">{{ t('loginRegister') }}</a>
+        <a href="/">{{ t('backWebsite') }}</a>
       </div>
     </aside>
 
@@ -36,26 +36,28 @@
           <p class="header-desc">{{ pageDesc }}</p>
         </div>
         <div class="header-actions">
-          <a v-if="primaryTenantUrl" class="ghost-action" :href="primaryTenantUrl" target="_blank" rel="noopener">进入后台</a>
-          <button class="primary-action" type="button" @click="refreshCenter">刷新</button>
+          <a v-if="primaryTenantUrl" class="ghost-action" :href="primaryTenantUrl" target="_blank" rel="noopener">{{ t('enterBackend') }}</a>
+          <button class="primary-action" type="button" @click="refreshCenter">{{ t('refresh') }}</button>
         </div>
       </header>
 
+      <div v-if="profileNotice" class="profile-notice" :class="profileNotice.type" role="status">{{ profileNotice.message }}</div>
+
       <section v-if="!isAuthed" class="state-panel">
-        <h2>请先登录</h2>
-        <p>登录后可以查看你的 SaaS 租户、免费创建第一个数据库，并进入后台管理系统。</p>
-        <a class="primary-action inline" href="/login.html?redirect=/profile.html">去登录</a>
+        <h2>{{ t('loginRequired') }}</h2>
+        <p>{{ t('loginRequiredDesc') }}</p>
+        <a class="primary-action inline" href="/login.html?redirect=/profile.html">{{ t('goLogin') }}</a>
       </section>
 
       <template v-else>
         <section v-if="activeMenu === 'overview'" class="profile-hero">
           <div>
             <p class="eyebrow">Microi Account</p>
-            <h2>个人中心</h2>
-            <p>{{ profileName }} 的 SaaS 工作空间、授权状态和租户入口都在这里。</p>
+            <h2>{{ t('overview') }}</h2>
+            <p>{{ t('overviewDesc', { name: profileName }) }}</p>
           </div>
           <article class="license-card">
-            <span>当前授权</span>
+            <span>{{ t('currentLicense') }}</span>
             <strong>{{ licenseDisplayTitle }}</strong>
             <small>{{ licenseDisplayDesc }}</small>
           </article>
@@ -63,48 +65,61 @@
 
         <section v-if="activeMenu === 'overview'" class="overview-grid">
           <article class="stat-card">
-            <span>已创建租户</span>
+            <span>{{ t('tenantCreated') }}</span>
             <strong>{{ tenants.length }}</strong>
-            <small>免费额度 {{ tenantCenter.FreeQuota || 1 }} 个</small>
+            <small>{{ t('freeQuota', { count: tenantCenter.FreeQuota || 1 }) }}</small>
           </article>
           <article class="stat-card">
-            <span>免费创建</span>
-            <strong>{{ canCreateFreeTenant ? '可用' : '已使用' }}</strong>
-            <small>每个账号可免费创建 1 个租户</small>
+            <span>{{ t('freeCreate') }}</span>
+            <strong>{{ canCreateFreeTenant ? t('available') : t('used') }}</strong>
+            <small>{{ t('freeCreateTip') }}</small>
           </article>
           <article class="stat-card">
-            <span>扩容价格</span>
+            <span>{{ t('expansionPrice') }}</span>
             <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }}</strong>
-            <small>第二个租户起 / 年</small>
+            <small>{{ t('expansionPriceTip') }}</small>
           </article>
           <article class="stat-card token-stat-card">
-            <span>AI 中转站 Token</span>
+            <span>{{ t('relayToken') }}</span>
             <strong>{{ formatTokenNumber(relayToken.RemainingTokens) }}</strong>
-            <small>已用 {{ formatTokenNumber(relayToken.UsedTokens) }} / 赠送 {{ formatTokenNumber(relayToken.GiftTokens) }}</small>
+            <small>{{ t('tokenUsedTotal', { used: formatTokenNumber(relayToken.UsedTokens), total: formatTokenNumber(relayToken.GiftTokens) }) }}</small>
           </article>
         </section>
+
+        <ProfileAiSummary
+          v-if="activeMenu === 'overview'"
+          compact
+          :api-key="aiApiKey"
+          :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
+          :total="relayToken.GiftTokens"
+          :used="relayToken.UsedTokens"
+          :remaining="relayToken.RemainingTokens"
+          :locale="locale"
+          :labels="aiSummaryLabels"
+          @copy="copyAiApiKey"
+        />
 
         <section v-if="activeMenu === 'overview'" class="content-panel tenant-overview-panel">
           <div class="panel-head">
             <div>
-              <h2>SaaS 租户</h2>
-              <p>每个租户都是独立低代码数据库与访问入口。默认管理员为 admin，默认密码为租户 Key，请首次登录后及时修改。</p>
+              <h2>{{ t('saasTenants') }}</h2>
+              <p>{{ t('tenantDesc') }}</p>
             </div>
-            <button class="primary-action small" type="button" @click="navigateProfile('create')">创建租户</button>
+            <button class="primary-action small" type="button" @click="navigateProfile('create')">{{ t('createTenant') }}</button>
           </div>
-          <div v-if="isLoading" class="loading-row">正在读取租户信息...</div>
+          <div v-if="isLoading" class="loading-row">{{ t('loadingTenants') }}</div>
           <TenantList v-else :tenants="tenants" />
           <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
           <div class="billing-strip">
             <div>
-              <span>免费额度</span>
-              <strong>1 个租户</strong>
-              <small>适合试用、学习和小型系统搭建。</small>
+              <span>{{ t('freeCreate') }}</span>
+              <strong>{{ t('oneTenant') }}</strong>
+              <small>{{ t('freeQuotaDesc') }}</small>
             </div>
             <div>
-              <span>扩容价格</span>
-              <strong>¥{{ tenantCenter.NextTenantPrice || 9.9 }} / 年 / 个</strong>
-              <small>第二个租户开始计费，付费开通功能后续上线。</small>
+              <span>{{ t('expansionPrice') }}</span>
+              <strong>{{ t('expansionAmount', { price: tenantCenter.NextTenantPrice || 9.9 }) }}</strong>
+              <small>{{ t('expansionDesc') }}</small>
             </div>
           </div>
         </section>
@@ -113,30 +128,30 @@
           <form class="content-panel create-panel" @submit.prevent="createTenant">
             <div class="panel-head">
               <div>
-                <h2>{{ canCreateFreeTenant ? '创建免费租户' : '创建更多租户' }}</h2>
-                <p>{{ canCreateFreeTenant ? '第一个租户免费，创建完成后即可访问后台。' : '第二个租户开始每个 9.9 元/年，付费开通功能即将开放。' }}</p>
+                <h2>{{ canCreateFreeTenant ? t('createFreeTenant') : t('createMoreTenants') }}</h2>
+                <p>{{ canCreateFreeTenant ? t('firstTenantFree') : t('moreTenantPaid') }}</p>
               </div>
             </div>
             <div class="form-row">
-              <label>租户 Key</label>
-              <input v-model.trim="tenantKey" placeholder="例如 anderson" autocomplete="off" />
-              <small>必须以英文字母开头，仅支持英文字母、数字、- 和 _。</small>
+              <label>{{ t('tenantKey') }}</label>
+              <input v-model.trim="tenantKey" :placeholder="t('tenantKeyPlaceholder')" autocomplete="off" />
+              <small>{{ t('tenantKeyTip') }}</small>
             </div>
             <div class="form-row">
-              <label>系统名称</label>
-              <input v-model.trim="systemName" placeholder="例如 Anderson CRM" autocomplete="organization" />
-              <small>创建后会写入新库系统设置的 SysTitle / SysShortTitle。</small>
+              <label>{{ t('systemName') }}</label>
+              <input v-model.trim="systemName" :placeholder="t('systemNamePlaceholder')" autocomplete="organization" />
+              <small>{{ t('systemNameTip') }}</small>
             </div>
             <p v-if="createError" class="error-box">{{ createError }}</p>
             <button class="primary-action submit" type="submit" :disabled="isCreating || !canCreateFreeTenant">
-              {{ isCreating ? '正在创建...' : canCreateFreeTenant ? '创建免费租户' : '付费开通即将上线' }}
+              {{ isCreating ? t('creating') : canCreateFreeTenant ? t('createFreeTenant') : t('paymentComing') }}
             </button>
           </form>
 
           <div class="content-panel progress-panel">
             <div class="panel-head">
               <div>
-                <h2>开通进度</h2>
+                <h2>{{ t('progress') }}</h2>
                 <p>{{ tenantProgress || tenantStepSummary }}</p>
               </div>
             </div>
@@ -154,16 +169,42 @@
         </section>
 
         <section v-if="activeMenu === 'account'" class="content-panel">
-          <h2>账号信息</h2>
+          <h2>{{ t('account') }}</h2>
           <div class="account-grid">
-            <label>账号</label>
+            <label>{{ t('accountLabel') }}</label>
             <span>{{ currentUser.Account || '-' }}</span>
-            <label>姓名</label>
+            <label>{{ t('nameLabel') }}</label>
             <span>{{ currentUser.Name || currentUser.NickName || '-' }}</span>
-            <label>手机号</label>
+            <label>{{ t('phoneLabel') }}</label>
             <span>{{ currentUser.Phone || '-' }}</span>
           </div>
-          <button class="ghost-action danger" type="button" @click="logout">退出登录</button>
+          <button class="ghost-action danger" type="button" @click="logout">{{ t('logout') }}</button>
+        </section>
+
+        <section v-if="activeMenu === 'ai'" class="content-panel">
+          <ProfileAiSummary
+            :api-key="aiApiKey"
+            :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
+            :total="relayToken.GiftTokens"
+            :used="relayToken.UsedTokens"
+            :remaining="relayToken.RemainingTokens"
+            :locale="locale"
+            :labels="aiSummaryLabels"
+            @copy="copyAiApiKey"
+          />
+          <div class="usage-table-wrap">
+            <table class="usage-table">
+              <thead><tr><th>{{ t('time') }}</th><th>{{ t('model') }}</th><th>{{ t('input') }}</th><th>{{ t('output') }}</th><th>{{ t('deduction') }}</th><th>{{ t('remaining') }}</th><th>{{ t('source') }}</th></tr></thead>
+              <tbody>
+                <tr v-for="item in relayUsageLogs" :key="item.Id">
+                  <td>{{ item.CreateTime }}</td><td>{{ item.AiModel || '-' }}</td><td>{{ item.PromptTokens || 0 }}</td>
+                  <td>{{ item.CompletionTokens || 0 }}</td><td>{{ item.TotalTokens || 0 }}</td>
+                  <td>{{ formatTokenNumber(item.RemainingTokens) }}</td><td>{{ item.Source || '-' }}</td>
+                </tr>
+                <tr v-if="relayUsageLogs.length === 0"><td colspan="7">{{ t('noUsage') }}</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <p v-if="profileError" class="page-error">{{ profileError }}</p>
@@ -173,12 +214,16 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from 'vue'
+import ProfileAiSummary from './ProfileAiSummary.vue'
+import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
 
 const activeMenu = ref('overview')
+const locale = ref(getInitialProfileLocale())
+const t = (key, params = {}) => translateProfile(locale.value, key, params)
 const authToken = ref('')
 const currentUser = ref(null)
 const tenantCenter = ref({})
@@ -190,6 +235,7 @@ const systemName = ref('')
 const tenantProgress = ref('')
 const createError = ref('')
 const profileError = ref('')
+const profileNotice = ref(null)
 const tenantSteps = ref([])
 const tenantProgressTick = ref(Date.now())
 const relayToken = ref({
@@ -197,33 +243,43 @@ const relayToken = ref({
   UsedTokens: 0,
   RemainingTokens: 100000
 })
+const aiApiKey = ref('')
+const aiApiEndpoint = ref('https://api.itdos.com/v1')
+const relayUsageLogs = ref([])
 
 let tenantProgressTimer = null
+let profileNoticeTimer = null
 let tenantProgressTraceId = ''
 let tenantProgressRestorePending = false
 
-const menus = [
-  { key: 'overview', name: '个人中心', icon: '⌂' },
-  { key: 'create', name: '创建租户', icon: '+' },
-  { key: 'account', name: '账号信息', icon: '◉' }
-]
+const menus = computed(() => [
+  { key: 'overview', name: t('overview'), icon: '⌂' },
+  { key: 'create', name: t('createTenant'), icon: '+' },
+  { key: 'ai', name: t('aiRelay'), icon: 'AI' },
+  { key: 'account', name: t('account'), icon: '◉' }
+])
 
-const menuKeys = menus.map(item => item.key)
+const menuKeys = ['overview', 'create', 'ai', 'account']
 const routeAliases = { tenants: 'overview', billing: 'overview' }
 
-const defaultTenantSteps = [
-  { Key: 'validate', Title: '校验账号与租户Key', Detail: '检查登录态、租户Key格式和系统名称。', Status: 'pending' },
-  { Key: 'quota', Title: '检查免费开通额度', Detail: '每个账号可免费创建一个租户，第二个起按 9.9 元/年。', Status: 'pending' },
-  { Key: 'columns', Title: '检查主库字段', Detail: '补齐官网开通所需的租户归属字段。', Status: 'pending' },
-  { Key: 'database-info', Title: '生成数据库信息', Detail: '生成数据库名、连接串和访问域名。', Status: 'pending' },
-  { Key: 'create-database', Title: '创建租户数据库', Detail: '在当前数据库服务中创建独立租户库。', Status: 'pending' },
-  { Key: 'import-template', Title: '下载并导入空库模板', Detail: '每次都从 CDN 获取最新 microi_empty_temp.sql.zip。', Status: 'pending' },
-  { Key: 'create-osclient', Title: '写入SaaS引擎配置', Detail: '复制主租户公共配置并写入租户域名、连接串和JWT密钥。', Status: 'pending' },
-  { Key: 'owner', Title: '绑定账号与租户', Detail: '记录租户归属，后续个人中心按账号展示。', Status: 'pending' },
-  { Key: 'admin', Title: '关联默认管理员', Detail: '复用空库模板中的默认 admin 账号，不额外插入管理员数据。', Status: 'pending' },
-  { Key: 'sys-config', Title: '初始化系统设置', Detail: '复制主库系统设置并归一化为一条启用配置。', Status: 'pending' },
-  { Key: 'reload', Title: '刷新SaaS引擎缓存', Detail: '让新租户无需重启即可访问。', Status: 'pending' }
-]
+const tenantStepMessages = {
+  'zh-CN': [
+    ['validate', '校验账号与租户Key', '检查登录态、租户Key格式和系统名称。'], ['quota', '检查免费开通额度', '每个账号可免费创建一个租户，第二个起按 9.9 元/年。'],
+    ['columns', '检查主库字段', '补齐官网开通所需的租户归属字段。'], ['database-info', '生成数据库信息', '生成数据库名、连接串和访问域名。'],
+    ['create-database', '创建租户数据库', '在当前数据库服务中创建独立租户库。'], ['import-template', '下载并导入空库模板', '每次都从 CDN 获取最新 microi_empty_temp.sql.zip。'],
+    ['create-osclient', '写入SaaS引擎配置', '复制主租户公共配置并写入租户域名、连接串和JWT密钥。'], ['owner', '绑定账号与租户', '记录租户归属，后续个人中心按账号展示。'],
+    ['admin', '关联默认管理员', '复用空库模板中的默认 admin 账号，不额外插入管理员数据。'], ['sys-config', '初始化系统设置', '复制主库系统设置并归一化为一条启用配置。'],
+    ['reload', '刷新SaaS引擎缓存', '让新租户无需重启即可访问。']
+  ],
+  'en-US': [
+    ['validate', 'Validate account and tenant key', 'Check the session, tenant key format, and system name.'], ['quota', 'Check free quota', 'Each account has one free tenant; additional tenants cost ¥9.9/year.'],
+    ['columns', 'Check main database fields', 'Add the ownership fields required by website provisioning.'], ['database-info', 'Generate database information', 'Generate the database name, connection string, and domain.'],
+    ['create-database', 'Create tenant database', 'Create an independent tenant database on the current server.'], ['import-template', 'Import the empty template', 'Download the latest microi_empty_temp.sql.zip from CDN.'],
+    ['create-osclient', 'Write SaaS configuration', 'Copy shared settings and write the domain, connection string, and JWT secret.'], ['owner', 'Bind account and tenant', 'Save tenant ownership for the personal center.'],
+    ['admin', 'Bind default administrator', 'Reuse the admin account from the empty template.'], ['sys-config', 'Initialize system settings', 'Copy and normalize the enabled system configuration.'],
+    ['reload', 'Refresh SaaS cache', 'Make the new tenant available without restarting.']
+  ]
+}
 
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
 const canCreateFreeTenant = computed(() => tenants.value.length < (tenantCenter.value.FreeQuota || 1))
@@ -235,22 +291,22 @@ const licenseInfo = computed(() => {
   const raw = String(currentUser.value?.LicenseType || tenantCenter.value?.LicenseType || tenantCenter.value?.SysConfig?.LicenseType || '').trim().toLowerCase()
   if (raw === 'personal') {
     return {
-      short: '个人版',
-      title: 'Personal（个人版）',
-      desc: '授权永久有效，售后服务支持有效期 1 年，续费 499/年。'
+      short: t('licensePersonal'),
+      title: t('licensePersonalTitle'),
+      desc: t('licensePersonalDesc')
     }
   }
   if (raw === 'enterprise') {
     return {
-      short: '企业版',
-      title: 'Enterprise（企业版）',
-      desc: '授权永久有效，售后服务支持有效期 1 年，续费 2.5w/年。'
+      short: t('licenseEnterprise'),
+      title: t('licenseEnterpriseTitle'),
+      desc: t('licenseEnterpriseDesc')
     }
   }
   return {
-    short: '开源版',
-    title: '开源版',
-    desc: '当前账号使用开源版能力，可按需升级到个人版或企业版。'
+    short: t('licenseOpen'),
+    title: t('licenseOpen'),
+    desc: t('licenseOpenDesc')
   }
 })
 const licenseShortText = computed(() => licenseInfo.value.short)
@@ -258,28 +314,30 @@ const licenseDisplayTitle = computed(() => licenseInfo.value.title)
 const licenseDisplayDesc = computed(() => licenseInfo.value.desc)
 const pageTitle = computed(() => {
   const map = {
-    overview: '个人中心',
-    create: '创建租户',
-    account: '账号信息'
+    overview: t('overview'),
+    create: t('createTenant'),
+    ai: t('aiRelay'),
+    account: t('account')
   }
-  return map[activeMenu.value] || '个人中心'
+  return map[activeMenu.value] || t('overview')
 })
 const pageDesc = computed(() => {
-  if (!isAuthed.value) return '登录后管理你的 Microi SaaS 工作空间。'
-  if (activeMenu.value === 'create') return '第一个租户免费，第二个开始每个 9.9 元/年。'
-  return `${profileName.value} 的 SaaS 工作空间管理。`
+  if (!isAuthed.value) return t('loginPageDesc')
+  if (activeMenu.value === 'create') return t('createPageDesc')
+  return t('pageDesc', { name: profileName.value })
 })
+const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken') }))
 const tenantStepSummary = computed(() => {
   const errorStep = tenantSteps.value.find(step => step.Status === 'error')
-  if (errorStep) return `${errorStep.Title}失败：${errorStep.Detail}`
+  if (errorStep) return t('failedStep', { title: errorStep.Title, detail: errorStep.Detail })
   const runningStep = tenantSteps.value.find(step => step.Status === 'running')
   if (runningStep) {
     const index = tenantSteps.value.findIndex(step => step.Key === runningStep.Key) + 1
-    return `正在执行第 ${index}/${tenantSteps.value.length} 步：${runningStep.Title}，已耗时 ${formatStepElapsed(runningStep)} 秒`
+    return t('runningStep', { index, count: tenantSteps.value.length, title: runningStep.Title, seconds: formatStepElapsed(runningStep) })
   }
   const doneCount = tenantSteps.value.filter(step => step.Status === 'done').length
-  if (doneCount === tenantSteps.value.length) return '所有步骤已完成。'
-  return `准备创建租户，共 ${tenantSteps.value.length} 步。`
+  if (doneCount === tenantSteps.value.length) return t('allDone')
+  return t('preparingSteps', { count: tenantSteps.value.length })
 })
 
 const TenantList = defineComponent({
@@ -290,19 +348,19 @@ const TenantList = defineComponent({
     }, [
       h('div', { class: 'tenant-card-top' }, [
         h('div', { class: 'tenant-title-block' }, [
-          h('strong', tenant.ClientName || tenant.OsClient || '未命名租户'),
+          h('strong', tenant.ClientName || tenant.OsClient || t('unnamedTenant')),
           h('small', tenant.OsClient || '-')
         ]),
-        h('span', { class: ['tenant-status', tenant.IsEnable == 1 ? 'enabled' : 'disabled'] }, tenant.IsEnable == 1 ? '启用中' : '已停用')
+        h('span', { class: ['tenant-status', tenant.IsEnable == 1 ? 'enabled' : 'disabled'] }, tenant.IsEnable == 1 ? t('enabled') : t('disabled'))
       ]),
       h('div', { class: 'tenant-domain' }, [
-        h('span', '访问入口'),
+        h('span', t('accessEntry')),
         h('a', { href: tenant.Url, target: '_blank', rel: 'noopener noreferrer' }, tenant.DomainName || tenant.Url || '-')
       ]),
       h('div', { class: 'tenant-password-tip' }, [
-        h('span', '默认管理员'),
+        h('span', t('defaultAdmin')),
         h('b', `admin / ${tenant.AdminDefaultPassword || tenant.OsClient || '-'}`),
-        h('small', '请首次登录后及时修改密码')
+        h('small', t('changePassword'))
       ]),
       h('div', { class: 'tenant-card-actions' }, [
         h('a', {
@@ -310,12 +368,12 @@ const TenantList = defineComponent({
           href: tenant.Url,
           target: '_blank',
           rel: 'noopener noreferrer'
-        }, '进入后台'),
+        }, t('enterBackend')),
         h('button', {
           class: 'tenant-copy',
           type: 'button',
           onClick: () => copyTenantUrl(tenant.Url)
-        }, '复制链接')
+        }, t('copyLink'))
       ])
     ])))
   }
@@ -325,16 +383,17 @@ const EmptyTenants = defineComponent({
   emits: ['create'],
   setup(_, { emit }) {
     return () => h('div', { class: 'empty-card' }, [
-      h('h3', '还没有租户'),
-      h('p', '你可以免费创建第一个 SaaS 数据库，创建完成后立即进入后台使用。'),
-      h('button', { class: 'primary-action small', type: 'button', onClick: () => emit('create') }, '创建免费租户')
+      h('h3', t('noTenants')),
+      h('p', t('noTenantsDesc')),
+      h('button', { class: 'primary-action small', type: 'button', onClick: () => emit('create') }, t('createFreeTenant'))
     ])
   }
 })
 
-function copyTenantUrl(url) {
-  if (!url || typeof navigator === 'undefined' || !navigator.clipboard) return
-  navigator.clipboard.writeText(url)
+async function copyTenantUrl(url) {
+  if (!url) return
+  const copied = await copyTextValue(url)
+  showProfileNotice(copied ? 'success' : 'error', copied ? t('copySuccess') : t('copyFailed'))
 }
 
 function normalizeProfileRoute(raw) {
@@ -399,13 +458,30 @@ function authHeaders() {
   return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
 }
 
+function syncAuthTokenFromResponse(response) {
+  const nextToken = normalizeToken(response?.headers?.get?.('authorization'))
+  if (!nextToken || nextToken === authToken.value) return
+  authToken.value = nextToken
+  localStorage.setItem('microi_doc_token', nextToken)
+  window.dispatchEvent(new CustomEvent('microi-token-refreshed'))
+}
+
+async function authenticatedFetch(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), ...authHeaders() }
+  })
+  syncAuthTokenFromResponse(response)
+  return response
+}
+
 function formatTokenNumber(value) {
   const num = Number(value || 0)
-  return Number.isFinite(num) ? num.toLocaleString('zh-CN') : '0'
+  return Number.isFinite(num) ? num.toLocaleString(locale.value) : '0'
 }
 
 function createTenantSteps() {
-  return defaultTenantSteps.map(step => ({ ...step }))
+  return tenantStepMessages[locale.value].map(([Key, Title, Detail]) => ({ Key, Title, Detail, Status: 'pending' }))
 }
 
 tenantSteps.value = createTenantSteps()
@@ -443,9 +519,9 @@ function formatStepElapsed(step) {
 }
 
 function stepElapsedText(step) {
-  if (!step || step.Status === 'pending') return '等待中'
-  if (step.Status === 'skipped') return '未执行'
-  return `耗时 ${formatStepElapsed(step)} 秒`
+  if (!step || step.Status === 'pending') return t('waiting')
+  if (step.Status === 'skipped') return t('skipped')
+  return t('elapsed', { seconds: formatStepElapsed(step) })
 }
 
 function restoreSession() {
@@ -458,21 +534,50 @@ function restoreSession() {
   }
 }
 
+function isSessionExpiredResult(result) {
+  const code = Number(result?.Code ?? result?.code ?? 0)
+  const message = String(result?.Msg || result?.msg || '')
+  return code === 1001 || code === 1002 || /登录身份已过期|请重新登录|token.*(expired|invalid)|session.*expired/i.test(message)
+}
+
+function clearSession() {
+  localStorage.removeItem('microi_doc_user')
+  localStorage.removeItem('microi_doc_token')
+  localStorage.removeItem('microi_doc_tenant')
+  localStorage.removeItem('microi_doc_tenant_url')
+  localStorage.removeItem('microi_doc_phone')
+  authToken.value = ''
+  currentUser.value = null
+  tenants.value = []
+  tenantCenter.value = {}
+  window.dispatchEvent(new CustomEvent('microi-auth-expired'))
+}
+
+function handleSessionExpired() {
+  clearSession()
+  profileError.value = ''
+  const redirect = '/profile.html' + (window.location.hash || '#/overview')
+  window.location.replace(`/login.html?redirect=${encodeURIComponent(redirect)}&reason=expired`)
+}
+
 async function refreshCenter() {
   if (!isAuthed.value) return
   isLoading.value = true
   profileError.value = ''
   try {
-    const resp = await fetch(apiEngineUrl('official_tenant_center'), {
+    const resp = await authenticatedFetch(apiEngineUrl('official_tenant_center'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ OsClient: OS_CLIENT })
     })
     const result = await resp.json()
     if (result.Code !== 1) {
-      profileError.value = result.Msg || '租户信息读取失败。'
-      if (result.Code === 1001) logout(false)
-      return
+      if (isSessionExpiredResult(result)) {
+        handleSessionExpired()
+        return false
+      }
+      profileError.value = localizeServerMessage(result.Msg) || t('tenantReadFailed')
+      return false
     }
     tenantCenter.value = result.Data || {}
     tenants.value = Array.isArray(result.Data?.Tenants) ? result.Data.Tenants : []
@@ -480,9 +585,11 @@ async function refreshCenter() {
       localStorage.setItem('microi_doc_tenant', tenants.value[0].OsClient || '')
       localStorage.setItem('microi_doc_tenant_url', tenants.value[0].Url || '')
     }
-    await refreshRelayTokenSummary()
+    await Promise.all([refreshRelayTokenSummary(), refreshAiApiKey(), refreshAiUsage()])
+    return true
   } catch {
-    profileError.value = '网络异常，租户信息读取失败。'
+    profileError.value = t('networkFailed')
+    return false
   } finally {
     isLoading.value = false
   }
@@ -491,12 +598,16 @@ async function refreshCenter() {
 async function refreshRelayTokenSummary() {
   if (!isAuthed.value) return
   try {
-    const resp = await fetch(`${API_BASE}/api/Ai/RelayTokenSummary?OsClient=${OS_CLIENT}`, {
+    const resp = await authenticatedFetch(`${API_BASE}/api/Ai/RelayTokenSummary?OsClient=${OS_CLIENT}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ OsClient: OS_CLIENT })
     })
     const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
     if (result.Code === 1 && result.Data) {
       relayToken.value = {
         GiftTokens: Number(result.Data.GiftTokens || 100000),
@@ -509,16 +620,93 @@ async function refreshRelayTokenSummary() {
   }
 }
 
+async function refreshAiApiKey() {
+  try {
+    const resp = await authenticatedFetch(`${API_BASE}/api/Ai/GetUserAiApiKey?OsClient=${OS_CLIENT}`, { method: 'POST' })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    if (result.Code === 1 && result.Data) {
+      aiApiKey.value = result.Data.AiApiKey || ''
+      aiApiEndpoint.value = result.Data.Endpoint || 'https://api.itdos.com/v1'
+    } else if (result.Msg) {
+      profileError.value = localizeServerMessage(result.Msg)
+    }
+  } catch (error) {
+    profileError.value = error?.message || t('networkFailed')
+  }
+}
+
+async function refreshAiUsage() {
+  try {
+    const resp = await authenticatedFetch(`${API_BASE}/api/Ai/GetUserAiUsage?OsClient=${OS_CLIENT}&pageSize=50`, { method: 'POST' })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    if (result.Code === 1 && result.Data) {
+      relayToken.value = {
+        GiftTokens: Number(result.Data.GiftTokens || 100000),
+        UsedTokens: Number(result.Data.UsedTokens || 0),
+        RemainingTokens: Number(result.Data.RemainingTokens || 0)
+      }
+      relayUsageLogs.value = Array.isArray(result.Data.Logs) ? result.Data.Logs : []
+    }
+  } catch {}
+}
+
+async function copyAiApiKey() {
+  if (!aiApiKey.value) return
+  const copied = await copyTextValue(aiApiKey.value)
+  showProfileNotice(copied ? 'success' : 'error', copied ? t('copySuccess') : t('copyFailed'))
+}
+
+async function copyTextValue(value) {
+  if (!value || typeof document === 'undefined') return false
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value)
+      return true
+    }
+  } catch {}
+  const input = document.createElement('textarea')
+  input.value = value
+  input.setAttribute('readonly', '')
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  document.body.appendChild(input)
+  input.select()
+  let copied = false
+  try { copied = document.execCommand('copy') } catch {}
+  input.remove()
+  return copied
+}
+
+function showProfileNotice(type, message) {
+  profileNotice.value = { type, message }
+  if (profileNoticeTimer) clearTimeout(profileNoticeTimer)
+  profileNoticeTimer = setTimeout(() => { profileNotice.value = null }, 2600)
+}
+
+function localizeServerMessage(message) {
+  const text = String(message || '').trim()
+  if (/登录身份已过期|token.*(expired|invalid)|session.*expired/i.test(text)) return t('sessionExpired')
+  return text
+}
+
 async function createTenant() {
   createError.value = ''
   tenantProgress.value = ''
   if (isCreating.value || !canCreateFreeTenant.value) return
   if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(tenantKey.value)) {
-    createError.value = '租户 Key 格式不正确。'
+    createError.value = t('invalidTenantKey')
     return
   }
   if (!systemName.value) {
-    createError.value = '请输入系统名称。'
+    createError.value = t('enterSystemName')
     return
   }
   isCreating.value = true
@@ -526,15 +714,15 @@ async function createTenant() {
   let keepPollingAfterRequestError = false
   startTenantProgress(traceId)
   try {
-    const resp = await fetch(apiEngineUrl('official_create_tenant'), {
+    const resp = await authenticatedFetch(apiEngineUrl('official_create_tenant'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ TenantKey: tenantKey.value, SystemName: systemName.value, TraceId: traceId, _Lang: 'zh-CN' })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ TenantKey: tenantKey.value, SystemName: systemName.value, TraceId: traceId, _Lang: locale.value })
     })
     const result = await resp.json()
     mergeTenantSteps(result.DataAppend?.Steps || result.Data?.Steps)
     if (result.Code !== 1) {
-      createError.value = result.Msg || '租户创建失败。'
+      createError.value = result.Msg || t('tenantCreateFailed')
       tenantProgress.value = createError.value
       return
     }
@@ -544,14 +732,14 @@ async function createTenant() {
       startTenantProgress(returnedTraceId)
     }
     if (data.Status === 'running' || data.TaskId || data.TraceId) {
-      tenantProgress.value = result.Msg || '租户创建任务已提交，正在后台处理。'
+      tenantProgress.value = result.Msg || t('taskSubmitted')
       keepPollingAfterRequestError = true
       return
     }
     const url = data.Url || (data.DomainName ? `https://${data.DomainName}` : `https://${tenantKey.value}.microi.net`)
     localStorage.setItem('microi_doc_tenant', data.OsClient || tenantKey.value)
     localStorage.setItem('microi_doc_tenant_url', url)
-    tenantProgress.value = `租户创建成功，访问地址：${url}`
+    tenantProgress.value = t('tenantCreatedAt', { url })
     tenantKey.value = ''
     systemName.value = ''
     await refreshCenter()
@@ -559,7 +747,7 @@ async function createTenant() {
   } catch {
     keepPollingAfterRequestError = true
     createError.value = ''
-    tenantProgress.value = '请求连接已中断，后台可能仍在创建租户；页面会继续读取实时进度。'
+    tenantProgress.value = t('connectionInterrupted')
   } finally {
     if (!keepPollingAfterRequestError) {
       stopTenantProgress()
@@ -599,10 +787,10 @@ async function restoreActiveTenantProgress() {
   if (!isAuthed.value || activeMenu.value !== 'create' || tenantProgressTimer || tenantProgressRestorePending) return
   tenantProgressRestorePending = true
   try {
-    const resp = await fetch(apiEngineUrl('official_create_tenant_progress'), {
+    const resp = await authenticatedFetch(apiEngineUrl('official_create_tenant_progress'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ ActiveOnly: 1, _Lang: 'zh-CN' })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ActiveOnly: 1, _Lang: locale.value })
     })
     const result = await resp.json()
     const data = result.Data || {}
@@ -614,7 +802,7 @@ async function restoreActiveTenantProgress() {
     if (!systemName.value && activeTask.SystemName) systemName.value = activeTask.SystemName
     createError.value = ''
     isCreating.value = true
-    tenantProgress.value = data.Msg || '检测到租户创建任务正在后台执行，已恢复实时进度。'
+    tenantProgress.value = data.Msg || t('restoredProgress')
     mergeTenantSteps(data.Steps)
     startTenantProgress(traceId, { reset: false })
   } catch {
@@ -640,10 +828,10 @@ function markTenantStep(key, status, detail) {
 async function pollTenantProgress(traceId) {
   if (!traceId || traceId !== tenantProgressTraceId) return
   try {
-    const resp = await fetch(apiEngineUrl('official_create_tenant_progress'), {
+    const resp = await authenticatedFetch(apiEngineUrl('official_create_tenant_progress'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ TraceId: traceId, _Lang: 'zh-CN' })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ TraceId: traceId, _Lang: locale.value })
     })
     const result = await resp.json()
     const data = result.Data || {}
@@ -653,7 +841,7 @@ async function pollTenantProgress(traceId) {
       const url = payload.Url || (payload.DomainName ? `https://${payload.DomainName}` : `https://${payload.OsClient || tenantKey.value}.microi.net`)
       localStorage.setItem('microi_doc_tenant', payload.OsClient || tenantKey.value)
       localStorage.setItem('microi_doc_tenant_url', url)
-      tenantProgress.value = `租户创建成功，访问地址：${url}`
+      tenantProgress.value = t('tenantCreatedAt', { url })
       tenantKey.value = ''
       systemName.value = ''
       await refreshCenter()
@@ -695,15 +883,7 @@ function mergeTenantSteps(serverSteps) {
 }
 
 function logout(goLogin = true) {
-  localStorage.removeItem('microi_doc_user')
-  localStorage.removeItem('microi_doc_token')
-  localStorage.removeItem('microi_doc_tenant')
-  localStorage.removeItem('microi_doc_tenant_url')
-  localStorage.removeItem('microi_doc_phone')
-  authToken.value = ''
-  currentUser.value = null
-  tenants.value = []
-  tenantCenter.value = {}
+  clearSession()
   if (goLogin) window.location.href = '/'
 }
 
@@ -716,6 +896,10 @@ function onTenantUpdated() {
   refreshCenter()
 }
 
+function onProfileLocaleChange(event) {
+  locale.value = normalizeProfileLocale(event?.detail)
+}
+
 function redirectToLoginIfNeeded() {
   if (isAuthed.value) return false
   if (typeof window !== 'undefined') {
@@ -724,22 +908,38 @@ function redirectToLoginIfNeeded() {
   return true
 }
 
-onMounted(() => {
+watch(locale, (value) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem('microi_profile_locale', value)
+  document.documentElement.lang = value
+  const translated = createTenantSteps()
+  tenantSteps.value = tenantSteps.value.map((step, index) => ({
+    ...(translated.find(item => item.Key === step.Key) || translated[index] || step),
+    ...step,
+    Title: translated.find(item => item.Key === step.Key)?.Title || step.Title,
+    Detail: translated.find(item => item.Key === step.Key)?.Detail || step.Detail
+  }))
+}, { immediate: true })
+
+onMounted(async () => {
   restoreSession()
   syncMenuFromHash()
   if (redirectToLoginIfNeeded()) return
   window.addEventListener('microi-login-success', onLoginSuccess)
   window.addEventListener('microi-tenant-updated', onTenantUpdated)
+  window.addEventListener('microi-profile-locale-change', onProfileLocaleChange)
   window.addEventListener('hashchange', syncMenuFromHash)
   window.addEventListener('popstate', syncMenuFromHash)
-  refreshCenter()
-  if (activeMenu.value === 'create') restoreActiveTenantProgress()
+  const valid = await refreshCenter()
+  if (valid && activeMenu.value === 'create') restoreActiveTenantProgress()
 })
 
 onUnmounted(() => {
   stopTenantProgress()
+  if (profileNoticeTimer) clearTimeout(profileNoticeTimer)
   window.removeEventListener('microi-login-success', onLoginSuccess)
   window.removeEventListener('microi-tenant-updated', onTenantUpdated)
+  window.removeEventListener('microi-profile-locale-change', onProfileLocaleChange)
   window.removeEventListener('hashchange', syncMenuFromHash)
   window.removeEventListener('popstate', syncMenuFromHash)
 })
@@ -886,8 +1086,24 @@ onUnmounted(() => {
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
 }
+
+.profile-notice {
+  position: fixed;
+  top: 22px;
+  right: 24px;
+  z-index: 1000;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #047857;
+  box-shadow: 0 14px 40px rgba(15,23,42,.16);
+  font-weight: 700;
+}
+
+.profile-notice.error { background: #fef2f2; color: #b91c1c; }
 
 .primary-action,
 .ghost-action,
@@ -1742,6 +1958,29 @@ onUnmounted(() => {
 .dark .step-item em {
   color: #fdba74;
 }
+
+.ai-key-box {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 10px;
+  margin: 18px 0;
+  align-items: center;
+}
+
+.ai-key-box code {
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.ai-usage-grid { margin: 16px 0; }
+.usage-table-wrap { overflow: auto; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.usage-table th, .usage-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; white-space: nowrap; }
+.dark .ai-key-box code, .dark .usage-table { color: #e2e8f0; background: #0f172a; border-color: rgba(148,163,184,.22); }
+.dark .usage-table th, .dark .usage-table td { border-color: rgba(148,163,184,.18); }
 
 .dark .step-item.running {
   background: rgba(251, 146, 60, 0.12);

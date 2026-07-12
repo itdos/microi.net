@@ -13,6 +13,10 @@ namespace Microi.net
         public string? Endpoint { get; set; }
         public string? AiModel { get; set; }
         /// <summary>
+        /// 选择 Microi.AI 中转站时实际调用的官方模型标识。
+        /// </summary>
+        public string? RelayModel { get; set; }
+        /// <summary>
         /// mic_ai 表主键。前端传入后，后端优先按 Id 精确读取模型配置。
         /// </summary>
         public string? AiModelId { get; set; }
