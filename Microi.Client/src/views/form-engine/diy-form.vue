@@ -1371,7 +1371,7 @@ export default {
                 }
             }
         },
-        async RunV8Code({ field, thisValue, v8codeKey, _v8Code, callback }) {
+        async RunV8Code({ field, thisValue, v8codeKey, _v8Code, callback, eventName, event }) {
             var self = this;
             if (!v8codeKey) {
                 v8codeKey = "V8Code";
@@ -1392,7 +1392,8 @@ export default {
                 });
                 var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                 V8.ThisValue = self.DiyCommon.IsNull(thisValue) ? "" : thisValue; // 这个是Select控制选择后的回调对象
-                V8.EventName = "FieldValueChange";
+                V8.EventName = eventName || "FieldValueChange";
+                V8.Event = event || null;
                 self.SetV8DefaultValue(V8, field);
 
                 var result = null;

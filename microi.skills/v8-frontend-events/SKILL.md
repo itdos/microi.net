@@ -70,6 +70,23 @@ if (V8.ThisValue && !/^1[3-9]\d{9}$/.test(V8.ThisValue)) {
 }
 ```
 
+### FieldSlotButtonClick — 单行文本插槽按钮
+
+单行文本 `Text` 开启【插槽按钮】后，必须在【插槽按钮V8代码】中配置行为，不要再写“弹出表格Id”。
+
+```javascript
+// V8.EventName === 'FieldSlotButtonClick'
+// V8.ThisValue — 当前输入框值
+// V8.Event     — 原生点击事件
+
+if (V8.LoadMode === 'Design') return;
+
+V8.OpenAnyTable({ TableName: 'sys_user', Title: '选择用户' });
+// 或 V8.OpenAnyForm / V8.OpenAppDialog / V8.ApiEngine.Run 等任意前端 V8 能力
+```
+
+`ReadOnlyButton` 的产品文案是【禁用插槽按钮】：只控制按钮是否可点击，不等同于字段只读，应保留用于权限和状态控制。
+
 ## 按钮事件
 
 ### V8BtnRun — 按钮点击执行（菜单按钮、表单按钮）

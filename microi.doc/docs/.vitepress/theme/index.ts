@@ -10,6 +10,7 @@ import AiChat from "./components/AiChat.vue";
 import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
 import ProfilePage from "./components/ProfilePage.vue";
+import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
 import "./styles/mci-site.scss";
@@ -20,7 +21,7 @@ export default {
         return h(DefaultTheme.Layout, null, {
             'layout-top': () => h(Fragment, null, [h(GlowBackground), h(Hero3DBackground), h(HeroTitle3D)]),
             'home-features-after': () => h(Fragment, null, [h(AiChat), h(ProductShowcase)]),
-            'nav-bar-content-after': () => h(UserBar)
+            'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)])
         })
     },
     enhanceApp(ctx) {

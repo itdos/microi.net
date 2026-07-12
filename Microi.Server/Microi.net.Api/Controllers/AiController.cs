@@ -600,6 +600,17 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 获取当前登录用户的中转站 Token 余额和最近扣减记录。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetUserAiUsage(int pageSize = 20)
+        {
+            var (userId, _) = await GetCurrentUserAsync();
+            if (string.IsNullOrEmpty(userId)) return Json(new DosResult(0, null, "请先登录！"));
+            return Json(await _subService.GetRelayTokenUsage(userId, pageSize));
+        }
+
+        /// <summary>
         /// 创建订阅订单
         /// </summary>
         [HttpPost]
@@ -840,7 +851,8 @@ namespace Microi.net.Api
             try
             {
                 string targetUrl = route.ApiBase.TrimEnd('/') + route.ApiPath;
-                await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                var responseCapture = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseCapture, "proxy-chat-stream");
                 _ = _subService.IncrementApiKeyCallCount(userId);
             }
             catch (TaskCanceledException) { }
@@ -904,6 +916,7 @@ namespace Microi.net.Api
                 if (!success)
                     return Json(new DosResult(0, null, $"上游 API 错误: {statusCode} - {responseBody}"));
 
+                if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseBody, "proxy-chat");
                 _ = _subService.IncrementApiKeyCallCount(userId);
                 return Json(new DosResult(1, JObject.Parse(responseBody)));
             }
@@ -995,7 +1008,8 @@ namespace Microi.net.Api
                     Response.Headers["Connection"] = "keep-alive";
                     Response.Headers["X-Accel-Buffering"] = "no";
 
-                    await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                    var responseCapture = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                    if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseCapture, "openai-stream");
                 }
                 else
                 {
@@ -1003,6 +1017,7 @@ namespace Microi.net.Api
                     Response.StatusCode = statusCode;
                     Response.ContentType = "application/json; charset=utf-8";
                     await Response.WriteAsync(responseBody);
+                    if (success && route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseBody, "openai");
                 }
 
                 _ = _subService.IncrementApiKeyCallCount(userId);
@@ -1025,6 +1040,18 @@ namespace Microi.net.Api
         public async Task<JsonResult> OpenAIListModels()
         {
             return Json(await _proxyService.GetModelListAsync());
+        }
+
+        /// <summary>
+        /// OpenAI 兼容凭据的 Token 余额与最近扣减记录。
+        /// </summary>
+        [HttpGet("/v1/usage")]
+        [AllowAnonymous]
+        public async Task<JsonResult> OpenAIUsage(int pageSize = 20)
+        {
+            var (userId, authError) = await _proxyService.AuthByPlatformApiKey(Request.Headers["Authorization"].ToString());
+            if (!string.IsNullOrEmpty(authError)) return Json(new DosResult(0, null, authError));
+            return Json(await _subService.GetRelayTokenUsage(userId, pageSize));
         }
 
         /// <summary>
