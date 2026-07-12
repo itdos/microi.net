@@ -59,6 +59,30 @@ var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 
 ## 公有桶 vs 私有桶
 
+### 应用商城 ZIP
+
+应用商城的 AI 应用/微服务资产禁止逐文件 Base64 持久化到数据库。编译产物打成公有 ZIP，源码 ZIP 默认不生成、由发布者逐应用勾选；数据库只保存路径和校验元数据。
+
+```javascript
+var zipResult = V8.Method.CreateZip({
+  Entries: [
+    { Path: 'index.html', Content: '<html></html>' },
+    { Path: 'assets/app.js', FileByteBase64: jsBase64 }
+  ],
+  MaxFileCount: 20000,
+  MaxEntryBytes: 268435456,
+  MaxTotalBytes: 2147483648
+});
+
+var extractResult = V8.Method.ExtractZip({
+  FileByteBase64: zipBase64,
+  MaxFileCount: 20000,
+  MaxCompressionRatio: 200
+});
+```
+
+`System.IO` 在 Jint 沙箱中被禁止，不能在 V8 代码里直接构造 `MemoryStream/ZipArchive`；必须使用以上受控方法。
+
 | 类型 | `Limit` | 访问 URL | 用途 |
 |------|---------|---------|------|
 | 公有桶 | `false` | 直接拼接 `V8.SysConfig.FileServer + Path` | 头像、产品图、公开文档 |

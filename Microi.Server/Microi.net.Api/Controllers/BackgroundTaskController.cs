@@ -26,7 +26,28 @@ namespace Microi.net.Api
             var identity = await GetIdentity(param).ConfigureAwait(false);
             var count = BackgroundTaskService.ClearCompleted(identity.OsClient, identity.UserKey);
             await BackgroundTaskService.SendTaskListToUserAsync(identity.OsClient, identity.UserKey).ConfigureAwait(false);
-            return Json(new DosResult(1, new { Count = count }, $"已清除{count}条已完成任务"));
+            return Json(new DosResult(1, new { Count = count }, $"已清除{count}条成功任务"));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Remove([FromBody] JObject param)
+        {
+            param ??= new JObject();
+            var taskId = param["Id"]?.ToString();
+            if (taskId.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, "任务Id不能为空"));
+            }
+
+            var identity = await GetIdentity(param).ConfigureAwait(false);
+            var result = BackgroundTaskService.Remove(identity.OsClient, identity.UserKey, taskId);
+            if (result)
+            {
+                await BackgroundTaskService.SendTaskListToUserAsync(identity.OsClient, identity.UserKey).ConfigureAwait(false);
+            }
+            return Json(result
+                ? new DosResult(1, null, "后台任务已清除")
+                : new DosResult(0, null, "只能清除属于当前用户且已结束的后台任务"));
         }
 
         [HttpPost]
@@ -57,17 +78,26 @@ namespace Microi.net.Api
             }
 
             var identity = await GetIdentity(param).ConfigureAwait(false);
+            if (identity.CurrentUser == null || identity.CurrentUser["Id"]?.ToString().DosIsNullOrWhiteSpace() != false)
+            {
+                return Json(new DosResult(0, null, "登录身份已失效，请重新登录后再提交后台任务"));
+            }
+
+            // 客户端业务参数不允许决定执行身份。身份由服务端从当前登录令牌读取，
+            // 并作为后台任务的可信快照单独传给执行器。
             var apiParam = param["Param"] as JObject ?? new JObject();
+            apiParam = (JObject)apiParam.DeepClone();
+            apiParam.Remove("_CurrentUser");
             apiParam["ApiEngineKey"] = apiEngineKey;
             apiParam["OsClient"] = identity.OsClient;
-            if (identity.CurrentUser != null)
-            {
-                apiParam["_CurrentUser"] = JTokenEx.FromObject(identity.CurrentUser);
-            }
-            apiParam["_InvokeType"] = "Client";
 
             var title = param["Title"]?.ToString();
-            var item = BackgroundTaskService.StartApiEngine(identity.OsClient, identity.UserKey, title, apiParam);
+            var item = BackgroundTaskService.StartApiEngine(
+                identity.OsClient,
+                identity.UserKey,
+                title,
+                apiParam,
+                identity.CurrentUser);
             return Json(new DosResult(1, item, "后台任务已提交"));
         }
 
@@ -75,17 +105,27 @@ namespace Microi.net.Api
         {
             dynamic token = await DiyToken.GetCurrentToken().ConfigureAwait(false);
             string osClient = null;
-            object currentUser = null;
+            JObject currentUser = null;
             string userKey = null;
 
             try { osClient = token?.OsClient; } catch { }
-            try { currentUser = token?.CurrentUser; } catch { }
-            if (currentUser is JObject currentUserJObject)
+            try
             {
-                userKey = currentUserJObject["Id"]?.Val<string>();
+                var tokenUser = token?.CurrentUser;
+                if (tokenUser != null)
+                {
+                    currentUser = tokenUser is JObject currentUserJObject
+                        ? (JObject)currentUserJObject.DeepClone()
+                        : JObject.FromObject(tokenUser);
+                }
+            }
+            catch { }
+            if (currentUser != null)
+            {
+                userKey = currentUser["Id"]?.Val<string>();
                 if (userKey.DosIsNullOrWhiteSpace())
                 {
-                    userKey = currentUserJObject["Account"]?.Val<string>();
+                    userKey = currentUser["Account"]?.Val<string>();
                 }
             }
             if (userKey.DosIsNullOrWhiteSpace())
@@ -117,7 +157,7 @@ namespace Microi.net.Api
         {
             public string OsClient { get; set; }
             public string UserKey { get; set; }
-            public object CurrentUser { get; set; }
+            public JObject CurrentUser { get; set; }
         }
     }
 }

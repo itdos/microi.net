@@ -341,6 +341,7 @@ Microi 的在线 AI 应用统一使用 `mci_ai_app / mci_ai_app_file / mci_ai_ap
 
 - 开始改页面前先通过 MCP 的 `microi_list_applications` 和 `microi_get_application_context` 读取应用、文件树与源码，不得只看本地目录。
 - 在线 AI 工作台应允许三种应用在线编辑、保存、运行/预览、下载源码/编译包、制作离线包、发布应用商城；不能在前端单独拦截 `MicroService` 构建。
-- 源码一律上传当前租户私有 HDFS；最终编译文件一律上传公有 HDFS。应用包必须内嵌两类文件内容，安装时通过目标租户 HDFS 适配器重新上传，不能把发布者私有桶 URL 交给安装者。
+- 源码一律上传当前租户私有 HDFS；最终编译文件一律上传公有 HDFS。应用商城包使用 `ApplicationBundle.SchemaVersion=2 + PackageAssets`：编译 ZIP 必须上传公有桶并允许匿名下载，源码 ZIP 按应用选配且默认不发布；数据库只保存公开 ZIP 路径、大小、校验值，禁止再把每个源码/构建文件以 `FileByteBase64` 写入 `AppPakcet`。安装端下载 ZIP 后必须通过目标租户 HDFS 适配器重新上传。旧版 `SourceFiles/BuildAssets` 逐文件 Base64 仅作为向后兼容读取格式。
+- V8/Jint 沙箱禁止接口脚本直接访问 `System.IO`。创建和解压应用 ZIP 必须使用受控的 `V8.Method.CreateZip / ExtractZip`，由服务端统一执行 Zip Slip、文件数、单文件大小、解压总大小和异常压缩比检查，禁止放开 `System.IO` 黑名单。
 - 商城字段 `AppType` 是历史“应用类别（官方/社区）”；运行类型使用独立 `ApplicationType`，枚举为 `Regular / MicroService / UniApp / Web`，禁止复用 `AppType` 破坏旧筛选。
 - 三类前端应用可复用 `ApplicationBundle` 文件传输协议，但运行安装不同：MicroService 还要写 `sys_microiservice_page`，Web/UniApp 只维护 AI 应用与版本，因此商城必须保存明确类型，不能合并成一个含糊枚举。

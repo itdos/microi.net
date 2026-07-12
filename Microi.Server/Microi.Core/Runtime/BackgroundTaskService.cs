@@ -42,7 +42,12 @@ namespace Microi.net
             BackgroundTaskRuntime.UpdateProgressHandler = UpdateProgress;
         }
 
-        public static BackgroundTaskItem StartApiEngine(string osClient, string userKey, string title, JObject apiParam)
+        public static BackgroundTaskItem StartApiEngine(
+            string osClient,
+            string userKey,
+            string title,
+            JObject apiParam,
+            JObject trustedCurrentUser)
         {
             var item = new BackgroundTaskItem
             {
@@ -65,7 +70,9 @@ namespace Microi.net
             CancellationTokens[item.Id] = cts;
             SaveTask(item);
             NotifyUser(item);
-            _ = Task.Run(() => RunApiEngineTask(item, apiParam ?? new JObject(), cts.Token));
+            var taskParam = apiParam == null ? new JObject() : (JObject)apiParam.DeepClone();
+            var taskUser = trustedCurrentUser == null ? null : (JObject)trustedCurrentUser.DeepClone();
+            _ = Task.Run(() => RunApiEngineTask(item, taskParam, taskUser, cts.Token));
             return ApplyRuntimeFields(item);
         }
 
@@ -81,7 +88,9 @@ namespace Microi.net
         public static int ClearCompleted(string osClient, string userKey)
         {
             var items = ListAllTasks(osClient, userKey)
-                .Where(item => IsTerminal(item.Status))
+                // 批量清理只删除成功任务。失败/取消任务需要保留排查，
+                // 用户确认后再通过单条清除处理。
+                .Where(item => string.Equals(item.Status, "Succeeded", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             var count = 0;
@@ -102,6 +111,27 @@ namespace Microi.net
                 }
             }
             return count;
+        }
+
+        public static bool Remove(string osClient, string userKey, string taskId)
+        {
+            if (taskId.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            var item = ListAllTasks(osClient, userKey)
+                .FirstOrDefault(candidate => string.Equals(candidate?.Id, taskId, StringComparison.OrdinalIgnoreCase));
+            if (item == null || !IsTerminal(item.Status))
+            {
+                return false;
+            }
+
+            CancellationTokens.TryRemove(taskId, out var cts);
+            cts?.Dispose();
+            var removedMemory = Tasks.TryRemove(taskId, out _);
+            var removedCache = DeleteTask(item.OsClient, item.UserKey, taskId);
+            return removedMemory || removedCache;
         }
 
         public static bool Cancel(string osClient, string userKey, string taskId)
@@ -201,7 +231,11 @@ namespace Microi.net
             }
         }
 
-        private static async Task RunApiEngineTask(BackgroundTaskItem item, JObject apiParam, CancellationToken cancellationToken)
+        private static async Task RunApiEngineTask(
+            BackgroundTaskItem item,
+            JObject apiParam,
+            JObject trustedCurrentUser,
+            CancellationToken cancellationToken)
         {
             var gateAcquired = false;
             try
@@ -220,6 +254,13 @@ namespace Microi.net
 
                 apiParam["_BackgroundTaskId"] = item.Id;
                 apiParam["_BackgroundTaskTitle"] = item.Title ?? "";
+                apiParam["OsClient"] = item.OsClient;
+                apiParam["_InvokeType"] = "Client";
+                apiParam.Remove("_CurrentUser");
+                if (trustedCurrentUser != null)
+                {
+                    apiParam["_CurrentUser"] = trustedCurrentUser.DeepClone();
+                }
                 dynamic result = await MicroiEngine.ApiEngine.RunAsync(apiParam).ConfigureAwait(false);
                 item.Result = SafeToJObject(result);
                 item.Msg = item.Result?["Msg"]?.ToString() ?? "";
