@@ -261,7 +261,12 @@ namespace Microi.net
                 {
                     apiParam["_CurrentUser"] = trustedCurrentUser.DeepClone();
                 }
-                dynamic result = await MicroiEngine.ApiEngine.RunAsync(apiParam).ConfigureAwait(false);
+                // 后台线程可能已经脱离原 HTTP 请求，DiyToken 此时会回退到服务默认租户。
+                // 必须通过后台任务专用入口传入提交阶段由服务端认证得到的可信用户快照，
+                // 不能让普通接口的跨租户匿名保护误删子租户身份。
+                dynamic result = await MicroiEngine.BackgroundTaskApiEngine
+                    .RunBackgroundAsync(apiParam, trustedCurrentUser)
+                    .ConfigureAwait(false);
                 item.Result = SafeToJObject(result);
                 item.Msg = item.Result?["Msg"]?.ToString() ?? "";
                 item.Progress = 100;
