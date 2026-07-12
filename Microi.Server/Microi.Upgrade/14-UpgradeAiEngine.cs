@@ -8,7 +8,7 @@ namespace Microi.net
     /// </summary>
     public class Upgrade14
     {
-        public static string Version = "6.2.3.0";
+        public static string Version = "6.2.5.0";
 
         public async Task<List<string>> Run(string osClient)
         {
@@ -45,24 +45,71 @@ namespace Microi.net
             }
 
             var tableId = (string)tableResult.Data.Id;
-            var menuId = (string)menuResult.Data.Id;
-            var currentTableId = (string)menuResult.Data.DiyTableId;
-            if (currentTableId == tableId)
+            var fieldResult = await MicroiEngine.FormEngine.GetFormDataAsync("diy_field", new
             {
-                return msgs;
+                OsClient = osClient,
+                _Where = new List<object>
+                {
+                    new List<object> { "TableId", "=", tableId },
+                    new List<object> { "Name", "=", "IsRelayModel" }
+                },
+                _SelectFields = new[] { "Id" }
+            });
+            if (fieldResult.Code != 1)
+            {
+                var addField = await MicroiEngine.FormEngine.AddFieldAsync(new
+                {
+                    OsClient = osClient,
+                    TableId = tableId,
+                    TableName = "mic_ai",
+                    Name = "IsRelayModel",
+                    Label = "加入AI中转站",
+                    Type = "int",
+                    Component = "Switch",
+                    DefaultValue = "0",
+                    Sort = 750,
+                    Visible = 1,
+                    AppVisible = 1,
+                    Description = "开启后该模型可由Microi.AI中转站对外提供。"
+                });
+                if (addField.Code != 1) msgs.Add("新增 mic_ai.IsRelayModel 失败：" + addField.Msg);
             }
 
-            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new
+            var relayResult = await MicroiEngine.FormEngine.GetFormDataAsync("mic_ai", new
             {
-                Id = menuId,
                 OsClient = osClient,
-                DiyTableId = tableId,
-                DiyTableName = (string)tableResult.Data.Name
+                _Where = new List<object>
+                {
+                    new List<object> { "Name", "In", new[] { "Microi吾码AI中转站", "Microi.AI中转站" } }
+                }
             });
-            if (updateResult.Code != 1)
+            if (relayResult.Code == 1 && relayResult.Data != null)
             {
-                msgs.Add("AI引擎菜单绑定 mic_ai 表失败：" + updateResult.Msg);
-                return msgs;
+                var relayUpdate = await MicroiEngine.FormEngine.UptFormDataAsync("mic_ai", new
+                {
+                    Id = (string)relayResult.Data.Id,
+                    OsClient = osClient,
+                    Name = "Microi.AI中转站",
+                    AiModel = "Microi.AI中转站",
+                    Endpoint = "https://api.itdos.com/v1",
+                    IsEnable = 1,
+                    Remark = "ApiKey由吾码官网个人中心生成，创建SaaS租户时自动写入。"
+                });
+                if (relayUpdate.Code != 1) msgs.Add("更新 Microi.AI中转站 失败：" + relayUpdate.Msg);
+            }
+
+            var menuId = (string)menuResult.Data.Id;
+            var currentTableId = (string)menuResult.Data.DiyTableId;
+            if (currentTableId != tableId)
+            {
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new
+                {
+                    Id = menuId,
+                    OsClient = osClient,
+                    DiyTableId = tableId,
+                    DiyTableName = (string)tableResult.Data.Name
+                });
+                if (updateResult.Code != 1) msgs.Add("AI引擎菜单绑定 mic_ai 表失败：" + updateResult.Msg);
             }
 
             await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{menuId}");

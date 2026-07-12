@@ -23,6 +23,29 @@
 
 ## 单行文本 Text
 
+### 插槽按钮
+
+开启【插槽按钮】后，输入框的前缀或后缀文字会变成按钮。按钮行为统一配置在【插槽按钮V8代码】，不再配置“弹出表格Id”。点击时可使用：
+
+- `V8.EventName === 'FieldSlotButtonClick'`
+- `V8.ThisValue`：当前文本框值
+- `V8.Event`：原生点击事件
+- `V8.Form`、`V8.Field`：当前表单及字段上下文
+
+```js
+// 打开任意列表
+V8.OpenAnyTable({
+  TableName: 'sys_user',
+  Title: '选择用户'
+});
+
+// 也可以打开表单或调用接口引擎
+// V8.OpenAnyForm({ TableName: 'sys_user', Id: V8.ThisValue, FormMode: 'View' });
+// var result = await V8.ApiEngine.Run('my-api', { Value: V8.ThisValue });
+```
+
+【禁用插槽按钮】只禁用按钮本身，不改变文本框的只读状态。它适合按权限或业务状态禁止按钮操作，因此保留；底层继续兼容历史配置键 `ReadOnlyButton`。
+
 若要限制单行文本只允许输入数字、身份证号、手机号、纯字母等，可通过字段的值变更 V8 事件、表单提交前 V8 事件进行限制：
 ```js
 //Phone字段属性的【值变更V8事件】

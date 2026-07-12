@@ -177,6 +177,11 @@ function onLoginSuccess(e) {
   }
 }
 
+function onAuthExpired() {
+  user.value = null
+  showMenu.value = false
+}
+
 function openSetPwd() {
   showMenu.value = false
   newPwd.value = ''
@@ -258,11 +263,13 @@ function closeMenu(e) {
 onMounted(() => {
   loadUser()
   window.addEventListener('microi-login-success', onLoginSuccess)
+  window.addEventListener('microi-auth-expired', onAuthExpired)
   document.addEventListener('click', closeMenu)
 })
 
 onUnmounted(() => {
   window.removeEventListener('microi-login-success', onLoginSuccess)
+  window.removeEventListener('microi-auth-expired', onAuthExpired)
   document.removeEventListener('click', closeMenu)
   stopPwdDrag()
 })

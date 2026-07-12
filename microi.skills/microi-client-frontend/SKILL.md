@@ -5,6 +5,13 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 # Microi.Client 前台源码架构说明
 
+## 单行文本插槽按钮约定
+
+- `diy-input.vue` 的插槽按钮行为存储在 `diy_field.Config.SlotButtonV8Code`。
+- 点击事件通过 `CallbackRunV8Code` 进入 `diy-form.vue` 的统一前端 V8 上下文，事件名为 `FieldSlotButtonClick`。
+- 禁止再新增或依赖 `OpenTableId` 一类硬编码目标；打开表格、表单、微服务或调用接口均由 V8 代码决定。
+- 历史键 `ReadOnlyButton` 继续兼容，设计器显示为【禁用插槽按钮】。
+
 > 适用于修改 `Microi.Client/` 前台源码。新 AI 对话在动 `Microi.Client/src/views/form-engine` 前，应先阅读本 Skill，避免把分散在 SFC、mixins、utils、路由和低代码配置里的逻辑误判成不存在。
 
 ---
@@ -345,3 +352,24 @@ Microi 的在线 AI 应用统一使用 `mci_ai_app / mci_ai_app_file / mci_ai_ap
 - V8/Jint 沙箱禁止接口脚本直接访问 `System.IO`。创建和解压应用 ZIP 必须使用受控的 `V8.Method.CreateZip / ExtractZip`，由服务端统一执行 Zip Slip、文件数、单文件大小、解压总大小和异常压缩比检查，禁止放开 `System.IO` 黑名单。
 - 商城字段 `AppType` 是历史“应用类别（官方/社区）”；运行类型使用独立 `ApplicationType`，枚举为 `Regular / MicroService / UniApp / Web`，禁止复用 `AppType` 破坏旧筛选。
 - 三类前端应用可复用 `ApplicationBundle` 文件传输协议，但运行安装不同：MicroService 还要写 `sys_microiservice_page`，Web/UniApp 只维护 AI 应用与版本，因此商城必须保存明确类型，不能合并成一个含糊枚举。
+
+### AI 应用工作台页面预览映射
+
+- `microi.routes.json` 的页面路由建议显式保存 `sourceFile`（例如 `src/CreateSaasTenant.vue`）；插件创建、读取、同步微服务时必须保留该字段。旧项目没有 `sourceFile` 时，工作台才从 `main.js/routes.js` 的 import、route 条件和文件名约定推断。
+- 用户处于“预览”视图时点击页面级 Vue/JSX 文件，应保持预览并切换对应 `microRoute`；点击工具、样式、配置等非页面文件时才切到源码。处于源码视图时点击页面文件仍先显示源码，但要同步记录下次预览的路由。
+- 微服务、Web 应用默认 PC 预览，只有 UniApp 默认移动端预览。源码/编译代码树切换使用紧凑圆角分段控件，运行类型必须显示本地化名称，禁止直接用长英文枚举挤压标题。
+
+### AI 对话历史与模型列表
+
+- AI 对话归档状态保存到 `mic_ai_record.Content.Archived`，按 `ConversationId` 成组更新和展示；归档或还原后刷新当前列表，但不得擅自切换【AI对话 / 已归档】Tab。归档是状态变更，不能删除消息记录。
+- 中转模型选择器必须显示和提交模型 Id，厂商 `DisplayName` 只能作为辅助说明，不能替代模型 Id。
+- `mic_ai` 的中转站配置允许 `AiModel` 为空，实际运行模型来自中转模型选择器；发送校验和所有 AI 请求统一使用“普通模型的 `AiModel` / 中转站的 `RelayModel`”解析结果，同时保留中转站配置的 `AiModelId`。
+- AI 引擎列表通过 `PropsSysMenuId` 使用模块设计中的 `SelectFields/SearchFieldIds`；禁止再传硬编码 `PropsSelectFields` 覆盖模块设计，否则新增的【加入AI中转站】等列不会显示。
+
+### 官网个人中心 i18n
+
+- 官网 Markdown 中英文继续使用独立 URL 以利 SEO；`profile.html` 这类登录态单页使用常规前端 i18n 字典，固定文案必须在源码维护中英文对照，并记住用户选择。
+- `profile.html` 只保留导航栏中的一个语言切换入口，切换个人中心字典时不得跳转 `/en/profile.html`；离开个人中心后仍使用 VitePress 原有的路由式语言切换。
+- 个人中心路由本身是公开静态页，不能把“能打开 URL”或本地缓存中的用户对象当成有效登录。必须调用受保护接口验证 Token；收到 `1001/1002` 或明确过期消息后清理用户与 Token 缓存，并携带当前 Hash 跳转登录页，不能一边展示个人信息一边在页面底部提示身份过期。
+- 官网独立页面必须接收每次受保护请求响应头中的新 `authorization` 并立刻覆盖 Token 缓存，再发起后续并发请求；否则服务端轮换 Token 后继续使用旧 Token，会出现主接口成功、次级接口却提示身份过期的矛盾页面。
+- 同一份 ApiKey/Token 摘要在 Overview 与 AI 页面复用同一个组件；Token 额度统一展示“总量/Total”，不要把总量写成“赠送”。复制密钥必须有明确成功或失败提示，并提供 Clipboard API 不可用时的兼容复制。
