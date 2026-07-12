@@ -485,6 +485,8 @@ export default {
             TempLoading: {},
             Shangquan_Data: [],
             TableMultipleSelection: [],
+            ContinuousSelection: false,
+            _selectionSyncing: false,
             // BtnLoading:false,
             TableSelectedRow: {},
             TableSelectedRowLast: {},

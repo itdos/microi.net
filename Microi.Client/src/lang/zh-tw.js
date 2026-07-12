@@ -17,6 +17,7 @@ const Msg = {
     BackgroundTaskProgress: "進度",
     BackgroundTaskMessage: "執行資訊",
     BackgroundTaskResult: "返回結果",
+    DownloadArtifact: "下載產物",
     NotificationCenter: "通知中心",
     OfficialApps: "官方應用",
     NoOfficialAppUpdates: "暫無官方應用更新提醒",

@@ -5,6 +5,7 @@ using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
 using System;
 
 namespace Microi.net.Api
@@ -22,10 +23,12 @@ namespace Microi.net.Api
     public class LicenseController : Controller
     {
         private readonly ICaptcha _captcha;
+        private readonly IMicroiAI _microiAi;
 
-        public LicenseController(ICaptcha captcha)
+        public LicenseController(ICaptcha captcha, IMicroiAI microiAi)
         {
             _captcha = captcha;
+            _microiAi = microiAi;
         }
 
         /// <summary>
@@ -148,7 +151,12 @@ namespace Microi.net.Api
         {
             try
             {
-                var data = LicenseService.Verify();
+                var data = JObject.FromObject(LicenseService.Verify());
+                var aiLicense = _microiAi.GetOnlineAiLicenseState();
+                data["OnlineAiLicensed"] = aiLicense?.IsLicensed == true;
+                data["AiProductType"] = aiLicense?.ProductType ?? "OpenSource";
+                data["LicenseProviderAssemblyVersion"] = aiLicense?.ProviderAssemblyVersion ?? "";
+                data["MicroiAiAssemblyVersion"] = _microiAi.GetType().Assembly.GetName().Version?.ToString() ?? "";
                 return Json(new DosResult(1, data));
             }
             catch (Exception ex)

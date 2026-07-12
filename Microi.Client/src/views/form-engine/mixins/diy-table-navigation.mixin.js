@@ -209,33 +209,18 @@ export default {
         },
         getOpenAnyTableParam(param) {
             var self = this;
-            // 获取取消勾选数据
-            const unselectedRows = param.OldTableMultipleSelection.filter((prevRow) => !param.TableMultipleSelection.some((currRow) => currRow.Id === prevRow.Id));
-            // 3. 构建新的 TableIndexDataList
-            let newTableIndexDataList = [];
-
-            // 如果之前已有数据，先展开
-            if (self.OpenAnyTableParam.TableIndexDataList && Array.isArray(self.OpenAnyTableParam.TableIndexDataList)) {
-                newTableIndexDataList = [...self.OpenAnyTableParam.TableIndexDataList];
-            }
-
-            // 4. 【删除操作】移除取消勾选的行（unselectedRows）
-            newTableIndexDataList = newTableIndexDataList.filter((existingRow) => !unselectedRows.some((unselected) => unselected.Id === existingRow.Id));
-
-            // 5. 【新增操作】添加当前选中的行（如果还未存在）
-            param.TableMultipleSelection.forEach((currRow) => {
-                if (!newTableIndexDataList.some((row) => row.Id === currRow.Id)) {
-                    newTableIndexDataList.push(currRow);
-                }
+            var selectedIds = {};
+            var newTableIndexDataList = [];
+            (param.TableMultipleSelection || []).forEach(function(row) {
+                if (!row || !row.Id || selectedIds[row.Id]) return;
+                selectedIds[row.Id] = true;
+                newTableIndexDataList.push(row);
             });
-            if (param.Type === "N") {
-                self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].toggleSelection(unselectedRows, "N");
-            }
-            // console.log('🔴 取消勾选的行:', unselectedRows);
             self.OpenAnyTableParam = {
                 ...self.OpenAnyTableParam,
                 ShowDiyFieldList: param.ShowDiyFieldList,
                 PageIndex: param.PageIndex,
+                ContinuousSelection: param.ContinuousSelection === true,
                 TableIndexDataList: newTableIndexDataList
             };
         },

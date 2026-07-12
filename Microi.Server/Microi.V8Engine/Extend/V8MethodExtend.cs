@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Security.Cryptography;
 using System.Text;
+using Dos.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -8,6 +9,31 @@ namespace Microi.net
 {
     public partial class V8EngineMethodExtend
     {
+        /// <summary>
+        /// 制作并发布 iTdos 主库脱敏空数据库。
+        /// 业务入口保留在接口引擎；此处只封装接口引擎无法安全表达的数据库复制、文件导出和 HDFS 覆盖能力。
+        /// </summary>
+        public DosResult BuildSanitizedEmptyDatabaseRelease(dynamic dynamicParam)
+        {
+            try
+            {
+                var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                var currentUser = param["CurrentUser"] as JObject
+                                  ?? param["_CurrentUser"] as JObject
+                                  ?? new JObject();
+                var osClient = param["OsClient"]?.ToString() ?? "";
+                var backgroundTaskId = param["_BackgroundTaskId"]?.ToString()
+                                       ?? param["BackgroundTaskId"]?.ToString()
+                                       ?? param["TaskId"]?.ToString()
+                                       ?? "";
+                return new EmptyDatabaseReleaseService(backgroundTaskId).Build(currentUser, osClient);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "制作主库空数据库失败：" + ex.Message);
+            }
+        }
+
         /// <summary>
         /// 扩展 V8.Method.TestExtend 方法
         /// </summary>

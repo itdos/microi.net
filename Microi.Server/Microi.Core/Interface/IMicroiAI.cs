@@ -26,6 +26,12 @@ namespace Microi.net
     public interface IMicroiAI
     {
         /// <summary>
+        /// 返回 AI 当前实际使用的统一授权状态。
+        /// License 验证接口也必须读取此结果，避免授权页与 AI 功能判断分叉。
+        /// </summary>
+        OnlineAiLicenseState GetOnlineAiLicenseState();
+
+        /// <summary>
         /// AI对话
         /// </summary>
         /// <param name="param"></param>
