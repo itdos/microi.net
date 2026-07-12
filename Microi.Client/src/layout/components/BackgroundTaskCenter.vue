@@ -104,8 +104,11 @@
                         <el-table-column :label="$t('Msg.Elapsed')" width="78">
                             <template #default="{ row }">{{ row.ElapsedText || "-" }}</template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.Operation')" width="112" fixed="right">
+                        <el-table-column :label="$t('Msg.Operation')" width="178" fixed="right">
                             <template #default="{ row }">
+                                <el-button v-if="getTaskDownloadUrl(row)" link size="small" type="primary" :icon="Download" @click.stop="downloadTaskResult(row)">
+                                    {{ $t("Msg.DownloadArtifact") }}
+                                </el-button>
                                 <el-button v-if="canCancel(row)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(row)">
                                     {{ $t("Msg.Stop") }}
                                 </el-button>
@@ -225,7 +228,7 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { Bell, CircleClose, Delete, Monitor, Refresh, SwitchButton, UserFilled } from "@element-plus/icons-vue";
+import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, UserFilled } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
@@ -259,6 +262,7 @@ export default {
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
             Delete,
+            Download,
             Refresh,
             CircleClose,
             SwitchButton
@@ -550,6 +554,23 @@ export default {
         },
         canCancel(item) {
             return item && (item.Status === "Pending" || item.Status === "Running");
+        },
+        getTaskDownloadUrl(item) {
+            if (!item || item.Status !== "Succeeded") return "";
+            const result = item.Result || {};
+            const data = result.Data || result.data || {};
+            return data.DownloadUrl || data.downloadUrl || result.DownloadUrl || result.downloadUrl || "";
+        },
+        downloadTaskResult(item) {
+            const url = this.getTaskDownloadUrl(item);
+            if (!url) return;
+            const link = document.createElement("a");
+            link.href = url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         },
         getTaskStatusType(status) {
             if (status === "Succeeded") return "success";

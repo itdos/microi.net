@@ -156,6 +156,15 @@
                                 {{ cardSelection.length > 0 ? `${$t('Msg.Selected')} ${cardSelection.length} ${$t('Msg.Items')}` : $t('Msg.SelectAll') }}
                             </el-checkbox>
                             <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
+                                <el-checkbox
+                                    v-if="btnIndex === 0 && TableMultipleSelection.length > 0"
+                                    v-model="ContinuousSelection"
+                                    @change="ContinuousSelectionChange"
+                                    border
+                                    style="margin: 0 10px;"
+                                >
+                                    {{ $t('Msg.ContinuousSelection') }}
+                                </el-checkbox>
                                 <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                     {{ btn.Name }}
@@ -2219,6 +2228,7 @@ export default {
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
+            self.TableMultipleSelection = self.GetUniqueSelectedRows(self.TableMultipleSelection);
             if(!V8.Form){
                 V8.Form = self.CurrentSelectedRowModel;
                 V8.FormSet = (fieldName, value) => {
@@ -2248,6 +2258,7 @@ export default {
             V8.HideFormBtn = self.CallbackHideFormBtn;
             V8.TableRowSelected = self.TableMultipleSelection;
             V8.SelectedData = self.TableMultipleSelection;
+            V8.ClearTableSelection = self.ResetTableSelection;
             V8.ParentForm = self.FatherFormModel;
             if (self.ParentV8_Data) {
                 V8.ParentV8 = self.ParentV8_Data;
