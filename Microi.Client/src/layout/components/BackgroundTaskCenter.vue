@@ -104,12 +104,14 @@
                         <el-table-column :label="$t('Msg.Elapsed')" width="78">
                             <template #default="{ row }">{{ row.ElapsedText || "-" }}</template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.Operation')" width="68" fixed="right">
+                        <el-table-column :label="$t('Msg.Operation')" width="112" fixed="right">
                             <template #default="{ row }">
                                 <el-button v-if="canCancel(row)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(row)">
                                     {{ $t("Msg.Stop") }}
                                 </el-button>
-                                <span v-else>-</span>
+                                <el-button v-else link size="small" type="danger" :icon="Delete" @click.stop="removeTask(row)">
+                                    {{ $t("Msg.Delete") }}
+                                </el-button>
                             </template>
                         </el-table-column>
                     </el-table>
@@ -526,6 +528,25 @@ export default {
             if (result && result.Code === 1) {
                 this.refreshTasks();
             }
+        },
+        async removeTask(item) {
+            if (!item || !item.Id || !this.isTerminalTask(item)) return;
+            try {
+                await ElMessageBox.confirm(this.$t("Msg.ConfirmDel"), this.$t("Msg.Tips"), {
+                    type: "warning",
+                    confirmButtonText: this.$t("Msg.Ok"),
+                    cancelButtonText: this.$t("Msg.Cancel")
+                });
+            } catch (_) {
+                return;
+            }
+            const result = await DiyCommon.PostAsync("/api/BackgroundTask/Remove", { Id: item.Id }, null, null, "json");
+            if (result && result.Code === 1) {
+                this.refreshTasks();
+            }
+        },
+        isTerminalTask(item) {
+            return item && ["Succeeded", "Failed", "Canceled"].includes(item.Status);
         },
         canCancel(item) {
             return item && (item.Status === "Pending" || item.Status === "Running");

@@ -16,17 +16,17 @@
             :show-close="false"
             append-to-body
         >
-            <template #header
-                ><div>
-                    <div class="pull-left">
+            <template #header>
+                <div class="diy-custom-dialog__header">
+                    <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
                         {{ title }}
                     </div>
-                    <div class="pull-right">
+                    <div class="diy-custom-dialog__actions">
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
                     </div>
-                </div></template
-            >
+                </div>
+            </template>
             <div class="clear">
                 <template v-if="!DiyCommon.IsNull(ComponentName)">
                     <component v-if="!DiyCommon.IsNull(ComponentName)" :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
@@ -47,17 +47,17 @@
             :show-close="false"
             append-to-body
         >
-            <template #header
-                ><div>
-                    <div class="pull-left" style="color: var(--el-text-color-primary); font-size: 15px">
+            <template #header>
+                <div class="diy-custom-dialog__header">
+                    <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
                         {{ title }}
                     </div>
-                    <div class="pull-right">
+                    <div class="diy-custom-dialog__actions">
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
                     </div>
-                </div></template
-            >
+                </div>
+            </template>
 
             <div class="clear">
                 <!-- && !DiyCommon.IsNull(ComponentPath) -->
@@ -145,4 +145,26 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.diy-custom-dialog__header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.diy-custom-dialog__title {
+    min-width: 0;
+    color: var(--el-text-color-primary);
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.diy-custom-dialog__actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+</style>

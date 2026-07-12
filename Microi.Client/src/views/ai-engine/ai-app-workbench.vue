@@ -254,8 +254,10 @@
                             :value="versionKey(item)"
                         />
                     </el-select>
-                    <el-button :disabled="!activeFile" @click="formatActiveFile">格式化</el-button>
-                    <el-button :disabled="!activeFile" :loading="fileSaving" @click="saveActiveFile">保存源码</el-button>
+                    <el-button :disabled="!currentEditorFile" @click="formatActiveFile">格式化</el-button>
+                    <el-button :disabled="!currentEditorFile" :loading="fileSaving" @click="saveCurrentFile">
+                        {{ activeView === 'build' ? '保存编译文件' : '保存源码' }}
+                    </el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('source')">下载源码ZIP</el-button>
                     <el-button :disabled="!currentApp" @click="downloadZip('build')">下载编译ZIP</el-button>
                     <el-button :disabled="!currentApp" :loading="building" type="primary" @click="buildApp">运行/发布</el-button>
@@ -265,11 +267,11 @@
                     <el-button v-if="previewUrl" tag="a" :href="previewUrl" target="_blank">打开预览</el-button>
                 </div>
             </header>
-            <div v-if="activeFile" class="active-file-meta">
-                <span class="path">{{ activeFile.FilePath }}</span>
-                <span>{{ formatFileSize(activeFileSize) }}</span>
-                <span>创建：{{ formatMetaTime(activeFile.CreateTime || activeFile.CreateDate) }}</span>
-                <span>修改：{{ formatMetaTime(activeFile.UpdateTime || activeFile.ModifyTime) }}</span>
+            <div v-if="currentEditorFile" class="active-file-meta">
+                <span class="path">{{ currentEditorFile.FilePath }}</span>
+                <span>{{ formatFileSize(currentEditorFileSize) }}</span>
+                <span v-if="activeView !== 'build'">创建：{{ formatMetaTime(currentEditorFile.CreateTime || currentEditorFile.CreateDate) }}</span>
+                <span v-if="activeView !== 'build'">修改：{{ formatMetaTime(currentEditorFile.UpdateTime || currentEditorFile.ModifyTime) }}</span>
             </div>
             <div v-if="currentApp" class="publish-meta">
                 <span>应用Key：{{ currentApp.AppKey || "未生成" }}</span>
@@ -284,6 +286,9 @@
                         </button>
                         <button type="button" :class="{ active: activeView === 'source' }" @click="activeView = 'source'">
                             源码视图
+                        </button>
+                        <button type="button" :class="{ active: activeView === 'build' }" @click="openBuildView">
+                            编译视图
                         </button>
                         <button type="button" :class="{ active: activeView === 'versions' }" @click="activeView = 'versions'">
                             版本记录
@@ -314,7 +319,32 @@
                             v8CodeType="client"
                         />
                         <div v-else class="empty-area">
-                            <p>选择左侧文件后可以在线查看、编辑源码。</p>
+                            <p>{{ files.length ? '选择左侧文件后可以在线查看、编辑源码。' : '该应用安装时未携带源码包；仍可在【编译视图】查看和修改已发布代码。' }}</p>
+                        </div>
+                    </div>
+
+                    <div v-show="activeView === 'build'" class="source-pane build-pane">
+                        <div v-if="buildFiles.length" class="build-file-toolbar">
+                            <span>编译文件</span>
+                            <el-select v-model="buildFilePath" filterable placeholder="输入路径搜索编译文件" @change="openBuildFile">
+                                <el-option
+                                    v-for="file in buildFiles"
+                                    :key="file.FilePath"
+                                    :label="file.FilePath"
+                                    :value="file.FilePath"
+                                />
+                            </el-select>
+                        </div>
+                        <DiyCodeEditor
+                            v-if="activeBuildFile"
+                            v-model="activeBuildContent"
+                            :field="editorField"
+                            :height="editorHeight"
+                            FormMode="Edit"
+                            v8CodeType="client"
+                        />
+                        <div v-else class="empty-area">
+                            <p>{{ buildFiles.length ? '请选择一个编译文件。' : '当前应用还没有可查看的编译产物。' }}</p>
                         </div>
                     </div>
 
@@ -412,6 +442,10 @@ const files = ref([]);
 const versions = ref([]);
 const activeFile = ref(null);
 const activeContent = ref("");
+const buildFiles = ref([]);
+const activeBuildFile = ref(null);
+const activeBuildContent = ref("");
+const buildFilePath = ref("");
 const activeView = ref("source");
 const selectedVersionKey = ref("");
 const fileSaving = ref(false);
@@ -452,17 +486,19 @@ const currentUser = computed(() => diyStore.GetCurrentUser || {});
 const currentUserId = computed(() => String(currentUser.value?.Id || "").trim());
 const editorHeight = computed(() => "calc(100vh - 250px)");
 const editorField = computed(() => ({
-    Id: activeFile.value?.Id || activeFile.value?.FilePath || "ai-app-file",
+    Id: currentEditorFile.value?.Id || currentEditorFile.value?.FilePath || "ai-app-file",
     Name: "SourceCode",
-    Label: activeFile.value?.FilePath || "源码",
+    Label: currentEditorFile.value?.FilePath || "代码",
     Config: {
         CodeEditor: {
             Height: "620",
-            Language: getEditorLanguage(activeFile.value?.FilePath || "")
+            Language: getEditorLanguage(currentEditorFile.value?.FilePath || "")
         }
     }
 }));
-const activeFileSize = computed(() => getFileSize(activeFile.value, activeContent.value));
+const currentEditorFile = computed(() => activeView.value === "build" ? activeBuildFile.value : activeFile.value);
+const currentEditorContent = computed(() => activeView.value === "build" ? activeBuildContent.value : activeContent.value);
+const currentEditorFileSize = computed(() => getFileSize(currentEditorFile.value, currentEditorContent.value));
 const fileTreeData = computed(() => buildFileTree(files.value));
 const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
 const canSendAppChat = computed(() => (
@@ -786,6 +822,10 @@ async function selectApp(app) {
     previewHtml.value = "";
     activeFile.value = null;
     activeContent.value = "";
+    buildFiles.value = [];
+    activeBuildFile.value = null;
+    activeBuildContent.value = "";
+    buildFilePath.value = "";
     appChatMessages.value = [];
     try {
         const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
@@ -793,6 +833,16 @@ async function selectApp(app) {
         currentApp.value = selected;
         files.value = detail?.Files || [];
         versions.value = detail?.Versions || [];
+        try {
+            const buildDetail = await runAiAppEngine("ai_app_build_file", { Action: "List", AppId: app.Id });
+            buildFiles.value = (buildDetail?.Files || []).map((item) => ({
+                ...item,
+                FilePath: item.Path || item.FilePath || item.RelativePath || item.FileName
+            })).filter((item) => item.FilePath);
+        } catch (buildError) {
+            console.warn("[AiApp] load build files failed", buildError);
+            buildFiles.value = [];
+        }
         const latestVersion = sortedVersions.value[0];
         if (latestVersion) {
             selectedVersionKey.value = versionKey(latestVersion);
@@ -912,9 +962,33 @@ async function openFile(file, options = {}) {
 }
 
 function formatActiveFile() {
-    if (!activeFile.value) return;
-    activeContent.value = formatSourceCode(activeContent.value, activeFile.value.FilePath);
-    ElMessage.success("源码已格式化");
+    if (!currentEditorFile.value) return;
+    if (activeView.value === "build") {
+        activeBuildContent.value = formatSourceCode(activeBuildContent.value, activeBuildFile.value.FilePath);
+    } else {
+        activeContent.value = formatSourceCode(activeContent.value, activeFile.value.FilePath);
+    }
+    ElMessage.success("代码已格式化");
+}
+
+async function openBuildView() {
+    activeView.value = "build";
+    if (!activeBuildFile.value && buildFiles.value.length) {
+        await openBuildFile(buildFiles.value[0].FilePath);
+    }
+}
+
+async function openBuildFile(path) {
+    if (!currentApp.value || !path) return;
+    try {
+        const data = await runAiAppEngine("ai_app_build_file", { Action: "Get", AppId: currentApp.value.Id, Path: path });
+        activeBuildContent.value = formatSourceCode(data?.Content || "", path);
+        activeBuildFile.value = { ...(buildFiles.value.find((item) => item.FilePath === path) || {}), ...(data || {}), FilePath: path };
+        buildFilePath.value = path;
+        activeView.value = "build";
+    } catch (error) {
+        ElMessage.error(error.message || "读取编译文件失败");
+    }
 }
 
 function formatSourceCode(content, filePath) {
@@ -1020,6 +1094,30 @@ async function saveActiveFile() {
     }
 }
 
+async function saveCurrentFile() {
+    if (activeView.value !== "build") return saveActiveFile();
+    if (!currentApp.value || !activeBuildFile.value) return;
+    const filePath = activeBuildFile.value.FilePath;
+    fileSaving.value = true;
+    try {
+        const content = formatSourceCode(activeBuildContent.value, filePath);
+        activeBuildContent.value = content;
+        await runAiAppEngine("ai_app_build_file", {
+            Action: "Save",
+            AppId: currentApp.value.Id,
+            Path: filePath,
+            Content: content
+        });
+        ElMessage.success("编译文件已保存");
+        await selectApp(currentApp.value);
+        await openBuildFile(filePath);
+    } catch (error) {
+        ElMessage.error(error.message || "保存编译文件失败");
+    } finally {
+        fileSaving.value = false;
+    }
+}
+
 async function buildApp() {
     if (!currentApp.value) return;
     building.value = true;
@@ -1067,7 +1165,7 @@ async function publishToStore() {
     if (!currentApp.value) return;
     try {
         await ElMessageBox.confirm(
-            `确认将【${currentApp.value.Name}】的私有源码与最新编译产物发布到应用商城？`,
+            `确认将【${currentApp.value.Name}】的最新编译 ZIP 发布到应用商城？默认不包含私有源码；需要源码包请在商城的【配置AI应用包】中勾选。`,
             "发布应用商城",
             { type: "warning", confirmButtonText: "开始发布", cancelButtonText: "取消" }
         );
@@ -2002,6 +2100,10 @@ function scrollAppChat() {
     height: 100%;
     background: #f8fafc;
 }
+
+.build-pane { display: flex; flex-direction: column; }
+.build-file-toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #edf1f7; color: #667085; font-size: 12px; }
+.build-file-toolbar .el-select { width: min(620px, 80%); }
 
 .preview-frame {
     width: 100%;

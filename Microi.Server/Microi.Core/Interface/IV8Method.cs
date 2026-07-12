@@ -71,6 +71,16 @@ namespace Microi.net
         DosResult Upload(dynamic dynamicParam);
 
         /// <summary>
+        /// 创建受限的内存 ZIP，供 V8 脚本安全打包应用资产。
+        /// </summary>
+        DosResult CreateZip(dynamic dynamicParam);
+
+        /// <summary>
+        /// 安全解压内存 ZIP，包含路径穿越与解压炸弹防护。
+        /// </summary>
+        DosResult ExtractZip(dynamic dynamicParam);
+
+        /// <summary>
         /// 移动 HDFS 文件到指定完整路径。用于发布类接口引擎生成稳定对象地址。
         /// </summary>
         DosResult MoveObject(dynamic dynamicParam);
