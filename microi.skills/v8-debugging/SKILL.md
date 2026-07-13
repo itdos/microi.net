@@ -107,6 +107,36 @@ V8.Method.AddSysLog({
 
 存在 `sys_log` 表，可以在系统日志菜单查看，可按 Type 过滤。
 
+### 匿名登录/第三方授权接口的追踪日志
+
+微信手机号、OAuth、短信快捷登录等匿名接口必须生成追踪号并按阶段记录失败。开发者工具成功不能替代体验版/真机验证。
+
+```javascript
+var traceId = V8.Method.NewGuid().replace(/-/g, '').substring(0, 16);
+
+function fail(stage, message, detail) {
+  V8.Method.AddSysLog({
+    Type: 'ThirdPartyLogin',
+    Title: '授权登录失败[' + stage + '][' + traceId + ']',
+    Content: JSON.stringify({
+      TraceId: traceId,
+      Stage: stage,
+      Message: message,
+      Detail: detail || {},
+      OsClient: V8.OsClient
+    }),
+    Remark: traceId,
+    Level: 3
+  });
+  return { Code: 0, Msg: '授权登录失败（' + stage + '）：' + message + '；追踪号：' + traceId };
+}
+```
+
+- 在身份交换、AccessToken、手机号/用户资料交换、账号匹配、注册/更新、Token 签发前维护明确阶段名，所有显式失败和顶层 `catch` 都走同一个 `fail`。
+- 日志保留第三方 `errcode/errmsg`，但先脱敏；禁止记录 Secret、AccessToken、授权 code、LoginCode、OpenId、完整手机号和用户 Token。
+- `V8.Method.AddSysLog` 写 MongoDB 系统日志，适合 `Code=0` 仍需保留的失败记录；同时可用 `console.error` 作为容器日志兜底。
+- 前端响应显示同一个追踪号，排查时先按追踪号查系统日志，再结合容器日志和第三方错误码定位。
+
 ## console 在 Docker 中查看
 
 ```bash

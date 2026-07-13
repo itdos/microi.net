@@ -23,6 +23,16 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 - 微信小程序手机号快捷登录必须使用 `<button open-type="getPhoneNumber">`，通过 `@getphonenumber` 获取 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`。前端不能假设能直接拿到手机号明文。
 - H5/App 可提供手机号输入兜底，但必须确认后端接口支持 `Phone` 登录；微信小程序优先走 `Code + LoginCode`。
 - 登录按钮、去登录按钮、手机号授权按钮必须是图标 + 文案按钮，具备 loading、disabled/pressed 反馈，且原生 button 默认边框要清掉。
+- 体验版授权登录必须保留可诊断错误：请求层归一化 `uni.request.fail.errMsg`、HTTP 状态和接口 `Msg`，登录页用模态框完整展示“阶段 + 原因 + 追踪号”。后端接口引擎按阶段写脱敏系统日志；不能只在前端 catch 后显示固定“手机号登录失败”。
+
+## 微信小程序全页面分享
+
+- 创建或维护 UniApp 微信小程序时，默认把好友转发与朋友圈分享视为页面基础能力；按 `pages.json` 全量路由逐页接入，不等待用户额外提出。
+- Vue3 `<script setup>` 页面直接导入 `onShareAppMessage`、`onShareTimeline` 并注册处理函数。可以复用项目级 payload 工具，但生命周期导入必须出现在页面源码中，确保 uni-app 编译器注册页面能力。
+- `onShareAppMessage` 返回业务标题和完整页面 `path`；`onShareTimeline` 返回业务标题和当前页 `query`。资讯、报告等内容页可返回符合平台尺寸要求的 `imageUrl`。
+- 分享参数保留页面定位所需的 Id、分类和公开 ShareToken，统一过滤 Authorization、AccessToken、CustomerToken、手机号授权码、LoginCode、OpenId、验证码等敏感参数。
+- 登录页、员工页、管理页等受保护页面同样可分享。接收者打开后由 session/角色守卫展示登录或无权限提示，不得因页面需要登录就调用 `hideShareMenu`。
+- 验收不能只看首页右上角。用脚本比较 `pages.json` 路由数量与源码/微信构建产物中的两种分享生命周期数量，并在体验版抽测公开页、登录页和受保护详情页。
 
 ## 首屏 Hero 与浮动面板验收
 
@@ -313,6 +323,7 @@ async function load() {
 - 所有页面、底部导航、按钮、未登录提示、头像姓名和角色文本都必须读同一个 session store。页面不能直接读取旧 storage 展示用户名。
 - 客户小程序手机号登录得到的是业务 `CustomerToken`，与员工 `sys_user` token 是两条会话；客户数据必须通过绑定关系过滤，不要把客户账号塞进员工接口绕过权限。
 - 登出、登录失败、token 缺失、用户 `Id` 缺失时要统一清理 `Token`、`staffUser/customerUser`、绑定信息和本地 session。
+- 接口引擎登录失败时要把 `Msg` 原样传到统一错误展示层，禁止在 store 或业务 API 包装中覆盖成固定文案；网络错误优先读取 `errMsg/message`，HTTP 错误同时保留状态码。
 
 ## 数字、主题、上传与消息
 

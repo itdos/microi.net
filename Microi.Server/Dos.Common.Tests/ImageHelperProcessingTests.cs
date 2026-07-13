@@ -237,6 +237,43 @@ public class ImageHelperProcessingTests
     }
 
     [Fact]
+    public void Draw_falls_back_per_glyph_when_font_family_does_not_exist()
+    {
+        const string text = "中文字体自动回退";
+        using var matched = SKFontManager.Default.MatchCharacter('中');
+        if (matched == null || !matched.ContainsGlyphs(text))
+        {
+            var missingFont = Assert.Throws<InvalidOperationException>(() => DrawText(
+                text, "Microi-Definitely-Missing-Font-7D65C1"));
+            Assert.Contains("已拒绝输出缺字方框", missingFont.Message);
+            return;
+        }
+
+        var fallbackResult = DrawText(text, "Microi-Definitely-Missing-Font-7D65C1");
+        using var fallbackBitmap = Decode(fallbackResult.Bytes);
+        using var legacyMissingGlyphBitmap = DrawTextWithoutGlyphFallback(
+            text, "Microi-Definitely-Missing-Font-7D65C1");
+        Assert.Contains(Enumerable.Range(0, fallbackBitmap.Width * fallbackBitmap.Height), pixel =>
+        {
+            var color = fallbackBitmap.GetPixel(pixel % fallbackBitmap.Width, pixel / fallbackBitmap.Width);
+            return color.Red < 245 || color.Green < 245 || color.Blue < 245;
+        });
+        AssertBitmapsNotEqual(legacyMissingGlyphBitmap, fallbackBitmap);
+    }
+
+    [Fact]
+    public void Draw_rejects_a_character_that_no_installed_font_contains()
+    {
+        var unsupportedCharacter = char.ConvertFromUtf32(0x10FFFF);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => DrawText(
+            "glyph:" + unsupportedCharacter, "Microi-Definitely-Missing-Font-7D65C1"));
+
+        Assert.Contains("U+10FFFF", exception.Message);
+        Assert.Contains("已拒绝输出缺字方框", exception.Message);
+    }
+
+    [Fact]
     public void Rotate_crop_and_get_info_report_the_transformed_dimensions()
     {
         var source = Solid(6, 4, "#ff0000");
@@ -390,10 +427,50 @@ public class ImageHelperProcessingTests
         });
     }
 
+    private static ImageProcessResult DrawText(string text, string fontFamily)
+    {
+        var source = Solid(520, 100, "#ffffff");
+        return ImageHelper.Draw(new ImageDrawParam
+        {
+            Bytes = source.Bytes,
+            Elements =
+            [
+                new ImageDrawElementParam
+                {
+                    Type = "text",
+                    Text = text,
+                    X = 16,
+                    Y = 18,
+                    FontSize = 48,
+                    FontFamily = fontFamily,
+                    Color = "#111827"
+                }
+            ]
+        });
+    }
+
     private static SKBitmap Decode(byte[] bytes)
     {
         var bitmap = SKBitmap.Decode(bytes);
         return Assert.IsType<SKBitmap>(bitmap);
+    }
+
+    private static SKBitmap DrawTextWithoutGlyphFallback(string text, string fontFamily)
+    {
+        var bitmap = new SKBitmap(new SKImageInfo(520, 100, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        using var typeface = SKTypeface.FromFamilyName(fontFamily);
+        using var paint = new SKPaint
+        {
+            IsAntialias = true,
+            Typeface = typeface,
+            TextSize = 48,
+            Color = new SKColor(0x11, 0x18, 0x27),
+            TextAlign = SKTextAlign.Left
+        };
+        canvas.DrawText(text, 16, 18 - paint.FontMetrics.Ascent, paint);
+        return bitmap;
     }
 
     private static void AssertColor(SKBitmap bitmap, int x, int y, SKColor expected, int tolerance = 2)
@@ -403,5 +480,16 @@ public class ImageHelperProcessingTests
         Assert.InRange(Math.Abs(actual.Green - expected.Green), 0, tolerance);
         Assert.InRange(Math.Abs(actual.Blue - expected.Blue), 0, tolerance);
         Assert.InRange(Math.Abs(actual.Alpha - expected.Alpha), 0, tolerance);
+    }
+
+    private static void AssertBitmapsNotEqual(SKBitmap expected, SKBitmap actual)
+    {
+        Assert.Equal(expected.Width, actual.Width);
+        Assert.Equal(expected.Height, actual.Height);
+        for (var y = 0; y < expected.Height; y++)
+        for (var x = 0; x < expected.Width; x++)
+            if (expected.GetPixel(x, y) != actual.GetPixel(x, y))
+                return;
+        Assert.Fail("字体回退结果仍与旧版缺字方框渲染完全相同。");
     }
 }
