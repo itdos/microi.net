@@ -61,6 +61,8 @@ export function createApp() {
 - Token 与用户缓存使用 `V8.getToken`、`V8.setToken`、`V8.clearToken`、`V8.getUser` 和 `V8.setUser`。
 - JavaScript 需要平台安全区数值时使用 `V8.getSafeArea`；CSS 仍使用 `env(safe-area-inset-*)`。
 
+`Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
+
 ## 登录与验证码封装
 
 SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。

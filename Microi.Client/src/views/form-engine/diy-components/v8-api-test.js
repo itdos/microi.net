@@ -96,20 +96,56 @@ async function testApiEngine() {
 
 // 测试8: HTTP请求智能提示
 async function testHttpRequest() {
-    // POST请求
-    var postResult = await V8.Post("/api/xxx", {
-        id: "1",
-        name: "test"
+    // 与后端同构的新写法（前端必须 await）
+    var patchResult = await V8.Http.Patch({
+        Url: "/api/xxx/1",
+        PatchParam: { name: "new name" },
+        ParamType: "json"
     });
 
-    // GET请求
-    var getResult = await V8.Get("/api/xxx");
+    // 新代码优先使用与后端同构的 V8.Http
+    var postResult = await V8.Http.Post({
+        Url: "/api/xxx",
+        PostParam: { id: "1", name: "test" },
+        ParamType: "json"
+    });
+
+    var getResult = await V8.Http.Get({
+        Url: "/api/xxx",
+        GetParam: { id: "1" }
+    });
+
+    // 旧 V8.Post/Get 仅作为兼容 API 保留
+    var legacyPostResult = await V8.Post("/api/xxx", { id: "1" });
+    var legacyGetResult = await V8.Get("/api/xxx");
 
     console.log("POST结果:", postResult);
     console.log("GET结果:", getResult);
+    console.log("兼容API结果:", legacyPostResult, legacyGetResult);
 }
 
-// 测试9: 其他常用API
+// 测试9: 后端 Office 导出智能提示（接口引擎代码示例）
+function testOfficeExport() {
+    var excelResult = V8.Office.ExportExcel({
+        OsClient: V8.OsClient,
+        ExcelSheets: [{
+            SheetName: "数据",
+            ExcelData: [{ Name: "测试" }],
+            ExcelHeader: [{ Name: "Name", Label: "名称", Component: "Text" }]
+        }]
+    });
+    var wordResult = V8.Office.ExportWord({
+        Title: "报告",
+        Paragraphs: [{ Text: "正文" }]
+    });
+    var pptResult = V8.Office.ExportPowerPoint({
+        Title: "汇报",
+        Slides: [{ Layout: "TitleSlide", Title: "汇报" }]
+    });
+    return { excelResult, wordResult, pptResult };
+}
+
+// 测试10: 其他常用API
 function testOtherApis() {
     // 判断空值
     if (V8.IsNull(V8.Form.UserName)) {
@@ -132,7 +168,7 @@ function testOtherApis() {
     // V8.Window.Open("https://www.example.com");
 }
 
-// 测试10: 访问表单数据
+// 测试11: 访问表单数据
 function testFormData() {
     // 访问当前表单数据
     var currentName = V8.Form.UserName;

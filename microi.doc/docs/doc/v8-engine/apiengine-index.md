@@ -232,8 +232,8 @@ var excelByte = excelResult.Data;
 return {
   Code : 1,
   Data : {
-    FileName : '测试接口引擎导出excel.xls',
-    ContentType : 'application/vnd.ms-excel',
+    FileName : '测试接口引擎导出excel.xlsx',
+    ContentType : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     FileByteBase64 : System.Convert.ToBase64String(excelByte)
   }
 };
@@ -298,7 +298,7 @@ var excelResult = V8.Office.ExportExcel({
 
 
 ## 自定义导出 Word
->* 2026-06-30 开始支持通过 `V8.Office.ExportWordText()` 将纯文本内容导出为紧凑版式的 Word 文档，适合题库、合同、法律文案等需要保留原始排版行的场景。
+>* `V8.Office.ExportWordText()` 继续兼容旧版纯文本导出；新代码优先使用对象参数的 `V8.Office.ExportWord()`，可生成段落、章节、表格、图片、页眉页脚和页码。
 >* 该方法返回 `byte[]`，接口引擎需要开启【响应文件】，并使用 `System.Convert.ToBase64String()` 转成文件响应。
 
 ::: details 展开查看 JavaScript 代码
@@ -322,6 +322,90 @@ return {
     FileName: '题库导出.docx',
     ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+:::
+
+::: details 展开查看富文本 Word 导出
+```javascript
+var wordResult = V8.Office.ExportWord({
+  Title: '月度经营报告',
+  Author: V8.CurrentUser.Name,
+  PageSize: 'A4',
+  Orientation: 'Portrait',
+  HeaderText: '吾码经营中心',
+  FooterText: '内部资料',
+  ShowPageNumber: true,
+  Paragraphs: [{ Text: '本月经营情况总体稳定。', FirstLineIndent: 0.74 }],
+  Sections: [{
+    Heading: '一、核心指标',
+    Tables: [{
+      Headers: ['指标', '本月', '同比'],
+      Rows: [['销售额', 1280000, '12.5%'], ['订单数', 860, '8.1%']]
+    }]
+  }],
+  Images: [{
+    FileByteBase64: chartBase64,
+    FileName: 'chart.png',
+    ContentType: 'image/png',
+    Width: 15,
+    Height: 8,
+    Caption: '图 1：趋势分析'
+  }]
+});
+if (wordResult.Code != 1) return wordResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '月度经营报告.docx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+:::
+
+## 自定义导出 PowerPoint
+
+`V8.Office.ExportPowerPoint()` 使用对象参数生成 `.pptx`。幻灯片、图片和表格的位置/尺寸单位为英寸，默认 16:9。
+
+::: details 展开查看 JavaScript 代码
+```javascript
+var pptResult = V8.Office.ExportPowerPoint({
+  Title: '季度经营汇报',
+  Author: V8.CurrentUser.Name,
+  FontFamily: 'Microsoft YaHei',
+  ShowSlideNumber: true,
+  Slides: [{
+    Layout: 'TitleSlide',
+    Title: '季度经营汇报',
+    Subtitle: DateNow('yyyy-MM-dd')
+  },{
+    Title: '核心结论',
+    Bullets: ['收入保持增长', '重点客户续约稳定'],
+    Tables: [{
+      Headers: ['指标', '本期', '目标'],
+      Rows: [['销售额', '128万', '120万']],
+      X: 0.7, Y: 4.0, Width: 11.9, Height: 2.2
+    }]
+  },{
+    Title: '趋势图',
+    Images: [{
+      FileByteBase64: chartBase64,
+      FileName: 'trend.png',
+      ContentType: 'image/png',
+      X: 1.2, Y: 1.5, Width: 10.9, Height: 5.2
+    }]
+  }]
+});
+if (pptResult.Code != 1) return pptResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '季度经营汇报.pptx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    FileByteBase64: System.Convert.ToBase64String(pptResult.Data)
   }
 };
 ```

@@ -652,56 +652,72 @@ V8.MongoDb.GetFormData({
 ```
 
 ## V8.Http
->* 对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
-::: details 展开查看 JavaScript 代码（45 行）
+>* 对 RestSharp 的受控封装，支持 GET、POST、PATCH。前后端 V8 使用相同的 PascalCase 对象参数；后端接口引擎同步返回，前端浏览器端需使用 `await`。
+
+| 方法 | 主要参数 | 返回值 |
+|---|---|---|
+| `V8.Http.Get` | `GetParam` | 响应字符串 |
+| `V8.Http.Post` | `PostParam` / `PostParamString` | 响应字符串 |
+| `V8.Http.Patch` | `PatchParam` / `PatchParamString` | 响应字符串 |
+| `GetResponse/PostResponse/PatchResponse` | 同上 | 完整响应对象 |
+
+完整响应对象包含 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。`Timeout` 与兼容参数名 `TimeOut` 的单位均为秒，默认 `600` 秒（10 分钟）；`Headers` 与 `Header` 等效；`ParamType` 支持 `form`（默认）、`json`、`xml`、`binary`。`GetParam` 是 URL 查询参数，GET、POST、PATCH 均可使用。
+
 ```javascript
-//post请求，返回string，对应的也有V8.Http.Get，参数名称则为GetParam
-var loginResult = V8.Http.Post({
-  Url : 'http://192.168.0.173:1052/api/SysUser/login', //必传
-  PostParam : { Account : 'admin', Pwd : '****', OsClient : 'veken' },
-  //注意目前PostParam暂不支持多级属性，如：{ User: { Account : 'admin' }, OsClient : 'veken' }，此时则需要传入序列化后的字符串，如：
-  PostParamString : JSON.stringify({ User: { Account : 'admin' }, OsClient : 'veken' }),
-  ParamType : 'json', //请求类型，默认form
-  Timeout : 5, //请求超时时间，单位秒，默认5秒
-  Headers : { token : '', did : ''  }, //请求报文，参数名也可以是Header，平台均支持
-  FilesByteBase64 : {}, //上传文件，后期补充用法
-  FilesByteString : {}, //上传文件，后期补充用法
+// POST JSON。嵌套对象使用 PostParamString，避免对象转换丢失层级。
+var loginText = V8.Http.Post({
+  Url: 'https://api.example.com/login',
+  PostParamString: JSON.stringify({
+    User: { Account: 'admin', Pwd: '******' },
+    OsClient: 'demo'
+  }),
+  ParamType: 'json',
+  Timeout: 10,
+  Headers: { 'X-Trace-Id': V8.Method.NewGuid() }
+});
+var loginResult = JSON.parse(loginText);
+
+// GET 查询参数
+var listText = V8.Http.Get({
+  Url: 'https://api.example.com/users',
+  GetParam: { page: 1, size: 20 },
+  Headers: { Authorization: 'Bearer ' + loginResult.token }
 });
 
-//post请求，返回Response对象，目前里面暂时只包含Headers、Content。，对应的也有V8.Http.GetResponse，参数数名称则为GetParam
-var loginResult2 = V8.Http.PostResponse({
-  Url : 'http://192.168.0.173:1052/api/SysUser/login',
-  PostParam : { Account : 'admin', Pwd : '******', OsClient : 'veken' }
+// PATCH JSON。嵌套对象使用 PatchParamString。
+var patchText = V8.Http.Patch({
+  Url: 'https://api.example.com/users/123',
+  PatchParamString: JSON.stringify({ profile: { name: '新名字' } }),
+  ParamType: 'json',
+  Headers: { Authorization: 'Bearer ' + loginResult.token }
 });
-//获取header中的Authorization值
-var header = loginResult2.Headers.find(item => {
-  return item.Name == 'Authorization' || item.Name == 'authorization';
-})
-if(header){
-  //再获取当前登陆身份信息，测试传入header
-  var token = header.Value;
-  var getCurrentUser = V8.Http.Post({
-    Url: 'http://192.168.0.173:1052/api/SysUser/getCurrentUser',
-    Headers: { authorization : 'Bearer ' + token}
-  });
-  return {
-    Code : 0, Msg : '获取身份信息成功：' + getCurrentUser
-  };
-}else{
-  //未获取到token
-  return {
-    Code : 0,  Msg : '获取header失败：' + loginResult2
-  }
+
+// PATCH 完整响应
+var patchResp = V8.Http.PatchResponse({
+  Url: 'https://api.example.com/users/123',
+  PatchParam: { Status: 1 },
+  ParamType: 'json'
+});
+if (patchResp.StatusCode < 200 || patchResp.StatusCode >= 300) {
+  return { Code: 0, Msg: patchResp.ErrorMessage || patchResp.Content };
 }
 
-//发起xml请求
-var result = V8.Http.Post({
-  Url : 'http://192.168.0.173:1052/api/SysUser/login',
-  ParamType : 'xml',
-  PostParamString : '<xml><text>1</text></xml>'
+// XML 请求
+var xmlText = V8.Http.Post({
+  Url: 'https://api.example.com/xml',
+  ParamType: 'xml',
+  PostParamString: '<xml><text>1</text></xml>'
+});
+
+// 上传文件：键同时作为表单字段名和文件名
+var uploadText = V8.Http.Post({
+  Url: 'https://api.example.com/upload',
+  PostParam: { title: '附件' },
+  FilesByteBase64: { 'report.pdf': pdfBase64 }
 });
 ```
-:::
+
+接口引擎中必须使用对象参数格式，例如 `V8.Http.Get({ Url: url })`。不要使用 `V8.Http.Get(url)`；旧的 .NET 同名异步重载可能被 Jint 解析为 Promise。
 
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
@@ -719,6 +735,232 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 
 ## V8.Office
+
+`V8.Office` 可在接口引擎中生成 Excel、Word、PowerPoint 文件。导出方法返回 `DosResult<byte[]>`，接口引擎需要开启【响应文件】，并把 `Data` 转成 Base64 返回。
+
+| 方法 | 说明 |
+|---|---|
+| `ExportExcel({...})` | 导出 `.xlsx`，支持单 Sheet、多 Sheet、图片和动态表头 |
+| `ExcelToList({...})` | 解析 Excel；`SheetIndex` 从 `0` 开始 |
+| `ExportWordText({...})` | 旧版纯文本 Word 导出，继续兼容 |
+| `ExportWord({...})` | 导出 `.docx`，支持段落、章节、表格、图片、页眉页脚、页码 |
+| `ExportPowerPoint({...})` | 导出 `.pptx`，支持多页、文本、项目符号、表格、图片、主题、页码 |
+| `SendEmail({...})` | 发送 HTML 邮件 |
+
+### 导出 Excel
+
+单 Sheet：
+
+```js
+var excelResult = V8.Office.ExportExcel({
+  OsClient: V8.OsClient,
+  ExcelData: dataList,
+  ExcelHeader: [
+    { Name: 'Name', Label: '姓名', Component: 'Text' },
+    { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal' }
+  ]
+});
+if (excelResult.Code !== 1) return excelResult;
+
+return {
+  Code: 1,
+  Data: {
+    FileName: '业务数据.xlsx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    FileByteBase64: System.Convert.ToBase64String(excelResult.Data)
+  }
+};
+```
+
+多 Sheet：
+
+```js
+var excelResult = V8.Office.ExportExcel({
+  OsClient: V8.OsClient,
+  ExcelSheets: [
+    {
+      SheetName: '订单',
+      ExcelData: orderList,
+      ExcelHeader: [
+        { Name: 'OrderNo', Label: '订单号', Component: 'Text' },
+        { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal' }
+      ]
+    },
+    {
+      SheetName: '客户',
+      ExcelData: customerList,
+      ExcelHeader: [
+        { Name: 'Name', Label: '客户名称', Component: 'Text' },
+        { Name: 'Phone', Label: '联系电话', Component: 'Text' }
+      ]
+    }
+  ]
+});
+if (excelResult.Code !== 1) return excelResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '订单与客户.xlsx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    FileByteBase64: System.Convert.ToBase64String(excelResult.Data)
+  }
+};
+```
+
+`ExcelSheets` 每项可分别传 `SheetName`、`ExcelData`、`ExcelHeader`，也可传 `FormEngineKey/TableId/_Where/_OrderBy/_PageSize` 等查询参数。`Sheets` 是兼容别名，新代码使用 `ExcelSheets`。Sheet 名称中的非法字符、31 字符上限和重名会自动处理。
+
+### 导出 Word
+
+新代码使用对象参数的 `ExportWord`；`ExportWordText` 仅作为旧版纯文本接口继续保留。页面边距、图片宽高单位为厘米，字体大小单位为磅。
+
+```js
+var wordResult = V8.Office.ExportWord({
+  Title: '月度经营报告',
+  Subtitle: DateNow('yyyy年MM月'),
+  Author: V8.CurrentUser.Name,
+  Subject: '经营分析',
+  Keywords: '经营,月报',
+  Description: '月度经营分析报告',
+  PageSize: 'A4',                 // A4 | Letter
+  Orientation: 'Portrait',       // Portrait | Landscape
+  MarginTop: 2.2,
+  MarginRight: 2.0,
+  MarginBottom: 2.2,
+  MarginLeft: 2.0,
+  FontFamily: 'Microsoft YaHei',
+  FontSize: 10.5,
+  TitleFontSize: 20,
+  SubtitleFontSize: 12,
+  TitleAlignment: 'Center',
+  LineSpacing: 1.25,
+  ParagraphSpacingAfter: 6,
+  HeaderText: '吾码经营中心',
+  FooterText: '内部资料',
+  ShowPageNumber: true,
+  Paragraphs: [
+    { Text: '本月经营情况总体稳定。', FirstLineIndent: 0.74 },
+    { Text: '以下数据未经授权不得外传。', Bold: true, FontColor: 'C00000' }
+  ],
+  Sections: [{
+    Heading: '一、核心指标',
+    HeadingLevel: 1,
+    Content: '本节展示主要经营指标。',
+    Tables: [{
+      Title: '指标明细',
+      Headers: ['指标', '本月', '同比'],
+      Rows: [['销售额', 1280000, '12.5%'], ['订单数', 860, '8.1%']],
+      ColumnWidths: [4, 4, 4],
+      HeaderBackgroundColor: 'D9EAF7',
+      BorderColor: 'B7C9D6'
+    }]
+  }],
+  Images: [{
+    FileByteBase64: chartBase64,  // 纯 Base64 或 data URI
+    FileName: 'chart.png',
+    ContentType: 'image/png',
+    Width: 15,
+    Height: 8,
+    Alignment: 'Center',
+    Caption: '图 1：趋势分析'
+  }]
+});
+if (wordResult.Code !== 1) return wordResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '月度经营报告.docx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+
+常用子参数：
+
+| 对象 | 支持参数 |
+|---|---|
+| `Paragraphs[]` | `Text/Alignment/Bold/Italic/Underline/FontFamily/FontSize/FontColor/SpacingBefore/SpacingAfter/LineSpacing/FirstLineIndent/PageBreakBefore` |
+| `Sections[]` | `Heading/HeadingLevel/Content/Paragraphs/Tables/Images/PageBreakBefore` |
+| `Tables[]` | `Title/Headers/Rows/ColumnWidths/Alignment/HeaderBold/HeaderBackgroundColor/HeaderFontColor/BorderColor/FontSize` |
+| `Images[]` | `FileByteBase64/FileName/ContentType/Width/Height/Alignment/Caption` |
+
+### 导出 PowerPoint
+
+幻灯片尺寸、图片/表格位置和宽高单位均为英寸；默认画布为 16:9（`13.333 × 7.5`）。
+
+```js
+var pptResult = V8.Office.ExportPowerPoint({
+  Title: '季度经营汇报',
+  Author: V8.CurrentUser.Name,
+  Subject: '季度复盘',
+  Keywords: '经营,季度',
+  SlideWidth: 13.333,
+  SlideHeight: 7.5,
+  FontFamily: 'Microsoft YaHei',
+  BackgroundColor: 'FFFFFF',
+  TitleColor: '17365D',
+  TextColor: '222222',
+  TitleFontSize: 28,
+  BodyFontSize: 18,
+  ShowSlideNumber: true,
+  Slides: [
+    {
+      Layout: 'TitleSlide',
+      Title: '季度经营汇报',
+      Subtitle: DateNow('yyyy-MM-dd')
+    },
+    {
+      Layout: 'TitleAndContent',
+      Title: '核心结论',
+      Bullets: ['收入保持增长', '重点客户续约稳定'],
+      TextItems: [
+        { Text: '风险：回款周期延长', Bullet: true, Level: 0, Bold: true, FontColor: 'C00000' }
+      ],
+      Tables: [{
+        Headers: ['指标', '本期', '目标'],
+        Rows: [['销售额', '128万', '120万']],
+        X: 0.7, Y: 4.0, Width: 11.9, Height: 2.2,
+        HeaderBackgroundColor: '17365D'
+      }]
+    },
+    {
+      Title: '趋势图',
+      Images: [{
+        FileByteBase64: chartBase64,
+        FileName: 'trend.png',
+        ContentType: 'image/png',
+        X: 1.2, Y: 1.5, Width: 10.9, Height: 5.2
+      }]
+    }
+  ]
+});
+if (pptResult.Code !== 1) return pptResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '季度经营汇报.pptx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    FileByteBase64: System.Convert.ToBase64String(pptResult.Data)
+  }
+};
+```
+
+| 对象 | 支持参数 |
+|---|---|
+| 顶层 | `Title/Author/Subject/Keywords/Company/SlideWidth/SlideHeight/FontFamily/BackgroundColor/TitleColor/TextColor/TitleFontSize/BodyFontSize/ShowSlideNumber/Slides` |
+| `Slides[]` | `Layout/Title/Subtitle/Content/Bullets/TextItems/Images/Tables/BackgroundColor/TitleColor/TextColor/TitleFontSize/BodyFontSize` |
+| `TextItems[]` | `Text/Level/Bullet/Bold/Italic/FontSize/FontColor/Alignment` |
+| `Images[]` | `FileByteBase64/FileName/ContentType/X/Y/Width/Height` |
+| `Tables[]` | `Headers/Rows/ColumnWidths/X/Y/Width/Height/HeaderBackgroundColor/HeaderFontColor/CellBackgroundColor/CellFontColor/FontSize` |
+
+### 解析 Excel
+
+```js
+var rows = V8.Office.ExcelToList({
+  FileByteBase64: excelBase64,
+  SheetIndex: 0
+});
+```
 
 ### 发送邮件 SendEmail
 >* 源码实现在[/Microi.Server/Microi.Office/MicroiOffice.cs](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)

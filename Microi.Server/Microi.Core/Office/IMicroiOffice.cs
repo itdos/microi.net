@@ -38,6 +38,16 @@ namespace Microi.net
         DosResult<byte[]> ExportWordText(dynamic dynamicParam);
         Task<DosResult<byte[]>> ExportWordTextAsync(OfficeExportWordTextParam param);
         /// <summary>
+        /// 使用对象参数导出 Word 文档。
+        /// </summary>
+        DosResult<byte[]> ExportWord(dynamic dynamicParam);
+        Task<DosResult<byte[]>> ExportWordAsync(OfficeExportWordParam param);
+        /// <summary>
+        /// 使用对象参数导出 PowerPoint 文档。
+        /// </summary>
+        DosResult<byte[]> ExportPowerPoint(dynamic dynamicParam);
+        Task<DosResult<byte[]>> ExportPowerPointAsync(OfficeExportPowerPointParam param);
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>

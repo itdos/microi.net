@@ -351,21 +351,82 @@ redisConn = RedisConnBuilder.Build(clientModel);
 #endregion
 
 #region License 自动恢复
+var scheduleLicenseRestoreRetry = false;
 try
 {
     var licenseRestoreResult = await LicenseServerStore.RestoreCurrentServerLicenseAsync(osClientName);
     if (licenseRestoreResult != null && licenseRestoreResult.Code == 1)
     {
-        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】已根据当前HID自动恢复License文件。");
+        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{licenseRestoreResult.Msg}");
     }
-    else if (licenseRestoreResult != null && licenseRestoreResult.Code == 0)
+    else if (licenseRestoreResult != null && licenseRestoreResult.Code == 2)
     {
-        Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复未完成：{licenseRestoreResult.Msg}");
+        Console.WriteLine($"Microi：【ℹ️提示】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复跳过：{licenseRestoreResult.Msg}");
+    }
+    else
+    {
+        scheduleLicenseRestoreRetry = true;
+        Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复首次执行未完成：{licenseRestoreResult?.Msg ?? "未返回执行结果"}，应用启动后将自动重试。");
     }
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复失败：{ex.Message}");
+    scheduleLicenseRestoreRetry = true;
+    Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复首次执行失败：{ex.Message}，应用启动后将自动重试。");
+}
+
+if (scheduleLicenseRestoreRetry)
+{
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    lifetime.ApplicationStarted.Register(() =>
+    {
+        _ = Task.Run(async () =>
+        {
+            var maxAttempts = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",
+                "License:RestoreMaxAttempts",
+                30));
+            var retrySeconds = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_LICENSE_RESTORE_RETRY_SECONDS",
+                "License:RestoreRetrySeconds",
+                10));
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(retrySeconds), lifetime.ApplicationStopping);
+
+                    // 编排更新时数据库通常晚于 API 就绪；每次重试先重新挂载主租户连接。
+                    OsClient.EnsureHydrated(osClientName);
+                    var retryResult = await LicenseServerStore.RestoreCurrentServerLicenseAsync(osClientName);
+                    if (retryResult != null && retryResult.Code == 1)
+                    {
+                        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复重试第{attempt}次成功：{retryResult.Msg}");
+                        return;
+                    }
+
+                    if (retryResult != null && retryResult.Code == 2)
+                    {
+                        Console.WriteLine($"Microi：【ℹ️提示】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复重试停止：{retryResult.Msg}");
+                        return;
+                    }
+
+                    Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复重试第{attempt}/{maxAttempts}次未完成：{retryResult?.Msg ?? "未返回执行结果"}");
+                }
+                catch (OperationCanceledException) when (lifetime.ApplicationStopping.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Microi：【⚠️注意】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复重试第{attempt}/{maxAttempts}次失败：{ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】License自动恢复在{maxAttempts}次重试后仍未完成，请检查主租户数据库及表[{LicenseServerStore.TableName}]。");
+        });
+    });
 }
 #endregion
 

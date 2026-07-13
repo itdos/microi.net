@@ -172,30 +172,7 @@ namespace Microi.net
         {
             DiyHttpParam diyHttpParam = DynamicToDiyHttpParam(dynamicParam);
             var response = await GetResponseAsync(diyHttpParam);
-            var result = new V8EngineHttpResponse();
-            result.Headers = new List<V8EngineHttpResponseHeaders>();
-            if (response.Headers != null)
-            {
-                foreach (var item in response.Headers)
-                {
-                    result.Headers.Add(new V8EngineHttpResponseHeaders()
-                    {
-                        Name = item.Name,
-                        Value = item.Value,
-                        //Type = item.Type,
-                        //DataFormat = item.DataFormat,
-                        //ContentType = item.ContentType
-                    });
-                }
-            }
-            result.Content = response.Content;
-            result.RawBytes = response.RawBytes;
-            //result.Headers = new Dictionary<string, string>();
-            //foreach (var item in response.Headers)
-            //{
-            //    result.Headers.Add(item.Name, item.va);
-            //}
-            return result;
+            return ToV8EngineHttpResponse(response);
         }
         /// <summary>
         /// 
@@ -260,33 +237,7 @@ namespace Microi.net
         {
             DiyHttpParam diyHttpParam = DynamicToDiyHttpParam(dynamicParam);
             var response = await PostResponse(diyHttpParam);
-            var result = new V8EngineHttpResponse();
-
-            result.Headers = new List<V8EngineHttpResponseHeaders>();
-            if (response.Headers != null)
-            {
-                foreach (var item in response.Headers)
-                {
-                    result.Headers.Add(new V8EngineHttpResponseHeaders()
-                    {
-                        Name = item.Name,
-                        Value = item.Value,
-                        //Type = item.Type,
-                        //DataFormat = item.DataFormat,
-                        //ContentType = item.ContentType
-                    });
-                }
-            }
-
-            result.Content = response.Content;
-            result.ErrorMessage = response.ErrorMessage;
-            result.RawBytes = response.RawBytes;
-            //result.Headers = new Dictionary<string, string>();
-            //foreach (var item in response.Headers)
-            //{
-            //    result.Headers.Add(item.Name, item.va);
-            //}
-            return result;
+            return ToV8EngineHttpResponse(response);
         }
         /// <summary>
         /// 
@@ -296,6 +247,53 @@ namespace Microi.net
         public V8EngineHttpResponse PostResponse(dynamic dynamicParam)
         {
             return PostResponseAsync(dynamicParam).GetAwaiter().GetResult();
+        }
+
+        public async Task<string> PatchAsync(dynamic dynamicParam)
+        {
+            DiyHttpParam diyHttpParam = DynamicToDiyHttpParam(dynamicParam);
+            return await Patch(diyHttpParam);
+        }
+
+        public string Patch(dynamic dynamicParam)
+        {
+            return PatchAsync(dynamicParam).GetAwaiter().GetResult();
+        }
+
+        public async Task<V8EngineHttpResponse> PatchResponseAsync(dynamic dynamicParam)
+        {
+            DiyHttpParam diyHttpParam = DynamicToDiyHttpParam(dynamicParam);
+            var response = await PatchResponse(diyHttpParam);
+            return ToV8EngineHttpResponse(response);
+        }
+
+        public V8EngineHttpResponse PatchResponse(dynamic dynamicParam)
+        {
+            return PatchResponseAsync(dynamicParam).GetAwaiter().GetResult();
+        }
+
+        private static V8EngineHttpResponse ToV8EngineHttpResponse(RestResponse response)
+        {
+            var result = new V8EngineHttpResponse
+            {
+                Headers = new List<V8EngineHttpResponseHeaders>(),
+                Content = response?.Content,
+                ErrorMessage = response?.ErrorMessage,
+                RawBytes = response?.RawBytes,
+                StatusCode = response == null ? 0 : (int)response.StatusCode
+            };
+            if (response?.Headers != null)
+            {
+                foreach (var item in response.Headers)
+                {
+                    result.Headers.Add(new V8EngineHttpResponseHeaders
+                    {
+                        Name = item.Name,
+                        Value = item.Value
+                    });
+                }
+            }
+            return result;
         }
         private class RestClientAndRequest
         {
@@ -325,7 +323,13 @@ namespace Microi.net
 
             // client.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true; // 禁用证书验证
 
-            RestRequest request = new RestRequest(param.Url, param.Method?.ToLower() == "post" ? Method.Post : Method.Get);
+            var httpMethod = (param.Method ?? "GET").Trim().ToUpperInvariant();
+            var restMethod = httpMethod == "POST"
+                ? Method.Post
+                : httpMethod == "PATCH"
+                    ? Method.Patch
+                    : Method.Get;
+            RestRequest request = new RestRequest(param.Url, restMethod);
             if (param.ParamType?.ToLower() == "json")
             {
                 // request = new RestRequest(param.Url, param.Method?.ToLower() == "post" ? Method.Post : Method.Get, DataFormat.Json);
@@ -338,10 +342,13 @@ namespace Microi.net
                 request.RequestFormat = RestSharp.DataFormat.None;
             }
 
+            var bodyParam = httpMethod == "PATCH" ? param.PatchParam : param.PostParam;
+            var bodyParamString = httpMethod == "PATCH" ? param.PatchParamString : param.PostParamString;
+
             if (param.ParamType?.ToLower() == "xml")
             {
                 request.RequestFormat = RestSharp.DataFormat.Xml;
-                request.AddParameter("application/xml", param.PostParamString, ParameterType.RequestBody);
+                request.AddParameter("application/xml", bodyParamString, ParameterType.RequestBody);
             }
 
             if (param.ParamType?.ToLower() == "binary")
@@ -377,31 +384,31 @@ namespace Microi.net
                 }
             }
 
-            if (param.PostParam != null)
+            if (bodyParam != null)
             {
                 if (param.ParamType?.ToLower() == "json")
                 {
                     //AddJsonBody可传入new { AAA = 1 } object对象。也可传入序列化后的json字符串，但就是不能使用param.PostParam这个object
-                    request.AddJsonBody(JsonHelper.Serialize(param.PostParam));
+                    request.AddJsonBody(JsonHelper.Serialize(bodyParam));
                 }
                 else
                 {
-                    var postParams = JObject.FromObject(param.PostParam);
+                    var postParams = JObject.FromObject(bodyParam);
                     foreach (var item in postParams)
                     {
                         request.AddParameter(item.Key, item.Value?.ToString());
                     }
                 }
             }
-            if (!param.PostParamString.DosIsNullOrWhiteSpace()
+            if (!bodyParamString.DosIsNullOrWhiteSpace()
                 && param.ParamType?.ToLower() == "json"
                 )
             {
-                request.AddJsonBody(param.PostParamString);
+                request.AddJsonBody(bodyParamString);
             }
 
             // System.Threading.Thread.Sleep(2000);
-            request.Timeout = new TimeSpan(0, 0, param.TimeOut == 0 ? 5 : param.TimeOut);
+            request.Timeout = TimeSpan.FromSeconds(param.TimeOut <= 0 ? 600 : param.TimeOut);
             // client.Encoding = param.Encoding;
 
             //处理文件上传
@@ -468,6 +475,29 @@ namespace Microi.net
             var restObj = GetRestClientAndRequest(param);
             var response = await restObj.Client.ExecutePostAsync(restObj.Request);
             return response;
+        }
+
+        /// <summary>
+        /// PATCH 请求返回字符串。
+        /// </summary>
+        public async Task<string> Patch(DiyHttpParam param)
+        {
+            var response = await PatchResponse(param);
+            if (!response.ErrorMessage.DosIsNullOrWhiteSpace())
+            {
+                return response.ErrorMessage;
+            }
+            return response.Content;
+        }
+
+        /// <summary>
+        /// PATCH 请求返回完整 RestResponse。
+        /// </summary>
+        public async Task<RestResponse> PatchResponse(DiyHttpParam param)
+        {
+            param.Method = "PATCH";
+            var restObj = GetRestClientAndRequest(param);
+            return await restObj.Client.ExecuteAsync(restObj.Request);
         }
 
         /// <summary>

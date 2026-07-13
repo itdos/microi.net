@@ -47,13 +47,17 @@ namespace Microi.net
         //public EnumHelper.HttpParamType ParamType { get; set; }
         public string ParamType { get; set; }
         /// <summary>
-        /// Delete参数。
+        /// Patch参数。
         /// <para>可以传入Json对像：new { Key1 = Value1, Key2 = Value2}</para>
         /// <para>可以传入Json字符串：{"Key1":"Value1","Key2":"Value2"}</para>
         /// <para>可以传入key/value字符串："key1=value1＆key2=value2"</para>
         /// <para>可以传入xml字符串等等</para>
         /// </summary>
         public object PatchParam { get; set; }
+        /// <summary>
+        /// Patch序列化参数字符串。用于嵌套JSON、XML或文本请求体。
+        /// </summary>
+        public string PatchParamString { get; set; }
         /// <summary>
         /// Put参数。
         /// <para>可以传入Json对像：new { Key1 = Value1, Key2 = Value2}</para>
@@ -91,9 +95,9 @@ namespace Microi.net
         /// </summary>
         public object Header { get; set; }
 
-        private int _timeOut = 30;
+        private int _timeOut = 600;
         /// <summary>
-        /// 请求超时时间。单位：秒。默认值5秒。
+        /// 请求超时时间。单位：秒。默认值600秒（10分钟）。
         /// </summary>
         public int TimeOut
         {
