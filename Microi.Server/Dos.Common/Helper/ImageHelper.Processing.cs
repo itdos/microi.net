@@ -250,6 +250,10 @@ namespace Dos.Common
         public const int ImageProcessingMaxInputBytesPerImage = 25 * 1024 * 1024;
         public const long ImageProcessingMaxTotalInputBytes = 100L * 1024 * 1024;
         public const int ImageProcessingMaxOutputBytes = 50 * 1024 * 1024;
+        private const string EmbeddedFallbackFontResource =
+            "Dos.Common.Resource.NotoSansCJKsc-Regular.otf";
+        private static readonly Lazy<byte[]> EmbeddedFallbackFontBytes =
+            new Lazy<byte[]>(LoadEmbeddedFallbackFontBytes);
 
         public static ImageProcessResult Create(ImageCreateParam param)
         {
@@ -1046,8 +1050,8 @@ namespace Dos.Common
                     else
                     {
                         throw new InvalidOperationException(
-                            $"当前服务器已安装字体均不包含字符“{value}”（U+{codepoint:X4}），无法绘制。" +
-                            "请安装包含该字符的字体（中文建议 Noto Sans CJK 或微软雅黑）；已拒绝输出缺字方框。");
+                            $"系统字体和内置 Noto Sans CJK SC 均不包含字符“{value}”（U+{codepoint:X4}），无法绘制；" +
+                            "已拒绝输出缺字方框。可通过安装包含该字符的业务字体扩展字形范围。");
                     }
                 }
 
@@ -1076,15 +1080,60 @@ namespace Dos.Common
         private static SKTypeface MatchFallbackTypeface(string fontFamily, SKFontStyleWeight weight,
             SKFontStyleSlant slant, int codepoint)
         {
-            var manager = SKFontManager.Default;
-            var languageTags = new[] { "zh-Hans", "zh-CN", "zh", "en" };
-            var familyHint = string.IsNullOrWhiteSpace(fontFamily) ? null : fontFamily;
-            var typeface = manager.MatchCharacter(familyHint, weight, SKFontStyleWidth.Normal, slant,
-                languageTags, codepoint);
-            if (typeface == null && familyHint != null)
-                typeface = manager.MatchCharacter(null, weight, SKFontStyleWidth.Normal, slant,
+            SKTypeface typeface = null;
+            try
+            {
+                var manager = SKFontManager.Default;
+                var languageTags = new[] { "zh-Hans", "zh-CN", "zh", "en" };
+                var familyHint = string.IsNullOrWhiteSpace(fontFamily) ? null : fontFamily;
+                typeface = manager.MatchCharacter(familyHint, weight, SKFontStyleWidth.Normal, slant,
                     languageTags, codepoint);
+                if (typeface == null && familyHint != null)
+                    typeface = manager.MatchCharacter(null, weight, SKFontStyleWidth.Normal, slant,
+                        languageTags, codepoint);
+            }
+            catch
+            {
+                // fontconfig 在精简 Linux / NAS 环境可能不可用，继续使用程序集内置字体。
+            }
+
+            if (typeface != null && typeface.ContainsGlyph(codepoint))
+                return typeface;
+
+            typeface?.Dispose();
+            typeface = CreateEmbeddedFallbackTypeface();
+            if (typeface.ContainsGlyph(codepoint))
+                return typeface;
+
+            typeface.Dispose();
+            return null;
+        }
+
+        private static SKTypeface CreateEmbeddedFallbackTypeface()
+        {
+            // FromStream 会接管流的所有权；每次绘制创建独立 typeface，随后由调用方释放，
+            // 字体原始字节只在托管内存中缓存一份，避免并发共享可释放的 Skia 句柄。
+            var stream = new MemoryStream(EmbeddedFallbackFontBytes.Value, false);
+            var typeface = SKTypeface.FromStream(stream);
+            if (typeface == null)
+                throw new InvalidOperationException("内置 Noto Sans CJK SC 字体资源无效，无法绘制文字。");
             return typeface;
+        }
+
+        private static byte[] LoadEmbeddedFallbackFontBytes()
+        {
+            var assembly = typeof(ImageHelper).Assembly;
+            using (var stream = assembly.GetManifestResourceStream(EmbeddedFallbackFontResource))
+            {
+                if (stream == null)
+                    throw new InvalidOperationException(
+                        $"缺少内置字体资源 {EmbeddedFallbackFontResource}，请重新发布完整程序集。");
+                using (var buffer = new MemoryStream())
+                {
+                    stream.CopyTo(buffer);
+                    return buffer.ToArray();
+                }
+            }
         }
 
         private sealed class TextDrawRun
@@ -1106,10 +1155,7 @@ namespace Dos.Common
             var typeface = string.IsNullOrWhiteSpace(fontFamily)
                 ? SKTypeface.Default
                 : SKTypeface.FromFamilyName(fontFamily, weight, SKFontStyleWidth.Normal, slant);
-            if (typeface == null)
-                throw new InvalidOperationException(
-                    "当前运行环境没有可用字体。请安装所需字体，并通过 FontFamily 指定字体族。");
-            return typeface;
+            return typeface ?? CreateEmbeddedFallbackTypeface();
         }
 
         private static void DrawCreateBackground(SKCanvas canvas, int width, int height, string start,

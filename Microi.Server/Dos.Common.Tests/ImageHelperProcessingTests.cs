@@ -239,26 +239,26 @@ public class ImageHelperProcessingTests
     [Fact]
     public void Draw_falls_back_per_glyph_when_font_family_does_not_exist()
     {
-        const string text = "中文字体自动回退";
-        using var matched = SKFontManager.Default.MatchCharacter('中');
-        if (matched == null || !matched.ContainsGlyphs(text))
-        {
-            var missingFont = Assert.Throws<InvalidOperationException>(() => DrawText(
-                text, "Microi-Definitely-Missing-Font-7D65C1"));
-            Assert.Contains("已拒绝输出缺字方框", missingFont.Message);
-            return;
-        }
-
+        const string text = "Microi 吾码中文字体自动回退 123";
         var fallbackResult = DrawText(text, "Microi-Definitely-Missing-Font-7D65C1");
         using var fallbackBitmap = Decode(fallbackResult.Bytes);
-        using var legacyMissingGlyphBitmap = DrawTextWithoutGlyphFallback(
-            text, "Microi-Definitely-Missing-Font-7D65C1");
         Assert.Contains(Enumerable.Range(0, fallbackBitmap.Width * fallbackBitmap.Height), pixel =>
         {
             var color = fallbackBitmap.GetPixel(pixel % fallbackBitmap.Width, pixel / fallbackBitmap.Width);
             return color.Red < 245 || color.Green < 245 || color.Blue < 245;
         });
-        AssertBitmapsNotEqual(legacyMissingGlyphBitmap, fallbackBitmap);
+    }
+
+    [Fact]
+    public void Embedded_fallback_font_is_packaged_and_contains_latin_and_simplified_chinese()
+    {
+        var assembly = typeof(ImageHelper).Assembly;
+        const string resourceName = "Dos.Common.Resource.NotoSansCJKsc-Regular.otf";
+        Assert.Contains(resourceName, assembly.GetManifestResourceNames());
+
+        var stream = Assert.IsAssignableFrom<Stream>(assembly.GetManifestResourceStream(resourceName));
+        using var typeface = Assert.IsType<SKTypeface>(SKTypeface.FromStream(stream));
+        Assert.True(typeface.ContainsGlyphs("Microi吾码图片合成123"));
     }
 
     [Fact]
@@ -455,24 +455,6 @@ public class ImageHelperProcessingTests
         return Assert.IsType<SKBitmap>(bitmap);
     }
 
-    private static SKBitmap DrawTextWithoutGlyphFallback(string text, string fontFamily)
-    {
-        var bitmap = new SKBitmap(new SKImageInfo(520, 100, SKColorType.Rgba8888, SKAlphaType.Premul));
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
-        using var typeface = SKTypeface.FromFamilyName(fontFamily);
-        using var paint = new SKPaint
-        {
-            IsAntialias = true,
-            Typeface = typeface,
-            TextSize = 48,
-            Color = new SKColor(0x11, 0x18, 0x27),
-            TextAlign = SKTextAlign.Left
-        };
-        canvas.DrawText(text, 16, 18 - paint.FontMetrics.Ascent, paint);
-        return bitmap;
-    }
-
     private static void AssertColor(SKBitmap bitmap, int x, int y, SKColor expected, int tolerance = 2)
     {
         var actual = bitmap.GetPixel(x, y);
@@ -482,14 +464,4 @@ public class ImageHelperProcessingTests
         Assert.InRange(Math.Abs(actual.Alpha - expected.Alpha), 0, tolerance);
     }
 
-    private static void AssertBitmapsNotEqual(SKBitmap expected, SKBitmap actual)
-    {
-        Assert.Equal(expected.Width, actual.Width);
-        Assert.Equal(expected.Height, actual.Height);
-        for (var y = 0; y < expected.Height; y++)
-        for (var x = 0; x < expected.Width; x++)
-            if (expected.GetPixel(x, y) != actual.GetPixel(x, y))
-                return;
-        Assert.Fail("字体回退结果仍与旧版缺字方框渲染完全相同。");
-    }
 }
