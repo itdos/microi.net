@@ -1368,7 +1368,7 @@
         <!-- :visible="DiyCustomDialogConfig.Visible" -->
         <DiyCustomDialog
             v-if="_shouldRenderDiyCustomDialog"
-            :DataAppend="GetDiyCustomDialogDataAppend()"
+            :DataAppend="DiyCustomDialogDataAppend"
             :OpenType="DiyCustomDialogConfig.OpenType"
             :title="DiyCustomDialogConfig.Title"
             :TitleIcon="DiyCustomDialogConfig.TitleIcon"

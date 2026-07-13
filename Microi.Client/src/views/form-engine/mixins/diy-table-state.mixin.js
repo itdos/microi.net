@@ -473,6 +473,7 @@ export default {
             Where: [],
             PageType: "", //=Report时为报表
             DiyCustomDialogConfig: {},
+            DiyCustomDialogDataAppend: {},
             // regionData:regionData,
             BtnExportLoading: false,
             NotSaveField: [],

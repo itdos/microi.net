@@ -239,6 +239,10 @@ export default {
                 return;
             }
             self.DiyCustomDialogConfig = param;
+            // SetV8DefaultValue 会更新表格选择态、工作流和 V8 缓存等响应式数据。
+            // 必须在点击事件中预先生成弹窗上下文，不能在模板渲染期间调用，
+            // 否则会形成“渲染 -> 写响应式状态 -> 再渲染”的递归更新。
+            self.DiyCustomDialogDataAppend = self.GetDiyCustomDialogDataAppend();
             // self.DiyCustomDialogConfig.Visible = true;
             // 延迟渲染：首次调用时才渲染组件，避免循环依赖
             if (!self._shouldRenderDiyCustomDialog) {
