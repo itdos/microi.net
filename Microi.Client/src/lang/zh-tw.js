@@ -50,6 +50,7 @@ const Msg = {
     Avatar: "頭像",
     Exit: "退出",
     BatchOperation: "批次操作",
+    ContinuousSelection: "連續選擇",
     Field: "欄位",
     Form: "表單",
     AutoSave: "自動儲存",
