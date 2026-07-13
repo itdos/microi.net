@@ -111,9 +111,23 @@ namespace Microi.net
         DosResult UpdateBackgroundTask(dynamic dynamicParam);
 
         /// <summary>
-        /// 仅供主租户超级管理员生成脱敏空数据库发布包。
-        /// 固定使用主库、microi_empty_temp、内置脱敏脚本和公开发布路径，禁止调用方覆盖。
+        /// 仅供主租户超级管理员重建并复制 microi_empty_temp。
         /// </summary>
-        DosResult BuildSanitizedEmptyDatabaseRelease(dynamic dynamicParam);
+        DosResult PrepareEmptyDatabaseRelease(dynamic dynamicParam);
+
+        /// <summary>
+        /// 在固定目标库执行接口引擎提供的脱敏 SQL，并完成安全校验。
+        /// </summary>
+        DosResult ApplyEmptyDatabaseSanitization(dynamic dynamicParam);
+
+        /// <summary>
+        /// 导出、压缩并发布已脱敏的固定目标库。
+        /// </summary>
+        DosResult PublishEmptyDatabaseRelease(dynamic dynamicParam);
+
+        /// <summary>
+        /// 清理固定临时空数据库，供接口引擎异常补偿使用。
+        /// </summary>
+        DosResult CleanupEmptyDatabaseRelease(dynamic dynamicParam);
     }
 }

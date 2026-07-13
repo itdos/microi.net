@@ -121,12 +121,26 @@ namespace Microi.net.Api
             public string Role { get; set; }
             public string Mode { get; set; }
             public string Content { get; set; }
+            public string Error { get; set; }
             public string CreatedAt { get; set; }
+        }
+
+        private static bool IsConversationRuntimeError(AiConversationRecord item)
+        {
+            if (item == null || (item.Role != "assistant" && item.Role != "ai")) return false;
+            if (!string.IsNullOrWhiteSpace(item.Error)) return true;
+
+            var content = item.Content ?? "";
+            return content.Contains(MicroiAI.NoAiAuthMsg, StringComparison.Ordinal)
+                || (content.Contains("产品为[开源版]", StringComparison.Ordinal)
+                    && content.Contains("无法使用在线AI", StringComparison.Ordinal))
+                || (content.Contains("产品为【开源版】", StringComparison.Ordinal)
+                    && content.Contains("无法使用在线 AI", StringComparison.Ordinal));
         }
 
         private async Task ApplyServerConversationContextAsync(AiParam param)
         {
-            if (param == null || string.IsNullOrWhiteSpace(param.ConversationId))
+            if (param == null || string.IsNullOrWhiteSpace(param.ConversationId) || string.IsNullOrWhiteSpace(param.CurrentUserId))
             {
                 return;
             }
@@ -134,6 +148,11 @@ namespace Microi.net.Api
             var source = string.IsNullOrWhiteSpace(param.Source) ? "ai-engine-workbench" : param.Source;
             var rowsResult = await _formEngine.GetTableDataAsync("mic_ai_record", new
             {
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "UserId", Value = param.CurrentUserId, Type = "=" },
+                    new DiyWhere { Name = "Content", Value = param.ConversationId, Type = "Like", AndOr = "And" }
+                },
                 _OrderBy = "CreateTime",
                 _OrderByType = "DESC",
                 _PageSize = 300,
@@ -165,12 +184,16 @@ namespace Microi.net.Api
                     Role = (payload["Role"]?.ToString() ?? "assistant").Trim().ToLowerInvariant(),
                     Mode = payload["Mode"]?.ToString() ?? param.Mode ?? "",
                     Content = payload["Content"]?.ToString() ?? "",
+                    Error = payload["Error"]?.ToString() ?? "",
                     CreatedAt = payload["CreatedAt"]?.ToString() ?? rowJson?["CreateTime"]?.ToString() ?? ""
                 });
             }
 
             records = records
                 .Where(item => !string.IsNullOrWhiteSpace(item.Content))
+                // 授权失败、网络失败等运行期提示不是用户与模型的有效语义上下文。
+                // 历史错误一旦被继续送入模型，会让已经恢复授权的旧会话反复复述旧错误。
+                .Where(item => !IsConversationRuntimeError(item))
                 .OrderBy(item => item.CreatedAt)
                 .ToList();
             if (records.Count == 0)
@@ -217,6 +240,66 @@ namespace Microi.net.Api
                 }));
 
             param.ChatHistory = history;
+        }
+
+        public class UpdateConversationTitleParam
+        {
+            public string ConversationId { get; set; }
+            public string Title { get; set; }
+            public string Source { get; set; }
+        }
+
+        /// <summary>
+        /// 修改当前用户整组 AI 对话标题。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> UpdateConversationTitle([FromBody] UpdateConversationTitleParam param)
+        {
+            var (userId, _, _) = await GetCurrentUserContextAsync();
+            if (string.IsNullOrWhiteSpace(userId)) return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            var conversationId = (param?.ConversationId ?? "").Trim();
+            var title = (param?.Title ?? "").Trim();
+            var source = string.IsNullOrWhiteSpace(param?.Source) ? "ai-engine-workbench" : param.Source.Trim();
+            if (string.IsNullOrWhiteSpace(conversationId)) return Json(new DosResult(0, null, "ConversationId不能为空。"));
+            if (string.IsNullOrWhiteSpace(title)) return Json(new DosResult(0, null, "标题不能为空。"));
+            if (title.Length > 60) return Json(new DosResult(0, null, "标题不能超过60个字符。"));
+
+            var rowsResult = await _formEngine.GetTableDataAsync("mic_ai_record", new
+            {
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "UserId", Value = userId, Type = "=" },
+                    new DiyWhere { Name = "Content", Value = conversationId, Type = "Like", AndOr = "And" }
+                },
+                _OrderBy = "CreateTime",
+                _OrderByType = "ASC",
+                _PageSize = 5000,
+                _SelectFields = new[] { "Id", "Content" }
+            });
+            if (rowsResult.Code != 1 || rowsResult.Data == null) return Json(rowsResult);
+
+            var updates = new List<Task<DosResult>>();
+            foreach (var row in rowsResult.Data)
+            {
+                var rowJson = SafeJObject(row);
+                var payload = SafeJObject(rowJson?["Content"]?.ToString());
+                if (payload == null) continue;
+                if (!string.Equals(payload["Source"]?.ToString(), source, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.Equals(payload["ConversationId"]?.ToString(), conversationId, StringComparison.OrdinalIgnoreCase)) continue;
+                payload["Title"] = title;
+                updates.Add(_formEngine.UptFormDataAsync("mic_ai_record", new
+                {
+                    Id = rowJson?["Id"]?.ToString(),
+                    Content = payload.ToString(Formatting.None)
+                }));
+            }
+            if (updates.Count == 0) return Json(new DosResult(0, null, "未找到可修改的对话记录。"));
+
+            var results = await Task.WhenAll(updates);
+            var failed = results.FirstOrDefault(item => item.Code != 1);
+            return failed != null
+                ? Json(new DosResult(0, null, failed.Msg ?? "修改标题失败。"))
+                : Json(new DosResult(1, new { ConversationId = conversationId, Title = title, UpdatedCount = results.Length }, "标题已修改。"));
         }
 
         private static string BuildConversationSummary(List<AiConversationRecord> records)
@@ -603,11 +686,11 @@ namespace Microi.net.Api
         /// 获取当前登录用户的中转站 Token 余额和最近扣减记录。
         /// </summary>
         [HttpGet, HttpPost]
-        public async Task<JsonResult> GetUserAiUsage(int pageSize = 20)
+        public async Task<JsonResult> GetUserAiUsage(int pageIndex = 1, int pageSize = 20)
         {
             var (userId, _) = await GetCurrentUserAsync();
             if (string.IsNullOrEmpty(userId)) return Json(new DosResult(0, null, "请先登录！"));
-            return Json(await _subService.GetRelayTokenUsage(userId, pageSize));
+            return Json(await _subService.GetRelayTokenUsage(userId, pageIndex, pageSize));
         }
 
         /// <summary>
@@ -833,7 +916,7 @@ namespace Microi.net.Api
             }
 
             // 规范化请求体（替换为上游模型名）
-            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: true);
+            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: true, includeUsage: route.IsRelayModel);
             if (!string.IsNullOrEmpty(bodyError))
             {
                 Response.ContentType = "text/event-stream; charset=utf-8";
@@ -851,8 +934,9 @@ namespace Microi.net.Api
             try
             {
                 string targetUrl = route.ApiBase.TrimEnd('/') + route.ApiPath;
-                var responseCapture = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
-                if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseCapture, "proxy-chat-stream");
+                var streamResult = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                if (streamResult.Success && route.IsRelayModel)
+                    await _subService.RecordRelayTokenUsage(userId, route, body, streamResult.ResponseBody, "proxy-chat-stream");
                 _ = _subService.IncrementApiKeyCallCount(userId);
             }
             catch (TaskCanceledException) { }
@@ -905,7 +989,7 @@ namespace Microi.net.Api
             if (!string.IsNullOrEmpty(prepError))
                 return Json(new DosResult(0, null, prepError));
 
-            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: false);
+            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: false, includeUsage: route.IsRelayModel);
             if (!string.IsNullOrEmpty(bodyError))
                 return Json(new DosResult(0, null, bodyError));
 
@@ -989,7 +1073,7 @@ namespace Microi.net.Api
             }
 
             // 5. 规范化请求体（替换为上游模型名）
-            var (body, isStream, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId);
+            var (body, isStream, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, includeUsage: route.IsRelayModel);
             if (!string.IsNullOrEmpty(bodyError))
             {
                 await WriteOpenAIErrorAsync(400, bodyError, "invalid_request_error", "invalid_json");
@@ -1008,8 +1092,9 @@ namespace Microi.net.Api
                     Response.Headers["Connection"] = "keep-alive";
                     Response.Headers["X-Accel-Buffering"] = "no";
 
-                    var responseCapture = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
-                    if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseCapture, "openai-stream");
+                    var streamResult = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
+                    if (streamResult.Success && route.IsRelayModel)
+                        await _subService.RecordRelayTokenUsage(userId, route, body, streamResult.ResponseBody, "openai-stream");
                 }
                 else
                 {
@@ -1047,11 +1132,11 @@ namespace Microi.net.Api
         /// </summary>
         [HttpGet("/v1/usage")]
         [AllowAnonymous]
-        public async Task<JsonResult> OpenAIUsage(int pageSize = 20)
+        public async Task<JsonResult> OpenAIUsage(int pageIndex = 1, int pageSize = 20)
         {
             var (userId, authError) = await _proxyService.AuthByPlatformApiKey(Request.Headers["Authorization"].ToString());
             if (!string.IsNullOrEmpty(authError)) return Json(new DosResult(0, null, authError));
-            return Json(await _subService.GetRelayTokenUsage(userId, pageSize));
+            return Json(await _subService.GetRelayTokenUsage(userId, pageIndex, pageSize));
         }
 
         /// <summary>

@@ -64,6 +64,17 @@
                             <span class="conversation-title">{{ item.title }}</span>
                             <small>{{ item.lastTime || "-" }}</small>
                         </button>
+                        <el-tooltip content="修改标题" placement="top">
+                            <button
+                                type="button"
+                                class="conversation-action"
+                                :disabled="historyActionLoading === item.id"
+                                aria-label="修改标题"
+                                @click.stop="editConversationTitle(item)"
+                            >
+                                <el-icon><EditPen /></el-icon>
+                            </button>
+                        </el-tooltip>
                         <el-tooltip :content="item.archived ? '还原对话' : '归档任务'" placement="right">
                             <button
                                 type="button"
@@ -438,7 +449,7 @@ import {
     Top,
     User
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
 const AiAppWorkbench = defineAsyncComponent(() => import("./ai-app-workbench.vue"));
@@ -904,6 +915,42 @@ async function setConversationArchived(item, archived) {
         ElMessage.success(archived ? "对话已归档" : "对话已还原");
     } catch (error) {
         ElMessage.error(`${archived ? "归档" : "还原"}失败：${error?.message || "未知错误"}`);
+    } finally {
+        historyActionLoading.value = "";
+    }
+}
+
+async function editConversationTitle(item) {
+    if (!item?.id || historyActionLoading.value) return;
+
+    try {
+        const { value } = await ElMessageBox.prompt("请输入新的对话标题", "修改标题", {
+            confirmButtonText: "保存",
+            cancelButtonText: "取消",
+            inputValue: item.title || "",
+            inputPlaceholder: "请输入对话标题",
+            inputValidator: (text) => {
+                const title = String(text || "").trim();
+                if (!title) return "标题不能为空";
+                if (title.length > 60) return "标题不能超过 60 个字符";
+                return true;
+            }
+        });
+        const title = String(value || "").trim();
+        if (!title || title === item.title) return;
+
+        historyActionLoading.value = item.id;
+        const result = await DiyCommon.PostAsync("/api/Ai/UpdateConversationTitle", {
+            ConversationId: item.id,
+            Title: title,
+            Source: SOURCE
+        }, null, null, "json");
+        if (!isOk(result)) throw new Error(unwrapDosResult(result)?.Msg || "保存失败");
+        await loadHistory();
+        ElMessage.success("标题已修改");
+    } catch (error) {
+        if (error === "cancel" || error === "close" || error?.action === "cancel" || error?.action === "close") return;
+        ElMessage.error(`修改标题失败：${error?.message || "未知错误"}`);
     } finally {
         historyActionLoading.value = "";
     }

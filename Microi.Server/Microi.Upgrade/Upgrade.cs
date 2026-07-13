@@ -343,7 +343,8 @@ namespace Microi.net
             #endregion
 
             #region 升级13 --2026-02-03【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeAppStore.Version))
+            var needAppStoreVersionUpgrade = NeedUpgrade(CurrentVersion, UpgradeAppStore.Version);
+            if (needAppStoreVersionUpgrade || await UpgradeAppStore.NeedRefreshAsync(osClientSecret.OsClient))
             {
                 try
                 {
@@ -358,8 +359,11 @@ namespace Microi.net
                     else
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级13 - 2026-02-03】成功！");
-                        needUptServerVersion = true;
-                        uptVersion = UpgradeAppStore.Version;
+                        if (needAppStoreVersionUpgrade)
+                        {
+                            needUptServerVersion = true;
+                            uptVersion = UpgradeAppStore.Version;
+                        }
                     }
                 }
                 catch (Exception ex)

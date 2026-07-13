@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -16,7 +17,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.2.1.0";
+        public static string Version = "6.2.4.1";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(30)
@@ -43,6 +44,41 @@ namespace Microi.net
             { ModuleEnginePackageResourceName, "模块引擎" },
             { AppStorePackageResourceName, "应用商城" }
         };
+
+        /// <summary>
+        /// 全局数据库版本可能已经高于本升级号，但租户库中的导入器仍可能因历史应用包覆盖而停留在旧版。
+        /// 因此必须单独检查导入器能力标记，不能只依赖 SysConfig.Version。
+        /// </summary>
+        public static async Task<bool> NeedRefreshAsync(string osClient)
+        {
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "ApiEngineKey", "=", "import-microi-store-package" }
+                    },
+                    _SelectFields = new[] { "ApiV8Code" }
+                });
+                if (result.Code != 1 || result.Data == null) return true;
+
+                var code = Convert.ToString((object)result.Data.ApiV8Code) ?? string.Empty;
+                var versionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                System.Version importerVersion;
+                return !versionMatch.Success ||
+                       !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
+                       importerVersion < new System.Version(1, 2, 7) ||
+                       !code.Contains("field_primary_recovered_") ||
+                       !code.Contains("rename_skipped_target_exists_") ||
+                       !code.Contains("applicationSha256Base64");
+            }
+            catch
+            {
+                return true;
+            }
+        }
 
         private static readonly string[] CoreNullableTables =
         {
@@ -134,6 +170,16 @@ namespace Microi.net
                 if (!content.Contains("import-microi-store-package"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                }
+                var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                if (!versionMatch.Success ||
+                    !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
+                    importerVersion < new System.Version(1, 2, 7) ||
+                    !content.Contains("applicationSha256Base64") ||
+                    !content.Contains("field_primary_recovered_") ||
+                    !content.Contains("rename_skipped_target_exists_"))
+                {
+                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
                 return;
             }
