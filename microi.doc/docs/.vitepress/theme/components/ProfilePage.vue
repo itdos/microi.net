@@ -192,18 +192,61 @@
             :labels="aiSummaryLabels"
             @copy="copyAiApiKey"
           />
+          <h3 class="usage-section-title">{{ t('usageRecords') }}</h3>
           <div class="usage-table-wrap">
             <table class="usage-table">
-              <thead><tr><th>{{ t('time') }}</th><th>{{ t('model') }}</th><th>{{ t('input') }}</th><th>{{ t('output') }}</th><th>{{ t('deduction') }}</th><th>{{ t('remaining') }}</th><th>{{ t('source') }}</th></tr></thead>
+              <thead><tr><th>{{ t('time') }}</th><th>{{ t('model') }}</th><th>{{ t('promptPreview') }}</th><th>{{ t('input') }}</th><th>{{ t('output') }}</th><th>{{ t('deduction') }}</th><th>{{ t('remaining') }}</th><th>{{ t('source') }}</th></tr></thead>
               <tbody>
                 <tr v-for="item in relayUsageLogs" :key="item.Id">
-                  <td>{{ item.CreateTime }}</td><td>{{ item.AiModel || '-' }}</td><td>{{ item.PromptTokens || 0 }}</td>
+                  <td>{{ item.CreateTime }}</td><td>{{ item.AiModel || '-' }}</td><td :title="item.PromptPreview || ''">{{ item.PromptPreview || '-' }}</td><td>{{ item.PromptTokens || 0 }}</td>
                   <td>{{ item.CompletionTokens || 0 }}</td><td>{{ item.TotalTokens || 0 }}</td>
                   <td>{{ formatTokenNumber(item.RemainingTokens) }}</td><td>{{ item.Source || '-' }}</td>
                 </tr>
-                <tr v-if="relayUsageLogs.length === 0"><td colspan="7">{{ t('noUsage') }}</td></tr>
+                <tr v-if="relayUsageLogs.length === 0"><td colspan="8">{{ aiUsageLoading ? t('loadingUsage') : t('noUsage') }}</td></tr>
               </tbody>
             </table>
+          </div>
+          <div class="usage-pagination">
+            <span>{{ t('usageTotal', { total: aiUsageTotal }) }}</span>
+            <label>
+              {{ t('pageSize') }}
+              <select v-model.number="aiUsagePageSize" @change="changeAiUsagePageSize">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+            <button type="button" :disabled="aiUsageLoading || aiUsagePageIndex <= 1" @click="goAiUsagePage(aiUsagePageIndex - 1)">{{ t('previousPage') }}</button>
+            <strong>{{ aiUsagePageIndex }} / {{ aiUsageTotalPages }}</strong>
+            <button type="button" :disabled="aiUsageLoading || aiUsagePageIndex >= aiUsageTotalPages" @click="goAiUsagePage(aiUsagePageIndex + 1)">{{ t('nextPage') }}</button>
+          </div>
+          <h3 class="usage-section-title recharge-title">{{ t('rechargeRecords') }}</h3>
+          <div class="usage-table-wrap">
+            <table class="usage-table">
+              <thead><tr><th>{{ t('time') }}</th><th>{{ t('rechargeAmount') }}</th><th>{{ t('afterTotal') }}</th><th>{{ t('afterRemaining') }}</th><th>{{ t('rechargeType') }}</th><th>{{ t('status') }}</th><th>{{ t('source') }}</th><th>{{ t('remark') }}</th></tr></thead>
+              <tbody>
+                <tr v-for="item in rechargeLogs" :key="item.Id">
+                  <td>{{ item.CreateTime }}</td><td>{{ formatSignedToken(item.TokenAmount) }}</td><td>{{ formatTokenNumber(item.AfterTotal) }}</td>
+                  <td>{{ formatTokenNumber(item.AfterRemaining) }}</td><td>{{ rechargeTypeText(item.RechargeType) }}</td><td>{{ rechargeStatusText(item.Status) }}</td>
+                  <td>{{ item.Source || '-' }}</td><td :title="item.Remark || ''">{{ item.Remark || '-' }}</td>
+                </tr>
+                <tr v-if="rechargeLogs.length === 0"><td colspan="8">{{ rechargeLoading ? t('loadingRecharge') : t('noRecharge') }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="usage-pagination">
+            <span>{{ t('usageTotal', { total: rechargeTotal }) }}</span>
+            <label>
+              {{ t('pageSize') }}
+              <select v-model.number="rechargePageSize" @change="changeRechargePageSize">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+            <button type="button" :disabled="rechargeLoading || rechargePageIndex <= 1" @click="goRechargePage(rechargePageIndex - 1)">{{ t('previousPage') }}</button>
+            <strong>{{ rechargePageIndex }} / {{ rechargeTotalPages }}</strong>
+            <button type="button" :disabled="rechargeLoading || rechargePageIndex >= rechargeTotalPages" @click="goRechargePage(rechargePageIndex + 1)">{{ t('nextPage') }}</button>
           </div>
         </section>
 
@@ -246,6 +289,17 @@ const relayToken = ref({
 const aiApiKey = ref('')
 const aiApiEndpoint = ref('https://api.itdos.com/v1')
 const relayUsageLogs = ref([])
+const aiUsagePageIndex = ref(1)
+const aiUsagePageSize = ref(20)
+const aiUsageTotal = ref(0)
+const aiUsageLoading = ref(false)
+const aiUsageTotalPages = computed(() => Math.max(1, Math.ceil(aiUsageTotal.value / aiUsagePageSize.value)))
+const rechargeLogs = ref([])
+const rechargePageIndex = ref(1)
+const rechargePageSize = ref(20)
+const rechargeTotal = ref(0)
+const rechargeLoading = ref(false)
+const rechargeTotalPages = computed(() => Math.max(1, Math.ceil(rechargeTotal.value / rechargePageSize.value)))
 
 let tenantProgressTimer = null
 let profileNoticeTimer = null
@@ -585,7 +639,7 @@ async function refreshCenter() {
       localStorage.setItem('microi_doc_tenant', tenants.value[0].OsClient || '')
       localStorage.setItem('microi_doc_tenant_url', tenants.value[0].Url || '')
     }
-    await Promise.all([refreshRelayTokenSummary(), refreshAiApiKey(), refreshAiUsage()])
+    await Promise.all([refreshRelayTokenSummary(), refreshAiApiKey(), refreshAiUsage(), refreshRechargeLogs()])
     return true
   } catch {
     profileError.value = t('networkFailed')
@@ -639,9 +693,14 @@ async function refreshAiApiKey() {
   }
 }
 
-async function refreshAiUsage() {
+async function refreshAiUsage(pageIndex = aiUsagePageIndex.value) {
+  aiUsageLoading.value = true
   try {
-    const resp = await authenticatedFetch(`${API_BASE}/api/Ai/GetUserAiUsage?OsClient=${OS_CLIENT}&pageSize=50`, { method: 'POST' })
+    const resp = await authenticatedFetch(apiEngineUrl('official_ai_usage'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ PageIndex: pageIndex, PageSize: aiUsagePageSize.value })
+    })
     const result = await resp.json()
     if (isSessionExpiredResult(result)) {
       handleSessionExpired()
@@ -654,8 +713,82 @@ async function refreshAiUsage() {
         RemainingTokens: Number(result.Data.RemainingTokens || 0)
       }
       relayUsageLogs.value = Array.isArray(result.Data.Logs) ? result.Data.Logs : []
+      aiUsagePageIndex.value = Number(result.Data.PageIndex || pageIndex || 1)
+      aiUsagePageSize.value = Number(result.Data.PageSize || aiUsagePageSize.value)
+      aiUsageTotal.value = Number(result.Data.TotalCount || 0)
     }
-  } catch {}
+  } catch {
+    relayUsageLogs.value = []
+  } finally {
+    aiUsageLoading.value = false
+  }
+}
+
+function goAiUsagePage(pageIndex) {
+  const target = Math.min(Math.max(1, Number(pageIndex || 1)), aiUsageTotalPages.value)
+  if (target === aiUsagePageIndex.value && relayUsageLogs.value.length) return
+  refreshAiUsage(target)
+}
+
+function changeAiUsagePageSize() {
+  aiUsagePageIndex.value = 1
+  refreshAiUsage(1)
+}
+
+async function refreshRechargeLogs(pageIndex = rechargePageIndex.value) {
+  rechargeLoading.value = true
+  try {
+    const resp = await authenticatedFetch(apiEngineUrl('official_ai_usage'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ RecordType: 'Recharge', PageIndex: pageIndex, PageSize: rechargePageSize.value })
+    })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    if (result.Code === 1 && result.Data) {
+      rechargeLogs.value = Array.isArray(result.Data.RechargeLogs) ? result.Data.RechargeLogs : []
+      rechargePageIndex.value = Number(result.Data.PageIndex || pageIndex || 1)
+      rechargePageSize.value = Number(result.Data.PageSize || rechargePageSize.value)
+      rechargeTotal.value = Number(result.Data.TotalCount || 0)
+    }
+  } catch {
+    rechargeLogs.value = []
+  } finally {
+    rechargeLoading.value = false
+  }
+}
+
+function goRechargePage(pageIndex) {
+  const target = Math.min(Math.max(1, Number(pageIndex || 1)), rechargeTotalPages.value)
+  if (target === rechargePageIndex.value && rechargeLogs.value.length) return
+  refreshRechargeLogs(target)
+}
+
+function changeRechargePageSize() {
+  rechargePageIndex.value = 1
+  refreshRechargeLogs(1)
+}
+
+function rechargeTypeText(value) {
+  const type = String(value || '').toLowerCase()
+  if (type === 'online') return t('onlineRecharge')
+  if (type === 'adjustment') return t('tokenAdjustment')
+  return t('manualRecharge')
+}
+
+function rechargeStatusText(value) {
+  const status = String(value || '').toLowerCase()
+  if (status === 'success') return t('rechargeSuccess')
+  if (status === 'refunded') return t('rechargeRefunded')
+  return value || '-'
+}
+
+function formatSignedToken(value) {
+  const amount = Number(value || 0)
+  return `${amount > 0 ? '+' : ''}${formatTokenNumber(amount)}`
 }
 
 async function copyAiApiKey() {
@@ -1976,11 +2109,23 @@ onUnmounted(() => {
 }
 
 .ai-usage-grid { margin: 16px 0; }
+.usage-section-title { margin: 20px 0 10px; font-size: 16px; color: #1f2937; }
+.recharge-title { margin-top: 30px; }
 .usage-table-wrap { overflow: auto; }
 .usage-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .usage-table th, .usage-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; white-space: nowrap; }
+.usage-pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 14px; color: #64748b; font-size: 13px; }
+.usage-pagination label { display: inline-flex; align-items: center; gap: 6px; }
+.usage-pagination select, .usage-pagination button { min-height: 32px; border: 1px solid #dbe2ea; border-radius: 8px; background: #fff; color: #334155; padding: 0 10px; }
+.usage-pagination button { cursor: pointer; }
+.usage-pagination button:disabled { cursor: not-allowed; opacity: .45; }
+.usage-pagination strong { min-width: 58px; color: #334155; text-align: center; }
 .dark .ai-key-box code, .dark .usage-table { color: #e2e8f0; background: #0f172a; border-color: rgba(148,163,184,.22); }
 .dark .usage-table th, .dark .usage-table td { border-color: rgba(148,163,184,.18); }
+.dark .usage-pagination { color: #94a3b8; }
+.dark .usage-pagination select, .dark .usage-pagination button { border-color: rgba(148,163,184,.25); background: #111827; color: #e2e8f0; }
+.dark .usage-pagination strong { color: #e2e8f0; }
+.dark .usage-section-title { color: #e2e8f0; }
 
 .dark .step-item.running {
   background: rgba(251, 146, 60, 0.12);

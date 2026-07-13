@@ -10,28 +10,98 @@ namespace Microi.net
     public partial class V8EngineMethodExtend
     {
         /// <summary>
-        /// 制作并发布 iTdos 主库脱敏空数据库。
-        /// 业务入口保留在接口引擎；此处只封装接口引擎无法安全表达的数据库复制、文件导出和 HDFS 覆盖能力。
+        /// 重建并复制 iTdos 主库到固定临时数据库。
         /// </summary>
-        public DosResult BuildSanitizedEmptyDatabaseRelease(dynamic dynamicParam)
+        public DosResult PrepareEmptyDatabaseRelease(dynamic dynamicParam)
         {
             try
             {
-                var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
-                var currentUser = param["CurrentUser"] as JObject
-                                  ?? param["_CurrentUser"] as JObject
-                                  ?? new JObject();
-                var osClient = param["OsClient"]?.ToString() ?? "";
-                var backgroundTaskId = param["_BackgroundTaskId"]?.ToString()
-                                       ?? param["BackgroundTaskId"]?.ToString()
-                                       ?? param["TaskId"]?.ToString()
-                                       ?? "";
-                return new EmptyDatabaseReleaseService(backgroundTaskId).Build(currentUser, osClient);
+                var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
+                return request.Service.Prepare(request.CurrentUser, request.OsClient);
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, "制作主库空数据库失败：" + ex.Message);
+                return new DosResult(0, null, "准备主库空数据库失败：" + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 在固定临时数据库执行线上接口引擎返回的脱敏 SQL。
+        /// </summary>
+        public DosResult ApplyEmptyDatabaseSanitization(dynamic dynamicParam)
+        {
+            try
+            {
+                var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
+                return request.Service.ApplySanitization(
+                    request.CurrentUser,
+                    request.OsClient,
+                    request.Param["SanitizationSql"]?.ToString() ?? "");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "执行空数据库脱敏失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 导出、压缩并发布已脱敏的固定临时数据库。
+        /// </summary>
+        public DosResult PublishEmptyDatabaseRelease(dynamic dynamicParam)
+        {
+            try
+            {
+                var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
+                return request.Service.Publish(request.CurrentUser, request.OsClient);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "发布主库空数据库失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 清理固定临时数据库，供接口引擎异常补偿调用。
+        /// </summary>
+        public DosResult CleanupEmptyDatabaseRelease(dynamic dynamicParam)
+        {
+            try
+            {
+                var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
+                return request.Service.Cleanup(request.CurrentUser, request.OsClient);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "清理主库空数据库失败：" + ex.Message);
+            }
+        }
+
+        private static EmptyDatabaseReleaseRequest ParseEmptyDatabaseReleaseRequest(object dynamicParam)
+        {
+            var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+            var currentUser = param["CurrentUser"] as JObject
+                              ?? param["_CurrentUser"] as JObject
+                              ?? new JObject();
+            string osClient = param["OsClient"]?.ToString() ?? "";
+            string backgroundTaskId = param["_BackgroundTaskId"]?.ToString()
+                                      ?? param["BackgroundTaskId"]?.ToString()
+                                      ?? param["TaskId"]?.ToString()
+                                      ?? "";
+            return new EmptyDatabaseReleaseRequest
+            {
+                Param = param,
+                CurrentUser = currentUser,
+                OsClient = osClient,
+                Service = new EmptyDatabaseReleaseService(backgroundTaskId)
+            };
+        }
+
+        private sealed class EmptyDatabaseReleaseRequest
+        {
+            public JObject Param { get; set; }
+            public JObject CurrentUser { get; set; }
+            public string OsClient { get; set; }
+            public EmptyDatabaseReleaseService Service { get; set; }
         }
 
         /// <summary>

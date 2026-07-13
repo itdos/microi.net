@@ -107,6 +107,9 @@ export default {
             } else {
                 self.TableMultipleSelection = currentSelection;
             }
+            if (self.TableMultipleSelection.length === 0) {
+                self.ContinuousSelection = false;
+            }
             self.cardSelection = currentSelection;
             self.EmitOpenTableSelectionChange(OldTableMultipleSelection, "Y");
         },
@@ -488,6 +491,9 @@ export default {
             } else {
                 self.TableMultipleSelection = self.GetUniqueSelectedRows(self.cardSelection);
             }
+            if (self.TableMultipleSelection.length === 0) {
+                self.ContinuousSelection = false;
+            }
             self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },
         isCardSelected(model) {
@@ -512,6 +518,9 @@ export default {
                 );
             } else {
                 self.TableMultipleSelection = self.GetUniqueSelectedRows(self.cardSelection);
+            }
+            if (self.TableMultipleSelection.length === 0) {
+                self.ContinuousSelection = false;
             }
             self.EmitOpenTableSelectionChange(oldSelection, "Y");
         },

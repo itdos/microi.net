@@ -7,7 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
+using System.Text.RegularExpressions;
 using Dos.Common;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
@@ -17,7 +17,7 @@ namespace Microi.net
     /// <summary>
     /// 主库空数据库发布服务。
     ///
-    /// 安全边界：调用方不能指定源库、目标库、脱敏 SQL、临时目录或 HDFS 路径。
+    /// 安全边界：调用方不能指定源库、目标库、临时目录或 HDFS 路径；脱敏 SQL 由内部接口引擎提供并在执行前校验。
     /// 任何失败都会删除可能包含未脱敏数据的临时数据库，同时保留线上上一版 ZIP。
     /// </summary>
     public sealed class EmptyDatabaseReleaseService
@@ -30,16 +30,14 @@ namespace Microi.net
         internal const string PublicObjectPath = "/install/microi_empty_temp.sql.zip";
         internal const string PublicDownloadUrl = "https://static.itdos.com/install/microi_empty_temp.sql.zip";
 
-        private static readonly SemaphoreSlim LocalBuildLock = new SemaphoreSlim(1, 1);
         private readonly string _backgroundTaskId;
-        private bool _targetDatabaseCreated;
 
         public EmptyDatabaseReleaseService(string backgroundTaskId)
         {
             _backgroundTaskId = backgroundTaskId ?? "";
         }
 
-        public DosResult Build(JObject currentUser, string osClient)
+        public DosResult Prepare(JObject currentUser, string osClient)
         {
             var permissionResult = ValidatePermission(currentUser, osClient);
             if (permissionResult.Code != 1)
@@ -47,28 +45,13 @@ namespace Microi.net
                 return permissionResult;
             }
 
-            if (!LocalBuildLock.Wait(0))
-            {
-                return new DosResult(0, null, "空数据库发布任务正在执行，请勿重复提交。");
-            }
-
-            string workDirectory = null;
             MySqlConnectionStringBuilder sourceBuilder = null;
             try
             {
-                Report(1, 8, "正在检查主库配置和脱敏脚本");
+                Report(1, 8, "正在检查主库配置");
                 sourceBuilder = BuildAndValidateSourceConnection();
-                var sanitizationSqlPath = ResolveSanitizationSqlPath();
-
-                workDirectory = Path.Combine(Path.GetTempPath(), "microi-empty-release", Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(workDirectory);
-                var sqlPath = Path.Combine(workDirectory, SqlFileName);
-                var zipPath = Path.Combine(workDirectory, ZipFileName);
-
                 Report(2, 8, "正在重建临时空数据库");
                 RecreateTargetDatabase(sourceBuilder);
-                _targetDatabaseCreated = true;
-
                 Report(3, 8, "正在复制主库全部表结构");
                 var sourceTables = CopyTableStructures(sourceBuilder);
                 if (sourceTables.Count == 0)
@@ -78,22 +61,84 @@ namespace Microi.net
 
                 Report(4, 8, "正在复制主库全部表数据");
                 var copiedRows = CopyTableData(sourceBuilder, sourceTables);
+                return new DosResult(1, new
+                {
+                    SourceTableCount = sourceTables.Count,
+                    CopiedRowCount = copiedRows
+                }, "主库结构和数据已复制到 microi_empty_temp。");
+            }
+            catch (Exception ex)
+            {
+                if (sourceBuilder != null)
+                {
+                    TryDropTargetDatabase(sourceBuilder);
+                }
+                Report(0, 8, "复制失败，已清理未完成的临时数据库");
+                Console.WriteLine($"Microi：准备主库空数据库失败：{ex.Message}");
+                return new DosResult(0, null, "准备主库空数据库失败，已清理临时数据库。错误：" + ex.Message);
+            }
+        }
 
-                Report(5, 8, "正在执行固定脱敏脚本");
-                ExecuteSanitizationScript(sourceBuilder, sanitizationSqlPath);
+        public DosResult ApplySanitization(JObject currentUser, string osClient, string sanitizationSql)
+        {
+            var permissionResult = ValidatePermission(currentUser, osClient);
+            if (permissionResult.Code != 1)
+            {
+                return permissionResult;
+            }
+
+            MySqlConnectionStringBuilder sourceBuilder = null;
+            try
+            {
+                sourceBuilder = BuildAndValidateSourceConnection();
+                ValidateSanitizationSql(sanitizationSql);
+                Report(5, 8, "正在执行线上脱敏 SQL 接口引擎脚本");
+                ExecuteSanitizationScript(sourceBuilder, sanitizationSql);
                 var validation = ValidateSanitizedDatabase(sourceBuilder);
+                return new DosResult(1, new
+                {
+                    RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers
+                }, "脱敏 SQL 已完整执行并通过核心校验。");
+            }
+            catch (Exception ex)
+            {
+                if (sourceBuilder != null)
+                {
+                    TryDropTargetDatabase(sourceBuilder);
+                }
+                Report(0, 8, "脱敏失败，已删除可能含敏感数据的临时数据库");
+                Console.WriteLine($"Microi：执行空数据库脱敏失败：{ex.Message}");
+                return new DosResult(0, null, "执行脱敏 SQL 失败，已删除临时数据库。错误：" + ex.Message);
+            }
+        }
+
+        public DosResult Publish(JObject currentUser, string osClient)
+        {
+            var permissionResult = ValidatePermission(currentUser, osClient);
+            if (permissionResult.Code != 1)
+            {
+                return permissionResult;
+            }
+
+            string workDirectory = null;
+            try
+            {
+                var sourceBuilder = BuildAndValidateSourceConnection();
+                var validation = ValidateSanitizedDatabase(sourceBuilder);
+                workDirectory = Path.Combine(Path.GetTempPath(), "microi-empty-release", Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(workDirectory);
+                var sqlPath = Path.Combine(workDirectory, SqlFileName);
+                var zipPath = Path.Combine(workDirectory, ZipFileName);
 
                 Report(6, 8, "正在导出脱敏后的表结构和数据");
                 var exportResult = ExportDatabase(sourceBuilder, sqlPath);
-
                 Report(7, 8, "正在压缩并上传公开发布包");
                 CreateZip(sqlPath, zipPath);
                 var zipSize = new FileInfo(zipPath).Length;
                 var sha256 = ComputeFileSha256(zipPath);
                 UploadPublicPackage(zipPath);
-
                 Report(8, 8, "发布完成，可下载最新空数据库");
-                _targetDatabaseCreated = false;
+
                 return new DosResult(1, new
                 {
                     DownloadUrl = PublicDownloadUrl,
@@ -101,8 +146,6 @@ namespace Microi.net
                     HdfsPath = PublicObjectPath,
                     Sha256 = sha256,
                     ZipSize = zipSize,
-                    SourceTableCount = sourceTables.Count,
-                    CopiedRowCount = copiedRows,
                     PublishedTableCount = exportResult.TableCount,
                     PublishedRowCount = exportResult.RowCount,
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
@@ -111,13 +154,9 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                if (_targetDatabaseCreated && sourceBuilder != null)
-                {
-                    TryDropTargetDatabase(sourceBuilder);
-                }
-                Report(0, 8, "制作失败，已清理未完成的临时数据库");
-                Console.WriteLine($"Microi：制作主库空数据库失败：{ex.Message}");
-                return new DosResult(0, null, "制作主库空数据库失败，未覆盖线上文件。请查看后台日志。错误：" + ex.Message);
+                Report(0, 8, "导出或发布失败，线上旧文件保持不变");
+                Console.WriteLine($"Microi：发布主库空数据库失败：{ex.Message}");
+                return new DosResult(0, null, "发布主库空数据库失败，未覆盖线上旧文件。错误：" + ex.Message);
             }
             finally
             {
@@ -125,7 +164,24 @@ namespace Microi.net
                 {
                     TryDeleteDirectory(workDirectory);
                 }
-                LocalBuildLock.Release();
+            }
+        }
+
+        public DosResult Cleanup(JObject currentUser, string osClient)
+        {
+            var permissionResult = ValidatePermission(currentUser, osClient);
+            if (permissionResult.Code != 1)
+            {
+                return permissionResult;
+            }
+            try
+            {
+                TryDropTargetDatabase(BuildAndValidateSourceConnection());
+                return new DosResult(1, null, "临时空数据库已清理。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "清理临时空数据库失败：" + ex.Message);
             }
         }
 
@@ -165,19 +221,135 @@ namespace Microi.net
             return builder;
         }
 
-        private static string ResolveSanitizationSqlPath()
+        private static void ValidateSanitizationSql(string sql)
         {
-            var candidates = new[]
+            if (string.IsNullOrWhiteSpace(sql))
             {
-                Path.Combine(AppContext.BaseDirectory, "Resources", "itdos数据库脱敏.sql"),
-                Path.Combine(Directory.GetCurrentDirectory(), "Resources", "itdos数据库脱敏.sql")
-            };
-            var path = candidates.FirstOrDefault(File.Exists);
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                throw new FileNotFoundException("发布目录缺少固定脱敏脚本 Resources/itdos数据库脱敏.sql。");
+                throw new InvalidOperationException("脱敏 SQL 接口引擎返回内容为空。");
             }
-            return path;
+            if (Encoding.UTF8.GetByteCount(sql) > 2 * 1024 * 1024)
+            {
+                throw new InvalidOperationException("脱敏 SQL 超过 2MB 安全限制。");
+            }
+            // 只检查 SQL 语法本身，忽略注释和字符串内容，避免 URL、说明文字等误判。
+            var sqlWithoutLiteralsAndComments = StripSqlLiteralsAndComments(sql);
+            var forbidden = new[]
+            {
+                @"\bUSE\s+", @"\bCREATE\s+DATABASE\b", @"\bDROP\s+DATABASE\b",
+                @"(?:`itdos`|\bitdos)\s*\."
+            };
+            foreach (var pattern in forbidden)
+            {
+                if (Regex.IsMatch(sqlWithoutLiteralsAndComments, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    throw new InvalidOperationException("脱敏 SQL 只能操作固定目标库，检测到禁止语句。");
+                }
+            }
+        }
+
+        private static string StripSqlLiteralsAndComments(string sql)
+        {
+            var result = new StringBuilder(sql.Length);
+            var state = SqlScanState.Normal;
+            for (var index = 0; index < sql.Length; index++)
+            {
+                var current = sql[index];
+                var next = index + 1 < sql.Length ? sql[index + 1] : '\0';
+
+                if (state == SqlScanState.Normal)
+                {
+                    if (current == '\'' || current == '"')
+                    {
+                        state = current == '\'' ? SqlScanState.SingleQuoted : SqlScanState.DoubleQuoted;
+                        result.Append(' ');
+                    }
+                    else if (current == '#')
+                    {
+                        state = SqlScanState.LineComment;
+                        result.Append(' ');
+                    }
+                    else if (current == '-' && next == '-'
+                             && (index + 2 >= sql.Length || char.IsWhiteSpace(sql[index + 2])))
+                    {
+                        state = SqlScanState.LineComment;
+                        result.Append("  ");
+                        index++;
+                    }
+                    else if (current == '/' && next == '*')
+                    {
+                        state = SqlScanState.BlockComment;
+                        result.Append("  ");
+                        index++;
+                    }
+                    else
+                    {
+                        result.Append(current);
+                    }
+                    continue;
+                }
+
+                if (state == SqlScanState.LineComment)
+                {
+                    if (current == '\r' || current == '\n')
+                    {
+                        state = SqlScanState.Normal;
+                        result.Append(current);
+                    }
+                    else
+                    {
+                        result.Append(' ');
+                    }
+                    continue;
+                }
+
+                if (state == SqlScanState.BlockComment)
+                {
+                    if (current == '*' && next == '/')
+                    {
+                        state = SqlScanState.Normal;
+                        result.Append("  ");
+                        index++;
+                    }
+                    else
+                    {
+                        result.Append(current == '\r' || current == '\n' ? current : ' ');
+                    }
+                    continue;
+                }
+
+                result.Append(current == '\r' || current == '\n' ? current : ' ');
+                if (current == '\\' && index + 1 < sql.Length)
+                {
+                    result.Append(' ');
+                    index++;
+                    continue;
+                }
+
+                var quote = state == SqlScanState.SingleQuoted ? '\'' : '"';
+                if (current != quote)
+                {
+                    continue;
+                }
+                if (next == quote)
+                {
+                    result.Append(' ');
+                    index++;
+                }
+                else
+                {
+                    state = SqlScanState.Normal;
+                }
+            }
+            return result.ToString();
+        }
+
+        private enum SqlScanState
+        {
+            Normal,
+            SingleQuoted,
+            DoubleQuoted,
+            LineComment,
+            BlockComment
         }
 
         private static void RecreateTargetDatabase(MySqlConnectionStringBuilder sourceBuilder)
@@ -242,13 +414,8 @@ namespace Microi.net
             return copiedRows;
         }
 
-        private static void ExecuteSanitizationScript(MySqlConnectionStringBuilder sourceBuilder, string sqlPath)
+        private static void ExecuteSanitizationScript(MySqlConnectionStringBuilder sourceBuilder, string sql)
         {
-            var sql = File.ReadAllText(sqlPath, new UTF8Encoding(false));
-            if (string.IsNullOrWhiteSpace(sql))
-            {
-                throw new InvalidOperationException("脱敏脚本为空，已拒绝继续。");
-            }
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
             var script = new MySqlScript(connection, sql);
             script.Execute();
