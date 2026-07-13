@@ -209,30 +209,38 @@ V8.Cache.HashDelete('hashKey', 'field1');
 ## V8.Http — HTTP 请求
 
 ```js
-// 简洁格式
-var result = V8.Http.Get('https://api.example.com/data');
-var result = V8.Http.Post('https://api.example.com/data',
-  JSON.stringify({ key: 'value' }),
-  { 'Content-Type': 'application/json' }
-);
+// GET：必须使用对象参数格式
+var result = V8.Http.Get({
+  Url: 'https://api.example.com/data',
+  GetParam: { page: 1 },
+  Timeout: 600,                  // 秒，默认 10 分钟
+  Headers: { token: 'xxx' }
+});
 
-// 对象格式（完整参数）
+// POST
 var result = V8.Http.Post({
   Url: 'https://api.example.com/data',
   PostParam: { key: 'value' },
-  ParamType: 'json',              // 'json' | 'form'
-  Timeout: 5,                     // 秒
+  ParamType: 'json',              // 'json' | 'form' | 'xml' | 'binary'
+  Timeout: 600,                   // 秒，默认 10 分钟
   Headers: { token: 'xxx' },
   FilesByteBase64: {}             // 上传文件
 });
 
-// 获取完整响应（含响应头、状态码）
-var resp = V8.Http.PostResponse('https://api.example.com/data', body, headers);
-// resp.Content, resp.Headers, resp.StatusCode
+// PATCH：与 POST 对称，使用 PatchParam / PatchParamString
+var result = V8.Http.Patch({
+  Url: 'https://api.example.com/data/1',
+  PatchParamString: JSON.stringify({ nested: { enabled: true } }),
+  ParamType: 'json'
+});
 
-// 下载文件（获取字节）
-var resp = V8.Http.GetResponse({ Url: 'https://example.com/file.png' });
-var imgByte = resp.RawBytes;
+// 完整响应：GetResponse / PostResponse / PatchResponse
+var resp = V8.Http.PatchResponse({
+  Url: 'https://api.example.com/data/1',
+  PatchParam: { enabled: true },
+  ParamType: 'json'
+});
+// resp.Content, resp.Headers, resp.RawBytes, resp.StatusCode, resp.ErrorMessage
 ```
 
 ---
@@ -317,13 +325,31 @@ V8.Office.SendEmail({
   EmailSubject:'标题', EmailBody:'<b>HTML内容</b>',
   Receivers:['a@qq.com']
 });
-// 自定义导出Excel
+// 多 Sheet Excel（单 Sheet 仍可传 ExcelData + ExcelHeader）
 var excelResult = V8.Office.ExportExcel({
   OsClient: V8.OsClient,
-  ExcelData: dataList,
-  ExcelHeader: [{Name:'字段名',Label:'显示名',Component:'Text',Config:{}}]
+  ExcelSheets: [
+    { SheetName:'订单', ExcelData:orderList, ExcelHeader:[{Name:'OrderNo',Label:'订单号',Component:'Text'}] },
+    { SheetName:'客户', ExcelData:customerList, ExcelHeader:[{Name:'Name',Label:'客户名称',Component:'Text'}] }
+  ]
 });
 var rows = V8.Office.ExcelToList({ FileByteBase64: base64, SheetIndex: 0 });
+
+// 富文本 Word；ExportWordText 继续兼容旧版纯文本
+var wordResult = V8.Office.ExportWord({
+  Title:'月度报告', HeaderText:'吾码', FooterText:'内部资料', ShowPageNumber:true,
+  Paragraphs:[{Text:'正文',FirstLineIndent:0.74}],
+  Tables:[{Headers:['指标','值'],Rows:[['销售额',1280000]]}]
+});
+
+// PowerPoint 多页导出
+var pptResult = V8.Office.ExportPowerPoint({
+  Title:'季度汇报', ShowSlideNumber:true,
+  Slides:[
+    {Layout:'TitleSlide',Title:'季度汇报',Subtitle:DateNow('yyyy-MM-dd')},
+    {Title:'核心结论',Bullets:['收入增长','续约稳定']}
+  ]
+});
 ```
 
 ---
@@ -520,6 +546,13 @@ console.log('调试信息')                                  // 控制台输出�
 - 已有合适 MicroService 时优先新增页面/路由；没有时使用 `microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_microservice` 创建、同步私有源码并发布公有编译产物。
 - `V8.ConfirmTips` 只用于纯文本确认或极少量一次性输入。三个以上字段、联动校验、上传、表格、Tab、步骤条、代码编辑器或需长期维护的弹窗，必须使用微服务页面并通过 `V8.OpenAppDialog` 打开，禁止在 V8 代码里拼接大段 HTML。
 - 应用商城历史字段 `AppType` 表示官方/社区分类；运行应用类型使用 `ApplicationType`，值为 `Regular / MicroService / UniApp / Web`。
+
+## 官方文档原位增补与中文单源规则
+
+- 修改官方文档前先搜索已有页面并原位补充；除非确有长期独立主题，不得新建相近 Markdown 页面、导航项或页面路由。
+- 前端 V8 API 固定维护 `microi.doc/docs/doc/v8-engine/v8-client.md`，后端 V8 / 接口引擎 API 固定维护 `microi.doc/docs/doc/v8-engine/v8-server.md`。
+- 日常功能开发只维护 `microi.doc/docs/doc/` 中文文档；`microi.doc/docs/en/` 由官网统一翻译生成，不手工重复编写英文版。
+- 前端新 HTTP 代码优先使用与后端参数基本一致的 `V8.Http`；旧 `V8.Post/Get` 只作兼容保留。
 
 
 ---

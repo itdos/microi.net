@@ -276,7 +276,7 @@ export const V8ServerApiDefinitions = {
                         label: "Post",
                         kind: "Method",
                         documentation:
-                            'POST请求，返回string\n\n参数:\n  - Url: 请求地址(必传)\n  - PostParam: 请求参数\n  - PostParamString: 序列化后的参数字符串\n  - ParamType: 请求类型("json"或"form"，默认form)\n  - Timeout: 超时时间(秒，默认5)\n  - Headers/Header: 请求头\n\n示例:\nvar result = V8.Http.Post({\n  Url: "http://api.example.com",\n  PostParam: { Account: "admin" },\n  ParamType: "json",\n  Headers: { token: "" }\n});',
+                            'POST请求，返回string\n\n参数:\n  - Url: 请求地址(必传)\n  - PostParam: 请求参数\n  - PostParamString: 序列化后的参数字符串\n  - ParamType: 请求类型("json"或"form"，默认form)\n  - Timeout: 超时时间(秒，默认600，即10分钟)\n  - Headers/Header: 请求头\n\n示例:\nvar result = V8.Http.Post({\n  Url: "http://api.example.com",\n  PostParam: { Account: "admin" },\n  ParamType: "json",\n  Headers: { token: "" }\n});',
                         insertText: "Post",
                         snippet: 'Post({\n\tUrl: "${1:url}",\n\tPostParam: {\n\t\t${2:param}: ${3:value}\n\t}${4:,\n\tParamType: "json"}\n})'
                     },
@@ -287,6 +287,22 @@ export const V8ServerApiDefinitions = {
                             'POST请求，返回Response对象\n\n包含Headers、Content、RawBytes\n\n示例:\nvar result = V8.Http.PostResponse({\n  Url: "...",\n  PostParam: {}\n});\nvar header = result.Headers.find(item => item.Name == "Authorization");',
                         insertText: "PostResponse",
                         snippet: 'PostResponse({\n\tUrl: "${1:url}",\n\tPostParam: {\n\t\t${2:param}: ${3:value}\n\t}\n})'
+                    },
+                    Patch: {
+                        label: "Patch",
+                        kind: "Method",
+                        documentation:
+                            'PATCH请求，返回string\n\n参数与Post对称：\n  - Url: 请求地址(必传)\n  - PatchParam: 请求参数\n  - PatchParamString: 序列化后的参数字符串\n  - ParamType: "json" / "form" / "xml" / "binary"\n  - Timeout/TimeOut: 超时秒数\n  - Headers/Header: 请求头\n\n示例:\nvar result = V8.Http.Patch({\n  Url: "https://api.example.com/users/1",\n  PatchParam: { Status: 1 },\n  ParamType: "json"\n});',
+                        insertText: "Patch",
+                        snippet: 'Patch({\n\tUrl: "${1:url}",\n\tPatchParam: {\n\t\t${2:param}: ${3:value}\n\t}${4:,\n\tParamType: "json"}\n})'
+                    },
+                    PatchResponse: {
+                        label: "PatchResponse",
+                        kind: "Method",
+                        documentation:
+                            'PATCH请求，返回包含Headers、Content、RawBytes、StatusCode、ErrorMessage的完整响应对象。',
+                        insertText: "PatchResponse",
+                        snippet: 'PatchResponse({\n\tUrl: "${1:url}",\n\tPatchParam: {\n\t\t${2:param}: ${3:value}\n\t}\n})'
                     },
                     Get: {
                         label: "Get",
@@ -301,6 +317,58 @@ export const V8ServerApiDefinitions = {
                         documentation: "GET请求，返回Response对象",
                         insertText: "GetResponse",
                         snippet: 'GetResponse({\n\tUrl: "${1:url}"\n})'
+                    }
+                }
+            },
+
+            // ========== Office 文档导入导出 ==========
+            Office: {
+                label: "Office",
+                kind: "Module",
+                documentation: "Office 文档处理：Excel 单/多 Sheet、Word、PowerPoint 导出与 Excel 解析。接口引擎返回文件时必须开启【响应文件】。",
+                insertText: "Office",
+                methods: {
+                    ExportExcel: {
+                        label: "ExportExcel",
+                        kind: "Method",
+                        documentation: "导出 .xlsx。单 Sheet 使用 ExcelData + ExcelHeader；多 Sheet 使用 ExcelSheets，每项传 SheetName、ExcelData、ExcelHeader（Sheets 为兼容别名）。",
+                        insertText: "ExportExcel",
+                        snippet: "ExportExcel({\n\tOsClient: V8.OsClient,\n\tExcelSheets: [\n\t\t{ SheetName: \"${1:Sheet1}\", ExcelData: ${2:dataList}, ExcelHeader: ${3:headerList} }\n\t]\n})"
+                    },
+                    ExcelToList: {
+                        label: "ExcelToList",
+                        kind: "Method",
+                        documentation: "解析 Excel Base64 为数据列表，SheetIndex 从 0 开始。",
+                        insertText: "ExcelToList",
+                        snippet: "ExcelToList({\n\tFileByteBase64: ${1:base64},\n\tSheetIndex: ${2:0}\n})"
+                    },
+                    ExportWordText: {
+                        label: "ExportWordText",
+                        kind: "Method",
+                        documentation: "兼容旧版纯文本 Word 导出。新代码需要段落、表格、图片等能力时使用 ExportWord。",
+                        insertText: "ExportWordText",
+                        snippet: "ExportWordText({\n\tTitle: \"${1:标题}\",\n\tContent: \"${2:正文}\"\n})"
+                    },
+                    ExportWord: {
+                        label: "ExportWord",
+                        kind: "Method",
+                        documentation: "导出 .docx，支持 Paragraphs、Sections、Tables、Images、HeaderText、FooterText、ShowPageNumber 等对象参数。",
+                        insertText: "ExportWord",
+                        snippet: "ExportWord({\n\tTitle: \"${1:标题}\",\n\tParagraphs: [{ Text: \"${2:正文}\" }],\n\tTables: [{ Headers: [\"${3:列名}\"], Rows: [[${4:value}]] }],\n\tShowPageNumber: true\n})"
+                    },
+                    ExportPowerPoint: {
+                        label: "ExportPowerPoint",
+                        kind: "Method",
+                        documentation: "导出 .pptx，支持多页 Slides、Bullets、TextItems、Tables、Images、主题颜色和页码。位置和尺寸单位为英寸。",
+                        insertText: "ExportPowerPoint",
+                        snippet: "ExportPowerPoint({\n\tTitle: \"${1:汇报标题}\",\n\tShowSlideNumber: true,\n\tSlides: [\n\t\t{ Layout: \"TitleSlide\", Title: \"${2:汇报标题}\" },\n\t\t{ Title: \"${3:核心结论}\", Bullets: [\"${4:结论}\"] }\n\t]\n})"
+                    },
+                    SendEmail: {
+                        label: "SendEmail",
+                        kind: "Method",
+                        documentation: "发送 HTML 邮件。",
+                        insertText: "SendEmail",
+                        snippet: "SendEmail({\n\tSmtpServer: \"${1:smtp.example.com}\",\n\tSmtpPort: ${2:587},\n\tEnableSSL: true,\n\tSystemEmail: \"${3:sender@example.com}\",\n\tSystemEmailPwd: \"${4:password}\",\n\tEmailSubject: \"${5:标题}\",\n\tEmailBody: \"${6:内容}\",\n\tReceivers: [\"${7:receiver@example.com}\"]\n})"
                     }
                 }
             },

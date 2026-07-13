@@ -8,7 +8,7 @@
 
 - 前端 V8 引擎代码与服务器端 V8 的编程语言均为 JavaScript 语法
 - 前端 V8 引擎支持完整 ES6 语法
-- 集成了很多函数直接通过 HTTP 调用后端接口，与 `V8.Post()` 写对应接口地址效果一样
+- 前端新 HTTP 代码优先使用与后端参数基本一致的 `V8.Http`；旧 `V8.Post/Get` 继续兼容已有代码
 - 若前端直接调用服务器端的通用增删改查接口，前端 V8 事件**不会执行**（服务器端 V8 事件会执行）
 - 主要用于表单属性的前端 V8 事件、模块引擎 V8 按钮代码等
 
@@ -151,8 +151,41 @@ V8.Tips(msgContent, true/false, time)
 var id = V8.CurrentUser.Id;
 ```
 
+## V8.Http
+
+前端现已支持与后端一致的对象参数：`Get/GetResponse`、`Post/PostResponse`、`Patch/PatchResponse`。浏览器请求是异步的，因此前端必须使用 `await`；字符串方法返回原始响应文本，完整响应方法返回 `{ Content, Headers, RawBytes, StatusCode, ErrorMessage }`。
+
+```javascript
+var postText = await V8.Http.Post({
+  Url: '/api/example',
+  PostParam: { Id: 1 },
+  ParamType: 'json',
+  Timeout: 600, // 秒；默认即 600（10 分钟），可按接口覆盖
+  Headers: { 'X-Trace-Id': 'trace-id' }
+});
+var postResult = JSON.parse(postText);
+
+var getText = await V8.Http.Get({
+  Url: '/api/example',
+  GetParam: { Id: 1 }
+});
+
+var patchResp = await V8.Http.PatchResponse({
+  Url: '/api/example/1',
+  PatchParamString: JSON.stringify({ profile: { name: '新名字' } }),
+  ParamType: 'json'
+});
+if (patchResp.StatusCode >= 200 && patchResp.StatusCode < 300) {
+  var data = JSON.parse(patchResp.Content);
+}
+```
+
+参数与后端一致：`Url`、`GetParam`、`PostParam/PostParamString`、`PatchParam/PatchParamString`、`ParamType`、`Timeout/TimeOut`、`Headers/Header`、`FilesByteBase64/FilesByteString/FilesByte`。默认超时 `600` 秒（10 分钟）；`GetParam` 可为 GET、POST、PATCH 附加 URL 查询参数。相对地址或当前 `ApiBase` 会自动携带吾码登录头并接收续签 Token；外部绝对地址不会自动携带吾码 Token。浏览器请求第三方域名仍需对方允许 CORS。
+
+浏览器不支持后端的 `FilesStream`；使用 Base64、字符串或字节数组文件参数。更多示例见后端 `V8.Http` 文档及 `v8-http-integration` skill。
+
 ## V8.Post
->* 注意后端V8的post是V8.Http.Post()，目前暂时写法不一致，后期会统一。
+>* 历史兼容方法，继续保留。前端新代码应优先使用参数与后端基本一致的 `V8.Http`；`V8.Post/Get` 不再作为新功能首选，已有代码无需迁移。
 ```javascript
 //发起ajax请求，常规用法，自带token，默认Form Data参数格式（非Request Payload）
 V8.Post('api url', { Id : 1 }, function(result){
@@ -170,7 +203,7 @@ V8.Post({
 ```
 
 ## V8.Get
->* 发起ajax请求
+>* 历史兼容 GET 方法，继续保留。
 ```js
 V8.Get('api url', {}, function(result){})
 ```

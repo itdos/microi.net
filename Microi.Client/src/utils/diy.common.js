@@ -18,6 +18,7 @@ import _ from "underscore";
 import LocalStorageManager from "./localStorage-manager.js";
 import { initV8ScanCode } from "./v8-scan-code.js";
 import { initV8Print } from "./v8-print.js";
+import { createV8Http } from "./v8-http.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -4714,6 +4715,7 @@ var DiyCommon = {
                 Get : DiyCommon.Get,
                 GetSync : DiyCommon.GetSync,
                 GetAsync : DiyCommon.GetAsync,
+                Http : DiyCommon.Http,
                 Tips : DiyCommon.Tips,
                 ConfirmTips : DiyCommon.OsConfirm,
                 // 注意：CurrentUser / CurrentToken / SysConfig 不放在静态缓存里，
@@ -5293,5 +5295,31 @@ var DiyCommon = {
         }
     }
 };
+DiyCommon.Http = createV8Http({
+    getApiBase: function () {
+        return DiyCommon.GetApiBase();
+    },
+    getPlatformContext: function () {
+        var requestToken = DiyCommon.getToken();
+        var headers = {
+            did: DiyCommon.GetDid(),
+            macaddress: LocalStorageManager.get("MacAddress") || "",
+            lang: DiyCommon.GetCurrentLang()
+        };
+        if (!DiyCommon.IsNull(requestToken)) headers.authorization = "Bearer " + requestToken;
+        return { headers: headers, requestToken: requestToken };
+    },
+    onPlatformResponse: function (headers, requestToken) {
+        var responseToken = "";
+        Object.keys(headers || {}).some(function (name) {
+            if (String(name).toLowerCase() === "authorization" || String(name).toLowerCase() === "token") {
+                responseToken = headers[name];
+                return true;
+            }
+            return false;
+        });
+        DiyCommon.ApplyAuthorizationToken(responseToken, requestToken);
+    }
+});
 // DiyCommon.OsClientInit();
 export { DiyCommon };

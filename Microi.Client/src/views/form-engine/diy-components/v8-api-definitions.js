@@ -225,7 +225,59 @@ export const V8ApiDefinitions = {
                 }
             },
 
-            // ========== HTTP请求方法 ==========
+            // ========== 与后端同构的 HTTP 请求对象 ==========
+            Http: {
+                label: "Http",
+                kind: "Module",
+                documentation: "前端HTTP请求对象，参数与后端V8.Http一致；浏览器端必须使用await。",
+                insertText: "Http",
+                methods: {
+                    Get: {
+                        label: "Get",
+                        kind: "Method",
+                        documentation: "GET请求，返回原始响应文本。参数：Url、GetParam、Timeout/TimeOut、Headers/Header。",
+                        insertText: "Get",
+                        snippet: 'Get({\n\tUrl: "${1:/api/url}",\n\tGetParam: {\n\t\t${2:param}: ${3:value}\n\t}\n})'
+                    },
+                    GetResponse: {
+                        label: "GetResponse",
+                        kind: "Method",
+                        documentation: "GET请求，返回Content、Headers、RawBytes、StatusCode、ErrorMessage。",
+                        insertText: "GetResponse",
+                        snippet: 'GetResponse({\n\tUrl: "${1:/api/url}",\n\tGetParam: {}\n})'
+                    },
+                    Post: {
+                        label: "Post",
+                        kind: "Method",
+                        documentation: "POST请求，返回原始响应文本。参数：Url、GetParam、PostParam/PostParamString、ParamType、Timeout/TimeOut、Headers/Header。",
+                        insertText: "Post",
+                        snippet: 'Post({\n\tUrl: "${1:/api/url}",\n\tPostParam: {\n\t\t${2:param}: ${3:value}\n\t},\n\tParamType: "${4:json}"\n})'
+                    },
+                    PostResponse: {
+                        label: "PostResponse",
+                        kind: "Method",
+                        documentation: "POST请求，返回完整响应对象。",
+                        insertText: "PostResponse",
+                        snippet: 'PostResponse({\n\tUrl: "${1:/api/url}",\n\tPostParam: {},\n\tParamType: "${2:json}"\n})'
+                    },
+                    Patch: {
+                        label: "Patch",
+                        kind: "Method",
+                        documentation: "PATCH请求，返回原始响应文本。参数：Url、GetParam、PatchParam/PatchParamString、ParamType、Timeout/TimeOut、Headers/Header。",
+                        insertText: "Patch",
+                        snippet: 'Patch({\n\tUrl: "${1:/api/url}",\n\tPatchParam: {\n\t\t${2:param}: ${3:value}\n\t},\n\tParamType: "${4:json}"\n})'
+                    },
+                    PatchResponse: {
+                        label: "PatchResponse",
+                        kind: "Method",
+                        documentation: "PATCH请求，返回完整响应对象。",
+                        insertText: "PatchResponse",
+                        snippet: 'PatchResponse({\n\tUrl: "${1:/api/url}",\n\tPatchParam: {},\n\tParamType: "${2:json}"\n})'
+                    }
+                }
+            },
+
+            // ========== 旧版 HTTP 请求方法（兼容保留） ==========
             Post: {
                 label: "Post",
                 kind: "Method",

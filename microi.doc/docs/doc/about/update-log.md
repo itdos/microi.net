@@ -6,6 +6,19 @@
 所有更新日志请见 Gitee 仓库提交记录：[https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master)
 :::
 
+::: details 2026-07-13 - V8.Http 前后端统一与 PATCH 支持
+
+- 后端 `V8.Http` 新增 `Patch/PatchResponse`，请求体使用 `PatchParam/PatchParamString`。
+- 前端新增同构 `V8.Http.Get/Post/Patch` 及对应 Response 方法；前端调用需使用 `await`。
+- 完整响应统一提供 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。
+- `V8.Http` 前后端默认超时统一为 `600` 秒（10 分钟），仍可通过 `Timeout/TimeOut` 按请求覆盖。
+- 历史前端 `V8.Post/Get` 保持兼容，不需要迁移已有代码。
+- `V8.Office.ExportExcel` 完善多 Sheet 导出说明，`ExcelSheets` 每项可使用独立数据源、表头和查询条件。
+- 后端新增对象参数的 `V8.Office.ExportWord/ExportPowerPoint`，支持富文本 Word、多页 PPT、表格、图片、主题及页码；旧 `ExportWordText` 继续兼容。
+- 官方文档约定改为优先原位补充现有 `v8-client.md/v8-server.md` 中文页面，英文版由官网统一翻译生成。
+
+:::
+
 ::: details Latest - 重要更新 - 2025-08-07
 ```js
 由于前端、移动端已100%开源，后端99%开源，且由团队多人持续维护升级，导致更新频率较高，因此所有更新日志请见Gitee仓库 https://gitee.com/ITdos/microi.net/commits/master 提交日志

@@ -51,6 +51,34 @@ namespace Microi.net
         V8EngineHttpResponse PostResponse(dynamic dynamicParam);
 
         /// <summary>
+        /// 异步执行PATCH请求
+        /// </summary>
+        /// <param name="dynamicParam">动态参数</param>
+        /// <returns>响应字符串</returns>
+        Task<string> PatchAsync(dynamic dynamicParam);
+
+        /// <summary>
+        /// 同步执行PATCH请求
+        /// </summary>
+        /// <param name="dynamicParam">动态参数</param>
+        /// <returns>响应字符串</returns>
+        string Patch(dynamic dynamicParam);
+
+        /// <summary>
+        /// 异步执行PATCH请求并返回完整响应
+        /// </summary>
+        /// <param name="dynamicParam">动态参数</param>
+        /// <returns>V8EngineHttpResponse响应对象</returns>
+        Task<V8EngineHttpResponse> PatchResponseAsync(dynamic dynamicParam);
+
+        /// <summary>
+        /// 同步执行PATCH请求并返回完整响应
+        /// </summary>
+        /// <param name="dynamicParam">动态参数</param>
+        /// <returns>V8EngineHttpResponse响应对象</returns>
+        V8EngineHttpResponse PatchResponse(dynamic dynamicParam);
+
+        /// <summary>
         /// 异步执行GET请求
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
@@ -105,6 +133,20 @@ namespace Microi.net
         /// <param name="param">HTTP 请求参数</param>
         /// <returns>RestResponse 对象</returns>
         Task<RestResponse> PostResponse(DiyHttpParam param);
+
+        /// <summary>
+        /// PATCH 请求返回字符串
+        /// </summary>
+        /// <param name="param">HTTP 请求参数</param>
+        /// <returns>响应字符串</returns>
+        Task<string> Patch(DiyHttpParam param);
+
+        /// <summary>
+        /// PATCH 请求返回 RestResponse
+        /// </summary>
+        /// <param name="param">HTTP 请求参数</param>
+        /// <returns>RestResponse 对象</returns>
+        Task<RestResponse> PatchResponse(DiyHttpParam param);
 
         /// <summary>
         /// 下载文件请求

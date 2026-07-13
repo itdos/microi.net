@@ -1,11 +1,13 @@
 ---
 name: v8-http-integration
-description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/GetResponse/PostResponse 调用第三方 API，处理请求头、JSON/form 载荷、超时、文件和响应解析。
+description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch 及对应 Response 方法调用接口，处理请求头、JSON/form/XML 载荷、超时、文件和响应解析，并兼容前后端 V8。
 ---
 
 # Microi V8 HTTP 外部接口集成
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要调用外部 HTTP API（微信、支付宝、短信、ERP 等第三方系统）。
+
+文档维护时，前端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-client.md`，后端用法更新现有 `microi.doc/docs/doc/v8-engine/v8-server.md`；不要新建重复的 V8.Http 文档页面或路由。只维护中文 `docs/doc/`，英文 `docs/en/` 由官网统一翻译生成。
 
 ## V8.Http API
 
@@ -13,8 +15,27 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/GetResp
 |------|------|--------|
 | `V8.Http.Get({...})` | GET 请求 | 字符串（响应体） |
 | `V8.Http.Post({...})` | POST 请求 | 字符串（响应体） |
+| `V8.Http.Patch({...})` | PATCH 请求 | 字符串（响应体） |
 | `V8.Http.GetResponse({...})` | GET（完整响应） | `{ Content, Headers, StatusCode }` |
 | `V8.Http.PostResponse({...})` | POST（完整响应） | `{ Content, Headers, StatusCode }` |
+| `V8.Http.PatchResponse({...})` | PATCH（完整响应） | `{ Content, Headers, StatusCode }` |
+
+前端与后端统一使用上表中的 PascalCase 对象参数格式。唯一无法统一的是执行模型：后端接口引擎为同步返回，前端浏览器请求必须使用 `await`（返回 `Promise`）。旧版前端 `V8.Post/Get` 继续兼容，不得删除。
+
+通用参数：
+
+| 参数 | 说明 |
+|---|---|
+| `Url` | 必传。后端通常使用绝对地址；前端支持相对当前 `ApiBase` 的地址和绝对地址。 |
+| `GetParam` | URL 查询参数；GET、POST、PATCH 均可使用。 |
+| `PostParam` / `PatchParam` | POST / PATCH 对象请求体。 |
+| `PostParamString` / `PatchParamString` | 已序列化的 JSON 或 XML 请求体，嵌套 JSON 优先使用。 |
+| `ParamType` | `form`（默认）、`json`、`xml`、`binary`。 |
+| `Timeout` / `TimeOut` | 超时秒数；默认 `600` 秒（10 分钟）。 |
+| `Headers` / `Header` | 请求头对象，两种参数名兼容。 |
+| `FilesByteBase64` / `FilesByteString` | 文件字段对象，键同时作为字段名和文件名。 |
+
+`GetResponse/PostResponse/PatchResponse` 返回 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。后端 `RawBytes` 是 `.NET byte[]`，前端是 `Uint8Array`。
 
 ## POST 请求（对象参数格式）
 
@@ -28,10 +49,33 @@ var result = V8.Http.Post({
   Url: 'https://api.example.com/users',          // 必传
   PostParam: { name: '张三', phone: '13800001234' }, // form 参数（不支持多级嵌套）
   ParamType: 'json',           // 请求类型：默认 form，可选 json / xml
-  Timeout: 10,                 // 超时秒数，默认 5 秒
+  Timeout: 600,                // 超时秒数，默认 600 秒（10 分钟）
   Headers: { Authorization: 'Bearer ' + token }  // 请求头
 });
 var data = JSON.parse(result);
+```
+
+## PATCH 请求
+
+PATCH 与 POST 的参数完全对称，只需把请求体参数改为 `PatchParam` / `PatchParamString`：
+
+```javascript
+// 后端接口引擎：同步返回字符串
+var result = V8.Http.Patch({
+  Url: 'https://api.example.com/users/123',
+  PatchParamString: JSON.stringify({ profile: { name: '新名字' } }),
+  ParamType: 'json',
+  Timeout: 10,
+  Headers: { Authorization: 'Bearer ' + token }
+});
+var data = JSON.parse(result);
+
+// 前端 V8：参数相同，但浏览器请求必须 await
+var result = await V8.Http.Patch({
+  Url: '/api/users/123',
+  PatchParam: { Status: 1 },
+  ParamType: 'json'
+});
 ```
 
 ### POST 嵌套 JSON 对象
@@ -99,6 +143,26 @@ if (resp.StatusCode !== 200) {
 
 var data = JSON.parse(resp.Content);
 ```
+
+PATCH 完整响应写法相同：
+
+```javascript
+var resp = V8.Http.PatchResponse({
+  Url: 'https://api.example.com/users/123',
+  PatchParam: { status: 'enabled' },
+  ParamType: 'json'
+});
+```
+
+前端调用时写为 `await V8.Http.PostResponse(...)` 或 `await V8.Http.PatchResponse(...)`。
+
+## 前端 V8 行为与兼容性
+
+- 前端新代码应优先使用 `await V8.Http.Get/Post/Patch`，参数与后端一致；不要再把 `V8.Post/Get` 作为新功能首选。旧 `V8.Post/Get` 仅作为兼容 API 保留，其回调和 Promise 写法保持不变。
+- 相对地址或当前 `ApiBase` 地址会沿用吾码登录头，并接收响应中的新 `authorization`；第三方绝对地址不会自动携带吾码 Token，避免凭据泄漏。
+- 浏览器请求第三方地址受 CORS 限制；这是浏览器安全策略，后端 `V8.Http` 不受浏览器 CORS 限制。
+- 前端字符串方法同后端一样返回原始响应文本，不会自动 `JSON.parse`；需要对象时显式解析。
+- 浏览器端不支持后端的 `FilesStream`，可使用 `FilesByteBase64`、`FilesByteString` 或 `FilesByte`。
 
 ## 下载远程文件（图片、PDF 等二进制）
 
@@ -269,7 +333,10 @@ try {
 ## 注意事项
 
 - `V8.Http.Post` 的 `PostParam` 不支持多级嵌套对象，嵌套需用 `PostParamString`
+- `V8.Http.Patch` 的 `PatchParam` 不支持多级嵌套对象，嵌套需用 `PatchParamString`
 - `Headers` 参数也可以写成 `Header`（两者等效）
+- 前端 `V8.Http` 必须使用 `await`；后端接口引擎无需 `await`
+- 旧版前端 `V8.Post/Get` 是兼容 API，不能删除；但新代码必须优先使用 `V8.Http`
 - 第三方 API 密钥建议存在 `V8.OsClientModel`（SaaS 引擎）中，不要硬编码
 - 调用外部接口应加 try-catch，第三方服务不可控
 - 对于需要缓存的 token（如微信 access_token），使用 `V8.Cache` 避免频繁请求
