@@ -43,6 +43,10 @@ namespace Microi.net
         /// <value></value>
         public byte[] RawBytes { get; set; }
         /// <summary>
+        /// HTTP 响应状态码。
+        /// </summary>
+        public int StatusCode { get; set; }
+        /// <summary>
         /// 
         /// </summary>
         /// <value></value>

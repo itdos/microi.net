@@ -236,6 +236,19 @@ Page 模式要特别注意：
 
 ## 8. 运行时高频坑复盘
 
+### 前端 V8.Http 与后端同构契约
+
+`Microi.Client` 的前端 V8 运行时在 `src/utils/diy.common.js` 挂载 `V8.Http`，实现位于 `src/utils/v8-http.js`。修改 HTTP 能力时必须保持：
+
+- 新接口使用与后端一致的 PascalCase 对象参数：`Get/GetResponse`、`Post/PostResponse`、`Patch/PatchResponse`。
+- GET 使用 `GetParam`，POST 使用 `PostParam/PostParamString`，PATCH 使用 `PatchParam/PatchParamString`。
+- 通用参数包括 `Url`、`ParamType`、`Timeout/TimeOut`、`Headers/Header`、`FilesByteBase64/FilesByteString/FilesByte`。
+- 浏览器端必须 `await V8.Http.*`；字符串方法返回原始文本，Response 方法返回 `Content/Headers/RawBytes/StatusCode/ErrorMessage`。
+- 表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，不得再把旧 `V8.Post/Get` 作为新功能首选。
+- 历史 `V8.Post/Get` 及其回调、Promise 写法必须继续保留，不能通过重命名或替换破坏旧 V8 代码。
+- 相对地址或当前 `ApiBase` 才能自动携带登录头；外部绝对地址禁止自动附加吾码 Token。第三方浏览器请求需满足 CORS。
+- 修改后至少运行 `npm run test:v8-http` 和 `npm run build`，并同步前后端代码编辑器提示与官方文档。
+
 ### FormEngine 前端封装以 `diy.common.js` 为准
 
 前端 `DiyCommon.FormEngine` 不是后端 `FormEngine` 方法的一比一暴露，动表单引擎数据前必须先查 `Microi.Client/src/utils/diy.common.js` 的真实封装。单条新增评论、日志、草稿、配置等业务数据时使用：

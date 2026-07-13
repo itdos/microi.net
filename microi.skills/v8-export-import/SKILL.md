@@ -1,18 +1,23 @@
 ---
 name: v8-export-import
-description: Microi V8 Excel 导入导出指南。用于使用 V8.Office.ExportExcel、ExcelToList、自定义表头、图片导出、文件响应和批量数据导入校验。
+description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出单/多 Sheet Excel、Word、PowerPoint，解析 Excel，自定义表头/图片、文件响应和批量导入校验。
 ---
 
-# Microi V8 Excel 导入导出
+# Microi V8 Office 导入导出
 
-你正在为 Microi 吾码平台编写自定义 Excel 导入/导出代码。平台通过 `V8.Office` 提供 Excel 处理能力，源码在 `Microi.Office` 插件中。
+你正在为 Microi 吾码平台编写自定义 Excel、Word、PowerPoint 导入/导出代码。平台通过 `V8.Office` 提供 Office 处理能力，源码在 `Microi.Office` 插件中。
+
+文档维护必须优先更新既有后端 V8 主文档 `microi.doc/docs/doc/v8-engine/v8-server.md`，再按需补充已有专题页；不得为同一组 `V8.Office` API 新建重复 Markdown 页面或文档路由。只维护 `microi.doc/docs/doc/` 中文文档，`docs/en/` 由官网统一翻译生成，不手工同步英文版。
 
 ## 核心 API
 
 | 方法 | 说明 |
 |------|------|
-| `V8.Office.ExportExcel({...})` | 自定义动态导出 Excel（支持图片、多图列） |
+| `V8.Office.ExportExcel({...})` | 自定义导出 `.xlsx`；支持单 Sheet、多 Sheet、图片和多图列 |
 | `V8.Office.ExcelToList({...})` | 解析上传的 Excel 文件为 JSON 数组 |
+| `V8.Office.ExportWordText({...})` | 兼容旧版纯文本 Word 导出 |
+| `V8.Office.ExportWord({...})` | 导出 `.docx`；支持段落、章节、表格、图片、页眉页脚和页码 |
+| `V8.Office.ExportPowerPoint({...})` | 导出 `.pptx`；支持多页、文本、项目符号、表格、图片、主题和页码 |
 | `V8.Office.SendEmail({...})` | 发送邮件（HTML 内容） |
 
 ## 自定义导出 Excel（接口引擎）
@@ -56,12 +61,183 @@ if (excelResult.Code !== 1) return excelResult;
 return {
   Code: 1,
   Data: {
-    FileName: '导出_' + DateNow('yyyyMMdd_HHmmss') + '.xls',
-    ContentType: 'application/vnd.ms-excel',
+    FileName: '导出_' + DateNow('yyyyMMdd_HHmmss') + '.xlsx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     FileByteBase64: System.Convert.ToBase64String(excelResult.Data)
   }
 };
 ```
+
+## 多 Sheet Excel 导出
+
+`ExcelSheets` 中每项是一张独立工作表，可分别传 `ExcelData`、`ExcelHeader`，也可传 `FormEngineKey`、查询条件等让后端自行查询。`Sheets` 是兼容别名；新代码统一使用 `ExcelSheets`。
+
+```javascript
+var excelResult = V8.Office.ExportExcel({
+  OsClient: V8.OsClient,
+  ExcelSheets: [
+    {
+      SheetName: '订单',
+      ExcelData: orderList,
+      ExcelHeader: [
+        { Name: 'OrderNo', Label: '订单号', Component: 'Text' },
+        { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal' }
+      ]
+    },
+    {
+      SheetName: '客户',
+      ExcelData: customerList,
+      ExcelHeader: [
+        { Name: 'Name', Label: '客户名称', Component: 'Text' },
+        { Name: 'Phone', Label: '联系电话', Component: 'Text' }
+      ]
+    }
+  ]
+});
+if (excelResult.Code !== 1) return excelResult;
+
+return {
+  Code: 1,
+  Data: {
+    FileName: '业务数据.xlsx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    FileByteBase64: System.Convert.ToBase64String(excelResult.Data)
+  }
+};
+```
+
+`SheetName` 会自动处理 Excel 非法字符、31 字符上限和重名。未传 `ExcelHeader` 时，可以在每个 Sheet 中传 `TableId`、`FormEngineKey`、`_Where`、`_OrderBy`、`_PageSize` 等查询参数，并继承外层的 `OsClient`、`TableId`、`_SysMenuId` 等默认值。
+
+## Word 导出
+
+新代码使用对象参数的 `ExportWord`；`ExportWordText` 继续保留，只用于兼容旧版纯文本场景。Word 的页面边距、图片宽高单位为厘米，字体大小单位为磅。
+
+```javascript
+var wordResult = V8.Office.ExportWord({
+  Title: '月度经营报告',
+  Subtitle: DateNow('yyyy年MM月'),
+  Author: V8.CurrentUser.Name,
+  Subject: '经营分析',
+  Keywords: '经营,月报',
+  PageSize: 'A4',                 // A4 | Letter
+  Orientation: 'Portrait',       // Portrait | Landscape
+  MarginTop: 2.2,
+  MarginRight: 2.0,
+  MarginBottom: 2.2,
+  MarginLeft: 2.0,
+  FontFamily: 'Microsoft YaHei',
+  FontSize: 10.5,
+  TitleFontSize: 20,
+  HeaderText: '吾码经营中心',
+  FooterText: '内部资料',
+  ShowPageNumber: true,
+  Paragraphs: [
+    { Text: '本月经营情况总体稳定。', FirstLineIndent: 0.74 },
+    { Text: '以下数据未经授权不得外传。', Bold: true, FontColor: 'C00000' }
+  ],
+  Sections: [{
+    Heading: '一、核心指标',
+    HeadingLevel: 1,
+    Content: '本节展示主要经营指标。',
+    Tables: [{
+      Title: '指标明细',
+      Headers: ['指标', '本月', '同比'],
+      Rows: [['销售额', 1280000, '12.5%'], ['订单数', 860, '8.1%']],
+      ColumnWidths: [4, 4, 4],
+      HeaderBackgroundColor: 'D9EAF7'
+    }]
+  }],
+  Images: [{
+    FileByteBase64: chartBase64,  // 支持纯 Base64 或 data URI
+    FileName: 'chart.png',
+    ContentType: 'image/png',
+    Width: 15,
+    Height: 8,
+    Alignment: 'Center',
+    Caption: '图 1：趋势分析'
+  }]
+});
+if (wordResult.Code !== 1) return wordResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '月度经营报告.docx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    FileByteBase64: System.Convert.ToBase64String(wordResult.Data)
+  }
+};
+```
+
+段落支持 `Text/Alignment/Bold/Italic/Underline/FontFamily/FontSize/FontColor/SpacingBefore/SpacingAfter/LineSpacing/FirstLineIndent/PageBreakBefore`。章节支持 `Heading/HeadingLevel/Content/Paragraphs/Tables/Images/PageBreakBefore`；表格支持 `Headers/Rows/ColumnWidths/Alignment/HeaderBold/HeaderBackgroundColor/HeaderFontColor/BorderColor/FontSize`。
+
+## PowerPoint 导出
+
+PowerPoint 的幻灯片尺寸、图片/表格位置与宽高单位均为英寸，默认画布为 16:9（13.333 × 7.5）。
+
+```javascript
+var pptResult = V8.Office.ExportPowerPoint({
+  Title: '季度经营汇报',
+  Author: V8.CurrentUser.Name,
+  Subject: '季度复盘',
+  Company: '吾码',
+  SlideWidth: 13.333,
+  SlideHeight: 7.5,
+  FontFamily: 'Microsoft YaHei',
+  BackgroundColor: 'FFFFFF',
+  TitleColor: '17365D',
+  TextColor: '222222',
+  TitleFontSize: 28,
+  BodyFontSize: 18,
+  ShowSlideNumber: true,
+  Slides: [
+    {
+      Layout: 'TitleSlide',
+      Title: '季度经营汇报',
+      Subtitle: DateNow('yyyy-MM-dd')
+    },
+    {
+      Layout: 'TitleAndContent',
+      Title: '核心结论',
+      Bullets: ['收入保持增长', '重点客户续约稳定'],
+      TextItems: [
+        { Text: '风险：回款周期延长', Bullet: true, Level: 0, Bold: true, FontColor: 'C00000' }
+      ],
+      Tables: [{
+        Headers: ['指标', '本期', '目标'],
+        Rows: [['销售额', '128万', '120万']],
+        X: 0.7, Y: 4.0, Width: 11.9, Height: 2.2,
+        HeaderBackgroundColor: '17365D'
+      }]
+    },
+    {
+      Title: '趋势图',
+      Images: [{
+        FileByteBase64: chartBase64,
+        FileName: 'trend.png',
+        ContentType: 'image/png',
+        X: 1.2, Y: 1.5, Width: 10.9, Height: 5.2
+      }]
+    }
+  ]
+});
+if (pptResult.Code !== 1) return pptResult;
+return {
+  Code: 1,
+  Data: {
+    FileName: '季度经营汇报.pptx',
+    ContentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    FileByteBase64: System.Convert.ToBase64String(pptResult.Data)
+  }
+};
+```
+
+`Layout` 支持 `TitleSlide`、`TitleAndContent`。单页支持独立覆盖 `BackgroundColor/TitleColor/TextColor/TitleFontSize/BodyFontSize`。`TextItems` 支持 `Text/Level/Bullet/Bold/Italic/FontSize/FontColor/Alignment`；表格支持位置、尺寸、列宽、表头/单元格颜色；图片支持 Base64/data URI、位置和尺寸。
+
+## 文件响应与前端调用约定
+
+- 接口引擎必须开启【响应文件】，并返回正确的 `FileName`、`ContentType`、`FileByteBase64`。
+- `V8.Office.ExportExcel/ExportWord/ExportPowerPoint` 返回的是 `DosResult<byte[]>`；先判断 `Code`，再对 `Data` 调用 `System.Convert.ToBase64String`。
+- 前端调用 Office 导出接口时，新代码优先使用 `V8.Http.GetResponse/PostResponse`；`V8.Post/V8.Get` 仅用于兼容历史代码，不再作为新代码首选。
 
 ### 表头配置项
 

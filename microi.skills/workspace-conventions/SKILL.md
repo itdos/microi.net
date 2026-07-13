@@ -82,6 +82,16 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 更新 VS Code 插件生成模板时，要同步检查当前已生成的 `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md`、`.cursorrules` 和 Cursor rules，避免模板下一次刷新又把英文写回来。
 - 收尾时用 `rg` 扫描明显英文规范短语（如 `Use when`、`Required:`、`Forbidden:`、`Acceptance:`、`Quick Workflow`、`MCP default visibility`）。剩余英文必须属于必要标识符或专有名词。
 
+## 官方文档原位增补与中文单源规则（强制）
+
+修改 Microi 官方文档前，必须先用 `rg` 查找已有页面、标题和示例，并在最匹配的现有页面原位补充。不得因为方便就新建相近主题的 Markdown 页面、导航项或页面路由，避免同一 API 的说明散落多处。只有现有目录确实没有承载该独立主题的页面，而且新页面具有长期独立维护价值时，才允许新增页面，并需同时说明新建原因和导航归属。
+
+- 前端 V8 API 的主文档固定维护在 `microi.doc/docs/doc/v8-engine/v8-client.md`。
+- 后端 V8 / 接口引擎 API 的主文档固定维护在 `microi.doc/docs/doc/v8-engine/v8-server.md`。
+- 导入导出等专题页可以保留深度案例，但新增或修改 `V8.Office`、`V8.Http` 等公共 API 时，必须先补齐上述前端/后端 V8 主文档，再按需同步专题页，不能另建重复 API 页面。
+- `microi.doc/docs/doc/` 是人工维护的中文文档单源；`microi.doc/docs/en/` 由官网统一翻译生成。日常功能开发只修改中文文档，不手工修改英文版，不为“中英文同步”重复写一遍。
+- 文档改动后执行 `npm run docs:build`；验收时检查本次没有无理由新增 `.md` 页面或导航路由。
+
 ## 配置文件说明中文优先规则
 
 AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员或用户阅读的自然语言描述，默认必须写中文。适用范围包括 `appsettings*.json`、`docker-compose*.yml`、`launchSettings.json`、`*.example`、安装脚本注释、部署说明和示例配置。

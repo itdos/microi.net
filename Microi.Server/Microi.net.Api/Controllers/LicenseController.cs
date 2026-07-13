@@ -235,6 +235,15 @@ namespace Microi.net.Api
                 {
                     var saveResult = await LicenseServerStore.SaveCurrentServerLicenseAsync(request?.LicenseContent, result);
                     result.DataAppend = saveResult;
+                    if (saveResult == null || saveResult.Code != 1)
+                    {
+                        return Json(new DosResult(0, result.Data,
+                            "License已写入当前服务器，但自动恢复节点保存失败：" +
+                            (saveResult?.Msg ?? "未返回保存结果"))
+                        {
+                            DataAppend = saveResult
+                        });
+                    }
                 }
                 return Json(result);
             }
