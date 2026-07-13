@@ -950,28 +950,154 @@ namespace Dos.Common
             var styleToken = NormalizeToken(element.FontStyle);
             var slant = styleToken.Contains("italic") ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
             var weight = styleToken.Contains("bold") ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-            using (var typeface = ResolveTypeface(element.FontFamily, weight, slant))
-            using (var paint = new SKPaint
+            var ownedTypefaces = new List<SKTypeface>();
+            try
             {
-                IsAntialias = true,
-                Typeface = typeface,
-                TextSize = (float)Math.Max(1D, element.FontSize),
-                Color = ApplyOpacity(ParseColor(element.Color), element.Opacity),
-                TextAlign = ParseTextAlign(element.Align)
-            })
-            {
-                var x = (float)element.X;
-                var y = (float)element.Y;
-                var metrics = paint.FontMetrics;
-                var vertical = NormalizeToken(element.VerticalAlign);
-                if (vertical == "middle" || vertical == "center")
-                    y -= (metrics.Ascent + metrics.Descent) / 2F;
-                else if (vertical == "bottom")
-                    y -= metrics.Descent;
-                else
-                    y -= metrics.Ascent;
-                canvas.DrawText(element.Text, x, y, paint);
+                var primaryTypeface = ResolveTypeface(element.FontFamily, weight, slant);
+                ownedTypefaces.Add(primaryTypeface);
+                var runs = ResolveTextRuns(element.Text, element.FontFamily, weight, slant,
+                    primaryTypeface, ownedTypefaces);
+
+                using (var paint = new SKPaint
+                {
+                    IsAntialias = true,
+                    TextSize = (float)Math.Max(1D, element.FontSize),
+                    Color = ApplyOpacity(ParseColor(element.Color), element.Opacity),
+                    TextAlign = SKTextAlign.Left
+                })
+                {
+                    var totalWidth = 0F;
+                    var lineAscent = 0F;
+                    var lineDescent = 0F;
+                    foreach (var run in runs)
+                    {
+                        paint.Typeface = run.Typeface;
+                        run.Width = paint.MeasureText(run.Text);
+                        totalWidth += run.Width;
+                        var metrics = paint.FontMetrics;
+                        lineAscent = Math.Min(lineAscent, metrics.Ascent);
+                        lineDescent = Math.Max(lineDescent, metrics.Descent);
+                    }
+
+                    var x = (float)element.X;
+                    var alignment = ParseTextAlign(element.Align);
+                    if (alignment == SKTextAlign.Center)
+                        x -= totalWidth / 2F;
+                    else if (alignment == SKTextAlign.Right)
+                        x -= totalWidth;
+
+                    var y = (float)element.Y;
+                    var vertical = NormalizeToken(element.VerticalAlign);
+                    if (vertical == "middle" || vertical == "center")
+                        y -= (lineAscent + lineDescent) / 2F;
+                    else if (vertical == "bottom")
+                        y -= lineDescent;
+                    else
+                        y -= lineAscent;
+
+                    foreach (var run in runs)
+                    {
+                        paint.Typeface = run.Typeface;
+                        canvas.DrawText(run.Text, x, y, paint);
+                        x += run.Width;
+                    }
+                }
             }
+            finally
+            {
+                foreach (var typeface in ownedTypefaces)
+                    typeface.Dispose();
+            }
+        }
+
+        private static List<TextDrawRun> ResolveTextRuns(string text, string fontFamily,
+            SKFontStyleWeight weight, SKFontStyleSlant slant, SKTypeface primaryTypeface,
+            List<SKTypeface> ownedTypefaces)
+        {
+            var runs = new List<TextDrawRun>();
+            TextDrawRun currentRun = null;
+            for (var index = 0; index < text.Length;)
+            {
+                var codepoint = char.ConvertToUtf32(text, index);
+                var charLength = char.IsSurrogatePair(text, index) ? 2 : 1;
+                var value = text.Substring(index, charLength);
+                var typeface = FindExistingTypeface(ownedTypefaces, codepoint);
+                if (typeface == null)
+                {
+                    typeface = MatchFallbackTypeface(fontFamily, weight, slant, codepoint);
+                    if (typeface != null && !typeface.ContainsGlyph(codepoint))
+                    {
+                        typeface.Dispose();
+                        typeface = null;
+                    }
+
+                    if (typeface != null)
+                        ownedTypefaces.Add(typeface);
+                }
+
+                if (typeface == null)
+                {
+                    var category = CharUnicodeInfo.GetUnicodeCategory(text, index);
+                    if (category == UnicodeCategory.Control || category == UnicodeCategory.Format ||
+                        category == UnicodeCategory.LineSeparator || category == UnicodeCategory.ParagraphSeparator)
+                    {
+                        typeface = currentRun?.Typeface ?? primaryTypeface;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            $"当前服务器已安装字体均不包含字符“{value}”（U+{codepoint:X4}），无法绘制。" +
+                            "请安装包含该字符的字体（中文建议 Noto Sans CJK 或微软雅黑）；已拒绝输出缺字方框。");
+                    }
+                }
+
+                if (currentRun == null || !ReferenceEquals(currentRun.Typeface, typeface))
+                {
+                    currentRun = new TextDrawRun(typeface);
+                    runs.Add(currentRun);
+                }
+                currentRun.Builder.Append(value);
+                index += charLength;
+            }
+
+            foreach (var run in runs)
+                run.Text = run.Builder.ToString();
+            return runs;
+        }
+
+        private static SKTypeface FindExistingTypeface(IEnumerable<SKTypeface> typefaces, int codepoint)
+        {
+            foreach (var typeface in typefaces)
+                if (typeface.ContainsGlyph(codepoint))
+                    return typeface;
+            return null;
+        }
+
+        private static SKTypeface MatchFallbackTypeface(string fontFamily, SKFontStyleWeight weight,
+            SKFontStyleSlant slant, int codepoint)
+        {
+            var manager = SKFontManager.Default;
+            var languageTags = new[] { "zh-Hans", "zh-CN", "zh", "en" };
+            var familyHint = string.IsNullOrWhiteSpace(fontFamily) ? null : fontFamily;
+            var typeface = manager.MatchCharacter(familyHint, weight, SKFontStyleWidth.Normal, slant,
+                languageTags, codepoint);
+            if (typeface == null && familyHint != null)
+                typeface = manager.MatchCharacter(null, weight, SKFontStyleWidth.Normal, slant,
+                    languageTags, codepoint);
+            return typeface;
+        }
+
+        private sealed class TextDrawRun
+        {
+            public TextDrawRun(SKTypeface typeface)
+            {
+                Typeface = typeface;
+            }
+
+            public SKTypeface Typeface { get; }
+            public StringBuilder Builder { get; } = new StringBuilder();
+            public string Text { get; set; }
+            public float Width { get; set; }
         }
 
         private static SKTypeface ResolveTypeface(string fontFamily, SKFontStyleWeight weight,

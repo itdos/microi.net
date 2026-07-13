@@ -20,6 +20,8 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/GetResp
 
 > V8 接口引擎中必须使用对象参数格式。尤其禁止 `V8.Http.Get(url)`：当前 .NET 同名重载包含 `Task<string> Get(string)`，Jint 可能把字符串调用解析为异步重载，脚本最终拿到 `[object Promise]`。GET 必须写成 `V8.Http.Get({ Url: url })`；第三方登录、微信 `jscode2session`、AccessToken 等链路保存后必须用无效 code 烟测，确认返回的是第三方明确错误而不是 Promise。
 
+第三方授权链路还必须把身份交换、AccessToken、用户资料/手机号交换拆成独立阶段。每阶段分别捕获 HTTP 异常和第三方业务 `errcode/errmsg`，失败时写带追踪号的脱敏系统日志并把明确原因返回前端；禁止只在最外层返回固定“登录失败”。
+
 ```javascript
 // POST JSON（推荐使用对象参数格式）
 var result = V8.Http.Post({

@@ -455,6 +455,8 @@ var result = V8.Image.Convert({
 
 文字默认 `FontSize: 24`、`FontStyle: 'normal'`、`Align: 'left'`、`VerticalAlign: 'top'`。`FontStyle` 可包含 `bold`、`italic` 或两者；水平对齐支持 `left`、`center` / `middle`、`right` / `end`，垂直对齐支持 `top`、`middle` / `center`、`bottom`。
 
+`FontFamily` 表示首选字体。即使没有传入，或传入的字体族在服务器上不存在，运行时也会逐个 Unicode 字符检查实际字形，并自动回退到服务器已安装且包含该字形的字体；同一段中英文混排文字可使用多个字体段。如果整台服务器没有任何字体包含某字符，调用会返回包含字符和 `U+XXXX` 码位的明确错误，不会生成“口口”缺字方框。
+
 单次最多绘制 500 个元素。
 
 ```javascript
@@ -615,4 +617,4 @@ if (info.Data.Width < 800 || info.Data.Height < 600) {
 
 这些是运行时保护上限，不是业务推荐值。匿名接口、批量任务和高并发场景应配置更严格的业务限制，并控制并发，避免大量图片同时解码占用内存。
 
-文字绘制依赖操作系统字体。Linux / 精简容器必须安装业务所需字体（中文建议 Noto Sans CJK 等），并在需要稳定字形时显式传 `FontFamily`；不要假设开发机字体在生产容器中存在。
+文字绘制依赖操作系统字体。运行时会对不存在的 `FontFamily` 和缺失字形自动回退，并在确实没有可用字形时明确失败，绝不输出“口口”缺字方框。Linux / 精简容器仍应安装业务所需字体（中文建议 Noto Sans CJK 等），并在需要稳定字形风格时显式传 `FontFamily`；不要假设开发机字体在生产容器中存在。

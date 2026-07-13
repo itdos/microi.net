@@ -507,7 +507,7 @@ Built-in limits are: at most 50 images per merge; no dimension above 16,384 pixe
 
 These are protective ceilings, not recommended business limits. Anonymous APIs should enforce stricter count, dimension, concurrency, and permission limits. Fetch remote images with `V8.Http` first and validate user-controlled URLs against protocol, host, and destination-address allowlists. Never pass a URL or server path directly to `V8.Image`.
 
-Text rendering depends on operating-system fonts. Install the required fonts in Linux or minimal containers (for example, Noto Sans CJK for Chinese) and pass `FontFamily` explicitly; missing glyphs may otherwise be absent.
+`FontFamily` is a preferred family. The runtime validates every Unicode character and automatically falls back to an installed font when no family is specified, the requested family does not exist, or it lacks part of the text. Mixed-script text may therefore use multiple font runs. If no installed font contains a character, the API returns a clear error containing that character and its `U+XXXX` code point instead of rendering missing-glyph boxes. Text appearance still depends on operating-system fonts, so install the required business fonts in Linux or minimal containers (for example, Noto Sans CJK for Chinese) and pass `FontFamily` when typography must remain stable.
 
 ## Current User V8.CurrentUser
 > * The information of the current login user, including the role and organization of the user, and the information of the fields added to the sys_user table by using the form engine.
