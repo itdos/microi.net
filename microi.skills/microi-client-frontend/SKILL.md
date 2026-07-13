@@ -277,6 +277,13 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
   - `V8CodeShow: return true;` 是否显示。
   - `V8CodeShow: V8.Result = false;` 是否仍兼容。
 
+### 复盘：模板渲染期间构造 V8 上下文导致递归更新
+
+- 触发场景：列表行按钮通过 `V8.OpenDialog` 首次打开打印引擎等异步组件时，页面报 `Maximum recursive updates exceeded in component <DiyTableRowlist>`，严重时浏览器卡死。
+- 根因：模板绑定直接调用 `GetDiyCustomDialogDataAppend()`；该方法内部执行 `SetV8DefaultValue()`，而后者会更新表格选择态、工作流和 V8 缓存等响应式数据，形成“渲染 -> 写状态 -> 再渲染”的闭环。
+- 通用规则：模板渲染函数必须保持无副作用。弹窗所需 V8 上下文应在 `OpenDialog` 点击事件中一次性生成并保存，模板只绑定稳定的数据对象；禁止在模板表达式、render 函数、computed getter 中调用会写响应式状态的方法。
+- 自动化检查：在真实列表点击一次和连续点击两次 `V8.OpenDialog` 行按钮，断言弹窗正常打开、页面仍可交互，控制台不出现 `Maximum recursive updates`、Vue errorHandler 或未处理 Promise 错误。
+
 ### Element Plus 弹窗默认交互
 
 新增或改造 `Microi.Client` 的 `el-dialog` 时，默认必须上下左右居中并支持 PC 端标题栏拖动。除非有明确的移动端抽屉/全屏业务理由，否则不要让弹窗贴在左上角、底部或跟随内容自然流偏移。

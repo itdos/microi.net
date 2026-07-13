@@ -199,6 +199,7 @@ beforeUnmount() {
 
         // ========== 8. 清理弹窗配置 ==========
         self.DiyCustomDialogConfig = {};
+        self.DiyCustomDialogDataAppend = {};
         self.OpenAnyTableParam = {};
         self.FormWF = {};
 
