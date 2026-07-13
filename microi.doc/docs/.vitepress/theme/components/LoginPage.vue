@@ -105,6 +105,7 @@
                   <div class="step-content">
                     <strong>{{ step.Title }}</strong>
                     <em>{{ stepElapsedText(step) }}</em>
+                    <b v-if="step.Key === 'import-template'" class="tenant-step-wait">预计耗费30-60秒，请耐心等待</b>
                     <small>{{ step.Detail }}</small>
                   </div>
                 </div>
@@ -1523,6 +1524,25 @@ onUnmounted(() => {
   color: rgba(210, 210, 226, 0.62);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.tenant-step-wait {
+  display: inline-flex;
+  width: fit-content;
+  margin: 3px 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(251, 146, 60, 0.72);
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tenant-step.running .tenant-step-wait {
+  animation: stepPulse 1.1s ease-in-out infinite;
 }
 
 @keyframes stepPulse {

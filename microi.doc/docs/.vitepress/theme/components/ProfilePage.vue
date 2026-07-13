@@ -161,6 +161,7 @@
                 <div>
                   <strong>{{ step.Title }}</strong>
                   <em class="step-elapsed">{{ stepElapsedText(step) }}</em>
+                  <b v-if="step.Key === 'import-template'" class="step-wait-notice">{{ t('templateImportEstimate') }}</b>
                   <small>{{ step.Detail }}</small>
                 </div>
               </div>
@@ -1870,6 +1871,30 @@ onUnmounted(() => {
 .step-item em,
 .step-item small {
   display: block;
+}
+
+.step-wait-notice {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border: 1px solid #fb923c;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #c2410c;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.18);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.step-item.running .step-wait-notice {
+  animation: waitNoticePulse 1.35s ease-in-out infinite;
+}
+
+@keyframes waitNoticePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(234, 88, 12, 0.18); }
+  50% { transform: scale(1.025); box-shadow: 0 6px 20px rgba(234, 88, 12, 0.34); }
 }
 
 .step-item em {

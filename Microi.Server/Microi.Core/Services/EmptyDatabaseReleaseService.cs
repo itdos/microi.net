@@ -467,7 +467,8 @@ namespace Microi.net
                 var columns = GetInsertableColumns(connection, TargetDatabase, table);
                 if (columns.Count > 0)
                 {
-                    rowCount += ExportTableRows(connection, writer, table, columns);
+                    var columnDataTypes = GetColumnDataTypes(connection, TargetDatabase, table, columns);
+                    rowCount += ExportTableRows(connection, writer, table, columns, columnDataTypes);
                 }
                 if (index == tables.Count || index % 20 == 0)
                 {
@@ -481,7 +482,8 @@ namespace Microi.net
             return new ExportResult { TableCount = tables.Count, RowCount = rowCount };
         }
 
-        private static long ExportTableRows(MySqlConnection connection, TextWriter writer, string table, IReadOnlyList<string> columns)
+        private static long ExportTableRows(MySqlConnection connection, TextWriter writer, string table,
+            IReadOnlyList<string> columns, IReadOnlyList<string> columnDataTypes)
         {
             var fields = string.Join(",", columns.Select(QuoteIdentifier));
             var prefix = $"INSERT INTO {QuoteIdentifier(table)} ({fields}) VALUES\n";
@@ -499,7 +501,7 @@ namespace Microi.net
                 var values = new string[reader.FieldCount];
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
-                    values[i] = FormatSqlValue(reader.GetValue(i));
+                    values[i] = FormatSqlValue(reader.GetValue(i), columnDataTypes[i]);
                 }
                 var row = "(" + string.Join(",", values) + ")";
                 if (hasRows && batch.Length + row.Length + 3 > maxStatementChars)
@@ -527,12 +529,30 @@ namespace Microi.net
             return rows;
         }
 
-        private static string FormatSqlValue(object value)
+        private static string FormatSqlValue(object value, string dataTypeName = null)
         {
             if (value == null || value == DBNull.Value) return "NULL";
             if (value is byte[] bytes) return "0x" + BitConverter.ToString(bytes).Replace("-", "");
             if (value is bool boolean) return boolean ? "1" : "0";
             if (value is DateTime dateTime) return "'" + dateTime.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.') + "'";
+            // MySql.Data 在部分连接配置下会把 DATETIME/TIMESTAMP/DATE 读取为字符串，
+            // 若直接导出会生成 05/12/2026 这类区域格式，严格模式下无法重新导入。
+            var dateText = IsDateDataType(dataTypeName)
+                ? Convert.ToString(value, CultureInfo.GetCultureInfo("en-US"))
+                : null;
+            if (dateText != null
+                && DateTime.TryParse(dateText, CultureInfo.GetCultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out var parsedDate))
+            {
+                var format = string.Equals(dataTypeName, "DATE", StringComparison.OrdinalIgnoreCase)
+                    ? "yyyy-MM-dd"
+                    : "yyyy-MM-dd HH:mm:ss.ffffff";
+                var formattedDate = parsedDate.ToString(format, CultureInfo.InvariantCulture);
+                if (!string.Equals(dataTypeName, "DATE", StringComparison.OrdinalIgnoreCase))
+                {
+                    formattedDate = formattedDate.TrimEnd('0').TrimEnd('.');
+                }
+                return "'" + formattedDate + "'";
+            }
             if (value is TimeSpan timeSpan) return "'" + timeSpan.ToString("c", CultureInfo.InvariantCulture) + "'";
             if (value is sbyte || value is byte || value is short || value is ushort
                 || value is int || value is uint || value is long || value is ulong
@@ -541,6 +561,13 @@ namespace Microi.net
                 return Convert.ToString(value, CultureInfo.InvariantCulture);
             }
             return "'" + MySqlHelper.EscapeString(Convert.ToString(value, CultureInfo.InvariantCulture) ?? "") + "'";
+        }
+
+        private static bool IsDateDataType(string dataTypeName)
+        {
+            return string.Equals(dataTypeName, "DATE", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dataTypeName, "DATETIME", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dataTypeName, "TIMESTAMP", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void CreateZip(string sqlPath, string zipPath)
@@ -621,6 +648,25 @@ ORDER BY ORDINAL_POSITION;";
                 result.Add(reader.GetString(0));
             }
             return result;
+        }
+
+        private static List<string> GetColumnDataTypes(MySqlConnection connection, string database, string table,
+            IReadOnlyList<string> columns)
+        {
+            var dataTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using var command = connection.CreateCommand();
+            command.CommandText = @"SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
+            command.Parameters.AddWithValue("@database", database);
+            command.Parameters.AddWithValue("@table", table);
+            command.CommandTimeout = 0;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                dataTypes[reader.GetString(0)] = reader.GetString(1);
+            }
+            return columns.Select(column => dataTypes.TryGetValue(column, out var dataType) ? dataType : "")
+                .ToList();
         }
 
         private static string GetCreateTableSql(MySqlConnection connection, string database, string table)

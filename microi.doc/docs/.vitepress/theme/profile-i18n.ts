@@ -29,7 +29,7 @@ const messages = {
     licensePersonal: '个人版', licensePersonalTitle: 'Personal（个人版）', licensePersonalDesc: '授权永久有效，售后服务支持有效期 1 年，续费 499/年。',
     licenseEnterprise: '企业版', licenseEnterpriseTitle: 'Enterprise（企业版）', licenseEnterpriseDesc: '授权永久有效，售后服务支持有效期 1 年，续费 2.5w/年。',
     licenseOpen: '开源版', licenseOpenDesc: '当前账号使用开源版能力，可按需升级到个人版或企业版。',
-    waiting: '等待中', skipped: '未执行', elapsed: '耗时 {seconds} 秒', allDone: '所有步骤已完成。', preparingSteps: '准备创建租户，共 {count} 步。', runningStep: '正在执行第 {index}/{count} 步：{title}，已耗时 {seconds} 秒', failedStep: '{title}失败：{detail}',
+    waiting: '等待中', skipped: '未执行', elapsed: '耗时 {seconds} 秒', templateImportEstimate: '预计耗费30-60秒，请耐心等待', allDone: '所有步骤已完成。', preparingSteps: '准备创建租户，共 {count} 步。', runningStep: '正在执行第 {index}/{count} 步：{title}，已耗时 {seconds} 秒', failedStep: '{title}失败：{detail}',
     tenantReadFailed: '租户信息读取失败。', networkFailed: '网络异常，租户信息读取失败。', invalidTenantKey: '租户 Key 格式不正确。', enterSystemName: '请输入系统名称。', tenantCreateFailed: '租户创建失败。', taskSubmitted: '租户创建任务已提交，正在后台处理。', tenantCreatedAt: '租户创建成功，访问地址：{url}', connectionInterrupted: '请求连接已中断，后台可能仍在创建租户；页面会继续读取实时进度。', restoredProgress: '检测到租户创建任务正在后台执行，已恢复实时进度。'
   },
   'en-US': {
@@ -54,7 +54,7 @@ const messages = {
     unnamedTenant: 'Unnamed tenant', enabled: 'Enabled', disabled: 'Disabled', accessEntry: 'Access URL', defaultAdmin: 'Default admin', changePassword: 'Change the password after first sign-in', copyLink: 'Copy link',
     noTenants: 'No tenants yet', noTenantsDesc: 'Create your first SaaS database for free and use it immediately.',
     licensePersonal: 'Personal', licensePersonalTitle: 'Personal', licensePersonalDesc: 'Perpetual license with one year of support; renewal is ¥499/year.', licenseEnterprise: 'Enterprise', licenseEnterpriseTitle: 'Enterprise', licenseEnterpriseDesc: 'Perpetual license with one year of support; renewal is ¥25,000/year.', licenseOpen: 'Open Source', licenseOpenDesc: 'This account uses the open-source edition and can upgrade to Personal or Enterprise.',
-    waiting: 'Waiting', skipped: 'Skipped', elapsed: '{seconds}s', allDone: 'All steps completed.', preparingSteps: 'Preparing {count} provisioning steps.', runningStep: 'Running step {index}/{count}: {title} ({seconds}s)', failedStep: '{title} failed: {detail}',
+    waiting: 'Waiting', skipped: 'Skipped', elapsed: '{seconds}s', templateImportEstimate: 'Usually takes 30–60 seconds. Please wait.', allDone: 'All steps completed.', preparingSteps: 'Preparing {count} provisioning steps.', runningStep: 'Running step {index}/{count}: {title} ({seconds}s)', failedStep: '{title} failed: {detail}',
     tenantReadFailed: 'Failed to load tenant information.', networkFailed: 'Network error while loading tenant information.', invalidTenantKey: 'Invalid tenant key.', enterSystemName: 'Enter a system name.', tenantCreateFailed: 'Tenant creation failed.', taskSubmitted: 'Tenant creation task submitted and running in the background.', tenantCreatedAt: 'Tenant created: {url}', connectionInterrupted: 'The request disconnected. Provisioning may still be running; this page will keep polling.', restoredProgress: 'An active tenant provisioning task was found and live progress has been restored.'
   }
 } as const
