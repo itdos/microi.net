@@ -1917,7 +1917,9 @@ async function copyText(text) {
 
 .ai-engine-page.is-embedded {
     width: 100%;
+    max-width: 100%;
     height: 100%;
+    min-width: 0;
     min-height: 0;
     margin: 0;
     border-radius: var(--mci-shape-panel, 12px);
@@ -2031,6 +2033,42 @@ async function copyText(text) {
 
 .ai-engine-page.is-compact .composer {
     padding: 8px 12px 10px;
+}
+
+.ai-engine-page.is-embedded.is-compact .composer-footer {
+    flex-wrap: wrap;
+}
+
+.ai-engine-page.is-embedded.is-compact .composer-left,
+.ai-engine-page.is-embedded.is-compact .composer-right {
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.ai-engine-page.is-embedded.is-compact .composer-left {
+    flex: 1 1 400px;
+}
+
+.ai-engine-page.is-embedded.is-compact .composer-right {
+    flex: 1 1 396px;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+.ai-engine-page.is-embedded.is-compact .semantic-select,
+.ai-engine-page.is-embedded.is-compact .reasoning-select,
+.ai-engine-page.is-embedded.is-compact .composer-model-select {
+    max-width: 100%;
+}
+
+.ai-engine-page.is-embedded.is-compact .composer-model-select {
+    width: min(260px, 100%);
+    flex: 1 1 180px;
+}
+
+.ai-engine-page.is-embedded.is-compact .relay-model-select {
+    width: min(190px, 100%);
+    flex: 1 1 160px;
 }
 
 .ai-engine-page.is-app-workspace {
@@ -2255,6 +2293,7 @@ async function copyText(text) {
     height: 100%;
     overflow: hidden;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 64px minmax(0, 1fr) auto;
     background: #fff;
 }
@@ -2264,6 +2303,9 @@ async function copyText(text) {
 }
 
 .ai-engine-header {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2329,7 +2371,10 @@ async function copyText(text) {
 }
 
 .message-wrap {
+    min-width: 0;
     min-height: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     overflow: auto;
     padding: 18px 24px;
 }
@@ -2798,6 +2843,9 @@ async function copyText(text) {
 }
 
 .composer {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     border-top: 1px solid #edf0f5;
     padding: 14px 24px 18px;
     background: #fff;
@@ -3402,6 +3450,65 @@ body.dark .ai-engine-page,
     .platform-stat,
     .quick-prompt {
         transition: none;
+    }
+}
+
+@container ai-engine-widget (max-width: 900px) {
+    .ai-engine-page.is-embedded.is-compact .ai-engine-header {
+        height: auto;
+        min-height: 50px;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-left,
+    .ai-engine-page.is-embedded.is-compact .header-tools {
+        flex-wrap: wrap;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-tools {
+        margin-left: auto;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .platform-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-embedded.is-compact .quick-prompts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-embedded.is-compact .quick-prompt:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .composer-left,
+    .ai-engine-page.is-embedded.is-compact .composer-right {
+        flex-basis: 100%;
+    }
+}
+
+@container ai-engine-widget (max-width: 560px) {
+    .ai-engine-page.is-embedded.is-compact .ai-engine-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-tools {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .header-tools .el-button {
+        flex: 1 1 auto;
+        margin-left: 0;
+    }
+
+    .ai-engine-page.is-embedded.is-compact .composer-model-select,
+    .ai-engine-page.is-embedded.is-compact .relay-model-select {
+        flex-basis: min(180px, 100%);
     }
 }
 

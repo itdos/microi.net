@@ -811,12 +811,19 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
 }
 
 .box-card.is-ai-engine-panel {
+  width: 100%;
+  max-width: 100%;
   height: 100%;
+  min-width: 0;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .box-card.is-ai-engine-panel :deep(> .el-card__body) {
+  width: 100%;
+  max-width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -828,14 +835,19 @@ const startResizeMargin = useResizable(curWrapper, 'marginTop').startResize
 .box-card.is-ai-engine-panel .runtime-scroll-area > .el-row,
 .box-card.is-ai-engine-panel .runtime-scroll-area > .el-row > .el-col {
   height: 100%;
+  min-width: 0;
   min-height: 0;
 }
 
 .box-card.is-ai-engine-panel :deep(.common-widget-body),
 .box-card.is-ai-engine-panel :deep(.aiengine-widget),
 .box-card.is-ai-engine-panel :deep(.ai-engine-page.is-embedded) {
+  width: 100% !important;
+  max-width: 100%;
   height: 100% !important;
+  min-width: 0;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 @media screen and (max-width: 768px) {
