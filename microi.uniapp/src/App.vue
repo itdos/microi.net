@@ -1,5 +1,5 @@
 <script>
-import { getToken, request } from './utils/request.js'
+import { getToken, V8 } from './utils/request.js'
 import { initializeThemeSystem } from './utils/theme.js'
 
 export default {
@@ -26,16 +26,15 @@ export default {
     console.log('App Hide')
   },
   methods: {
-    refreshToken() {
+    async refreshToken() {
       const token = getToken()
       if (!token) return
-      request({
-        url: '/api/SysUser/refreshToken',
-        method: 'POST',
-        data: { authorization: token }
-      }).catch(() => {
-        // 静默失败，用户会在下次业务请求时触发401跳转登录页
-      })
+      try {
+        await V8.resumeAuthSession(false)
+      } catch (error) {
+        // 网络异常不清理本地身份；后端明确返回身份失效时由 SDK 统一提示并跳转。
+        console.warn('[Auth] 前台恢复时Token续签失败:', error && (error.message || error.errMsg || error))
+      }
     }
   }
 }

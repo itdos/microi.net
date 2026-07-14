@@ -5,6 +5,7 @@ const TOKEN_KEY = 'microi_token';
 const USER_KEY = 'microi_user';
 
 let redirectingToLogin = false;
+let authExpiredPrompting = false;
 
 function getRuntimeUni() {
   try {
@@ -83,14 +84,30 @@ export const V8 = createMicroiV8({
   fileServer: appConfig.fileServer,
   webBase: appConfig.webviewUrl,
   osClient: appConfig.osClient,
+  clientType: 'Mobile',
   tokenKey: TOKEN_KEY,
   userKey: USER_KEY,
   maxConcurrent: 8,
   appendOsClientQuery: true,
   requestAdapter: uniRequestAdapter,
-  onAuthExpired: () => {
+  onAuthExpired: (body) => {
     removeToken();
-    redirectToLogin();
+    const runtimeUni = getRuntimeUni();
+    const message = body && body.Msg ? String(body.Msg) : '当前登录身份已过期，请重新登录。';
+    if (!runtimeUni || typeof runtimeUni.showModal !== 'function' || authExpiredPrompting) {
+      redirectToLogin();
+      return;
+    }
+    authExpiredPrompting = true;
+    runtimeUni.showModal({
+      title: '登录身份已失效',
+      content: message,
+      showCancel: false,
+      complete: () => {
+        authExpiredPrompting = false;
+        redirectToLogin();
+      }
+    });
   }
 });
 

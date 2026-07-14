@@ -73,6 +73,13 @@ function buildRuntimeServerName(context: McpServerContext): string {
 
 const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_get_status',
+  'microi_redis_statistics',
+  'microi_redis_list_keys',
+  'microi_redis_get_key',
+  'microi_redis_delete_keys',
+  'microi_redis_replace_value',
+  'microi_redis_rename_key',
+  'microi_redis_set_ttl',
   'microi_get_db_schema',
   'microi_get_field_list',
   'microi_add_field',
@@ -406,6 +413,11 @@ BOUNDARY RULES:
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
+## Redis 管理
+- **microi_redis_statistics / microi_redis_list_keys / microi_redis_get_key** — 统计、SCAN 分页与查看 String/Hash/List/Set/Sorted Set/Stream；默认操作当前租户 Redis
+- **microi_redis_delete_keys / microi_redis_replace_value / microi_redis_rename_key / microi_redis_set_ttl** — 删除、写入、重命名和 TTL，均要求 confirmExecution
+- 不要把 Redis 密码放进 MCP 参数、日志或回答；额外连接应先由平台 Redis 管理页保存，再通过 connectionId 使用
+
 ## sys_menu 自动增强默认值（创建后端菜单必须关注）
 - 绑定 diyTableId 创建菜单时，不要只写 Name/DiyTableId。应配置或允许 MCP/后端自动推断：TableDiyFieldIds、SelectFields、SearchFieldIds、SortFieldIds、NotShowFields、StatisticsFields、MobileListFields、CardTitleTagFields、CardBottomTagFields、DefaultOrderBy。
 - NotShowFields 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；SearchFieldIds 默认选择标题、名称、编号、状态、类型、分类、负责人、时间等常用筛选；StatisticsFields 默认选择金额、价格、数量、积分、余额等数值字段；MobileListFields 默认选择 3-4 个卡片可读字段。
@@ -628,6 +640,163 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         return { content: [{ type: 'text', text: `⚠️ Server returned Code=${result.Code}: ${result.Msg}` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_statistics',
+    `Get Redis server/keyspace statistics for OsClient "${osClient}". Uses the current tenant Redis by default; pass connectionId only for a connection previously saved in mci_redis_connection. Never pass Redis passwords through MCP.`,
+    {
+      database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+      connectionId: z.string().optional().describe('Optional saved mci_redis_connection Id. Omit for current tenant Redis.'),
+    },
+    async ({ database, connectionId }) => {
+      try {
+        const result = await client.getRedisStatistics(database || 0, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_list_keys',
+    `SCAN Redis keys for OsClient "${osClient}" without using blocking KEYS. Returns type, TTL, memory estimate and an opaque next cursor.`,
+    {
+      pattern: z.string().optional().describe('Redis glob pattern. Plain text is treated as a contains search. Default: *.'),
+      database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+      pageSize: z.number().int().min(10).max(500).optional().describe('Page size. Default: 100.'),
+      cursor: z.string().optional().describe('Opaque NextCursor from the previous call.'),
+      connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
+    },
+    async ({ pattern, database, pageSize, cursor, connectionId }) => {
+      try {
+        const result = await client.getRedisKeys(pattern || '*', database || 0, pageSize || 100, cursor, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_get_key',
+    `Read one Redis key for OsClient "${osClient}". Supports String, Hash, List, Set, Sorted Set and Stream with bounded pagination.`,
+    {
+      key: z.string().describe('Exact Redis key.'),
+      database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+      pageIndex: z.number().int().min(1).optional().describe('Collection page index. Default: 1.'),
+      pageSize: z.number().int().min(10).max(1000).optional().describe('Collection page size. Default: 500.'),
+      connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
+    },
+    async ({ key, database, pageIndex, pageSize, connectionId }) => {
+      try {
+        const result = await client.getRedisKey(key, database || 0, pageIndex || 1, pageSize || 500, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_delete_keys',
+    `Delete up to 500 Redis keys for OsClient "${osClient}". This is irreversible and requires confirmExecution="DELETE".`,
+    {
+      keys: z.array(z.string()).min(1).max(500).describe('Exact Redis keys to delete.'),
+      database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+      connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
+      confirmExecution: z.string().optional().describe('Required. Pass DELETE after reviewing the key list.'),
+    },
+    async ({ keys, database, connectionId, confirmExecution }) => {
+      if (confirmExecution !== 'DELETE') {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'delete', database: database || 0, connectionId: connectionId || null, keys }, null, 2) }] };
+      }
+      try {
+        const result = await client.deleteRedisKeys(keys, database || 0, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_replace_value',
+    `Create or replace a Redis String/Hash/List/Set/Sorted Set for OsClient "${osClient}". Existing content is replaced; confirmExecution must equal the exact key or EXECUTE.`,
+    {
+      key: z.string().describe('Exact Redis key.'),
+      dataType: z.enum(['string', 'hash', 'list', 'set', 'sortedset']).describe('Target Redis data type.'),
+      value: z.string().describe('String value, or JSON object/array for collection types.'),
+      ttlSeconds: z.number().int().min(-1).optional().describe('-1 permanent, 0 delete immediately, positive seconds. Omit to preserve existing TTL.'),
+      database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
+      connectionId: z.string().optional().describe('Optional saved connection Id. Omit for current tenant Redis.'),
+      confirmExecution: z.string().optional().describe('Required. Pass the exact key or EXECUTE.'),
+    },
+    async ({ key, dataType, value, ttlSeconds, database, connectionId, confirmExecution }) => {
+      if (confirmExecution !== key && confirmExecution !== 'EXECUTE') {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, key, dataType, ttlSeconds, database: database || 0, connectionId: connectionId || null, valueLength: value.length }, null, 2) }] };
+      }
+      try {
+        const result = await client.replaceRedisValue(key, dataType, value, database || 0, ttlSeconds, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_rename_key',
+    `Rename a Redis key for OsClient "${osClient}" without overwriting an existing target. Requires confirmExecution equal to the new key or EXECUTE.`,
+    {
+      key: z.string().describe('Existing Redis key.'),
+      newKey: z.string().describe('New Redis key.'),
+      database: z.number().int().min(0).max(1023).optional(),
+      connectionId: z.string().optional(),
+      confirmExecution: z.string().optional().describe('Required. Pass newKey or EXECUTE.'),
+    },
+    async ({ key, newKey, database, connectionId, confirmExecution }) => {
+      if (confirmExecution !== newKey && confirmExecution !== 'EXECUTE') {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'rename', key, newKey, database: database || 0 }, null, 2) }] };
+      }
+      try {
+        const result = await client.renameRedisKey(key, newKey, database || 0, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_redis_set_ttl',
+    `Set Redis TTL for OsClient "${osClient}". -1 persists, 0 deletes, positive values are seconds. Requires confirmExecution equal to the key or EXECUTE.`,
+    {
+      key: z.string().describe('Exact Redis key.'),
+      ttlSeconds: z.number().int().min(-1).describe('-1 permanent, 0 delete, positive seconds.'),
+      database: z.number().int().min(0).max(1023).optional(),
+      connectionId: z.string().optional(),
+      confirmExecution: z.string().optional().describe('Required. Pass key or EXECUTE.'),
+    },
+    async ({ key, ttlSeconds, database, connectionId, confirmExecution }) => {
+      if (confirmExecution !== key && confirmExecution !== 'EXECUTE') {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, action: 'ttl', key, ttlSeconds, database: database || 0 }, null, 2) }] };
+      }
+      try {
+        const result = await client.setRedisTtl(key, ttlSeconds, database || 0, connectionId);
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || { ok: true }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
     },
   );

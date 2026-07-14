@@ -1005,6 +1005,77 @@ export class MicroiClient {
     });
   }
 
+  async getRedisStatistics(database = 0, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_STATISTICS, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+    });
+  }
+
+  async getRedisKeys(pattern = '*', database = 0, pageSize = 100, cursor?: string, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_KEYS, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Pattern: pattern,
+      PageSize: pageSize,
+      Cursor: cursor || '',
+    });
+  }
+
+  async getRedisKey(key: string, database = 0, pageIndex = 1, pageSize = 500, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_KEY, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Key: key,
+      PageIndex: pageIndex,
+      PageSize: pageSize,
+    });
+  }
+
+  async deleteRedisKeys(keys: string[], database = 0, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_DELETE_KEYS, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Keys: keys,
+    });
+  }
+
+  async replaceRedisValue(key: string, dataType: string, value: string, database = 0, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_REPLACE_VALUE, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Key: key,
+      DataType: dataType,
+      Value: value,
+      ...(ttlSeconds === undefined ? {} : { TtlSeconds: ttlSeconds }),
+    });
+  }
+
+  async renameRedisKey(key: string, newKey: string, database = 0, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_RENAME_KEY, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Key: key,
+      NewKey: newKey,
+    });
+  }
+
+  async setRedisTtl(key: string, ttlSeconds: number, database = 0, connectionId?: string): Promise<ApiResponse> {
+    return this.post(API.REDIS_SET_TTL, {
+      Mode: connectionId ? 'saved' : 'tenant',
+      ConnectionId: connectionId || '',
+      Database: database,
+      Key: key,
+      TtlSeconds: ttlSeconds,
+    });
+  }
+
   // ---------- 界面引擎 API 方法 ----------
 
   async getPageEngineList(keyword?: string): Promise<ApiResponse> {
