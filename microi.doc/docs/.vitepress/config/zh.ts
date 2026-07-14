@@ -116,6 +116,10 @@ function nav(): DefaultTheme.NavItem[] {
 					text: "Nuget iTdos 官方账号",
 					link: "https://www.nuget.org/profiles/ITdos",
 				},
+				{
+					text: "更新日志",
+					link: "/doc/about/update-log",
+				}
 			],
 		},
 		{ text: "联系我们", link: "/contact/index" },

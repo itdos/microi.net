@@ -23,12 +23,22 @@
 - **官方私钥发现**：Microi.net 的 `LicenseService` 增加源码工作区私钥路径发现，统一判断本地官方服务能力，客户 NuGet 和发布包因不包含私钥不会被误识别为官方应用源。
 - **其它修复**：修复任务调度升级脚本中 `V8.Http.Post` 的 `PostParam` 语法错误；完善后台任务通知、应用商城、模块引擎、前端微服务和 V8 客户端文档；重写完整历史更新日志并补充对应 Microi Skills 规范。
 
+- 2026-07-14：版本发布：v6.3.5 更新日期为 2026-07-14（commit c75fc9a1）
+- 2026-07-14：Microi.VSCode：新增：更新版本号至 3.6.5，新增拉取服务器前端微服务功能及相关命令（commit 80e72cd）
+- 2026-07-14：Microi.AI：新增：更新版本号至6.3.5，优化AI配置解析逻辑，增加配置获取方法（commit 24f4670）
+- 2026-07-14：Microi.net：新增：更新版本号至6.3.5，优化私钥搜索路径逻辑（commit 617ca86）
+
 ## v6.3.4
 
 更新日期：2026-07-13
 
 - 2026-07-13：新增：Word 文档导出支持动态内容（commit d4aec76a）
 - 2026-07-13：新增：更新版本至3.5.9，并修改更新时间（commit 170fcade）
+
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.6，新增 V8Http 请求参数接口及导出功能（commit 62bead7）
+- 2026-07-13：Microi.AI：新增：更新版本号至6.3.4，完善V8.Http API文档，添加PATCH请求示例（commit 663a7bd）
+- 2026-07-13：Microi.net：新增：更新版本号至6.3.4，修复License节点信息更新和查询逻辑（commit 84ef09b）
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.9，优化本地路径比较函数及相关逻辑（commit f8b4a09）
 
 ## v6.3.3
 
@@ -44,6 +54,10 @@
 - 2026-07-13：新增：更新版本至3.5.3，并完善SKILL.md中的ApiKey配置说明（commit b5669ff7）
 - 2026-07-13：新增：更新多个组件版本至6.3.2（commit 39c40be5）
 
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.3（commit 73578d2）
+- 2026-07-13：Microi.net：新增：更新版本号至6.3.2，修复版本信息以保持一致性（commit c6ba27f）
+- 2026-07-13：Microi.AI：新增：更新版本号至6.3.2（commit 7adcedd）
+
 ## v6.3.1
 
 更新日期：2026-07-13
@@ -52,11 +66,18 @@
 - 2026-07-13：新增：更新多个组件的样式以支持响应式布局，并修复弹窗数据传递逻辑（commit 8e6757dc）
 - 2026-07-13：新增：更新多个组件版本至6.3.1，并优化数据库导出导入逻辑，增加导入过程中的提示信息（commit ce045710）
 
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.4.6（commit d1c5142）
+- 2026-07-13：Microi.net：新增：更新版本号至6.3.1，增强MySQL数据库导入功能，优化CDN下载逻辑（commit 26dd8f3）
+- 2026-07-13：Microi.AI：新增：更新版本号至6.3.1（commit 86b9c2c）
+
 ## v6.3.0
 
 更新日期：2026-07-13
 
 - 2026-07-13：新增：更新版本至 6.3.0 用于 Microi.V8Engine，Microi.WeChat 软件包（commit 192db234）
+
+- 2026-07-13：Microi.AI：新增：更新版本号至6.3.0，添加PromptPreview字段，优化Token使用记录逻辑（commit 3201859）
+- 2026-07-13：Microi.net：新增：更新版本号至6.3.0，新增后台任务接口和功能授权提供器，增强系统扩展性（commit 8c4acf1）
 
 ## v6.2.9
 
@@ -64,11 +85,16 @@
 
 - 2026-07-13：更新版本至 6.2.9 （多个 Microi 组件），新增 new EmptyDatabaseReleaseService 用于 脱敏数据库创建（commit 2638c9d4）
 
+- 2026-07-13：Microi.AI：新增：更新版本号至6.2.9，重构AI授权验证逻辑，优化License管理（commit 039551c）
+
 ## v6.2.8
 
 更新日期：2026-07-13
 
 - 2026-07-13：新增：更新版本至 6.2.8 （Microi 组件），更新 后台任务 API engine（commit 926b221f）
+
+- 2026-07-13：Microi.AI：新增：更新版本号至6.2.8，添加在线AI授权验证功能（commit ebeb0f6）
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.4.5（commit 6ecf34e）
 
 ## v6.2.6
 
@@ -77,12 +103,25 @@
 - 2026-07-12：新增：单行文本字段支持插槽按钮，并增强用户资料组件（commit 505080cf）
 - 2026-07-13：工程维护：更新版本至 6.2.6 （Microi 组件），更新 相关 文档（commit 1c7767b3）
 
+- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.4.1，新增路由项的 sourceFile 属性以支持文件来源信息（commit 09247fa）
+- 2026-07-13：Microi.net：新增：更新版本号至6.2.6，新增License文件刷新功能以支持动态授权验证（commit f75703a）
+
+## v6.2.5
+
+更新日期：2026-07-12
+
+- 2026-07-12：Microi.AI：新增：更新版本号至6.2.5，增强中转模型支持与令牌管理功能（commit 1395f5b）
+- 2026-07-12：Microi.net：新增：更新版本号至6.2.5，新增AI API密钥参数以增强租户系统配置初始化功能（commit ed3f179）
+
 ## v6.2.4
 
 更新日期：2026-07-12
 
 - 2026-07-12：新增：增强 界面引擎 并 嵌套渲染，independent state 管理（commit a1eee08f）
 - 2026-07-12：新增：更新 Microi 组件版本至 6.2.4，增强 弹窗样式（commit e7dca905）
+
+- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.3.9，优化 MCP 配置以使用 process.execPath 代替硬编码的 node 命令（commit da48941）
+- 2026-07-12：Microi.net：新增：更新版本号至6.2.4，新增创建和提取ZIP文件的方法，增强文件处理能力（commit 59839bb）
 
 ## v6.2.2
 
@@ -94,11 +133,40 @@
 - 2026-07-11：新增：新增 ai-app-publish-store 脚本 用于 统一应用打包（commit a2a9fc2e）
 - 2026-07-12：新增：Microi.V8Engine 与 Microi.WeChat 升级至 6.2.2；AiController 增加 ReasoningEffort 参数；更新 SysUserController 的 Token 处理；完善界面引擎与 UI 设计技能文档；在 v8-security 中实现用户退出登录（commit 2a6d1a69）
 
+- 2026-07-10：Microi.VSCode：新增：更新版本号至 3.2.5，增强 API 客户端和认证管理器以支持更灵活的 token 维护和刷新机制（commit 5406d99）
+- 2026-07-11：Microi.VSCode：新增：更新版本号至 3.2.8，增强微服务源码同步功能，支持自动上传项目源码至在线 AI 应用（commit d637542）
+- 2026-07-12：Microi.net：新增：更新版本号至6.2.2，新增清除用户登录信息的方法，增强安全性（commit 153d59c）
+- 2026-07-12：Microi.AI：新增：更新版本号至6.2.2，添加推理强度选项支持（commit 1a40cf4）
+- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.3.3，新增清除用户登录信息功能，优化在线应用规则（commit 12b2f85）
+
+## v6.2.1
+
+更新日期：2026-07-11
+
+- 2026-07-11：Microi.net：新增：更新版本号至6.2.1，移除后台任务运行时桥接相关代码，优化JWT AuthSecret提示信息（commit 0a02b69）
+- 2026-07-11：Microi.AI：新增：更新版本号至6.2.1（commit 99ba92a）
+
+## v6.2.0
+
+更新日期：2026-07-10
+
+- 2026-07-10：Microi.net：新增：更新版本号至6.2.0，增强JWT AuthSecret生成与持久化逻辑（commit d0fe887）
+- 2026-07-10：Microi.AI：新增：更新版本号至6.2.0（commit 68c865b）
+
+## v6.1.9
+
+更新日期：2026-07-10
+
+- 2026-07-10：Microi.net：新增：更新版本号至6.1.9，增强后台任务进度更新逻辑，支持当前和总进度参数（commit 3d40096）
+- 2026-07-10：Microi.AI：新增：更新版本号至6.1.9（commit 9cf1d4d）
+
 ## v6.1.8
 
 更新日期：2026-07-09
 
 - 2026-07-09：新增：更新 Microi 组件版本至 6.1.8，增强 token 处理（commit aa4e0d31）
+
+- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.3，优化 API 客户端和认证管理器以支持更灵活的 token 管理和刷新机制（commit 4068440）
 
 ## v6.1.7
 
@@ -114,6 +182,8 @@
 - 2026-07-09：新增：新增 默认 RSA 公开 key，device ID 至 MicroiClient（commit 1d36f7b5）
 - 2026-07-09：新增：更新多个组件版本至 6.1.6，并添加默认登录 RSA 私钥配置（commit 8e156342）
 
+- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.1，增强 API 客户端和认证管理器以支持 RSA 公钥登录及认证恢复处理（commit 7ea6a5d）
+
 ## v6.1.5
 
 更新日期：2026-07-09
@@ -121,6 +191,23 @@
 - 2026-07-09：新增：增强 JWT Token 处理和在线终端管理（commit 7d6d143b）
 - 2026-07-09：新增：更新 MicroiClient 的 RSA 公钥处理并优化登录流程（commit 3d1cc2b4）
 - 2026-07-09：新增：更新多个组件版本至 6.1.5，增强 JSON 表格配置文档（commit 8c915939）
+
+- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.1.6（commit bc66a58）
+- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.0，增强 API 客户端和认证管理器以支持 RSA 公钥登录及请求体格式化（commit 06690d5）
+
+## v6.1.4
+
+更新日期：2026-07-09
+
+- 2026-07-09：Microi.AI：新增：更新版本号至6.1.4（commit c211c06）
+- 2026-07-09：Microi.net：新增：更新版本号至6.1.4，增强接口启用状态检查逻辑（commit c2781f7）
+
+## v6.1.3
+
+更新日期：2026-07-09
+
+- 2026-07-09：Microi.net：新增：更新版本号至6.1.3，增强JWT AuthSecret轮换逻辑，支持安全版本升级（commit 04a9dca）
+- 2026-07-09：Microi.AI：新增：更新版本号至6.1.3（commit da1dc89）
 
 ## v6.1.1
 
@@ -131,6 +218,18 @@
 - 2026-07-08：新增：新增 一键编排 脚本，增强 installation 流程（commit 901709e4）
 - 2026-07-09：更新版本至 6.1.1 （多个 Microi 组件），增强 development 登录绕过 功能（commit c9d1a952）
 
+- 2026-07-07：Microi.AI：更新 Microi.AI 版本并增强 AI 中转功能（commit e203db6）
+- 2026-07-09：Microi.net：新增：更新版本号至6.1.1，增强OsClient配置处理逻辑，确保强JWT AuthSecret生成与存储（commit a6cfbfe）
+- 2026-07-09：Microi.AI：新增：更新版本号至6.1.1（commit c533e7a）
+- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.1.4（commit 8dd9247）
+
+## v6.1.0
+
+更新日期：2026-07-07
+
+- 2026-07-07：Microi.net：新增 LicenseServerStore，支持授权持久化与恢复（commit 0e309bb）
+- 2026-07-07：Microi.net：新增：更新版本号至6.1.0，提升项目版本管理（commit a71a5b8）
+
 ## v6.0.8
 
 更新日期：2026-07-07
@@ -138,6 +237,12 @@
 - 2026-07-06：新增：更新 ProfilePage 和 UserBar 组件，优化界面与功能（commit 56851871）
 - 2026-07-07：新增：增强 导入-软件包.js 并 物理列同步，优化 AI 意图识别（commit 01f8ceca）
 - 2026-07-07：新增：更新所有项目版本号至6.0.8（commit 747b745b）
+
+## v6.0.7
+
+更新日期：2026-07-07
+
+- 2026-07-07：Microi.AI：新增：更新版本号至6.0.7，添加 TryBuildBuiltinChatReply 和 ResolveIntentAsync 方法（commit c6c51ef）
 
 ## v6.0.6
 
@@ -153,12 +258,19 @@
 
 - 2026-07-06：工程维护：更新 Microi.net 版本至 6.0.5 （所有项目），增强 error 处理 在 Excel 导入 功能（commit a001a4d4）
 
+- 2026-07-06：Microi.net：增强租户开通服务与 V8 引擎集成（commit 09ff591）
+- 2026-07-06：Microi.net：新增：增强ReloadSingleOsClient方法，添加性能计时和错误处理；版本号更新至6.0.5（commit 9953363）
+- 2026-07-06：Microi.AI：新增：更新版本号至6.0.5（commit 7f64bfc）
+
 ## v6.0.4
 
 更新日期：2026-07-06
 
 - 2026-07-06：新增：新增 ProfilePage 组件，profile 管理 功能（commit 83731185）
 - 2026-07-06：工程维护：更新版本至 6.0.4 （多个 Microi 组件），更新 README links（commit 380aa963）
+
+- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.0.9，增强 MCP 服务器名称构建逻辑以处理重复身份部分（commit aa0104e）
+- 2026-07-06：Microi.AI：新增：更新版本号至6.0.4（commit 438f9e0）
 
 ## v6.0.2
 
@@ -171,6 +283,20 @@
 - 2026-07-06：新增：增强 AI engine 查询结果 显示，新增 数据 analysis summary（commit 839ffd39）
 - 2026-07-06：新增：更新版本至 6.0.2，增强 通知中心（commit 2cf6a331）
 
+- 2026-06-29：Microi.VSCode：新增：添加 Codex MCP stdio 适配器，支持与 Microi MCP 服务器的兼容性（commit 2800b9f）
+- 2026-07-02：Microi.VSCode：新增：更新 MCP server key 命名规则，添加诊断 MCP 可调用性功能（commit d61791a）
+- 2026-07-04：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 8b30904）
+- 2026-07-04：Microi.VSCode：新增：更新版本号至 3.0.3，添加 Copilot 同步警告功能（commit 8d349e0）
+- 2026-07-05：Microi.VSCode：新增：更新版本号至 3.0.6，增强 Copilot 模型验证和工具限制保护功能（commit e94df04）
+- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.0.8，增强 Codex MCP 配置功能（commit 3adc061）
+
+## v6.0.1
+
+更新日期：2026-07-06
+
+- 2026-07-06：Microi.AI：新增：更新版本号至6.0.1，增强AI模型配置检查和流式响应处理（commit 6ac0279）
+- 2026-07-06：Microi.net：新增：更新租户开通服务，增强数据库连接和错误处理；版本号更新至6.0.1（commit 2a9b552）
+
 ## v6.0.0
 
 更新日期：2026-07-02
@@ -178,6 +304,15 @@
 - 2026-07-01：新增：增加 diy_field 记录批量更新工具和表单布局规范（commit 8ed5cb4f）
 - 2026-07-02：新增：新增 MicroiCaptchaRecognizer 用于 验证码识别，实现 采集引擎 文档（commit 7483ba8b）
 - 2026-07-02：新增：更新版本至 6.0.0，更新 相关 配置 （多个项目）（commit 2aff403f）
+
+- 2026-07-04：Microi.net：新增：更新ApiEngine和FormEngine以优化V8引擎参数处理；版本号更新至6.0.0（commit fbf3ef6）
+- 2026-07-04：Microi.AI：新增：更新版本号至6.0.0（commit ef4b347）
+
+## v5.9.9
+
+更新日期：2026-07-02
+
+- 2026-07-02：Microi.net：新增：更新多个文件以优化表单事件处理和内存限制；版本号更新至5.9.9（commit 6e90842）
 
 ## v5.9.1
 
@@ -193,6 +328,16 @@
 - 2026-06-29：新增：增强 工具注册，执行顺序（commit 1f58dfab）
 - 2026-06-30：新增：更新版本至 5.9.0 （多个项目），增强 Microi.Spider 功能（commit 54f40594）
 
+- 2026-06-27：Microi.net：增强表单引擎缓存与翻译能力（commit f8eaea6）
+- 2026-06-29：Microi.net：新增：添加后台任务进度更新功能；优化V8引擎并增强树懒加载支持（commit 6045388）
+- 2026-06-30：Microi.net：新增：更新多个文件以增强字段处理和命令超时配置；版本号更新至5.9.0（commit 07ca67e）
+
+## v5.8.8
+
+更新日期：2026-06-29
+
+- 2026-06-29：Microi.AI：新增：更新版本号至5.8.8（commit f2e1acd）
+
 ## v5.8.7
 
 更新日期：2026-06-28
@@ -204,6 +349,10 @@
 更新日期：2026-06-28
 
 - 2026-06-28：新增：更新版本至 5.8.5 （多个项目），增强 API 功能（commit 79346126）
+
+- 2026-06-25：Microi.VSCode：新增：更新 MCP 配置支持，添加 Claude Code 项目级 .mcp.json 文件，优化服务器配置读取逻辑（commit f7d45d1）
+- 2026-06-27：Microi.VSCode：新增：更新版本号至 2.5.3，增强 Claude Code 用户级 MCP 配置同步功能（commit 6a45c28）
+- 2026-06-28：Microi.AI：新增：更新版本号至5.8.5（commit 0ec05c2）
 
 ## v5.8.1
 
@@ -228,6 +377,19 @@
 - 2026-06-24：新增：增强 V8 engine，Excel 导出 功能（commit 55b531aa）
 - 2026-06-25：优化子菜单样式（commit d012088d）
 - 2026-06-25：更新v5.8.0，完善多语言系统（commit 235ea91c）
+
+- 2026-06-12：Microi.net：新增：优化错误信息返回格式，增强可读性和调试信息（commit f13be09）
+- 2026-06-24：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit ad04a5f）
+- 2026-06-24：Microi.net：重构代码结构，提高可读性和可维护性（commit d30260c）
+- 2026-06-24：Microi.VSCode：新增：更新版本号至 2.5.0（commit acb7746）
+- 2026-06-25：Microi.net：新增：增强翻译引擎，添加空值检查和HTTP翻译支持；优化数据返回格式（commit 79758ad）
+- 2026-06-25：Microi.net：新增：添加租户创建和缓存清理功能；更新版本号至5.8.0（commit df06e64）
+
+## v5.7.9
+
+更新日期：2026-06-24
+
+- 2026-06-24：Microi.AI：新增：更新版本号至5.7.9（commit f2dd374）
 
 ## v5.7.6
 
@@ -255,6 +417,9 @@
 - 2026-06-17：新增：优化表单和标签组件的样式与功能，增强用户体验（commit c550051f）
 - 2026-06-19：新增：新增 MicroAppHost 组件，AI 工作流 API（commit d2f06ca1）
 - 2026-06-19：新增：更新版本号至 5.7.5，并优化 MicroAppController 中的存储逻辑（commit 774b77d4）
+
+- 2026-06-13：Microi.VSCode：新增：更新版本号至 2.1.8，添加 MCP 默认可见性参考，优化知识库构建逻辑（commit 296c111）
+- 2026-06-14：Microi.VSCode：新增：更新版本号至 2.1.9（commit 1129bcf）
 
 ## v5.7.2
 
@@ -289,6 +454,16 @@
 - 2026-06-13：新增：更新 V8 引擎编码最佳实践，增加移动端应用质量门禁和主题切换规范（commit 905de52f）
 - 2026-06-13：新增：更新版本号至 5.7.2，优化 Kestrel 请求处理配置（commit ce0baf62）
 
+- 2026-06-01：Microi.VSCode：新增性能测试模块与 V8 版本管理（commit 05b5547）
+- 2026-06-04：Microi.VSCode：更新项目结构并增强功能（commit 8016dde）
+- 2026-06-04：Microi.VSCode：新增：统一 AI 指令文件写入工作区根目录，新增初始化 AI 配置命令，更新 MCP 配置同步（commit eb23321）
+- 2026-06-04：Microi.VSCode：新增：增强插件兼容性，支持 Windows Git 长路径，更新 MCP server key 命名规则（commit 16a8a1a）
+- 2026-06-06：Microi.VSCode：新增：优化同步管理器，增强元数据更新逻辑，处理空代码情况（commit a1de8c1）
+- 2026-06-07：Microi.VSCode：新增：更新版本号至 2.0.1，增强同步管理器以支持本地变更项的处理（commit d435761）
+- 2026-06-09：Microi.VSCode：新增：增强版本管理和同步功能，支持技能版本处理和本地变更汇总（commit 0a48e6c）
+- 2026-06-10：Microi.VSCode：新增：更新版本号至 2.0.9，增强 V8 树节点定位和远程差异显示功能（commit bc540f7）
+- 2026-06-12：Microi.VSCode：新增：更新版本号至 2.1.3，增强 MCP 服务器管理功能，添加多个 MCP 相关命令和状态监控（commit 9dd65f4）
+
 ## v5.7.1
 
 更新日期：2026-06-01
@@ -305,6 +480,17 @@
 - 2026-06-01：新增：新增 MongoDB logging 功能（commit 42cff4d1）
 - 2026-06-01：新增：增强 批量拖选，行高亮 在 DIY 表（commit 96007bc0）
 - 2026-06-01：工程维护：更新版本至 5.7.1 （多个项目），优化 文档（commit 01a972bd）
+
+- 2026-05-19：Microi.net：新增 C# Dev Kit 语言服务缓存文件以提升性能（commit 6cfbc66）
+- 2026-06-01：Microi.net：增强 V8 引擎集成与调试能力（commit 7006544）
+- 2026-06-04：Microi.net：新增：更新版本号至5.7.1（commit 74d796b）
+- 2026-06-04：Microi.AI：新增：更新版本号至5.7.1（commit 93a639b）
+
+## v5.6.8
+
+更新日期：2026-06-01
+
+- 2026-06-01：Microi.AI：新增：更新版本号至5.6.8（commit 4125af6）
 
 ## v5.6.0
 
@@ -344,6 +530,14 @@
 - 2026-05-19：新增：新增 文件 upload 功能，优化 文档（commit b930a42d）
 - 2026-05-20：重构 MicroiClient 至 use Base64 encoding 用于 ApiV8Code（commit 45eb2199）
 - 2026-05-20：新增：更新所有组件版本至5.5.4，确保一致性和兼容性（commit 31eed85d）
+
+- 2026-05-19：Microi.VSCode：新增：更新版本至 1.7.6，并增强 V8 引擎类型定义和数据库结构文档（commit 6bb008d）
+
+## v5.5.3
+
+更新日期：2026-05-19
+
+- 2026-05-19：Microi.AI：新增：更新版本号至5.5.3，并优化V8事件条件判断说明（commit 6d15301）
 
 ## v5.5.2
 
@@ -393,6 +587,8 @@
 - 2026-05-08：合并 https://gitee.com/zhao-huiyin/microi.net 的 master 分支（commit 78f14da1）
 - 2026-05-08：新增：更新所有项目版本号至 5.4.9（commit d2a043f8）
 
+- 2026-05-08：Microi.VSCode：新增：更新版本至 1.6.9，增强 Playwright 测试支持和错误处理（commit 27e4213）
+
 ## v5.4.8
 
 更新日期：2026-05-07
@@ -413,6 +609,11 @@
 - 2026-05-07：新增：增强 工作流 处理，form 数据 管理（commit e39eb595）
 - 2026-05-07：新增：移除选择用户的回调并优化工作流处理逻辑（commit 33f268a5）
 - 2026-05-07：新增：更新版本号至 5.4.7，包含多个模块的版本同步（commit b3ccc1b5）
+
+- 2026-05-06：Microi.VSCode：新增 Playwright E2E 集成及命令（commit 09aae98）
+- 2026-05-07：Microi.net：新增：更新版本号至5.4.7，并优化工作流引擎中的条件判断逻辑（commit f64d9d6）
+- 2026-05-07：Microi.AI：新增：更新版本号至5.4.7（commit 881dd6d）
+- 2026-05-07：Microi.VSCode：新增：更新版本至 1.6.5（commit 2f14632）
 
 ## v5.4.5
 
@@ -437,6 +638,10 @@
 - 2026-05-04：新增：实现数据表字段排序自动递增；更新 API 排序说明；完善 Playwright 端到端测试文档及示例；补充 uni-app 主题切换实现，并强制主题色使用 CSS 变量（commit 06f03540）
 - 2026-05-04：新增：更新 Playwright 端到端 test 说明，版本升级至 5.4.4 （多个项目）（commit 0211f7d7）
 
+- 2026-04-23：Microi.VSCode：新增：增加对数据库模式的 Markdown 文件支持，并优化 API 文件命名（commit f3e8e64）
+- 2026-05-03：Microi.VSCode：增强 AI 文档与数据库结构处理（commit 19c84ae）
+- 2026-05-04：Microi.VSCode：新增：更新版本至 1.6.0，并增强数据库结构文档说明（commit 674c08a）
+
 ## v5.3.8
 
 更新日期：2026-05-02
@@ -454,6 +659,10 @@
 - 2026-05-01：安全：修复 CVE-2023-44270 - PostCSS 注入漏洞修复（commit c152f363）
 - 2026-05-02：更新版本号至 5.3.8，确保所有相关项目一致性（commit dc499847）
 
+- 2026-05-01：Microi.net：新增：增强 V8 引擎安全性，添加类型黑名单和安全类型解析器（commit 9b2fc20）
+- 2026-05-03：Microi.AI：新增：更新版本号至5.3.8（commit 3cde37f）
+- 2026-05-03：Microi.net：新增：更新版本号至5.3.8，并优化 OsClient 处理逻辑以增强错误处理和缓存清理（commit 9391354）
+
 ## v5.3.7
 
 更新日期：2026-04-29
@@ -463,6 +672,9 @@
 - 2026-04-29：优化权限管理逻辑，修复角色权限获取和保存中的多个问题；调整前端组件以支持权限预览功能（commit 0a16c207）
 - 2026-04-29：优化多语言支持，增加日语和繁体中文语言包；调整语言选择组件，支持动态语言切换；改进语言存储逻辑，确保语言设置同步更新（commit b5172b48）
 - 2026-04-29：将所有组件的版本升级至 5.3.7，并更新文档链接以使用新的域名格式。（commit e773da3c）
+
+- 2026-05-01：Microi.net：版本更新至 5.3.7，并增强 V8TenantContext 使用（commit d7aebb4）
+- 2026-05-01：Microi.AI：新增：更新版本号至5.3.7（commit 5d0fc92）
 
 ## v5.3.6
 
@@ -511,6 +723,9 @@
 - 2026-04-23：在应用启动时初始化主题系统，并在 App.vue 中显示事件（commit 7fce850b）
 - 2026-04-23：更新所有项目版本号至 5.3.4（commit 3f6c2e7f）
 
+- 2026-04-23：Microi.AI：新增：更新版本号至5.3.4（commit a1014ef）
+- 2026-04-23：Microi.net：新增：更新版本号至5.3.4，新增 OsClient 方法以支持占位模型检测和主租户加载验证（commit 99c2bca）
+
 ## v5.3.3
 
 更新日期：2026-04-20
@@ -526,6 +741,9 @@
 - 2026-04-19：合并远程 master 分支（commit 5858cd29）
 - 2026-04-20：添加 MCI 设计系统全局样式，支持明暗主题（commit 909b1050）
 - 2026-04-20：更新版本号至 5.3.3，确保所有相关项目一致性（commit d300957c）
+
+- 2026-04-20：Microi.net：新增：更新版本号至5.3.3，并优化级联选择器和树形选择器的默认字段配置（commit d87ef03）
+- 2026-04-20：Microi.AI：新增：更新版本号至5.3.3（commit 15fdc99）
 
 ## v5.3.2
 
@@ -554,6 +772,9 @@
 - 2026-04-16：!79 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit 85cb7b62）
 - 2026-04-17：- **新增**：增强表单组件的数据加载能力，防止重复请求 - 在 `SetFieldData` 和 `GetFieldsData` 方法中增加加载状态管理，避免并发请求。- 更新 `diy-cascader` 和 `diy-select-tree` 组件，确保 `Config` 属性已初始化，避免出现未定义错误。- 优化 `diy-select-tree` 中的树形结构处理，保证数据嵌套正确。- **重构**：调整 `diy-form-full` 在新增条目时复用 `TableRowId`，避免不必要的 API 调用。- **调整**：优化 `diy-form` 的自动初始化逻辑，防止特定模式下出现重复请求。- **优化**：改进 `diy-表` 的移动端搜索界面，提升用户体验。- **版本更新**：将多个项目中的 Microi.net 版本统一升级至 5.3.2。- **配置调整**：修改开发环境的启动配置。（commit 280c0719）
 
+- 2026-04-17：Microi.AI：新增：更新版本号至5.3.2（commit 1f596ac）
+- 2026-04-17：Microi.net：新增：更新版本号至5.3.2，并修复树形结构和Where条件的处理逻辑（commit 47ed0dc）
+
 ## v5.3.0
 
 更新日期：2026-04-13
@@ -565,6 +786,9 @@
 - 2026-04-11：特性：为 HDFS 实现文件管理 API（commit dbe9eca7）
 - 2026-04-13：特性：版本升级至 5.3.0 并优化工作流移动端界面（commit 9fd639bf）
 
+- 2026-04-13：Microi.AI：新增：更新版本号至5.3.0（commit 906f8e6）
+- 2026-04-13：Microi.net：新增：更新版本号至5.3.0（commit 06b1f73）
+
 ## v5.2.9
 
 更新日期：2026-04-10
@@ -572,6 +796,9 @@
 - 2026-04-09：注释权限问题（commit 64ef539e）
 - 2026-04-09：合并远程 master 分支（commit 10cdce67）
 - 2026-04-10：版本升级至 5.2.9，更新多个组件的版本号（commit f4718f41）
+
+- 2026-04-10：Microi.net：新增：更新版本号至5.2.9（commit 3aac4ef）
+- 2026-04-10：Microi.AI：新增：更新版本号至5.2.9（commit 61aefac）
 
 ## v5.2.8
 
@@ -585,6 +812,9 @@
 - 2026-04-09：修复新增按钮展示（commit 36653151）
 - 2026-04-09：功能：将版本更新至 5.2.8 并增强全屏功能（commit 9f6014c7）
 
+- 2026-04-09：Microi.AI：新增：更新版本号至5.2.8（commit fc536f6）
+- 2026-04-09：Microi.net：新增：更新版本号至5.2.8，并在加密脚本中添加加密指纹标记功能（commit fdaed74）
+
 ## v5.2.3
 
 更新日期：2026-04-08
@@ -594,6 +824,16 @@
 - 2026-04-07：合并远程 master 分支（commit 3c9cc2e4）
 - 2026-04-07：修改级联选择器超屏幕问题（commit d6b66ec9）
 - 2026-04-08：版本升级至5.2.3，并为Dos.ORM增加异步数据检索方法（commit e7621929）
+
+- 2026-04-08：Microi.AI：新增：更新版本号至5.2.3（commit 2213a48）
+- 2026-04-08：Microi.net：新增：更新版本号至5.2.3，增强 SQL 注入防护和字段名校验（commit 2c16e8b）
+
+## v5.2.0
+
+更新日期：2026-04-07
+
+- 2026-04-07：Microi.AI：新增：更新版本号至5.2.0（commit fa4b284）
+- 2026-04-07：Microi.net：重构数据库事务处理，并将版本更新至 5.2.0（commit 4d08735）
 
 ## v5.1.9
 
@@ -623,6 +863,18 @@
 - 2026-04-07：更新 launchSettings.json 中的 ASPNETCORE_ENVIRONMENT 为 'chongshi'（commit 0e5ca617）
 - 2026-04-07：更新项目版本至 5.1.9 （多个 Microi.Server 组件）（commit 2af1ff1e）
 
+- 2026-04-03：Microi.VSCode：新增：更新 package.json 版本至 1.5.5，并增强设置面板的环境变量管理和用户提示（commit b477a97）
+- 2026-04-03：Microi.VSCode：新增：更新 package.json 版本至 1.5.7，并优化发布脚本以使用 npx 调用 ovsx（commit 563476f）
+- 2026-04-07：Microi.AI：新增：更新版本号至5.1.9（commit c7ac274）
+- 2026-04-07：Microi.net：新增：更新版本号至5.1.9，添加 Windows 路径转换功能以支持 .NET 工具（commit 095f8f0）
+
+## v5.1.8
+
+更新日期：2026-04-04
+
+- 2026-04-04：Microi.AI：新增：更新版本号至5.1.8，优化AI配置管理，减少动态类型使用，提升代码安全性和可维护性（commit 41cc3e3）
+- 2026-04-04：Microi.net：新增：更新版本号至5.1.8，统一关闭 HidePrivateApi 设置以避免 DLR 运行时错误（commit 6121165）
+
 ## v5.1.7
 
 更新日期：2026-04-02
@@ -638,11 +890,17 @@
 
 - 2026-04-02：将所有相关组件版本更新至5.1.5，添加AI模型选择和对话历史功能（commit ce89e5fa）
 
+- 2026-04-02：Microi.net：新增：更新版本号至5.1.5（commit e00e794）
+- 2026-04-02：Microi.AI：新增：更新版本号至5.1.5，并优化AI配置管理，减少async方法中的局部变量数量（commit f17c8b5）
+
 ## v5.1.3
 
 更新日期：2026-04-02
 
 - 2026-04-02：将所有相关组件版本更新至5.1.3，添加Docker镜像推送选项及官方网站文档发布功能（commit 03325439）
+
+- 2026-04-02：Microi.net：新增：更新版本号至5.1.3（commit 6a39d26）
+- 2026-04-02：Microi.AI：更新版本号至5.1.3（commit 551f2ef）
 
 ## v5.1.2
 
@@ -661,6 +919,22 @@
 - 2026-04-02：壮举：添加micro -offline-prepare.sh脚本，用于创建离线安装包（commit 8e0309f7）
 - 2026-04-02：将所有相关组件版本更新至5.1.2，确保一致性（commit a96d55d4）
 
+- 2026-04-01：Microi.VSCode：新增：增强 Claude Code 安装路径检测和环境状态显示（commit 387e87f）
+- 2026-04-01：Microi.VSCode：新增：删除 v8-engine 1.1.7 的安装包（commit 3c0e58c）
+- 2026-04-01：Microi.net：增强租户开通与 V8 上下文隔离（commit d911adc）
+- 2026-04-01：Microi.VSCode：新增：更新 package.json 版本至 1.4.8，并增强设置面板的 Claude Code 状态显示和模型配置引导（commit 309a32e）
+- 2026-04-02：Microi.VSCode：新增：更新 package.json 版本至 1.4.9，并增强设置面板的 Claude Code 模型切换提示和环境变量管理（commit 49537ff）
+- 2026-04-02：Microi.net：新增（TenantProvisioningService）：添加从CDN下载空库SQL文件的功能，优化导入逻辑（commit ff8c8c4）
+- 2026-04-02：Microi.AI：新增 Microi V8 引擎安全最佳实践，涵盖 SQL 注入防护、权限校验、输入校验、XSS 防护和敏感数据处理（commit 9600860）
+- 2026-04-02：Microi.AI：更新版本号至5.1.2（commit d0d238c）
+- 2026-04-02：Microi.net：新增：更新版本号至5.1.2（commit 6b51341）
+
+## v5.0.9
+
+更新日期：2026-04-01
+
+- 2026-04-01：Microi.AI：更新版本号至5.0.9（commit 2f762b1）
+
 ## v5.0.8
 
 更新日期：2026-03-31
@@ -678,6 +952,9 @@
 - 2026-03-30：!71 AI 队友自动生成：[Security-中危] CVE-2023-44270 - PostCSS 注入漏洞（commit 0d6a200a）
 - 2026-03-31：为Microi低代码平台的本地设置和部署添加文档（commit 99af0c86）
 - 2026-03-31：将项目版本更新到5.0.7，并添加数据库结构文档和相关说明（commit c92ca20c）
+
+- 2026-03-29：Microi.VSCode：增强设置面板的 Claude Code 管理，并新增接口引擎创建面板（commit d754078）
+- 2026-03-31：Microi.VSCode：新增：更新 package.json 版本至 1.4.5，并增强设置面板的 Claude Code 安装和检测功能（commit b7b456c）
 
 ## v5.0.6
 
@@ -699,6 +976,8 @@
 - 2026-03-30：同步已选中数据源项状态，优化表格数据管理逻辑（commit 30fb9ac9）
 - 2026-03-30：将项目版本更新到5.0.5，修改启动设置，并使用AI集成指南和页面和打印引擎的新技能增强文档。（commit 44f8e7db）
 
+- 2026-03-29：Microi.VSCode：新增：更新模型管理功能，支持 Claude Code 模型的添加、编辑和删除 工程维护：更新版本至 1.3.6，添加 publish-tokens.json 文件 重构：修改路径结构以支持中文目录名（commit e8d6452）
+
 ## v5.0.3
 
 更新日期：2026-03-28
@@ -710,12 +989,38 @@
 - 2026-03-28：更新launchSettings.json中的ASPNETCORE_ENVIRONMENT变量为iTdos（commit 3ddd9663）
 - 2026-03-28：更新所有项目版本号至5.0.3（commit 39713f29）
 
+- 2026-03-28：Microi.net：表单引擎新增数据写入辅助方法，支持自动编号生成、唯一字段校验和 SQL 构建（commit 7382e7c）
+- 2026-03-28：Microi.net：新增（FormEngine）：优化自动编号生成逻辑，使用Redis计数器避免编号重复，增强文档说明（commit cfe5eb7）
+- 2026-03-29：Microi.net：新增：更新版本号至5.0.3（commit c302c9e）
+- 2026-03-29：Microi.AI：更新版本号至5.0.3（commit 093b3a5）
+
+## v5.0.2
+
+更新日期：2026-03-28
+
+- 2026-03-28：Microi.net：新增：更新表单操作日志，使用表名替代原有字段名，优化慢执行警告信息（commit 8139c94）
+- 2026-03-28：Microi.AI：优化日志输出格式，添加时间戳和统一前缀（commit 86c4cc7）
+- 2026-03-28：Microi.net：新增：添加获取表别名和SQL前缀处理方法，优化字段查询逻辑（commit c7a003d）
+- 2026-03-28：Microi.net：新增：优化数据库字段类型处理，增强SQL生成逻辑，支持显式别名和ORDER BY子句附加（commit 5016efb）
+- 2026-03-28：Microi.AI：更新版本号至5.0.2（commit 074f5fc）
+- 2026-03-28：Microi.net：新增：更新版本号至5.0.2（commit 15310a2）
+
 ## v5.0.1
 
 更新日期：2026-03-28
 
 - 2026-03-27：壮举：使用综合指标实现系统监控功能（commit 4ca047ab）
 - 2026-03-28：壮举：将Microi.net版本更新到5.0.1，并添加API调用计数跟踪（commit 9e4000e1）
+
+- 2026-03-27：Microi.net：增强 V8 事件日志与慢 SQL 执行跟踪（commit db8b5f1）
+- 2026-03-28：Microi.net：新增：增加异步记录接口调用次数和日志功能，更新版本号至5.0.1（commit 5a6e86b）
+- 2026-03-28：Microi.AI：更新版本号至5.0.1（commit 2252802）
+
+## v5.0.0
+
+更新日期：2026-03-27
+
+- 2026-03-27：Microi.AI：更新版本号至5.0.0（commit 7f6b707）
 
 ## v4.9.9
 
@@ -724,11 +1029,16 @@
 - 2026-03-27：删除微型页面引擎和打印引擎子项目（commit 0c8d670a）
 - 2026-03-27：更新版本至4.9.9，修改多个项目文件以反映新版本（commit 6be8fad3）
 
+- 2026-03-27：Microi.AI：更新版本号至4.9.9（commit ea4633d）
+
 ## v4.9.8
 
 更新日期：2026-03-26
 
 - 2026-03-26：更新版本至4.9.8，修改多个项目文件以反映新版本（commit b04ce660）
+
+- 2026-03-27：Microi.net：发布版本 v4.9.8（commit 8d64cea）
+- 2026-03-27：Microi.AI：更新版本号至4.9.8，并优化授权检查提示信息（commit af186ac）
 
 ## v4.9.7
 
@@ -755,6 +1065,8 @@
 
 - 2026-03-26：更新版本至4.9.3，添加生成ULID的方法，更新文档以反映新功能（commit c84060c9）
 
+- 2026-03-26：Microi.net：发布版本 v4.9.3（commit 1fddb21）
+
 ## v4.9.1
 
 更新日期：2026-03-25
@@ -774,6 +1086,19 @@
 - 2026-03-24：更新：修复README和索引文档中的预览图像格式（commit 2a00098d）
 - 2026-03-24：更新：从文档中移除多余的空图像行以优化布局（commit a0f77a58）
 - 2026-03-25：更新v4.9.1（commit 33ff6e8b）
+
+- 2026-03-24：Microi.VSCode：工程维护：版本更新至 1.3.4，并增强 MCP 服务器配置（commit 644d058）
+- 2026-03-25：Microi.net：全新授权机制（commit 51a9ec8）
+- 2026-03-25：Microi.net：发布版本 v4.9.1（commit 5493acf）
+- 2026-03-25：Microi.AI：更新版本号至4.9.1（commit 888d61e）
+
+## v4.8.4
+
+更新日期：2026-03-24
+
+- 2026-03-20：Microi.net：工程维护（commit 015fcd7）
+- 2026-03-24：Microi.AI：更新版本号至4.8.4（commit 726af1f）
+- 2026-03-24：Microi.net：发布版本 v4.8.4（commit 2e27507）
 
 ## v4.8.3
 
@@ -806,6 +1131,26 @@
 - 2026-03-23：壮举：更新V8引擎集成，并添加MongoDB和MQTT技能（commit f77fc964）
 - 2026-03-23：更新：重构V8引擎API知识库文档，添加接口引擎和CRUD操作示例（commit 14f9ddb9）
 - 2026-03-24：跨多个项目将版本升级到4.8.3，并为VS Code插件集成更新README（commit 36368a60）
+
+- 2026-03-20：Microi.AI：工程维护（commit bc20bdb）
+- 2026-03-21：Microi.AI：新增：新增 SubscriptionService，用于管理订阅、订单及 API 密钥，支持多服务商（commit 07f49c2）
+- 2026-03-21：Microi.VSCode：Microi吾码 - V8引擎 VS Code 插件（commit 2affc3b）
+- 2026-03-21：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit ebfe7f2）
+- 2026-03-21：Microi.VSCode：新增：重构配置和同步管理（commit 2c547f5）
+- 2026-03-21：Microi.VSCode：新增：增强引擎文件处理和添加数据库模式同步（commit 90b4b27）
+- 2026-03-21：Microi.AI：增强V8引擎和API引擎的文档（commit dd98464）
+- 2026-03-21：Microi.VSCode：更新 README.md，增强 AI 辅助编程功能描述，添加工作原理和使用说明（commit 8afc854）
+- 2026-03-21：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit 2d2e3ba）
+- 2026-03-22：Microi.VSCode：添加3D效果（commit b71fa3c）
+- 2026-03-22：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit b3022d8）
+- 2026-03-22：Microi.VSCode：工程维护：清理代码结构并删除未使用的导入（commit be68aa2）
+- 2026-03-23：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit aa35b01）
+- 2026-03-23：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 6ee6679）
+- 2026-03-23：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 06fb38e）
+- 2026-03-23：Microi.VSCode：删除过时的 v8 引擎版本文件（commit 5f56b14）
+- 2026-03-24：Microi.VSCode：增强 MCP 配置与 Token 管理（commit 6b30895）
+- 2026-03-24：Microi.VSCode：工程维护：package.json 版本更新至 1.3.0（commit a9cef4f）
+- 2026-03-24：Microi.AI：更新版本号至4.8.3（commit 00a87b4）
 
 ## v4.8.1
 
@@ -907,6 +1252,9 @@
 - 2026-03-03：更新git（commit bff2e71e）
 - 2026-03-03：更新v4.7.8，修复后端模块引擎bug、前端打包apk扫一扫bug（commit 1525e994）
 
+- 2026-03-06：Microi.net：更新v4.7.8（commit d6aebf1）
+- 2026-03-06：Microi.AI：更新v4.7.8（commit e4f168f）
+
 ## v4.7.7
 
 更新日期：2026-02-26
@@ -925,6 +1273,10 @@
 - 2026-02-25：适配全平台小程序（commit 2d63108a）
 - 2026-02-25：更新文档（commit 73fe3485）
 - 2026-02-26：更新v4.7.7，优化前后端框架，移植并完善旧版移动端的扫一扫、蓝牙打印等功能（commit 81ebb35c）
+
+- 2026-02-09：Microi.AI：发布AI编程：新增自然语言转V8引擎代码（commit ea66004）
+- 2026-02-26：Microi.AI：发布版本 v4.7.7（commit 1add39a）
+- 2026-02-26：Microi.net：发布版本 v4.7.7：开源版允许使用工作流了（commit 0e44672）
 
 ## v4.7.6
 
@@ -962,6 +1314,8 @@
 - 2026-02-06：修复单选框、复选框当数据源为sql或其它动态数据源，加载表单未显示选择项的bug（commit a83f0956）
 - 2026-02-07：更新平台文档、修复模块引擎【不显示列】不生效的bug（commit e15690a5）
 - 2026-02-07：更新v4.7.5，AI编程功能上线（commit eac217dc）
+
+- 2026-02-09：Microi.net：发布版本 v4.7.5（commit d5170f8）
 
 ## v4.7.4
 
@@ -1010,6 +1364,13 @@
 - 2026-02-03：修复树形选择控件bug（commit d1ca08eb）
 - 2026-02-03：更新v4.7.1，应用商城功能上线（commit a4136bca）
 
+- 2026-01-30：Microi.AI：初始化 Microi.AI 工程（commit eaaa043）
+- 2026-01-30：Microi.AI：向量数据库完善ApiKey、差量同步（commit d56a1d1）
+- 2026-01-31：Microi.AI：自动意图识别（普通聊天 vs 数据查询）（commit 974862b）
+- 2026-01-31：Microi.AI：语义智能识别（commit 2ce8ef9）
+- 2026-02-03：Microi.net：发布版本 v4.7.1（commit d7768f4）
+- 2026-02-03：Microi.AI：发布版本 v4.7.1（commit c1895e8）
+
 ## v4.7.0
 
 更新日期：2026-01-31
@@ -1024,6 +1385,8 @@
 - 2026-01-29：优化传统界面vue3+兼容移动端（commit 36ac22f9）
 - 2026-01-31：AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit aaaece54）
 - 2026-01-31：更新v4.7.0：AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit f3f051be）
+
+- 2026-01-31：Microi.net：发布版本 v4.7.0（commit 1fa9b2c）
 
 ## v4.6.17
 
@@ -1074,6 +1437,8 @@
 - 2026-01-25：更新 .gitignore，允许提交 bin/Release 下的 Dockerfile 和 publish-demo.sh（commit e799e198）
 - 2026-01-25：更新v4.6.15，完善传统界面vue3，修复后端bug，新增前后端docker发布文件（commit 3246aa4e）
 
+- 2026-01-26：Microi.net：发布版本 v4.6.15（commit 839b1df）
+
 ## v4.6.14
 
 更新日期：2026-01-23
@@ -1092,6 +1457,8 @@
 更新日期：2026-01-22
 
 - 2026-01-22：更新v4.6.13，优化V8引擎（与JavaScript有更强的兼容性），优化代码编辑器（commit b56afe3f）
+
+- 2026-01-23：Microi.net：发布版本 v4.6.13（commit 7a36b59）
 
 ## v4.6.12
 
@@ -1129,6 +1496,8 @@
 
 - 2026-01-21：发布v4.6.7，V8编辑器新增完全的V8引擎代码提示功能，修复bug，升级接口引擎配置（commit 6f012453）
 
+- 2026-01-21：Microi.net：发布版本 v4.6.7（commit 8977556）
+
 ## v4.6.6
 
 更新日期：2026-01-21
@@ -1155,6 +1524,8 @@
 - 2026-01-17：修复V8.Db.Firs()无效的bug（commit b86fd075）
 - 2026-01-17：发布v4.6.4（commit fa1839b9）
 
+- 2026-01-17：Microi.net：发布版本 v4.6.4（commit b2d3dc3）
+
 ## v4.6.3
 
 更新日期：2026-01-16
@@ -1162,6 +1533,8 @@
 - 2026-01-16：修复SqlCount缓存bug（commit 26aaf682）
 - 2026-01-16：修复系统管理角色权限配置bug（commit 8063c905）
 - 2026-01-16：v4.6.3发布，修复新版v4.x的一些bug（commit 3eb140b3）
+
+- 2026-01-16：Microi.net：发布版本 v4.6.3（commit 001ce50）
 
 ## v4.6.1
 
@@ -1171,6 +1544,8 @@
 - 2026-01-13：优化解决方案目录（commit d0f904ad）
 - 2026-01-13：新增[AI+低代码]开发文档（commit ead5bcd0）
 - 2026-01-16：Microi.net.dll更新v.4.6.1，性能优化、架构优化、修复bug（commit aa3d031e）
+
+- 2026-01-16：Microi.net：发布版本 v4.6.1（commit ce58f15）
 
 ## v4.5.0
 
@@ -1213,6 +1588,20 @@
 - 2026-01-12：优化前端表单引擎性能（commit ce8381ad）
 - 2026-01-12：优化前端框架性能（commit 4d935d51）
 - 2026-01-13：Microi.net.dll发布v4.5.0，优化架构、性能（commit ff6fa01b）
+
+- 2026-01-13：Microi.net：发布版本 v4.5.0（commit 736063b）
+
+## v4.4.2
+
+更新日期：2026-01-10
+
+- 2026-01-10：Microi.net：发布版本 v4.4.2（commit 2d1a0e9）
+
+## v4.2.0
+
+更新日期：2026-01-09
+
+- 2026-01-09：Microi.net：发布版本 v4.2.0（commit 637e401）
 
 ## v4.1.1
 
@@ -1958,6 +2347,28 @@
 - 2025-12-29：修复查看密码功能bug（commit 531cb640）
 - 2026-01-04：【重要更新】平台架构升级、Microi.net.dll升级至v4.0（commit 6e6921c8）
 - 2026-01-04：【重要升级】后端开放更多源码（99%）、Microi.net升级至v4.1.0（commit f96c7826）
+
+- 2024-10-30：Microi.net：工程维护（commit 0f8b8aa）
+- 2024-10-30：Microi.net：更新readme（commit f96c770）
+- 2024-10-31：Microi.net：工程维护（commit f26fe5c）
+- 2024-11-19：Microi.net：工程维护（commit 140dce3）
+- 2025-03-06：Microi.net：工程维护（commit ba1697c）
+- 2025-06-03：Microi.net：工程维护（commit 28f0afd）
+- 2025-08-15：Microi.net：工程维护（commit ca3b8d5）
+- 2025-09-15：Microi.net：工程维护（commit 12c14e9）
+- 2025-10-10：Microi.net：工程维护（commit f605bb8）
+- 2025-10-28：Microi.net：工程维护（commit 4699630）
+- 2025-11-24：Microi.net：工程维护（commit a2967e2）
+- 2025-11-24：Microi.net：bug修复（commit 58707fe）
+- 2025-11-24：Microi.net：优化事务（commit f6b03bb）
+- 2025-11-25：Microi.net：优化代码（commit d6f9b13）
+- 2025-11-26：Microi.net：工程维护（commit 5f19d07）
+- 2025-12-25：Microi.net：发布版本 v3.3.1；工程维护（commit d762198）
+- 2026-01-04：Microi.net：发布v4.0（commit b64a6e1）
+- 2026-01-04：Microi.net：发布版本 v4.1.0（commit e5d6f8f）
+- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.1.0（commit 0397baa）
+- 2026-07-07：Microi.VSCode：新增：更新版本号至 3.1.3（commit 41327ff）
+- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.2，优化 MCP 运行时配置以支持独立 Node 和 Electron（commit f60dc3f）
 
 ## v4.0.0
 
