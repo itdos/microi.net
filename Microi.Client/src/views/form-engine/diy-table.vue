@@ -1551,7 +1551,7 @@
 <script>
 import { computed } from "vue";
 import { defineAsyncComponent } from "vue";
-import { useDiyStore } from "@/pinia";
+import { useDiyStore, useTagsViewStore } from "@/pinia";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
 import DiyCardSelect from "@/views/form-engine/diy-card-select.vue";
@@ -1612,6 +1612,7 @@ export default {
     },
     setup(props) {
         const diyStore = useDiyStore();
+        const tagsViewStore = useTagsViewStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const SysConfig = computed(() => diyStore.SysConfig);
 
@@ -1621,6 +1622,7 @@ export default {
 
         return {
             diyStore,
+            tagsViewStore,
             GetCurrentUser,
             SysConfig,
             bodyBgSvg
@@ -2306,12 +2308,25 @@ export default {
             // }else if (tab.name == 'SchoolHourse') {
             //     self.$router.push('/aiju-map/find-by-map');
             // }
+            var visibleTabs = self.SysMenuModel.PageTabs.filter((item) => item.IsVisible);
+            var paneName = tab && (tab.paneName || (tab.props && tab.props.name) || tab.name);
+            var tabModel = visibleTabs.find((item) => String(item.Id) === String(paneName))
+                || visibleTabs[parseInt(tab.index)];
+            if (!tabModel) return;
+
+            var previousTab = self.CurrentTableRowListActiveTab;
+            self.CurrentTableRowListActiveTab = tabModel;
+
+            var navigationResult = await self.NavigatePageTabModule(tabModel);
+            if (navigationResult === "navigated") return;
+            if (navigationResult === "blocked") {
+                self.CurrentTableRowListActiveTab = previousTab || {};
+                self.TableRowListActiveTab = previousTab && previousTab.Id ? previousTab.Id : "";
+                return;
+            }
+
             self.InitSearch();
             self.Where = [];
-
-            // var tabModel = self.GetPageTabs()[parseInt(tab.index)];
-            var tabModel = self.SysMenuModel.PageTabs.filter((item) => item.IsVisible)[parseInt(tab.index)];
-            self.CurrentTableRowListActiveTab = tabModel;
             //执行V8
             //注意：这里要设置搜索条件.V8.SetV8SearchModel({FieldName : value , FieldName2 : value});
             if (!self.DiyCommon.IsNull(tabModel.V8Code)) {
@@ -2319,6 +2334,52 @@ export default {
             }
             //2020-10-22新增，选择tab，重新查询数据
             self.GetDiyTableRow({ _PageIndex: 1 });
+        },
+        GetPageTabTargetSysMenuId(tabModel) {
+            if (!tabModel || typeof tabModel !== "object") return "";
+            var target = tabModel.TargetSysMenuId;
+            if (target && typeof target === "object") {
+                target = target.Id || target.Value || target.value || "";
+            }
+            return String(target || "").trim();
+        },
+        async NavigatePageTabModule(tabModel) {
+            var self = this;
+            var targetSysMenuId = self.GetPageTabTargetSysMenuId(tabModel);
+            if (!targetSysMenuId || targetSysMenuId === String(self.SysMenuId || "")) return "current";
+
+            var routes = self.$router.getRoutes ? self.$router.getRoutes() : [];
+            var targetRoute = routes.find(function (route) {
+                var meta = route.meta || {};
+                return String(meta.Id || meta.SysMenuId || route.Id || "") === targetSysMenuId;
+            });
+            if (!targetRoute || !targetRoute.name) {
+                self.DiyCommon.Tips("关联模块不存在、未分配权限或尚未刷新菜单，请重新登录后重试。", false);
+                return "blocked";
+            }
+
+            var currentRoute = self.$route;
+            var currentView = Object.assign({}, currentRoute, {
+                meta: Object.assign({}, currentRoute.meta || {}),
+                query: Object.assign({}, currentRoute.query || {})
+            });
+            var nextQuery = Object.assign({}, currentRoute.query || {}, {
+                Tab: tabModel.Name || ""
+            });
+            delete nextQuery.FormDataId;
+            delete nextQuery.SysMenuId;
+            delete nextQuery.Id;
+
+            // 页面 Tab 切换属于同一业务入口：替换当前路由和顶部访问标签，
+            // 让目标模块以自己的 sys_menu / diy_table / diy_field 完整重新初始化。
+            await self.$router.replace({
+                name: targetRoute.name,
+                query: nextQuery
+            });
+            if (self.tagsViewStore && typeof self.tagsViewStore.delView === "function") {
+                await self.tagsViewStore.delView(currentView);
+            }
+            return "navigated";
         },
         async RunPageTabV8Code(v8code) {
             var self = this;

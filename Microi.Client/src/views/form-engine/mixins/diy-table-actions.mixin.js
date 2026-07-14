@@ -252,11 +252,216 @@ IsPermission(type) {
             var btnName = String(btn?.Name || row?.StoreInstallActionName || "").trim();
             var v8Code = String(btn?.V8Code || "");
             var isStoreMenu = tableName === "sys_microistore" || menuUrl === "/microi-store" || menuUrl.indexOf("microi-store") > -1;
+            if (btnName === "安装离线包" || btn?.ShowRow === false) return false;
             var isInstallAction = ["安装", "更新", "重新安装", "异常"].indexOf(btnName) > -1
                 || v8Code.indexOf("import-microi-store-package") > -1
                 || v8Code.indexOf("get-microi-store-model") > -1
                 || btn?.ApiEngineKey === "import-microi-store-package";
             return isStoreMenu && isInstallAction;
+        },
+        IsMicroiStoreOfflineInstallButton(btn) {
+            var self = this;
+            var tableName = String(self.CurrentDiyTableModel?.Name || self.TableName || "").toLowerCase();
+            var menuUrl = String(self.SysMenuModel?.Url || self.$route?.path || "").toLowerCase();
+            var isStoreMenu = tableName === "sys_microistore" || menuUrl === "/microi-store" || menuUrl.indexOf("microi-store") > -1;
+            return isStoreMenu && String(btn?.Name || "").trim() === "安装离线包";
+        },
+        SelectMicroiStoreOfflinePackageFile() {
+            var self = this;
+            return new Promise(function (resolve, reject) {
+                var suffix = Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+                var inputId = "microi_offline_package_" + suffix;
+                var detailId = inputId + "_detail";
+                var errorId = inputId + "_error";
+                var state = { Selected: null, Reading: false };
+                var cleaned = false;
+                var cleanup = function () {
+                    if (cleaned) return;
+                    cleaned = true;
+                    var input = document.getElementById(inputId);
+                    if (input && input.__MicroiChangeHandler) {
+                        input.removeEventListener("change", input.__MicroiChangeHandler);
+                    }
+                };
+                var setText = function (selector, value) {
+                    var element = document.querySelector(selector);
+                    if (element) element.textContent = value || "-";
+                };
+                var formatSize = function (value) {
+                    var bytes = Number(value || 0);
+                    if (bytes < 1024) return bytes + " B";
+                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+                    return (bytes / 1024 / 1024).toFixed(2) + " MB";
+                };
+                var updateError = function (message) {
+                    var errorElement = document.getElementById(errorId);
+                    if (!errorElement) return;
+                    errorElement.textContent = message || "";
+                    errorElement.style.display = message ? "block" : "none";
+                };
+                var readFile = function (file) {
+                    state.Selected = null;
+                    updateError("");
+                    if (!file) return;
+                    state.Reading = true;
+                    var reader = new FileReader();
+                    reader.onerror = function () {
+                        state.Reading = false;
+                        updateError("读取离线包文件失败，请重新选择。");
+                    };
+                    reader.onload = function (event) {
+                        state.Reading = false;
+                        try {
+                            var packageModel = JSON.parse(String(event?.target?.result || "{}"));
+                            if (!packageModel || !packageModel.PackageInfo) {
+                                throw new Error("缺少 PackageInfo");
+                            }
+                            var packageInfo = packageModel.PackageInfo || {};
+                            var bundles = [];
+                            if (packageModel.ApplicationBundle) bundles.push(packageModel.ApplicationBundle);
+                            if (Array.isArray(packageModel.ApplicationBundles)) bundles = bundles.concat(packageModel.ApplicationBundles);
+                            var types = bundles.map(function (item) {
+                                return item?.ApplicationType || item?.Application?.AppType || "";
+                            }).filter(Boolean);
+                            var uniqueTypes = Array.from(new Set(types));
+                            var typeText = bundles.length
+                                ? "AI 应用" + (uniqueTypes.length ? "（" + uniqueTypes.join(" / ") + "）" : "")
+                                : "普通应用";
+                            state.Selected = { File: file, Package: packageModel };
+                            var detail = document.getElementById(detailId);
+                            if (detail) detail.style.display = "grid";
+                            setText("#" + detailId + " [data-field='file']", file.name);
+                            setText("#" + detailId + " [data-field='size']", formatSize(file.size));
+                            setText("#" + detailId + " [data-field='name']", packageInfo.Name || packageInfo.PackageName || file.name);
+                            setText("#" + detailId + " [data-field='version']", packageInfo.Version || packageInfo.AppVersion || "-");
+                            setText("#" + detailId + " [data-field='type']", typeText);
+                        } catch (error) {
+                            var detail = document.getElementById(detailId);
+                            if (detail) detail.style.display = "none";
+                            updateError("离线包格式不正确：" + error.message);
+                        }
+                    };
+                    reader.readAsText(file, "utf-8");
+                };
+                var html = "<div style='text-align:left;color:#303a4b;'>"
+                    + "<div style='padding:12px 14px;margin-bottom:14px;border:1px solid #d7e8ff;border-radius:9px;background:#f0f7ff;line-height:1.7;'>"
+                    + "<b style='display:block;margin-bottom:3px;'>上传应用离线包</b>"
+                    + "<span style='color:#617086;font-size:13px;'>支持普通应用，以及 Web、UniApp、前端微服务等 AI 应用。确认后仍由后台任务安装。</span></div>"
+                    + "<label for='" + inputId + "' style='display:block;padding:22px 14px;border:1px dashed #aab8ca;border-radius:9px;background:#fafcff;text-align:center;cursor:pointer;'>"
+                    + "<b>点击选择离线包 JSON</b><span style='display:block;margin-top:6px;color:#8a95a5;font-size:12px;'>选择后会先校验格式并显示应用信息</span></label>"
+                    + "<input id='" + inputId + "' type='file' accept='.json,application/json' style='display:none;'>"
+                    + "<div id='" + detailId + "' style='display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;font-size:12px;'>"
+                    + "<div><span style='color:#8a95a5;'>文件：</span><b data-field='file'></b></div>"
+                    + "<div><span style='color:#8a95a5;'>大小：</span><b data-field='size'></b></div>"
+                    + "<div><span style='color:#8a95a5;'>应用：</span><b data-field='name'></b></div>"
+                    + "<div><span style='color:#8a95a5;'>版本：</span><b data-field='version'></b></div>"
+                    + "<div style='grid-column:1 / -1;'><span style='color:#8a95a5;'>类型：</span><b data-field='type'></b></div></div>"
+                    + "<div id='" + errorId + "' style='display:none;margin-top:10px;padding:9px 10px;border-radius:7px;color:#c9363e;background:#fff1f1;font-size:12px;'></div>"
+                    + "<div style='margin-top:12px;padding:9px 10px;border-radius:7px;color:#6b5b20;background:#fff9e8;font-size:12px;line-height:1.6;'>正式环境安装前，请先确认数据库与文件存储已经备份。</div></div>";
+
+                self.DiyCommon.OsConfirm(html, function () {
+                    var selected = state.Selected;
+                    cleanup();
+                    resolve(selected);
+                }, function () {
+                    cleanup();
+                    reject(new Error("__MICROI_USER_CANCEL__"));
+                }, {
+                    Title: "安装离线包",
+                    OkText: "开始后台安装",
+                    Icon: "info",
+                    CustomClass: "microi-offline-install-messagebox",
+                    BeforeClose: function (action, instance, done) {
+                        if (action === "confirm" && state.Reading) {
+                            self.DiyCommon.Tips("离线包仍在读取，请稍候。", false);
+                            return;
+                        }
+                        if (action === "confirm" && !state.Selected) {
+                            self.DiyCommon.Tips("请先选择并通过校验的离线包 JSON。", false);
+                            return;
+                        }
+                        done();
+                    }
+                });
+                setTimeout(function () {
+                    var input = document.getElementById(inputId);
+                    if (!input) return;
+                    input.__MicroiChangeHandler = function () { readFile(input.files && input.files[0]); };
+                    input.addEventListener("change", input.__MicroiChangeHandler);
+                }, 0);
+            });
+        },
+        async CanUseMicroiStoreOfflineInstallerApp() {
+            var self = this;
+            if (typeof self.OpenAppDialog !== "function") return false;
+            try {
+                // 老版本数据库的 GetFormData 可能受历史字段元数据影响而查询失败，
+                // GetTableData 对新旧库都稳定；这里只取第一条已发布的同 Key 微服务。
+                var result = await self.DiyCommon.FormEngine.GetTableData("sys_microiservice", {
+                    _Where: [["MsKey", "=", "microi-platform-service"]],
+                    _PageIndex: 1,
+                    _PageSize: 1
+                });
+                // 兼容新旧前端封装：有的版本返回 DosResult，有的版本直接返回数组，
+                // 还有旧网关会把 DosResult 再包一层 Data。
+                var rows = Array.isArray(result)
+                    ? result
+                    : (result && Array.isArray(result.Data)
+                        ? result.Data
+                        : (result && result.Data && Array.isArray(result.Data.Data) ? result.Data.Data : []));
+                var resultCode = result && (result.Code ?? result.code);
+                var service = rows[0] || null;
+                if ((resultCode !== undefined && resultCode !== null && Number(resultCode) !== 1)
+                    || !service || Number(service.IsEnable) === 0) return false;
+                var parts = String(service.BuildVersion || "").replace(/^v/i, "").split(".").map(function (item) { return parseInt(item || 0, 10) || 0; });
+                return ((parts[0] || 0) * 1000000 + (parts[1] || 0) * 1000 + (parts[2] || 0)) >= 1000008;
+            } catch (_) {
+                return false;
+            }
+        },
+        async RunMicroiStoreOfflineInstallButton(V8) {
+            var self = this;
+            if (await self.CanUseMicroiStoreOfflineInstallerApp()) {
+                self.OpenAppDialog({
+                    AppKey: "microi-platform-service",
+                    RoutePath: "/offline-package-installer",
+                    Title: "安装离线包",
+                    Width: "min(760px, calc(100vw - 32px))",
+                    Data: { Source: "MicroiStore" },
+                    OnSuccess: async function (result) {
+                        self.DiyCommon.Tips(result?.message || "离线包安装任务已提交，请在右上角通知中心查看进度。");
+                        self.NotifyBackgroundTaskStarted(result);
+                        if (typeof self.DiyCommon.RefreshAppStores === "function") await self.DiyCommon.RefreshAppStores();
+                        if (typeof self.GetDiyTableRow === "function") self.GetDiyTableRow({ _PageIndex: self.DiyTableRowPageIndex || 1 });
+                    },
+                    OnError: function (error) {
+                        self.DiyCommon.Tips(error?.message || "离线包安装页面执行失败。", false);
+                    }
+                });
+                self.BtnV8Loading = false;
+                return;
+            }
+            var selected = await self.SelectMicroiStoreOfflinePackageFile();
+            var packageInfo = selected.Package.PackageInfo || {};
+            var packageName = packageInfo.Name || packageInfo.PackageName || selected.File.name;
+
+            var result = await V8.ApiEngine.RunBackground(
+                "import-microi-store-package",
+                { Package: selected.Package, PackageFileName: selected.File.name },
+                "安装离线包应用：" + packageName,
+                function () { self.BtnV8Loading = false; }
+            );
+            if (!result || Number(result.Code) !== 1) {
+                throw new Error((result && (result.Msg || result.Message)) || "离线包安装任务创建失败");
+            }
+            self.DiyCommon.Tips("离线包安装任务已提交，请在右上角通知中心查看进度。");
+            self.NotifyBackgroundTaskStarted(result);
+            if (typeof self.DiyCommon.RefreshAppStores === "function") {
+                await self.DiyCommon.RefreshAppStores();
+            }
+            if (typeof self.GetDiyTableRow === "function") {
+                self.GetDiyTableRow({ _PageIndex: self.DiyTableRowPageIndex || 1 });
+            }
         },
         BuildMicroiStoreInstallParam(btn, row) {
             var self = this;
@@ -331,7 +536,8 @@ IsPermission(type) {
                 var hasBackgroundApiEngine = (btn.RunBackground === true || btn.BackgroundTask === true || btn.IsBackgroundTask === true)
                     && !self.DiyCommon.IsNull(btn.ApiEngineKey || btn.BackgroundApiEngineKey);
                 var hasBuiltInAppStoreInstall = self.IsMicroiStoreInstallButton(btn, row);
-                if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine || hasBuiltInAppStoreInstall) {
+                var hasBuiltInOfflineInstall = self.IsMicroiStoreOfflineInstallButton(btn);
+                if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine || hasBuiltInAppStoreInstall || hasBuiltInOfflineInstall) {
                     if (self.SysConfig.EnableUserClickLog) {
                         self.DiyCommon.AddSysLog({
                             Type: `点击V8按钮`,
@@ -359,6 +565,10 @@ IsPermission(type) {
 
                     if (hasBuiltInAppStoreInstall) {
                         await self.RunMicroiStoreInstallButton(btn, row, V8);
+                        return;
+                    }
+                    if (hasBuiltInOfflineInstall) {
+                        await self.RunMicroiStoreOfflineInstallButton(V8);
                         return;
                     }
 

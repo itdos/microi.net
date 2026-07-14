@@ -104,6 +104,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 | `PageTabs` | 列表页 Tab |
 | `ExportMoreBtns` | 导出下拉扩展 |
 
+`PageTabs.TargetSysMenuId` 是通用的跨模块页签协议。未配置时继续执行当前模块的页签 V8；配置其它 `sys_menu.Id` 时，`diy-table.vue` 使用动态路由替换当前地址，让目标模块按自身 `sys_menu / diy_table / diy_field` 完整重建，并移除旧的顶部访问标签。不得为应用商城或其它单一模块在 schema/data mixin 中增加专用数据源分支。
+
 按钮显隐链路：
 
 1. `DiyCommon.ForConvertSysMenu()` 把 JSON 字符串转成数组并补默认值。
@@ -353,6 +355,8 @@ VS Code 插件创建前端微服务时，目录名必须以用户输入的微服
 `MsKey/appKey` 生成遇到中文时必须转成拼音安全串：前两个汉字取完整拼音，后续汉字取拼音首字母；英文和数字保留并转小写；空格、中文标点和常见特殊符号转成 `-` 或 `_`；最终只允许 ASCII 字母、数字、`-`、`_`。例如 `测试微服务六` 应生成类似 `ceshiwfwl`，禁止生成 `/micro-app/%E6%B5%8B...` 这类浏览器编码路由。
 
 创建前端微服务不能只落本地目录。插件必须在 `.microi-micro-app.json` 写入 `osClient/apiBaseUrl/appKey/name` 后立刻刷新左侧树，让目录立即可见，然后再执行远端草稿注册与 `npm install`；远端需注册一条未发布占位记录，并用 `IsEnable=0` 表示尚未推送编译产物。如果目录已存在但远端记录缺失，再次创建同名微服务时必须补注册。左侧树显示微服务项目时，必须优先读取 `.microi-micro-app.json` 的 `osClient/apiBaseUrl` 判断归属，不能再依赖 `{OsClient}` 或 `{OsClient}~` 目录前缀过滤，否则中文或自定义名称目录会被错误隐藏。
+
+`Microi-MicroApp` 必须与 `Microi-V8-Engine` 使用同一套服务器/租户隔离层级：`{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/{appKey}`。不同服务器或租户的相同 `appKey` 不能共用本地目录。插件要提供“拉取服务器前端微服务”，通过在线应用上下文读取 `mci_ai_app_file` 的私有 HDFS 源码；`sys_microiservice` 只有公有运行产物时必须明确提示“无私有源码”，不得生成伪源码。旧版平铺目录只兼容展示，不自动移动或删除。
 
 推送前端微服务时必须按 `sys_microiservice.MsKey` 定位唯一微服务。如果本地项目的 `appKey` 已被远端其它微服务占用，必须先修正本地 `appKey` 再新增/更新，不得直接覆盖。`sys_microiservice.BuildVersion` 和 `sys_microiservice_page.BuildVersion` 从 `v1.0.0` 开始递增，规则为 `v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`；上传到分布式存储/CDN 的路径必须包含该版本号，禁止继续使用时间戳目录。
 

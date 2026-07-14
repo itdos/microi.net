@@ -57,6 +57,13 @@ namespace Microi.net
             return int.TryParse(text, out var value) ? value : fallback;
         }
 
+        private static string SafeJDateTime(JObject row, string fieldName)
+        {
+            var token = row?[fieldName];
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return "";
+            return FormatDbDateTime(token is JValue value ? value.Value : token.ToString());
+        }
+
         private static string SafeString(object value, string fallback = "")
         {
             if (value == null) return fallback;
@@ -454,22 +461,23 @@ namespace Microi.net
                     var list = new List<dynamic>();
                     foreach (var item in result.Data)
                     {
-                        var apiV8Code = (string)item.ApiV8Code ?? "";
-                        var updateTime = item.UpdateTime?.ToString() ?? "";
+                        var row = JObject.FromObject(item);
+                        var apiV8Code = SafeJString(row, "ApiV8Code");
+                        var updateTime = SafeJDateTime(row, "UpdateTime");
                         apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                         list.Add(new
                         {
-                            Id = (string)item.Id,
-                            ApiName = (string)item.ApiName ?? "",
-                            ApiEngineKey = (string)item.ApiEngineKey ?? "",
-                            Category = (string)item.Category ?? "未分类",
-                            ApiAddress = (string)item.ApiAddress ?? "",
-                            IsEnable = item.IsEnable,
-                            ApiRemark = (string)item.ApiRemark ?? "",
+                            Id = SafeJString(row, "Id"),
+                            ApiName = SafeJString(row, "ApiName"),
+                            ApiEngineKey = SafeJString(row, "ApiEngineKey"),
+                            Category = SafeJString(row, "Category", "未分类"),
+                            ApiAddress = SafeJString(row, "ApiAddress"),
+                            IsEnable = SafeJInt(row, "IsEnable", 1),
+                            ApiRemark = SafeJString(row, "ApiRemark"),
                             ApiV8Code = apiV8Code,
-                            Version = hasVersionColumn ? SafeString(item.Version) : "",
-                            ChangeHistory = hasChangeHistoryColumn ? SafeString(item.ChangeHistory) : "",
+                            Version = hasVersionColumn ? SafeJString(row, "Version") : "",
+                            ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
                             UpdateTime = updateTime
                         });
                     }
@@ -516,23 +524,23 @@ namespace Microi.net
 
                 if (result.Code == 1 && result.Data != null)
                 {
-                    var item = result.Data;
-                    var apiV8Code = (string)item.ApiV8Code ?? "";
+                    var row = JObject.FromObject(result.Data);
+                    var apiV8Code = SafeJString(row, "ApiV8Code");
                     apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                     return new DosResult<object>(1, new
                     {
-                        Id = (string)item.Id,
-                        ApiName = (string)item.ApiName ?? "",
-                        ApiEngineKey = (string)item.ApiEngineKey ?? "",
-                        Category = (string)item.Category ?? "未分类",
-                        ApiAddress = (string)item.ApiAddress ?? "",
-                        IsEnable = item.IsEnable,
-                        ApiRemark = (string)item.ApiRemark ?? "",
+                        Id = SafeJString(row, "Id"),
+                        ApiName = SafeJString(row, "ApiName"),
+                        ApiEngineKey = SafeJString(row, "ApiEngineKey"),
+                        Category = SafeJString(row, "Category", "未分类"),
+                        ApiAddress = SafeJString(row, "ApiAddress"),
+                        IsEnable = SafeJInt(row, "IsEnable", 1),
+                        ApiRemark = SafeJString(row, "ApiRemark"),
                         ApiV8Code = apiV8Code,
-                        Version = hasVersionColumn ? SafeString(item.Version) : "",
-                        ChangeHistory = hasChangeHistoryColumn ? SafeString(item.ChangeHistory) : "",
-                        UpdateTime = FormatDbDateTime(item.UpdateTime)
+                        Version = hasVersionColumn ? SafeJString(row, "Version") : "",
+                        ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
+                        UpdateTime = SafeJDateTime(row, "UpdateTime")
                     });
                 }
 
@@ -573,16 +581,17 @@ namespace Microi.net
 
                 if (result.Code == 1 && result.Data != null)
                 {
-                    var apiV8Code = (string)result.Data.ApiV8Code ?? "";
+                    var row = JObject.FromObject(result.Data);
+                    var apiV8Code = SafeJString(row, "ApiV8Code");
                     apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                     return new DosResult<object>(1, new
                     {
                         ApiEngineKey = apiEngineKey,
                         ApiV8Code = apiV8Code,
-                        Version = hasVersionColumn ? SafeString(result.Data.Version) : "",
-                        ChangeHistory = hasChangeHistoryColumn ? SafeString(result.Data.ChangeHistory) : "",
-                        UpdateTime = FormatDbDateTime(result.Data.UpdateTime)
+                        Version = hasVersionColumn ? SafeJString(row, "Version") : "",
+                        ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
+                        UpdateTime = SafeJDateTime(row, "UpdateTime")
                     });
                 }
 
@@ -628,21 +637,22 @@ namespace Microi.net
                     var list = new List<dynamic>();
                     foreach (var item in result.Data)
                     {
-                        var apiV8Code = (string)item.ApiV8Code ?? "";
+                        var row = JObject.FromObject(item);
+                        var apiV8Code = SafeJString(row, "ApiV8Code");
                         apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
 
                         list.Add(new
                         {
-                            Id = (string)item.Id,
-                            ApiName = (string)item.ApiName ?? "",
-                            ApiEngineKey = (string)item.ApiEngineKey ?? "",
-                            Category = (string)item.Category ?? "未分类",
-                            ApiAddress = (string)item.ApiAddress ?? "",
-                            IsEnable = item.IsEnable,
-                            ApiRemark = (string)item.ApiRemark ?? "",
+                            Id = SafeJString(row, "Id"),
+                            ApiName = SafeJString(row, "ApiName"),
+                            ApiEngineKey = SafeJString(row, "ApiEngineKey"),
+                            Category = SafeJString(row, "Category", "未分类"),
+                            ApiAddress = SafeJString(row, "ApiAddress"),
+                            IsEnable = SafeJInt(row, "IsEnable", 1),
+                            ApiRemark = SafeJString(row, "ApiRemark"),
                             ApiV8Code = apiV8Code,
-                            UpdateTime = FormatDbDateTime(item.UpdateTime),
-                            IsDeleted = item.IsDeleted
+                            UpdateTime = SafeJDateTime(row, "UpdateTime"),
+                            IsDeleted = SafeJInt(row, "IsDeleted")
                         });
                     }
                     return new DosResult<object>(1, new
@@ -3232,9 +3242,11 @@ namespace Microi.net
 
                 var v8Code = item["V8Code"].Val<string>();
                 var url = item["Url"].Val<string>();
-                if (v8Code.DosIsNullOrWhiteSpace() && url.DosIsNullOrWhiteSpace())
+                var targetSysMenuId = item["TargetSysMenuId"].Val<string>();
+                var hasRelatedModule = fieldName == "PageTabs" && !targetSysMenuId.DosIsNullOrWhiteSpace();
+                if (v8Code.DosIsNullOrWhiteSpace() && url.DosIsNullOrWhiteSpace() && !hasRelatedModule)
                 {
-                    return (false, rawValue, $"{fieldName}[{i}] 必须配置 V8Code 或 Url");
+                    return (false, rawValue, $"{fieldName}[{i}] 必须配置 V8Code、Url 或关联模块 TargetSysMenuId");
                 }
 
                 var id = item["Id"].Val<string>();

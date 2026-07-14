@@ -36,6 +36,7 @@ namespace Microi.net
     {
         private static readonly ConcurrentDictionary<string, BackgroundTaskItem> Tasks = new ConcurrentDictionary<string, BackgroundTaskItem>();
         private static readonly ConcurrentDictionary<string, CancellationTokenSource> CancellationTokens = new ConcurrentDictionary<string, CancellationTokenSource>();
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> SerialApiEngineGates = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
         private static readonly SemaphoreSlim RunnerGate = new SemaphoreSlim(64, 64);
         static BackgroundTaskService()
         {
@@ -238,8 +239,23 @@ namespace Microi.net
             CancellationToken cancellationToken)
         {
             var gateAcquired = false;
+            var serialGateAcquired = false;
+            SemaphoreSlim serialGate = null;
             try
             {
+                var serialKey = GetSerialApiEngineKey(item, apiParam);
+                if (!serialKey.DosIsNullOrWhiteSpace())
+                {
+                    serialGate = SerialApiEngineGates.GetOrAdd(serialKey, _ => new SemaphoreSlim(1, 1));
+                    item.Status = "Pending";
+                    item.StatusText = "等待同租户其它应用安装完成";
+                    item.Progress = Math.Max(item.Progress, 5);
+                    item.Msg = "应用安装已排队，将按顺序执行，避免旧库并发DDL和元数据写入死锁。";
+                    NotifyUser(item);
+                    await serialGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    serialGateAcquired = true;
+                }
+
                 await RunnerGate.WaitAsync(cancellationToken).ConfigureAwait(false);
                 gateAcquired = true;
                 cancellationToken.ThrowIfCancellationRequested();
@@ -313,10 +329,25 @@ namespace Microi.net
                 {
                     RunnerGate.Release();
                 }
+                if (serialGateAcquired)
+                {
+                    serialGate.Release();
+                }
                 CancellationTokens.TryRemove(item.Id, out var cts);
                 cts?.Dispose();
                 NotifyUser(item);
             }
+        }
+
+        private static string GetSerialApiEngineKey(BackgroundTaskItem item, JObject apiParam)
+        {
+            var apiEngineKey = apiParam?["ApiEngineKey"]?.ToString();
+            if (!string.Equals(apiEngineKey, "import-microi-store-package", StringComparison.OrdinalIgnoreCase))
+            {
+                return "";
+            }
+
+            return $"{item?.OsClient ?? ""}:{apiEngineKey}";
         }
 
         private static void NotifyUser(BackgroundTaskItem item)

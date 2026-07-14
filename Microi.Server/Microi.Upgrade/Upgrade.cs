@@ -17,20 +17,35 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
         {
-            if (!CurrentVersion.DosIsNullOrWhiteSpace() && CurrentVersion.DosSplit('.').Length != 4)
+            if (!CurrentVersion.DosIsNullOrWhiteSpace()
+                && (!System.Version.TryParse(CurrentVersion, out var parsedCurrentVersion)
+                    || parsedCurrentVersion.Revision < 0))
             {
-                Console.WriteLine($"Microi：【Error异常】microi sys_config verison value is error.");
-                return new DosResultList<MicroiUpgradeResult>(0, null, "microi sys_config verison value is error.");
+                Console.WriteLine($"Microi：【Error异常】租户[{osClientSecret?.OsClient}] sys_config.ServerVersion格式错误：{CurrentVersion}");
+                return new DosResultList<MicroiUpgradeResult>(0, null, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
             }
             var result = new List<MicroiUpgradeResult>();
             var needUptServerVersion = false;
             var uptVersion = "";
+            var migrationFailed = false;
+            var migrationErrors = new List<string>();
 
-            EnsureAuthSecretColumns(osClientSecret);
-            EnsureMicroServiceColumns(osClientSecret);
+            try
+            {
+                // 运行时不变量不能只依赖可能被错误推进的历史版本号。
+                EnsureAuthSecretColumns(osClientSecret);
+                EnsureMicroServiceColumns(osClientSecret);
+                EnsureSecurityLevels(osClientSecret);
+            }
+            catch (Exception ex)
+            {
+                migrationFailed = true;
+                migrationErrors.Add("修复升级运行时不变量失败：" + ex.Message);
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【修复升级运行时不变量】失败：{ex.Message}");
+            }
 
             #region 升级AppDisplay、AppVisible  --2024-09-19【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeAppDisplay.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, UpgradeAppDisplay.Version))
             {
                 try
                 {
@@ -41,6 +56,8 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级AppDisplay、AppVisible失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级AppDisplay、AppVisible】失败：{ex.Message}");//。Sql：{UpgradeAppDisplay.Sql}。
                 }
                 // result.Add(new MicroiUpgrade()
@@ -52,13 +69,15 @@ namespace Microi.net
             #endregion
 
             #region 升级sys_config --2024-09-22【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeSysConfig.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, UpgradeSysConfig.Version))
             {
                 try
                 {
                     var msgs = await new UpgradeSysConfig().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{msg}");
@@ -74,13 +93,15 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级sys_config失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{ex.Message}");//。Sql：{UpgradeSysConfig.Sql}。
                 }
             }
             #endregion
 
             #region 升级多语言 --2024-09-19【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeLang.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, UpgradeLang.Version))
             {
                 try
                 {
@@ -91,47 +112,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级多语言失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级多语言】失败：{ex.Message}");//。Sql：{UpgradeLang.Sql}。
                 }
             }
             #endregion
 
-            #region 升级sys_menu --2024-10-02【非必须】
-            // if (NeedUpgrade(CurrentVersion, UpgradeSysMenu.Version))
-            // {
-            //     try
-            //     {
-            //         var msgs = await UpgradeSysMenu.Run(osClientSecret.OsClient);
-            //         if(msgs.Count > 0)
-            //         {
-            //             foreach (var msg in msgs)
-            //             {
-            //                 Console.WriteLine($"Microi：【异步】平台自动升级【{osClientSecret.OsClient}】【升级sys_menu】失败：{msg}");
-            //             }
-            //         } 
-            //         var count = osClientSecret.Db.FromSql(UpgradeSysMenu.Sql).ExecuteNonQuery();
-            //         Console.WriteLine($"Microi：【异步】平台自动升级【{osClientSecret.OsClient}】【升级sys_menu】成功！");
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         Console.WriteLine($"Microi：【异步】平台自动升级【{osClientSecret.OsClient}】【升级sys_menu】失败：{ex.Message}");//。Sql：{UpgradeSysMenu.Sql}。
-            //     }
-            //     // result.Add(new MicroiUpgrade()
-            //     // {
-            //     //     Version = UpgradeSysMenu.Version,
-            //     //     Sql = UpgradeSysMenu.Sql,
-            //     // });
-            // }
-            #endregion
-
             #region 升级ApiEngine --2024-10-02【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeApiEngine.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, UpgradeApiEngine.Version))
             {
                 try
                 {
                     var msgs = await new UpgradeApiEngine().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{msg}");
@@ -147,46 +144,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级ApiEngine失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{ex.Message}");
                 }
             }
             #endregion
 
-            #region 升级ApiEngine6 --2024-10-24【必须】 --不再需要
-            // if (NeedUpgrade(CurrentVersion, UpgradeApiEngine6.Version))
-            // {
-            //     try
-            //     {
-            //         var msgs = await new UpgradeApiEngine6().Run(osClientSecret.OsClient);
-            //         if (msgs.Count > 0)
-            //         {
-            //             foreach (var msg in msgs)
-            //             {
-            //                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{msg}");
-            //             }
-            //         }
-            //         else
-            //         {
-            //             Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】成功！");
-            //             needUptServerVersion = true;
-            //             uptVersion = UpgradeApiEngine6.Version;
-            //         }
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{ex.Message}");
-            //     }
-            // }
-            #endregion
-
             #region 升级7 --2025-08-16【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade7.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade7.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade7().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{msg}");
@@ -202,19 +176,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级7失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级8 --2025-12-19【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade8.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade8.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade8().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{msg}");
@@ -229,19 +207,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级8失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级9 --2026-01-09【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade9.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade9.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade9().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】失败：{msg}");
@@ -256,19 +238,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级9失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级9 --2026-01-10【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade10.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade10.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade10().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级10 - 2026-01-10】失败：{msg}");
@@ -283,19 +269,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级10失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级10 - 2026-01-10】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级11 --2026-01-13【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade11.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade11.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade11().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】失败：{msg}");
@@ -310,19 +300,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级11失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级12 --2026-01-13【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade12.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade12.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade12().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】失败：{msg}");
@@ -337,6 +331,8 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级12失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】失败：{ex.Message}");
                 }
             }
@@ -344,13 +340,15 @@ namespace Microi.net
 
             #region 升级13 --2026-02-03【必须】
             var needAppStoreVersionUpgrade = NeedUpgrade(CurrentVersion, UpgradeAppStore.Version);
-            if (needAppStoreVersionUpgrade || await UpgradeAppStore.NeedRefreshAsync(osClientSecret.OsClient))
+            if (!migrationFailed && (needAppStoreVersionUpgrade || await UpgradeAppStore.NeedRefreshAsync(osClientSecret.OsClient)))
             {
                 try
                 {
                     var msgs = await new UpgradeAppStore().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级13 - 2026-02-03】失败：{msg}");
@@ -368,19 +366,23 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级13失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级13 - 2026-02-03】失败：{ex.Message}");
                 }
             }
             #endregion
 
             #region 升级14 --2026-07-12【必须】
-            if (NeedUpgrade(CurrentVersion, Upgrade14.Version))
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade14.Version))
             {
                 try
                 {
                     var msgs = await new Upgrade14().Run(osClientSecret.OsClient);
                     if (msgs.Count > 0)
                     {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
                         foreach (var msg in msgs)
                         {
                             Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级14 - 2026-07-12】失败：{msg}");
@@ -395,6 +397,8 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级14失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级14 - 2026-07-12】失败：{ex.Message}");
                 }
             }
@@ -403,7 +407,7 @@ namespace Microi.net
             #region 更新版本号【必须】
             try
             {
-                if (needUptServerVersion)
+                if (needUptServerVersion && !migrationFailed)
                 {
                     var count = osClientSecret.Db.FromSql("update sys_config set ServerVersion=@p0")
                         .AddInParameter("p0", uptVersion)
@@ -416,10 +420,45 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                migrationFailed = true;
+                migrationErrors.Add("更新ServerVersion失败：" + ex.Message);
                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】失败：{ex.Message}");//Sql：{UpgradeAppDisplay.Sql}。
             }
             #endregion
+            if (migrationFailed)
+            {
+                var message = string.Join("；", migrationErrors);
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】已停止，未推进ServerVersion：{message}");
+                return new DosResultList<MicroiUpgradeResult>(0, result, message);
+            }
             return new DosResultList<MicroiUpgradeResult>(1, result);
+        }
+
+        private void EnsureSecurityLevels(OsClientSecret osClientSecret)
+        {
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+
+            if (TableExists(osClientSecret, "sys_role"))
+            {
+                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_role{quoteClose} SET {quoteOpen}Level{quoteClose}=9999 WHERE {quoteOpen}Level{quoteClose}=999").ExecuteNonQuery();
+                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_role{quoteClose} SET {quoteOpen}Level{quoteClose}=9998 WHERE {quoteOpen}Level{quoteClose}=998").ExecuteNonQuery();
+            }
+            if (TableExists(osClientSecret, "sys_user"))
+            {
+                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_user{quoteClose} SET {quoteOpen}Level{quoteClose}=9999 WHERE {quoteOpen}Level{quoteClose}=999").ExecuteNonQuery();
+                osClientSecret.Db.FromSql($"UPDATE {quoteOpen}sys_user{quoteClose} SET {quoteOpen}Level{quoteClose}=9998 WHERE {quoteOpen}Level{quoteClose}=998").ExecuteNonQuery();
+            }
+            if (TableExists(osClientSecret, "sys_config") && ColumnExists(osClientSecret, "sys_config", "PwdEncode"))
+            {
+                osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_config{quoteClose}
+                    SET {quoteOpen}PwdEncode{quoteClose}='DES'
+                    WHERE {quoteOpen}PwdEncode{quoteClose} IS NULL
+                       OR {quoteOpen}PwdEncode{quoteClose}=''
+                       OR {quoteOpen}PwdEncode{quoteClose}='V8'").ExecuteNonQuery();
+            }
         }
 
         private void EnsureMicroServiceColumns(OsClientSecret osClientSecret)
@@ -453,7 +492,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret?.OsClient}】【检查微前端服务表字段】失败：{ex.Message}");
+                throw new InvalidOperationException("检查微前端服务表字段失败：" + ex.Message, ex);
             }
         }
 
@@ -493,7 +532,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret?.OsClient}】【检查JWT密钥字段】失败：{ex.Message}");
+                throw new InvalidOperationException("检查JWT密钥字段失败：" + ex.Message, ex);
             }
         }
 
@@ -623,26 +662,17 @@ namespace Microi.net
             {
                 return true;
             }
-            var currentVersionArr = CurrentVersion.DosSplit('.');
-            var upgradeVersionArr = UpgrageVersion.DosSplit('.');
-            for (int i = 0; i < currentVersionArr.Length; i++)
+            if (!System.Version.TryParse(CurrentVersion, out var currentVersion)
+                || currentVersion.Revision < 0)
             {
-                var currentVersionInt = int.Parse(currentVersionArr[i]);
-                var upgradeVersionInt = int.Parse(upgradeVersionArr[i]);
-                if (currentVersionInt == upgradeVersionInt)
-                {
-                    continue;
-                }
-                else if (currentVersionInt < upgradeVersionInt)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                throw new FormatException($"无效的当前版本号：{CurrentVersion}");
             }
-            return false;
+            if (!System.Version.TryParse(UpgrageVersion, out var upgradeVersion)
+                || upgradeVersion.Revision < 0)
+            {
+                throw new FormatException($"无效的升级版本号：{UpgrageVersion}");
+            }
+            return currentVersion.CompareTo(upgradeVersion) < 0;
         }
     }
 }

@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -17,10 +20,10 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.2.4.1";
+        public static string Version = "6.2.5.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(8)
         };
         private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
         private const string ImportPackageResourceName = "import-package.js";
@@ -49,35 +52,148 @@ namespace Microi.net
         /// 全局数据库版本可能已经高于本升级号，但租户库中的导入器仍可能因历史应用包覆盖而停留在旧版。
         /// 因此必须单独检查导入器能力标记，不能只依赖 SysConfig.Version。
         /// </summary>
-        public static async Task<bool> NeedRefreshAsync(string osClient)
+        public static Task<bool> NeedRefreshAsync(string osClient)
         {
+            if (IsOfficialSourceTenant(osClient))
+            {
+                Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过基础应用包完整性回写检查。");
+                return Task.FromResult(false);
+            }
+
             try
             {
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>
-                    {
-                        new List<object> { "ApiEngineKey", "=", "import-microi-store-package" }
-                    },
-                    _SelectFields = new[] { "ApiV8Code" }
-                });
-                if (result.Code != 1 || result.Data == null) return true;
+                // 老库的物理表与 diy_table/diy_field 元数据经常不同步。启动完整性判断如果继续走
+                // FormEngine，会把“物理数据存在但元数据缺失”误判为需要升级并在每次启动重复导入。
+                // 这里仅做参数化只读查询，以物理表事实为准；任何缺表/缺列异常仍安全地触发修复。
+                var client = OsClient.GetClient(osClient);
+                if (client?.Db == null) return RefreshRequired(osClient, "未找到租户数据库连接");
 
-                var code = Convert.ToString((object)result.Data.ApiV8Code) ?? string.Empty;
+                var code = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "import-microi-store-package")
+                    .ToScalar()?.ToString() ?? string.Empty;
                 var versionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
-                System.Version importerVersion;
-                return !versionMatch.Success ||
-                       !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                       importerVersion < new System.Version(1, 2, 7) ||
-                       !code.Contains("field_primary_recovered_") ||
-                       !code.Contains("rename_skipped_target_exists_") ||
-                       !code.Contains("applicationSha256Base64");
+                var importerVersion = new System.Version(0, 0, 0);
+                if (!versionMatch.Success ||
+                    !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
+                    importerVersion < new System.Version(1, 3, 2) ||
+                    !code.Contains("field_primary_recovered_") ||
+                    !code.Contains("rename_skipped_target_exists_") ||
+                    !code.Contains("preserve_interface_engine_pagetabs_") ||
+                    !code.Contains("System.DateTime.Now.ToString") ||
+                    !code.Contains("applicationSha256Base64"))
+                {
+                    return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
+                }
+
+                var publisherCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "ai_app_publish_store")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                var publisherStopHttp = client.Db.FromSql(@"SELECT StopHttp FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "ai_app_publish_store")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                var publisherVersionMatch = Regex.Match(publisherCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                if (!publisherVersionMatch.Success ||
+                    !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
+                    publisherVersion < new System.Version(1, 1, 2) ||
+                    !publisherCode.Contains("OfflineSelfContained") ||
+                    publisherStopHttp != "0")
+                {
+                    return RefreshRequired(osClient, "AI应用离线发布器缺失、自包含能力过低或禁止HTTP调用");
+                }
+
+                // ServerVersion 只能说明某个后续步骤曾成功，不能证明商城安装完整。
+                foreach (var tableName in new[] { "sys_microistore", "sys_microistoreversion" })
+                {
+                    var tableCount = client.Db.FromSql(@"SELECT COUNT(1) FROM diy_table
+WHERE LOWER(Name)=LOWER(@p0) AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                        .AddInParameter("p0", tableName)
+                        .ToScalar();
+                    if (!HasRows(tableCount)) return RefreshRequired(osClient, $"缺少表单元数据[{tableName}]");
+                }
+
+                var menuId = client.Db.FromSql(@"SELECT Id FROM sys_menu
+WHERE ModuleEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "sys_microistore")
+                    .ToScalar()?.ToString();
+                if (menuId.DosIsNullOrWhiteSpace()) return RefreshRequired(osClient, "缺少应用商城菜单");
+
+                var relatedMenuCount = client.Db.FromSql(@"SELECT COUNT(1) FROM sys_menu
+WHERE Id IN (@p0,@p1) AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "01KXFSG7MZ40CY8KCWCZZZJH2M")
+                    .AddInParameter("p1", "01KXFSG8153B3VZPZ45WNCCFHR")
+                    .ToScalar();
+                if (!long.TryParse(relatedMenuCount?.ToString(), out var relatedCount) || relatedCount < 2)
+                {
+                    return RefreshRequired(osClient, "缺少应用商城关联模块");
+                }
+
+                // sys_menu 的 diy_table.Id 在部分早期客户库中并非官方固定 Id，
+                // 必须按表名关联查找，避免完整性检查永远误判并重复安装应用商城。
+                var pageTabsConfig = client.Db.FromSql(@"SELECT f.Config
+FROM diy_field f
+INNER JOIN diy_table t ON t.Id=f.TableId
+WHERE LOWER(t.Name)=LOWER(@p0)
+  AND f.Name=@p1
+  AND (t.IsDeleted=0 OR t.IsDeleted IS NULL)
+  AND (f.IsDeleted=0 OR f.IsDeleted IS NULL)")
+                    .AddInParameter("p0", "sys_menu")
+                    .AddInParameter("p1", "PageTabs")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                if (!pageTabsConfig.Contains("TargetSysMenuId"))
+                {
+                    return RefreshRequired(osClient, "页面多Tab缺少关联模块配置");
+                }
+
+                var appStorePageTabs = client.Db.FromSql(@"SELECT PageTabs FROM sys_menu
+WHERE Id=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", menuId)
+                    .ToScalar()?.ToString() ?? string.Empty;
+                if (!appStorePageTabs.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
+                    !appStorePageTabs.Contains("01KXFSG8153B3VZPZ45WNCCFHR"))
+                {
+                    return RefreshRequired(osClient, "应用商城页面多Tab未关联本租户模块");
+                }
+
+                var roleLimitCount = client.Db.FromSql(@"SELECT COUNT(1) FROM sys_rolelimit
+WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
+                    .AddInParameter("p0", "5db47859-35a3-411a-a1f7-99482e057d24")
+                    .AddInParameter("p1", menuId)
+                    .AddInParameter("p2", "Menu")
+                    .ToScalar();
+                if (!HasRows(roleLimitCount)) return RefreshRequired(osClient, "缺少应用商城超级管理员菜单权限");
+
+                return Task.FromResult(false);
             }
-            catch
+            catch (Exception ex)
             {
-                return true;
+                return RefreshRequired(osClient, "完整性检查异常：" + ex.Message);
             }
+        }
+
+        private static bool HasRows(object value)
+        {
+            return long.TryParse(value?.ToString(), out var count) && count > 0;
+        }
+
+        private static Task<bool> RefreshRequired(string osClient, string reason)
+        {
+            Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]需要修复：{reason}。");
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// 官方应用源数据库不能被随程序集发布的商城基线包反向覆盖。
+        /// 客户可以使用同名 iTdos 租户，因此租户名本身绝不能作为判断依据。
+        /// 统一调用 Microi.net 的 LicenseService 判断当前服务器是否拥有签发私钥；
+        /// 客户 NuGet/发布包不包含私钥，即使租户也叫 iTdos 仍会正常升级。
+        /// </summary>
+        internal static bool IsOfficialSourceTenant(string osClient)
+        {
+            return string.Equals(osClient, "iTdos", StringComparison.OrdinalIgnoreCase)
+                   && Microi.License.LicenseService.HasPrivateKey();
         }
 
         private static readonly string[] CoreNullableTables =
@@ -90,15 +206,45 @@ namespace Microi.net
             "sys_osclients"
         };
         
-        private static async Task<Dictionary<string, string>> DownloadRequiredResourcesAsync()
+        private static Dictionary<string, string> LoadBundledResources()
         {
             var resources = new Dictionary<string, string>(StringComparer.Ordinal);
+            var assembly = typeof(UpgradeAppStore).GetTypeInfo().Assembly;
             foreach (var resourceName in RequiredResourceNames)
             {
-                resources[resourceName] = await DownloadOfficialResourceAsync(resourceName);
+                var manifestName = "Microi.Upgrade.Resource." + resourceName;
+                using (var stream = assembly.GetManifestResourceStream(manifestName))
+                {
+                    if (stream == null)
+                    {
+                        throw new InvalidOperationException($"程序集缺少基础升级资源[{resourceName}]。请刷新资源后重新构建。");
+                    }
+                    using (var reader = new StreamReader(stream))
+                    {
+                        var content = reader.ReadToEnd();
+                        ValidateResourceContent(resourceName, content);
+                        resources[resourceName] = content;
+                    }
+                }
             }
-
             return resources;
+        }
+
+        private static async Task<Dictionary<string, string>> LoadUpgradeResourcesAsync()
+        {
+            var bundledResources = LoadBundledResources();
+            try
+            {
+                var pairs = await Task.WhenAll(RequiredResourceNames.Select(async resourceName =>
+                    new KeyValuePair<string, string>(resourceName, await DownloadOfficialResourceAsync(resourceName))));
+                Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
+                return pairs.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【基础应用升级】官方资源不可用，整组回退到程序集内置资源：{ex.Message}");
+                return bundledResources;
+            }
         }
 
         private static async Task<string> DownloadOfficialResourceAsync(string resourceName)
@@ -174,9 +320,11 @@ namespace Microi.net
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 2, 7) ||
+                    importerVersion < new System.Version(1, 3, 2) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
+                    !content.Contains("preserve_interface_engine_pagetabs_") ||
+                    !content.Contains("System.DateTime.Now.ToString") ||
                     !content.Contains("rename_skipped_target_exists_"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
@@ -186,7 +334,12 @@ namespace Microi.net
 
             if (string.Equals(resourceName, PublishAiAppResourceName, StringComparison.Ordinal))
             {
-                if (!content.Contains("ai_app_publish_store"))
+                var publisherVersionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                if (!content.Contains("ai_app_publish_store") ||
+                    !publisherVersionMatch.Success ||
+                    !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
+                    publisherVersion < new System.Version(1, 1, 2) ||
+                    !content.Contains("OfflineSelfContained"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
                 }
@@ -209,6 +362,19 @@ namespace Microi.net
             {
                 throw new InvalidOperationException($"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。");
             }
+
+            if (string.Equals(resourceName, AppStorePackageResourceName, StringComparison.Ordinal))
+            {
+                var packageVersionText = package["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
+                if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
+                    packageVersion < new System.Version(6, 2, 9) ||
+                    !content.Contains("TargetSysMenuId") ||
+                    !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
+                    !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR"))
+                {
+                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
+                }
+            }
         }
 
         private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName, IReadOnlyDictionary<string, string> resources)
@@ -229,6 +395,66 @@ namespace Microi.net
             Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
         }
 
+        private static void EnsureImporterExecutionLimits(string osClient)
+        {
+            var client = OsClient.GetClient(osClient);
+            if (client?.Db == null) throw new InvalidOperationException($"未找到租户[{osClient}]数据库连接。");
+            var dbType = client.OsClientModel?["DbType"]?.Val<string>();
+            var sql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                ? @"UPDATE [sys_apiengine] SET [Timeout]=@p0, [MaxStatements]=@p1, [LimitMemory]=@p2, [LimitRecursion]=@p3, [Lock]=1 WHERE [ApiEngineKey]=@p4"
+                : @"UPDATE `sys_apiengine` SET `Timeout`=@p0, `MaxStatements`=@p1, `LimitMemory`=@p2, `LimitRecursion`=@p3, `Lock`=1 WHERE `ApiEngineKey`=@p4";
+            client.Db.FromSql(sql)
+                .AddInParameter("p0", 3600)
+                .AddInParameter("p1", 100000000)
+                .AddInParameter("p2", 2048)
+                .AddInParameter("p3", 10000)
+                .AddInParameter("p4", "import-microi-store-package")
+                .ExecuteNonQuery();
+        }
+
+        private static void EnsurePublisherHttpEnabled(string osClient)
+        {
+            var client = OsClient.GetClient(osClient);
+            if (client?.Db == null) throw new InvalidOperationException($"未找到租户[{osClient}]数据库连接。");
+            var dbType = client.OsClientModel?["DbType"]?.Val<string>();
+            var sql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                ? @"UPDATE [sys_apiengine] SET [StopHttp]=0 WHERE [ApiEngineKey]=@p0"
+                : @"UPDATE `sys_apiengine` SET `StopHttp`=0 WHERE `ApiEngineKey`=@p0";
+            client.Db.FromSql(sql)
+                .AddInParameter("p0", "ai_app_publish_store")
+                .ExecuteNonQuery();
+        }
+
+        private static async Task EnsureAppStoreAdminPermission(string osClient, string menuId, List<string> msgs)
+        {
+            var roleId = "5db47859-35a3-411a-a1f7-99482e057d24";
+            var existing = await MicroiEngine.FormEngine.GetFormDataAsync("sys_rolelimit", new
+            {
+                OsClient = osClient,
+                _Where = new List<object>
+                {
+                    new List<object> { "RoleId", "=", roleId },
+                    new List<object> { "FkId", "=", menuId },
+                    new List<object> { "Type", "=", "Menu" }
+                },
+                _SelectFields = new[] { "Id" }
+            });
+            if (existing.Code == 1 && existing.Data != null) return;
+
+            var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_rolelimit", new
+            {
+                OsClient = osClient,
+                RoleId = roleId,
+                FkId = menuId,
+                Type = "Menu",
+                Permission = "[\"Add\",\"Edit\",\"Del\",\"Export\",\"Import\"]"
+            });
+            if (addResult.Code != 1)
+            {
+                msgs.Add("应用商城超级管理员菜单权限补齐失败：" + addResult.Msg);
+            }
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -236,9 +462,15 @@ namespace Microi.net
         {
             var msgs = new List<string>();
 
-            // 必须先完整下载并校验全部资源。任意资源不可用时直接终止，避免部分升级，
-            // 更不能再使用随安装包发布的旧资源覆盖客户数据库。
-            var resources = await DownloadRequiredResourcesAsync();
+            if (IsOfficialSourceTenant(osClient))
+            {
+                Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]是吾码官方应用源，跳过导入器及基础应用包回写；其它升级步骤不受影响。");
+                return msgs;
+            }
+
+            // 在线资源必须整组成功才使用；断网、超时或任一资源校验失败时，整组使用
+            // 当前程序集随版本发布的基线，确保客户更新后端即可自动获得应用商城。
+            var resources = await LoadUpgradeResourcesAsync();
 
             var nullableMessages = new List<string>();
             EnsureCoreTableColumnsNullable(osClient, nullableMessages);
@@ -269,6 +501,11 @@ namespace Microi.net
                     ApiEngineKey = "import-microi-store-package",
                     ApiAddress = "/apiengine/import-microi-store-package",
                     IsEnable = 1,
+                    Timeout = 3600,
+                    MaxStatements = 100000000,
+                    LimitMemory = 2048,
+                    LimitRecursion = 10000,
+                    Lock = 1,
                     OsClient = osClient,
                     ApiV8Code = importV8
                 });
@@ -286,6 +523,11 @@ namespace Microi.net
                     ApiEngineKey = "import-microi-store-package",
                     ApiAddress = "/apiengine/import-microi-store-package",
                     IsEnable = 1,
+                    Timeout = 3600,
+                    MaxStatements = 100000000,
+                    LimitMemory = 2048,
+                    LimitRecursion = 10000,
+                    Lock = 1,
                     OsClient = osClient,
                     ApiV8Code = importV8
                 });
@@ -300,6 +542,15 @@ namespace Microi.net
                     await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
                 }
             }
+            if (msgs.Count == 0)
+            {
+                // 老库虽然已有物理字段，但 diy_field 元数据可能缺失，FormEngine 更新会忽略这些值。
+                // 这里直接修正导入器运行限额，避免大体量元数据包继续使用默认 1GB 限制。
+                EnsureImporterExecutionLimits(osClient);
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:import-microi-store-package");
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
+            }
+            if (msgs.Count > 0) return msgs;
             #endregion
 
             #region AI应用发布到商城V8
@@ -323,7 +574,7 @@ namespace Microi.net
                     ApiEngineKey = "ai_app_publish_store",
                     ApiAddress = "/apiengine/ai_app_publish_store",
                     IsEnable = 1,
-                    StopHttp = 1,
+                    StopHttp = 0,
                     ApiV8Code = publishAiAppV8
                 });
             }
@@ -336,16 +587,20 @@ namespace Microi.net
                     ApiEngineKey = "ai_app_publish_store",
                     ApiAddress = "/apiengine/ai_app_publish_store",
                     IsEnable = 1,
-                    StopHttp = 1,
+                    StopHttp = 0,
                     ApiV8Code = publishAiAppV8
                 });
             }
             if (publishAiAppResult.Code != 1)
             {
-                msgs.Add("AI应用发布商城接口升级失败：" + publishAiAppResult.Msg);
+                // AI 发布器不是应用商城启动的前置条件，老库缺少可选字段时不应阻断三套基础包。
+                Console.WriteLine("Microi：【基础应用升级】AI应用发布商城接口升级跳过：" + publishAiAppResult.Msg);
             }
             else
             {
+                // 老库的 StopHttp 物理列可能缺少 diy_field 元数据，FormEngine 更新会静默忽略；
+                // 再以参数化 SQL 强制修正，保证登录态工作台可以通过 HTTP 制作离线包。
+                EnsurePublisherHttpEnabled(osClient);
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:ai_app_publish_store");
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:/apiengine/ai_app_publish_store");
             }
@@ -353,14 +608,17 @@ namespace Microi.net
             
             #region 表单引擎 数据包
             await InstallUpgradePackage(osClient, msgs, FormEnginePackageResourceName, "表单引擎数据包", resources);
+            if (msgs.Count > 0) return msgs;
             #endregion
 
             #region 模块引擎 数据包
             await InstallUpgradePackage(osClient, msgs, ModuleEnginePackageResourceName, "模块引擎数据包", resources);
+            if (msgs.Count > 0) return msgs;
             #endregion
 
             #region 应用商城 数据包
             await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
+            if (msgs.Count > 0) return msgs;
             #endregion
 
             #region 修正sys_menu的DiyTableId关联值
@@ -381,8 +639,9 @@ namespace Microi.net
                 });
                 if(getMenuResult.Code == 1)
                 {
+                    var appStoreMenuId = (string)getMenuResult.Data.Id;
                     var uptMenuResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new {
-                        Id = (string)getMenuResult.Data.Id,
+                        Id = appStoreMenuId,
                         OsClient = osClient,
                         DiyTableId = (string)getStoreTableResult.Data.Id,
                         DiyTableName = (string)getStoreTableResult.Data.Name,
@@ -392,9 +651,12 @@ namespace Microi.net
                         msgs.Add(uptMenuResult.Msg);
                     }else
                     {
-                        await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{(string)getMenuResult.Data.Id}");
+                        await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{appStoreMenuId}");
                         await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:sys_microistore");
                     }
+                    await EnsureAppStoreAdminPermission(osClient, appStoreMenuId, msgs);
+                    await EnsureAppStoreAdminPermission(osClient, "01KXFSG7MZ40CY8KCWCZZZJH2M", msgs);
+                    await EnsureAppStoreAdminPermission(osClient, "01KXFSG8153B3VZPZ45WNCCFHR", msgs);
                 }
             }
             #endregion

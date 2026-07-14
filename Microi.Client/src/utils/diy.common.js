@@ -1620,6 +1620,9 @@ var DiyCommon = {
             closeOnPressEscape: false,
             closeOnHashChange: false,
 
+            customClass: option.CustomClass || "",
+            beforeClose: typeof option.BeforeClose === "function" ? option.BeforeClose : undefined,
+
             showClose: option.ShowClose,
             showCancelButton: option.ShowCancelButton
         })

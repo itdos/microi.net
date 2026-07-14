@@ -21,6 +21,7 @@
             :baseroute="baseRoute"
             :default-page="microRoutePath || '/'"
             router-mode="pure"
+            iframe
             keep-alive
         />
     </div>
@@ -196,7 +197,7 @@ export default {
 
             let microAppUrl = safeDecode(all.src || all.url || meta.MicroAppUrl || meta.Url || "");
             const urlApiEngineId = all.urlApiEngineId || meta.MicroAppUrlApiEngineId || meta.UrlApiEngineId || "";
-            let appKey = all.appKey || all.AppKey || all.key || "";
+            let appKey = all.appKey || all.AppKey || all.key || meta.MicroServiceKey || meta.MsKey || meta.AppKey || "";
             let version = all.version || all.Version || "";
             let microRoutePath = safeDecode(all.microRoute || all.routePath || meta.MicroServiceRoutePath || meta.RoutePath || "");
             const routePathConfig = parseMicroAppPath(route.path || "");

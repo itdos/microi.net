@@ -14,6 +14,7 @@
             :data="microAppData"
             :default-page="routePath"
             router-mode="pure"
+            iframe
             @datachange="handleDataChange"
         />
     </section>
@@ -87,13 +88,25 @@ export default {
                 if (!this.appKey) throw new Error("OpenAppDialog 缺少 AppKey");
                 let version = String(this.DataAppend?.Version || "").trim();
                 if (!version) {
-                    const result = await DiyCommon.FormEngine.GetFormData("sys_microiservice", {
+                    // GetFormData 在部分老库会被历史字段元数据影响；列表查询只取首条，
+                    // 并兼容旧前端/网关的不同 DosResult 包装结构。
+                    const result = await DiyCommon.FormEngine.GetTableData("sys_microiservice", {
                         _Where: [["MsKey", "=", this.appKey]],
-                        _SelectFields: ["Id", "MsKey", "BuildVersion", "IsEnable"]
+                        _PageIndex: 1,
+                        _PageSize: 1
                     });
-                    if (!result || result.Code !== 1 || !result.Data) throw new Error(`未找到已发布微服务：${this.appKey}`);
-                    if (Number(result.Data.IsEnable) === 0) throw new Error(`微服务已停用：${this.appKey}`);
-                    version = result.Data.BuildVersion || "";
+                    const rows = Array.isArray(result)
+                        ? result
+                        : (Array.isArray(result?.Data)
+                            ? result.Data
+                            : (Array.isArray(result?.Data?.Data) ? result.Data.Data : []));
+                    const resultCode = result?.Code ?? result?.code;
+                    const service = rows[0];
+                    if ((resultCode !== undefined && resultCode !== null && Number(resultCode) !== 1) || !service) {
+                        throw new Error(`未找到已发布微服务：${this.appKey}`);
+                    }
+                    if (Number(service.IsEnable) === 0) throw new Error(`微服务已停用：${this.appKey}`);
+                    version = service.BuildVersion || "";
                 }
                 this.appVersion = version;
                 const versionPart = version ? `/${encodeURIComponent(version)}` : "";

@@ -198,6 +198,25 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 
 >* **页面多Tab**
 
+页面多Tab支持两种动态模式：
+
+- 不配置【关联模块】：在当前模块执行 `V8Code`，通常使用 `V8.SearchSet(...)` 切换筛选条件。
+- 配置【关联模块】：保存目标 `sys_menu.Id` 到 `TargetSysMenuId`。点击后替换当前路由并完整加载目标模块；目标菜单可以设置 `Display=0、AppDisplay=0` 隐藏导航入口，但仍需给当前角色分配菜单权限。
+
+关联模块适合一个业务入口下不同页签分别使用不同 `diy_table`、字段、列表模板、查询接口替换或按钮配置的场景。所有关联模块建议配置同一组 PageTabs，才能从任意页签无感切回其它模块；不要在前端 mixin 中按菜单名或表名写死数据源。
+
+```json
+[
+  {
+    "Id": "01K...",
+    "Sort": 10,
+    "Name": "本地记录",
+    "TargetSysMenuId": "目标sys_menu.Id",
+    "IsVisible": true
+  }
+]
+```
+
 ## 平台支持的URL参数
 >* ShowClassicTop：若设置为0，则不显示经典顶部内容。默认值为1
 >* ShowClassicLeft：若设置为0，则不显示经典左侧菜单。默认值为1

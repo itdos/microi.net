@@ -11,6 +11,14 @@ import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 const whiteList = ["/login", "/auth-redirect"]; // no redirect whitelist
 
+function isAuthenticationFailure(error) {
+    if (!error) return false;
+    if (error.isAuthFailure === true) return true;
+    if ([1001, 1002].includes(Number(error.code))) return true;
+    var message = String(error.message || error.Msg || "").trim().toLowerCase();
+    return message === "nologin" || message.includes("未登录") || message.includes("token失效") || message.includes("身份验证失败");
+}
+
 function normalizeIframeRouteUrl(url) {
     if (!url) return url;
     var rawUrl = String(url).trim();
@@ -206,9 +214,9 @@ router.beforeEach(async (to, from, next) => {
                     next({ ...to, replace: true });
                 } catch (error) {
                     console.error("[permission] 动态路由初始化失败：", error);
-                    // 路由构建异常不等于登录失效。Token 存在时清空它会让同域的所有标签页一起退出。
-                    // 真正的 1001/1002 由统一请求层负责处理。
-                    if (!DiyCommon.getToken()) {
+                    // 同域切换 OsClient 时，浏览器里可能仍残留其它租户的 Token。
+                    // 菜单接口明确返回 NoLogin/1001/1002 时必须清理并跳登录页，否则 next(false) 会留下空白页。
+                    if (!DiyCommon.getToken() || isAuthenticationFailure(error)) {
                         await userStore.resetToken();
                         next({ path: "/login", query: { redirect: to.fullPath } });
                     } else {

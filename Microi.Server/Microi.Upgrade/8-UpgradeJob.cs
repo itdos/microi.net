@@ -110,7 +110,7 @@ if(V8.FormSubmitAction == 'Insert'){
 else if(V8.FormSubmitAction == 'Update'){
   var result = V8.Http.Post({ 
     Url : apiBase + '/api/Job/UpdateJob',
-    PostParam, para, 
+    PostParam : para,
     ParamType : 'form',
     Headers:{
       authorization : 'Bearer ' + currentTokenObj.Token

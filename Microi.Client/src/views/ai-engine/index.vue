@@ -430,6 +430,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import {
     Box,
@@ -466,6 +467,7 @@ const props = defineProps({
 const embedded = computed(() => props.embedded);
 const compact = computed(() => props.compact);
 const { proxy } = getCurrentInstance();
+const route = useRoute();
 const DiyCommon = proxy.DiyCommon;
 const diyStore = useDiyStore();
 
@@ -511,7 +513,7 @@ const aiSysMenuId = ref("");
 const aiModelTableId = ref("");
 const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
-const activeWorkspace = ref("chat");
+const activeWorkspace = ref(route.query.workspace === "apps" || route.query.appId ? "apps" : "chat");
 const statsLoading = ref(false);
 const platformStats = reactive({
     DiyTableCount: 0,
@@ -628,6 +630,10 @@ watch(reasoningEffort, (value) => {
     try {
         window.localStorage.setItem("microi-ai-reasoning-effort", value || "auto");
     } catch {}
+});
+
+watch(() => [route.query.workspace, route.query.appId], ([workspace, appId]) => {
+    if (workspace === "apps" || appId) activeWorkspace.value = "apps";
 });
 
 watch(selectedAiModel, () => {

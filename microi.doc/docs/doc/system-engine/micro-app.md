@@ -108,6 +108,7 @@
 | 命令 | 作用 |
 |---|---|
 | `创建前端微服务` | 创建 Vue/Vite 工程、安装依赖，并注册微服务草稿。 |
+| `拉取服务器前端微服务` | 从当前租户的在线 AI 应用私有 HDFS 拉取完整源码；只有运行产物、未保存源码的应用会明确拒绝拉取。 |
 | `构建前端微服务` | 清理 `dist`，执行 `npm run build`，校验入口文件。 |
 | `推送前端微服务到数据库` | 上传已有 `dist`，更新运行时、版本和页面路由。 |
 | `构建并推送前端微服务` | 构建、上传产物、同步路由，并尝试把源码同步到在线 AI 应用。 |
@@ -128,28 +129,33 @@ npm run dev
 
 ```text
 Microi-MicroApp/
-  iTdos~吾码官网微服务/
-    .microi-micro-app.json
-    microi.routes.json
-    package.json
-    vite.config.js
-    index.html
-    src/
-      App.vue
-      main.js
-      microi.js
-      utils/
-        microi.v8.js
-      pages/
+  Microi吾码 (api.itdos.com)/
+    iTdos.Product.Internal/
+      microi-official/
+        .microi-micro-app.json
+        microi.routes.json
+        package.json
+        vite.config.js
+        index.html
+        src/
+          App.vue
+          main.js
+          microi.js
+          utils/
+            microi.v8.js
+          pages/
 ```
 
-同一个 `OsClient` 可以创建多个目录，例如：
+目录隔离规则与 `Microi-V8-Engine` 完全一致：第一层为 `{系统名称} ({ApiBase域名})`，第二层为 `{OsClient}.{OsClientType}.{OsClientNetwork}`，第三层才是微服务 `appKey`。因此不同服务器或租户即使存在相同 `appKey`，也不会覆盖同一份本地源码。
+
+同一个租户可以创建多个微服务，例如：
 
 ```text
-Microi-MicroApp/iTdos
-Microi-MicroApp/iTdos~2
-Microi-MicroApp/iTdos~吾码官网微服务
+Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/microi-official
+Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/platform-service
 ```
+
+旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入隔离目录。拉取读取的是 `mci_ai_app / mci_ai_app_file` 中保存的私有源码，不是 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
 
 `.microi-micro-app.json` 是插件识别项目的依据：
 
