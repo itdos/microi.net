@@ -372,6 +372,20 @@
             }
         }
     }
+    .el-message-box.microi-offline-install-messagebox {
+        width: min(620px, calc(100vw - 32px));
+        padding: 0;
+        overflow: hidden;
+        .el-message-box__header {
+            padding: 20px 22px 10px;
+        }
+        .el-message-box__content {
+            padding: 8px 22px 6px;
+        }
+        .el-message-box__btns {
+            padding: 14px 22px 20px;
+        }
+    }
     //如果设置了遮罩层，那么diy弹出层就在下面了， DIY弹出层是2000+
     //已知的问题是遮罩层挡不住3000的编辑器
     .v-modal {

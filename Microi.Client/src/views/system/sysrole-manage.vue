@@ -125,57 +125,21 @@
                     </el-col>
                     <el-col :span="24" :xs="24">
                         <el-form-item label="权限明细">
-                            <el-table
-                                v-loading="tableLoading"
-                                :data="SysMenuList"
-                                row-key="Id"
-                                :tree-props="{ children: '_Child' }"
-                                class="diy-table table-sysmenu table-sysmenu-roles cell-br"
-                                style="width: 100%"
-                                stripe
-                                border
-                            >
-                                <el-table-column label="名称" width="250">
-                                    <template #default="scope">
-                                        <span
-                                            :style="{
-                                                marginLeft: (DiyCommon.IsNull(scope.row._Child) || scope.row._Child.length == 0) && scope.row.ParentId == DiyCommon.GuidEmpty ? '23px' : '0px'
-                                            }"
-                                        >
-                                            <el-checkbox
-                                                v-model="scope.row._Check"
-                                                @change="
-                                                    (val) => {
-                                                        return NameChange(val, scope.row);
-                                                    }
-                                                "
-                                            >
-                                                <i :class="DiyCommon.IsNull(scope.row.IconClass) ? 'icon mr-2' : 'icon  mr-2 ' + scope.row.IconClass"></i>
-                                                {{ DiyCommon.IsNull(scope.row.Name) ? scope.row.EnName : scope.row.Name }}
-                                            </el-checkbox>
-                                        </span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="权限" min-width="360">
-                                    <template #default="scope">
-                                        <div class="permission-checkbox-group">
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Add')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Add')"> {{ $t("Msg.Add") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Edit')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Edit')"> {{ $t("Msg.Edit") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Del')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Del')"> {{ $t("Msg.Del") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Import')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Import')"> {{ $t("Msg.Import") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('Export')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'Export')"> {{ $t("Msg.Export") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('NoDetail')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'NoDetail')"> 无{{ $t("Msg.Detail") }}</label>
-                                            <label class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes('NoSearch')" @change="(e) => handlePermChange(e.target.checked, scope.row, 'NoSearch')"> 无{{ $t("Msg.Search") }}</label>
-                                            <label v-for="btn in scope.row.MoreBtns" :key="'m-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                            <label v-for="btn in scope.row.ExportMoreBtns" :key="'e-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                            <label v-for="btn in scope.row.BatchSelectMoreBtns" :key="'b-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                            <label v-for="btn in scope.row.PageBtns" :key="'p-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                            <label v-for="btn in scope.row.PageTabs" :key="'t-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                            <label v-for="btn in scope.row.FormBtns" :key="'f-' + btn.Id" class="perm-cb"><input type="checkbox" :checked="scope.row.Permission.includes(btn.Id)" @change="(e) => togglePermission(e.target.checked, scope.row, btn.Id)"> {{ btn.Name }}</label>
-                                        </div>
-                                    </template>
-                                </el-table-column>
-                            </el-table>
+                            <div v-loading="tableLoading" class="role-menu-permission-tree">
+                                <div class="role-menu-header">
+                                    <div>名称</div>
+                                    <div>权限</div>
+                                </div>
+                                <SysroleMenuPermissionRow
+                                    v-for="menu in SysMenuList"
+                                    :key="menu.Id"
+                                    :row="menu"
+                                    :permission-labels="permissionLabels"
+                                    @name-change="NameChange"
+                                    @permission-change="handlePermChange"
+                                    @toggle-permission="togglePermission"
+                                />
+                            </div>
                         </el-form-item>
                     </el-col>
                 </el-row>
@@ -193,8 +157,12 @@
 import _ from "underscore";
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
+import SysroleMenuPermissionRow from "./components/sysrole-menu-permission-row.vue";
 export default {
     name: "sys_role",
+    components: {
+        SysroleMenuPermissionRow
+    },
     directives: {},
     setup() {
         const diyStore = useDiyStore();
@@ -241,8 +209,22 @@ export default {
                 children: "_Child",
                 label: "Name"
             },
-            SysMenuList: []
+            SysMenuList: [],
+            MenuParentMap: Object.create(null)
         };
+    },
+    computed: {
+        permissionLabels() {
+            return {
+                Add: this.$t("Msg.Add"),
+                Edit: this.$t("Msg.Edit"),
+                Del: this.$t("Msg.Del"),
+                Import: this.$t("Msg.Import"),
+                Export: this.$t("Msg.Export"),
+                NoDetail: "无" + this.$t("Msg.Detail"),
+                NoSearch: "无" + this.$t("Msg.Search")
+            };
+        }
     },
     mounted() {
         var self = this;
@@ -307,17 +289,12 @@ export default {
                         self.ForBtnChange(val, childRow, type);
                     });
                 }
-                //递归选中上级的主菜单
-                self.SysMenuList.forEach((parentRow) => {
-                    if (parentRow._Child && parentRow._Child) {
-                        if (_.where(parentRow._Child, { Id: row.Id }).length > 0) {
-                            parentRow._Check = true;
-                            return;
-                        }
-                        //此递归比较特殊，需要传入Arr
-                        self.ForBtnParentChange(parentRow._Child, row, [parentRow]);
-                    }
-                });
+                // 通过预构建父索引选中上级，避免每次勾选都扫描整棵菜单树。
+                var parentRow = self.MenuParentMap[row.Id];
+                while (parentRow) {
+                    parentRow._Check = true;
+                    parentRow = self.MenuParentMap[parentRow.Id];
+                }
             } else {
                 //递归取消子级的此权限
                 if (row._Child) {
@@ -513,6 +490,8 @@ export default {
                             self.DiyCommon.ForConvertSysMenu(element);
                         });
 
+                        self.MenuParentMap = Object.create(null);
+                        self.BuildMenuParentMap(result.Data, null);
                         self.SysMenuList = result.Data;
                     }
                     self.tableLoading = false;
@@ -533,6 +512,17 @@ export default {
                 // }
                 if (!self.DiyCommon.IsNull(element._Child) && element._Child.length > 0) {
                     self.ForSysMenuList(element._Child);
+                }
+            });
+        },
+        BuildMenuParentMap(sysMenuList, parentRow) {
+            var self = this;
+            sysMenuList.forEach((element) => {
+                if (parentRow) {
+                    self.MenuParentMap[element.Id] = parentRow;
+                }
+                if (Array.isArray(element._Child) && element._Child.length > 0) {
+                    self.BuildMenuParentMap(element._Child, element);
                 }
             });
         },
@@ -776,10 +766,101 @@ export default {
     display: block;
 }
 
-.el-table.table-sysmenu-roles {
-    .cell {
-        white-space: normal;
+.role-menu-permission-tree {
+    width: 100%;
+    max-height: calc(100vh - 310px);
+    overflow: auto;
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 4px;
+
+    .role-menu-header,
+    .role-menu-row {
+        display: grid;
+        grid-template-columns: 250px minmax(360px, 1fr);
+        min-width: 720px;
     }
+
+    .role-menu-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        color: var(--el-text-color-secondary, #909399);
+        font-weight: 600;
+        background: var(--el-fill-color-light, #f5f7fa);
+
+        > div {
+            padding: 10px 12px;
+            border-right: 1px solid var(--el-border-color-lighter, #ebeef5);
+        }
+    }
+
+    .role-menu-row {
+        align-items: stretch;
+        min-height: 42px;
+        border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
+
+        &:hover {
+            background: var(--el-fill-color-lighter, #fafafa);
+        }
+
+        > div {
+            display: flex;
+            align-items: center;
+            padding: 7px 12px;
+            border-right: 1px solid var(--el-border-color-lighter, #ebeef5);
+            box-sizing: border-box;
+        }
+    }
+
+    .role-menu-name {
+        min-width: 0;
+    }
+
+    .role-menu-expand,
+    .role-menu-expand-placeholder {
+        width: 22px;
+        min-width: 22px;
+        height: 22px;
+    }
+
+    .role-menu-expand {
+        padding: 0;
+        border: 0;
+        color: var(--el-text-color-secondary, #909399);
+        background: transparent;
+        cursor: pointer;
+    }
+
+    .role-menu-expand-arrow {
+        display: inline-block;
+        font-size: 20px;
+        line-height: 20px;
+        transform: rotate(0deg);
+        transition: transform 0.12s ease;
+
+        &.expanded {
+            transform: rotate(90deg);
+        }
+    }
+
+    .role-menu-check {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        cursor: pointer;
+
+        input {
+            margin-right: 7px;
+            accent-color: var(--el-color-primary, #409eff);
+        }
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
     .permission-checkbox-group {
         display: flex;
         flex-wrap: wrap;

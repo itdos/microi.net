@@ -236,7 +236,13 @@
                         </div>
                     </template>
                 </el-tree>
-                <el-empty v-else :image-size="76" :description="fileTreeMode === 'build' ? '暂无编译文件' : '暂无源码文件'" />
+                <el-empty
+                    v-else
+                    :image-size="76"
+                    :description="fileTreeMode === 'build'
+                        ? (buildFilesUnavailableReason || '暂无编译文件')
+                        : (sourceFilesUnavailableReason || '暂无源码文件')"
+                />
             </div>
         </section>
 
@@ -317,6 +323,7 @@
                                 :data="previewMicroAppData"
                                 :default-page="previewMicroRoute"
                                 router-mode="pure"
+                                iframe
                             />
                             <iframe v-else :src="previewUrl" class="preview-frame"></iframe>
                         </div>
@@ -341,7 +348,7 @@
                             v8CodeType="client"
                         />
                         <div v-else class="empty-area">
-                            <p>{{ files.length ? '选择左侧文件后可以在线查看、编辑源码。' : '该应用安装时未携带源码包；仍可在【编译视图】查看和修改已发布代码。' }}</p>
+                            <p>{{ files.length ? '选择左侧文件后可以在线查看、编辑源码。' : sourceFilesUnavailableReason }}</p>
                         </div>
                     </div>
 
@@ -355,7 +362,7 @@
                             v8CodeType="client"
                         />
                         <div v-else class="empty-area">
-                            <p>{{ buildFiles.length ? '请在左侧编译代码树中选择文件。' : '当前应用还没有可查看的编译产物。' }}</p>
+                            <p>{{ buildFiles.length ? '请在左侧编译代码树中选择文件。' : (buildFilesUnavailableReason || '当前应用还没有可查看的编译产物。') }}</p>
                         </div>
                     </div>
 
@@ -419,6 +426,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import { Back, CircleClose, Cpu, Document, EditPen, Folder, Grid, Paperclip, Top, View } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
@@ -447,6 +455,8 @@ const emit = defineEmits(["update:selectedAiModel"]);
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
 const diyStore = useDiyStore();
+const route = useRoute();
+const router = useRouter();
 
 const keyword = ref("");
 const appViewMode = ref("gallery");
@@ -459,6 +469,7 @@ const versions = ref([]);
 const activeFile = ref(null);
 const activeContent = ref("");
 const buildFiles = ref([]);
+const buildFilesUnavailableReason = ref("");
 const activeBuildFile = ref(null);
 const activeBuildContent = ref("");
 const fileTreeMode = ref("source");
@@ -519,6 +530,10 @@ const editorField = computed(() => ({
 const currentEditorFile = computed(() => fileTreeMode.value === "build" ? activeBuildFile.value : activeFile.value);
 const currentEditorContent = computed(() => fileTreeMode.value === "build" ? activeBuildContent.value : activeContent.value);
 const currentEditorFileSize = computed(() => getFileSize(currentEditorFile.value, currentEditorContent.value));
+const sourceFilesUnavailableReason = computed(() => files.value.length
+    ? ""
+    : "当前安装包只有已发布运行产物，没有携带私有源码。请从原开发服务器重新制作包含源码的离线包，或在保存了源码的服务器上用 VS Code 拉取。"
+);
 const isMicroServicePreview = computed(() => currentApp.value?.AppType === "MicroService");
 const microServiceRoutes = computed(() => {
     const routeFile = files.value.find((item) => /(^|\/)microi\.routes\.json$/i.test(String(item?.FilePath || item?.FileName || "")));
@@ -587,7 +602,14 @@ const canSendAppChat = computed(() => (
     && (appPrompt.value.trim() || appSelectedFiles.value.length)
 ));
 
-onMounted(loadApps);
+onMounted(async () => {
+    await loadApps();
+    await openAppFromRoute();
+});
+
+watch(() => route.query.appId, async () => {
+    await openAppFromRoute();
+});
 
 watch(currentUserId, (value, oldValue) => {
     if (!value || value === oldValue) return;
@@ -785,9 +807,9 @@ async function switchFileTreeMode(mode) {
     fileTreeMode.value = mode;
     if (mode === "build") {
         activeView.value = "build";
-        if (!activeBuildFile.value && buildFiles.value.length) {
-            await openBuildFile(buildFiles.value[0].FilePath);
-        }
+        if (!buildFiles.value.length && !buildFilesUnavailableReason.value) {
+            buildFilesUnavailableReason.value = "编译产物在线编辑是可选能力；当前租户未提供编译文件列表接口，请使用已发布预览或在原开发端重新构建。";
+        } else if (!activeBuildFile.value && buildFiles.value.length) await openBuildFile(buildFiles.value[0].FilePath);
         return;
     }
     activeView.value = "source";
@@ -852,7 +874,25 @@ async function loadApps() {
             Keyword: keyword.value,
             PageSize: 200
         });
-        apps.value = normalizeAppList(Array.isArray(list) ? list : []);
+        let unownedApps = [];
+        try {
+            const unownedResult = await DiyCommon.FormEngine.GetTableData("mci_ai_app", {
+                _OrderBy: "UpdateTime",
+                _OrderByType: "DESC",
+                _PageIndex: 1,
+                _PageSize: 200
+            });
+            if (unownedResult && Number(unownedResult.Code) === 1 && Array.isArray(unownedResult.Data)) {
+                unownedApps = unownedResult.Data.filter((app) => !String(app?.OwnerUserId || "").trim());
+            }
+        } catch (_) {
+            // 老库可能尚未具备 OwnerUserId 字段；保留 ai_app_list 的原有结果即可。
+        }
+        const merged = (Array.isArray(list) ? list : []).concat(unownedApps);
+        const normalizedKeyword = String(keyword.value || "").trim().toLowerCase();
+        apps.value = normalizeAppList(normalizedKeyword
+            ? merged.filter((app) => `${app?.Name || ""} ${app?.Description || ""} ${app?.AppKey || ""}`.toLowerCase().includes(normalizedKeyword))
+            : merged);
         if (!currentApp.value && apps.value.length && appViewMode.value === "develop") {
             await selectApp(apps.value[0]);
         }
@@ -1025,6 +1065,7 @@ async function selectApp(app) {
     activeFile.value = null;
     activeContent.value = "";
     buildFiles.value = [];
+    buildFilesUnavailableReason.value = "";
     activeBuildFile.value = null;
     activeBuildContent.value = "";
     selectedPreviewRoute.value = "";
@@ -1041,16 +1082,12 @@ async function selectApp(app) {
             const homeRoute = microServiceRoutes.value.find((item) => item?.isHome || item?.IsHome) || microServiceRoutes.value[0];
             selectedPreviewRoute.value = normalizeMicroRoute(homeRoute?.path || "/");
         }
-        try {
-            const buildDetail = await runAiAppEngine("ai_app_build_file", { Action: "List", AppId: app.Id });
-            buildFiles.value = (buildDetail?.Files || []).map((item) => ({
-                ...item,
-                FilePath: item.Path || item.FilePath || item.RelativePath || item.FileName
-            })).filter((item) => item.FilePath);
-        } catch (buildError) {
-            console.warn("[AiApp] load build files failed", buildError);
-            buildFiles.value = [];
-        }
+        // 编译文件管理接口不是所有历史租户都已安装。进入开发工作台时不再自动调用它，
+        // 避免只有运行产物的离线应用出现“获取下载项失败: undefined”。
+        buildFiles.value = [];
+        buildFilesUnavailableReason.value = files.value.length
+            ? "编译产物在线编辑是可选能力；需要时请在原开发端重新构建并发布。"
+            : "该离线应用未携带私有源码，也未提供可在线编辑的编译文件；已发布运行页面仍可正常预览。";
         const latestVersion = sortedVersions.value[0];
         if (latestVersion) {
             selectedVersionKey.value = versionKey(latestVersion);
@@ -1076,9 +1113,24 @@ async function selectApp(app) {
 async function enterDevelop(app) {
     appViewMode.value = "develop";
     await selectApp(app);
+    var nextQuery = { ...route.query, workspace: "apps", appId: String(app?.Id || "") };
+    if (String(route.query.appId || "") !== String(app?.Id || "") || route.query.workspace !== "apps") {
+        await router.push({ path: route.path, query: nextQuery });
+    }
     if (previewUrl.value) {
         activeView.value = "preview";
     }
+}
+
+async function openAppFromRoute() {
+    var appId = String(route.query.appId || "").trim();
+    if (!appId || !apps.value.length) return;
+    if (appViewMode.value === "develop" && String(currentApp.value?.Id || "") === appId) return;
+    var app = apps.value.find((item) => String(item?.Id || "") === appId);
+    if (!app) return;
+    appViewMode.value = "develop";
+    await selectApp(app);
+    if (previewUrl.value) activeView.value = "preview";
 }
 
 async function previewApp(app) {
@@ -1106,8 +1158,11 @@ async function getPublishedPreviewUrl(app) {
         || normalizePreviewUrl(app?.PreviewUrl || app?.PublishUrl || app?.PublicUrl || "");
 }
 
-function backToGallery() {
+async function backToGallery() {
     appViewMode.value = "gallery";
+    var nextQuery = { ...route.query, workspace: "apps" };
+    delete nextQuery.appId;
+    await router.push({ path: route.path, query: nextQuery });
 }
 
 async function loadAppChatHistory(appId) {
