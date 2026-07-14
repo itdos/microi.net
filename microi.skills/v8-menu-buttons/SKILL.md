@@ -18,7 +18,7 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
 | `MoreBtns` | 列表每行尾的"…更多"操作 | `Id, Name, V8Code`，建议 `ShowRow:true` |
 | `FormBtns` | 表单右上角 / 移动端 FAB | `Id, Name, V8Code` |
 | `BatchSelectMoreBtns` | 列表勾选多行后顶部出现 | `Id, Name, V8Code`，按钮里用 `V8.TableRowSelected` 取选中行 |
-| `PageTabs` | 列表页顶部页签切换 | `Id, Name, V8Code`，`V8Code` 通常调用 `V8.SearchSet({...})` |
+| `PageTabs` | 列表页顶部页签切换 | `Id, Name`，当前模块筛选用 `V8Code`；跨模块切换用 `TargetSysMenuId` |
 | `ExportMoreBtns` | 列表"导出"下拉的扩展 | `Id, Name, V8Code` |
 | `PageBtns` | 页面级顶部按钮 | `Id, Name, V8Code` |
 
@@ -38,12 +38,21 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
   "V8CodeShow": "...",        // 显隐表达式 JS：return true/false 或赋值 V8.Result=true/false
   "V8Code": "...",            // 点击执行的 JS（前端 V8 上下文）
   "Url": "",                  // 可选：直接跳转 URL（不与 V8Code 同用）
+  "TargetSysMenuId": "",      // 仅 PageTabs：关联另一个 sys_menu.Id，替换路由并完整加载目标模块
   "RunBackground": false,      // 可选：true 时以后台任务执行接口引擎
   "BackgroundTask": false,     // 可选：兼容别名
   "IsBackgroundTask": false,   // 可选：兼容别名
   "ApiEngineKey": ""           // 可选：后台任务要执行的接口引擎 Key
 }
 ```
+
+### PageTabs 关联模块
+
+- `TargetSysMenuId` 为空时，页签仍在当前模块执行 `V8Code` 和重新查询。
+- `TargetSysMenuId` 指向其它模块时，点击会替换当前路由，并使用目标模块自己的表单引擎、字段、查询接口替换、按钮和分页配置完整初始化。
+- 目标模块可以设置 `Display=0、AppDisplay=0` 隐藏左侧菜单，但必须给使用角色分配菜单权限，否则动态路由中找不到目标模块。
+- 组成一组的所有模块应保存同一套 PageTabs；跨模块页签负责导航，目标模块加载后再根据路由 `Tab` 执行对应页签 V8。
+- 禁止在 `diy-table` 或 mixin 中按模块名、Url、表名写死页签数据源。
 
 ### V8CodeShow（显隐控制）—— 支持 `return` 和 `V8.Result`
 

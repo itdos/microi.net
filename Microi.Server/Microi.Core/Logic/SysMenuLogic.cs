@@ -272,6 +272,11 @@ namespace Microi.net
             });
             var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
 
+            // 兼容旧版 Vue2 定制页面菜单：微服务发布时可在 RouteMetaJson 中声明
+            // LegacyMenuUrls / LegacyComponentPaths。这里仅对接口返回值做瞬时映射，
+            // 不修改客户库 sys_menu，因而同一套新版服务可以直接承接多个老库。
+            await ApplyLegacyMicroServiceAliases(param.OsClient, allData);
+
             // 按ParentId构建字典索引，将递归子节点查找从O(n²)优化为O(n)
             var childrenMap = new Dictionary<string, List<dynamic>>();
             foreach (var item in allData)
@@ -323,6 +328,180 @@ namespace Microi.net
             //递归获取层级（使用字典索引优化）
             BuildChildrenFromMap(childrenMap, firstList);
             return new DosResultList<dynamic>(1, firstList, "", dataCount);
+        }
+
+        private async Task ApplyLegacyMicroServiceAliases(string osClient, List<dynamic> menus)
+        {
+            if (menus == null || menus.Count == 0) return;
+
+            try
+            {
+                var serviceResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice", new
+                {
+                    OsClient = osClient,
+                    _PageSize = 1000
+                });
+                var pageResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice_page", new
+                {
+                    OsClient = osClient,
+                    _PageSize = 5000
+                });
+                if (serviceResult.Code != 1 || pageResult.Code != 1) return;
+
+                var services = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
+                foreach (var rawService in serviceResult.Data as List<dynamic> ?? new List<dynamic>())
+                {
+                    JObject service = ToJObject((object)rawService);
+                    var serviceId = service?["Id"]?.ToString() ?? "";
+                    if (service != null && IsEnabled(service["IsEnable"]) && !serviceId.DosIsNullOrWhiteSpace())
+                    {
+                        services[serviceId] = service;
+                    }
+                }
+                if (services.Count == 0) return;
+
+                var aliases = new Dictionary<string, LegacyMicroServicePage>(StringComparer.OrdinalIgnoreCase);
+                foreach (var rawPage in pageResult.Data as List<dynamic> ?? new List<dynamic>())
+                {
+                    JObject page = ToJObject((object)rawPage);
+                    if (page == null || !IsEnabled(page["IsEnable"])) continue;
+
+                    var serviceId = page["MicroServiceId"]?.ToString() ?? "";
+                    if (!services.TryGetValue(serviceId, out var service)) continue;
+
+                    var meta = ParseRouteMeta(page["RouteMetaJson"]);
+                    var target = new LegacyMicroServicePage
+                    {
+                        ServiceId = serviceId,
+                        ServiceKey = FirstNotEmpty(page["MicroServiceKey"]?.ToString(), service["MsKey"]?.ToString()),
+                        PageId = page["Id"]?.ToString() ?? "",
+                        RoutePath = FirstNotEmpty(page["RoutePath"]?.ToString(), meta?["RoutePath"]?.ToString(), "/")
+                    };
+                    if (target.ServiceKey.DosIsNullOrWhiteSpace()) continue;
+
+                    AddLegacyAliases(aliases, target, "url", meta?["LegacyMenuUrls"]);
+                    AddLegacyAliases(aliases, target, "url", meta?["LegacyMenuUrl"]);
+                    AddLegacyAliases(aliases, target, "component", meta?["LegacyComponentPaths"]);
+                    AddLegacyAliases(aliases, target, "component", meta?["LegacyComponentPath"]);
+                }
+                if (aliases.Count == 0) return;
+
+                for (var i = 0; i < menus.Count; i++)
+                {
+                    JObject menu = ToJObject((object)menus[i]);
+                    if (menu == null || IsMicroServiceMenu(menu)) continue;
+
+                    var urlKey = BuildLegacyAliasKey("url", menu["Url"]?.ToString());
+                    var componentKey = BuildLegacyAliasKey("component", menu["ComponentPath"]?.ToString());
+                    LegacyMicroServicePage target = null;
+                    if (!urlKey.DosIsNullOrWhiteSpace()) aliases.TryGetValue(urlKey, out target);
+                    if (target == null && !componentKey.DosIsNullOrWhiteSpace()) aliases.TryGetValue(componentKey, out target);
+                    if (target == null) continue;
+
+                    menu["LegacyMenuUrl"] = menu["Url"]?.ToString() ?? "";
+                    menu["LegacyComponentPath"] = menu["ComponentPath"]?.ToString() ?? "";
+                    menu["OpenType"] = "MicroService";
+                    menu["IsMicroiService"] = 1;
+                    menu["ComponentPath"] = "/micro-app/host";
+                    menu["MicroServiceId"] = target.ServiceId;
+                    menu["MicroServiceKey"] = target.ServiceKey;
+                    menu["MsKey"] = target.ServiceKey;
+                    menu["MicroServicePageId"] = target.PageId;
+                    menu["MicroServiceRoutePath"] = NormalizeMicroServiceRoute(target.RoutePath);
+                    menus[i] = menu;
+                }
+            }
+            catch
+            {
+                // 尚未安装微服务相关表的老库仍按原菜单逻辑启动；安装应用后自动获得兼容能力。
+            }
+        }
+
+        private static JObject ToJObject(object value)
+        {
+            if (value == null) return null;
+            if (value is JObject jObject) return jObject;
+            try { return JObject.FromObject(value); } catch { return null; }
+        }
+
+        private static JObject ParseRouteMeta(JToken value)
+        {
+            if (value == null || value.Type == JTokenType.Null) return new JObject();
+            if (value is JObject jObject) return jObject;
+            try { return JObject.Parse(value.ToString()); } catch { return new JObject(); }
+        }
+
+        private static bool IsEnabled(JToken value)
+        {
+            if (value == null || value.Type == JTokenType.Null) return true;
+            var text = value.ToString().Trim();
+            return text != "0" && !text.Equals("false", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsMicroServiceMenu(JObject menu)
+        {
+            var openType = menu["OpenType"]?.ToString() ?? "";
+            var flag = menu["IsMicroiService"]?.ToString() ?? "";
+            return openType.IndexOf("micro", StringComparison.OrdinalIgnoreCase) >= 0
+                || flag == "1"
+                || flag.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || (menu["ComponentPath"]?.ToString() ?? "").IndexOf("/micro-app/host", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string FirstNotEmpty(params string[] values)
+        {
+            return values?.FirstOrDefault(value => !value.DosIsNullOrWhiteSpace()) ?? "";
+        }
+
+        private static string NormalizeMicroServiceRoute(string value)
+        {
+            var route = (value ?? "/").Trim();
+            if (route.DosIsNullOrWhiteSpace() || route == "/") return "/";
+            return route.StartsWith("/") ? route : "/" + route;
+        }
+
+        private static void AddLegacyAliases(Dictionary<string, LegacyMicroServicePage> aliases, LegacyMicroServicePage target, string type, JToken values)
+        {
+            if (values == null || values.Type == JTokenType.Null) return;
+            IEnumerable<JToken> list;
+            if (values.Type == JTokenType.Array)
+            {
+                list = values.Children();
+            }
+            else
+            {
+                list = new JToken[] { values };
+            }
+            foreach (var value in list)
+            {
+                var key = BuildLegacyAliasKey(type, value?.ToString());
+                if (!key.DosIsNullOrWhiteSpace()) aliases[key] = target;
+            }
+        }
+
+        private static string BuildLegacyAliasKey(string type, string value)
+        {
+            if (value.DosIsNullOrWhiteSpace()) return "";
+            var normalized = value.Trim().Replace('\\', '/');
+            var queryIndex = normalized.IndexOfAny(new[] { '?', '#' });
+            if (queryIndex >= 0) normalized = normalized.Substring(0, queryIndex);
+            while (normalized.Contains("//")) normalized = normalized.Replace("//", "/");
+            if (!normalized.StartsWith("/")) normalized = "/" + normalized;
+            if (type == "component" && normalized.StartsWith("/views/", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring("/views".Length);
+            }
+            if (normalized.EndsWith(".vue", StringComparison.OrdinalIgnoreCase)) normalized = normalized.Substring(0, normalized.Length - 4);
+            if (normalized.Length > 1) normalized = normalized.TrimEnd('/');
+            return type + ":" + normalized.ToLowerInvariant();
+        }
+
+        private sealed class LegacyMicroServicePage
+        {
+            public string ServiceId { get; set; }
+            public string ServiceKey { get; set; }
+            public string PageId { get; set; }
+            public string RoutePath { get; set; }
         }
         /// <summary>
         /// 递归获取层级（基于字典索引，O(n)复杂度）

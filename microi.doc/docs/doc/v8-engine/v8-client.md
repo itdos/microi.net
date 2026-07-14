@@ -379,6 +379,8 @@ V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 >* 确认提示框
 ```javascript
 例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 
+
+`option` 除了 `Title`、`OkText`、`CancelText`、`Icon` 外，还支持 `CustomClass` 自定义弹窗样式，以及 Element Plus 兼容的 `BeforeClose(action, instance, done)` 关闭前校验。文件上传、表格、Tab、步骤条等复杂交互仍应优先使用 `V8.OpenAppDialog`；`BeforeClose` 主要用于极少量输入或老环境兼容兜底。
 //option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
 ```
 >* 自定义html玩法，可以传入动态html字符串，来实现更丰富的提示框内容，如下图所示：

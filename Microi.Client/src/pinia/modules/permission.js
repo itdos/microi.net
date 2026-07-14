@@ -205,12 +205,15 @@ function buildMicroAppMenuPath(item) {
 
 function appendMicroAppMeta(meta, item) {
     meta.OpenType = item.OpenType;
-    meta.Url = item.Url;
+    meta.Url = item.LegacyMenuUrl ? "" : item.Url;
+    meta.LegacyMenuUrl = item.LegacyMenuUrl;
     meta.UrlApiEngineId = item.UrlApiEngineId;
     meta.ComponentPath = item.ComponentPath;
     meta.MicroAppUrl = item.MicroAppUrl;
     meta.MicroAppUrlApiEngineId = item.MicroAppUrlApiEngineId;
     meta.MicroServiceId = item.MicroServiceId;
+    meta.MicroServiceKey = item.MicroServiceKey;
+    meta.MsKey = item.MsKey;
     meta.MicroServicePageId = item.MicroServicePageId;
     meta.MicroServiceRoutePath = item.MicroServiceRoutePath;
     meta.RoutePath = item.MicroServiceRoutePath;
@@ -383,7 +386,10 @@ function MenuBuild(result, data, isFater) {
                 item.MicroAppUrlApiEngineId = item.UrlApiEngineId;
                 item.MicroServiceRoutePath = normalizeMicroRoutePath(item.MicroServiceRoutePath || parsedMicroAppUrl.routePath || "/");
                 item.ComponentPath = "/micro-app/host";
-                item.Url = buildMicroAppMenuPath(item);
+                item.MicroAppFriendlyUrl = buildMicroAppMenuPath(item);
+                item.Url = item.LegacyMenuUrl
+                    ? normalizeMenuRoutePath(item.LegacyMenuUrl)
+                    : item.MicroAppFriendlyUrl;
             } else {
                 if (item.Url.indexOf("?") > -1) {
                     item.UrlParam = item.Url.split("?")[1];
@@ -592,7 +598,11 @@ export const usePermissionStore = defineStore("permission", {
                         } else {
                             // 请求失败时，拒绝 Promise，避免无限循环
                             console.error("获取菜单失败:", result);
-                            reject(new Error(result.Msg || "获取菜单数据失败"));
+                            var menuError = new Error(result.Msg || "获取菜单数据失败");
+                            menuError.code = result.Code;
+                            menuError.isAuthFailure = [1001, 1002].includes(Number(result.Code))
+                                || String(result.Msg || "").toLowerCase() === "nologin";
+                            reject(menuError);
                         }
                     },
                     (error) => {

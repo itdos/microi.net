@@ -654,7 +654,10 @@ export default {
             }
             
             return {
-                Id: col.Key,
+                // JSON 表格列可复用一个真实 diy_field 的远程数据源配置。
+                // 默认仍使用列 Key，只有显式配置 DataSourceFieldId 时才代理到该字段，
+                // 避免给某个业务模块写死下拉选项或接口地址。
+                Id: config.DataSourceFieldId || col.Key,
                 Name: col.Key,
                 Label: col.Label,
                 Component: col.Component || 'Text',

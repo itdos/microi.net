@@ -217,8 +217,10 @@ function normalizeMenuJsonArray(fieldName, raw) {
             errors.push(`${fieldName}[${index}].Name 不能为空`);
         const runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
         const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
-        if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url') && !(runBackground && apiEngineKey)) {
-            errors.push(`${fieldName}[${index}] 必须配置 V8Code、Url，或后台任务 ApiEngineKey`);
+        const targetSysMenuId = getString(button, 'TargetSysMenuId', 'targetSysMenuId');
+        const hasRelatedModule = fieldName === 'PageTabs' && !!targetSysMenuId;
+        if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url') && !(runBackground && apiEngineKey) && !hasRelatedModule) {
+            errors.push(`${fieldName}[${index}] 必须配置 V8Code、Url、关联模块 TargetSysMenuId，或后台任务 ApiEngineKey`);
         }
         const id = getString(button, 'Id', 'id') || randomId();
         if (!getString(button, 'Id', 'id'))
@@ -246,6 +248,7 @@ function normalizeMenuJsonArray(fieldName, raw) {
             BackgroundTask: button.BackgroundTask ?? button.backgroundTask ?? undefined,
             IsBackgroundTask: button.IsBackgroundTask ?? button.isBackgroundTask ?? undefined,
             ApiEngineKey: apiEngineKey || undefined,
+            TargetSysMenuId: targetSysMenuId || undefined,
         });
     });
     return { ok: errors.length === 0, value: JSON.stringify(normalized), errors, warnings };
