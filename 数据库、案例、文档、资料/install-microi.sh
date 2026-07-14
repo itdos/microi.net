@@ -4,10 +4,10 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-08
+# 版本：v2026-07-15
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
-#   microi-install-mysql      - MySQL 5.7 数据库
+#   microi-install-mysql      - MySQL 5.7 / 8.0 数据库（安装前选择）
 #   microi-install-redis      - Redis 7.4.2 缓存
 #   microi-install-mongodb    - MongoDB 数据库
 #   microi-install-minio      - MinIO 对象存储
@@ -26,13 +26,15 @@
 
 set -e
 
+SCRIPT_VERSION="v2026-07-15"
+
 # === 修复中文显示：确保终端使用 UTF-8 编码 ===
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
 export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
 
 echo ''
 echo '=================================================================='
-echo 'Microi：Docker Compose 一键安装脚本 v2026-07-08'
+echo "Microi：Docker Compose 一键安装脚本 ${SCRIPT_VERSION}"
 echo '=================================================================='
 echo ''
 
@@ -68,6 +70,50 @@ is_rhel_based() {
   [[ "${OS_ID}" == "centos" || "${OS_ID}" == "rhel" || "${OS_ID}" == "rocky" || "${OS_ID}" == "almalinux" || "${OS_ID}" == "fedora" || "${OS_ID}" == "openEuler" || "${OS_ID}" == "centos-stream" || "${OS_ID}" == "amzn" ]]
 }
 
+# 校验 IPv4 地址及 Docker bridge 网络 CIDR，避免错误配置进入自动安装阶段
+is_valid_ipv4() {
+  local ip="$1"
+  local octet
+  local -a octets
+  [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  IFS='.' read -r -a octets <<< "${ip}"
+  [ "${#octets[@]}" -eq 4 ] || return 1
+  for octet in "${octets[@]}"; do
+    [[ "${octet}" =~ ^[0-9]{1,3}$ ]] || return 1
+    [ $((10#${octet})) -le 255 ] || return 1
+  done
+}
+
+ipv4_to_int() {
+  local ip="$1"
+  local a b c d
+  IFS='.' read -r a b c d <<< "${ip}"
+  echo $(( (10#${a} << 24) + (10#${b} << 16) + (10#${c} << 8) + 10#${d} ))
+}
+
+validate_network_config() {
+  local subnet="$1"
+  local gateway="$2"
+  local subnet_ip prefix subnet_int gateway_int mask network_int broadcast_int
+
+  [[ "${subnet}" =~ ^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/([0-9]+)$ ]] || return 1
+  subnet_ip="${BASH_REMATCH[1]}"
+  prefix="${BASH_REMATCH[2]}"
+  is_valid_ipv4 "${subnet_ip}" || return 1
+  is_valid_ipv4 "${gateway}" || return 1
+  [ $((10#${prefix})) -ge 1 ] && [ $((10#${prefix})) -le 30 ] || return 1
+
+  subnet_int=$(ipv4_to_int "${subnet_ip}")
+  gateway_int=$(ipv4_to_int "${gateway}")
+  mask=$(( (0xFFFFFFFF << (32 - 10#${prefix})) & 0xFFFFFFFF ))
+  network_int=$((subnet_int & mask))
+  broadcast_int=$((network_int | (0xFFFFFFFF ^ mask)))
+
+  # subnet 必须填写规范网络地址，gateway 必须位于可用主机地址范围内
+  [ "${subnet_int}" -eq "${network_int}" ] || return 1
+  [ "${gateway_int}" -gt "${network_int}" ] && [ "${gateway_int}" -lt "${broadcast_int}" ] || return 1
+}
+
 # === 获取IP地址 ===
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
 if [ -z "${LAN_IP}" ]; then
@@ -99,6 +145,68 @@ if [ "$install_type" == "g" ]; then
 elif [ "$install_type" == "n" ]; then
   ACCESS_IP=$LAN_IP
   echo 'Microi：将以内网IP安装 ✓'
+else
+  echo 'Microi：错误：无效的输入，脚本退出。'
+  exit 1
+fi
+
+# === MySQL 版本选择 ===
+echo ''
+echo 'Microi：请选择要安装的 MySQL 版本。'
+echo 'Microi：输入 5.7 安装 MySQL 5.7，输入 8.0 安装 MySQL 8.0：'
+read -r mysql_version_input
+
+if [ "${mysql_version_input}" == "5.7" ]; then
+  MYSQL_VERSION="5.7"
+  MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7"
+  MYSQL_CONTAINER_NAME="microi-install-mysql57"
+elif [ "${mysql_version_input}" == "8.0" ]; then
+  MYSQL_VERSION="8.0"
+  MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0"
+  MYSQL_CONTAINER_NAME="microi-install-mysql80"
+else
+  echo 'Microi：错误：无效的 MySQL 版本，请输入 5.7 或 8.0，脚本退出。'
+  exit 1
+fi
+echo "Microi：将安装 MySQL ${MYSQL_VERSION} ✓"
+
+# === 可选的 Microi Docker 固定网段 ===
+echo ''
+echo 'Microi：是否创建并让所有编排使用指定网段的 microi Docker 网络？'
+echo 'Microi：输入 1 配置，输入 0 使用 Docker Compose 默认网络：'
+read -r install_microi_network
+
+if [ "${install_microi_network}" == "1" ]; then
+  INSTALL_MICROI_NETWORK=1
+  echo 'Microi：请输入网络 subnet（例如 172.16.238.0/24）：'
+  read -r MICROI_NETWORK_SUBNET
+  echo 'Microi：请输入网络 gateway（例如 172.16.238.1）：'
+  read -r MICROI_NETWORK_GATEWAY
+
+  if ! validate_network_config "${MICROI_NETWORK_SUBNET}" "${MICROI_NETWORK_GATEWAY}"; then
+    echo 'Microi：错误：subnet 或 gateway 无效。subnet 必须是 /1-/30 的规范 IPv4 网络地址，gateway 必须位于该网段可用地址范围内。'
+    exit 1
+  fi
+
+  echo ''
+  echo 'Microi：请确认 Docker 网络配置：'
+  echo '------------------------------------------------------------------'
+  echo '  网络名称: microi'
+  echo "  subnet:  ${MICROI_NETWORK_SUBNET}"
+  echo "  gateway: ${MICROI_NETWORK_GATEWAY}"
+  echo '------------------------------------------------------------------'
+  echo 'Microi：输入 1 确认并继续，输入其他内容退出：'
+  read -r confirm_microi_network
+  if [ "${confirm_microi_network}" != "1" ]; then
+    echo 'Microi：已取消安装。'
+    exit 1
+  fi
+  echo 'Microi：将创建或复用上述 microi Docker 网络 ✓'
+elif [ "${install_microi_network}" == "0" ]; then
+  INSTALL_MICROI_NETWORK=0
+  MICROI_NETWORK_SUBNET=""
+  MICROI_NETWORK_GATEWAY=""
+  echo 'Microi：将使用各 Docker Compose 项目的默认网络 ✓'
 else
   echo 'Microi：错误：无效的输入，脚本退出。'
   exit 1
@@ -282,6 +390,48 @@ else
   echo "Microi：Docker Compose 安装成功: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
 fi
 
+# === 创建或校验可选的 Microi 固定网段 ===
+ensure_microi_network() {
+  local existing_driver existing_subnet existing_gateway
+
+  if [ "${INSTALL_MICROI_NETWORK}" != "1" ]; then
+    COMPOSE_SERVICE_NETWORK=""
+    COMPOSE_EXTERNAL_NETWORKS=""
+    return 0
+  fi
+
+  if docker network inspect microi > /dev/null 2>&1; then
+    existing_driver=$(docker network inspect microi --format '{{.Driver}}')
+    existing_subnet=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' | head -1)
+    existing_gateway=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' | head -1)
+
+    if [ "${existing_driver}" != "bridge" ] || [ "${existing_subnet}" != "${MICROI_NETWORK_SUBNET}" ] || [ "${existing_gateway}" != "${MICROI_NETWORK_GATEWAY}" ]; then
+      echo 'Microi：错误：已存在名为 microi 的 Docker 网络，但配置与本次输入不一致。'
+      echo "Microi：现有配置: driver=${existing_driver}, subnet=${existing_subnet}, gateway=${existing_gateway}"
+      echo "Microi：本次配置: driver=bridge, subnet=${MICROI_NETWORK_SUBNET}, gateway=${MICROI_NETWORK_GATEWAY}"
+      echo 'Microi：为避免影响现有容器，脚本不会自动删除或修改该网络。请确认网络配置后重试。'
+      exit 1
+    fi
+    echo "Microi：已复用现有 microi 网络（${existing_subnet}, gateway ${existing_gateway}）✓"
+  else
+    echo 'Microi：正在创建 microi Docker 网络...'
+    if docker network create \
+      --driver bridge \
+      --subnet "${MICROI_NETWORK_SUBNET}" \
+      --gateway "${MICROI_NETWORK_GATEWAY}" \
+      microi > /dev/null; then
+      echo "Microi：microi 网络创建成功（${MICROI_NETWORK_SUBNET}, gateway ${MICROI_NETWORK_GATEWAY}）✓"
+    else
+      echo 'Microi：错误：microi 网络创建失败。请检查该网段是否与现有 Docker 网络重叠。'
+      exit 1
+    fi
+  fi
+
+  # 每个独立编排都连接到同一个预先创建的外部网络
+  COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi'
+  COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi'
+}
+
 # === 检查已有容器/编排 ===
 EXISTING_MICROI_CONTAINERS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^microi-install-' || true)
 if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
@@ -295,6 +445,8 @@ if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   echo 'Microi：注意此操作将会影响数据库、MinIO文件等数据，请谨慎操作！'
   exit 1
 fi
+
+ensure_microi_network
 
 # === 安装依赖工具（unzip/curl/openssl） ===
 install_deps() {
@@ -539,6 +691,9 @@ generate_mysql_config() {
   local read_buffer_size
   local join_buffer_size
   local innodb_log_file_size
+  local innodb_buffer_pool_instances
+  local innodb_io_capacity
+  local innodb_io_capacity_max
 
   if [ ${total_mem_mb} -le 1024 ]; then
     echo "Microi：MySQL配置模式: 极低配(≤1GB内存)" >&2
@@ -626,13 +781,92 @@ generate_mysql_config() {
     join_buffer_size="4M"
   fi
 
-  cat <<MYSQLCNF
+  if [ ${total_mem_mb} -le 2048 ]; then
+    innodb_buffer_pool_instances=1
+    innodb_io_capacity=500
+    innodb_io_capacity_max=1000
+  elif [ ${total_mem_mb} -le 4096 ]; then
+    innodb_buffer_pool_instances=2
+    innodb_io_capacity=1000
+    innodb_io_capacity_max=2000
+  elif [ ${total_mem_mb} -le 8192 ]; then
+    innodb_buffer_pool_instances=4
+    innodb_io_capacity=4000
+    innodb_io_capacity_max=8000
+  else
+    innodb_buffer_pool_instances=8
+    innodb_io_capacity=4000
+    innodb_io_capacity_max=8000
+  fi
+
+  if [ "${MYSQL_VERSION}" == "8.0" ]; then
+    cat <<MYSQL8CNF
 [mysqld]
+# 基础配置（MySQL 8.0）
+lower_case_table_names = 1
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+max_allowed_packet = 512M
+net_buffer_length = 16384
+skip_name_resolve = ON
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+# 连接配置（根据${total_mem_mb}MB内存自动生成）
+max_connections = ${max_connections}
+max_connect_errors = 100000
+thread_cache_size = ${thread_cache_size}
+table_open_cache = ${table_open_cache}
+table_open_cache_instances = 16
+
+# 内存配置
+innodb_buffer_pool_size = ${innodb_buffer_pool_size}
+innodb_log_buffer_size = ${innodb_log_buffer_size}
+key_buffer_size = ${key_buffer_size}
+tmp_table_size = ${tmp_table_size}
+max_heap_table_size = ${max_heap_table_size}
+
+# InnoDB I/O 优化
+innodb_io_capacity = ${innodb_io_capacity}
+innodb_io_capacity_max = ${innodb_io_capacity_max}
+innodb_flush_method = O_DIRECT
+innodb_flush_neighbors = 0
+innodb_log_file_size = ${innodb_log_file_size}
+innodb_log_files_in_group = 2
+innodb_buffer_pool_instances = ${innodb_buffer_pool_instances}
+innodb_read_io_threads = 8
+innodb_write_io_threads = 8
+innodb_purge_threads = 4
+innodb_adaptive_flushing = ON
+
+# 缓冲配置
+sort_buffer_size = ${sort_buffer_size}
+read_buffer_size = ${read_buffer_size}
+read_rnd_buffer_size = ${read_buffer_size}
+join_buffer_size = ${join_buffer_size}
+thread_stack = 512K
+binlog_cache_size = 2M
+
+# SSD 持久化优化
+innodb_flush_log_at_trx_commit = 2
+sync_binlog = 1000
+innodb_doublewrite = 1
+
+# MySQL 8.0 兼容与运行配置
+default_authentication_plugin = mysql_native_password
+innodb_dedicated_server = ON
+log_bin_trust_function_creators = ON
+performance_schema = ON
+MYSQL8CNF
+  else
+    cat <<MYSQL57CNF
+[mysqld]
+# 基础配置（MySQL 5.7）
 lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 max_allowed_packet = 512M
 skip_name_resolve = ON
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
 # 连接配置（根据${total_mem_mb}MB内存自动生成）
 max_connections = ${max_connections}
@@ -649,7 +883,7 @@ query_cache_size = 0
 tmp_table_size = ${tmp_table_size}
 max_heap_table_size = ${max_heap_table_size}
 
-# InnoDB优化
+# InnoDB 优化
 innodb_flush_method = O_DIRECT
 innodb_flush_neighbors = 0
 innodb_log_file_size = ${innodb_log_file_size}
@@ -671,9 +905,8 @@ binlog_cache_size = 196608
 innodb_flush_log_at_trx_commit = 2
 sync_binlog = 1000
 innodb_doublewrite = 1
-
-sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
-MYSQLCNF
+MYSQL57CNF
+  fi
 }
 
 # ============================================================
@@ -790,10 +1023,10 @@ echo '=================================================================='
 
 
 # ============================================================
-# 步骤6：部署 MySQL 5.7 编排
+# 步骤6：部署用户选择的 MySQL 编排
 # ============================================================
 echo ''
-echo '[步骤6/11] 部署 MySQL 5.7'
+echo "[步骤6/11] 部署 MySQL ${MYSQL_VERSION}"
 echo '------------------------------------------------------------------'
 
 MYSQL_DIR="${COMPOSE_BASE_DIR}/microi-install-mysql"
@@ -820,18 +1053,19 @@ echo "Microi：MySQL 数据目录已初始化: ${MYSQL_DATA_DIR} ✓"
 
 mkdir -p "${MYSQL_DIR}"
 
-# 根据服务器内存自动生成MySQL配置
+# 根据服务器内存和所选版本自动生成 MySQL 配置
 generate_mysql_config > "${MYSQL_DIR}/my_microi.cnf"
-echo "Microi：MySQL 配置文件已生成 ✓"
+echo "Microi：MySQL ${MYSQL_VERSION} 配置文件已生成 ✓"
 
 echo "Microi：MySQL 端口: ${MYSQL_PORT}, Root密码: ${MYSQL_ROOT_PASSWORD}"
 
 cat > "${MYSQL_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
 services:
-  microi-install-mysql57:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
-    container_name: microi-install-mysql57
+  ${MYSQL_CONTAINER_NAME}:
+    image: ${MYSQL_IMAGE}
+    container_name: ${MYSQL_CONTAINER_NAME}
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -840,6 +1074,7 @@ services:
       - "${MYSQL_PORT}:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_ROOT_HOST=%
       - MYSQL_TIME_ZONE=Asia/Shanghai
     volumes:
       - ${MYSQL_DATA_DIR}:/var/lib/mysql
@@ -849,6 +1084,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：MySQL 编排文件已生成: ${MYSQL_DIR}/docker-compose.yml ✓"
 
@@ -860,14 +1096,14 @@ echo 'Microi：等待MySQL容器启动...'
 sleep 5
 
 # 先检查容器是否还在运行（避免空等60秒）
-if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
+if ! docker ps --format '{{.Names}}' | grep -qx "${MYSQL_CONTAINER_NAME}"; then
   echo 'Microi：错误：MySQL 容器启动后立即退出，以下是容器日志：'
   echo '------------------------------------------------------------------'
-  docker logs microi-install-mysql57 2>&1 | tail -50
+  docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
   echo '------------------------------------------------------------------'
   echo 'Microi：正在清理失败的MySQL部署...'
-  docker stop microi-install-mysql57 > /dev/null 2>&1 || true
-  docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+  docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
+  docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
   rm -rf "${MYSQL_DATA_DIR}"
   echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
   exit 1
@@ -876,19 +1112,19 @@ fi
 MYSQL_READY=false
 for i in $(seq 1 30); do
   # 每轮检查容器是否仍在运行
-  if ! docker ps --format '{{.Names}}' | grep -q 'microi-install-mysql57'; then
+  if ! docker ps --format '{{.Names}}' | grep -qx "${MYSQL_CONTAINER_NAME}"; then
     echo 'Microi：错误：MySQL 容器在等待过程中退出，以下是容器日志：'
     echo '------------------------------------------------------------------'
-    docker logs microi-install-mysql57 2>&1 | tail -50
+    docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
     echo '------------------------------------------------------------------'
     echo 'Microi：正在清理失败的MySQL部署...'
-    docker stop microi-install-mysql57 > /dev/null 2>&1 || true
-    docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+    docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
+    docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
     rm -rf "${MYSQL_DATA_DIR}"
     echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
     exit 1
   fi
-  if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
+  if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
     MYSQL_READY=true
     break
   fi
@@ -899,11 +1135,11 @@ done
 if [ "${MYSQL_READY}" = false ]; then
   echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪。以下是容器日志：'
   echo '------------------------------------------------------------------'
-  docker logs microi-install-mysql57 2>&1 | tail -50
+  docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
   echo '------------------------------------------------------------------'
   echo 'Microi：正在清理失败的MySQL部署...'
-  docker stop microi-install-mysql57 > /dev/null 2>&1 || true
-  docker rm -f microi-install-mysql57 > /dev/null 2>&1 || true
+  docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
+  docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
   rm -rf "${MYSQL_DATA_DIR}"
   echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
   exit 1
@@ -911,12 +1147,17 @@ fi
 echo 'Microi：MySQL 容器已启动就绪 ✓'
 
 echo 'Microi：配置MySQL远程访问权限...'
-if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"; then
+if [ "${MYSQL_VERSION}" == "8.0" ]; then
+  MYSQL_GRANT_SQL="CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}'; ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
+else
+  MYSQL_GRANT_SQL="USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"
+fi
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "${MYSQL_GRANT_SQL}"; then
   echo 'Microi：MySQL 远程访问权限已配置 ✓'
 else
   echo 'Microi：警告：MySQL 远程访问权限配置失败，请稍后手动配置'
 fi
-docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;" > /dev/null 2>&1 || true
+docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;" > /dev/null 2>&1 || true
 
 # 下载并还原数据库
 SQL_ZIP_FILE="/tmp/mysql_backup.zip"
@@ -948,7 +1189,7 @@ if [ ! -f "${SQL_FILE}" ]; then
 fi
 
 echo 'Microi：创建数据库 microi_demo...'
-if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
   echo 'Microi：数据库 microi_demo 已创建 ✓'
 else
   echo 'Microi：错误：数据库创建失败。'
@@ -956,7 +1197,7 @@ else
 fi
 
 echo 'Microi：还原MySQL数据库备份（可能需要几分钟）...'
-if docker exec -i microi-install-mysql57 mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo < "${SQL_FILE}"; then
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo < "${SQL_FILE}"; then
   echo 'Microi：数据库还原完成 ✓'
 else
   echo 'Microi：错误：数据库还原失败，请检查 SQL 文件。'
@@ -1008,6 +1249,7 @@ services:
   microi-install-redis:
     image: registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
     container_name: microi-install-redis
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -1054,6 +1296,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：Redis 编排文件已生成 ✓"
 
@@ -1081,6 +1324,7 @@ services:
   microi-install-mongodb:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
     container_name: microi-install-mongodb
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -1098,6 +1342,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：MongoDB 编排文件已生成 ✓"
 
@@ -1125,6 +1370,7 @@ services:
   microi-install-minio:
     image: registry.cn-hangzhou.aliyuncs.com/microios/minio:latest
     container_name: microi-install-minio
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -1144,6 +1390,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：MinIO 编排文件已生成 ✓"
 
@@ -1177,6 +1424,7 @@ services:
   microi-install-ollama:
     image: registry.cn-hangzhou.aliyuncs.com/microios/ollama:latest
     container_name: microi-install-ollama
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     ports:
       - "${OLLAMA_PORT}:11434"
@@ -1195,6 +1443,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
   echo "Microi：Ollama 编排文件已生成 ✓"
 
@@ -1219,6 +1468,7 @@ services:
   microi-install-qdrant:
     image: registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest
     container_name: microi-install-qdrant
+${COMPOSE_SERVICE_NETWORK}
     restart: unless-stopped
     ports:
       - "${QDRANT_HTTP_PORT}:6333"
@@ -1260,6 +1510,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
   echo "Microi：Qdrant 编排文件已生成 ✓"
 
@@ -1289,6 +1540,7 @@ services:
   microi-install-api:
     image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
     container_name: microi-install-api
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -1316,6 +1568,7 @@ services:
   microi-install-client:
     image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest
     container_name: microi-install-client
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -1332,6 +1585,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：平台应用编排文件已生成 ✓"
 
@@ -1360,12 +1614,13 @@ WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
 echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-client"
 
 mkdir -p "${WATCHTOWER_DIR}"
-cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<'EOF'
+cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
 services:
   microi-install-watchtower:
     image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
     container_name: microi-install-watchtower
+${COMPOSE_SERVICE_NETWORK}
     restart: always
     privileged: true
     tty: true
@@ -1378,6 +1633,7 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：Watchtower 编排文件已生成 ✓"
 
@@ -1423,7 +1679,7 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '服务信息：'
 echo '------------------------------------------------------------------'
-echo "MySQL:       容器 microi-install-mysql57,    端口 ${MYSQL_PORT},  Root密码: ${MYSQL_ROOT_PASSWORD}"
+echo "MySQL ${MYSQL_VERSION}:  容器 ${MYSQL_CONTAINER_NAME},    端口 ${MYSQL_PORT},  Root密码: ${MYSQL_ROOT_PASSWORD}"
 echo "             数据目录: ${MYSQL_DATA_DIR}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-mysql/"
 echo ""
@@ -1463,6 +1719,13 @@ echo ""
 echo "Watchtower:  容器 microi-install-watchtower"
 echo "             监控: microi-install-api, microi-install-client"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
+echo ''
+if [ "${INSTALL_MICROI_NETWORK}" == "1" ]; then
+  echo "Docker网络:  microi（bridge，subnet ${MICROI_NETWORK_SUBNET}，gateway ${MICROI_NETWORK_GATEWAY}）"
+  echo '             所有本次生成的编排均通过 external: true 引用该网络'
+else
+  echo 'Docker网络:  使用各 Docker Compose 项目的默认网络'
+fi
 echo ''
 echo '------------------------------------------------------------------'
 echo '已开放的防火墙端口（服务器内部防火墙）：'

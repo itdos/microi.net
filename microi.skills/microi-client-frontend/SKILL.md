@@ -328,6 +328,14 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 远程地址或租户变化时清空旧验证码和 Token；登录失败时刷新验证码。未开启验证码时不得显示验证码输入，也不得提交空验证码字段。
 - 远程响应头必须通过 CORS 暴露 `captchaid` 和 `authorization`；前端还应兼容登录响应体中的 Token，避免只依赖响应头。
 
+### PC/移动自适应 Token 续签
+
+- PC 登录传 `_ClientType:'PC'`；`diyStore.IsPhoneView` 的移动自适应登录传 `_ClientType:'Mobile'`。完整协议以 `microi-frontend-sdk/SKILL.md` 为准。
+- `TokenExpires` 表示“下次应检查续签的时间”，不能固定成所有终端 15 分钟；应从 JWT `exp` 和 `MicroiTokenIssuedAt` 按 10% 提前量计算，最少 5 分钟、最多 1 天。
+- `App.vue` 除一分钟维护定时器外，还必须监听 `visibilitychange`、`focus`、`pageshow`。标签页从浏览器休眠恢复时先走 single-flight RefreshToken，再发业务请求。
+- `Code=1001/1002` 时展示后端原始 `Msg`。提示必须保留已过期时长或 `TenantMismatch` 的 Token 租户/当前租户信息，不能统一覆盖成“登录身份已过期”。
+- 多 Tab 共享 Token 时，旧请求返回不得覆盖新 Token，也不得因旧 Token 的失效响应清除另一个 Tab 已写入的新 Token。
+
 ## Microi 前端 SDK 约束
 
 当修改 `Microi.Client` 之外的 Vue3 前端、PC 官网、移动 H5 或定制微前端页面时，必须优先读取 `microi.skills/microi-frontend-sdk/SKILL.md` 并使用 `microi.skills/microi.v8.js`。`Microi.Client` 主后台已有平台请求与 Pinia 体系时，可以复用现有平台能力；但新增独立页面、外部站点、插件页、嵌入式页面不得再复制旧 Vue2/Vuex 版 `microi.v8.js`。

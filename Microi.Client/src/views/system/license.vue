@@ -22,6 +22,17 @@
             </div>
 
             <template v-else>
+                <el-alert
+                    v-if="!isMainTenant"
+                    type="info"
+                    :closable="false"
+                    show-icon
+                    class="readonly-alert"
+                >
+                    <template #title>当前为子租户，授权管理处于只读模式</template>
+                    当前租户 {{ currentOsClient }} 可查看本服务器的授权状态和完整授权信息；提交授权申请、重新验证、下载或自动部署 License 仅允许主租户 {{ mainOsClient }} 执行。
+                </el-alert>
+
                 <!-- ========== 已授权状态 ========== -->
                 <el-card v-if="isLicensed" class="status-card status-licensed" shadow="hover">
                     <div class="status-row">
@@ -35,6 +46,8 @@
                     </div>
                     <el-descriptions :column="2" border class="license-desc" :label-style="{ width: '140px', fontWeight: 600 }">
                         <el-descriptions-item label="授权公司">{{ licenseInfo.Company }}</el-descriptions-item>
+                        <el-descriptions-item label="授权联系人">{{ licenseInfo.Name || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="联系电话">{{ licenseInfo.Phone || '-' }}</el-descriptions-item>
                         <el-descriptions-item label="产品版本">
                             {{ licenseInfo.ProductType === 'Enterprise' ? '企业版 Enterprise' : '个人版 Personal' }}
                         </el-descriptions-item>
@@ -42,10 +55,27 @@
                             <code class="hid-code">{{ licenseInfo.HID }}</code>
                         </el-descriptions-item>
                         <el-descriptions-item label="授权到期">{{ licenseInfo.ExpirationDate }}</el-descriptions-item>
+                        <el-descriptions-item label="更新服务到期">{{ licenseInfo.UpdateExpirationDate || '-' }}</el-descriptions-item>
                         <el-descriptions-item label="签发时间">{{ licenseInfo.IssuedDate }}</el-descriptions-item>
+                        <el-descriptions-item label="License格式版本">v{{ licenseInfo.LicenseVersion || 1 }}</el-descriptions-item>
+                        <el-descriptions-item label="在线AI授权">
+                            <el-tag :type="licenseInfo.OnlineAiLicensed ? 'success' : 'info'" size="small">
+                                {{ licenseInfo.OnlineAiLicensed ? '已授权' : '未授权' }}
+                            </el-tag>
+                            <span class="inline-info">{{ formatProductType(licenseInfo.AiProductType) }}</span>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="当前 / 主租户">
+                            {{ currentOsClient }} / {{ mainOsClient }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="授权组件版本">
+                            {{ licenseInfo.LicenseProviderAssemblyVersion || '-' }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="Microi.AI版本">
+                            {{ licenseInfo.MicroiAiAssemblyVersion || '-' }}
+                        </el-descriptions-item>
                     </el-descriptions>
-                    <div class="card-actions">
-                        <el-button type="primary" :loading="verifying" @click="loadVerify">
+                    <div v-if="isMainTenant" class="card-actions">
+                        <el-button type="primary" :loading="verifying" @click="refreshLicense">
                             <el-icon><Refresh /></el-icon> 重新验证
                         </el-button>
                     </div>
@@ -62,7 +92,10 @@
                             <span class="status-label warning">未授权</span>
                             <el-tag type="info" effect="dark" size="large">开源版 OpenSource</el-tag>
                         </div>
-                        <p class="status-hint">当前服务器未检测到有效的License授权，AI相关高级功能受限。请提交授权申请或部署已签发的License文件。</p>
+                        <p class="status-hint">
+                            当前服务器未检测到有效的License授权，AI相关高级功能受限。
+                            {{ isMainTenant ? '请提交授权申请或部署已签发的License文件。' : '当前子租户仅可查看状态，请联系主租户管理员处理授权。' }}
+                        </p>
                     </el-card>
 
                     <!-- 已提交过申请的状态提示 -->
@@ -87,10 +120,10 @@
                             <template #title>驳回原因：{{ existingApp.RejectReason }}</template>
                         </el-alert>
                         <p v-if="existingApp.Status === 'Pending'" style="margin: 12px 0 0; color: #909399; font-size: 13px;">
-                            您的申请正在等待管理员审核，您也可以修改信息后重新提交。
+                            您的申请正在等待管理员审核。{{ isMainTenant ? '您也可以修改信息后重新提交。' : '' }}
                         </p>
                         <p v-if="existingApp.Status === 'Issued' && !existingApp.Revoked" style="margin: 12px 0 0; color: #67c23a; font-size: 13px;">
-                            License已签发，请切换到「检查并部署License」选项卡进行部署。
+                            {{ isMainTenant ? 'License已签发，请切换到「检查并部署License」选项卡进行部署。' : 'License已签发，请联系主租户管理员完成部署。' }}
                         </p>
                     </el-card>
 
@@ -112,7 +145,7 @@
                     </el-card>
 
                     <!-- 主操作区：Tabs -->
-                    <el-card class="main-card" shadow="hover">
+                    <el-card v-if="isMainTenant" class="main-card" shadow="hover">
                         <el-tabs v-model="activeTab" type="border-card" @tab-change="onTabChange">
                             <!-- TAB 1: 提交申请 -->
                             <el-tab-pane name="apply">
@@ -246,7 +279,7 @@
                     <template #header>
                         <div class="card-title server-title">
                             <span><el-icon><Connection /></el-icon> 已部署服务器节点</span>
-                            <el-button link type="primary" :loading="licenseServersLoading" @click="loadLicenseServers">刷新</el-button>
+                            <el-button v-if="isMainTenant" link type="primary" :loading="licenseServersLoading" @click="loadLicenseServers">刷新</el-button>
                         </div>
                     </template>
                     <el-table
@@ -266,6 +299,8 @@
                         <el-table-column prop="HID" label="HID" min-width="220" show-overflow-tooltip />
                         <el-table-column prop="ProductType" label="授权类型" width="120" />
                         <el-table-column prop="Company" label="授权主体" min-width="160" show-overflow-tooltip />
+                        <el-table-column prop="IpAddress" label="服务器IP" min-width="150" show-overflow-tooltip />
+                        <el-table-column prop="ExpirationDate" label="授权到期" min-width="160" />
                         <el-table-column prop="LastDeployTime" label="最后部署" min-width="160" />
                         <el-table-column prop="LastRestoreTime" label="最后恢复" min-width="160" />
                         <el-table-column prop="Status" label="状态" width="110" />
@@ -296,6 +331,9 @@ export default {
             hid: "",
             isLicensed: false,
             licenseInfo: {},
+            isMainTenant: false,
+            currentOsClient: "",
+            mainOsClient: "",
             // 申请表单
             activeTab: "apply",
             applyForm: {
@@ -342,58 +380,75 @@ export default {
         async init() {
             this.pageLoading = true;
             const self = this;
-            // 先获取HID，再验证License
-            this.loadHID(() => {
-                self.loadVerify(() => {
-                    self.pageLoading = false;
-                    self.loadLicenseServers();
-                    // 如果未授权，向License服务器查询是否已提交过申请
-                    if (!self.isLicensed && self.hid) {
-                        self.queryExistingApplication();
+            this.loadVerify(() => {
+                self.pageLoading = false;
+                self.loadLicenseServers();
+                // 如果未授权，向License服务器查询是否已提交过申请
+                if (!self.isLicensed && self.hid) {
+                    self.queryExistingApplication();
+                    if (self.isMainTenant) {
                         self.loadCaptcha();
                     }
-                });
-            });
-        },
-
-        // 获取本机HID
-        loadHID(done) {
-            const self = this;
-            self.DiyCommon.Get("/api/License/GetHardwareId", {}, function (result) {
-                if (result && result.Code === 1 && result.Data) {
-                    self.hid = result.Data.HID || "";
                 }
-                if (done) done();
-            }, function () {
-                if (done) done();
             });
         },
 
-        // 验证本机License状态
+        // 读取当前登录租户可见的完整 License 管理状态
         loadVerify(done) {
             const self = this;
             self.verifying = true;
-            self.DiyCommon.Get("/api/License/Verify", {}, function (result) {
+            self.DiyCommon.Get("/api/License/GetManagementState", {}, function (result) {
                 self.verifying = false;
                 if (result && result.Code === 1 && result.Data) {
                     const d = result.Data;
                     self.isLicensed = d.IsLicensed === true;
+                    self.isMainTenant = d.IsMainTenant === true;
+                    self.currentOsClient = d.CurrentOsClient || "";
+                    self.mainOsClient = d.MainOsClient || "";
                     self.licenseInfo = {
                         HID: d.HID || self.hid,
                         ProductType: d.ProductType || "",
                         Company: d.Company || "",
+                        Name: d.Name || "",
+                        Phone: d.Phone || "",
                         ExpirationDate: d.ExpirationDate || "",
+                        UpdateExpirationDate: d.UpdateExpirationDate || "",
                         IssuedDate: d.IssuedDate || "",
+                        LicenseVersion: d.LicenseVersion || 1,
+                        OnlineAiLicensed: d.OnlineAiLicensed === true,
+                        AiProductType: d.AiProductType || "OpenSource",
+                        LicenseProviderAssemblyVersion: d.LicenseProviderAssemblyVersion || "",
+                        MicroiAiAssemblyVersion: d.MicroiAiAssemblyVersion || "",
                     };
-                    if (!self.hid) self.hid = d.HID || "";
+                    self.hid = d.HID || self.hid;
                 } else {
                     self.isLicensed = false;
+                    ElMessage.error((result && result.Msg) || "授权状态读取失败");
                 }
                 if (done) done();
             }, function () {
                 self.verifying = false;
                 self.isLicensed = false;
                 if (done) done();
+            });
+        },
+
+        // 主租户重新加载并验证本机 License 文件
+        refreshLicense() {
+            if (!this.ensureMainTenant()) return;
+            const self = this;
+            self.verifying = true;
+            self.DiyCommon.Post("/api/License/RefreshCurrentServer", {}, function (result) {
+                self.verifying = false;
+                if (result && result.Code === 1) {
+                    ElMessage.success(result.Msg || "License已重新验证");
+                    self.loadVerify();
+                } else {
+                    ElMessage.error((result && result.Msg) || "License重新验证失败");
+                }
+            }, function () {
+                self.verifying = false;
+                ElMessage.error("License重新验证请求失败");
             });
         },
 
@@ -415,7 +470,7 @@ export default {
                         if (result.Data.Phone) self.applyForm.Phone = result.Data.Phone;
                         if (result.Data.Remark) self.applyForm.Remark = result.Data.Remark;
                         // 如果已签发且未作废，自动切换到部署tab并获取LicenseContent
-                        if (result.Data.Status === 'Issued' && !result.Data.Revoked) {
+                        if (self.isMainTenant && result.Data.Status === 'Issued' && !result.Data.Revoked) {
                             self.activeTab = "deploy";
                             self.checkLicense();
                         }
@@ -429,17 +484,17 @@ export default {
             const self = this;
             self.licenseServersLoading = true;
             try {
-                const result = await self.DiyCommon.FormEngine.GetTableData("mci_license_server", {
-                    _PageIndex: 1,
-                    _PageSize: 50,
-                    _OrderBy: "UpdateTime",
-                    _OrderByType: "DESC"
+                await new Promise((resolve) => {
+                    self.DiyCommon.Get("/api/License/GetServerNodes", {}, function (result) {
+                        self.licenseServers = result && result.Code === 1 && Array.isArray(result.Data)
+                            ? result.Data
+                            : [];
+                        resolve();
+                    }, function () {
+                        self.licenseServers = [];
+                        resolve();
+                    });
                 });
-                if (result && result.Code === 1 && Array.isArray(result.Data)) {
-                    self.licenseServers = result.Data;
-                } else {
-                    self.licenseServers = [];
-                }
             } catch (error) {
                 self.licenseServers = [];
             } finally {
@@ -449,6 +504,7 @@ export default {
 
         // Tab切换事件
         onTabChange(name) {
+            if (!this.isMainTenant) return;
             if (name === "deploy" && this.hid && this.checkResult === null) {
                 this.checkLicense();
             }
@@ -456,6 +512,7 @@ export default {
 
         // 加载验证码（从License服务器）
         loadCaptcha() {
+            if (!this.ensureMainTenant(false)) return;
             const self = this;
             fetch(LICENSE_API_BASE + "/api/License/GetCaptcha", { method: "GET" })
                 .then(r => r.json())
@@ -472,9 +529,10 @@ export default {
                 });
         },
 
-        // 提交申请到 api.itdos.com（不发送authorization报文）
+        // 通过本机受保护接口向 License 服务提交申请
         submitApply() {
             const self = this;
+            if (!self.ensureMainTenant()) return;
             if (!self.hid) {
                 ElMessage.warning("HID获取失败，请刷新页面重试");
                 return;
@@ -521,45 +579,39 @@ export default {
                 Remark: self.applyForm.Remark.trim(),
             };
 
-            fetch(LICENSE_API_BASE + "/api/License/Apply", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(param),
-            })
-                .then(r => r.json())
-                .then(result => {
-                    self.applying = false;
-                    if (result && result.Code === 1) {
-                        if (result.Data && result.Data.LicenseContent) {
-                            ElMessage.success(result.Msg || "License已自动签发！");
-                            self.checkResult = result.Data;
-                            self.activeTab = "deploy";
-                        } else {
-                            ElMessage.success(result.Msg || "授权申请已提交，等待管理员审核");
-                            self.queryExistingApplication();
-                            self.activeTab = "deploy";
-                        }
-                        // 重置验证码
-                        self.applyForm.CaptchaValue = "";
-                        self.loadCaptcha();
+            self.DiyCommon.Post("/api/License/ApplyCurrentServer", param, function (result) {
+                self.applying = false;
+                if (result && result.Code === 1) {
+                    if (result.Data && result.Data.LicenseContent) {
+                        ElMessage.success(result.Msg || "License已自动签发！");
+                        self.checkResult = result.Data;
+                        self.activeTab = "deploy";
                     } else {
-                        ElMessage.error((result && result.Msg) || "申请提交失败");
-                        // 验证码可能已失效，刷新验证码
-                        self.loadCaptcha();
-                        self.applyForm.CaptchaValue = "";
+                        ElMessage.success(result.Msg || "授权申请已提交，等待管理员审核");
+                        self.queryExistingApplication();
+                        self.activeTab = "deploy";
                     }
-                })
-                .catch(() => {
-                    self.applying = false;
-                    ElMessage.error("网络请求失败，请检查网络连接");
+                    // 重置验证码
+                    self.applyForm.CaptchaValue = "";
+                    self.loadCaptcha();
+                } else {
+                    ElMessage.error((result && result.Msg) || "申请提交失败");
+                    // 验证码可能已失效，刷新验证码
                     self.loadCaptcha();
                     self.applyForm.CaptchaValue = "";
-                });
+                }
+            }, function () {
+                self.applying = false;
+                ElMessage.error("网络请求失败，请检查网络连接");
+                self.loadCaptcha();
+                self.applyForm.CaptchaValue = "";
+            });
         },
 
         // 检查授权状态（从 api.itdos.com，不发送authorization报文）
         checkLicense() {
             const self = this;
+            if (!self.ensureMainTenant()) return;
             if (!self.hid) {
                 ElMessage.warning("HID获取失败，请刷新页面重试");
                 return;
@@ -591,6 +643,7 @@ export default {
         // 自动部署到本地服务器
         deployLicense() {
             const self = this;
+            if (!self.ensureMainTenant()) return;
             if (!self.checkResult || !self.checkResult.LicenseContent) {
                 ElMessage.warning("无可用的License内容");
                 return;
@@ -625,6 +678,7 @@ export default {
 
         // 下载License文件
         downloadLicense() {
+            if (!this.ensureMainTenant()) return;
             if (!this.checkResult || !this.checkResult.LicenseContent) {
                 ElMessage.warning("无可用的License内容");
                 return;
@@ -639,6 +693,20 @@ export default {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             ElMessage.success("License文件下载成功");
+        },
+
+        ensureMainTenant(showMessage = true) {
+            if (this.isMainTenant) return true;
+            if (showMessage) {
+                ElMessage.warning("当前为子租户，仅主租户可以执行授权管理操作");
+            }
+            return false;
+        },
+
+        formatProductType(productType) {
+            if (productType === "Enterprise") return "企业版 Enterprise";
+            if (productType === "Personal") return "个人版 Personal";
+            return "开源版 OpenSource";
         },
 
         // 复制文本
@@ -811,6 +879,13 @@ export default {
 }
 .info-card {
     margin-bottom: 20px;
+}
+.readonly-alert {
+    margin-bottom: 20px;
+}
+.inline-info {
+    margin-left: 8px;
+    color: #606266;
 }
 .license-server-card {
     :deep(.el-card__header) {

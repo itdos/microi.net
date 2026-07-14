@@ -9,7 +9,7 @@ import { getToken } from "@/utils/auth.js"; // get token from cookie
 import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
-const whiteList = ["/login", "/auth-redirect"]; // no redirect whitelist
+const whiteList = ["/login", "/auth-redirect", "/mci-redis-manager"]; // no redirect whitelist
 
 function isAuthenticationFailure(error) {
     if (!error) return false;

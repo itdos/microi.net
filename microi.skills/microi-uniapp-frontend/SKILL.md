@@ -324,6 +324,10 @@ async function load() {
 - 客户小程序手机号登录得到的是业务 `CustomerToken`，与员工 `sys_user` token 是两条会话；客户数据必须通过绑定关系过滤，不要把客户账号塞进员工接口绕过权限。
 - 登出、登录失败、token 缺失、用户 `Id` 缺失时要统一清理 `Token`、`staffUser/customerUser`、绑定信息和本地 session。
 - 接口引擎登录失败时要把 `Msg` 原样传到统一错误展示层，禁止在 store 或业务 API 包装中覆盖成固定文案；网络错误优先读取 `errMsg/message`，HTTP 错误同时保留状态码。
+- 员工账号登录必须传准确 `_ClientType`；H5、App、微信/支付宝/飞书/抖音小程序均属于移动长效终端，默认读取 SaaS 引擎 `AccessTokenLifetime`（单位天，默认 30 天）。完整 Token 协议以 `microi-frontend-sdk/SKILL.md` 为准。
+- 项目统一持久化稳定 `did` 并通过请求头发送；同一安装不得每次请求生成新 `did`。
+- `App.onShow` 必须调用 `V8.resumeAuthSession(false)`。只使用后台 `setInterval` 不可靠，因为系统休眠、WebView 后台化和浏览器节流都会暂停定时器。
+- 收到 `Code=1001/1002` 时用可完整阅读的模态框展示后端 `Msg`，包括过期分钟/小时/天或租户不匹配信息，确认后再跳登录；不能先覆盖成固定 Toast。
 
 ## 数字、主题、上传与消息
 

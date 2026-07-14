@@ -6,6 +6,13 @@ export declare const API: {
     readonly LOGIN: "/api/SysUser/Login";
     readonly REFRESH_TOKEN: "/api/SysUser/RefreshToken";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
+    readonly REDIS_STATISTICS: "/api/Cache/redis/statistics";
+    readonly REDIS_KEYS: "/api/Cache/redis/keys";
+    readonly REDIS_KEY: "/api/Cache/redis/key";
+    readonly REDIS_DELETE_KEYS: "/api/Cache/redis/keys/delete";
+    readonly REDIS_REPLACE_VALUE: "/api/Cache/redis/key/replace";
+    readonly REDIS_RENAME_KEY: "/api/Cache/redis/key/rename";
+    readonly REDIS_SET_TTL: "/api/Cache/redis/key/ttl";
     readonly GET_DB_SCHEMA: "/api/V8Engine/GetDbSchema";
     readonly GET_PLAYWRIGHT_CONTEXT: "/api/V8Engine/GetPlaywrightContext";
     readonly GET_ENGINE_LIST: "/api/V8Engine/GetApiEngineList";

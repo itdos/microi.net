@@ -8,6 +8,14 @@ export const API = {
     REFRESH_TOKEN: '/api/SysUser/RefreshToken',
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
+    // Redis 管理器（默认当前租户连接，可指定已保存连接）
+    REDIS_STATISTICS: '/api/Cache/redis/statistics',
+    REDIS_KEYS: '/api/Cache/redis/keys',
+    REDIS_KEY: '/api/Cache/redis/key',
+    REDIS_DELETE_KEYS: '/api/Cache/redis/keys/delete',
+    REDIS_REPLACE_VALUE: '/api/Cache/redis/key/replace',
+    REDIS_RENAME_KEY: '/api/Cache/redis/key/rename',
+    REDIS_SET_TTL: '/api/Cache/redis/key/ttl',
     // 数据库结构
     GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
     GET_PLAYWRIGHT_CONTEXT: '/api/V8Engine/GetPlaywrightContext',

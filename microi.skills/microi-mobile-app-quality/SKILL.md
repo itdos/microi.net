@@ -47,6 +47,8 @@ applyTo: "**/*.{vue,js,ts,css,scss,json,md}"
 - 会话恢复必须重新校验 token 和用户 `Id`。如果本地只有 `staffUser.Account/Name` 但没有 token，必须清空缓存，不能出现“姓名是 admin、状态是未登录”的矛盾界面。
 - 登录后所有页面的 `isLogin`、头像姓名、角色文本、未登录提示和可见按钮必须来自同一个 session store，不要让单页自己读取旧缓存。
 - 登录实现后的第一个测试必须包含真实点击登录按钮，并检查控制台和网络请求。
+- 登录必须传移动端 `_ClientType` 和稳定 `did`，并在 `App.onShow` 调用标准 SDK 的 `resumeAuthSession(false)`。系统休眠后不能只等定时器恢复。
+- 登录失效提示必须原样展示后端 `Msg`；如果 Token 已过期，显示过期分钟/小时/天，如果 Token 属于其它租户，显示 Token 租户与当前租户。详细协议读取 `microi-frontend-sdk/SKILL.md`。
 
 禁止：
 - 凭空编造 SDK 子对象。
