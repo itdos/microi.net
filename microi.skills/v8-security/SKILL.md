@@ -284,6 +284,16 @@ try {
 }
 ```
 
+## 9. Token、终端会话与租户隔离
+
+开发 Web、H5、UniApp、小程序、App、VS Code 或 MCP 客户端时，必须同时遵守 `microi-frontend-sdk/SKILL.md` 的 Token 协议：登录传 `_ClientType`，请求头传稳定 `did`，每次响应接收新的 `authorization`，并在浏览器/应用恢复前台时检查续签。
+
+- PC 默认使用 `SessionAuthTimeout` 分钟策略；移动端、VS Code、MCP 默认使用 `AccessTokenLifetime` 天策略。不要在前端自行扩大服务端有效期。
+- Token 的 `OsClient` 必须与当前请求租户一致。收到 `TenantMismatch` 时立即停止请求，不能自动把 Token 复制到另一个租户。
+- 收到 `JwtExpired`、`SessionExpired`、`SessionMissing`、`AuthVersionChanged` 时清理当前连接的 Token；多服务器或多租户客户端只能清理受影响的连接，不能全局退出其它连接。
+- 收到 `TokenReplaced` 时先检查同一终端是否已有新 Token，避免并发旧响应误清新登录态。
+- 用户提示可以显示过期时长、终端类型和租户 Key，但日志、Toast、URL、截图禁止输出完整 Token。
+
 ## 安全检查清单
 
 - [ ] 所有数据库查询使用参数化（`_Where` 或 `@p0`）

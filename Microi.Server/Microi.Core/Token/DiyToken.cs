@@ -214,6 +214,35 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 将 Token 已过期时长转换为面向用户的分钟、小时或天描述。
+        /// </summary>
+        public static string DescribeExpiredDuration(TimeSpan elapsed)
+        {
+            if (elapsed < TimeSpan.Zero)
+            {
+                elapsed = TimeSpan.Zero;
+            }
+            if (elapsed.TotalMinutes < 1)
+            {
+                return "不足1分钟";
+            }
+            if (elapsed.TotalHours < 1)
+            {
+                return $"{Math.Max(1, (int)Math.Floor(elapsed.TotalMinutes))}分钟";
+            }
+            if (elapsed.TotalDays < 1)
+            {
+                var hours = Math.Max(1, (int)Math.Floor(elapsed.TotalHours));
+                var minutes = elapsed.Minutes;
+                return minutes > 0 ? $"{hours}小时{minutes}分钟" : $"{hours}小时";
+            }
+
+            var days = Math.Max(1, (int)Math.Floor(elapsed.TotalDays));
+            var remainingHours = elapsed.Hours;
+            return remainingHours > 0 ? $"{days}天{remainingHours}小时" : $"{days}天";
+        }
+
+        /// <summary>
         /// 获取当前 OsClient
         /// </summary>
         /// <param name="returnDefaultOsClient">当未从当前上下文获取到OsClient时，是否返回默认的OsClient</param>
@@ -897,14 +926,20 @@ namespace Microi.net
             return null;
         }
 
-        public static async Task<string> DiagnoseInactiveToken(string token, string osClient = "")
+        public static async Task<TokenAuthDiagnostic> DiagnoseInactiveTokenDetail(string token, string osClient = "")
         {
+            var diagnostic = new TokenAuthDiagnostic
+            {
+                RequestOsClient = osClient?.Trim() ?? ""
+            };
             try
             {
                 var normalizedToken = NormalizeBearerToken(token);
                 if (normalizedToken.DosIsNullOrWhiteSpace())
                 {
-                    return "MissingToken";
+                    diagnostic.ReasonCode = "MissingToken";
+                    diagnostic.UserMessage = "请求未携带Token，请重新登录。";
+                    return diagnostic;
                 }
 
                 JwtSecurityToken jwtToken;
@@ -914,28 +949,55 @@ namespace Microi.net
                 }
                 catch
                 {
-                    return "MalformedToken";
+                    diagnostic.ReasonCode = "MalformedToken";
+                    diagnostic.UserMessage = "当前Token格式无效，请重新登录。";
+                    return diagnostic;
                 }
 
                 var claims = jwtToken.Claims?.ToList();
                 var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;
                 var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                var clientType = claims?.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                var did = claims?.FirstOrDefault(d => d.Type == "Did")?.Value;
+                diagnostic.TokenOsClient = tokenOsClient ?? "";
+                diagnostic.ClientType = clientType.DosIsNullOrWhiteSpace("Empty");
+                diagnostic.Did = did.DosIsNullOrWhiteSpace("Empty");
+                if (long.TryParse(claims?.FirstOrDefault(d => d.Type == TokenIssuedAtClaimType)?.Value, out var issuedAtSeconds))
+                {
+                    diagnostic.IssuedAt = DateTimeOffset.FromUnixTimeSeconds(issuedAtSeconds)
+                        .LocalDateTime
+                        .ToString("yyyy-MM-dd HH:mm:ss");
+                }
                 if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace())
                 {
-                    return "MissingClaims";
+                    diagnostic.ReasonCode = "MissingClaims";
+                    diagnostic.UserMessage = "当前Token缺少用户或租户信息，请重新登录。";
+                    return diagnostic;
                 }
                 if (!osClient.DosIsNullOrWhiteSpace()
                     && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
                 {
-                    return "TenantMismatch";
+                    diagnostic.ReasonCode = "TenantMismatch";
+                    diagnostic.IsTenantMismatch = true;
+                    diagnostic.UserMessage = $"当前Token属于租户【{tokenOsClient}】，不能用于当前租户【{osClient}】，请切换到正确租户或重新登录。";
+                    return diagnostic;
                 }
                 if (!IsCurrentAuthVersion(claims))
                 {
-                    return "AuthVersionChanged";
+                    diagnostic.ReasonCode = "AuthVersionChanged";
+                    diagnostic.UserMessage = "当前Token的安全版本已失效，请重新登录。";
+                    return diagnostic;
                 }
                 if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
                 {
-                    return "JwtExpired";
+                    diagnostic.ReasonCode = "JwtExpired";
+                    diagnostic.SetExpired(jwtToken.ValidTo);
+                    diagnostic.UserMessage = $"当前Token已过期{diagnostic.ExpiredFor}（过期时间：{diagnostic.ExpiresAt}），请重新登录。";
+                    return diagnostic;
+                }
+                if (jwtToken.ValidTo != DateTime.MinValue)
+                {
+                    diagnostic.ExpiresAt = jwtToken.ValidTo.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
                 }
 
                 CurrentToken tokenModel;
@@ -946,24 +1008,62 @@ namespace Microi.net
                 }
                 catch
                 {
-                    return "CacheUnavailable";
+                    diagnostic.ReasonCode = "CacheUnavailable";
+                    diagnostic.UserMessage = "暂时无法读取服务端登录状态，请稍后重试。";
+                    return diagnostic;
                 }
                 if (tokenModel == null || tokenModel.CurrentUser == null)
                 {
-                    return "SessionMissing";
+                    diagnostic.ReasonCode = "SessionMissing";
+                    diagnostic.UserMessage = "当前Token对应的服务端登录身份已失效，可能已退出、被管理员清除或登录缓存已重建，请重新登录。";
+                    return diagnostic;
                 }
                 if (!string.Equals(tokenModel.AuthVersion, CurrentAuthVersion, StringComparison.Ordinal))
                 {
-                    return "AuthVersionChanged";
+                    diagnostic.ReasonCode = "AuthVersionChanged";
+                    diagnostic.UserMessage = "当前Token的安全版本已失效，请重新登录。";
+                    return diagnostic;
                 }
-                return IsActiveCachedToken(tokenModel, normalizedToken)
-                    ? "Unknown"
-                    : "TokenReplaced";
+
+                var activeTokenEntry = GetActiveCachedTokenEntry(tokenModel, normalizedToken);
+                if (activeTokenEntry == null)
+                {
+                    diagnostic.ReasonCode = "TokenReplaced";
+                    diagnostic.UserMessage = "当前Token已被同一终端的新Token替换，可能是其它标签页或并发请求已完成续签，请重试；仍失败时请重新登录。";
+                    return diagnostic;
+                }
+
+                var clientModel = OsClientExtend.GetClient(tokenOsClient);
+                var tokenLifetime = ResolveClientTokenLifetime(clientModel, diagnostic.ClientType);
+                var activeUpdateTime = activeTokenEntry.UpdateTime == default
+                    ? tokenModel.UpdateTime
+                    : activeTokenEntry.UpdateTime;
+                if (activeUpdateTime != default)
+                {
+                    var sessionExpiresAt = activeUpdateTime.Add(tokenLifetime);
+                    if (sessionExpiresAt < DateTime.Now)
+                    {
+                        diagnostic.ReasonCode = "SessionExpired";
+                        diagnostic.SetExpired(sessionExpiresAt.ToUniversalTime());
+                        diagnostic.UserMessage = $"当前{diagnostic.ClientType}终端登录已过期{diagnostic.ExpiredFor}（有效期：{DescribeClientTokenLifetime(clientModel, diagnostic.ClientType)}，过期时间：{diagnostic.ExpiresAt}），请重新登录。";
+                        return diagnostic;
+                    }
+                }
+
+                diagnostic.ReasonCode = "Unknown";
+                diagnostic.UserMessage = "当前Token未处于有效登录状态，请重试；仍失败时请重新登录。";
+                return diagnostic;
             }
             catch
             {
-                return "Unknown";
+                return diagnostic;
             }
+        }
+
+        public static async Task<string> DiagnoseInactiveToken(string token, string osClient = "")
+        {
+            var diagnostic = await DiagnoseInactiveTokenDetail(token, osClient);
+            return diagnostic?.ReasonCode ?? "Unknown";
         }
 
     }

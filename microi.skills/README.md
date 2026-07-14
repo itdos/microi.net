@@ -55,7 +55,7 @@
 | **business-blueprint** | 从需求生成业务蓝图、模块边界、数据模型与接口清单 | `business-blueprint/SKILL.md` |
 | **microi-system-delivery** | 自然语言到完整系统交付的总控、MCP 编排、验收和复盘 | `microi-system-delivery/SKILL.md` |
 | **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
-| **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
+| **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token终端会话/续签、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
 | **microi-uniapp-frontend** | Microi UniApp/H5 通用前端规范、安全区、资源解析、骨架屏、主题与页面质量 | `microi-uniapp-frontend/SKILL.md` |
 | **microi-mobile-app-quality** | 移动端质量门禁：登录、验证码、图标、菜单层级、主题、动效、截图验收 | `microi-mobile-app-quality/SKILL.md` |
 | **microi-datasource-mapping** | 数据源 Key/Value 映射、下拉枚举与前后端显示值一致性 | `microi-datasource-mapping/SKILL.md` |
@@ -227,7 +227,7 @@ MIT
 
 ## 新增通用前端 SDK Skill
 
-- `microi.skills/microi-frontend-sdk/SKILL.md`：Microi Vue3 前端 SDK 规范，覆盖请求、Token、上传、资源 URL、ApiEngine/FormEngine、Vue3 app 挂载。所有移动端 H5、UniApp、PC 官网、响应式站点和独立前端项目都应优先参考。
+- `microi.skills/microi-frontend-sdk/SKILL.md`：Microi Vue3 前端 SDK 规范，覆盖请求、Token终端类型、`did`、休眠恢复续签、过期/租户诊断、上传、资源 URL、ApiEngine/FormEngine、Vue3 app 挂载。所有移动端 H5、UniApp、PC 官网、响应式站点和独立前端项目都应优先参考。
 
 ## 新增表单布局分组 Skill
 

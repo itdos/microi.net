@@ -777,11 +777,13 @@ namespace Microi.net.Api
             var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
             if (tokenModelJobj == null)
             {
-                var reasonCode = await DiyToken.DiagnoseInactiveToken(param.authorization, param.OsClient);
-                return Json(new DosResult(0, null, "无效的Token.", 0, new
-                {
-                    ReasonCode = reasonCode
-                }));
+                var diagnostic = await DiyToken.DiagnoseInactiveTokenDetail(param.authorization, param.OsClient);
+                return Json(new DosResult(
+                    1001,
+                    null,
+                    diagnostic?.UserMessage ?? "当前Token无效，请重新登录。",
+                    0,
+                    diagnostic));
             }
 
             var tokenClientType = ReadTokenClaim(param.authorization, "ClientType");

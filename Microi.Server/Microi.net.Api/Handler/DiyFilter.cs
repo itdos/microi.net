@@ -96,6 +96,44 @@ namespace Microi.net.Api
             }
 
         }
+
+        private static string GetRequestAuthorizationToken(HttpContext context)
+        {
+            var token = context?.Request?.Headers["Authorization"].ToString();
+            if (token.DosIsNullOrWhiteSpace() && context?.Request?.HasFormContentType == true)
+            {
+                token = context.Request.Form["authorization"].ToString();
+            }
+            return token.DosTrim().DosReplace("Bearer ", "");
+        }
+
+        private static async Task<DosResult> BuildTokenAuthFailureAsync(
+            string osClient,
+            string lang,
+            string token,
+            string appendMsg)
+        {
+            var diagnostic = await DiyToken.DiagnoseInactiveTokenDetail(token, osClient);
+            if (diagnostic != null)
+            {
+                diagnostic.AppendMsg = appendMsg ?? "";
+            }
+            var baseMessage = DiyMessage.GetLang(osClient, "NoLogin", lang);
+            var message = diagnostic?.UserMessage;
+            if (message.DosIsNullOrWhiteSpace()
+                || string.Equals(diagnostic?.ReasonCode, "Unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                message = appendMsg.DosIsNullOrWhiteSpace()
+                    ? baseMessage
+                    : $"{baseMessage}：{appendMsg}";
+            }
+            return new DosResult(
+                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                null,
+                message,
+                null,
+                diagnostic);
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -304,6 +342,7 @@ namespace Microi.net.Api
                 _Lang = DiyMessage.Lang;
             }
             var headerOrFormOsClient = context.HttpContext.Request.Headers["osclient"].ToString();
+            var requestToken = GetRequestAuthorizationToken(context.HttpContext);
             if (context.Filters.Any(item => item is IAllowAnonymousFilter))
             {
                 return;
@@ -321,16 +360,15 @@ namespace Microi.net.Api
             //如果未标记[AllowAnonymous]，则需要身份认证
             if (!context.Filters.Any(item => item is IAllowAnonymousFilter))
             {
-                if (!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
+                if (!headerOrFormOsClient.DosIsNullOrWhiteSpace()
+                    && !osClient.DosIsNullOrWhiteSpace()
+                    && !string.Equals(headerOrFormOsClient, osClient, StringComparison.OrdinalIgnoreCase))
                 {
-                    var jsonResult = new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 
-                        null,
-                        new
-                        {
-                            AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
-                        });
+                    var jsonResult = await BuildTokenAuthFailureAsync(
+                        headerOrFormOsClient,
+                        _Lang,
+                        requestToken,
+                        $"请求租户为[{headerOrFormOsClient}]，Token租户为[{osClient}]，请重新登录");
                     context.Result = new JsonResult(jsonResult);
                     return;
                 }
@@ -339,24 +377,17 @@ namespace Microi.net.Api
 
                 if (currentToken.CurrentUser == null)
                 {
-                    context.Result = new JsonResult(
-                        new DosResult(
-                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 
-                            null, new
-                            {
-                                AppendMsg = $"Token中未找到用户信息，可能是因为Redis缓存被清空了。OsClient：{osClient}"
-                            }));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        requestOsClient.DosIsNullOrWhiteSpace() ? osClient : requestOsClient,
+                        _Lang,
+                        requestToken,
+                        $"Token中未找到有效用户信息。OsClient：{osClient}"));
                     return;
                 }
 
                 #region 从jwt中获取身份认证信息
                 var claims = new List<Claim>();
-                var token = context.HttpContext.Request.Headers["Authorization"].ToString();
-                if (token.DosIsNullOrWhiteSpace() && context.HttpContext.Request?.HasFormContentType == true)
-                {
-                    token = context.HttpContext.Request?.Form["authorization"].ToString();
-                }
+                var token = requestToken;
                 if (token.DosIsNullOrWhiteSpace())
                 {
                     token = currentToken.Token;
@@ -373,13 +404,11 @@ namespace Microi.net.Api
                     // 先检查token格式是否有效
                     if (!tokenHandler.CanReadToken(tokenString))
                     {
-                        context.Result = new JsonResult(new DosResult(
-                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                            null, 
-                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                            0,
-                            new { AppendMsg = "Token格式无效" }
-                        ));
+                        context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                            osClient,
+                            _Lang,
+                            token,
+                            "Token格式无效"));
                         return;
                     }
                     
@@ -416,26 +445,22 @@ namespace Microi.net.Api
                                 OsClient = osClient
                             });
                             
-                            context.Result = new JsonResult(new DosResult(
-                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                                null, 
-                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                                0,
-                                new { AppendMsg = "Token签名验证失败，请重新登录" }
-                            ));
+                            context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                                osClient,
+                                _Lang,
+                                token,
+                                "Token签名验证失败，请重新登录"));
                             return;
                         }
                         
                         // 验证token是否过期
                         if (jwtToken.ValidTo < DateTime.UtcNow)
                         {
-                            context.Result = new JsonResult(new DosResult(
-                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                                null, 
-                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                                0,
-                                new { AppendMsg = "Token已过期" }
-                            ));
+                            context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                                osClient,
+                                _Lang,
+                                token,
+                                "Token已过期"));
                             return;
                         }
                         
@@ -443,13 +468,11 @@ namespace Microi.net.Api
                         claims = jwtToken.Claims?.ToList();
                         if (!DiyToken.IsCurrentAuthVersion(claims))
                         {
-                            context.Result = new JsonResult(new DosResult(
-                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                                null,
-                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                                0,
-                                new { AppendMsg = "Token安全版本已失效，请重新登录" }
-                            ));
+                            context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                                osClient,
+                                _Lang,
+                                token,
+                                "Token安全版本已失效，请重新登录"));
                             return;
                         }
                     }
@@ -464,23 +487,22 @@ namespace Microi.net.Api
                         });
                         
                         claims = null;
-                        context.Result = new JsonResult(new DosResult(
-                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                            null, 
-                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                            0,
-                            new { AppendMsg = "Token解析失败" }
-                        ));
+                        context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                            osClient,
+                            _Lang,
+                            token,
+                            "Token解析失败"));
                         return;
                     }
                 }
 
                 if (claims == null)
                 {
-                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
-                    {
-                        AppendMsg = $"claims is null."
-                    }));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        osClient,
+                        _Lang,
+                        token,
+                        "Token中不存在有效Claims"));
                     return;
                 }
 
@@ -491,31 +513,21 @@ namespace Microi.net.Api
                 if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                     )
                 {
-                    context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                        null, 
-                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                        null,
-                        new
-                        {
-                            AppendMsg = $"从Token的claims中未找到有效的用户信息。UserId：{userId}, OsClient：{tokenOsClient}"
-                        }
-                    ));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        osClient,
+                        _Lang,
+                        token,
+                        "从Token的Claims中未找到有效的用户或租户信息"));
                     return;
                 }
                 TokensModel activeTokenEntry = null;
                 if (!string.Equals(tokenOsClient, osClient, StringComparison.OrdinalIgnoreCase))
                 {
-                    context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null,
-                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                        null,
-                        new
-                        {
-                            AppendMsg = $"Token租户与当前请求租户不一致。TokenOsClient：{tokenOsClient}, RequestOsClient：{osClient}"
-                        }
-                    ));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        osClient,
+                        _Lang,
+                        token,
+                        $"Token租户[{tokenOsClient}]与当前请求租户[{osClient}]不一致"));
                     return;
                 }
                 else
@@ -533,15 +545,11 @@ namespace Microi.net.Api
                     //登陆身份已失效，因为redis被清了
                     if (tokenModel == null)
                     {
-                        context.Result = new JsonResult(new DosResult(
-                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
-                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2",
-                            null,
-                            new
-                            {
-                                AppendMsg = $"Token对应的用户信息未找到，可能是因为Redis缓存被清空了。UserId：{userId}, OsClient：{tokenOsClient}"
-                            }
-                        ));
+                        context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                            osClient,
+                            _Lang,
+                            token,
+                            "Token对应的服务端登录身份未找到，可能已退出、被管理员清除或登录缓存已重建"));
                         return;
                     }
                     activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(tokenModel, token);
@@ -558,16 +566,11 @@ namespace Microi.net.Api
                         catch (Exception)
                         {
                         }
-                        context.Result = new JsonResult(new DosResult(
-                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                            null,
-                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                            null,
-                            new
-                            {
-                                AppendMsg = "Token不在当前有效登录列表中，请重新登录"
-                            }
-                        ));
+                        context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                            osClient,
+                            _Lang,
+                            token,
+                            "Token不在当前有效登录列表中，请重新登录"));
                         return;
                     }
                     else
@@ -581,16 +584,11 @@ namespace Microi.net.Api
                 if (sysUser == null)
                 {
                     //登陆身份已失效，因为redis被清了
-                    context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null, 
-                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                        null,
-                        new
-                        {
-                            AppendMsg = $"Token对应的用户信息未找到，可能是因为Redis缓存被清空了。UserId：{userId}, OsClient：{tokenOsClient}"
-                        }
-                    ));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        osClient,
+                        _Lang,
+                        token,
+                        "Token对应的用户信息未找到，可能已退出、被管理员清除或登录缓存已重建"));
                     return;
                 }
 
@@ -614,16 +612,11 @@ namespace Microi.net.Api
                     catch (Exception)
                     {
                     }
-                    context.Result = new JsonResult(new DosResult(
-                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
-                        null,
-                        DiyMessage.GetLang(osClient, "NoLogin", _Lang),
-                        null,
-                        new
-                        {
-                            AppendMsg = $"Token已过期，ClientType：{clientType}, 最后更新时间：{activeTokenUpdateTime}, 当前时间：{DateTime.Now}, 超过当前终端配置的过期时间：{tokenLifetimeText}"
-                        }
-                    ));
+                    context.Result = new JsonResult(await BuildTokenAuthFailureAsync(
+                        osClient,
+                        _Lang,
+                        token,
+                        $"Token终端会话已过期，ClientType：{clientType}，有效期：{tokenLifetimeText}"));
                     return;
                 }
                 try

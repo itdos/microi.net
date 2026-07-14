@@ -23,6 +23,13 @@ export const constantRoutes = [
         hidden: true
     },
     {
+        path: "/mci-redis-manager",
+        name: "mci_redis_manager",
+        component: () => import("@/views/system/mci-redis-manager.vue"),
+        hidden: true,
+        meta: { title: "Redis 管理器", anonymous: true, keepAlive: false }
+    },
+    {
         path: "/mic/renderer-embed/:Id",
         name: "mic_renderer_embed_id",
         component: () => import("@/views/page-engine/renderer.vue"),

@@ -1,6 +1,6 @@
 ---
 name: v8-cache-pattern
-description: Microi V8 Redis 缓存模式。用于读写 V8.Cache 键、租户缓存命名、TTL 策略、失效处理、HashSet/HashGet 和防陈旧数据模式。
+description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租户缓存命名、TTL 策略、防陈旧数据，以及使用 Redis 管理器页面或 MCP 检索、统计、查看和维护 String、Hash、List、Set、Sorted Set、Stream。
 ---
 
 # Microi V8 Redis 缓存模式
@@ -15,6 +15,28 @@ description: Microi V8 Redis 缓存模式。用于读写 V8.Cache 键、租户�
 | `V8.Cache.Get(key)` | 获取缓存 | `string \| null` |
 | `V8.Cache.Remove(key)` | 删除缓存 | `boolean` |
 | `V8.Cache.Exists(key)` | 是否存在 | `boolean` |
+
+## Redis 管理器与 MCP
+
+平台 Redis 管理器固定路由为 `#/mci-redis-manager`：
+
+- 已登录平台管理员可使用当前租户默认 Redis，并可管理保存于主租户 `mci_redis_connection` 表的额外连接；记录必须按 `TenantOsClient` 隔离，密码只在后端加密保存且永不回传前端。
+- 未登录时只允许创建当前页面内存中的临时连接；不得加载当前租户 Redis、已保存连接或缓存中的旧用户信息，刷新页面后必须清空临时凭据。
+- Key 列表必须使用 `SCAN` 游标分页，禁止在生产 Redis 上使用阻塞式 `KEYS *`。内容查看支持 String、Hash、List、Set、Sorted Set、Stream；集合内容要分页并限制单次条数。
+- 写入 Hash/List/Set/Sorted Set 时先完整解析 JSON，再覆盖旧 Key；删除、覆盖、重命名和 TTL 变更属于破坏性操作，必须先展示目标连接、数据库与 Key 并要求明确确认。
+- 临时匿名接口只开放白名单操作，不开放任意 Redis 命令、Lua、`FLUSHALL` 或 `FLUSHDB`；设置短连接超时、访问频率限制、单次 Key 数量和内容大小上限。
+
+MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，禁止在 MCP 参数、日志或回答中传递 Redis 密码。
+
+| MCP 工具 | 用途 | 确认规则 |
+|------|------|------|
+| `microi_redis_statistics` | 服务器、内存、客户端、命中率与 Key 类型统计 | 只读 |
+| `microi_redis_list_keys` | SCAN 分页检索 Key、类型、TTL、内存估算 | 只读 |
+| `microi_redis_get_key` | 分页查看单个 Key 内容 | 只读 |
+| `microi_redis_delete_keys` | 单个或批量删除，最多 500 个 | `confirmExecution="DELETE"` |
+| `microi_redis_replace_value` | 新建或覆盖 String/Hash/List/Set/Sorted Set | `confirmExecution` 等于完整 Key 或 `EXECUTE` |
+| `microi_redis_rename_key` | 不覆盖目标的 Key 重命名 | `confirmExecution` 等于新 Key 或 `EXECUTE` |
+| `microi_redis_set_ttl` | `-1` 永久、`0` 删除、正数为秒 | `confirmExecution` 等于完整 Key 或 `EXECUTE` |
 
 **过期时间格式：** 支持两种写法
 - 整数（秒）：`V8.Cache.Set(key, value, 3600)` = 1 小时

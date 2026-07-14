@@ -149,6 +149,17 @@ server {
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
+### Redis 管理器
+
+平台内置 Redis 管理页面：`#/mci-redis-manager`。页面采用连接/数据库树、Key 空间树、SCAN 列表和内容编辑器三栏布局，可查看服务器与内存统计，并维护 String、Hash、List、Set、Sorted Set；Stream 支持分页只读。Hash、集合等内容统一使用吾码代码编辑器展示和格式化 JSON。
+
+- 已登录平台管理员默认可连接当前租户 Redis，也可新增额外连接。额外连接保存于主租户的 `mci_redis_connection` 表，并通过 `TenantOsClient` 隔离；密码由后端加密保存且不会返回前端。
+- 未登录也可直接打开此路由，但不会看到当前租户或已保存服务器，只能输入 Host、端口、用户名、密码和数据库建立当前页面内存中的临时连接。刷新页面后临时凭据立即清空，适合登录系统不可用时检查或删除缓存。
+- Key 查询使用非阻塞 `SCAN` 游标分页，支持按模式搜索、类型/TTL/内存查看、单个与批量删除、重命名、TTL 设置和 JSON 内容覆盖。匿名模式同样只开放这些白名单操作，不支持任意命令、Lua、`FLUSHALL` 或 `FLUSHDB`。
+- 修改集合内容时，后端会先完整校验 JSON，再替换原 Key；删除和覆盖操作会显示确认提示。生产环境仍应优先按 `Microi:{OsClient}:...` 前缀缩小检索范围。
+
+Microi MCP 同步提供 `microi_redis_statistics`、`microi_redis_list_keys`、`microi_redis_get_key`、`microi_redis_delete_keys`、`microi_redis_replace_value`、`microi_redis_rename_key`、`microi_redis_set_ttl`。MCP 默认操作当前 `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，不得把 Redis 密码写入 MCP 参数或日志。所有写操作都要求 `confirmExecution` 明确确认。
+
 ## MQ消息队列配置
 >* 支持集群模式
 

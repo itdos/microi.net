@@ -1,6 +1,6 @@
 ---
 name: microi-frontend-sdk
-description: Microi 前端 SDK 使用规范，适用于 Vue 3、uni-app、H5、PC 网站与 Microi.Client 扩展。用于创建或修改前端请求、登录态、上传、文件 URL、ApiEngine、FormEngine 或应用启动代码。
+description: Microi 前端 SDK 使用规范，适用于 Vue 3、uni-app、H5、PC 网站与 Microi.Client 扩展。用于创建或修改前端请求、登录态、Token 续签、终端会话、上传、文件 URL、ApiEngine、FormEngine 或应用启动代码。
 ---
 
 # Microi 前端 SDK
@@ -109,6 +109,85 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 - 页面传入的 `headers` / `header` 要先合并，再统一去重；禁止 `headers.OsClient = ...` 和 `headers.osclient = ...` 同时存在。
 - 小程序授权登录、账号登录、刷新 Token、FormEngine、ApiEngine、上传都必须走同一套去重逻辑。
 - 验收时检查真实网络请求：不得出现 `osclient: xjy, xjy`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
+
+## Token、当前登录用户与当前终端登录协议
+
+Microi 后端不是只保存一个全局 Token。每个租户、每个 `sys_user` 在 Redis 中维护一份 `CurrentToken`，其中 `CurrentUser` 表示平台当前登录用户，`Tokens` 表示该用户的多个当前终端登录。每个终端项至少包含 `Token`、`ClientType`、`Did`、`IP`、`CreateTime`、`UpdateTime`；退出、管理员清除登录信息、同终端重新登录或 Token 轮换都会影响该列表。
+
+登录必须同时标记终端类型和稳定设备 Id：
+
+```js
+const V8 = createMicroiV8({
+  apiBase,
+  osClient,
+  clientType: 'Mobile', // PC / Mobile / H5 / App / WxMiniProgram / VSCode / MCP
+  didKey: 'microi_did'
+});
+
+const result = await V8.Login({
+  Account,
+  Pwd,
+  _ClientType: 'Mobile'
+});
+```
+
+- PC 后台传 `_ClientType:'PC'`，有效期读取 SaaS 引擎 `SessionAuthTimeout`，单位分钟，默认 20 分钟。
+- VS Code 传 `_ClientType:'VSCode'`，优先读取 `VSCodeAccessTokenLifetime`，否则读取 `AccessTokenLifetime`，单位天，默认 30 天。
+- MCP 传 `_ClientType:'MCP'`，优先读取 `McpAccessTokenLifetime`，否则读取 `AccessTokenLifetime`，单位天，默认 30 天。
+- Mobile、H5、App、各类小程序及其它非 PC 终端读取 `AccessTokenLifetime`，单位天，默认 30 天。
+- `did` 通过请求头发送，同一安装或浏览器配置必须稳定持久化；不要每次请求生成新值。标准 SDK 使用 `V8.getDid()` 自动生成和复用。
+- Token 优先从响应头 `authorization` 读取，并立即覆盖本地旧 Token；兼容接口才从响应体读取。每个受保护请求都要接收响应头中的新 Token，因为后端可能在普通请求中自动轮换。
+
+### 续签时机
+
+不要把本地固定 15 分钟当作所有终端的有效期。读取 JWT 的 `exp` 与 `MicroiTokenIssuedAt`，在到期前按以下规则触发以旧换新：
+
+```text
+提前量 = lifetime / 10
+最少提前 5 分钟
+最多提前 1 天
+```
+
+因此默认 PC 20 分钟会在约第 15 分钟续签；默认移动端、VS Code 30 天会在到期前 1 天进入续签窗口。调用：
+
+```js
+V8.startTokenMaintenance();
+
+// UniApp/App/小程序每次回到前台
+await V8.resumeAuthSession(false);
+
+// 主动以旧换新
+const result = await V8.refreshToken();
+```
+
+- Web 同时监听 `visibilitychange`、`focus`、`pageshow`。浏览器可能休眠后台标签页并暂停 `setInterval`，恢复可见时必须立即检查，不能等下一个定时周期。
+- UniApp/App/小程序在 `App.onShow` 调用 `resumeAuthSession(false)`。
+- VS Code 在扩展激活后维护 Token，并在 `vscode.window.onDidChangeWindowState` 恢复焦点时立即检查。
+- 多请求、多 Tab 续签必须 single-flight。PC 后台可使用 Web Locks；收到响应时，如果本地 Token 已被其它 Tab 更新，旧请求不得把旧 Token 覆盖回来或清掉新登录态。
+- 调用 `/api/SysUser/RefreshToken` 时同时传旧 `authorization`、当前 `OsClient`、原终端 `_ClientType`，请求头继续传稳定 `did`。不要频繁无条件换新。
+
+### 失效提示与租户边界
+
+受保护接口返回 `Code=1001/1002`，或 RefreshToken 返回登录失效时，必须原样展示后端 `Msg`，禁止覆盖成固定“登录已过期”。后端会返回 `DataAppend` 诊断：
+
+| `ReasonCode` | 处理方式 |
+|---|---|
+| `JwtExpired` / `SessionExpired` | 展示已过期分钟、小时或天以及过期时间，然后清理当前终端会话并重新登录 |
+| `TenantMismatch` | 提示 Token 所属租户与当前请求租户，切换租户或重新登录；禁止把该 Token 用于当前租户 |
+| `TokenReplaced` | 先检查本地 Token 是否已被其它 Tab/并发请求更新；有新 Token 时重试一次，否则重新登录 |
+| `SessionMissing` | 服务端登录态已退出、被管理员清除或缓存已重建；清理本地 Token 并重新登录 |
+| `AuthVersionChanged` | 后端安全版本已升级，必须重新登录 |
+| `MalformedToken` / `MissingClaims` | Token 无法继续使用，清理并重新登录 |
+
+不要显示完整 Token、用户密码或密钥。日志只记录 `ReasonCode`、终端类型、脱敏 `did`、请求租户和 Token 租户。`TokenOsClient` 只用于提示和诊断，真正鉴权仍以服务端签名、租户和 Redis 当前终端列表为准。
+
+### Token 验收
+
+- PC、移动端、VS Code 分别登录，回读 JWT `ClientType`、`Did` 和有效期，确认命中对应 SaaS 配置。
+- 模拟页面隐藏超过 PC 有效期后恢复，确认先执行续签；若已无法续签，提示精确显示过期时长。
+- 使用 A 租户 Token 请求 B 租户，确认返回 `TenantMismatch`，提示同时包含 Token 租户与当前租户且不泄漏 Token。
+- 同一旧 Token 并发调用两次 RefreshToken，确认复用同一新 Token，后续请求成功。
+- 管理员调用 `ClearUserLoginInfo` 后，旧 Token 返回 `SessionMissing` 或等价明确原因，前端不再循环续签。
 
 ## 上传规则
 

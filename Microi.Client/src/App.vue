@@ -68,7 +68,9 @@ export default {
             // 存储定时器引用，用于组件销毁时清理，防止内存泄漏
             timers: [],
             // plusready 事件处理函数引用
-            plusreadyHandler: null
+            plusreadyHandler: null,
+            // 浏览器标签页从休眠/后台恢复时立即检查 Token 是否需要续签
+            authResumeHandler: null
         };
     },
     watch: {},
@@ -118,6 +120,14 @@ export default {
         if (!self.DiyCommon.isClientApp) {
             self.PageInit();
         }
+
+        self.authResumeHandler = function () {
+            if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+            self.RefreshTokenWithLock();
+        };
+        document.addEventListener("visibilitychange", self.authResumeHandler, false);
+        window.addEventListener("focus", self.authResumeHandler, false);
+        window.addEventListener("pageshow", self.authResumeHandler, false);
 
         // ===== 5+App 返回键：Vue Router 路由感知处理 =====
         // permission.js 的 router.afterEach 在每次路由完成后设置 window.__microi_isRootPage
@@ -172,6 +182,11 @@ export default {
         // 移除 plusready 事件监听器
         if (self.plusreadyHandler) {
             document.removeEventListener("plusready", self.plusreadyHandler, false);
+        }
+        if (self.authResumeHandler) {
+            document.removeEventListener("visibilitychange", self.authResumeHandler, false);
+            window.removeEventListener("focus", self.authResumeHandler, false);
+            window.removeEventListener("pageshow", self.authResumeHandler, false);
         }
         // 清理 Android 返回键处理
         window.__microi_handleBack = null;
@@ -244,7 +259,12 @@ export default {
                     self.DiyCommon.Post(
                         "/api/SysUser/refreshToken",
                         { authorization: authorization },
-                        function () { resolve(); },
+                        function (result) {
+                            if (!result || result.Code !== 1) {
+                                self.DiyCommon.Result(result);
+                            }
+                            resolve();
+                        },
                         function () { resolve(); }
                     );
                 });

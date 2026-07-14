@@ -342,6 +342,13 @@ export declare class MicroiClient {
     writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse>;
     queryMongodbLogs(query?: MongodbLogQuery): Promise<ApiResponse>;
     writeMongodbLog(log: MongodbLogWrite): Promise<ApiResponse>;
+    getRedisStatistics(database?: number, connectionId?: string): Promise<ApiResponse>;
+    getRedisKeys(pattern?: string, database?: number, pageSize?: number, cursor?: string, connectionId?: string): Promise<ApiResponse>;
+    getRedisKey(key: string, database?: number, pageIndex?: number, pageSize?: number, connectionId?: string): Promise<ApiResponse>;
+    deleteRedisKeys(keys: string[], database?: number, connectionId?: string): Promise<ApiResponse>;
+    replaceRedisValue(key: string, dataType: string, value: string, database?: number, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse>;
+    renameRedisKey(key: string, newKey: string, database?: number, connectionId?: string): Promise<ApiResponse>;
+    setRedisTtl(key: string, ttlSeconds: number, database?: number, connectionId?: string): Promise<ApiResponse>;
     getPageEngineList(keyword?: string): Promise<ApiResponse>;
     getPageEngineDetail(pageId: string): Promise<ApiResponse>;
     savePageEngine(data: {

@@ -1,5 +1,24 @@
 # 更新日志
 
+## v6.3.6
+
+更新日期：2026-07-15
+
+- **版本发布**：Microi.Client、Microi.net、Microi.AI 及服务器端公共组件统一升级至 v6.3.6；同步更新程序集、NuGet 包和客户端版本信息。
+- **Redis 管理器**：新增独立路由 `#/mci-redis-manager`，采用连接／数据库树、Key 空间树、SCAN 列表和内容编辑器三栏布局；支持服务器与内存统计、模式检索、分页加载、类型／TTL／内存查看、单个与批量删除、重命名、TTL 设置，以及 String、Hash、List、Set、Sorted Set 内容维护，Stream 提供分页只读查看。
+- **Redis 紧急恢复模式**：已登录超级管理员可使用当前租户 Redis 和按租户隔离的已保存连接；未登录时仅允许建立不落盘的临时连接，刷新页面即清除凭据，便于登录缓存异常时排查和恢复。登录失效后管理页会自动切换为临时连接模式，不再强制跳转登录页。
+- **Redis 安全与审计**：后端只开放明确的 Redis 白名单操作，Key 列表统一使用非阻塞 `SCAN`，限制连接超时、数据库范围、分页数量、批量删除数量和匿名访问频率；已保存密码后端加密且永不回传，错误信息自动脱敏，删除、写入、重命名和 TTL 变更记录系统审计，不开放任意命令、Lua、`FLUSHALL` 或 `FLUSHDB`。
+- **Redis MCP 工具**：新增 `microi_redis_statistics`、`microi_redis_list_keys`、`microi_redis_get_key`、`microi_redis_delete_keys`、`microi_redis_replace_value`、`microi_redis_rename_key`、`microi_redis_set_ttl` 七项工具；默认绑定当前 MCP 租户，写操作提供 dry-run 摘要并要求 `confirmExecution`，同时前置到 MCP 核心工具发现顺序。
+- **多租户授权管理**：授权页改为由本机受保护接口统一读取和操作。主租户可提交申请、重新验证、下载和部署 License，子租户可查看同一服务器的完整授权状态与节点信息但保持只读；License 文件写入不再允许匿名调用，避免子租户或未登录请求修改服务器级授权。
+- **授权状态可观测性**：授权页新增联系人、联系电话、更新服务到期时间、License 格式版本、在线 AI 授权、当前／主租户、授权组件版本和 Microi.AI 版本，并补充服务器 IP、授权到期时间等节点信息；`Microi.net` 统一从环境变量、应用配置和默认配置解析主租户，节点查询仅返回页面所需的非敏感字段。
+- **Token 失效诊断**：后端新增结构化 `TokenAuthDiagnostic`，统一识别 Token 缺失、格式错误、声明缺失、租户不匹配、安全版本变化、JWT／终端会话过期、服务端会话丢失和 Token 被替换等原因；1001 响应通过 `DataAppend` 返回原因码、终端、租户和过期时长，并向用户展示分钟／小时／天级的明确说明。
+- **登录续签与休眠恢复**：PC 前端不再固定每 15 分钟续签，而是根据 JWT `exp` 与 `MicroiTokenIssuedAt` 计算提前量；浏览器标签页在 `visibilitychange`、`focus`、`pageshow` 恢复时立即检查续签，并保护多标签页的新 Token 不被旧请求覆盖或误清。
+- **统一前端会话协议**：通用前端 SDK 与 UniApp 增加稳定 `did`、准确 `_ClientType`、JWT 解析、single-flight RefreshToken、前台恢复续签和定时维护接口；UniApp 在 `App.onShow` 恢复会话，登录失效时先用模态框完整展示后端诊断，再跳转登录页。
+- **VS Code 认证恢复**：Microi VS Code 插件支持解析后端 `DataAppend.ReasonCode`，窗口重新获得焦点时立即维护所有服务器 Token；自动重登录失败时显示经过一分钟去重的明确过期提示，并把 Redis 核心工具加入 MCP 可调用性诊断清单。
+- **安装脚本 MySQL 选型**：一键安装脚本升级至 v2026-07-15，安装前可选择 MySQL 5.7 或 8.0，分别生成兼容的配置、容器名、镜像和远程授权 SQL，并按服务器内存补充 Buffer Pool 实例数、I/O Capacity 等性能参数。
+- **Docker 固定网段**：安装脚本可选创建统一的 `microi` bridge 网络，严格校验 IPv4 subnet／gateway 和网络地址范围；已存在同名网络时仅在配置完全一致时复用，不一致则安全退出，不自动删除或修改现有网络，所有独立 Compose 编排可统一通过 external network 接入。
+- **文档与 Skills**：补充 SaaS 引擎 Redis 管理器文档，并同步完善缓存、安全、PC 前端、UniApp、移动端质量和通用前端 SDK Skills，统一终端类型、设备标识、续签时机、租户边界、失效提示及 Redis 管理规范。
+
 ## v6.3.5
 
 更新日期：2026-07-14

@@ -725,6 +725,11 @@ var DiyCommon = {
     Authorization: function () {
         return DiyCommon.getToken();
     },
+    IsRedisManagerRoute: function () {
+        return typeof window !== "undefined"
+            && window.location
+            && window.location.hash.indexOf("#/mci-redis-manager") === 0;
+    },
     zTreeSet: {
         edit: {
             enable: true,
@@ -1767,6 +1772,45 @@ var DiyCommon = {
         var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
         return !DiyCommon.IsNull(requested) && !DiyCommon.IsNull(current) && requested !== current;
     },
+    DecodeJwtPayload: function (token) {
+        try {
+            var normalized = DiyCommon.NormalizeAuthorizationToken(token);
+            var parts = normalized.split(".");
+            if (parts.length < 2) return null;
+            var payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+            while (payload.length % 4) payload += "=";
+            var json = decodeURIComponent(
+                atob(payload)
+                    .split("")
+                    .map(function (char) {
+                        return "%" + ("00" + char.charCodeAt(0).toString(16)).slice(-2);
+                    })
+                    .join("")
+            );
+            return JSON.parse(json);
+        } catch (e) {
+            return null;
+        }
+    },
+    GetTokenRefreshAt: function (token) {
+        var claims = DiyCommon.DecodeJwtPayload(token);
+        var expiresAtSeconds = Number(claims && claims.exp);
+        if (!Number.isFinite(expiresAtSeconds) || expiresAtSeconds <= 0) {
+            return new Date().AddTime("m", 15);
+        }
+        var issuedAtSeconds = Number(claims.MicroiTokenIssuedAt || claims.iat);
+        var nowSeconds = Math.floor(Date.now() / 1000);
+        var lifetimeSeconds = Number.isFinite(issuedAtSeconds)
+            && issuedAtSeconds > 0
+            && expiresAtSeconds > issuedAtSeconds
+            ? expiresAtSeconds - issuedAtSeconds
+            : Math.max(0, expiresAtSeconds - nowSeconds);
+        var refreshLeadSeconds = Math.min(
+            24 * 60 * 60,
+            Math.max(5 * 60, Math.floor(lifetimeSeconds / 10))
+        );
+        return new Date(Math.max(nowSeconds, expiresAtSeconds - refreshLeadSeconds) * 1000);
+    },
     ApplyAuthorizationToken: function (responseToken, requestToken) {
         var response = DiyCommon.NormalizeAuthorizationToken(responseToken);
         if (DiyCommon.IsNull(response)) return false;
@@ -1787,7 +1831,7 @@ var DiyCommon = {
         store.commit("user/SET_TOKEN", response);
         DiyCommon.setToken(response);
         setToken(response);
-        DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
+        DiyCommon.setTokenExpires(DiyCommon.GetTokenRefreshAt(response).Format("yyyy-MM-dd HH:mm:ss"));
         return true;
     },
     MarkAuthRequestToken: function (result, requestToken) {
@@ -1834,7 +1878,12 @@ var DiyCommon = {
                 DiyCommon.setToken("");
                 removeToken();
 
-                DiyCommon.OpenLogin();
+                if (DiyCommon.IsRedisManagerRoute()) {
+                    // Redis 紧急管理页必须在登录失效时继续可用，切换为匿名临时连接模式。
+                    window.dispatchEvent(new CustomEvent("microi-redis-auth-expired", { detail: result }));
+                } else {
+                    DiyCommon.OpenLogin();
+                }
             } else if (result.Code == 1002) {
                 // if (top.window.frames.length > 0) {
                 // 	DiyCommon.OpenLogin();
@@ -1854,6 +1903,9 @@ var DiyCommon = {
                 DiyCommon.OpenLogin();
             }
             setTimeout(function () {
+                if (DiyCommon.IsRedisManagerRoute() && (result.Code == 1001 || result.Code == 1002)) {
+                    return;
+                }
                 if(!(result.Code == 1001 
                     && (window.location.href.indexOf("#/login") > -1 
                             || window.location.hash == '#/' 
@@ -2143,8 +2195,12 @@ var DiyCommon = {
                         }
                         DiyCommon.setToken("");
                         removeToken();
+                        var isRedisManagerRoute = DiyCommon.IsRedisManagerRoute();
+                        if (isRedisManagerRoute) {
+                            window.dispatchEvent(new CustomEvent("microi-redis-auth-expired", { detail: error.response.data }));
+                        }
                         // 弹出登录（并发节流：多个请求同时 401 只弹一次）
-                        if (!DiyCommon._LoginPending) {
+                        if (!isRedisManagerRoute && !DiyCommon._LoginPending) {
                             DiyCommon._LoginPending = true;
                             try {
                                 var ret = DiyCommon.OpenLogin();
@@ -2158,7 +2214,9 @@ var DiyCommon = {
                             }
                         }
                     }
-                    DiyCommon.Tips(error.response.status + " " + error.message, false);
+                    if (!DiyCommon.IsRedisManagerRoute()) {
+                        DiyCommon.Tips(error.response.status + " " + error.message, false);
+                    }
                 } else {
                     console.log(error);
                 }
@@ -2252,9 +2310,13 @@ var DiyCommon = {
                         // })
                         DiyCommon.setToken("");
                         removeToken();
+                        var isRedisManagerRoute = DiyCommon.IsRedisManagerRoute();
+                        if (isRedisManagerRoute) {
+                            window.dispatchEvent(new CustomEvent("microi-redis-auth-expired", { detail: error.response.data }));
+                        }
 
                         // 弹出登录（并发节流）
-                        if (!DiyCommon._LoginPending) {
+                        if (!isRedisManagerRoute && !DiyCommon._LoginPending) {
                             DiyCommon._LoginPending = true;
                             try {
                                 var ret = DiyCommon.OpenLogin();
@@ -2267,7 +2329,9 @@ var DiyCommon = {
                                 DiyCommon._LoginPending = false;
                             }
                         }
-                        DiyCommon.Tips(error.response.status + " " + error.message, false);
+                        if (!isRedisManagerRoute) {
+                            DiyCommon.Tips(error.response.status + " " + error.message, false);
+                        }
                     } else {
                         DiyCommon.Tips(error.response.status + " " + error.message, false);
                     }

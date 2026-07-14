@@ -5,8 +5,11 @@ using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Net.Http;
+using System.Text;
 
 namespace Microi.net.Api
 {
@@ -15,13 +18,18 @@ namespace Microi.net.Api
     /// 
     /// 同一套代码部署在两种服务器上：
     /// - License服务器（有私钥）：Apply/Issue/Check/Revoke 等数据库操作可用
-    /// - 客户服务器（无私钥）：仅 GetHardwareId/Verify/WriteLicenseFile/Diagnostics 可用
+    /// - 客户服务器（无私钥）：状态查询可用；申请代理、重新验证、写入文件由主租户登录态控制
     /// </summary>
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
     public class LicenseController : Controller
     {
+        private static readonly HttpClient LicenseHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
         private readonly ICaptcha _captcha;
         private readonly IMicroiAI _microiAi;
 
@@ -166,6 +174,101 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 获取授权管理页完整状态。主、子租户均可查看；是否允许操作由 IsMainTenant 标识。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetManagementState()
+        {
+            var scope = await GetTenantScopeAsync();
+            if (scope.Error != null)
+            {
+                return Json(scope.Error);
+            }
+
+            return Json(new DosResult(1, BuildManagementState(scope), "获取授权状态成功"));
+        }
+
+        /// <summary>
+        /// 重新加载并验证当前服务器 License，仅主租户可执行。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> RefreshCurrentServer()
+        {
+            var scope = await GetTenantScopeAsync(true);
+            if (scope.Error != null)
+            {
+                return Json(scope.Error);
+            }
+
+            try
+            {
+                MicroiLicense.Reset();
+                MicroiLicense.Initialize();
+                return Json(new DosResult(1, BuildManagementState(scope), "License已重新验证"));
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "License重新验证失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 通过当前服务器向官方 License 服务提交申请，仅主租户可执行。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> ApplyCurrentServer([FromBody] LicenseApplyRequest request)
+        {
+            var scope = await GetTenantScopeAsync(true);
+            if (scope.Error != null)
+            {
+                return Json(scope.Error);
+            }
+
+            if (request == null)
+            {
+                return Json(new DosResult(0, null, "授权申请参数不能为空"));
+            }
+
+            try
+            {
+                var requestJson = JsonConvert.SerializeObject(request);
+                using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                using var response = await LicenseHttpClient.PostAsync(
+                    MicroiLicense.GetLicenseServerUrl() + "/api/License/Apply",
+                    content);
+                var responseText = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Json(new DosResult(0, null, $"License服务请求失败（HTTP {(int)response.StatusCode}）"));
+                }
+
+                var result = JsonConvert.DeserializeObject<JObject>(responseText);
+                return result == null
+                    ? Json(new DosResult(0, null, "License服务未返回有效结果"))
+                    : Json(result);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "License申请提交失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 获取主租户保存的已部署服务器节点。主、子租户均为只读访问。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetServerNodes()
+        {
+            var scope = await GetTenantScopeAsync();
+            if (scope.Error != null)
+            {
+                return Json(scope.Error);
+            }
+
+            return Json(await LicenseServerStore.GetLicenseServersAsync());
+        }
+
+        /// <summary>
         /// 获取硬件指纹诊断信息（需要登录）
         /// </summary>
         [HttpGet, HttpPost]
@@ -225,9 +328,14 @@ namespace Microi.net.Api
         /// 写入前会验证License内容的合法性（JSON格式 + RSA签名验签）
         /// </summary>
         [HttpPost]
-        [AllowAnonymous]
         public async Task<JsonResult> WriteLicenseFile([FromBody] WriteLicenseFileRequest request)
         {
+            var scope = await GetTenantScopeAsync(true);
+            if (scope.Error != null)
+            {
+                return Json(scope.Error);
+            }
+
             try
             {
                 var result = LicenseService.WriteLicenseFile(request?.LicenseContent);
@@ -251,6 +359,72 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "写入License文件失败: " + ex.Message));
             }
+        }
+
+        private JObject BuildManagementState(LicenseTenantScope scope)
+        {
+            var data = JObject.FromObject(LicenseService.Verify());
+            var licenseInfo = MicroiLicense.GetLicenseInfo();
+            var aiLicense = _microiAi.GetOnlineAiLicenseState();
+
+            data["Name"] = licenseInfo?.Name ?? "";
+            data["Phone"] = licenseInfo?.Phone ?? "";
+            data["UpdateExpirationDate"] = licenseInfo != null
+                ? licenseInfo.UpdateExpirationDate.ToString("yyyy-MM-dd HH:mm:ss")
+                : "";
+            data["LicenseVersion"] = licenseInfo?.Version ?? 0;
+            data["OnlineAiLicensed"] = aiLicense?.IsLicensed == true;
+            data["AiProductType"] = aiLicense?.ProductType ?? "OpenSource";
+            data["LicenseProviderAssemblyVersion"] = aiLicense?.ProviderAssemblyVersion ?? "";
+            data["MicroiAiAssemblyVersion"] = _microiAi.GetType().Assembly.GetName().Version?.ToString() ?? "";
+            data["CurrentOsClient"] = scope.CurrentOsClient;
+            data["MainOsClient"] = scope.MainOsClient;
+            data["IsMainTenant"] = scope.IsMainTenant;
+            data["CanManageLicense"] = scope.IsMainTenant;
+            return data;
+        }
+
+        private static async Task<LicenseTenantScope> GetTenantScopeAsync(bool requireMainTenant = false)
+        {
+            var token = await DiyToken.GetCurrentToken(false);
+            string currentOsClient = token?.OsClient?.Trim() ?? "";
+            var mainOsClient = LicenseServerStore.ResolveMainOsClient();
+
+            if (currentOsClient.DosIsNullOrWhiteSpace())
+            {
+                return new LicenseTenantScope
+                {
+                    Error = new DosResult(0, null, "请先登录后查看授权信息")
+                };
+            }
+
+            if (mainOsClient.DosIsNullOrWhiteSpace())
+            {
+                return new LicenseTenantScope
+                {
+                    CurrentOsClient = currentOsClient,
+                    Error = new DosResult(0, null, "服务器未配置主租户OsClient")
+                };
+            }
+
+            var isMainTenant = LicenseServerStore.IsMainTenant(currentOsClient);
+            if (requireMainTenant && !isMainTenant)
+            {
+                return new LicenseTenantScope
+                {
+                    CurrentOsClient = currentOsClient,
+                    MainOsClient = mainOsClient,
+                    IsMainTenant = false,
+                    Error = new DosResult(0, null, "当前为子租户，仅主租户可以执行授权管理操作")
+                };
+            }
+
+            return new LicenseTenantScope
+            {
+                CurrentOsClient = currentOsClient,
+                MainOsClient = mainOsClient,
+                IsMainTenant = isMainTenant
+            };
         }
 
         /// <summary>
@@ -427,5 +601,13 @@ namespace Microi.net.Api
         public string HID { get; set; }
         /// <summary>驳回原因</summary>
         public string RejectReason { get; set; }
+    }
+
+    internal class LicenseTenantScope
+    {
+        public string CurrentOsClient { get; set; } = "";
+        public string MainOsClient { get; set; } = "";
+        public bool IsMainTenant { get; set; }
+        public DosResult Error { get; set; }
     }
 }

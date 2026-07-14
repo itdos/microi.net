@@ -531,6 +531,9 @@ export function createMicroiV8(options = {}) {
     webBase: '',
     fileServer: '',
     osClient: '',
+    clientType: getUni() ? 'Mobile' : 'PC',
+    did: '',
+    didKey: 'microi_did',
     tokenKey: 'microi_token',
     userKey: 'microi_user',
     loginUrl: '',
@@ -550,6 +553,9 @@ export function createMicroiV8(options = {}) {
 
   const storage = options.storage || createDefaultStorage();
   let runQueued = createQueue(config.maxConcurrent);
+  let refreshTokenPromise = null;
+  let tokenMaintenanceTimer = null;
+  let stopBrowserResumeListeners = null;
 
   // 更新配置后立即刷新并发队列，保证 maxConcurrent 热更新生效。
   function configure(next = {}) {
@@ -584,6 +590,19 @@ export function createMicroiV8(options = {}) {
     return storage.get(config.tokenKey) || '';
   }
 
+  function getDid() {
+    if (config.did) return String(config.did);
+    const stored = storage.get(config.didKey);
+    if (stored) return String(stored);
+    const prefix = String(config.clientType || 'Client').replace(/[^a-z0-9_-]/gi, '') || 'Client';
+    const random = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+    const did = `${prefix}:${random}`;
+    storage.set(config.didKey, did);
+    return did;
+  }
+
   function setToken(token) {
     storage.set(config.tokenKey, token || '');
   }
@@ -605,6 +624,37 @@ export function createMicroiV8(options = {}) {
     if (Number(statusCode) === 401) return true;
     const code = body && body.Code;
     return config.authCodes.indexOf(code) >= 0;
+  }
+
+  function readTokenClaims(token = getToken()) {
+    try {
+      const normalized = normalizeBearer(token);
+      const parts = normalized.split('.');
+      if (parts.length < 2) return null;
+      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      if (typeof Buffer !== 'undefined') {
+        return JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));
+      }
+      const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const binary = atob(padded);
+      const bytes = Array.from(binary, (char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`).join('');
+      return JSON.parse(decodeURIComponent(bytes));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function shouldRefreshToken(token = getToken()) {
+    const claims = readTokenClaims(token);
+    const expiresAt = Number(claims && claims.exp);
+    if (!Number.isFinite(expiresAt) || expiresAt <= 0) return true;
+    const issuedAt = Number(claims.MicroiTokenIssuedAt || claims.iat);
+    const now = Math.floor(Date.now() / 1000);
+    const lifetime = Number.isFinite(issuedAt) && issuedAt > 0 && expiresAt > issuedAt
+      ? expiresAt - issuedAt
+      : Math.max(0, expiresAt - now);
+    const lead = Math.min(24 * 60 * 60, Math.max(5 * 60, Math.floor(lifetime / 10)));
+    return expiresAt - now <= lead;
   }
 
   function handleReturnedToken(headers) {
@@ -638,6 +688,8 @@ export function createMicroiV8(options = {}) {
       ...(options.headers || {})
     };
     if (config.osClient) setSingletonHeader(headers, 'osclient', config.osClient);
+    const did = getDid();
+    if (did) setSingletonHeader(headers, 'did', did);
     if (token) {
       setSingletonHeader(headers, 'Token', token);
       setSingletonHeader(headers, 'Authorization', `Bearer ${token}`);
@@ -740,6 +792,78 @@ export function createMicroiV8(options = {}) {
 
   function post(url, data = {}, options = {}) {
     return request({ ...options, url, data, method: 'POST' });
+  }
+
+  async function refreshToken() {
+    if (refreshTokenPromise) return refreshTokenPromise;
+    const oldToken = getToken();
+    if (!oldToken) return { Code: 1001, Msg: '请求未携带Token，请重新登录。' };
+
+    refreshTokenPromise = request({
+      url: '/api/SysUser/refreshToken',
+      method: 'POST',
+      auth: false,
+      checkCode: false,
+      silentError: true,
+      headers: {
+        Authorization: `Bearer ${normalizeBearer(oldToken)}`,
+        Token: normalizeBearer(oldToken)
+      },
+      data: {
+        authorization: normalizeBearer(oldToken),
+        OsClient: config.osClient || undefined,
+        _ClientType: config.clientType || undefined
+      }
+    }).then((result) => {
+      if (result && result.Code !== 1 && isAuthExpired(result)) {
+        handleAuthExpired(result);
+      }
+      return result;
+    }).finally(() => {
+      refreshTokenPromise = null;
+    });
+    return refreshTokenPromise;
+  }
+
+  async function resumeAuthSession(force = false) {
+    const token = getToken();
+    if (!token) return { Code: 1001, Msg: '请求未携带Token，请重新登录。' };
+    if (!force && !shouldRefreshToken(token)) return { Code: 1, Data: { Refreshed: false } };
+    return refreshToken();
+  }
+
+  function stopTokenMaintenance() {
+    if (tokenMaintenanceTimer) {
+      clearInterval(tokenMaintenanceTimer);
+      tokenMaintenanceTimer = null;
+    }
+    if (typeof stopBrowserResumeListeners === 'function') {
+      stopBrowserResumeListeners();
+      stopBrowserResumeListeners = null;
+    }
+  }
+
+  function startTokenMaintenance(options = {}) {
+    stopTokenMaintenance();
+    const intervalMs = Math.max(60 * 1000, Number(options.intervalMs || 60 * 1000));
+    const maintain = () => { void resumeAuthSession(false); };
+    tokenMaintenanceTimer = setInterval(maintain, intervalMs);
+    if (hasWindow()) {
+      const onResume = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        maintain();
+      };
+      document.addEventListener('visibilitychange', onResume);
+      window.addEventListener('focus', onResume);
+      window.addEventListener('pageshow', onResume);
+      stopBrowserResumeListeners = () => {
+        document.removeEventListener('visibilitychange', onResume);
+        window.removeEventListener('focus', onResume);
+        window.removeEventListener('pageshow', onResume);
+      };
+    }
+    maintain();
+    return stopTokenMaintenance;
   }
 
   // 资源地址统一过滤占位图，并兼容 HDFS 私有文件、FileServer 和绝对地址。
@@ -1195,6 +1319,13 @@ export function createMicroiV8(options = {}) {
     setToken,
     clearToken,
     removeToken: clearToken,
+    getDid,
+    readTokenClaims,
+    shouldRefreshToken,
+    refreshToken,
+    resumeAuthSession,
+    startTokenMaintenance,
+    stopTokenMaintenance,
     getUser,
     setUser,
     setCurrentUser: setUser,
@@ -1370,7 +1501,7 @@ export function createMicroiV8(options = {}) {
     RefreshToken: async function refreshToken(callback) {
       const token = legacyGetToken();
       if (!token) return { Code: 0, Msg: 'Token 为空。' };
-      const result = await legacyPost(legacyApi.RefreshToken, { authorization: token });
+      const result = await client.refreshToken();
       if (result && result.Code) legacySetCurrentUser(result.Data || {});
       if (typeof callback === 'function') callback(result);
       return result;
@@ -1387,7 +1518,9 @@ export function createMicroiV8(options = {}) {
     GetToken: legacyGetToken,
     SetToken: legacySetToken,
     Login(param) {
-      return legacyPost(legacyApi.Login, param, (result) => {
+      const loginParam = { ...(param || {}) };
+      if (!loginParam._ClientType) loginParam._ClientType = config.clientType || (getUni() ? 'Mobile' : 'PC');
+      return legacyPost(legacyApi.Login, loginParam, (result) => {
         if (result && result.Code) legacySetCurrentUser(result.Data || {});
       }, { DataType: 'form' });
     },
