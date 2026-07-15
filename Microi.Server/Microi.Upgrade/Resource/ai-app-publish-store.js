@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.1.2
+ * Version: v1.1.5
  * Function:
  * - Create self-contained offline packages or publish online applications, AI applications, and frontend microservices to the application store.
  */
@@ -254,7 +254,9 @@ var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResul
 var runtime = appType === 'MicroService' ? getMicroService(app.AppKey) : { Service: null, Pages: [] };
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
 var action = text(V8.Param.Action || 'Package');
-var isOfflineAction = action === 'OfflinePackage' || action === 'Download';
+// 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
+// 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
+var isOfflineAction = action === 'OfflinePackage' || action === 'Download' || action === 'PackageOnly';
 var preparedList = parseArray(V8.Param.PreparedAssets || V8.Param.AiAppPackageManifest);
 var packageAssets = null;
 for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++) {
@@ -344,11 +346,13 @@ var packageModel = {
     CreateUser: text(currentUser.Name || currentUser.Account),
     OsClient: V8.OsClient,
     DataSetCount: selectedDataSets.length,
-    DataRowCount: selectedDataRowCount
+    DataRowCount: selectedDataRowCount,
+    IncludeSource: includeSource
   },
   ApplicationBundle: {
     SchemaVersion: 2,
     ApplicationType: appType,
+    IncludeSource: includeSource,
     VersionNo: versionNo,
     EntryPath: entryPath,
     Application: {
@@ -400,6 +404,7 @@ if (isOfflineAction) {
         Version: storedSource.Version || 1
       });
     }
+    if (!sourceFiles.length) return fail('已选择“同时发布源码”，但当前应用没有可打包的私有源码，已停止生成离线包。');
     packageModel.ApplicationBundle.SourceFiles = sourceFiles;
   }
   packageModel.PackageInfo.OfflineSelfContained = true;

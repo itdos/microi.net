@@ -452,7 +452,10 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:selectedAiModel"]);
 
-const { proxy } = getCurrentInstance();
+const componentInstance = getCurrentInstance();
+const { proxy } = componentInstance;
+const routeCoordinatorKey = Symbol.for("microi.ai-app-workbench.route-coordinator");
+const routeCoordinator = globalThis[routeCoordinatorKey] || (globalThis[routeCoordinatorKey] = { token: null });
 const DiyCommon = proxy.DiyCommon;
 const diyStore = useDiyStore();
 const route = useRoute();
@@ -603,12 +606,16 @@ const canSendAppChat = computed(() => (
 ));
 
 onMounted(async () => {
+    var routeToken = claimRouteOpen();
     await loadApps();
-    await openAppFromRoute();
+    await completeRouteOpen(routeToken);
 });
 
 watch(() => route.query.appId, async () => {
-    await openAppFromRoute();
+    var routeToken = claimRouteOpen();
+    // 给按 fullPath 创建的新实例一次挂载机会；新实例会立即覆盖旧令牌。
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await completeRouteOpen(routeToken);
 });
 
 watch(currentUserId, (value, oldValue) => {
@@ -1111,20 +1118,44 @@ async function selectApp(app) {
 }
 
 async function enterDevelop(app) {
-    appViewMode.value = "develop";
-    await selectApp(app);
-    var nextQuery = { ...route.query, workspace: "apps", appId: String(app?.Id || "") };
-    if (String(route.query.appId || "") !== String(app?.Id || "") || route.query.workspace !== "apps") {
+    var appId = String(app?.Id || "").trim();
+    if (!appId) return;
+    var nextQuery = { ...route.query, workspace: "apps", appId };
+    if (String(route.query.appId || "") !== appId || route.query.workspace !== "apps") {
         await router.push({ path: route.path, query: nextQuery });
+        // 路由监听是开发工作台的唯一加载入口，避免点击时先加载一次、
+        // query 更新后又加载一次，造成页面和微应用 iframe 二次刷新。
+        return;
+    }
+    if (appViewMode.value !== "develop" || String(currentApp.value?.Id || "") !== appId) {
+        appViewMode.value = "develop";
+        await selectApp(app);
     }
     if (previewUrl.value) {
         activeView.value = "preview";
     }
 }
 
+function claimRouteOpen() {
+    var token = {};
+    routeCoordinator.token = token;
+    return token;
+}
+
+async function completeRouteOpen(token) {
+    // 主框架按 fullPath 重建页面、KeepAlive 中保留旧实例时，多个实例会同时收到 query 变化。
+    // 新实例在 loadApps 之前先抢占令牌，旧实例因此不会再读取一次应用详情。
+    if (routeCoordinator.token !== token || componentInstance?.isUnmounted) return;
+    await openAppFromRoute();
+}
+
 async function openAppFromRoute() {
     var appId = String(route.query.appId || "").trim();
-    if (!appId || !apps.value.length) return;
+    if (!appId) {
+        appViewMode.value = "gallery";
+        return;
+    }
+    if (!apps.value.length) return;
     if (appViewMode.value === "develop" && String(currentApp.value?.Id || "") === appId) return;
     var app = apps.value.find((item) => String(item?.Id || "") === appId);
     if (!app) return;
@@ -1375,7 +1406,8 @@ async function makeOfflinePackage() {
     try {
         const data = await runAiAppEngine("ai_app_publish_store", {
             Action: "OfflinePackage",
-            AppId: currentApp.value.Id
+            AppId: currentApp.value.Id,
+            IncludeSource: true
         });
         const payload = normalizeDownloadPayload(data);
         if (!payload.FileByteBase64) throw new Error("接口未返回离线包内容");

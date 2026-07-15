@@ -562,13 +562,19 @@ namespace Microi.net
             }
             #endregion
             var modelResult = await GetSysMenuModel(param);
+            if (modelResult.Code != 1 || modelResult.Data == null)
+            {
+                return new DosResult(modelResult.Code, null, modelResult.Msg);
+            }
             var model = modelResult.Data;
 
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
 
             #region  通用修改
-            model = MapperHelper.MapNotNull<object, SysMenu>(param);
+            // 必须合并到数据库旧实体。若重新 new SysMenu，未传的 int? 参数会落成实体 int 的默认值 0，
+            // 只改排序/父级时也会把 AppDisplay、Display 等客户配置意外清零。
+            model = MapperHelper.MapNotNull<object, SysMenu>(param, model);
             #endregion end
 
             var count = dbSession.Update(model, d => d.Id == param.Id);
@@ -622,6 +628,7 @@ namespace Microi.net
                     model.CreateTime = DateTime.Now;
                     model.MultRun = param.MultRun ?? 1;
                     model.Display = param.Display ?? 1;
+                    model.AppDisplay = param.AppDisplay ?? 1;
                     model.Code = "Code" + DateTime.Now.ToString("yyyyMMddHHmmss");
                     var count = dbSession.Insert(model);
                     if (model.ParentId != null)
