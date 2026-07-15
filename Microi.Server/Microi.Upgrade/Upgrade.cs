@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -29,6 +30,7 @@ namespace Microi.net
             var uptVersion = "";
             var migrationFailed = false;
             var migrationErrors = new List<string>();
+            var menuAppDisplaySnapshot = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
@@ -36,6 +38,8 @@ namespace Microi.net
                 EnsureAuthSecretColumns(osClientSecret);
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
+                EnsureMobileVisibilityColumns(osClientSecret);
+                menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
             catch (Exception ex)
             {
@@ -49,7 +53,9 @@ namespace Microi.net
             {
                 try
                 {
-                    var count = osClientSecret.Db.FromSql(UpgradeAppDisplay.Sql).ExecuteNonQuery();
+                    // 已由启动不变量按“查列、加列、回填”分步执行。这里不再运行不可重入的
+                    // 多语句 ALTER + UPDATE，避免某条 ALTER 成功后重启时永远卡在重复列错误。
+                    EnsureMobileVisibilityColumns(osClientSecret);
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级AppDisplay、AppVisible】成功！");
                     needUptServerVersion = true;
                     uptVersion = UpgradeAppDisplay.Version;
@@ -404,6 +410,19 @@ namespace Microi.net
             }
             #endregion
 
+            #region 保护客户已有菜单的移动端显隐配置【必须】
+            try
+            {
+                await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, menuAppDisplaySnapshot);
+            }
+            catch (Exception ex)
+            {
+                migrationFailed = true;
+                migrationErrors.Add("恢复菜单移动端显隐配置失败：" + ex.Message);
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【恢复菜单AppDisplay快照】失败：{ex.Message}");
+            }
+            #endregion
+
             #region 更新版本号【必须】
             try
             {
@@ -432,6 +451,107 @@ namespace Microi.net
                 return new DosResultList<MicroiUpgradeResult>(0, result, message);
             }
             return new DosResultList<MicroiUpgradeResult>(1, result);
+        }
+
+        public sealed class MenuAppDisplayRow
+        {
+            public string Id { get; set; }
+            public int? AppDisplay { get; set; }
+        }
+
+        private void EnsureMobileVisibilityColumns(OsClientSecret osClientSecret)
+        {
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+
+            if (TableExists(osClientSecret, "diy_field"))
+            {
+                EnsureColumn(osClientSecret, "diy_field", "AppVisible", "int");
+                var sourceExpression = ColumnExists(osClientSecret, "diy_field", "Visible")
+                    ? $"CASE WHEN {quoteOpen}Visible{quoteClose}=0 THEN 0 ELSE 1 END"
+                    : "1";
+                osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}diy_field{quoteClose}
+                    SET {quoteOpen}AppVisible{quoteClose}={sourceExpression}
+                    WHERE {quoteOpen}AppVisible{quoteClose} IS NULL").ExecuteNonQuery();
+            }
+
+            if (TableExists(osClientSecret, "sys_menu"))
+            {
+                EnsureColumn(osClientSecret, "sys_menu", "AppDisplay", "int");
+                var sourceExpression = ColumnExists(osClientSecret, "sys_menu", "Display")
+                    ? $"CASE WHEN {quoteOpen}Display{quoteClose}=0 THEN 0 ELSE 1 END"
+                    : "1";
+                osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                    SET {quoteOpen}AppDisplay{quoteClose}={sourceExpression}
+                    WHERE {quoteOpen}AppDisplay{quoteClose} IS NULL").ExecuteNonQuery();
+            }
+        }
+
+        private Dictionary<string, int> CaptureMenuAppDisplaySnapshot(OsClientSecret osClientSecret)
+        {
+            if (!TableExists(osClientSecret, "sys_menu") || !ColumnExists(osClientSecret, "sys_menu", "AppDisplay"))
+            {
+                return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            var rows = osClientSecret.Db.FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}AppDisplay{quoteClose}
+                    FROM {quoteOpen}sys_menu{quoteClose}
+                    WHERE {quoteOpen}IsDeleted{quoteClose}=0 OR {quoteOpen}IsDeleted{quoteClose} IS NULL")
+                .ToList<MenuAppDisplayRow>();
+
+            return rows
+                .Where(row => !string.IsNullOrWhiteSpace(row.Id))
+                .GroupBy(row => row.Id, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First().AppDisplay ?? 1, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async Task RestoreMenuAppDisplaySnapshotAsync(
+            OsClientSecret osClientSecret,
+            IReadOnlyDictionary<string, int> snapshot)
+        {
+            if (snapshot == null || snapshot.Count == 0) return;
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            var currentRows = osClientSecret.Db.FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}AppDisplay{quoteClose}
+                    FROM {quoteOpen}sys_menu{quoteClose}
+                    WHERE {quoteOpen}IsDeleted{quoteClose}=0 OR {quoteOpen}IsDeleted{quoteClose} IS NULL")
+                .ToList<MenuAppDisplayRow>();
+            var restoredIds = new List<string>();
+
+            foreach (var row in currentRows)
+            {
+                if (string.IsNullOrWhiteSpace(row.Id)
+                    || !snapshot.TryGetValue(row.Id, out var expectedValue)
+                    || row.AppDisplay == expectedValue)
+                {
+                    continue;
+                }
+
+                osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                        SET {quoteOpen}AppDisplay{quoteClose}=@p0
+                        WHERE {quoteOpen}Id{quoteClose}=@p1")
+                    .AddInParameter("p0", expectedValue)
+                    .AddInParameter("p1", row.Id)
+                    .ExecuteNonQuery();
+                restoredIds.Add(row.Id);
+            }
+
+            if (restoredIds.Count == 0) return;
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient);
+            await cache.RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_menu");
+            foreach (var id in restoredIds)
+            {
+                await cache.RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_menu:{id.ToLowerInvariant()}");
+            }
+            Console.WriteLine($"Microi：【保护】平台自动升级【{osClientSecret.OsClient}】已恢复 {restoredIds.Count} 个既有菜单的AppDisplay，升级包不得覆盖客户移动端显隐配置。");
         }
 
         private void EnsureSecurityLevels(OsClientSecret osClientSecret)

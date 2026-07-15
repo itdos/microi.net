@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.3.4
+ * Version: v1.4.1
  * Function:
  * - 安装应用商城数据包，导入结构、菜单、流程、接口引擎、业务数据及在线 AI 应用；兼容目标租户历史物理字段，保证重复安装幂等，保护接口引擎多 Tab，并为安装的在线应用写入当前安装用户归属。
  */
@@ -187,10 +187,27 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
         var sourceCount = packageAssets && packageAssets.SourceZip ? 1 : (bundle.SourceFiles && bundle.SourceFiles.length !== undefined ? bundle.SourceFiles.length : 0);
         var assetCount = packageAssets && packageAssets.BuildZip ? 1 : (bundle.BuildAssets && bundle.BuildAssets.length !== undefined ? bundle.BuildAssets.length : 0);
         var routeCount = bundle.Routes && bundle.Routes.length !== undefined ? bundle.Routes.length : 0;
+        var validationSourceExpected = (packageAssets && packageAssets.IncludeSource)
+            || bundle.IncludeSource === true || bundle.IncludeSource === 1 || String(bundle.IncludeSource || '').toLowerCase() == 'true'
+            || Package.PackageInfo.IncludeSource === true || Package.PackageInfo.IncludeSource === 1 || String(Package.PackageInfo.IncludeSource || '').toLowerCase() == 'true';
+        var embeddedSources = bundle.SourceFiles && bundle.SourceFiles.length !== undefined ? bundle.SourceFiles : [];
+        var embeddedAssets = bundle.BuildAssets && bundle.BuildAssets.length !== undefined ? bundle.BuildAssets : [];
+        var emptySourceContent = 0;
+        var emptyBuildContent = 0;
+        for (var validationSourceIndex = 0; validationSourceIndex < embeddedSources.length; validationSourceIndex++) {
+            var validationSource = embeddedSources[validationSourceIndex] || {};
+            if (!validationSource.FileByteBase64 && validationSource.Content === undefined && !validationSource.ContentBase64 && !validationSource.Base64) emptySourceContent++;
+        }
+        for (var validationAssetIndex = 0; validationAssetIndex < embeddedAssets.length; validationAssetIndex++) {
+            var validationAsset = embeddedAssets[validationAssetIndex] || {};
+            if (!validationAsset.FileByteBase64 && validationAsset.Content === undefined && !validationAsset.ContentBase64 && !validationAsset.Base64) emptyBuildContent++;
+        }
         if (supportedTypes.indexOf(applicationType) < 0) validationErrors.push('第' + (validationIndex + 1) + '个AI应用类型不受支持：' + applicationType);
         if (!application.AppKey) validationErrors.push('第' + (validationIndex + 1) + '个AI应用缺少 Application.AppKey');
         if (!application.Name) validationErrors.push('第' + (validationIndex + 1) + '个AI应用缺少 Application.Name');
-        if (packageAssets && packageAssets.IncludeSource && sourceCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个AI应用选择了源码包但未提供SourceZip');
+        if (validationSourceExpected && sourceCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个AI应用声明包含源码但没有源码文件');
+        if (emptySourceContent > 0) validationErrors.push('第' + (validationIndex + 1) + '个AI应用有' + emptySourceContent + '个源码文件缺少内嵌内容');
+        if (emptyBuildContent > 0) validationErrors.push('第' + (validationIndex + 1) + '个AI应用有' + emptyBuildContent + '个编译文件缺少内嵌内容');
         if (assetCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个AI应用没有公有编译产物');
         if (applicationType == 'MicroService' && !bundle.MicroService) validationErrors.push('第' + (validationIndex + 1) + '个微服务应用缺少 MicroService 运行配置');
         if (applicationType == 'MicroService' && routeCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个微服务应用没有可安装路由');
@@ -302,10 +319,37 @@ try {
         ApplicationSourceFiles: 0,
         ApplicationBuildAssets: 0,
         MicroServicePages: 0,
+        MicroServiceMenus: 0,
+        MicroServiceMenusPreserved: 0,
         DataSetCount: 0,
         DataInserted: 0,
         DataUpdated: 0,
         DataSkipped: 0
+    };
+
+    // 微服务页面安装完成后，再按路由元数据迁移目标库中的历史 Vue 菜单。
+    // 保留旧 Url 兼容书签，只把运行入口切换到已发布的微服务宿主。
+    var applicationMenuBindings = [];
+
+    var legacyRouteValues = function (route, pluralName, singleName) {
+        route = route || {};
+        var meta = route;
+        if (route.RouteMetaJson) {
+            try { meta = JSON.parse(route.RouteMetaJson) || route; } catch (routeMetaError) { meta = route; }
+        }
+        var value = route[pluralName] || route[singleName] || meta[pluralName] || meta[singleName] || [];
+        if (typeof value == 'string') {
+            var trimmed = value.replace(/^\s+|\s+$/g, '');
+            if (!trimmed) return [];
+            try { value = JSON.parse(trimmed); } catch (legacyValueError) { value = [trimmed]; }
+        }
+        if (!value || value.length === undefined) value = [value];
+        var result = [];
+        for (var legacyIndex = 0; legacyIndex < value.length; legacyIndex++) {
+            var item = firstTextParam([value[legacyIndex]]).replace(/^\s+|\s+$/g, '');
+            if (item && result.indexOf(item) < 0) result.push(item);
+        }
+        return result;
     };
 
     // ==================== Web / UniApp / MicroService 应用资产安装 ====================
@@ -478,6 +522,7 @@ try {
         var appId = firstTextParam([app.Id, bundle.AppId, V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid()]);
         var appName = firstTextParam([app.Name, app.MsName, Package.PackageInfo.Name, appKey]);
         var existingApp = getApplicationRow('mci_ai_app', appId, [['AppKey', '=', appKey]]);
+        var preserveExistingNativeMenus = !!(existingApp && existingApp.Id);
         var previousAppKey = '';
         if (existingApp && existingApp.Id) {
             appId = existingApp.Id;
@@ -490,6 +535,13 @@ try {
         var sourceFiles = embeddedSourceFiles && embeddedSourceFiles.length !== undefined && embeddedSourceFiles.length
             ? embeddedSourceFiles
             : (packageAssets && packageAssets.SourceZip ? downloadApplicationZip(packageAssets.SourceZip, '源码') : []);
+        var sourceExpected = bundle.IncludeSource === true || bundle.IncludeSource === 1
+            || String(bundle.IncludeSource || '').toLowerCase() == 'true'
+            || Package.PackageInfo.IncludeSource === true || Package.PackageInfo.IncludeSource === 1
+            || String(Package.PackageInfo.IncludeSource || '').toLowerCase() == 'true';
+        if (sourceExpected && (!sourceFiles || !sourceFiles.length)) {
+            throw new Error('安装包声明包含私有源码，但源码文件为空，已停止安装，避免只安装运行产物。');
+        }
         var uploadedSource = [];
         reportProgress(60, '正在写入' + appType + '应用私有源码');
         for (var i = 0; i < sourceFiles.length; i++) {
@@ -564,11 +616,22 @@ try {
             BuildStatus: uploadedBuild.length ? 'Success' : 'Changed',
             CurrentVersion: parseInt(app.CurrentVersion || 1, 10) || 1,
             PreviewUrl: previewUrl,
-            PrivateSourcePath: uploadedSource.length ? sourceRoot : '',
+            PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
             PublicPublishPath: buildRoot
         };
         var appResult = upsertApplicationRow('mci_ai_app', [['AppKey', '=', appKey]], appRow);
         if (!appResult || appResult.Code != 1) throw new Error('写入在线 AI 应用失败：' + ((appResult && appResult.Msg) || ''));
+        if (sourceExpected) {
+            var installedSources = V8.FormEngine.GetTableData('mci_ai_app_file', {
+                _Where: [['AppId', '=', appId]],
+                _SelectFields: ['Id'],
+                _PageIndex: 1,
+                _PageSize: 1
+            });
+            if (!installedSources || installedSources.Code != 1 || !installedSources.Data || !installedSources.Data.length) {
+                throw new Error('私有源码写入后回读为空，已停止安装，请检查目标租户私有 HDFS 配置。');
+            }
+        }
 
         if (uploadedBuild.length) {
             var versionRow = {
@@ -639,6 +702,16 @@ try {
                 };
                 var pageResult = upsertApplicationRow('sys_microiservice_page', [['MicroServiceId', '=', serviceId], ['AND', 'RoutePath', '=', routePath]], pageRow);
                 if (!pageResult || pageResult.Code != 1) throw new Error('写入微服务页面失败：' + routePath + '，' + ((pageResult && pageResult.Msg) || ''));
+                var installedPage = getApplicationRow('sys_microiservice_page', '', [['MicroServiceId', '=', serviceId], ['AND', 'RoutePath', '=', routePath]]);
+                applicationMenuBindings.push({
+                    ServiceId: serviceId,
+                    ServiceKey: appKey,
+                    PageId: installedPage && installedPage.Id ? installedPage.Id : '',
+                    RoutePath: routePath,
+                    PreserveExistingNativeMenus: preserveExistingNativeMenus,
+                    LegacyMenuUrls: legacyRouteValues(route, 'LegacyMenuUrls', 'LegacyMenuUrl'),
+                    LegacyComponentPaths: legacyRouteValues(route, 'LegacyComponentPaths', 'LegacyComponentPath')
+                });
                 stats.MicroServicePages++;
             }
         }
@@ -2308,6 +2381,29 @@ try {
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = menu.Id;
 
+        // 应用包升级只能更新菜单功能配置，不能反向覆盖客户已经维护的桌面端/移动端显隐。
+        // 新增菜单继续采用包内默认值；仅对目标库中已存在且值明确的菜单保留原值。
+        if (exists) {
+            var existingMenuVisibilityResult = V8.FormEngine.GetFormData('sys_menu', {
+                Id: menu.Id,
+                _SelectFields: ['Display', 'AppDisplay']
+            });
+            var existingMenuVisibility = existingMenuVisibilityResult
+                && existingMenuVisibilityResult.Code == 1
+                ? existingMenuVisibilityResult.Data
+                : null;
+            if (existingMenuVisibility) {
+                if (existingMenuVisibility.Display !== null && existingMenuVisibility.Display !== undefined) {
+                    modelCopy.Display = Number(existingMenuVisibility.Display);
+                }
+                if (existingMenuVisibility.AppDisplay !== null && existingMenuVisibility.AppDisplay !== undefined) {
+                    modelCopy.AppDisplay = Number(existingMenuVisibility.AppDisplay);
+                }
+                debugLog['preserve_existing_menu_visibility_' + menu.Id] =
+                    '已保留目标库菜单的Display/AppDisplay配置';
+            }
+        }
+
         // 接口引擎的 PageTabs 是每个客户按接口分类长期维护的V8按钮集合。
         // 只对 app.microi.api-engine 保留目标库已有的真正多Tab配置（至少2个）；其它字段、
         // 其它菜单及其它应用继续按应用包覆盖，避免把通用合并规则扩大到所有应用。
@@ -2389,12 +2485,70 @@ try {
         }
     }
 
+    var migratedMenuIds = {};
+    var migrateLegacyMenus = function (binding, fieldName, values) {
+        if (!binding || !values || !values.length) return;
+        var menuResult = V8.FormEngine.GetTableData('sys_menu', {
+            _Where: [[fieldName, 'In', values]],
+            _PageIndex: 1,
+            _PageSize: 1000
+        });
+        var menus = menuResult && menuResult.Code == 1 && menuResult.Data ? menuResult.Data : [];
+        for (var legacyMenuIndex = 0; legacyMenuIndex < menus.length; legacyMenuIndex++) {
+            var legacyMenu = menus[legacyMenuIndex] || {};
+            if (!legacyMenu.Id || migratedMenuIds[legacyMenu.Id]) continue;
+            var openType = String(legacyMenu.OpenType || '').toLowerCase();
+            var componentPath = String(legacyMenu.ComponentPath || '').toLowerCase();
+            var isExistingNativeComponent = openType != 'microservice'
+                && Number(legacyMenu.IsMicroiService || 0) !== 1
+                && componentPath
+                && componentPath != '/micro-app/host';
+            if (binding.PreserveExistingNativeMenus && isExistingNativeComponent) {
+                migratedMenuIds[legacyMenu.Id] = true;
+                stats.MicroServiceMenusPreserved++;
+                continue;
+            }
+            var stableRoutePath = String(binding.RoutePath || '/');
+            if (stableRoutePath.charAt(0) != '/') stableRoutePath = '/' + stableRoutePath;
+            var stableMenuUrl = '/micro-app/' + binding.ServiceKey + (stableRoutePath == '/' ? '' : stableRoutePath);
+            var migrateResult = runWriteWithRetry(function () {
+                return V8.FormEngine.UptFormData('sys_menu', {
+                    Id: legacyMenu.Id,
+                    Url: stableMenuUrl,
+                    OpenType: 'MicroService',
+                    IsMicroiService: 1,
+                    ComponentPath: '/micro-app/host',
+                    MicroServiceId: binding.ServiceId,
+                    MicroServiceKey: binding.ServiceKey,
+                    MsKey: binding.ServiceKey,
+                    MicroServicePageId: binding.PageId,
+                    MicroServiceRoutePath: binding.RoutePath
+                });
+            }, 'migrate_microservice_menu_' + legacyMenu.Id);
+            if (migrateResult && migrateResult.Code == 1) {
+                migratedMenuIds[legacyMenu.Id] = true;
+                stats.MicroServiceMenus++;
+                V8.Cache.Remove('Microi:' + V8.OsClient + ':FormData:sys_menu:' + String(legacyMenu.Id).toLowerCase());
+                if (legacyMenu.ModuleEngineKey) {
+                    V8.Cache.Remove('Microi:' + V8.OsClient + ':FormData:sys_menu:' + String(legacyMenu.ModuleEngineKey).toLowerCase());
+                }
+            } else {
+                debugLog['migrate_microservice_menu_error_' + legacyMenu.Id] = (migrateResult && migrateResult.Msg) || '接口无返回';
+            }
+        }
+    };
+    for (var bindingIndex = 0; bindingIndex < applicationMenuBindings.length; bindingIndex++) {
+        var binding = applicationMenuBindings[bindingIndex];
+        migrateLegacyMenus(binding, 'Url', binding.LegacyMenuUrls);
+        migrateLegacyMenus(binding, 'ComponentPath', binding.LegacyComponentPaths);
+    }
+
     var step3ReferenceRowsUpdated = syncMappedReferences();
     if (step3ReferenceRowsUpdated > 0) {
         debugLog.step3ReferenceRowsUpdated = step3ReferenceRowsUpdated;
     }
 
-    debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated;
+    debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated + '，迁移微服务旧菜单' + stats.MicroServiceMenus + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
 
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
 
@@ -2877,7 +3031,7 @@ try {
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
-            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码' + stats.ApplicationSourceFiles + '个，公有编译文件' + stats.ApplicationBuildAssets + '个，微服务页面' + stats.MicroServicePages + '个',
+            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码' + stats.ApplicationSourceFiles + '个，公有编译文件' + stats.ApplicationBuildAssets + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };

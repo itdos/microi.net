@@ -88,6 +88,20 @@ var extractResult = V8.Method.ExtractZip({
 | 公有桶 | `false` | 直接拼接 `V8.SysConfig.FileServer + Path` | 头像、产品图、公开文档 |
 | 私有桶 | `true` | 必须用 `V8.Method.GetPrivateFileUrl` 获取临时 URL | 合同、身份证、敏感数据 |
 
+### 默认 MinIO 桶名与安装验收
+
+- Microi 一键安装的默认私有桶固定为 `mci-private`，默认公有桶固定为 `mci-public`；禁止使用 `mci-publish` 等近似名称。
+- 安装脚本创建 `mci-public` 后必须设置匿名下载权限，并把 `HDFS=MinIO`、内外网端点、AccessKey/SecretKey、`MinIOPrivateBucketName=mci-private`、`MinIOPublicBucketName=mci-public` 同步写入当前租户的 `sys_osclients`。
+- 安装脚本还必须同步当前有效 `sys_config`：`ApiBase` 使用对外可访问的 API 端口，`FileServer` 使用 `http://<访问IP>:<MinIO API端口>/mci-public`。`ApiBase` 不能误用 Web 前端端口，因为 V8 代码会直接在其后拼接 `/api/...` 或 `/apiengine/...`。
+- 安装验收必须使用真实登录 Token 分别执行一次 `Limit=false` 和 `Limit=true` 上传：公有文件匿名访问应返回 `200`，私有文件匿名访问应返回 `403`，私有文件通过签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。
+
+### 复盘：MinIO 已可上传但系统设置仍指向官方地址
+
+- 触发场景：一键安装和桶初始化均成功，用户手工上传也成功，但读取系统设置时发现 `ApiBase`、`FileServer` 仍是空库模板中的官方地址。
+- 根因：安装流程只回写了 `sys_osclients` 的 MinIO 配置，没有同步前端和 V8 公共使用的 `sys_config` 地址字段。
+- 通用规则：数据库还原并创建默认桶后，必须按安装模式选择的访问 IP 和动态端口同时回写有效 `sys_config.ApiBase/FileServer`；其中 `ApiBase` 指向 API 服务，`FileServer` 指向公有桶根地址。
+- 自动化检查：安装完成后通过 `GetSysConfig` 回读两个字段，断言均使用本次访问 IP 和实际端口；再执行公有上传并使用 `FileServer + Path` 匿名下载，内容必须一致。
+
 公开页面图片（首页 banner、商品主图、头像等）应返回公有 URL，例如 `V8.SysConfig.FileServer + Path`。不要把公有图片统一转成 `GetPrivateFileUrl` 的 `static-private` 签名地址；部分 H5/浏览器会因响应头或跨域策略触发 ORB/CORS 拦截，表现为 uni-app `<image>` 内层 `background-image: none`。
 
 后台 `ImgUpload` 字段通常保存相对路径或 JSON：接口返回给移动端前先解析出 `Path`，再按公私有场景转换 URL：

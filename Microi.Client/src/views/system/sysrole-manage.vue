@@ -158,6 +158,7 @@ import _ from "underscore";
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import SysroleMenuPermissionRow from "./components/sysrole-menu-permission-row.vue";
+import { setRoleMenuChecked } from "./utils/sysrole-menu-permission";
 export default {
     name: "sys_role",
     components: {
@@ -335,38 +336,7 @@ export default {
             self.ForNameChange(val, row);
         },
         ForNameChange(val, row) {
-            var self = this;
-            var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
-            if (val) {
-                // 1. 默认权限
-                var newPermission = ["Add", "Edit", "Del", "Export", "Import"];
-                // 2. 当前节点自定义按钮
-                moreBtns.forEach((btnKey) => {
-                    if (row[btnKey] && Array.isArray(row[btnKey])) {
-                        row[btnKey].forEach((btnModel) => {
-                            if (btnModel && btnModel.Id && newPermission.indexOf(btnModel.Id) === -1) {
-                                newPermission.push(btnModel.Id);
-                            }
-                        });
-                    }
-                });
-                row.Permission = newPermission;
-                // 3. 递归处理所有子节点
-                if (row._Child) {
-                    row._Child.forEach((childRow) => {
-                        childRow._Check = true;
-                        self.ForNameChange(val, childRow); // 递归对子节点做同样处理
-                    });
-                }
-            } else {
-                row.Permission = [];
-                if (row._Child) {
-                    row._Child.forEach((childRow) => {
-                        childRow._Check = false;
-                        self.ForNameChange(val, childRow);
-                    });
-                }
-            }
+            setRoleMenuChecked(row, val);
         },
 
         TreeDeptClick(data) {

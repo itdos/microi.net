@@ -48,6 +48,8 @@ namespace Microi.net
         {
             if (client == null) return null;
 
+            EnsureMainTenantDatabaseConfig(client.OsClient, client.OsClientModel);
+
             // 【关键】直接返回完整的 OsClientModel JObject，保留所有数据库字段
             return client.OsClientModel;
         }
@@ -60,18 +62,91 @@ namespace Microi.net
         {
             if (localClient == null) return null;
 
-            // 【关键】如果缓存中有完整的 OsClientModel（JObject），直接恢复
+            // Redis 中保存的是 SaaS 业务配置；数据库连接属于当前进程的本地配置。
+            // 主租户在 sys_osclients 中通常不填写 DbConn，不能让缓存中的空值覆盖
+            // InitializeDefaultClient 从环境变量/appsettings 加载的连接字符串。
             if (config is JObject jobj)
             {
-                // 缓存中的配置是完整的 JObject，包含所有字段
-                // 直接作为 OsClientModel 恢复，保留所有数据库字段
-                localClient.OsClientModel = jobj;
+                var localModel = localClient.OsClientModel;
+                var localDbConn = localModel?["DbConn"]?.Val<string>();
+                var localDbReadConn = localModel?["DbReadConn"]?.Val<string>();
+                var localDbType = localModel?["DbType"]?.Val<string>();
+                var localDbReadType = localModel?["DbReadType"]?.Val<string>();
+
+                localClient.OsClientModel = (JObject)jobj.DeepClone();
+                RestoreLocalDatabaseValue(localClient.OsClientModel, "DbConn", localDbConn);
+                RestoreLocalDatabaseValue(localClient.OsClientModel, "DbReadConn", localDbReadConn);
+                RestoreLocalDatabaseValue(localClient.OsClientModel, "DbType", localDbType);
+                RestoreLocalDatabaseValue(localClient.OsClientModel, "DbReadType", localDbReadType);
             }
 
-            // 【重要】不从缓存恢复 DbConn/DbReadConn，这些始终使用本地值
-            // 因为本地的 DbConn/DbReadConn 可能被规范化处理过（如 MySQL 连接字符串）
+            EnsureMainTenantDatabaseConfig(localClient.OsClient, localClient.OsClientModel);
 
             return localClient;
+        }
+
+        private static void RestoreLocalDatabaseValue(JObject target, string fieldName, string localValue)
+        {
+            if (target != null && !localValue.DosIsNullOrWhiteSpace())
+            {
+                target[fieldName] = localValue;
+            }
+        }
+
+        /// <summary>
+        /// 主租户的数据库连接以进程环境变量为第一优先级、appsettings 为第二优先级。
+        /// sys_osclients.DbConn 可以留空，且 Redis 中的空值不得覆盖本机配置。
+        /// </summary>
+        private static void EnsureMainTenantDatabaseConfig(string osClient, JObject osClientModel)
+        {
+            if (osClientModel == null || !IsConfiguredMainTenant(osClient)) return;
+
+            var dbConn = GetConfiguredValue("OsClientDbConn", OsClientDefault.OsClientDbConn);
+            string currentDbConn = osClientModel["DbConn"]?.Val<string>() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(currentDbConn)
+                && !string.IsNullOrWhiteSpace(dbConn))
+            {
+                osClientModel["DbConn"] = dbConn;
+                currentDbConn = dbConn;
+            }
+
+            var dbType = GetConfiguredValue("OsClientDbType", OsClientDefault.OsClientDbType);
+            string currentDbType = osClientModel["DbType"]?.Val<string>() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(currentDbType)
+                && !string.IsNullOrWhiteSpace(dbType))
+            {
+                osClientModel["DbType"] = dbType;
+                currentDbType = dbType;
+            }
+
+            string currentDbReadConn = osClientModel["DbReadConn"]?.Val<string>() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(currentDbReadConn)
+                && !string.IsNullOrWhiteSpace(currentDbConn))
+            {
+                osClientModel["DbReadConn"] = currentDbConn;
+            }
+            string currentDbReadType = osClientModel["DbReadType"]?.Val<string>() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(currentDbReadType)
+                && !string.IsNullOrWhiteSpace(currentDbType))
+            {
+                osClientModel["DbReadType"] = currentDbType;
+            }
+        }
+
+        private static bool IsConfiguredMainTenant(string osClient)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()) return false;
+            var configuredOsClient = GetConfiguredValue("OsClient", OsClientDefault.OsClient);
+            return string.Equals(osClient, configuredOsClient, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetConfiguredValue(string key, string fallback)
+        {
+            var processValue = Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.Process);
+            if (!processValue.DosIsNullOrWhiteSpace()) return processValue;
+
+            var appSettingsValue = ConfigHelper.GetAppSettings(key);
+            return appSettingsValue.DosIsNullOrWhiteSpace() ? fallback : appSettingsValue;
         }
 
         /// <summary>
@@ -182,6 +257,8 @@ namespace Microi.net
                 {
                     client = MergeConfigWithClientObjects(cachedConfig, client);
                 }
+
+                EnsureMainTenantDatabaseConfig(osClient, client.OsClientModel);
 
                 //判断数据库对象是否初始化，或已断开？
                 if (client.Db == null || client.DbRead == null)

@@ -560,7 +560,7 @@ export const usePermissionStore = defineStore("permission", {
                 DiyCommon.Post(
                     DiyApi.GetSysMenuStep(),
                     {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "MicroServiceId", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",

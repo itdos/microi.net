@@ -294,12 +294,25 @@ namespace Microi.net.Api
 
         private static async Task<JObject> GetService(string osClient, string appKey)
         {
+            var service = await GetServiceByField(osClient, "MsKey", appKey);
+            if (service != null)
+            {
+                return service;
+            }
+
+            // Older clients and already-saved menus may still use the service Id in
+            // /micro-app/{appKey}. Keep those URLs working while new clients prefer MsKey.
+            return await GetServiceByField(osClient, "Id", appKey);
+        }
+
+        private static async Task<JObject> GetServiceByField(string osClient, string fieldName, string fieldValue)
+        {
             var param = new JObject
             {
                 ["FormEngineKey"] = ServiceTable,
                 ["OsClient"] = osClient,
                 ["_IsAnonymous"] = true,
-                ["_Where"] = Where(new JArray("MsKey", "=", appKey)),
+                ["_Where"] = Where(new JArray(fieldName, "=", fieldValue)),
                 ["_SelectFields"] = new JArray(
                     "Id",
                     "MsKey",
