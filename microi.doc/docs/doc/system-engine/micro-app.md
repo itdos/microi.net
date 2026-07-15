@@ -491,7 +491,11 @@ window.microApp.dispatch({
 - `sys_microiservice_page` 页面路由。
 - 包版本、来源租户和必要的基础元数据。
 
+应用商城“配置应用包”中的“同时发布源码 ZIP”只控制私有源码是否随包交付；无论是否勾选，真正的离线包都必须内嵌最新已发布运行产物。因此未携带源码的应用仍应可以运行和预览，只是不能在目标服务器继续在线开发。平台自有的打包接口必须自带时间格式化回退，不得依赖客户“系统设置”的全局 `DateNow`，更不能为了补函数覆盖客户维护的全局 V8。
+
 安装到另一个租户时，平台不会直接引用发布者的 HDFS 地址，而是把私有源码和公有构建文件重新上传到安装者自己的 HDFS，再写入目标租户的运行时和路由。因此发布者使用 MinIO、安装者使用阿里云 OSS 或其他已支持存储时，也可以完成迁移。
+
+声明“同时发布源码”的包若实际没有源码，生成或安装必须失败；目标租户写入私有 HDFS 后还要回读 `mci_ai_app_file`，不能返回“安装成功”后才在工作台显示无源码。原开发服务器已有可运行原生组件菜单时，重复制作或验证安装包不得把它改写成微服务菜单；目标端需要迁移的菜单才绑定 `/micro-app/host`，并把 `Url` 写成包含稳定 `MsKey` 的 `/micro-app/{MsKey}/{route}`。微服务友好路由优先使用 `MsKey`，后端同时兼容历史服务 `Id` 路由。
 
 若目标租户 HDFS 未配置、不可访问或上传失败，安装应终止并显示明确错误，不能只写数据库记录后留下无法打开的页面。
 
@@ -521,6 +525,7 @@ AI 应用工作台“发布应用商城”
 - `BuildVersion`、`EntryPath`、`AssetManifestJson` 和构建文件清单完整。
 - `microi.routes.json` 与 `sys_microiservice_page` 一致。
 - 菜单绑定了正确的 `MicroServiceId`、`MicroServicePageId` 和路由。
+- 目标端需要迁移的 `LegacyMenuUrls/LegacyComponentPaths` 菜单已绑定 `/micro-app/host`，且菜单 `Url` 使用稳定 `MsKey`；原开发服务器仍可运行的原生组件菜单保持不变。
 - 真实主站 URL 不携带 Token，页面仍能调用需要登录的接口。
 - Dialog 的成功、取消、失败回调都已测试。
 - 同一微服务的两个菜单连续切换不会出现 `app name conflict`。

@@ -46,11 +46,22 @@ namespace Microi.net
                     {
                         foreach (var clientModelItem in OsClient.ClientList)
                         {
-                            // 跳过没有数据库连接的租户
-                            var dbConn = clientModelItem.Value.OsClientModel?["DbConn"]?.ToString();
+                            // 统一通过 GetClient 重新解析运行时配置。主租户的 sys_osclients.DbConn
+                            // 通常为空，此处应使用环境变量/appsettings 中的 OsClientDbConn。
+                            OsClientSecret runtimeClient;
+                            try
+                            {
+                                runtimeClient = OsClient.GetClient(clientModelItem.Value.OsClient);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Microi：【Error异常】【{clientModelItem.Value.OsClient}】平台自动升级解析租户数据库配置失败：{ex.Message}");
+                                continue;
+                            }
+                            var dbConn = runtimeClient.OsClientModel?["DbConn"]?.ToString();
                             if (string.IsNullOrWhiteSpace(dbConn))
                             {
-                                Console.WriteLine($"Microi：【⚠️警告】平台自动升级跳过租户【{clientModelItem.Value.OsClient}】：数据库连接（DbConn）未配置。");
+                                Console.WriteLine($"Microi：【⚠️警告】平台自动升级跳过租户【{runtimeClient.OsClient}】：数据库连接（DbConn）未配置。");
                                 continue;
                             }
                             try
@@ -66,7 +77,7 @@ namespace Microi.net
                                         Type = "="
                                     }
                                 },
-                                    OsClient = clientModelItem.Value.OsClient
+                                    OsClient = runtimeClient.OsClient
                                 });
                                 var currentVersion = "";
                                 if (versionResult.Code == 1)
@@ -76,7 +87,7 @@ namespace Microi.net
                                 try
                                 {
                                     // var sqlResult = await new MicroiUpgrade().Upgrade(currentVersion, clientModelItem.Value);
-                                    await scheduledTask.Upgrade(currentVersion, clientModelItem.Value);
+                                    await scheduledTask.Upgrade(currentVersion, runtimeClient);
 
                                     // if (sqlResult.Code == 1)
                                     // {
@@ -113,7 +124,7 @@ namespace Microi.net
                                 try
                                 {
                                     // var langList = currentClientModel.Db.FromSql("select * from diy_lang").ToList<DiyLang>();
-                                    var langList = clientModelItem.Value.Db.FromSql("select * from diy_lang").ToList<dynamic>();
+                                    var langList = runtimeClient.Db.FromSql("select * from diy_lang").ToList<dynamic>();
                                     // var langs = new List<string>(){
                                     //     "zh-cn", "zh", "cn", "en", "zh-tw"
                                     // };
@@ -124,13 +135,13 @@ namespace Microi.net
                                         var key = itemObj["Key"]?.ToString();
                                         langLevel2.Add(key, itemObj);
                                     }
-                                    if (DiyMessage.Msg.ContainsKey(clientModelItem.Value.OsClient))
+                                    if (DiyMessage.Msg.ContainsKey(runtimeClient.OsClient))
                                     {
-                                        DiyMessage.Msg[clientModelItem.Value.OsClient] = langLevel2;
+                                        DiyMessage.Msg[runtimeClient.OsClient] = langLevel2;
                                     }
                                     else
                                     {
-                                        DiyMessage.Msg.Add(clientModelItem.Value.OsClient, langLevel2);
+                                        DiyMessage.Msg.Add(runtimeClient.OsClient, langLevel2);
                                     }
                                 }
                                 catch (Exception ex)

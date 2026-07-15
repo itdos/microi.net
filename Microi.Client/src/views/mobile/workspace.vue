@@ -172,6 +172,7 @@ import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight, Search } from '@element-plus/icons-vue';
 import { DiyCommon } from '@/utils/diy.common';
+import { isExplicitlyHiddenOnMobile } from './mobile-menu-visibility';
 
 defineOptions({
     name: 'mobile_workspace'
@@ -200,7 +201,8 @@ const menuList = computed(() => {
         if (!route.meta?.title) return false;
         const excludePaths = ['/redirect', '/login', '/404', '/401', '/:pathMatch'];
         if (excludePaths.some(p => route.path?.includes(p))) return false;
-        if (!route.AppDisplay) return false;
+        const appDisplay = route.AppDisplay ?? route.meta?.AppDisplay;
+        if (isExplicitlyHiddenOnMobile(appDisplay)) return false;
         return true;
     });
 });
@@ -285,7 +287,13 @@ const navigateToMenu = (menu) => {
 
 const getVisibleChildren = (children) => {
     if (!children || !Array.isArray(children)) return [];
-    return children.filter(child => child.AppDisplay !== 0 && child.AppDisplay !== "0" && child.Display !== 0 && child.Display !== "0" && !child.hidden);
+    return children.filter(child => {
+        const appDisplay = child.AppDisplay ?? child.meta?.AppDisplay;
+        return !isExplicitlyHiddenOnMobile(appDisplay)
+            && child.Display !== 0
+            && child.Display !== "0"
+            && !child.hidden;
+    });
 };
 
 const hasVisibleChildMenus = (menu) => {

@@ -6,7 +6,7 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-自动安装 **MySQL + Redis + MinIO + MongoDB + Ollama + Qdrant + Watchtower + 低代码平台程序（API + Web）**，基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
+自动安装 **MySQL + Redis + MinIO + MongoDB + Watchtower + 低代码平台程序（API + Web）**，可选安装 **Ollama + Qdrant** 在线 AI 依赖。全套服务基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
 
 ### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
 ```bash
@@ -17,19 +17,22 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 
 | 序号 | 说明 |
 | :--: | ---- |
-| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】和【Demo 示例数据库 / 空数据库】 |
+| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）和 MySQL 版本（输入 `5` 安装 5.7，输入 `8` 安装 8.0） |
 | 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
 | 3 | MySQL 性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位） |
-| 4 | 端口从 **7000 开始顺序 +1 分配**（7000-7009），安装前会自动检测端口占用，若有冲突则从 7100 开始重试 |
-| 5 | 安装前脚本会**先在防火墙中开放**所有端口，再部署服务（若使用云服务器，还需在云控制台安全组中开放） |
-| 6 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
-| 7 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
+| 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
+| 5 | MinIO 会自动创建私有桶 `mci-private`、公有桶 `mci-public`，为公有桶开放匿名下载权限，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
+| 6 | 根据安装模式选择的访问 IP 和实际分配端口，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为 `http://<访问IP>:<MinIO API端口>/mci-public` |
+| 7 | 端口从 **7000 开始顺序 +1 分配**；基础服务占用 7 个端口，选择在线 AI 后占用 10 个端口。安装前会自动检测占用，若有冲突则从 7100 开始重试 |
+| 8 | 安装前脚本会**先在防火墙中开放**所有端口，再部署服务（若使用云服务器，还需在云控制台安全组中开放） |
+| 9 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
+| 10 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 
 ### 📋 端口分配表（默认从 7000 开始）
 
 | 端口 | 服务 | 容器内部端口 |
 | :--: | ---- | :--: |
-| 7000 | MySQL 5.7 | 3306 |
+| 7000 | MySQL 5.7 / 8.0 | 3306 |
 | 7001 | Redis 7.4 | 6379 |
 | 7002 | MongoDB | 27017 |
 | 7003 | MinIO API | 9000 |
@@ -41,6 +44,18 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 | 7009 | Web 前端 | 80 |
 
 > 若 7000-7009 中有端口被占用，脚本会自动从 7100-7109 开始重新检测，以此类推（每次 +100）。
+
+> 上表是“安装在线 AI 依赖”时的 10 端口示例。若跳过 Ollama、Qdrant，则 API、Web 分别使用 7005、7006，共占用 7000-7006 七个端口。
+
+### 🔄 一键更新 API 与 Web 前端
+
+适用于通过上述一键安装脚本部署的环境。以下命令会拉取最新的 `microi-api`、`microi-client-dev` 镜像，并只重新创建 `microi-install-api`、`microi-install-client` 两个容器：
+
+```bash
+APP_DIR=/microi/compose/microi-install-app;if [ -d /www/dk_project/dk_compose/microi-install-app ];then APP_DIR=/www/dk_project/dk_compose/microi-install-app;fi;docker pull registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest && docker pull registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest && cd "$APP_DIR" && docker compose up -d --force-recreate --no-deps microi-install-api microi-install-client
+```
+
+> 命令同时兼容默认编排目录和宝塔面板编排目录。更新过程不会删除数据库或数据卷，但 API、Web 前端容器重新创建时会有短暂中断。
 
 ### 🗑️ 删除所有已安装容器/编排
 
@@ -1031,7 +1046,7 @@ services:
 
 | 端口 | 说明 |
 | :--: | ---- |
-| 1011 (9001) | MinIO 后台管理面板，安装后需添加 `public`（权限设为 public）和 `private` 两个 Bucket |
+| 1011 (9001) | MinIO 后台管理面板，安装后需添加公有桶 `mci-public`（权限设为 public）和私有桶 `mci-private` |
 | 1010 (9000) | Endpoint 端口，用于 SaaS 引擎配置 EndPoint，如 `192.168.31.199:1010` |
 
 ::: danger MinIO 反向代理注意

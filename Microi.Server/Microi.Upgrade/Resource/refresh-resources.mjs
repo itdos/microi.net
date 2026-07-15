@@ -26,15 +26,23 @@ function validate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_003_003
+    if (versionNumber < 1_004_000
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
-      || !content.includes('OwnerUserId')) {
-      throw new Error(`${name} 低于 v1.3.3 或缺少旧库/在线应用归属兼容保护，拒绝降级本地基线`);
+      || !content.includes('OwnerUserId')
+      || !content.includes('MicroServiceMenusPreserved')
+      || !content.includes('sourceExpected')
+      || !content.includes('validationSourceExpected')
+      || !content.includes('stableMenuUrl')) {
+      throw new Error(`${name} 低于 v1.4.0 或缺少旧库/在线应用归属/原生菜单/源码校验回读保护，拒绝降级本地基线`);
     }
   }
-  if (name === 'ai-app-publish-store.js' && !content.includes('ai_app_publish_store')) {
-    throw new Error(`${name} 缺少 ai_app_publish_store`);
+  if (name === 'ai-app-publish-store.js'
+    && (!content.includes('ai_app_publish_store')
+      || !content.includes('Version: v1.1.5')
+      || !content.includes('IncludeSource: includeSource')
+      || !content.includes("action === 'PackageOnly'"))) {
+    throw new Error(`${name} 缺少 v1.1.5 自包含源码 PackageOnly 能力`);
   }
   if (name.endsWith('.json')) {
     const packageModel = JSON.parse(content);

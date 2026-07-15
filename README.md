@@ -238,6 +238,10 @@ Microi.net/
 | 🔗 CSDN 基于吾码的开源项目 | [https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html) |
 ---
 
+## 📚 更新日志
+
+> [https://microi.net/doc/about/update-log.html](https://microi.net/doc/about/update-log.html)
+
 ## 💬 加入交流群
 
 欢迎加入官方 QQ 交流群，与开发团队和社区成员实时交流，获取最新资讯、答疑解惑、共同成长：

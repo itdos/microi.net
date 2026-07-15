@@ -8,7 +8,7 @@ namespace Microi.net
     /// </summary>
     public class Upgrade14
     {
-        public static string Version = "6.2.5.0";
+        public static string Version = "6.3.6.0";
 
         public async Task<List<string>> Run(string osClient)
         {

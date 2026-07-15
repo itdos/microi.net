@@ -150,22 +150,35 @@ else
   exit 1
 fi
 
+# === 指定主租户 OsClient ===
+echo ''
+echo 'Microi：请指定主租户 OsClient（示例：microi、loctek）。'
+echo 'Microi：直接按 Enter 使用默认值 iTdos：'
+read -r os_client_input
+OS_CLIENT="${os_client_input:-iTdos}"
+
+if [[ ! "${OS_CLIENT}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$ ]]; then
+  echo 'Microi：错误：OsClient 只能包含字母、数字、下划线和短横线，长度为 1-50，且必须以字母或数字开头。'
+  exit 1
+fi
+echo "Microi：主租户 OsClient/ClientName 将设置为 ${OS_CLIENT} ✓"
+
 # === MySQL 版本选择 ===
 echo ''
 echo 'Microi：请选择要安装的 MySQL 版本。'
-echo 'Microi：输入 5.7 安装 MySQL 5.7，输入 8.0 安装 MySQL 8.0：'
+echo 'Microi：输入 5 安装 MySQL 5.7，输入 8 安装 MySQL 8.0：'
 read -r mysql_version_input
 
-if [ "${mysql_version_input}" == "5.7" ]; then
+if [ "${mysql_version_input}" == "5" ]; then
   MYSQL_VERSION="5.7"
   MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7"
   MYSQL_CONTAINER_NAME="microi-install-mysql57"
-elif [ "${mysql_version_input}" == "8.0" ]; then
+elif [ "${mysql_version_input}" == "8" ]; then
   MYSQL_VERSION="8.0"
   MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0"
   MYSQL_CONTAINER_NAME="microi-install-mysql80"
 else
-  echo 'Microi：错误：无效的 MySQL 版本，请输入 5.7 或 8.0，脚本退出。'
+  echo 'Microi：错误：无效的 MySQL 版本，请输入 5 或 8，脚本退出。'
   exit 1
 fi
 echo "Microi：将安装 MySQL ${MYSQL_VERSION} ✓"
@@ -1204,6 +1217,15 @@ else
   exit 1
 fi
 
+echo "Microi：更新 SaaS 主租户为 ${OS_CLIENT}..."
+OS_CLIENT_SQL="UPDATE sys_osclients SET OsClient='${OS_CLIENT}', ClientName='${OS_CLIENT}' WHERE IFNULL(IsDeleted, 0) = 0;"
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${OS_CLIENT_SQL}"; then
+  echo 'Microi：SaaS 主租户 OsClient、ClientName 更新完成 ✓'
+else
+  echo 'Microi：错误：SaaS 主租户配置更新失败。'
+  exit 1
+fi
+
 # 清理临时文件
 rm -f "${SQL_ZIP_FILE}"
 rm -rf "${SQL_TMP_DIR}"
@@ -1396,6 +1418,95 @@ echo "Microi：MinIO 编排文件已生成 ✓"
 
 compose_up "${MINIO_DIR}"
 
+echo 'Microi：等待 MinIO API 就绪...'
+MINIO_READY=false
+for _minio_wait in $(seq 1 60); do
+  if curl -fsS --connect-timeout 2 "http://${LAN_IP}:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
+    MINIO_READY=true
+    break
+  fi
+  sleep 2
+done
+if [ "${MINIO_READY}" != "true" ]; then
+  echo 'Microi：错误：MinIO 在 120 秒内未就绪，请检查容器日志。'
+  docker logs microi-install-minio 2>&1 | tail -50 || true
+  exit 1
+fi
+echo 'Microi：MinIO API 已就绪 ✓'
+
+# 使用官方 mc 客户端初始化桶；配置放在临时目录，避免污染安装用户的 ~/.mc。
+case "$(uname -m)" in
+  x86_64|amd64) MINIO_MC_ARCH="amd64" ;;
+  aarch64|arm64) MINIO_MC_ARCH="arm64" ;;
+  ppc64le) MINIO_MC_ARCH="ppc64le" ;;
+  *)
+    echo "Microi：错误：当前 CPU 架构 $(uname -m) 暂不支持自动下载 MinIO mc 客户端。"
+    exit 1
+    ;;
+esac
+MINIO_MC_BIN="/tmp/microi-minio-mc"
+MINIO_MC_CONFIG_DIR="/tmp/microi-minio-mc-config"
+rm -f "${MINIO_MC_BIN}"
+rm -rf "${MINIO_MC_CONFIG_DIR}"
+mkdir -p "${MINIO_MC_CONFIG_DIR}"
+echo 'Microi：下载 MinIO 官方 mc 客户端并初始化存储桶...'
+if ! curl -fSL -o "${MINIO_MC_BIN}" "https://dl.min.io/client/mc/release/linux-${MINIO_MC_ARCH}/mc"; then
+  echo 'Microi：错误：MinIO mc 客户端下载失败。'
+  exit 1
+fi
+chmod +x "${MINIO_MC_BIN}"
+
+MINIO_MC_ALIAS="microi-local"
+MINIO_PRIVATE_BUCKET="mci-private"
+MINIO_PUBLIC_BUCKET="mci-public"
+if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" alias set "${MINIO_MC_ALIAS}" "http://${LAN_IP}:${MINIO_PORT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
+  echo 'Microi：错误：MinIO mc 无法连接已安装的 MinIO 服务。'
+  exit 1
+fi
+if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
+  echo "Microi：错误：MinIO 私有桶 ${MINIO_PRIVATE_BUCKET} 创建失败。"
+  exit 1
+fi
+if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
+  echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 创建失败。"
+  exit 1
+fi
+if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" anonymous set download "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
+  echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 的 public 下载权限设置失败。"
+  exit 1
+fi
+"${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
+rm -f "${MINIO_MC_BIN}"
+rm -rf "${MINIO_MC_CONFIG_DIR}"
+echo "Microi：MinIO 桶已初始化：${MINIO_PRIVATE_BUCKET}（私有）、${MINIO_PUBLIC_BUCKET}（public）✓"
+
+if [ "${install_type}" == "g" ]; then
+  MINIO_NETWORK_IS_INTERNET=1
+else
+  MINIO_NETWORK_IS_INTERNET=0
+fi
+MINIO_INTERNAL_ENDPOINT="${LAN_IP}:${MINIO_PORT}"
+MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
+MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='', NetworkIsInternet=${MINIO_NETWORK_IS_INTERNET} WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
+echo 'Microi：写入 SaaS 引擎 MinIO 配置...'
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${MINIO_CONFIG_SQL}"; then
+  echo 'Microi：SaaS 引擎 MinIO 配置更新完成 ✓'
+else
+  echo 'Microi：错误：SaaS 引擎 MinIO 配置更新失败。'
+  exit 1
+fi
+
+SYS_CONFIG_API_BASE="http://${ACCESS_IP}:${API_PORT}"
+SYS_CONFIG_FILE_SERVER="http://${ACCESS_IP}:${MINIO_PORT}/${MINIO_PUBLIC_BUCKET}"
+SYS_CONFIG_SQL="UPDATE sys_config SET ApiBase='${SYS_CONFIG_API_BASE}', FileServer='${SYS_CONFIG_FILE_SERVER}' WHERE IFNULL(IsDeleted, 0) = 0;"
+echo 'Microi：写入系统设置 API 与文件服务地址...'
+if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${SYS_CONFIG_SQL}"; then
+  echo "Microi：系统设置更新完成：ApiBase=${SYS_CONFIG_API_BASE}, FileServer=${SYS_CONFIG_FILE_SERVER} ✓"
+else
+  echo 'Microi：错误：系统设置 ApiBase、FileServer 更新失败。'
+  exit 1
+fi
+
 echo ''
 echo '[步骤9/11] MinIO 部署完成 ✓'
 
@@ -1548,7 +1659,7 @@ ${COMPOSE_SERVICE_NETWORK}
     ports:
       - "${API_PORT}:80"
     environment:
-      - OsClient=iTdos
+      - OsClient=${OS_CLIENT}
       - OsClientType=Product
       - OsClientNetwork=Internal
       - OsClientDbConn=${OS_CLIENT_DB_CONN}
@@ -1575,7 +1686,7 @@ ${COMPOSE_SERVICE_NETWORK}
     ports:
       - "${VUE_PORT}:80"
     environment:
-      - OsClient=iTdos
+      - OsClient=${OS_CLIENT}
       - ApiBase=http://${ACCESS_IP}:${API_PORT}
     volumes:
       - /etc/localtime:/etc/localtime
@@ -1625,6 +1736,8 @@ ${COMPOSE_SERVICE_NETWORK}
     privileged: true
     tty: true
     stdin_open: true
+    environment:
+      - DOCKER_API_VERSION=1.40
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: microi-install-api microi-install-client
@@ -1658,7 +1771,8 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '访问地址：'
 echo '------------------------------------------------------------------'
-echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}    账号: admin  密码: demo123456"
+echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}/?OsClient=${OS_CLIENT}    账号: admin  密码: demo123456"
+echo "主租户:        OsClient=${OS_CLIENT}, ClientName=${OS_CLIENT}"
 echo ''
 echo '------------------------------------------------------------------'
 echo "端口分配（从 ${PORT_BASE} 开始顺序分配）："
@@ -1693,6 +1807,7 @@ echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-mongodb/"
 echo ""
 echo "MinIO:       容器 microi-install-minio,      API端口 ${MINIO_PORT},  控制台端口 ${MINIO_CONSOLE_PORT}"
 echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_KEY}"
+echo "             私有桶: ${MINIO_PRIVATE_BUCKET}, 公有桶: ${MINIO_PUBLIC_BUCKET}（public 下载）"
 echo "             数据目录: ${MINIO_DATA_DIR}"
 echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-minio/"
 echo ""
