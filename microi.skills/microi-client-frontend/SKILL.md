@@ -364,11 +364,17 @@ VS Code 插件创建前端微服务时，目录名必须以用户输入的微服
 
 创建前端微服务不能只落本地目录。插件必须在 `.microi-micro-app.json` 写入 `osClient/apiBaseUrl/appKey/name` 后立刻刷新左侧树，让目录立即可见，然后再执行远端草稿注册与 `npm install`；远端需注册一条未发布占位记录，并用 `IsEnable=0` 表示尚未推送编译产物。如果目录已存在但远端记录缺失，再次创建同名微服务时必须补注册。左侧树显示微服务项目时，必须优先读取 `.microi-micro-app.json` 的 `osClient/apiBaseUrl` 判断归属，不能再依赖 `{OsClient}` 或 `{OsClient}~` 目录前缀过滤，否则中文或自定义名称目录会被错误隐藏。
 
-`Microi-MicroApp` 必须与 `Microi-V8-Engine` 使用同一套服务器/租户隔离层级：`{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/{appKey}`。不同服务器或租户的相同 `appKey` 不能共用本地目录。插件要提供“拉取服务器前端微服务”，通过在线应用上下文读取 `mci_ai_app_file` 的私有 HDFS 源码；`sys_microiservice` 只有公有运行产物时必须明确提示“无私有源码”，不得生成伪源码。旧版平铺目录只兼容展示，不自动移动或删除。
+前端微服务源码必须直接并入 V8 租户目录：`Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`，不得再为新项目创建独立的 `Microi-MicroApp` 根目录。这样接口引擎、表单引擎、模块引擎、流程引擎和 AI 应用可以在同一租户 Git 仓库中统一管理。不同服务器或租户的相同 `appKey` 不能共用本地目录。插件要提供“拉取服务器前端微服务”，通过在线应用上下文读取 `mci_ai_app_file` 的私有 HDFS 源码；`sys_microiservice` 只有公有运行产物时必须明确提示“无私有源码”，不得生成伪源码。旧版 `Microi-MicroApp` 目录只兼容展示；迁移到 `AI应用` 必须先明确提示用户，不得静默移动、覆盖或删除。
+
+前端微服务拉取必须维护独立的源码同步基线（不得混入要上传的业务源码），用“上次同步基线 / 当前本地 / 当前私有 HDFS 源码”做三方比较。已有本地目录时必须先统计仅本地修改、仅远端修改和双方冲突，支持查看逐文件同步状态；只有用户明确选择强制拉取后，才可按远端源码覆盖同名文件并删除远端已不存在的受管源码文件。`node_modules`、构建目录、Git/IDE 配置和插件本地元数据不参与比较、覆盖或源码上传。
+
+微服务项目节点必须把“构建并推送”和“查看同步状态”都作为可见的行内操作。同步检测结果不得只放在一次性的顶部 QuickPick 中；一次检测后应保留在侧边“同步结果”树，按冲突、服务器较新、本地未推送分组，允许用户连续切换并打开多个文件差异而不重复扫描服务器。
 
 推送前端微服务时必须按 `sys_microiservice.MsKey` 定位唯一微服务。如果本地项目的 `appKey` 已被远端其它微服务占用，必须先修正本地 `appKey` 再新增/更新，不得直接覆盖。`sys_microiservice.BuildVersion` 和 `sys_microiservice_page.BuildVersion` 从 `v1.0.0` 开始递增，规则为 `v1.0.9 -> v1.1.0`、`v1.9.9 -> v2.0.0`、`v9.9.9 -> v10.0.0`；上传到分布式存储/CDN 的路径必须包含该版本号，禁止继续使用时间戳目录。
 
 VS Code 插件执行前端微服务构建前必须先安全清理当前项目自己的 `distDir`（默认 `dist`），并校验待删除目录位于微服务项目目录内；推送时只能收集本次干净构建产生的文件。禁止把旧 chunk、旧 hash 文件或历史构建残留写入 `AssetManifestJson` / `AssetsJson`，否则会造成数据库附件列表与当前 `index.html` 不一致。
+
+“构建并推送前端微服务”必须在本地构建通过后，先把完整受管源码同步到当前租户私有 HDFS（`mci_ai_app / mci_ai_app_file`），再发布公有 HDFS 编译产物并更新 `sys_microiservice / sys_microiservice_page`。源码同步失败必须终止发布并向用户报错，禁止吞掉异常后留下“新运行产物已发布但没有对应源码”的半完成状态。
 
 ### 表单下拉 Data 动态对象选项
 
