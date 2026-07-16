@@ -9,6 +9,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, shallowRef } from 'vue'
 import { useRoute } from 'vitepress'
+import { siteStyle } from '../site-style'
 
 const isHomePage = ref(false)
 const containerRef = ref(null)
@@ -21,7 +22,8 @@ const sceneCtx = shallowRef(null)
 const checkHomePage = () => {
   if (typeof window === 'undefined') return false
   const path = route.path || window.location.pathname
-  return path === '/' || path === '/index.html' || path === '/index'
+  const isHome = path === '/' || path === '/index.html' || path === '/index'
+  return isHome && siteStyle.value === 'classic'
 }
 
 // 检测移动端
@@ -522,7 +524,7 @@ function destroyScene() {
   sceneCtx.value = null
 }
 
-watch(() => route.path, () => {
+watch([() => route.path, siteStyle], () => {
   const isHome = checkHomePage()
   isHomePage.value = isHome
   if (isHome) {

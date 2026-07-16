@@ -18,6 +18,7 @@ export const shared = defineConfig({
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		["meta", { name: "keywords", content: "Microi吾码,低代码,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
+		["script", {}, "(()=>{try{const s=localStorage.getItem('mci-site-style');document.documentElement.setAttribute('data-mci-site-style',s==='classic'?'classic':'mainstream')}catch(e){document.documentElement.setAttribute('data-mci-site-style','mainstream')}})()"],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],

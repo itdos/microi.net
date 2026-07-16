@@ -13,6 +13,78 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
 1DsI9VJ7gTHGL3R7sQIDAQAB
 -----END PUBLIC KEY-----`;
+export class MicroiTransportError extends Error {
+    kind;
+    requestPath;
+    uncertainOutcome;
+    constructor(message, options) {
+        super(message, { cause: options.cause });
+        this.name = 'MicroiTransportError';
+        this.kind = options.kind;
+        this.requestPath = options.requestPath;
+        this.uncertainOutcome = options.uncertainOutcome;
+    }
+}
+const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_WRITE_REQUEST_TIMEOUT_MS = 60_000;
+const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
+const MENU_JSON_ARRAY_FIELDS = new Set([
+    'MoreBtns',
+    'FormBtns',
+    'BatchSelectMoreBtns',
+    'PageTabs',
+    'ExportMoreBtns',
+    'PageBtns',
+]);
+function resolveTimeoutMs(value, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 1_000)
+        return fallback;
+    return Math.min(10 * 60_000, Math.round(parsed));
+}
+function normalizeCodeForComparison(value) {
+    return String(value ?? '').replace(/\r\n/g, '\n').trim();
+}
+function stripMenuRuntimeFields(value) {
+    if (Array.isArray(value))
+        return value.map(stripMenuRuntimeFields);
+    if (!value || typeof value !== 'object')
+        return value;
+    const entries = Object.entries(value)
+        .filter(([key]) => !key.startsWith('_'))
+        .sort(([left], [right]) => left.localeCompare(right));
+    return Object.fromEntries(entries.map(([key, item]) => [key, stripMenuRuntimeFields(item)]));
+}
+function canonicalMenuJson(value) {
+    try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        return JSON.stringify(stripMenuRuntimeFields(parsed));
+    }
+    catch {
+        return undefined;
+    }
+}
+function modulePatchMatches(expected, actual) {
+    const ignoredFields = new Set(['OsClient', 'ModuleId', 'Id']);
+    const mismatches = [];
+    for (const [field, expectedValue] of Object.entries(expected)) {
+        if (ignoredFields.has(field) || expectedValue === undefined)
+            continue;
+        const actualValue = actual[field];
+        if (MENU_JSON_ARRAY_FIELDS.has(field)) {
+            const expectedJson = canonicalMenuJson(expectedValue);
+            const actualJson = canonicalMenuJson(actualValue);
+            if (!expectedJson || !actualJson || expectedJson !== actualJson) {
+                mismatches.push(field);
+            }
+            continue;
+        }
+        if (String(expectedValue ?? '') !== String(actualValue ?? '')) {
+            mismatches.push(field);
+        }
+    }
+    return { matched: mismatches.length === 0, mismatches };
+}
 /**
  * Microi 后端 HTTP 客户端
  * - RSA 加密登录（与 Microi 前端 JSEncrypt 兼容）
@@ -24,12 +96,16 @@ export class MicroiClient {
     refreshTimer;
     rsaPublicKey;
     did;
+    requestTimeoutMs;
+    writeRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     inflightRefresh;
     constructor(config) {
         this.config = config;
         this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
         this.did = process.env.MICROI_MCP_DID || `MCP:${os.hostname() || 'Unknown'}`;
+        this.requestTimeoutMs = resolveTimeoutMs(config.requestTimeoutMs ?? process.env.MICROI_MCP_HTTP_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS);
+        this.writeRequestTimeoutMs = resolveTimeoutMs(config.writeRequestTimeoutMs ?? process.env.MICROI_MCP_WRITE_TIMEOUT_MS, DEFAULT_WRITE_REQUEST_TIMEOUT_MS);
         // 如果直接传入 token，跳过登录流程
         if (config.token) {
             this.token = normalizeAuthorizationToken(config.token);
@@ -240,14 +316,14 @@ export class MicroiClient {
         return false;
     }
     /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
-    async post(reqPath, body) {
-        return this.requestJson('POST', reqPath, body, undefined, true);
+    async post(reqPath, body, options = {}) {
+        return this.requestJson('POST', reqPath, body, undefined, true, options);
     }
     /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
-    async get(reqPath, params) {
-        return this.requestJson('GET', reqPath, undefined, params, true);
+    async get(reqPath, params, options = {}) {
+        return this.requestJson('GET', reqPath, undefined, params, true, options);
     }
-    async requestJson(method, reqPath, body, params, allowRetryOnAuthFailure = true) {
+    async requestJson(method, reqPath, body, params, allowRetryOnAuthFailure = true, options = {}) {
         let url = `${this.config.apiBaseUrl}${reqPath}`;
         if (method === 'GET' && params) {
             const qs = new URLSearchParams(params).toString();
@@ -259,21 +335,44 @@ export class MicroiClient {
             headers.OsClient = this.config.osClient;
         if (method === 'POST')
             headers['Content-Type'] = 'application/json';
-        const res = await fetch(url, {
-            method,
-            headers,
-            ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
-        });
+        const timeoutMs = resolveTimeoutMs(options.timeoutMs, this.requestTimeoutMs);
+        const operationName = options.operationName || `${method} ${reqPath}`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let res;
+        let text;
+        try {
+            res = await fetch(url, {
+                method,
+                headers,
+                signal: controller.signal,
+                ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
+            });
+            text = await res.text();
+        }
+        catch (error) {
+            const isTimeout = controller.signal.aborted;
+            throw new MicroiTransportError(isTimeout
+                ? `${operationName} 请求超时（${timeoutMs}ms）`
+                : `${operationName} 网络请求失败：${error instanceof Error ? error.message : String(error)}`, {
+                kind: isTimeout ? 'timeout' : 'network',
+                requestPath: reqPath,
+                uncertainOutcome: method === 'POST',
+                cause: error,
+            });
+        }
+        finally {
+            clearTimeout(timer);
+        }
         const newToken = res.headers.get('authorization');
         if (newToken) {
             this.token = normalizeAuthorizationToken(newToken);
             this.writeTokenToFile();
         }
-        const text = await res.text();
         // HTTP 401 → 刷新后重试一次
         if (res.status === 401 && allowRetryOnAuthFailure) {
             if (await this.tryRecoverFromAuthFailure()) {
-                return this.requestJson(method, reqPath, body, params, false);
+                return this.requestJson(method, reqPath, body, params, false, options);
             }
             throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
         }
@@ -294,10 +393,52 @@ export class MicroiClient {
         if (parsed?.Code === NO_LOGIN_CODE && allowRetryOnAuthFailure) {
             console.error(`[microi-mcp] Auth expired (Code=${NO_LOGIN_CODE}: ${parsed.Msg || ''}), attempting recovery...`);
             if (await this.tryRecoverFromAuthFailure()) {
-                return this.requestJson(method, reqPath, body, params, false);
+                return this.requestJson(method, reqPath, body, params, false, options);
             }
         }
         return parsed;
+    }
+    isUncertainWriteError(error) {
+        return error instanceof MicroiTransportError && error.uncertainOutcome;
+    }
+    async pollReadback(readback, matches) {
+        let lastResponse;
+        let lastError = '';
+        for (const delayMs of WRITE_READBACK_DELAYS_MS) {
+            if (delayMs > 0) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+            try {
+                const response = await readback();
+                lastResponse = response;
+                if (response.Code === 1 && matches(response.Data)) {
+                    return { matched: true, response };
+                }
+                lastError = response.Msg || `回读 Code=${response.Code}`;
+            }
+            catch (error) {
+                lastError = error instanceof Error ? error.message : String(error);
+            }
+        }
+        return { matched: false, response: lastResponse, lastError };
+    }
+    recoveredWriteResult(operation, error, data = {}) {
+        return {
+            Code: 1,
+            Data: {
+                ...data,
+                RecoveredAfterTransportError: true,
+                Verification: 'readback',
+                TransportError: error.message,
+            },
+            Msg: `${operation} 的客户端响应异常，但已通过远端回读确认写入成功。`,
+        };
+    }
+    uncertainWriteFailure(operation, error, lastError) {
+        return new Error(`${operation} 的客户端响应异常，且回读未能确认写入结果。`
+            + `原始错误：${error.message}`
+            + `${lastError ? `；回读结果：${lastError}` : ''}。`
+            + '请继续使用对应的标准 MCP 获取工具回读后再决定是否重试；不要改走原生 FormEngine、直接 SQL 或临时维护接口引擎。', { cause: error });
     }
     // ---------- API 方法 ----------
     async getStatus() {
@@ -352,13 +493,32 @@ export class MicroiClient {
             functionDescription: options?.functionDescription,
             changeSummary: options?.changeSummary || `保存接口引擎 ${apiEngineKey}`,
         });
-        return this.post(API.UPDATE_ENGINE_CODE, {
+        const payload = {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
             ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
             Version: prepared.version,
             ChangeHistory: prepared.changeHistory,
-        });
+        };
+        try {
+            return await this.post(API.UPDATE_ENGINE_CODE, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: `保存接口引擎 ${apiEngineKey}`,
+            });
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey), (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
+                === normalizeCodeForComparison(prepared.code));
+            if (verification.matched) {
+                return this.recoveredWriteResult(`保存接口引擎 ${apiEngineKey}`, error, {
+                    ApiEngineKey: apiEngineKey,
+                    Version: prepared.version,
+                });
+            }
+            throw this.uncertainWriteFailure(`保存接口引擎 ${apiEngineKey}`, error, verification.lastError);
+        }
     }
     async createEngine(data) {
         // 默认 ApiAddress 为 /apiengine/{key}，否则平台路由匹配会 404
@@ -485,14 +645,34 @@ export class MicroiClient {
             functionDescription: options?.functionDescription,
             changeSummary: options?.changeSummary || `保存 V8 事件 ${formEngineKey}/${eventType}`,
         });
-        return this.post(API.UPDATE_EVENT_CODE, {
+        const payload = {
             OsClient: this.config.osClient,
             FormEngineKey: formEngineKey,
             EventType: eventType,
             V8Code: prepared.code,
             Version: prepared.version,
             ChangeHistory: prepared.changeHistory,
-        });
+        };
+        try {
+            return await this.post(API.UPDATE_EVENT_CODE, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: `保存 V8 事件 ${formEngineKey}/${eventType}`,
+            });
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const verification = await this.pollReadback(() => this.getEventCode(formEngineKey, eventType), (data) => normalizeCodeForComparison(data?.V8Code || data?.Code)
+                === normalizeCodeForComparison(prepared.code));
+            if (verification.matched) {
+                return this.recoveredWriteResult(`保存 V8 事件 ${formEngineKey}/${eventType}`, error, {
+                    FormEngineKey: formEngineKey,
+                    EventType: eventType,
+                    Version: prepared.version,
+                });
+            }
+            throw this.uncertainWriteFailure(`保存 V8 事件 ${formEngineKey}/${eventType}`, error, verification.lastError);
+        }
     }
     async getEventList(keyword) {
         return this.post(API.GET_EVENT_LIST, {
@@ -646,10 +826,76 @@ export class MicroiClient {
         });
     }
     async updateModule(data) {
-        return this.post(API.UPDATE_MODULE, {
+        const payload = {
             OsClient: this.config.osClient,
             ...data,
-        });
+        };
+        const moduleId = String(payload.ModuleId || payload.Id || '');
+        const operation = `更新菜单模块 ${moduleId || payload.Name || ''}`.trim();
+        const verify = async () => {
+            if (!moduleId)
+                return { matched: false, mismatches: ['ModuleId'] };
+            try {
+                const response = await this.getModule(moduleId);
+                if (response.Code !== 1 || !response.Data || typeof response.Data !== 'object') {
+                    return { matched: false, mismatches: ['回读失败'], response };
+                }
+                const comparison = modulePatchMatches(payload, response.Data);
+                return { ...comparison, response };
+            }
+            catch {
+                return { matched: false, mismatches: ['回读请求异常'] };
+            }
+        };
+        try {
+            const result = await this.post(API.UPDATE_MODULE, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: operation,
+            });
+            if (result.Code !== 1)
+                return result;
+            const verification = await verify();
+            if (!verification.matched) {
+                return {
+                    Code: 0,
+                    Data: {
+                        ModuleId: moduleId,
+                        Mismatches: verification.mismatches,
+                        UpdateResponse: result.Data,
+                    },
+                    Msg: `${operation} 接口返回成功，但远端回读不一致：${verification.mismatches.join(', ')}`,
+                };
+            }
+            return {
+                ...result,
+                Data: {
+                    ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
+                    Verified: true,
+                    Verification: 'readback',
+                },
+            };
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            let lastMismatches = [];
+            const verification = await this.pollReadback(async () => {
+                const readback = await verify();
+                lastMismatches = readback.mismatches;
+                return {
+                    Code: readback.response?.Code ?? (readback.matched ? 1 : 0),
+                    Data: readback,
+                    Msg: readback.response?.Msg || '',
+                };
+            }, (readback) => readback.matched);
+            if (verification.matched) {
+                return this.recoveredWriteResult(operation, error, {
+                    ModuleId: moduleId,
+                    Verified: true,
+                });
+            }
+            throw this.uncertainWriteFailure(operation, error, lastMismatches.length ? `字段不一致：${lastMismatches.join(', ')}` : verification.lastError);
+        }
     }
     async listDataSources(keyword) {
         return this.post(API.LIST_DATA_SOURCES, {

@@ -134,6 +134,17 @@ app.config.performance = import.meta.env.DEV;
 app.config.warnHandler = import.meta.env.DEV ? undefined : () => {};
 // 挂载应用
 app.mount("#app_microi");
+// 通知独立 Loading 脚本：Vue 入口已被浏览器执行并成功挂载。
+// legacy 构建和现代构建共用该信号，避免脚本未启动时 Loading 到 100% 后静默白屏。
+window.__MICROI_APP_MOUNTED__ = true;
+window.__MICROI_APP_BUILD_TARGET__ = import.meta.env.LEGACY ? "legacy" : "modern";
+try {
+    window.dispatchEvent(new Event("microi:app-mounted"));
+} catch (error) {
+    var mountedEvent = document.createEvent("Event");
+    mountedEvent.initEvent("microi:app-mounted", false, false);
+    window.dispatchEvent(mountedEvent);
+}
 // 将一些方法和属性暴露到全局（用于兼容旧代码）
 window.__VUE_APP__ = app;
 // ============= 应用生命周期逻辑 =============

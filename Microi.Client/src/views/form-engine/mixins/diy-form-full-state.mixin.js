@@ -1,4 +1,29 @@
 export default {
+    methods: {
+        ParseRouteDefaultValues(route) {
+            var query = route && route.query ? route.query : {};
+            var rawValue = query.DefaultValues;
+            if (Array.isArray(rawValue)) {
+                rawValue = rawValue[0];
+            }
+            if (!rawValue) return {};
+            if (typeof rawValue === "object") return { ...rawValue };
+
+            try {
+                var parsed = JSON.parse(rawValue);
+                return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+            } catch (error) {
+                try {
+                    var decoded = decodeURIComponent(rawValue);
+                    var decodedParsed = JSON.parse(decoded);
+                    return decodedParsed && typeof decodedParsed === "object" && !Array.isArray(decodedParsed) ? decodedParsed : {};
+                } catch (decodeError) {
+                    console.warn("[diy-form-full] DefaultValues route parameter is invalid JSON");
+                    return {};
+                }
+            }
+        }
+    },
     watch: {
         // 监听路由变化，在页面模式下重新初始化表单
         $route: {
@@ -246,6 +271,7 @@ export default {
             }
             self.FormMode = self.$route.query.FormMode;
             self.SysMenuId = self.$route.query.SysMenuId || self.$route.query.Id || (self.$route.meta ? (self.$route.meta.Id || self.$route.meta.SysMenuId) : "");
+            self.FieldFormDefaultValues = self.ParseRouteDefaultValues(self.$route);
             if (!self.TableId || !self.FormMode) {
                 self.DiyCommon.Tips("缺少参数！格式：/FormMode/TableId/TableRowId", false);
                 return;

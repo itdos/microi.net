@@ -1,0 +1,1415 @@
+/**
+ * Microi吾码官网“主流”主题。
+ * 旧主题保留为 classic；本文件只在 data-mci-site-style="mainstream" 时覆盖。
+ */
+
+.site-style-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  margin-left: 10px;
+  padding: 3px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
+}
+
+.site-style-switch__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .18s ease, background-color .18s ease, transform .18s ease;
+}
+
+.site-style-switch__option:hover {
+  color: #0f172a;
+  background: rgba(226, 232, 240, .72);
+}
+
+.site-style-switch__option:active {
+  transform: scale(.96);
+}
+
+.site-style-switch__option:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.site-style-switch__option.active {
+  background: #fff;
+  color: #1557d8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .10);
+}
+
+.site-style-switch--floating {
+  display: none;
+}
+
+html[data-mci-site-style="classic"] .site-style-switch {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(15, 23, 42, .62);
+}
+
+html[data-mci-site-style="classic"] .site-style-switch__option {
+  color: rgba(226, 232, 240, .72);
+}
+
+html[data-mci-site-style="classic"] .site-style-switch__option.active {
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  box-shadow: none;
+}
+
+body:has(.ai-login-page) .site-style-switch--floating {
+  position: fixed;
+  top: 20px;
+  right: 22px;
+  z-index: 1200;
+  display: inline-flex;
+  margin: 0;
+}
+
+html[data-mci-site-style="mainstream"] {
+  color-scheme: light;
+  --mci-main-primary: #246bfd;
+  --mci-main-primary-strong: #1557d8;
+  --mci-main-primary-soft: #eaf1ff;
+  --mci-main-cyan: #0ea5c6;
+  --mci-main-ink: #0f172a;
+  --mci-main-text: #334155;
+  --mci-main-muted: #64748b;
+  --mci-main-page: #f7f9fc;
+  --mci-main-surface: #fff;
+  --mci-main-soft: #f1f5f9;
+  --mci-main-border: #e2e8f0;
+  --mci-main-border-strong: #cbd5e1;
+  --mci-main-shadow: 0 10px 30px rgba(15, 23, 42, .07);
+  --mci-main-shadow-hover: 0 18px 44px rgba(15, 23, 42, .11);
+  --mci-main-radius: 14px;
+  --mci-main-radius-lg: 18px;
+  --mci-main-glass: rgba(255, 255, 255, .94);
+  --mci-main-inline-code-bg: #eff5ff;
+  --mci-main-inline-code-border: #d6e2f7;
+  --mci-main-inline-code-text: #174ea6;
+  --mci-main-placeholder: #94a3b8;
+  --mci-main-hover-border: #b9ccf8;
+
+  --vp-layout-max-width: 1440px;
+  --vp-c-bg: #fff;
+  --vp-c-bg-alt: #f7f9fc;
+  --vp-c-bg-elv: #fff;
+  --vp-c-bg-soft: #f1f5f9;
+  --vp-c-text-1: #0f172a;
+  --vp-c-text-2: #475569;
+  --vp-c-text-3: #64748b;
+  --vp-c-divider: #e2e8f0;
+  --vp-c-gutter: #eef2f7;
+  --vp-c-brand: #246bfd;
+  --vp-c-brand-1: #246bfd;
+  --vp-c-brand-2: #1557d8;
+  --vp-c-brand-3: #0f4cbf;
+  --vp-c-brand-light: #4b83ff;
+  --vp-c-brand-lighter: #8eb0ff;
+  --vp-c-brand-lightest: #dbe7ff;
+  --vp-c-brand-dark: #1557d8;
+  --vp-c-brand-darker: #0f4cbf;
+  --vp-button-brand-bg: #246bfd;
+  --vp-button-brand-hover-bg: #1557d8;
+  --vp-button-brand-active-bg: #0f4cbf;
+}
+
+html.dark[data-mci-site-style="mainstream"] {
+  color-scheme: dark;
+  --mci-main-primary: #5b8cff;
+  --mci-main-primary-strong: #82a8ff;
+  --mci-main-primary-soft: #172b52;
+  --mci-main-cyan: #39b9d8;
+  --mci-main-ink: #f8fafc;
+  --mci-main-text: #cbd5e1;
+  --mci-main-muted: #94a3b8;
+  --mci-main-page: #0b1120;
+  --mci-main-surface: #111827;
+  --mci-main-soft: #172033;
+  --mci-main-border: #273449;
+  --mci-main-border-strong: #3b4a63;
+  --mci-main-shadow: 0 12px 34px rgba(0, 0, 0, .28);
+  --mci-main-shadow-hover: 0 20px 48px rgba(0, 0, 0, .38);
+  --mci-main-glass: rgba(17, 24, 39, .94);
+  --mci-main-inline-code-bg: #172b52;
+  --mci-main-inline-code-border: #294a82;
+  --mci-main-inline-code-text: #b7ceff;
+  --mci-main-placeholder: #718096;
+  --mci-main-hover-border: #46659b;
+
+  --vp-c-bg: #0b1120;
+  --vp-c-bg-alt: #0f172a;
+  --vp-c-bg-elv: #111827;
+  --vp-c-bg-soft: #172033;
+  --vp-c-text-1: #f8fafc;
+  --vp-c-text-2: #cbd5e1;
+  --vp-c-text-3: #94a3b8;
+  --vp-c-divider: #273449;
+  --vp-c-gutter: #172033;
+  --vp-c-brand: #82a8ff;
+  --vp-c-brand-1: #82a8ff;
+  --vp-c-brand-2: #a4beff;
+  --vp-c-brand-3: #c2d2ff;
+  --vp-button-brand-bg: #356fe6;
+  --vp-button-brand-hover-bg: #477ff0;
+  --vp-button-brand-active-bg: #2e61cc;
+}
+
+html[data-mci-site-style="mainstream"] body {
+  background: var(--mci-main-page) !important;
+  color: var(--mci-main-text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .Layout {
+  isolation: isolate;
+  background: var(--mci-main-page) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .Layout::before {
+  inset: 0 0 auto;
+  height: 520px;
+  background:
+    linear-gradient(rgba(36, 107, 253, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 107, 253, .035) 1px, transparent 1px),
+    linear-gradient(180deg, #f4f8ff 0%, rgba(247, 249, 252, 0) 100%) !important;
+  background-size: 56px 56px, 56px 56px, 100% 100% !important;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.75), transparent 96%);
+}
+
+html[data-mci-site-style="mainstream"] .glow-background-wrapper,
+html[data-mci-site-style="mainstream"] .hero-3d-background,
+html[data-mci-site-style="mainstream"] .hero-title-3d-anchor {
+  display: none !important;
+}
+
+/* 顶部导航：使用实色白底，避免半透明层叠在首页渐变上产生灰带。 */
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNav,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .container,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .title {
+  background-color: var(--mci-main-surface) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar {
+  min-height: 64px;
+  border-bottom: 1px solid rgba(226, 232, 240, .9) !important;
+  background: var(--mci-main-surface) !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar::after {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .container {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarTitle .title,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarMenuLink,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarMenuGroup .button,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarTitle .title,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuLink,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBarMenuGroup .button,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar .VPNavBarMenu a {
+  color: var(--mci-main-ink) !important;
+  font-weight: 650;
+  text-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarMenuLink:hover,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarMenuGroup .button:hover {
+  color: var(--mci-main-primary) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .DocSearch-Button,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .DocSearch-Button {
+  min-height: 38px;
+  border: 1px solid var(--mci-main-border) !important;
+  border-radius: 10px !important;
+  background: var(--mci-main-soft) !important;
+  color: var(--mci-main-muted) !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .DocSearch-Button * {
+  color: inherit !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .divider,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar .divider {
+  background-color: var(--mci-main-border) !important;
+}
+
+/* 首页 Hero */
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)),
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .Layout,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPContent,
+html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPHome,
+html[data-mci-site-style="mainstream"] .Layout.VPHomeLayout,
+html[data-mci-site-style="mainstream"] .VPHome,
+html[data-mci-site-style="mainstream"] div[class*="VPHome"] {
+  background: transparent !important;
+  color: var(--mci-main-text) !important;
+}
+
+html[data-mci-site-style="mainstream"] .Layout.VPHomeLayout::before,
+html[data-mci-site-style="mainstream"] .VPHome::before,
+html[data-mci-site-style="mainstream"] div[class*="VPHome"]::before {
+  background:
+    radial-gradient(circle at 82% 14%, rgba(14, 165, 198, .12), transparent 30rem),
+    radial-gradient(circle at 18% 10%, rgba(36, 107, 253, .12), transparent 26rem),
+    linear-gradient(180deg, #f4f8ff 0%, #fff 76%, #f7f9fc 100%) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero {
+  padding: 112px 32px 84px !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .container {
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: clamp(36px, 5vw, 72px);
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .main {
+  max-width: 700px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .name,
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .name * {
+  height: auto !important;
+  margin: 0 !important;
+  color: var(--mci-main-primary) !important;
+  -webkit-text-fill-color: var(--mci-main-primary) !important;
+  font-size: clamp(22px, 2.2vw, 30px) !important;
+  font-weight: 780 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -.02em !important;
+  background: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .name::before {
+  content: "OPEN SOURCE  ·  AI NATIVE";
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-right: 12px;
+  padding: 0 10px;
+  border: 1px solid var(--mci-main-border-strong);
+  border-radius: 8px;
+  background: var(--mci-main-glass);
+  color: var(--mci-main-primary-strong);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .08em;
+  vertical-align: 4px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .text,
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .text * {
+  max-width: 680px;
+  margin-top: 22px;
+  color: var(--mci-main-ink) !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+  font-size: clamp(42px, 5.1vw, 66px) !important;
+  font-weight: 760 !important;
+  line-height: 1.12 !important;
+  letter-spacing: -.04em !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline,
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline * {
+  max-width: 660px;
+  margin-top: 26px;
+  color: var(--mci-main-muted) !important;
+  -webkit-text-fill-color: var(--mci-main-muted) !important;
+  font-size: 17px !important;
+  font-weight: 450 !important;
+  line-height: 1.85 !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions {
+  gap: 12px;
+  padding-top: 30px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action .VPButton {
+  min-width: 118px;
+  min-height: 48px;
+  padding: 0 22px !important;
+  border-radius: 10px !important;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transition: transform .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action .VPButton::after {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action:nth-child(1) .VPButton {
+  border: 1px solid var(--mci-main-primary) !important;
+  background: var(--mci-main-primary) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  box-shadow: 0 10px 22px rgba(36, 107, 253, .20) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action:nth-child(2) .VPButton {
+  border: 1px solid var(--mci-main-border-strong) !important;
+  background: var(--mci-main-surface) !important;
+  color: var(--mci-main-ink) !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action:nth-child(3) .VPButton {
+  border: 1px solid transparent !important;
+  background: var(--mci-main-primary-soft) !important;
+  color: var(--mci-main-primary-strong) !important;
+  -webkit-text-fill-color: var(--mci-main-primary-strong) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action .VPButton:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, .10) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .image-container {
+  transform: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .image-bg {
+  width: 430px;
+  height: 430px;
+  border-radius: 38% 62% 58% 42%;
+  background:
+    linear-gradient(135deg, rgba(36, 107, 253, .20), rgba(14, 165, 198, .14)) !important;
+  filter: blur(34px) !important;
+  opacity: .72;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
+  filter: drop-shadow(0 24px 36px rgba(30, 64, 175, .14));
+}
+
+/* 首屏可信度与能力标题 */
+.mainstream-home-band {
+  position: relative;
+  z-index: 3;
+  max-width: 1200px;
+  margin: -18px auto 0;
+  padding: 0 32px 34px;
+}
+
+.mainstream-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--mci-main-border);
+  border-radius: var(--mci-main-radius-lg);
+  background: var(--mci-main-glass);
+  box-shadow: var(--mci-main-shadow);
+}
+
+.mainstream-proof-item {
+  position: relative;
+  display: flex;
+  min-height: 98px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.mainstream-proof-item + .mainstream-proof-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 36px;
+  background: var(--mci-main-border);
+}
+
+.mainstream-proof-item strong {
+  color: var(--mci-main-ink) !important;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mainstream-proof-item span {
+  color: var(--mci-main-muted) !important;
+  font-size: 13px;
+}
+
+.mainstream-section-intro {
+  max-width: 760px;
+  margin: 100px auto 50px;
+  text-align: center;
+}
+
+.mainstream-section-kicker {
+  color: var(--mci-main-primary) !important;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+.mainstream-section-intro h2 {
+  margin: 14px 0 14px;
+  color: var(--mci-main-ink) !important;
+  font-size: clamp(30px, 3.2vw, 42px);
+  line-height: 1.22;
+  letter-spacing: -.03em;
+}
+
+.mainstream-section-intro p {
+  margin: 0;
+  color: var(--mci-main-muted) !important;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+/* 首页能力卡片 */
+html[data-mci-site-style="mainstream"] .VPHome .VPFeatures {
+  padding: 0 32px 96px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPFeatures .container {
+  max-width: 1200px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPFeatures .items {
+  gap: 16px 0;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature {
+  min-height: 100%;
+  border: 1px solid var(--mci-main-border) !important;
+  border-radius: var(--mci-main-radius) !important;
+  background: var(--mci-main-surface) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .05) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature::before,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature::after {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature:hover {
+  border-color: var(--mci-main-hover-border) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: var(--mci-main-shadow-hover) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .icon {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--mci-main-primary-soft);
+  filter: none !important;
+  font-size: 23px;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .title,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .title * {
+  background: none !important;
+  color: var(--mci-main-ink) !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .details,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .details * {
+  color: var(--mci-main-muted) !important;
+  -webkit-text-fill-color: var(--mci-main-muted) !important;
+  font-size: 14px;
+  line-height: 1.78;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFeature .link-text {
+  color: var(--mci-main-primary) !important;
+  -webkit-text-fill-color: var(--mci-main-primary) !important;
+}
+
+/* 产品矩阵 */
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase {
+  color: var(--mci-main-text) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase {
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  padding-top: 104px;
+  padding-bottom: 120px;
+  background: var(--mci-main-surface);
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-divider {
+  max-width: 1200px;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-divider .divider-line {
+  background: linear-gradient(90deg, transparent, var(--mci-main-border), transparent) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-divider .divider-icon {
+  border: 1px solid var(--mci-main-border);
+  background: var(--mci-main-surface) !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-title,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-title * {
+  background: none !important;
+  color: var(--mci-main-ink) !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+  font-size: clamp(28px, 3vw, 38px) !important;
+  letter-spacing: -.02em;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .section-subtitle,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .card-desc,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .price-label,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .card-pricing {
+  color: var(--mci-main-muted) !important;
+  -webkit-text-fill-color: var(--mci-main-muted) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .card-glow {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .try-btn {
+  border-radius: 10px !important;
+  background: var(--mci-main-primary) !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .try-btn,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .try-btn * {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-grid {
+  max-width: 1200px;
+  gap: 16px;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-card {
+  border: 1px solid var(--mci-main-border) !important;
+  border-radius: var(--mci-main-radius) !important;
+  background: var(--mci-main-surface) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, .05) !important;
+  transform: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-card::before {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-card:hover {
+  border-color: var(--mci-main-hover-border) !important;
+  box-shadow: var(--mci-main-shadow-hover) !important;
+  transform: translateY(-4px) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .card-icon {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--mci-main-primary-soft) !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .card-title,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .price-value {
+  color: var(--mci-main-ink) !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .tag,
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .price-item {
+  border-color: var(--mci-main-border) !important;
+  background: var(--mci-main-soft) !important;
+  color: var(--mci-main-primary-strong) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFooter {
+  border-top: 1px solid var(--mci-main-border) !important;
+  background: var(--mci-main-soft) !important;
+  color: var(--mci-main-muted) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .VPFooter * {
+  color: inherit !important;
+}
+
+/* 文档、案例和常规内容 */
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPSidebar {
+  border-right: 1px solid var(--mci-main-border) !important;
+  background: var(--mci-main-glass) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPSidebarItem .text,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPSidebarItem .link {
+  border-radius: 8px;
+  color: var(--mci-main-text);
+  font-weight: 520;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPSidebarItem.is-active > .item .link,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPSidebarItem .link:hover {
+  background: var(--mci-main-primary-soft) !important;
+  color: var(--mci-main-primary-strong) !important;
+  transform: none;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc {
+  padding-top: 34px;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc .container {
+  max-width: none !important;
+  margin: 0 !important;
+  justify-content: stretch !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc .content,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc.has-aside .content {
+  flex: 1 1 auto;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc .content-container,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc.has-aside .content-container {
+  overflow: visible;
+  width: 100%;
+  max-width: 100% !important;
+  padding: 38px 44px 56px !important;
+  border: 1px solid var(--mci-main-border) !important;
+  border-radius: var(--mci-main-radius) !important;
+  background: var(--mci-main-surface) !important;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, .045) !important;
+  animation: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc .content-container::before {
+  display: none;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc h1 {
+  margin-bottom: 30px;
+  color: var(--mci-main-ink);
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 760;
+  line-height: 1.18;
+  letter-spacing: -.03em;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc h1::after,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc h2::before {
+  display: none;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc h2 {
+  margin-top: 46px;
+  padding-top: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mci-main-border);
+  color: var(--mci-main-ink);
+  font-size: 25px;
+  letter-spacing: -.015em;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc h3 {
+  color: var(--mci-main-ink);
+  font-size: 19px;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc p,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc li {
+  color: var(--mci-main-text);
+  line-height: 1.82;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc a {
+  color: var(--mci-main-primary-strong);
+  font-weight: 650;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc :not(pre) > code {
+  border: 1px solid var(--mci-main-inline-code-border);
+  border-radius: 6px;
+  background: var(--mci-main-inline-code-bg);
+  color: var(--mci-main-inline-code-text);
+  font-weight: 650;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc blockquote,
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc .custom-block {
+  border: 1px solid var(--mci-main-border);
+  border-radius: 10px;
+  background: var(--mci-main-soft);
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc table {
+  border-radius: 10px;
+  background: var(--mci-main-surface);
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc thead th {
+  background: var(--mci-main-soft) !important;
+  color: var(--mci-main-ink);
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDocAsideOutline .outline-link.active {
+  color: var(--mci-main-primary);
+}
+
+/* 登录页 */
+html[data-mci-site-style="mainstream"] body:has(.ai-login-page) {
+  background: var(--mci-main-page) !important;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page {
+  padding: 34px;
+  background:
+    linear-gradient(rgba(36, 107, 253, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 107, 253, .035) 1px, transparent 1px),
+    radial-gradient(circle at 16% 14%, rgba(36, 107, 253, .12), transparent 30rem),
+    linear-gradient(135deg, #f3f7ff 0%, #f8fafc 52%, #eef8fb 100%) !important;
+  background-size: 54px 54px, 54px 54px, auto, auto !important;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .particle-bg,
+html[data-mci-site-style="mainstream"] .ai-login-page .neural-grid,
+html[data-mci-site-style="mainstream"] .ai-login-page .ai-orbs {
+  display: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-container {
+  width: 1020px;
+  max-width: 94vw;
+  min-height: 640px;
+  border: 1px solid var(--mci-main-border);
+  border-radius: 20px;
+  background: var(--mci-main-surface);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .11);
+  backdrop-filter: none;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .brand-section {
+  padding: 54px 50px;
+  border-right: 1px solid var(--mci-main-border);
+  background:
+    linear-gradient(145deg, rgba(36,107,253,.09), rgba(14,165,198,.04)),
+    #f8fbff;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .ai-brain-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 30px;
+  border-radius: 16px;
+  background: var(--mci-main-surface) url('/icon.png') center / 42px 42px no-repeat;
+  box-shadow: 0 10px 28px rgba(36, 107, 253, .14);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .brain-svg {
+  display: none;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .brand-title,
+html[data-mci-site-style="mainstream"] .ai-login-page .login-title {
+  color: var(--mci-main-ink);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .brand-title {
+  font-size: 36px;
+  letter-spacing: -.03em;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .brand-subtitle,
+html[data-mci-site-style="mainstream"] .ai-login-page .feature-text,
+html[data-mci-site-style="mainstream"] .ai-login-page .login-desc,
+html[data-mci-site-style="mainstream"] .ai-login-page .login-tip,
+html[data-mci-site-style="mainstream"] .ai-login-page .agreement,
+html[data-mci-site-style="mainstream"] .ai-login-page .link-btn {
+  color: var(--mci-main-muted);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .feature-dot {
+  background: var(--mci-main-primary);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .back-home-link,
+html[data-mci-site-style="mainstream"] .ai-login-page .agreement a,
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-url {
+  color: var(--mci-main-primary-strong);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-section {
+  width: 450px;
+  padding: 44px 42px;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-card {
+  padding: 30px 22px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .card-top-glow {
+  height: 3px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--mci-main-primary), var(--mci-main-cyan));
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .auth-tabs,
+html[data-mci-site-style="mainstream"] .ai-login-page .mode-switcher {
+  border: 1px solid var(--mci-main-border);
+  background: var(--mci-main-soft);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .auth-tab,
+html[data-mci-site-style="mainstream"] .ai-login-page .mode-btn {
+  color: var(--mci-main-muted);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .auth-tab.active,
+html[data-mci-site-style="mainstream"] .ai-login-page .mode-btn.active {
+  background: var(--mci-main-surface);
+  color: var(--mci-main-primary-strong);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, .08);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .input-group {
+  border: 1px solid var(--mci-main-border);
+  background: var(--mci-main-surface);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .input-group:focus-within {
+  border-color: #7ba3ff;
+  box-shadow: 0 0 0 3px rgba(36, 107, 253, .10);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .input-icon,
+html[data-mci-site-style="mainstream"] .ai-login-page .sms-btn {
+  color: var(--mci-main-primary);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-input {
+  color: var(--mci-main-ink);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-input::placeholder {
+  color: var(--mci-main-placeholder);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .captcha-img-wrapper,
+html[data-mci-site-style="mainstream"] .ai-login-page .sms-btn {
+  border: 1px solid var(--mci-main-border);
+  background: var(--mci-main-soft);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .login-btn {
+  border-radius: 10px;
+  background: var(--mci-main-primary);
+  box-shadow: 0 10px 22px rgba(36, 107, 253, .20);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .token-tip,
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-progress-panel,
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-admin-tip {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-primary-soft);
+  color: var(--mci-main-text);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-step {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-surface);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .step-content strong,
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-ready-panel,
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-step-summary {
+  color: var(--mci-main-text);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .step-content small {
+  color: var(--mci-main-muted);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-badge {
+  background: var(--mci-main-primary-soft);
+  color: var(--mci-main-primary-strong);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .tenant-action.secondary {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-surface);
+  color: var(--mci-main-primary-strong);
+}
+
+html[data-mci-site-style="mainstream"] .ai-login-page .toast-msg {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-surface);
+  color: var(--mci-main-ink);
+  box-shadow: var(--mci-main-shadow);
+}
+
+/* 个人中心 */
+html[data-mci-site-style="mainstream"] .profile-page {
+  background: var(--mci-main-page);
+  color: var(--mci-main-text);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-sidebar {
+  border-right: 1px solid var(--mci-main-border);
+  background: var(--mci-main-surface);
+  color: var(--mci-main-ink);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand,
+html[data-mci-site-style="mainstream"] .profile-page .side-menu-item {
+  color: var(--mci-main-text);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand small,
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-footer a {
+  color: var(--mci-main-muted);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand-mark {
+  background: var(--mci-main-primary);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand-avatar-img {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-soft);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .side-menu-item.active,
+html[data-mci-site-style="mainstream"] .profile-page .side-menu-item:hover {
+  background: var(--mci-main-primary-soft);
+  color: var(--mci-main-primary-strong);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .eyebrow,
+html[data-mci-site-style="mainstream"] .profile-page .link-action {
+  color: var(--mci-main-primary);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .primary-action {
+  border-radius: 9px;
+  background: var(--mci-main-primary);
+  box-shadow: 0 9px 20px rgba(36, 107, 253, .18);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .ghost-action {
+  border-color: var(--mci-main-border);
+  color: var(--mci-main-text);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .link-action {
+  background: var(--mci-main-primary-soft);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero > div,
+html[data-mci-site-style="mainstream"] .profile-page .license-card,
+html[data-mci-site-style="mainstream"] .profile-page .token-stat-card {
+  border-color: var(--mci-main-border);
+  background:
+    radial-gradient(circle at 86% 10%, rgba(36, 107, 253, .09), transparent 34%),
+    var(--mci-main-surface);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .stat-card,
+html[data-mci-site-style="mainstream"] .profile-page .content-panel,
+html[data-mci-site-style="mainstream"] .profile-page .state-panel {
+  border-color: var(--mci-main-border);
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, .04);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-card {
+  border-color: var(--mci-main-border);
+}
+
+/* 主流风格暗色模式：明暗只切换底色层，保留主流风格的结构与蓝色品牌识别。 */
+html.dark[data-mci-site-style="mainstream"] .site-style-switch {
+  border-color: var(--mci-main-border);
+  background: rgba(17, 24, 39, .92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+html.dark[data-mci-site-style="mainstream"] .site-style-switch__option {
+  color: var(--mci-main-muted);
+}
+
+html.dark[data-mci-site-style="mainstream"] .site-style-switch__option:hover {
+  color: var(--mci-main-ink);
+  background: var(--mci-main-soft);
+}
+
+html.dark[data-mci-site-style="mainstream"] .site-style-switch__option.active {
+  background: var(--mci-main-primary-soft);
+  color: var(--mci-main-primary-strong);
+  box-shadow: none;
+}
+
+html.dark[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .Layout::before {
+  background:
+    linear-gradient(rgba(91, 140, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 140, 255, .045) 1px, transparent 1px),
+    linear-gradient(180deg, #0e172b 0%, rgba(11, 17, 32, 0) 100%) !important;
+}
+
+html.dark[data-mci-site-style="mainstream"] .Layout.VPHomeLayout::before,
+html.dark[data-mci-site-style="mainstream"] .VPHome::before,
+html.dark[data-mci-site-style="mainstream"] div[class*="VPHome"]::before {
+  background:
+    radial-gradient(circle at 82% 14%, rgba(57, 185, 216, .12), transparent 30rem),
+    radial-gradient(circle at 18% 10%, rgba(91, 140, 255, .16), transparent 26rem),
+    linear-gradient(180deg, #0d1629 0%, #0b1120 76%, #0f172a 100%) !important;
+}
+
+html.dark[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
+  filter: drop-shadow(0 24px 40px rgba(0, 0, 0, .34));
+}
+
+html.dark[data-mci-site-style="mainstream"] .ai-login-page {
+  background:
+    linear-gradient(rgba(91, 140, 255, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 140, 255, .045) 1px, transparent 1px),
+    radial-gradient(circle at 16% 14%, rgba(91, 140, 255, .16), transparent 30rem),
+    linear-gradient(135deg, #0d1629 0%, #0b1120 52%, #0d1b25 100%) !important;
+}
+
+html.dark[data-mci-site-style="mainstream"] .ai-login-page .brand-section {
+  background:
+    linear-gradient(145deg, rgba(91, 140, 255, .10), rgba(57, 185, 216, .04)),
+    var(--mci-main-soft);
+}
+
+html.dark[data-mci-site-style="mainstream"] .profile-page .profile-hero > div,
+html.dark[data-mci-site-style="mainstream"] .profile-page .license-card,
+html.dark[data-mci-site-style="mainstream"] .profile-page .token-stat-card {
+  background:
+    radial-gradient(circle at 86% 10%, rgba(91, 140, 255, .12), transparent 34%),
+    var(--mci-main-surface);
+}
+
+/* 响应式 */
+@media (max-width: 1100px) {
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero {
+    padding-top: 92px !important;
+  }
+
+  html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .site-style-switch__option {
+    min-width: 34px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  /* 移动端导航空间有限：切换器移到右下角，避免挤压菜单按钮并保留随时切换能力。 */
+  body:not(:has(.ai-login-page)) .VPNavBar .site-style-switch {
+    display: none;
+  }
+
+  /* 语言仍可从 VitePress 移动菜单进入，顶部只保留搜索、账号与菜单入口。 */
+  body:not(:has(.ai-login-page)) .VPNavBar .profile-locale-switch {
+    display: none !important;
+  }
+
+  body:not(:has(.ai-login-page)) .site-style-switch--floating {
+    position: fixed;
+    right: 14px;
+    bottom: 16px;
+    z-index: 1200;
+    display: inline-flex;
+    margin: 0;
+    background: var(--mci-main-glass);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+  }
+
+  body:has(.ai-login-page) .site-style-switch--floating {
+    top: 12px;
+    right: 12px;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero {
+    padding: 78px 20px 60px !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .container {
+    gap: 38px;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .main {
+    order: 1;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .image {
+    order: 2;
+    width: calc(100% + 40px) !important;
+    margin-right: -20px !important;
+    margin-left: -20px !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .image-bg {
+    width: calc(100vw - 8px) !important;
+    height: calc(100vw - 8px) !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .name::before {
+    display: flex;
+    width: fit-content;
+    margin: 0 0 14px;
+    vertical-align: 0;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .text,
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .text * {
+    font-size: clamp(36px, 11vw, 48px) !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline,
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline * {
+    font-size: 15px !important;
+    line-height: 1.75 !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions {
+    gap: 10px;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action {
+    flex: 1 1 calc(50% - 10px);
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action .VPButton {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 14px !important;
+  }
+
+  .mainstream-home-band {
+    margin-top: 0;
+    padding: 0 20px 18px;
+  }
+
+  .mainstream-proof-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mainstream-proof-item {
+    min-height: 86px;
+  }
+
+  .mainstream-proof-item + .mainstream-proof-item::before {
+    display: none;
+  }
+
+  .mainstream-proof-item:nth-child(odd) {
+    border-right: 1px solid var(--mci-main-border);
+  }
+
+  .mainstream-proof-item:nth-child(n+3) {
+    border-top: 1px solid var(--mci-main-border);
+  }
+
+  .mainstream-section-intro {
+    margin: 76px auto 38px;
+  }
+
+  .mainstream-section-intro h2 {
+    font-size: 30px;
+  }
+
+  html[data-mci-site-style="mainstream"] .VPHome .VPFeatures {
+    padding: 0 20px 72px;
+  }
+
+  html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase {
+    padding-top: 72px;
+    padding-bottom: 78px;
+  }
+
+  html[data-mci-site-style="mainstream"] body:has(.VPHome) .product-showcase .product-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc .content-container,
+  html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc.has-aside .content-container {
+    padding: 26px 20px 38px !important;
+    border-right: 0 !important;
+    border-left: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page {
+    padding: 66px 0 24px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .login-container {
+    width: min(460px, 94vw);
+    min-height: 0;
+    border-radius: 16px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .brand-section {
+    padding: 22px 26px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--mci-main-border);
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .ai-brain-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 14px;
+    border-radius: 13px;
+    background-size: 36px 36px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .brand-title {
+    font-size: 30px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .brand-subtitle {
+    margin-bottom: 8px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .brand-features {
+    display: none;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .back-home-link {
+    margin-top: 10px;
+  }
+
+  html[data-mci-site-style="mainstream"] .ai-login-page .login-section {
+    width: auto;
+    padding: 24px 18px 30px;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .profile-sidebar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 14px 18px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--mci-main-border);
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: clip;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .brand {
+    margin-bottom: 12px;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .side-menu {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .side-menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .side-menu-item {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 42px;
+    padding: 10px 13px;
+    white-space: nowrap;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .sidebar-footer {
+    display: none;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .profile-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 22px 18px 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-style-switch__option,
+  html[data-mci-site-style="mainstream"] .VPFeature,
+  html[data-mci-site-style="mainstream"] .product-card,
+  html[data-mci-site-style="mainstream"] .VPButton {
+    transition-duration: .01ms !important;
+    animation: none !important;
+  }
+}

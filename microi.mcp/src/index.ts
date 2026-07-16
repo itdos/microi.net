@@ -4,6 +4,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import { MicroiClient, type MicroiConfig } from './microi-client.js';
 import { createMcpServer, type McpServerContext } from './server.js';
+import { resolveMcpLabel } from './mcp-label.js';
 
 interface SseSession {
   transport: SSEServerTransport;
@@ -102,7 +103,12 @@ async function main(): Promise<void> {
     }
     const client = new MicroiClient(config);
     await client.login();
-    const serverContext: McpServerContext = { osClient: config.osClient || '', apiBaseUrl: config.apiBaseUrl, label: process.env.MICROI_LABEL || '' };
+    const serverContext: McpServerContext = {
+      osClient: config.osClient || '',
+      apiBaseUrl: config.apiBaseUrl,
+      label: resolveMcpLabel(process.env),
+      codexMode: process.env.MICROI_CODEX_MODE === '1',
+    };
     const server = createMcpServer(client, serverContext);
     await startStdio(server);
 

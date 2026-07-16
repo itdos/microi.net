@@ -76,7 +76,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 4, 1) ||
+                    importerVersion < new System.Version(1, 4, 2) ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -86,6 +86,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("sourceExpected") ||
                     !code.Contains("validationSourceExpected") ||
                     !code.Contains("stableMenuUrl") ||
+                    !code.Contains("normalizeRouteMeta") ||
+                    !code.Contains("recoverBoundMicroserviceMenus") ||
+                    !code.Contains("preservedLegacyUrl") ||
                     !code.Contains("preserve_existing_menu_visibility_"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
@@ -95,20 +98,31 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", "ai_app_publish_store")
                     .ToScalar()?.ToString() ?? string.Empty;
-                var publisherStopHttp = client.Db.FromSql(@"SELECT StopHttp FROM sys_apiengine
-WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                var dbType = client.OsClientModel?["DbType"]?.Val<string>();
+                var publisherSettingsSql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                    ? @"SELECT [StopHttp], [Timeout], [MaxStatements], [LimitMemory], [LimitRecursion], [Lock]
+FROM [sys_apiengine]
+WHERE [ApiEngineKey]=@p0 AND ([IsDeleted]=0 OR [IsDeleted] IS NULL)"
+                    : @"SELECT `StopHttp`, `Timeout`, `MaxStatements`, `LimitMemory`, `LimitRecursion`, `Lock`
+FROM `sys_apiengine`
+WHERE `ApiEngineKey`=@p0 AND (`IsDeleted`=0 OR `IsDeleted` IS NULL)";
+                var publisherSettingsRow = client.Db.FromSql(publisherSettingsSql)
                     .AddInParameter("p0", "ai_app_publish_store")
-                    .ToScalar()?.ToString() ?? string.Empty;
+                    .First<dynamic>();
+                var publisherSettings = publisherSettingsRow == null
+                    ? null
+                    : JObject.FromObject(publisherSettingsRow);
                 var publisherVersionMatch = Regex.Match(publisherCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 1, 5) ||
+                    publisherVersion < new System.Version(1, 1, 6) ||
                     !publisherCode.Contains("OfflineSelfContained") ||
                     !publisherCode.Contains("IncludeSource: includeSource") ||
                     !publisherCode.Contains("action === 'PackageOnly'") ||
-                    publisherStopHttp != "0")
+                    !publisherCode.Contains("ReturnPackageModel") ||
+                    !HasExpectedPublisherSettings(publisherSettings))
                 {
-                    return RefreshRequired(osClient, "AI应用离线发布器缺失、自包含能力过低或禁止HTTP调用");
+                    return RefreshRequired(osClient, "AI应用离线发布器缺失、自包含能力过低或运行限额不足");
                 }
 
                 foreach (var engineKey in new[]
@@ -202,6 +216,24 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
         private static bool HasRows(object value)
         {
             return long.TryParse(value?.ToString(), out var count) && count > 0;
+        }
+
+        private static bool HasExpectedPublisherSettings(JObject settings)
+        {
+            if (settings == null) return false;
+            return TryGetLong(settings, "StopHttp", out var stopHttp) && stopHttp == 0
+                   && TryGetLong(settings, "Timeout", out var timeout) && timeout >= 3600
+                   && TryGetLong(settings, "MaxStatements", out var maxStatements) && maxStatements >= 100000000
+                   && TryGetLong(settings, "LimitMemory", out var limitMemory) && limitMemory >= 2048
+                   && TryGetLong(settings, "LimitRecursion", out var limitRecursion) && limitRecursion >= 10000
+                   && TryGetLong(settings, "Lock", out var lockValue) && lockValue == 1;
+        }
+
+        private static bool TryGetLong(JObject model, string name, out long value)
+        {
+            value = 0;
+            var token = model.GetValue(name, StringComparison.OrdinalIgnoreCase);
+            return token != null && long.TryParse(token.ToString(), out value);
         }
 
         private static Task<bool> RefreshRequired(string osClient, string reason)
@@ -346,7 +378,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 4, 1) ||
+                    importerVersion < new System.Version(1, 4, 2) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -356,6 +388,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("sourceExpected") ||
                     !content.Contains("validationSourceExpected") ||
                     !content.Contains("stableMenuUrl") ||
+                    !content.Contains("normalizeRouteMeta") ||
+                    !content.Contains("recoverBoundMicroserviceMenus") ||
+                    !content.Contains("preservedLegacyUrl") ||
                     !content.Contains("preserve_existing_menu_visibility_"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
@@ -369,10 +404,11 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!content.Contains("ai_app_publish_store") ||
                     !publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 1, 5) ||
+                    publisherVersion < new System.Version(1, 1, 6) ||
                     !content.Contains("OfflineSelfContained") ||
                     !content.Contains("IncludeSource: includeSource") ||
-                    !content.Contains("action === 'PackageOnly'"))
+                    !content.Contains("action === 'PackageOnly'") ||
+                    !content.Contains("ReturnPackageModel"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
                 }
@@ -445,16 +481,20 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 .ExecuteNonQuery();
         }
 
-        private static void EnsurePublisherHttpEnabled(string osClient)
+        private static void EnsurePublisherExecutionSettings(string osClient)
         {
             var client = OsClient.GetClient(osClient);
             if (client?.Db == null) throw new InvalidOperationException($"未找到租户[{osClient}]数据库连接。");
             var dbType = client.OsClientModel?["DbType"]?.Val<string>();
             var sql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
-                ? @"UPDATE [sys_apiengine] SET [StopHttp]=0 WHERE [ApiEngineKey]=@p0"
-                : @"UPDATE `sys_apiengine` SET `StopHttp`=0 WHERE `ApiEngineKey`=@p0";
+                ? @"UPDATE [sys_apiengine] SET [StopHttp]=0, [Timeout]=@p0, [MaxStatements]=@p1, [LimitMemory]=@p2, [LimitRecursion]=@p3, [Lock]=1 WHERE [ApiEngineKey]=@p4"
+                : @"UPDATE `sys_apiengine` SET `StopHttp`=0, `Timeout`=@p0, `MaxStatements`=@p1, `LimitMemory`=@p2, `LimitRecursion`=@p3, `Lock`=1 WHERE `ApiEngineKey`=@p4";
             client.Db.FromSql(sql)
-                .AddInParameter("p0", "ai_app_publish_store")
+                .AddInParameter("p0", 3600)
+                .AddInParameter("p1", 100000000)
+                .AddInParameter("p2", 2048)
+                .AddInParameter("p3", 10000)
+                .AddInParameter("p4", "ai_app_publish_store")
                 .ExecuteNonQuery();
         }
 
@@ -505,13 +545,20 @@ var nowText = function (format) {
                     "ai_app_download_source_zip"
                 })
                 {
-                    var engine = client.Db.FromSql(@"SELECT Id, ApiAddress, ApiV8Code FROM sys_apiengine
-WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
+                    var dbType = client.OsClientModel?["DbType"]?.Val<string>();
+                    var getEngineSql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                        ? @"SELECT TOP 1 Id, ApiAddress, ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)"
+                        : @"SELECT Id, ApiAddress, ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
+                    var engine = client.Db.FromSql(getEngineSql)
                         .AddInParameter("p0", engineKey)
                         .First<dynamic>();
                     if (engine == null) continue;
 
-                    var code = engine.ApiV8Code?.ToString() ?? string.Empty;
+                    string code = Convert.ToString(engine.ApiV8Code) ?? string.Empty;
+                    string engineId = Convert.ToString(engine.Id) ?? string.Empty;
+                    string engineApiAddress = Convert.ToString(engine.ApiAddress) ?? string.Empty;
                     if (code.DosIsNullOrWhiteSpace()) continue;
 
                     var patchedCode = code;
@@ -531,18 +578,18 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
                     if (patchedCode == code) continue;
                     client.Db.FromSql(@"UPDATE sys_apiengine SET ApiV8Code=@p0 WHERE Id=@p1")
                         .AddInParameter("p0", patchedCode)
-                        .AddInParameter("p1", engine.Id?.ToString())
+                        .AddInParameter("p1", engineId)
                         .ExecuteNonQuery();
 
                     var cache = MicroiEngine.CacheTenant.Cache(osClient);
                     await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engineKey}");
-                    if (!(engine.Id?.ToString()).DosIsNullOrWhiteSpace())
+                    if (!string.IsNullOrWhiteSpace(engineId))
                     {
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engine.Id}");
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engineId}");
                     }
-                    if (!(engine.ApiAddress?.ToString()).DosIsNullOrWhiteSpace())
+                    if (!string.IsNullOrWhiteSpace(engineApiAddress))
                     {
-                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engine.ApiAddress}");
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engineApiAddress}");
                     }
                     Console.WriteLine($"Microi：【基础应用升级】已为[{engineKey}]补充局部时间回退/受控ZIP兼容，客户全局V8保持不变。");
                 }
@@ -722,6 +769,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
                     ApiAddress = "/apiengine/ai_app_publish_store",
                     IsEnable = 1,
                     StopHttp = 0,
+                    Timeout = 3600,
+                    MaxStatements = 100000000,
+                    LimitMemory = 2048,
+                    LimitRecursion = 10000,
+                    Lock = 1,
                     ApiV8Code = publishAiAppV8
                 });
             }
@@ -735,6 +787,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
                     ApiAddress = "/apiengine/ai_app_publish_store",
                     IsEnable = 1,
                     StopHttp = 0,
+                    Timeout = 3600,
+                    MaxStatements = 100000000,
+                    LimitMemory = 2048,
+                    LimitRecursion = 10000,
+                    Lock = 1,
                     ApiV8Code = publishAiAppV8
                 });
             }
@@ -745,9 +802,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
             }
             else
             {
-                // 老库的 StopHttp 物理列可能缺少 diy_field 元数据，FormEngine 更新会静默忽略；
-                // 再以参数化 SQL 强制修正，保证登录态工作台可以通过 HTTP 制作离线包。
-                EnsurePublisherHttpEnabled(osClient);
+                // 老库的运行参数物理列可能缺少 diy_field 元数据，FormEngine 更新会静默忽略；
+                // 再以参数化 SQL 强制修正，保证大型自包含源码包可以稳定生成。
+                EnsurePublisherExecutionSettings(osClient);
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:ai_app_publish_store");
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync("Microi:" + osClient + ":FormData:sys_apiengine:/apiengine/ai_app_publish_store");
             }

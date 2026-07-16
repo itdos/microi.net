@@ -11,6 +11,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vitepress'
+import { siteStyle } from '../site-style'
 
 const isHomePage = ref(false)
 const route = useRoute()
@@ -19,7 +20,8 @@ const route = useRoute()
 const checkHomePage = () => {
   if (typeof window === 'undefined') return false
   const path = route.path || window.location.pathname
-  return path === '/' || path === '/index.html' || path === '/index'
+  const isHome = path === '/' || path === '/index.html' || path === '/index'
+  return isHome && siteStyle.value === 'classic'
 }
 
 // 应用首页样式
@@ -58,7 +60,7 @@ const restoreNormalStyles = () => {
 }
 
 // 监听路由变化
-watch(() => route.path, (newPath) => {
+watch([() => route.path, siteStyle], () => {
   const isHome = checkHomePage()
   isHomePage.value = isHome
   

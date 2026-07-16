@@ -30,7 +30,7 @@ export const zh = defineConfig({
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
 	],
-	appearance: "dark", // 启用主题切换
+	appearance: true, // 保留 VitePress 明暗切换，初次访问跟随系统偏好
 	markdown: {
 		theme: {
 			light: "github-dark", // 浅色模式也使用深色代码主题

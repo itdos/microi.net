@@ -20,7 +20,7 @@ export const en = defineConfig({
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
 	],
-	appearance: "dark",
+	appearance: true,
 	markdown: {
 		theme: {
 			light: "github-dark",

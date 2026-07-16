@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.4.1
+ * Version: v1.4.2
  * Function:
  * - 安装应用商城数据包，导入结构、菜单、流程、接口引擎、业务数据及在线 AI 应用；兼容目标租户历史物理字段，保证重复安装幂等，保护接口引擎多 Tab，并为安装的在线应用写入当前安装用户归属。
  */
@@ -331,13 +331,31 @@ try {
     // 保留旧 Url 兼容书签，只把运行入口切换到已发布的微服务宿主。
     var applicationMenuBindings = [];
 
+    var normalizeRouteMeta = function (route) {
+        route = route || {};
+        var meta = {};
+        if (route.RouteMetaJson) {
+            try { meta = JSON.parse(route.RouteMetaJson) || {}; } catch (routeMetaError) { meta = {}; }
+        }
+        var metaFields = [
+            'PageKey', 'PageName', 'PageTitle', 'RoutePath', 'EntryPath',
+            'Sort', 'IsHome', 'IsEnable', 'LegacyMenuUrls', 'LegacyMenuUrl',
+            'LegacyComponentPaths', 'LegacyComponentPath'
+        ];
+        for (var metaFieldIndex = 0; metaFieldIndex < metaFields.length; metaFieldIndex++) {
+            var metaField = metaFields[metaFieldIndex];
+            if ((meta[metaField] === undefined || meta[metaField] === null || meta[metaField] === '')
+                && route[metaField] !== undefined && route[metaField] !== null && route[metaField] !== '') {
+                meta[metaField] = route[metaField];
+            }
+        }
+        return meta;
+    };
+
     var legacyRouteValues = function (route, pluralName, singleName) {
         route = route || {};
-        var meta = route;
-        if (route.RouteMetaJson) {
-            try { meta = JSON.parse(route.RouteMetaJson) || route; } catch (routeMetaError) { meta = route; }
-        }
-        var value = route[pluralName] || route[singleName] || meta[pluralName] || meta[singleName] || [];
+        var meta = normalizeRouteMeta(route);
+        var value = meta[pluralName] || meta[singleName] || route[pluralName] || route[singleName] || [];
         if (typeof value == 'string') {
             var trimmed = value.replace(/^\s+|\s+$/g, '');
             if (!trimmed) return [];
@@ -684,21 +702,22 @@ try {
             if (!routes.length) routes = [{ PageKey: 'home', PageName: '首页', PageTitle: '首页', RoutePath: '/', EntryPath: entryPath, Sort: 0, IsHome: 1 }];
             for (var r = 0; r < routes.length; r++) {
                 var route = routes[r] || {};
-                var routePath = firstTextParam([route.RoutePath, route.Path, '/']);
+                var routeMeta = normalizeRouteMeta(route);
+                var routePath = firstTextParam([route.RoutePath, route.Path, routeMeta.RoutePath, '/']);
                 var pageRow = {
                     MicroServiceId: serviceId,
                     MicroServiceKey: appKey,
-                    PageKey: firstTextParam([route.PageKey, route.Key, 'page-' + (r + 1)]),
-                    PageName: firstTextParam([route.PageName, route.Name, route.PageTitle, '页面' + (r + 1)]),
-                    PageTitle: firstTextParam([route.PageTitle, route.Title, route.PageName, '页面' + (r + 1)]),
+                    PageKey: firstTextParam([route.PageKey, route.Key, routeMeta.PageKey, 'page-' + (r + 1)]),
+                    PageName: firstTextParam([route.PageName, route.Name, route.PageTitle, routeMeta.PageName, routeMeta.PageTitle, '页面' + (r + 1)]),
+                    PageTitle: firstTextParam([route.PageTitle, route.Title, route.PageName, routeMeta.PageTitle, routeMeta.PageName, '页面' + (r + 1)]),
                     RoutePath: routePath,
-                    EntryPath: firstTextParam([route.EntryPath, entryPath]),
+                    EntryPath: firstTextParam([route.EntryPath, routeMeta.EntryPath, entryPath]),
                     MenuUrl: firstTextParam([route.MenuUrl, '/micro-app/' + appKey + routePath]),
-                    Sort: route.Sort || r,
-                    IsHome: route.IsHome === 0 ? 0 : (route.IsHome || (r == 0 ? 1 : 0)),
-                    IsEnable: route.IsEnable === 0 ? 0 : 1,
+                    Sort: route.Sort || routeMeta.Sort || r,
+                    IsHome: route.IsHome === 0 || routeMeta.IsHome === 0 ? 0 : (route.IsHome || routeMeta.IsHome || (r == 0 ? 1 : 0)),
+                    IsEnable: route.IsEnable === 0 || routeMeta.IsEnable === 0 ? 0 : 1,
                     BuildVersion: versionNo,
-                    RouteMetaJson: JSON.stringify(route)
+                    RouteMetaJson: JSON.stringify(routeMeta)
                 };
                 var pageResult = upsertApplicationRow('sys_microiservice_page', [['MicroServiceId', '=', serviceId], ['AND', 'RoutePath', '=', routePath]], pageRow);
                 if (!pageResult || pageResult.Code != 1) throw new Error('写入微服务页面失败：' + routePath + '，' + ((pageResult && pageResult.Msg) || ''));
@@ -709,8 +728,8 @@ try {
                     PageId: installedPage && installedPage.Id ? installedPage.Id : '',
                     RoutePath: routePath,
                     PreserveExistingNativeMenus: preserveExistingNativeMenus,
-                    LegacyMenuUrls: legacyRouteValues(route, 'LegacyMenuUrls', 'LegacyMenuUrl'),
-                    LegacyComponentPaths: legacyRouteValues(route, 'LegacyComponentPaths', 'LegacyComponentPath')
+                    LegacyMenuUrls: legacyRouteValues(routeMeta, 'LegacyMenuUrls', 'LegacyMenuUrl'),
+                    LegacyComponentPaths: legacyRouteValues(routeMeta, 'LegacyComponentPaths', 'LegacyComponentPath')
                 });
                 stats.MicroServicePages++;
             }
@@ -2494,6 +2513,33 @@ try {
             _PageSize: 1000
         });
         var menus = menuResult && menuResult.Code == 1 && menuResult.Data ? menuResult.Data : [];
+        // v1.4.1 曾把旧 Url 覆盖成稳定微服务 Url。再次安装时同时按微服务绑定回查，
+        // 才能恢复旧书签，而不是因为旧 Url 已丢失就永远无法命中。
+        var recoverBoundMicroserviceMenus = V8.FormEngine.GetTableData('sys_menu', {
+            _Where: [
+                ['MicroServiceKey', '=', binding.ServiceKey],
+                ['AND', 'MicroServiceRoutePath', '=', binding.RoutePath]
+            ],
+            _PageIndex: 1,
+            _PageSize: 1000
+        });
+        var boundMenus = recoverBoundMicroserviceMenus && recoverBoundMicroserviceMenus.Code == 1 && recoverBoundMicroserviceMenus.Data
+            ? recoverBoundMicroserviceMenus.Data
+            : [];
+        var menuIdMap = {};
+        var mergedMenus = [];
+        var appendMenus = function (rows) {
+            for (var appendIndex = 0; appendIndex < rows.length; appendIndex++) {
+                var appendMenu = rows[appendIndex] || {};
+                var appendKey = String(appendMenu.Id || 'index-' + appendIndex);
+                if (menuIdMap[appendKey]) continue;
+                menuIdMap[appendKey] = true;
+                mergedMenus.push(appendMenu);
+            }
+        };
+        appendMenus(menus);
+        appendMenus(boundMenus);
+        menus = mergedMenus;
         for (var legacyMenuIndex = 0; legacyMenuIndex < menus.length; legacyMenuIndex++) {
             var legacyMenu = menus[legacyMenuIndex] || {};
             if (!legacyMenu.Id || migratedMenuIds[legacyMenu.Id]) continue;
@@ -2511,10 +2557,15 @@ try {
             var stableRoutePath = String(binding.RoutePath || '/');
             if (stableRoutePath.charAt(0) != '/') stableRoutePath = '/' + stableRoutePath;
             var stableMenuUrl = '/micro-app/' + binding.ServiceKey + (stableRoutePath == '/' ? '' : stableRoutePath);
+            var currentMenuUrl = firstTextParam([legacyMenu.Url]);
+            var preservedLegacyUrl = currentMenuUrl || stableMenuUrl;
+            if (fieldName == 'Url' && currentMenuUrl == stableMenuUrl && values.length) {
+                preservedLegacyUrl = values[Math.min(legacyMenuIndex, values.length - 1)];
+            }
             var migrateResult = runWriteWithRetry(function () {
                 return V8.FormEngine.UptFormData('sys_menu', {
                     Id: legacyMenu.Id,
-                    Url: stableMenuUrl,
+                    Url: preservedLegacyUrl,
                     OpenType: 'MicroService',
                     IsMicroiService: 1,
                     ComponentPath: '/micro-app/host',

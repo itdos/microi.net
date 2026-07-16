@@ -60,6 +60,7 @@
 
 <script>
 import { defineAsyncComponent, computed } from "vue";
+import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode } from "@/utils/v8-button-visibility";
@@ -517,9 +518,8 @@ export default {
                         //2022-06-22新增
                         field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
-                        // Vue 3: 使用 defineAsyncComponent 包装动态 import
                         var componentPath = field.Config.DevComponentPath;
-                        var component = defineAsyncComponent(() => import(/* @vite-ignore */ `@/views${componentPath}`));
+                        var component = DynamicComponentCache.getOrCreate(field.Config.DevComponentName, componentPath);
                         // Vue 3: 使用全局 app 实例注册组件
                         const app = window.__VUE_APP__;
                         if (app && !app._context.components[field.Config.DevComponentName]) {

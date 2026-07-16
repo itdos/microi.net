@@ -8,6 +8,10 @@ export interface MicroiConfig {
     token?: string;
     /** Token 文件路径（VS Code 扩展写入；MCP 自身刷新时也会回写以保持同步） */
     tokenFilePath?: string;
+    /** 普通 HTTP 请求超时，默认 120 秒 */
+    requestTimeoutMs?: number;
+    /** V8 代码、菜单等写请求超时，默认 60 秒 */
+    writeRequestTimeoutMs?: number;
 }
 export interface ApiResponse<T = unknown> {
     Code: number;
@@ -22,6 +26,17 @@ export interface ListEnvelope<T> {
     OsClientNetwork?: string;
     List?: T[];
     Total?: number;
+}
+export declare class MicroiTransportError extends Error {
+    readonly kind: 'timeout' | 'network';
+    readonly requestPath: string;
+    readonly uncertainOutcome: boolean;
+    constructor(message: string, options: {
+        kind: 'timeout' | 'network';
+        requestPath: string;
+        uncertainOutcome: boolean;
+        cause?: unknown;
+    });
 }
 export interface DbTable {
     Id: string;
@@ -163,6 +178,8 @@ export declare class MicroiClient {
     private refreshTimer?;
     private rsaPublicKey;
     private readonly did;
+    private readonly requestTimeoutMs;
+    private readonly writeRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     private inflightRefresh?;
     constructor(config: MicroiConfig);
@@ -199,6 +216,10 @@ export declare class MicroiClient {
     /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
     private get;
     private requestJson;
+    private isUncertainWriteError;
+    private pollReadback;
+    private recoveredWriteResult;
+    private uncertainWriteFailure;
     getStatus(): Promise<ApiResponse>;
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
