@@ -1,6 +1,6 @@
 # 🤖 AI 编程
 
-> **在线 + 本地双模式 AI 编程，让 AI 充分了解你的 V8 API 与数据库结构，接口引擎代码生成准确率高达 99%**
+> **在线 + 本地双模式 AI 编程，让 AI 充分了解你的 V8 API 与数据库结构**
 
 平台全部源码开源：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 
@@ -46,7 +46,7 @@
 - **本地 AI 编程**：VS Code + GitHub Copilot / Claude Code / Cursor，知识库自动注入，写代码 → 执行 → 调试全在编辑器内完成，无需离开
 - **从 V8 代码中调用 AI 大模型**：在接口引擎里直接请求 DeepSeek 等接口，实现 ReAct 模式
 
-> 博主某 MES 项目：500+ 张表，大量接口引擎由 AI 一次生成，准确率高达 **99%**。
+> 博主某 MES 项目：500+ 张表，大量接口引擎均由 AI 生成。
 
 ---
 
@@ -121,6 +121,8 @@ Microi: 拉取V8引擎代码
 | 远程执行 | 右键 → `Microi: 远程执行当前接口引擎`（弹出参数输入框） |
 | 逐行调试 | 右键 → `Microi: 远程逐行调试`，支持断点 / Step Over / 变量观察 |
 | 推送保存 | 文件保存时自动同步到数据库，无需编译发布 |
+
+所有右下角的信息、警告和错误通知都会同步保存在 VS Code 的【输出 → Microi 吾码】中，包括微服务构建/推送、代码拉取/同步、登录和远程执行结果。日志时间使用运行 VS Code 电脑的本地时区；带按钮的通知还会记录用户最终选择，通知消失后仍可继续追查。后台身份维护使用静默状态探测，服务器临时不可达不会反复产生无内容的 `GetStatus Error:`；用户主动操作失败时则会保留错误码、地址和端口等诊断明细。
 
 <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">

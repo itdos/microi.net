@@ -318,8 +318,25 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - 同时检查 `.vscode/mcp.json`、`.cursor/mcp.json`、`.mcp.json` 和 `~/.codex/config.toml` 是否能解析，并确认目标服务器名、`MICROI_API_URL`、`MICROI_OS_CLIENT`、`MICROI_TOKEN_FILE` 已写入。
 - 如果手动启动 `mcp-server.js` 能响应，而当前 AI 会话仍握手失败，应优先怀疑 MCP stdio 协议兼容、初始化响应格式/大小、服务器进程提前退出或插件生成的 Codex 配置顺序问题，而不是简单归因于“用户没启用”。
 - 当 MCP 工具数量较多时，`tools/list` 的前段必须优先返回通用建模和维护工具，例如 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache`、`microi_create_table`、`microi_create_module`、`microi_get_event_code`、`microi_save_event_code`。部分 AI 客户端或模型上下文只注入前若干个工具，若核心工具排在后面，会误报“缺少 MCP 工具”。
-- MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界，`MICROI_LABEL` 只能作为显示名称，不能把中文显示名当成租户 Key 写入“只能管理某租户”的安全提示。
+- MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界。中文显示名通过 ASCII 的 `MICROI_LABEL_BASE64` 传输并在 MCP 内解码，旧版 `MICROI_LABEL` 只作兼容；显示名不能当成租户 Key 写入“只能管理某租户”的安全提示。
 - 修复 Microi.VSCode 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
+
+## MCP 写入超时与降级约定
+
+- 接口引擎代码只用 `microi_save_engine_code`，表单事件只用 `microi_save_event_code`，菜单按钮和 Tab 只用 `microi_update_module`。这些标准工具负责版本、校验、缓存和超时回读。
+- 请求超时是“结果不确定”，不是“写入失败”。标准工具返回 `RecoveredAfterTransportError:true` 时，表示已经通过远端回读确认成功，不得再次写入。
+- 标准工具明确返回“回读未确认”时，只调用对应 get 工具继续核对一次。没有用户明确授权，不得改走原生 FormEngine HTTP、直接 SQL、表定义增量更新，也不得创建一次性维护接口引擎绕过原端点。
+- `MoreBtns`、`FormBtns`、`BatchSelectMoreBtns`、`PageTabs`、`ExportMoreBtns`、`PageBtns` 一律向 MCP 传明文 JSON 数组。租户 `sys_menu` 表单事件中的 Base64 解码属于平台内部兼容逻辑，AI 不得据此手工 Base64 编码。
+- 发生连续写入超时时，要先停止并发写入，记录具体工具、资源 Key、耗时和回读结果；禁止用“服务器整体不可用”“缓存锁死”等没有日志证据的结论代替诊断。
+
+## Codex MCP 单入口约定
+
+- Codex 对普通 MCP 大工具集可能无法稳定注入时，使用插件生成的 `microi_codex` 单入口，不要据此判断服务器或帐号不可用。
+- `microi_codex` 的 `action="list_tools"` 可按 `params.keyword` 查找工具，`action="describe_tool"` + `params.name` 可读取参数说明；执行时 action 使用原始 `microi_*` 工具名，参数放在 `params`。
+- 单入口只负责路由，必须复用原工具的参数 schema、写入确认、审计、超时回读和错误返回。不得因为只暴露一个 Codex 工具而放宽远端写入保护。
+- 如果 Codex 仍不注入 `microi_codex`，优先使用它实际提供的资源工具：先 `list_mcp_resources` 并读取 `microi://codex/status` / `microi://codex/tools`；通用调用先 `list_mcp_resource_templates`，再读取 `microi://codex/action/{action}/{params}`，其中 `params` 是 URI 编码后的 JSON 对象。
+- 资源模板只是兼容传输层，执行的仍是原始 `microi_*` handler。写操作同样必须携带原工具要求的 `confirmExecution`，不得把 resource read 当成绕过确认的通道。
+- VS Code/Copilot、Cursor、Claude Code 仍使用完整 MCP 工具集；不要把 Codex 的 `enabled_tools = ["microi_codex"]` 复制到其他客户端配置。
 
 ## .venv Python 环境说明
 

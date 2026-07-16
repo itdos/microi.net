@@ -5,16 +5,71 @@ import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import { visualizer } from 'rollup-plugin-visualizer';
 import compression from 'vite-plugin-compression';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import legacy from '@vitejs/plugin-legacy';
+
+function monacoLegacySpreadCompat() {
+    const monacoGpuActionsPath = '/monaco-editor/esm/vs/editor/contrib/gpu/browser/gpuActions.js';
+    const monacoDocumentColorsPath = '/monaco-editor/esm/vs/editor/common/languages/defaultDocumentColorsComputer.js';
+    const regexLookbehind = "(?<=['\"\\s])";
+    const legacyUnsafeCode = `promises.push(...[
+                                fileService.writeFile(URI.joinPath(folders[0].uri, \`textureAtlasPage\${layerIndex}_actual.png\`), VSBuffer.wrap(new Uint8Array(await (await page.source.convertToBlob()).arrayBuffer()))),
+                                fileService.writeFile(URI.joinPath(folders[0].uri, \`textureAtlasPage\${layerIndex}_usage.png\`), VSBuffer.wrap(new Uint8Array(await (await page.getUsagePreview()).arrayBuffer()))),
+                            ]);`;
+    const legacySafeCode = `promises.push(
+                                fileService.writeFile(URI.joinPath(folders[0].uri, \`textureAtlasPage\${layerIndex}_actual.png\`), VSBuffer.wrap(new Uint8Array(await (await page.source.convertToBlob()).arrayBuffer())))
+                            );
+                            promises.push(
+                                fileService.writeFile(URI.joinPath(folders[0].uri, \`textureAtlasPage\${layerIndex}_usage.png\`), VSBuffer.wrap(new Uint8Array(await (await page.getUsagePreview()).arrayBuffer())))
+                            );`;
+
+    return {
+        name: 'microi:monaco-legacy-spread-compat',
+        enforce: 'pre',
+        transform(code, id) {
+            const normalizedId = id.split('?')[0].replace(/\\/g, '/');
+            if (normalizedId.endsWith(monacoGpuActionsPath)) {
+                if (!code.includes(legacyUnsafeCode)) {
+                    throw new Error('Monaco GPU legacy compatibility patch no longer matches the installed monaco-editor source.');
+                }
+                return {
+                    code: code.replace(legacyUnsafeCode, legacySafeCode),
+                    map: null
+                };
+            }
+            if (normalizedId.endsWith(monacoDocumentColorsPath)) {
+                if (!code.includes(regexLookbehind)) {
+                    throw new Error('Monaco color regex legacy compatibility patch no longer matches the installed monaco-editor source.');
+                }
+                return {
+                    // “#”本身已是明确分隔符，去掉后行断言不改变颜色文本的匹配范围。
+                    code: code.split(regexLookbehind).join(''),
+                    map: null
+                };
+            }
+            return null;
+        }
+    };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [
+        // 处理 Monaco 中 legacy 转换不支持的 spread-await 与正则后行断言。
+        monacoLegacySpreadCompat(),
         vue({
             template: {
                 compilerOptions: {
                     isCustomElement: (tag) => tag === 'iconify-icon' || tag === 'micro-app'
                 }
             }
+        }),
+        // Windows 7 客户环境仍可能使用 Chrome 49 / 旧版 360 极速内核。
+        // 现代浏览器继续加载 ESM 包，旧内核通过 nomodule 自动加载 SystemJS legacy 包。
+        legacy({
+            targets: ['Chrome >= 49'],
+            additionalLegacyPolyfills: [
+                'abortcontroller-polyfill/dist/abortcontroller-polyfill-only'
+            ]
         }),
         createSvgIconsPlugin({
             iconDirs: [path.resolve(process.cwd(), 'src/icons/svg')],
@@ -118,13 +173,14 @@ export default defineConfig({
                     if (id.includes('three')) return 'three'
                     if (id.includes('fullcalendar') || id.includes('@fullcalendar')) return 'fullcalendar'
                     if (id.includes('@wangeditor') || id.includes('@codemirror') || id.includes('codemirror')) return 'editors'
+                    // Element Plus 依赖 lodash-unified；lodash 不再强制拆成 utils，
+                    // 交由 Rollup 自动放置，避免 legacy SystemJS 循环分片。
                     if (id.includes('element-plus')) return 'element-plus'
                     if (id.includes('@element-plus/icons-vue')) return 'element-icons'
                     if (id.includes('@fortawesome')) return 'fontawesome'
                     if (id.includes('dhtmlx-gantt')) return 'gantt'
                     if (id.includes('@vue-office') || id.includes('xlsx')) return 'office'
                     if (id.includes('html2canvas') || id.includes('jspdf')) return 'export'
-                    if (id.includes('lodash') || id.includes('underscore')) return 'utils'
                 }
             }
         }

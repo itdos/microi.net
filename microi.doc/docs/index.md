@@ -28,7 +28,7 @@ features:
     linkText: AI本地编程文档
   - icon: 🔗
     title: API 接口引擎
-    details: 在线使用JavaScript编写后端api接口，支持 AI 在线编程 + VS Code 本地 AI 编程，代码生成准确率高达 99%。极致的性能与开发效率，无需编译发布，保存即生效。支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等
+    details: 在线使用JavaScript编写后端api接口，支持 AI 在线编程 + VS Code 本地 AI 编程。极致的性能与开发效率，无需编译发布，保存即生效。支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等
     link: /doc/v8-engine/api-engine
     linkText: 接口引擎文档
   - icon: ⚙️

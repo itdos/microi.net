@@ -471,7 +471,7 @@ export default {
         },
         writeV8(data) {
             // 替换中文字符为字段名（中文一定是字段名为前提）
-            var reg1 = /(?<=)([\u4e00-\u9fa5]*)(?=)/g;
+            var reg1 = /[\u4e00-\u9fa5]+/g;
             var current = data;
             var lists = "";
 

@@ -5,6 +5,7 @@ import { DiyApi, DiyCommon, DiyTable, DiyMyWork, DiyFlowIndex } from "@/utils/mi
 import Layout from "@/layout";
 import { DiyOsClient } from "@/utils/itdos.osclient";
 import _ from "underscore";
+import { buildMicroAppRouteAliases, resolveMicroAppMenuPaths } from "@/router/micro-app-route-alias";
 // Vue Router 4 支持直接使用 () => import() 形式，不需要 defineAsyncComponent
 
 /**
@@ -204,6 +205,12 @@ function buildMicroAppMenuPath(item) {
 }
 
 function appendMicroAppMeta(meta, item) {
+    const friendlyConfig = parseMicroAppUrl(item.MicroAppFriendlyUrl || "");
+    const resolvedAppKey = item.MicroServiceKey
+        || item.MsKey
+        || item.AppKey
+        || friendlyConfig.appKey
+        || (item.MicroServiceId ? DiyCommon.GuidRemoveSing(item.MicroServiceId) : "");
     meta.OpenType = item.OpenType;
     meta.Url = item.LegacyMenuUrl ? "" : item.Url;
     meta.LegacyMenuUrl = item.LegacyMenuUrl;
@@ -214,6 +221,8 @@ function appendMicroAppMeta(meta, item) {
     meta.MicroServiceId = item.MicroServiceId;
     meta.MicroServiceKey = item.MicroServiceKey;
     meta.MsKey = item.MsKey;
+    meta.AppKey = resolvedAppKey;
+    meta.MicroAppFriendlyUrl = item.MicroAppFriendlyUrl;
     meta.MicroServicePageId = item.MicroServicePageId;
     meta.MicroServiceRoutePath = item.MicroServiceRoutePath;
     meta.RoutePath = item.MicroServiceRoutePath;
@@ -309,18 +318,30 @@ function buildMeta(item, extra = {}) {
 
 function buildLeafRoute(item) {
     const component = GetComponent(item);
+    const routePath = normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id));
     const menu = {
         Id: item.Id,
         Display: item.Display,
         AppDisplay : item.AppDisplay,
         UrlParam: item.UrlParam,
         Link: item.Link,
-        path: normalizeMenuRoutePath(item.Url, "/menu-" + DiyCommon.GuidRemoveSing(item.Id)),
+        path: routePath,
         name: "menu_" + DiyCommon.GuidRemoveSing(item.Id),
         meta: buildMeta(item)
     };
     if (component != null) {
         menu.component = component;
+    }
+    if (isMicroAppMenu(item)) {
+        const aliases = buildMicroAppRouteAliases({
+            primaryPath: routePath,
+            friendlyPath: item.MicroAppFriendlyUrl,
+            serviceId: item.MicroServiceId,
+            routePath: item.MicroServiceRoutePath
+        });
+        if (aliases.length) {
+            menu.alias = aliases;
+        }
     }
     return menu;
 }
@@ -387,9 +408,13 @@ function MenuBuild(result, data, isFater) {
                 item.MicroServiceRoutePath = normalizeMicroRoutePath(item.MicroServiceRoutePath || parsedMicroAppUrl.routePath || "/");
                 item.ComponentPath = "/micro-app/host";
                 item.MicroAppFriendlyUrl = buildMicroAppMenuPath(item);
-                item.Url = item.LegacyMenuUrl
-                    ? normalizeMenuRoutePath(item.LegacyMenuUrl)
-                    : item.MicroAppFriendlyUrl;
+                const microAppMenuPaths = resolveMicroAppMenuPaths({
+                    menuUrl: item.Url,
+                    legacyMenuUrl: item.LegacyMenuUrl,
+                    friendlyPath: item.MicroAppFriendlyUrl
+                });
+                item.LegacyMenuUrl = microAppMenuPaths.legacyMenuUrl;
+                item.Url = microAppMenuPaths.primaryPath;
             } else {
                 if (item.Url.indexOf("?") > -1) {
                     item.UrlParam = item.Url.split("?")[1];

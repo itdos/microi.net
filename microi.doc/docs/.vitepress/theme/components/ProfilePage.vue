@@ -261,6 +261,7 @@
 import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from 'vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
+import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
@@ -306,6 +307,7 @@ let tenantProgressTimer = null
 let profileNoticeTimer = null
 let tenantProgressTraceId = ''
 let tenantProgressRestorePending = false
+let openClawAuthBridge = null
 
 const menus = computed(() => [
   { key: 'overview', name: t('overview'), icon: '⌂' },
@@ -606,11 +608,13 @@ function clearSession() {
   tenants.value = []
   tenantCenter.value = {}
   window.dispatchEvent(new CustomEvent('microi-auth-expired'))
+  openClawAuthBridge?.notify()
 }
 
 function handleSessionExpired() {
   clearSession()
   profileError.value = ''
+  if (isOpenClawBridgeMode()) return
   const redirect = '/profile.html' + (window.location.hash || '#/overview')
   window.location.replace(`/login.html?redirect=${encodeURIComponent(redirect)}&reason=expired`)
 }
@@ -669,6 +673,7 @@ async function refreshRelayTokenSummary() {
         UsedTokens: Number(result.Data.UsedTokens || 0),
         RemainingTokens: Number(result.Data.RemainingTokens || 0)
       }
+      openClawAuthBridge?.notify()
     }
   } catch {
     // Token 统计不阻塞个人中心主流程。
@@ -713,6 +718,7 @@ async function refreshAiUsage(pageIndex = aiUsagePageIndex.value) {
         UsedTokens: Number(result.Data.UsedTokens || 0),
         RemainingTokens: Number(result.Data.RemainingTokens || 0)
       }
+      openClawAuthBridge?.notify()
       relayUsageLogs.value = Array.isArray(result.Data.Logs) ? result.Data.Logs : []
       aiUsagePageIndex.value = Number(result.Data.PageIndex || pageIndex || 1)
       aiUsagePageSize.value = Number(result.Data.PageSize || aiUsagePageSize.value)
@@ -1036,6 +1042,10 @@ function onProfileLocaleChange(event) {
 
 function redirectToLoginIfNeeded() {
   if (isAuthed.value) return false
+  if (isOpenClawBridgeMode()) {
+    openClawAuthBridge?.notify()
+    return true
+  }
   if (typeof window !== 'undefined') {
     window.location.href = '/login.html?redirect=/profile.html%23/overview'
   }
@@ -1057,6 +1067,14 @@ watch(locale, (value) => {
 
 onMounted(async () => {
   restoreSession()
+  openClawAuthBridge = createOpenClawAuthBridge(() => ({
+    token: authToken.value,
+    user: currentUser.value,
+    quota: relayToken.value,
+    apiBase: API_BASE,
+    osClient: OS_CLIENT
+  }))
+  openClawAuthBridge.notify()
   syncMenuFromHash()
   if (redirectToLoginIfNeeded()) return
   window.addEventListener('microi-login-success', onLoginSuccess)
@@ -1069,6 +1087,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  openClawAuthBridge?.destroy()
+  openClawAuthBridge = null
   stopTenantProgress()
   if (profileNoticeTimer) clearTimeout(profileNoticeTimer)
   window.removeEventListener('microi-login-success', onLoginSuccess)

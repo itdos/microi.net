@@ -14,7 +14,9 @@ description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租
 | `V8.Cache.Set(key, value, expire)` | 设置缓存 | `boolean` |
 | `V8.Cache.Get(key)` | 获取缓存 | `string \| null` |
 | `V8.Cache.Remove(key)` | 删除缓存 | `boolean` |
-| `V8.Cache.Exists(key)` | 是否存在 | `boolean` |
+| `V8.Cache.KeyExist(key)` | 是否存在（兼容旧版运行时的真实方法名） | `boolean` |
+
+> 需要把接口引擎复制到不同版本的 Microi 环境时，统一使用 `V8.Cache.KeyExist(key)`。部分新版本可能提供 `Exists` 别名，但旧版运行时没有该方法。
 
 ## Redis 管理器与 MCP
 
@@ -198,7 +200,7 @@ if (result.Code === 1 && result.Data) {
 var lockKey = 'Microi:' + V8.OsClient + ':lock:order:' + V8.Param.orderId;
 
 // 尝试获取锁（10 秒过期）
-if (V8.Cache.Exists(lockKey)) {
+if (V8.Cache.KeyExist(lockKey)) {
   return { Code: 0, Msg: '操作正在进行中，请勿重复提交' };
 }
 V8.Cache.Set(lockKey, '1', '0.00:00:10');

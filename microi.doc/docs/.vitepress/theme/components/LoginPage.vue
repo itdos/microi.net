@@ -282,7 +282,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
+import { siteStyle } from '../site-style'
 
 const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
@@ -324,6 +326,7 @@ let resizeHandler = null
 let visibilityHandler = null
 let tenantProgressTimer = null
 let tenantProgressTraceId = ''
+let openClawAuthBridge = null
 
 function getDefaultApiBase() {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
@@ -648,6 +651,7 @@ function handleLoginSuccess(resp, result) {
   }
 
   window.dispatchEvent(new CustomEvent('microi-login-success', { detail: currentUser.value }))
+  openClawAuthBridge?.notify()
   showToast('登录成功，正在进入个人中心。', 'success')
   const redirect = getRedirectTarget()
   window.setTimeout(() => {
@@ -866,10 +870,12 @@ function resetSession() {
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_tenant')
   localStorage.removeItem('microi_doc_tenant_url')
+  openClawAuthBridge?.notify()
   showToast('已退出登录。')
 }
 
 function initParticles() {
+  if (animFrame || siteStyle.value !== 'classic') return
   const canvas = particleCanvas.value
   if (!canvas) return
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -947,14 +953,41 @@ function initParticles() {
   draw()
 }
 
+function destroyParticles() {
+  if (animFrame) cancelAnimationFrame(animFrame)
+  animFrame = null
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  resizeHandler = null
+  if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler)
+  visibilityHandler = null
+  const canvas = particleCanvas.value
+  const ctx = canvas?.getContext('2d')
+  if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
+
+watch(siteStyle, (value) => {
+  if (value === 'classic') nextTick(initParticles)
+  else destroyParticles()
+})
+
 onMounted(() => {
   restoreSession()
+  const query = new URLSearchParams(window.location.search)
+  if (query.get('tab') === 'register') authTab.value = 'register'
+  openClawAuthBridge = createOpenClawAuthBridge(() => ({
+    token: authToken.value,
+    user: currentUser.value,
+    quota: null,
+    apiBase: API_BASE,
+    osClient: OS_CLIENT
+  }))
+  openClawAuthBridge.notify()
   if (isAuthed.value) {
     window.location.href = getRedirectTarget() || '/profile.html#/overview'
     return
   }
   nextTick(() => {
-    initParticles()
+    if (siteStyle.value === 'classic') initParticles()
     if (!devSmsBypass.value) {
       refreshCaptcha()
     }
@@ -962,11 +995,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  openClawAuthBridge?.destroy()
+  openClawAuthBridge = null
   if (smsTimer) clearInterval(smsTimer)
   if (toastTimer) clearTimeout(toastTimer)
-  if (animFrame) cancelAnimationFrame(animFrame)
-  if (resizeHandler) window.removeEventListener('resize', resizeHandler)
-  if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler)
+  destroyParticles()
 })
 </script>
 

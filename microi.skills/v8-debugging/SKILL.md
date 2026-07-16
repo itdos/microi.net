@@ -174,6 +174,14 @@ console.error('校验失败', V8.Form);
 V8.Tips('调试: ' + JSON.stringify(V8.Form), true);
 ```
 
+## VS Code 插件输出约定
+
+Microi VS Code 插件的右下角信息、警告和错误通知必须同步写入【输出 → Microi 吾码】，让构建、推送、拉取、登录、同步和调试结果在通知消失后仍可追溯。输出时间使用运行 VS Code 电脑的本地时区，格式统一为 `yyyy-MM-dd HH:mm:ss`，禁止直接使用 `toISOString()` 造成 UTC 时间偏差。
+
+- 后台 Token/会话维护等静默健康探测设置 `silent=true` 后，预期的网络不可达不得反复写成红色错误。
+- 用户主动执行拉取、推送或状态检查时，网络错误必须保留错误码、系统调用、地址、端口及聚合错误明细；禁止出现只有 `Error:`、没有原因的空日志。
+- 所有右下角通知统一经过通知封装写入输出；带操作按钮的通知还应记录用户选择，禁止业务模块直接调用 `vscode.window.showInformationMessage/showWarningMessage/showErrorMessage` 绕过持久日志。
+
 ## 不要在生产泄漏敏感信息
 
 ```javascript

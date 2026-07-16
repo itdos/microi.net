@@ -392,8 +392,8 @@ Microi 的在线 AI 应用统一使用 `mci_ai_app / mci_ai_app_file / mci_ai_ap
 - 三类前端应用可复用 `ApplicationBundle` 文件传输协议，但运行安装不同：MicroService 还要写 `sys_microiservice_page`，Web/UniApp 只维护 AI 应用与版本，因此商城必须保存明确类型，不能合并成一个含糊枚举。
 - 在线商城记录可以保存可下载 ZIP 引用；用户下载的离线 JSON 则必须自包含最新运行产物，勾选“同时发布源码”时再额外内嵌私有源码。无源码只限制二次开发，不能阻断已经发布页面的运行。
 - 平台自有打包/导入接口不得假设客户全局 V8 已定义 `DateNow` 等辅助函数；应在接口内实现 `DateNow -> System.DateTime.Now -> ISO` 的局部回退，升级时只差量更新平台接口，禁止覆盖客户系统设置中的全局 V8。
-- 微服务安装器写入 `sys_microiservice_page` 后，应读取路由元数据中的 `LegacyMenuUrls/LegacyComponentPaths`。目标服务器可把占位或历史菜单迁移到 `/micro-app/host`，将 `Url` 写成包含稳定 `MsKey` 的 `/micro-app/{MsKey}/{route}` 并补齐服务、页面和路由字段；原开发服务器若已有可运行的原生 `ComponentPath`，重复打包/安装必须保留该菜单，不能破坏现有路由。
-- 微服务菜单的友好路由必须优先使用稳定的 `MsKey`，前端菜单查询要携带 `MicroServiceKey/MsKey`；后端资源控制器同时兼容按 `MsKey` 和历史服务 `Id` 查找，避免已保存的 `/micro-app/{Id}/...` 书签或菜单返回 404。
+- 微服务安装器写入 `sys_microiservice_page` 后，应读取路由元数据中的 `LegacyMenuUrls/LegacyComponentPaths`。插件同步 `microi.routes.json` 时必须同时接受这些字段位于路由顶层或 `meta` 内、camelCase 或 PascalCase，并统一写入 `RouteMetaJson`，禁止静默丢弃。目标服务器可把占位或历史菜单迁移到 `/micro-app/host`，将 `Url` 写成包含稳定 `MsKey` 的 `/micro-app/{MsKey}/{route}` 并补齐服务、页面和路由字段；原开发服务器若已有可运行的原生 `ComponentPath`，重复打包/安装必须保留该菜单，不能破坏现有路由。
+- 微服务菜单的友好路由必须优先使用稳定的 `MsKey`，前端菜单查询要携带 `MicroServiceKey/MsKey`；后端资源控制器同时兼容按 `MsKey` 和历史服务 `Id` 查找。动态路由必须把原菜单 URL、`/micro-app/{MsKey}/{route}`、`/micro-app/{Id}/{route}` 注册为同一宿主页的主路径/别名，使新旧书签同时可用，不能要求客户改一次菜单就废弃旧地址。
 
 ### AI 应用工作台页面预览映射
 

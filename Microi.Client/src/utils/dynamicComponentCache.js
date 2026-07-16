@@ -11,7 +11,8 @@
  * 使用全局缓存池，相同路径的组件只创建一次
  * 使用 import.meta.glob 预加载所有 vue 组件模块
  */
-import { defineAsyncComponent, markRaw } from 'vue';
+import { defineAsyncComponent, defineComponent, h, markRaw } from 'vue';
+import MicroAppDevComponent from '@/views/micro-app/dev-component.vue';
 
 // 使用 import.meta.glob 预加载所有 views 下的 .vue 组件
 // 这是 Vite 推荐的动态导入方式，必须在模块顶层使用静态字符串
@@ -118,12 +119,18 @@ const DynamicComponentCache = {
                 });
             } else {
                 console.warn(`[DynamicComponentCache] 未找到组件: ${path}`);
-                // 返回一个空组件占位符，避免渲染错误
-                component = defineAsyncComponent({
-                    loader: () => Promise.resolve({ 
-                        template: `<div class="component-not-found">组件未找到: ${path}</div>` 
-                    })
-                });
+                // 本地源码不存在时，尝试通过已安装微服务页面的 LegacyComponentPaths
+                // 解析并承载旧开发组件。离线应用包安装后即可生效，无需逐租户改字段。
+                component = markRaw(defineComponent({
+                    name: `MicroAppLegacyComponent_${String(name || "custom").replace(/[^\w]/g, "_")}`,
+                    inheritAttrs: false,
+                    setup(props, { attrs }) {
+                        return () => h(MicroAppDevComponent, {
+                            ...attrs,
+                            legacyComponentPath: path
+                        });
+                    }
+                }));
             }
         }
         

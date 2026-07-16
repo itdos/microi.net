@@ -45,14 +45,19 @@ test("application-store PackageOnly output is a self-contained offline package",
   assert.match(publishSource, /isOfflineAction\s*=\s*action\s*===\s*'OfflinePackage'[\s\S]*?action\s*===\s*'PackageOnly'/);
   assert.match(publishSource, /ApplicationBundle\.BuildAssets\s*=\s*buildAssets/);
   assert.match(publishSource, /ApplicationBundle\.SourceFiles\s*=\s*sourceFiles/);
+  assert.match(publishSource, /ReturnPackageModel/);
+  assert.match(publishSource, /if\s*\(returnPackageModel\)\s*offlineResult\.Package\s*=\s*packageModel/);
+  assert.doesNotMatch(publishSource, /return ok\(\{\s*Package:\s*packageModel,[\s\S]*?FileByteBase64/);
 });
 
 test("microservice installation preserves source-server native menus and migrates target placeholders", () => {
   assert.match(source, /LegacyMenuUrls[\s\S]*?LegacyComponentPaths/);
+  assert.match(source, /normalizeRouteMeta[\s\S]*?RouteMetaJson:\s*JSON\.stringify\(routeMeta\)/);
   assert.match(source, /PreserveExistingNativeMenus:\s*preserveExistingNativeMenus/);
   assert.match(source, /isExistingNativeComponent[\s\S]*?MicroServiceMenusPreserved\+\+/);
   assert.match(source, /OpenType:\s*'MicroService'/);
-  assert.match(source, /stableMenuUrl[\s\S]*?Url:\s*stableMenuUrl/);
+  assert.match(source, /recoverBoundMicroserviceMenus/);
+  assert.match(source, /stableMenuUrl[\s\S]*?preservedLegacyUrl[\s\S]*?Url:\s*preservedLegacyUrl/);
   assert.match(source, /ComponentPath:\s*'\/micro-app\/host'/);
   assert.match(source, /MicroServicePageId:\s*binding\.PageId/);
   assert.match(source, /MicroServiceRoutePath:\s*binding\.RoutePath/);

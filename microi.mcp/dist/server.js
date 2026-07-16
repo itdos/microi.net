@@ -42,12 +42,6 @@ function sanitizeServerNamePart(value) {
         .toLowerCase()
         .substring(0, 48);
 }
-function withMicroiServerPrefix(value) {
-    const name = String(value || '').trim();
-    if (!name)
-        return '';
-    return /^microi[-_]/i.test(name) ? name : `Microi-${name}`;
-}
 function buildRuntimeServerName(context) {
     let hostPart = '';
     try {
@@ -56,15 +50,13 @@ function buildRuntimeServerName(context) {
     catch {
         hostPart = sanitizeServerNamePart(context.apiBaseUrl || '');
     }
-    const titlePart = (context.label || '').trim();
-    if (titlePart)
-        return withMicroiServerPrefix(titlePart);
     const basePart = sanitizeServerNamePart(context.osClient || '')
         || hostPart
         || 'default';
     return `Microi-${basePart}`;
 }
 const CORE_TOOL_REGISTRATION_ORDER = [
+    'microi_codex',
     'microi_get_status',
     'microi_redis_statistics',
     'microi_redis_list_keys',
@@ -105,6 +97,39 @@ const CORE_TOOL_REGISTRATION_ORDER = [
 ];
 const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
 const jsonRecordSchema = z.record(z.unknown());
+function isZodSchema(value) {
+    return !!value
+        && typeof value === 'object'
+        && typeof value.safeParse === 'function';
+}
+function getToolDescription(registration) {
+    return registration.args.find((arg, index) => index > 0 && typeof arg === 'string') || '';
+}
+function getToolShape(registration) {
+    for (let index = 1; index < registration.args.length - 1; index += 1) {
+        const candidate = registration.args[index];
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+            continue;
+        const values = Object.values(candidate);
+        if (values.length === 0 || values.every(isZodSchema)) {
+            return candidate;
+        }
+    }
+    return undefined;
+}
+function getZodTypeName(schema) {
+    let current = schema;
+    const wrappers = [];
+    while (current?._def?.innerType && isZodSchema(current._def.innerType)) {
+        wrappers.push(String(current._def.typeName || current.constructor.name));
+        current = current._def.innerType;
+    }
+    const rawName = String(current?._def?.typeName || current?.constructor?.name || 'unknown');
+    const name = rawName.replace(/^Zod/, '').toLowerCase();
+    if (wrappers.some(item => /Array/i.test(item)))
+        return `${name}[]`;
+    return name;
+}
 function bufferToolRegistrationsByPriority(server) {
     const mutableServer = server;
     const originalTool = mutableServer.tool.bind(server);
@@ -114,17 +139,86 @@ function bufferToolRegistrationsByPriority(server) {
         buffered.push({ name, args, index: buffered.length });
         return undefined;
     };
-    return () => {
-        mutableServer.tool = originalTool;
-        buffered
-            .sort((a, b) => {
-            const priorityA = CORE_TOOL_PRIORITY.get(a.name) ?? Number.MAX_SAFE_INTEGER;
-            const priorityB = CORE_TOOL_PRIORITY.get(b.name) ?? Number.MAX_SAFE_INTEGER;
-            return priorityA - priorityB || a.index - b.index;
-        })
-            .forEach((item) => {
-            originalTool(...item.args);
-        });
+    const findRegistration = (name) => {
+        const normalized = name.startsWith('microi_') ? name : `microi_${name}`;
+        return buffered.find(item => item.name === normalized);
+    };
+    return {
+        flush: () => {
+            mutableServer.tool = originalTool;
+            buffered
+                .sort((a, b) => {
+                const priorityA = CORE_TOOL_PRIORITY.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+                const priorityB = CORE_TOOL_PRIORITY.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+                return priorityA - priorityB || a.index - b.index;
+            })
+                .forEach((item) => {
+                originalTool(...item.args);
+            });
+        },
+        invoke: async (name, params = {}) => {
+            const registration = findRegistration(name);
+            if (!registration || registration.name === 'microi_codex') {
+                return {
+                    content: [{ type: 'text', text: `Unknown Microi action: ${name}. Call action="list_tools" to discover available tools.` }],
+                    isError: true,
+                };
+            }
+            const handler = registration.args[registration.args.length - 1];
+            if (typeof handler !== 'function') {
+                return {
+                    content: [{ type: 'text', text: `Microi action has no callable handler: ${registration.name}` }],
+                    isError: true,
+                };
+            }
+            const shape = getToolShape(registration);
+            let validatedParams = params;
+            if (shape) {
+                const parsed = z.object(shape).safeParse(params);
+                if (!parsed.success) {
+                    return {
+                        content: [{
+                                type: 'text',
+                                text: JSON.stringify({
+                                    action: registration.name,
+                                    error: 'Invalid tool parameters',
+                                    issues: parsed.error.issues,
+                                }, null, 2),
+                            }],
+                        isError: true,
+                    };
+                }
+                validatedParams = parsed.data;
+            }
+            return handler(validatedParams, {});
+        },
+        list: (keyword) => buffered
+            .filter(item => item.name !== 'microi_codex')
+            .filter(item => !keyword
+            || includesKeyword(item.name, keyword)
+            || includesKeyword(getToolDescription(item), keyword))
+            .map(item => ({
+            name: item.name,
+            description: getToolDescription(item),
+        })),
+        describe: (name) => {
+            const registration = findRegistration(name);
+            if (!registration || registration.name === 'microi_codex')
+                return undefined;
+            const shape = getToolShape(registration) || {};
+            return {
+                name: registration.name,
+                description: getToolDescription(registration),
+                params: Object.fromEntries(Object.entries(shape).map(([key, schema]) => [
+                    key,
+                    {
+                        type: getZodTypeName(schema),
+                        required: !schema.isOptional(),
+                        description: schema.description || '',
+                    },
+                ])),
+            };
+        },
     };
 }
 /** 将表结构格式化为 Markdown（方便 AI 阅读） */
@@ -375,6 +469,12 @@ BOUNDARY RULES:
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
+## MCP 写入超时与回读规则
+- \`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
+- 超时只代表客户端没有及时拿到响应，不等于服务器一定未写入。必须先用对应 get 工具回读，禁止立即重复创建表、字段、接口引擎或按钮。
+- 菜单按钮字段始终传明文 JSON 数组；不要根据租户 \`sys_menu\` 事件自行 Base64 编码。
+- 标准工具回读仍不能确认时，报告“写入结果不确定”并保留原始错误。不要擅自改走原生 FormEngine HTTP、直接 SQL 或新建一次性维护接口引擎。
+
 ## Redis 管理
 - **microi_redis_statistics / microi_redis_list_keys / microi_redis_get_key** — 统计、SCAN 分页与查看 String/Hash/List/Set/Sorted Set/Stream；默认操作当前租户 Redis
 - **microi_redis_delete_keys / microi_redis_replace_value / microi_redis_rename_key / microi_redis_set_ttl** — 删除、写入、重命名和 TTL，均要求 confirmExecution
@@ -575,10 +675,50 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
  */
 export function createMcpServer(client, context) {
     const { osClient } = context;
-    // 服务器名称与 mcp.json key 保持一致：统一使用 Microi- 前缀，如 Microi-乐闪购。
+    // 协议层名称保持 ASCII；中文业务名只放在 UTF-8 instructions 中用于显示。
     const serverName = buildRuntimeServerName(context);
     const server = new McpServer({ name: serverName, version: '1.0.0' }, { instructions: buildInstructions(context) });
-    const flushToolRegistrations = bufferToolRegistrationsByPriority(server);
+    const toolRegistry = bufferToolRegistrationsByPriority(server);
+    server.tool('microi_codex', `Codex-compatible single entry point for all Microi tools on OsClient "${osClient}". Use action="list_tools" with optional params.keyword to discover tools, action="describe_tool" with params.name to inspect exact arguments, or pass any existing Microi tool name such as microi_get_status, microi_get_db_schema, microi_get_table_data, microi_get_module, microi_update_module, microi_get_engine_code, or microi_save_engine_code. The dispatcher reuses the original tool validation, write confirmation, audit, and readback logic.`, {
+        action: z.string().describe('list_tools | describe_tool | an existing microi_* tool name'),
+        params: jsonRecordSchema.optional().describe('Arguments for the selected action. Use {keyword?} for list_tools and {name} for describe_tool.'),
+    }, async ({ action, params }) => {
+        try {
+            if (action === 'list_tools') {
+                const keyword = getStringField(params, 'keyword', 'Keyword');
+                const tools = toolRegistry.list(keyword);
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({
+                                count: tools.length,
+                                keyword: keyword || null,
+                                tools,
+                                next: 'Call action="describe_tool" with params.name before invoking an unfamiliar write tool.',
+                            }, null, 2),
+                        }],
+                };
+            }
+            if (action === 'describe_tool') {
+                const name = getStringField(params, 'name', 'Name', 'tool', 'Tool');
+                const detail = toolRegistry.describe(name);
+                if (!detail) {
+                    return {
+                        content: [{ type: 'text', text: `Unknown Microi tool: ${name || '(empty)'}` }],
+                        isError: true,
+                    };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify(detail, null, 2) }] };
+            }
+            return await toolRegistry.invoke(action, params);
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `Microi dispatcher failed: ${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
     // ========================
     // Tool: 获取服务器状态
     // ========================
@@ -1015,7 +1155,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
@@ -1026,7 +1166,12 @@ export function createMcpServer(client, context) {
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: `✅ Engine "${apiEngineKey}" code saved successfully.` }] };
+            return {
+                content: [{
+                        type: 'text',
+                        text: `✅ Engine "${apiEngineKey}" code saved successfully.\n\n${JSON.stringify(result.Data || {}, null, 2)}`,
+                    }],
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -1128,7 +1273,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存 V8 事件代码
     // ========================
-    server.tool('microi_save_event_code', `Save (update) form/table V8 event code on Microi server (OsClient: ${osClient}). This is the MCP tool for submitting 表单V8事件 code. Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code.`, {
+    server.tool('microi_save_event_code', `Save (update) form/table V8 event code on Microi server (OsClient: ${osClient}). This is the MCP tool for submitting 表单V8事件 code. Increments semantic Version in the code header and keeps only the complete function description in code; change history is not written into event source code. Transport timeouts are automatically verified by remote readback. Do not switch to Diy_Table/FormEngine direct writes or SQL after a timeout.`, {
         formEngineKey: z.string().describe('The table name or FormEngine key the event belongs to'),
         eventType: z.string().describe('Event type: InFormV8 | SubmitFormV8 | OutFormV8 | SubmitBeforeServerV8 | SubmitAfterServerV8 | DataFilterV8'),
         code: z.string().describe('The complete JavaScript source code to save'),
@@ -1140,7 +1285,12 @@ export function createMcpServer(client, context) {
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: `✅ Event "${formEngineKey}/${eventType}" code saved successfully.` }] };
+            return {
+                content: [{
+                        type: 'text',
+                        text: `✅ Event "${formEngineKey}/${eventType}" code saved successfully.\n\n${JSON.stringify(result.Data || {}, null, 2)}`,
+                    }],
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -2003,7 +2153,7 @@ export function createMcpServer(client, context) {
     registerDesignTools(server, client, context);
     registerAdvancedTools(server, client, context);
     registerBlueprintTools(server, client, context);
-    flushToolRegistrations();
+    toolRegistry.flush();
     return server;
 }
 //# sourceMappingURL=server.js.map

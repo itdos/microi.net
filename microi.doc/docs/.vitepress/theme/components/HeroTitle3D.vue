@@ -7,6 +7,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vitepress'
+import { siteStyle } from '../site-style'
 
 const isHomePage = ref(false)
 const anchorRef = ref(null)
@@ -23,7 +24,8 @@ const brandMouse = { x: 0, y: 0, targetX: 0, targetY: 0 }
 const checkHomePage = () => {
   if (typeof window === 'undefined') return false
   const path = route.path || window.location.pathname
-  return path === '/' || path === '/index.html' || path === '/index'
+  const isHome = path === '/' || path === '/index.html' || path === '/index'
+  return isHome && siteStyle.value === 'classic'
 }
 
 function inject3DTitle() {
@@ -205,7 +207,7 @@ function tryInject() {
   tryIt()
 }
 
-watch(() => route.path, () => {
+watch([() => route.path, siteStyle], () => {
   const isHome = checkHomePage()
   isHomePage.value = isHome
   if (isHome) {

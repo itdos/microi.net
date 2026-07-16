@@ -48,8 +48,8 @@ export function formatMessageContent(content) {
     // 处理加粗 **text**
     content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     
-    // 处理斜体 *text*（排除已处理的加粗）
-    content = content.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    // 处理斜体 *text*（排除已处理的加粗）；避免正则后行断言以兼容 Chrome 49。
+    content = content.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
     
     // 处理换行
     content = content.replace(/\n/g, '<br>');

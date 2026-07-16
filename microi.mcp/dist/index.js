@@ -4,6 +4,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import { MicroiClient } from './microi-client.js';
 import { createMcpServer } from './server.js';
+import { resolveMcpLabel } from './mcp-label.js';
 /** 从 VS Code 扩展写入的 token 文件中读取指定服务器的 token */
 function readTokenFromFile(filePath, apiUrl, osClient) {
     try {
@@ -90,7 +91,11 @@ async function main() {
         }
         const client = new MicroiClient(config);
         await client.login();
-        const serverContext = { osClient: config.osClient || '', apiBaseUrl: config.apiBaseUrl, label: process.env.MICROI_LABEL || '' };
+        const serverContext = {
+            osClient: config.osClient || '',
+            apiBaseUrl: config.apiBaseUrl,
+            label: resolveMcpLabel(process.env),
+        };
         const server = createMcpServer(client, serverContext);
         await startStdio(server);
         // 监听 token 文件变化（VS Code 扩展每 14 分钟刷新 token 并写入文件）
