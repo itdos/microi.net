@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "6.4.0",
+  "version": "6.4.1",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -140,7 +140,9 @@
     "@types/keymaster": "^1.6.33",
     "@types/lodash": "^4.17.24",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-legacy": "^7.2.1",
     "@vitejs/plugin-vue": "^6.0.3",
+    "abortcontroller-polyfill": "^1.7.8",
     "autoprefixer": "^10.4.27",
     "cross-env": "^10.1.0",
     "fast-glob": "^3.3.3",
@@ -148,6 +150,7 @@
     "rollup-plugin-visualizer": "^6.0.5",
     "sass": "^1.83.0",
     "svgo": "^4.0.0",
+    "terser": "^5.49.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-compression": "^0.5.1",
@@ -155,13 +158,14 @@
   },
   "browserslist": [
     "> 1%",
-    "last 2 versions"
+    "last 2 versions",
+    "Chrome >= 49"
   ],
   "bugs": {
     "url": "https://www.microi.net"
   },
   "engines": {
-    "node": ">=18",
+    "node": "^20.19.0 || ^22.12.0",
     "npm": ">= 9.0.0"
   },
   "keywords": [

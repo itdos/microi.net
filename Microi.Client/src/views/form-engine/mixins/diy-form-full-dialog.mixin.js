@@ -595,6 +595,7 @@ export default {
                 self.TableId = self.$route.params.TableId;
                 self.FormMode = self.$route.query.FormMode;
                 self.SysMenuId = self.$route.query.SysMenuId || self.$route.query.Id || (self.$route.meta ? (self.$route.meta.Id || self.$route.meta.SysMenuId) : "");
+                self.FieldFormDefaultValues = self.ParseRouteDefaultValues(self.$route);
                 await self.EnsureSysMenuModel();
 
                 var newTableRowId = self.$route.params.TableRowId;

@@ -1636,7 +1636,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
   });
   server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
   server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-  server.tool('microi_update_module', `Incrementally update an existing menu module, including button/tab JSON. OsClient ${osClient}.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+  server.tool('microi_update_module', `Incrementally update an existing menu module, including button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
     const normalized = normalizeAllMenuJson(module);
     if (normalized.errors.length) return textResult(JSON.stringify(normalized, null, 2), true);
     const target = getString(module, 'moduleId', 'ModuleId', 'Id') || getString(module, 'name', 'Name');

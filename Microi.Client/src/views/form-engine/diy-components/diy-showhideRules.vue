@@ -762,7 +762,11 @@ export default {
             this.rulesLists = [];
 
             if (this.model.length > 0) {
-                var str = this.model.match(/(?<=codeSTART)(\S*)(?=codeEND)/g);
+                var str = [];
+                this.model.replace(/codeSTART(\S*)codeEND/g, function (match, payload) {
+                    str.push(payload);
+                    return match;
+                });
                 str.map((res) => {
                     this.rulesLists.push(JSON.parse(res));
                 });
@@ -778,7 +782,11 @@ export default {
             var list = [],
                 sumList = [];
             if (code) {
-                var str = code.match(/(?<=codeSTART)(\S*)(?=codeEND)/g);
+                var str = [];
+                code.replace(/codeSTART(\S*)codeEND/g, function (match, payload) {
+                    str.push(payload);
+                    return match;
+                });
                 str.map((res) => {
                     list.push(JSON.parse(res));
                 });

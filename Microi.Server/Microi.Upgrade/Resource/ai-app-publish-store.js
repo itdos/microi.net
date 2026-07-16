@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.1.5
+ * Version: v1.1.6
  * Function:
  * - Create self-contained offline packages or publish online applications, AI applications, and frontend microservices to the application store.
  */
@@ -253,6 +253,7 @@ var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
 var runtime = appType === 'MicroService' ? getMicroService(app.AppKey) : { Service: null, Pages: [] };
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
+var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
 var action = text(V8.Param.Action || 'Package');
 // 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
 // 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
@@ -409,12 +410,23 @@ if (isOfflineAction) {
   }
   packageModel.PackageInfo.OfflineSelfContained = true;
   var jsonText = JSON.stringify(packageModel, null, 2);
-  return ok({
-    Package: packageModel,
+  var offlineResult = {
     FileName: safeFileName(packageModel.PackageInfo.Name) + '-' + versionNo + '.microi-app.json',
     ContentType: 'application/json; charset=utf-8',
-    FileByteBase64: V8.Base64.StringToBase64(jsonText)
-  }, '应用离线包已生成');
+    FileByteBase64: V8.Base64.StringToBase64(jsonText),
+    PackageSummary: {
+      Name: packageModel.PackageInfo.Name,
+      Version: packageModel.PackageInfo.Version,
+      OfflineSelfContained: true,
+      BuildAssetCount: buildAssets.length,
+      SourceFileCount: sourceFiles.length,
+      RouteCount: packageModel.ApplicationBundle.Routes.length
+    }
+  };
+  // 大型源码包的 Package 对象和 FileByteBase64 内容完全重复。默认只返回下载内容，
+  // 避免响应序列化额外占用数百 MB；兼容确实需要内存对象的旧调用方。
+  if (returnPackageModel) offlineResult.Package = packageModel;
+  return ok(offlineResult, '应用离线包已生成');
 }
 
 if (action === 'Publish') {

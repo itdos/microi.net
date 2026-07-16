@@ -374,6 +374,38 @@
             0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
             40% { transform: scale(1); opacity: 1; }
         }
+        .mci-startup-error {
+            display: none;
+            width: calc(100vw - 48px);
+            max-width: 520px;
+            box-sizing: border-box;
+            margin-top: 10px;
+            padding: 14px 16px;
+            color: #9f1239;
+            color: var(--mci-color-danger);
+            background: rgba(232, 41, 74, 0.08);
+            border: 1px solid rgba(232, 41, 74, 0.22);
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            text-align: left;
+            word-break: break-word;
+        }
+        .mci-startup-error__retry {
+            display: block;
+            min-width: 108px;
+            margin: 12px auto 0;
+            padding: 8px 18px;
+            color: #fff;
+            background: #6C2BD9;
+            background: var(--mci-color-primary);
+            border: 0;
+            border-radius: 8px;
+            font: inherit;
+            cursor: pointer;
+        }
+        #microi_loading.startup-failed .mci-startup-error { display: block; }
+        #microi_loading.startup-failed .mci-load-dots { display: none; }
 
         /* === serverUrl（仅 APK 模式显示） === */
         .mci-server-url {
@@ -527,6 +559,11 @@
                 <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
             </div>
 
+            <div class="mci-startup-error" id="startupError" role="alert">
+                <div id="startupErrorMessage"></div>
+                <button class="mci-startup-error__retry" id="startupRetry" type="button">重新加载</button>
+            </div>
+
             <!-- 服务器地址（APK 模式下显示） -->
             <div class="mci-server-url" id="serverUrl"></div>
         </div>
@@ -633,7 +670,7 @@
       })();
     </script>
     <div id="app_microi"></div>
-    <script src="/static/js/microi.loading.js?d=20260424" type="text/javascript"></script>
+    <script src="/static/js/microi.loading.js?d=20260716" type="text/javascript"></script>
     <!-- Vite 入口 -->
     <script type="module" src="/src/main.js"></script>
 </body>
