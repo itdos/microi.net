@@ -22,6 +22,7 @@ public sealed class NamesTypesParametersTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData("*")]
     [InlineData(" \t")]
     [InlineData(".")]
     [InlineData("dbo.User")]
