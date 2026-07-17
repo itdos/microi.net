@@ -2,6 +2,7 @@
 layout: page
 title: 个人中心 - Microi吾码
 description: Microi吾码官网个人中心，用于管理 SaaS 租户、创建免费租户和查看账号信息
+pageClass: mci-profile-page
 head:
   - - meta
     - name: keywords

@@ -374,15 +374,23 @@ VS Code 插件创建前端微服务时，目录名必须以用户输入的微服
 
 VS Code 插件执行前端微服务构建前必须先安全清理当前项目自己的 `distDir`（默认 `dist`），并校验待删除目录位于微服务项目目录内；推送时只能收集本次干净构建产生的文件。禁止把旧 chunk、旧 hash 文件或历史构建残留写入 `AssetManifestJson` / `AssetsJson`，否则会造成数据库附件列表与当前 `index.html` 不一致。
 
-“构建并推送前端微服务”必须在本地构建通过后，先把完整受管源码同步到当前租户私有 HDFS（`mci_ai_app / mci_ai_app_file`），再发布公有 HDFS 编译产物并更新 `sys_microiservice / sys_microiservice_page`。源码同步失败必须终止发布并向用户报错，禁止吞掉异常后留下“新运行产物已发布但没有对应源码”的半完成状态。
+“构建并推送前端微服务”必须在本地构建通过后，先把完整受管源码同步到当前租户私有 HDFS（主数据写入 `sys_microistore`，源码清单写入 `mci_ai_app_file`），再发布公有 HDFS 编译产物并更新 `sys_microiservice / sys_microiservice_page`。源码同步失败必须终止发布并向用户报错，禁止吞掉异常后留下“新运行产物已发布但没有对应源码”的半完成状态。
 
 ### 表单下拉 Data 动态对象选项
 
 表单 V8 通过 `V8.FieldSet('字段名', 'Data', objectRows)` 动态写入下拉数据时，如果 `objectRows` 是对象数组，即使 `diy_field.Config.DataSource='Data'`，前端也必须按对象数据源处理，并使用 `SelectLabel/SelectSaveField` 或常见字段兜底生成 label/value。禁止把对象数组按普通字符串 Data 源过滤，否则会出现接口已有数据但下拉显示“无数据”的回归。
 
+### 复盘：历史 OpenIframe 打印入口在 Vue3 弹窗中空白
+
+- 触发场景：同一租户的旧正式版打印正常，最新版列表点击打印只打开空白抽屉；数据库中的当前按钮已改成 `PrintEngineView`，但运行态菜单缓存仍可能返回历史 `ComponentName: 'OpenIframe'`。
+- 根因：Vue3 全局组件表移除了 Vue2 的 `OpenIframe` 注册，动态组件只能渲染成未知标签；同时历史 `DataApi` 可能带有 `https:/host` 这种单斜杠协议地址。
+- 通用规则：必须保留 `OpenIframe` 兼容入口。含 `PrintId` 的旧打印参数转交当前内置 `PrintEngineView`，普通 URL 弹窗继续使用 iframe；打印数据地址进入请求层前统一修正单斜杠 HTTP(S) 协议。排查时必须同时核对数据库 V8 与浏览器运行态 V8，不能只比较服务器记录。
+- 分层排查：打印画布恢复后仍无业务数据时，继续直接运行 `DataApi` 及其 `V8.ApiEngine.Run` 依赖，逐一对比测试/正式环境的 `IsEnable/StopHttp/AllowAnonymous` 和真实返回；旧后端对仅赋值 `V8.Result` 的依赖可能需要同时保留赋值并显式 `return V8.Result`。不得把前端空白、数据接口失败和浏览器打印输出混成同一个结论。
+- 自动化检查：打开真实列表连续点击两次旧打印按钮，断言抽屉内出现打印引擎、打印数据接口成功、出现浏览器打印日志，并且没有未知组件警告、递归更新、页面异常或失败请求；保存首次和重复点击截图。
+
 ## 在线 AI 应用与微服务页面协作
 
-Microi 的在线 AI 应用统一使用 `mci_ai_app / mci_ai_app_file / mci_ai_app_version` 保存 Web、UniApp、MicroService 的应用、私有源码和版本。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
+Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`。`ApplicationType` 统一使用 `Platform / Web / UniApp / MicroService`，`Category` 保存游戏、企业、行业、教育等业务分类，`PublisherType` 保存官方/社区来源；`mci_ai_app_file / mci_ai_app_version` 仅作为私有源码清单和构建版本从表，其 `AppId` 必须指向 `sys_microistore.Id`。禁止再向 `mci_ai_app` 创建新的主记录。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
 
 - 开始改页面前先通过 MCP 的 `microi_list_applications` 和 `microi_get_application_context` 读取应用、文件树与源码，不得只看本地目录。
 - 在线 AI 工作台应允许三种应用在线编辑、保存、运行/预览、下载源码/编译包、制作离线包、发布应用商城；不能在前端单独拦截 `MicroService` 构建。

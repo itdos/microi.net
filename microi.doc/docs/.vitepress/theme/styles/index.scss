@@ -1,9 +1,9 @@
-// 登录页面：隐藏导航栏、侧边栏、页脚，内容全屏
+// 登录页面：保留顶部导航，隐藏文档侧栏与页脚。
 body:has(.ai-login-page) {
   overflow: hidden;
   background: #0a0a14 !important;
 
-  .VPNav, .VPNavBar, .VPSidebar, .VPFooter, .VPLocalNav {
+  .VPSidebar, .VPFooter, .VPLocalNav {
     display: none !important;
   }
   .Layout,
@@ -15,12 +15,12 @@ body:has(.ai-login-page) {
   .vp-doc {
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 100dvh !important;
+    min-height: calc(100dvh - 64px) !important;
     padding: 0 !important;
     margin: 0 !important;
   }
   .VPContent {
-    padding-top: 0 !important;
+    padding-top: 64px !important;
   }
   .VPDoc .container {
     max-width: 100% !important;

@@ -1287,9 +1287,9 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 
     <!-- 底部 Tabbar -->
     <nav class="mci-tabbar">
-      <a class="mci-tabbar__item mci-tabbar__item--active">首页</a>
-      <a class="mci-tabbar__item">消息</a>
-      <a class="mci-tabbar__item">我的</a>
+      <a class="mci-tabbar__item mci-tabbar__item--active"><svg class="mci-tabbar__icon" aria-hidden="true"><use href="#icon-home" /></svg><span>首页</span></a>
+      <a class="mci-tabbar__item"><svg class="mci-tabbar__icon" aria-hidden="true"><use href="#icon-message" /></svg><span>消息</span></a>
+      <a class="mci-tabbar__item"><svg class="mci-tabbar__icon" aria-hidden="true"><use href="#icon-user" /></svg><span>我的</span></a>
     </nav>
   </div>
 </template>

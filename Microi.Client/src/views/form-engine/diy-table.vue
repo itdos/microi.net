@@ -165,7 +165,12 @@
                                 >
                                     {{ $t('Msg.ContinuousSelection') }}
                                 </el-checkbox>
-                                <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
+                                <el-button
+                                    v-if="btn.IsVisible"
+                                    :key="TypeFieldName + 'more_btn_bs_' + btnIndex"
+                                    :type="GetMoreBtnStyle(btn)"
+                                    @click="RunMoreBtn(btn)"
+                                >
                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                     {{ btn.Name }}
                                 </el-button>

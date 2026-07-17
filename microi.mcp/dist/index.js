@@ -95,6 +95,7 @@ async function main() {
             osClient: config.osClient || '',
             apiBaseUrl: config.apiBaseUrl,
             label: resolveMcpLabel(process.env),
+            codexMode: process.env.MICROI_CODEX_MODE === '1',
         };
         const server = createMcpServer(client, serverContext);
         await startStdio(server);

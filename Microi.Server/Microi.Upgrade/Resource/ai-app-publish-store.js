@@ -1,9 +1,10 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.1.6
+ * Version: v1.4.0
  * Function:
- * - Create self-contained offline packages or publish online applications, AI applications, and frontend microservices to the application store.
+ * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
+ * - 优先从 mci_ai_app_file.PublishHdfsPath 打包真实 dist 编译资产，保证跨租户安装后可直接预览和重新编译。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -45,12 +46,12 @@ function normalizeVersion(value) {
   return 'v' + parseInt(match[1] || '1', 10) + '.' + parseInt(match[2] || '0', 10) + '.' + parseInt(match[3] || '0', 10);
 }
 function getApp(appIdOrKey) {
-  var result = V8.FormEngine.GetFormData('mci_ai_app', {
+  var result = V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['Id', '=', appIdOrKey]],
     _PageSize: 1
   });
   if (result && result.Code === 1 && result.Data) return result;
-  return V8.FormEngine.GetFormData('mci_ai_app', {
+  return V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['AppKey', '=', appIdOrKey]],
     _PageSize: 1
   });
@@ -119,7 +120,7 @@ function getMicroService(appKey) {
   return { Service: service.Data, Pages: pages && pages.Code === 1 ? toArray(pages.Data) : [] };
 }
 function getApplicationInfrastructure() {
-  var tableNames = ['mci_ai_app', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
+  var tableNames = ['sys_microistore', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
   var tablesResult = V8.FormEngine.GetTableData('diy_table', {
     _Where: [['Name', 'In', tableNames]],
     _PageSize: 100
@@ -134,7 +135,7 @@ function getApplicationInfrastructure() {
   });
   if (!fieldsResult || fieldsResult.Code !== 1) throw new Error('读取在线应用基础字段定义失败：' + ((fieldsResult && fieldsResult.Msg) || ''));
   var ddls = [
-    { TableName: 'mci_ai_app', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`Name` varchar(200) NULL,`AppKey` varchar(120) NULL,`AppType` varchar(50) NULL,`Description` mediumtext NULL,`Status` varchar(50) NULL,`OwnerUserId` varchar(50) NULL,`OwnerName` varchar(100) NULL,`CurrentVersion` int NULL,`PreviewUrl` varchar(1000) NULL,`PublicPublishPath` varchar(1000) NULL,`PrivateSourcePath` varchar(1000) NULL,`BuildStatus` varchar(50) NULL,`LastBuildTaskId` varchar(50) NULL,`LastBuildMsg` mediumtext NULL,`LastConversationId` varchar(50) NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
+    { TableName: 'sys_microistore', DDL: "CREATE TABLE IF NOT EXISTS `sys_microistore` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppName` varchar(200) NULL,`Name` varchar(200) NULL,`AppId` varchar(100) NULL,`AppKey` varchar(200) NULL,`AppVersion` varchar(50) NULL,`AppPublishTime` varchar(25) NULL,`AppUpdateTime` varchar(25) NULL,`AppAuthor` varchar(100) NULL,`AppAuthorAvatar` mediumtext NULL,`AppDetail` mediumtext NULL,`Description` mediumtext NULL,`AppPrice` int NULL,`AppOriPrice` int NULL,`AppRate` decimal(18,1) NULL,`AppPakcet` mediumtext NULL,`AppPreview` mediumtext NULL,`IsApprove` int NULL,`AppType` varchar(50) NULL,`ApplicationType` varchar(50) NULL,`Category` varchar(50) NULL,`PublisherType` varchar(50) NULL,`Status` varchar(50) NULL,`OwnerUserId` varchar(50) NULL,`OwnerName` varchar(200) NULL,`CurrentVersion` int NULL,`PreviewUrl` varchar(2000) NULL,`PublicPublishPath` varchar(2000) NULL,`PrivateSourcePath` varchar(2000) NULL,`BuildStatus` varchar(50) NULL,`LastBuildTaskId` varchar(50) NULL,`LastBuildMsg` mediumtext NULL,`LastConversationId` varchar(50) NULL,`ViewCount` int NULL,`InstallCount` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_file', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_file` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionId` varchar(50) NULL,`FilePath` varchar(1000) NULL,`FileName` varchar(255) NULL,`FileType` varchar(50) NULL,`HdfsPath` varchar(1000) NULL,`PublishHdfsPath` varchar(1000) NULL,`StorageScope` varchar(50) NULL,`ContentHash` varchar(100) NULL,`Size` bigint NULL,`Version` int NULL,`IsDirectory` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_version', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_version` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionNo` varchar(50) NULL,`VersionName` varchar(200) NULL,`Status` varchar(50) NULL,`SourceSnapshotPath` varchar(1000) NULL,`PublishPath` varchar(1000) NULL,`PreviewUrl` varchar(1000) NULL,`BuildTaskId` varchar(50) NULL,`BuildLog` mediumtext NULL,`ChangeSummary` mediumtext NULL,`FileCount` int NULL,`TotalSize` bigint NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'sys_microiservice', DDL: "CREATE TABLE IF NOT EXISTS `sys_microiservice` (`Id` varchar(36) NOT NULL PRIMARY KEY,`ParentId` varchar(50) NULL,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`MsName` varchar(50) NULL,`MsUrl` varchar(500) NULL,`MsKey` varchar(50) NULL,`MsType` varchar(50) NULL,`MsDevUrl` varchar(500) NULL,`IsEnable` int NULL,`StorageMode` varchar(50) NULL,`Runtime` varchar(50) NULL,`BuildVersion` varchar(50) NULL,`EntryPath` varchar(200) NULL,`AssetManifestJson` longtext NULL,`AssetsJson` longtext NULL,`DistHash` varchar(200) NULL,`AssetCount` int NULL,`TotalSize` varchar(25) NULL,`PublishTime` varchar(25) NULL,`SourceDirName` varchar(200) NULL,`Description` mediumtext NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
@@ -167,6 +168,34 @@ function getBuildAssets(app, latestVersion, runtime) {
       });
     }
   }
+  if (!assets.length && app && app.Id) {
+    var compiledFilesResult = getFiles(app.Id);
+    var compiledFiles = compiledFilesResult && compiledFilesResult.Code === 1
+      ? toArray(compiledFilesResult.Data)
+      : [];
+    for (var c = 0; c < compiledFiles.length; c++) {
+      var compiledFile = compiledFiles[c] || {};
+      var sourcePath = normalizePath(compiledFile.FilePath);
+      var publishPath = text(compiledFile.PublishHdfsPath);
+      if (isBlank(sourcePath) || isBlank(publishPath)) continue;
+      var lowerSourcePath = sourcePath.toLowerCase();
+      var buildPath = '';
+      if (lowerSourcePath.indexOf('dist/') === 0) buildPath = sourcePath.substring(5);
+      else if (lowerSourcePath.indexOf('build/') === 0) buildPath = sourcePath.substring(6);
+      else if (lowerSourcePath.indexOf('unpackage/dist/build/h5/') === 0) buildPath = sourcePath.substring(24);
+      if (isBlank(buildPath)) continue;
+      assets.push({
+        Path: buildPath,
+        FileName: compiledFile.FileName || buildPath.substring(buildPath.lastIndexOf('/') + 1),
+        ContentType: '',
+        FileByteBase64: readFileBase64(publishPath, isTextFile(buildPath), false),
+        Size: compiledFile.Size || 0,
+        Sha256: compiledFile.ContentHash || '',
+        IsEntry: buildPath.toLowerCase() === 'index.html',
+        Source: 'CompiledAssets'
+      });
+    }
+  }
   var html = latestVersion ? text(latestVersion.BuildLog) : '';
   if (!assets.length && !isBlank(html)) {
     assets.push({
@@ -183,6 +212,11 @@ function getBuildAssets(app, latestVersion, runtime) {
 
 function getExistingStore(appKey) {
   var result = V8.FormEngine.GetFormData('sys_microistore', {
+    _Where: [['AppKey', '=', appKey]],
+    _PageSize: 1
+  });
+  if (result && result.Code === 1 && result.Data) return result.Data;
+  result = V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['AppId', '=', appKey]],
     _PageSize: 1
   });
@@ -195,6 +229,32 @@ function parseArray(value) {
     catch (error) { throw new Error('选择数据配置不是有效JSON：' + error.message); }
   }
   return toArray(value);
+}
+function selectionValues(value, keys) {
+  var rows = parseArray(value);
+  var values = [];
+  var seen = {};
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var selected = '';
+    if (typeof row === 'string') {
+      selected = row;
+    } else if (row) {
+      for (var k = 0; k < keys.length; k++) {
+        if (!isBlank(row[keys[k]])) {
+          selected = text(row[keys[k]]);
+          break;
+        }
+      }
+    }
+    selected = text(selected).replace(/^\s+|\s+$/g, '');
+    var uniqueKey = selected.toLowerCase();
+    if (selected && !seen[uniqueKey]) {
+      seen[uniqueKey] = true;
+      values.push(selected);
+    }
+  }
+  return values;
 }
 function mergeUniqueRows(left, right, keyFields) {
   var result = [];
@@ -221,9 +281,15 @@ function mergeUniqueRows(left, right, keyFields) {
 
 function upsertStore(row) {
   var existing = V8.FormEngine.GetFormData('sys_microistore', {
-    _Where: [['AppId', '=', row.AppId]],
+    _Where: [['AppKey', '=', row.AppKey || row.AppId]],
     _PageSize: 1
   });
+  if ((!existing || existing.Code !== 1 || !existing.Data) && row.AppId) {
+    existing = V8.FormEngine.GetFormData('sys_microistore', {
+      _Where: [['AppId', '=', row.AppId]],
+      _PageSize: 1
+    });
+  }
   if (existing && existing.Code === 1 && existing.Data && existing.Data.Id) {
     row.Id = existing.Data.Id;
     return V8.FormEngine.UptFormData('sys_microistore', row);
@@ -247,7 +313,7 @@ if (isBlank(appIdOrKey)) return fail('AppId 或 AppKey 不能为空');
 var appResult = getApp(appIdOrKey);
 if (!appResult || appResult.Code !== 1 || !appResult.Data) return { Code: 2, Data: null, Msg: 'AI应用不存在' };
 var app = appResult.Data;
-var appType = text(app.AppType, 'Web');
+var appType = text(app.ApplicationType || app.AppType, 'Web');
 if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) return fail('不支持的应用类型：' + appType);
 var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
@@ -302,6 +368,12 @@ var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
 var existingStore = getExistingStore(app.AppKey);
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
+}
+if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
+  tableIds = selectionValues(existingStore.SelectTable, ['Id', 'TableId', 'Value']);
+}
+if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
+  apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
 }
 
 var selectedExport = {
@@ -358,10 +430,15 @@ var packageModel = {
     EntryPath: entryPath,
     Application: {
       Id: app.Id,
-      Name: text(V8.Param.AppName || app.Name),
-      AppKey: app.AppKey,
+      Name: text(V8.Param.AppName || app.AppName || app.Name),
+      AppName: text(V8.Param.AppName || app.AppName || app.Name),
+      AppId: text(app.AppId || app.AppKey),
+      AppKey: text(app.AppKey || app.AppId),
       AppType: appType,
-      Description: text(V8.Param.AppDetail || app.Description),
+      ApplicationType: appType,
+      Category: text(V8.Param.Category || app.Category || 'other'),
+      PublisherType: text(V8.Param.PublisherType || app.PublisherType || '官方应用'),
+      Description: text(V8.Param.AppDetail || app.AppDetail || app.Description),
       CurrentVersion: app.CurrentVersion || 1,
       EntryPath: entryPath,
       BuildVersion: versionNo
@@ -432,20 +509,35 @@ if (isOfflineAction) {
 if (action === 'Publish') {
   var storeRow = {
     AppName: packageModel.PackageInfo.Name,
-    AppId: app.AppKey,
+    Name: packageModel.PackageInfo.Name,
+    AppId: text(app.AppId || app.AppKey),
+    AppKey: text(app.AppKey || app.AppId),
     AppVersion: versionNo,
-    AppType: text(V8.Param.StoreCategory || '官方应用'),
+    AppType: appType,
     ApplicationType: appType,
+    Category: text(V8.Param.Category || app.Category || 'other'),
+    PublisherType: text(V8.Param.PublisherType || V8.Param.StoreCategory || app.PublisherType || '官方应用'),
     AppAuthor: text(V8.Param.AppAuthor || currentUser.Name || currentUser.Account),
-    AppDetail: text(V8.Param.AppDetail || app.Description),
+    OwnerUserId: text(app.OwnerUserId || currentUser.Id),
+    OwnerName: text(app.OwnerName || currentUser.Name || currentUser.Account),
+    AppDetail: text(V8.Param.AppDetail || app.AppDetail || app.Description),
+    Description: text(V8.Param.AppDetail || app.AppDetail || app.Description),
     AppPrice: V8.Param.AppPrice || 0,
     AppOriPrice: V8.Param.AppOriPrice || 0,
     AppRate: V8.Param.AppRate || 5,
     AppPreview: V8.Param.AppPreview || '',
     IsApprove: V8.Param.IsApprove || '是',
+    Status: 'Published',
+    BuildStatus: 'Success',
+    CurrentVersion: app.CurrentVersion || 1,
+    PreviewUrl: app.PreviewUrl || '',
+    PublicPublishPath: app.PublicPublishPath || '',
+    PrivateSourcePath: app.PrivateSourcePath || '',
     AppPublishTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppUpdateTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppPakcet: JSON.stringify(packageModel),
+    SelectTable: existingStore && existingStore.SelectTable ? existingStore.SelectTable : '',
+    SelectApiEngine: existingStore && existingStore.SelectApiEngine ? existingStore.SelectApiEngine : '',
     SelectAiApp: JSON.stringify([{ AppId: app.Id, AppKey: app.AppKey, AppName: app.Name, ApplicationType: appType, IncludeSource: !!packageAssets.SourceZip }]),
     AiAppZipFiles: JSON.stringify([packageAssets.BuildZip].concat(packageAssets.SourceZip ? [packageAssets.SourceZip] : [])),
     AiAppPackageManifest: JSON.stringify([packageAssets])

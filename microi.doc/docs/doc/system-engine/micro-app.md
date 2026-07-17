@@ -27,7 +27,8 @@
 ```text
 在线 AI / MCP / VS Code
           │
-          ├─ 私有源码 ──> mci_ai_app + mci_ai_app_file ──> 私有 HDFS
+          ├─ 应用主数据 ──> sys_microistore
+          ├─ 私有源码 ──> mci_ai_app_file ──> 私有 HDFS
           │
           └─ 构建发布 ──> sys_microiservice + sys_microiservice_page
                                       │
@@ -40,7 +41,7 @@
 
 | 表 | 作用 |
 |---|---|
-| `mci_ai_app` | 在线 AI 应用主表，`AppType` 支持 `Web`、`UniApp`、`MicroService`。 |
+| `sys_microistore` | 应用商城唯一主表，统一保存平台应用、Web、UniApp、MicroService 的名称、类型、分类、发布、预览和统计。 |
 | `mci_ai_app_file` | 应用源码文件清单，文件内容存储在当前租户的私有 HDFS。 |
 | `mci_ai_app_version` | 构建版本、状态、预览地址和变更说明。 |
 | `sys_microiservice` | 微服务运行时主表，保存 `MsKey`、版本、入口、构建清单、文件列表和发布时间。 |
@@ -61,7 +62,7 @@
 4. 建议开启 `生成骨架`，系统会生成可运行的基础源码。
 5. 创建后自动进入开发工作台。
 
-应用 Key 是运行时唯一标识，对应 `mci_ai_app.AppKey` 和 `sys_microiservice.MsKey`。建议使用稳定的英文、数字、`-`、`_` 组合，例如 `microi-official`，不要因为页面名称变化而反复修改 AppKey。
+应用 Key 是运行时唯一标识，对应 `sys_microistore.AppKey` 和 `sys_microiservice.MsKey`。建议使用稳定的英文、数字、`-`、`_` 组合，例如 `microi-official`，不要因为页面名称变化而反复修改 AppKey。
 
 一个范围较大的应用应使用一个稳定的微服务承载多个页面。例如“吾码官网微服务”可以包含 SaaS 租户管理、安装向导、运维工具等页面，不必为每一个弹窗新建一个微服务。
 
@@ -155,7 +156,7 @@ Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/microi-offic
 Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/platform-service
 ```
 
-旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入隔离目录。拉取读取的是 `mci_ai_app / mci_ai_app_file` 中保存的私有源码，不是 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
+旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入隔离目录。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
 
 `.microi-micro-app.json` 是插件识别项目的依据：
 
@@ -483,12 +484,13 @@ window.microApp.dispatch({
 
 | 字段 | 说明 |
 |---|---|
-| `AppType` | 原有应用分类或业务类别。 |
-| `ApplicationType` | 运行时应用类型：`Regular`、`MicroService`、`UniApp`、`Web`。 |
+| `ApplicationType` | 运行时应用类型：`Platform`、`Web`、`UniApp`、`MicroService`。 |
+| `Category` | 游戏、企业应用、办公、教育、行业应用、平台能力等业务分类。 |
+| `PublisherType` | 官方应用或社区应用来源；仅作为搜索字段，不再拆分一级页签。 |
 
 微服务应用包应包含：
 
-- `mci_ai_app` 应用信息。
+- `sys_microistore` 应用信息。
 - 私有源码文件及内容。
 - 最新公有构建产物。
 - `sys_microiservice` 运行时信息。
@@ -524,7 +526,7 @@ AI 应用工作台“发布应用商城”
 
 ## 上线验收清单
 
-- 已确认 `mci_ai_app.AppKey` 与 `sys_microiservice.MsKey` 一致。
+- 已确认 `sys_microistore.AppKey` 与 `sys_microiservice.MsKey` 一致。
 - 源码在私有 HDFS，构建产物在公有 HDFS。
 - `BuildVersion`、`EntryPath`、`AssetManifestJson` 和构建文件清单完整。
 - `microi.routes.json` 与 `sys_microiservice_page` 一致。

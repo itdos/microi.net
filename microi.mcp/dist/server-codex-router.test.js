@@ -14,6 +14,7 @@ test('microi_codex discovers and invokes existing tools through one entry point'
         osClient: 'junchi',
         apiBaseUrl: 'https://api.chongstech.com',
         label: '宁波鸿地',
+        codexMode: true,
     });
     const client = new Client({ name: 'microi-router-test', version: '1.0.0' });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -23,7 +24,21 @@ test('microi_codex discovers and invokes existing tools through one entry point'
     ]);
     try {
         const tools = await client.listTools();
+        assert.equal(tools.tools.length, 1);
         assert.ok(tools.tools.some(tool => tool.name === 'microi_codex'));
+        const resources = await client.listResources();
+        assert.ok(resources.resources.some(resource => resource.uri === 'microi://codex/status'));
+        assert.ok(resources.resources.some(resource => resource.uri === 'microi://codex/tools'));
+        const templates = await client.listResourceTemplates();
+        assert.ok(templates.resourceTemplates.some(template => template.uriTemplate === 'microi://codex/action/{action}/{params}'));
+        const resourceStatus = await client.readResource({
+            uri: 'microi://codex/action/microi_get_status/%7B%7D',
+        });
+        const firstResourceContent = resourceStatus.contents[0];
+        const resourceStatusText = firstResourceContent && 'text' in firstResourceContent
+            ? firstResourceContent.text
+            : '';
+        assert.match(resourceStatusText, /junchi/);
         const catalog = await client.callTool({
             name: 'microi_codex',
             arguments: { action: 'list_tools', params: { keyword: 'status' } },

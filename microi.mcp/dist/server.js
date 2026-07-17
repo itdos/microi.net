@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
@@ -130,6 +130,37 @@ function getZodTypeName(schema) {
         return `${name}[]`;
     return name;
 }
+function parseResourceParams(value) {
+    const raw = String(value || '').trim();
+    if (!raw)
+        return {};
+    const candidates = [raw];
+    try {
+        candidates.push(decodeURIComponent(raw));
+    }
+    catch {
+        // The MCP URI parser may already have decoded the variable.
+    }
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+        catch {
+            // Try the next representation.
+        }
+    }
+    throw new Error('params must be a URI-encoded JSON object');
+}
+function toolResultResourceText(result) {
+    return JSON.stringify({
+        isError: result.isError === true,
+        content: result.content,
+        structuredContent: result.structuredContent,
+    }, null, 2);
+}
 function bufferToolRegistrationsByPriority(server) {
     const mutableServer = server;
     const originalTool = mutableServer.tool.bind(server);
@@ -144,9 +175,11 @@ function bufferToolRegistrationsByPriority(server) {
         return buffered.find(item => item.name === normalized);
     };
     return {
-        flush: () => {
+        flush: (enabledNames) => {
+            const enabledSet = enabledNames ? new Set(enabledNames) : undefined;
             mutableServer.tool = originalTool;
             buffered
+                .filter(item => !enabledSet || enabledSet.has(item.name))
                 .sort((a, b) => {
                 const priorityA = CORE_TOOL_PRIORITY.get(a.name) ?? Number.MAX_SAFE_INTEGER;
                 const priorityB = CORE_TOOL_PRIORITY.get(b.name) ?? Number.MAX_SAFE_INTEGER;
@@ -470,10 +503,16 @@ BOUNDARY RULES:
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
 ## MCP 写入超时与回读规则
-- \`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
+- \`microi_create_engine\`、\`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端短超时回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
 - 超时只代表客户端没有及时拿到响应，不等于服务器一定未写入。必须先用对应 get 工具回读，禁止立即重复创建表、字段、接口引擎或按钮。
+- 接口引擎数据库创建成功后，后端路由缓存刷新超时不能把创建结果伪装成失败；检查响应中的 \`CacheRefresh\`，不要重复创建同一个 ApiEngineKey。
 - 菜单按钮字段始终传明文 JSON 数组；不要根据租户 \`sys_menu\` 事件自行 Base64 编码。
 - 标准工具回读仍不能确认时，报告“写入结果不确定”并保留原始错误。不要擅自改走原生 FormEngine HTTP、直接 SQL 或新建一次性维护接口引擎。
+
+## Codex 兼容入口
+- Codex 模式下协议层只暴露 \`microi_codex\`，但该入口内部仍可调用全部原始工具。
+- 若 Codex 线程只提供资源能力，读取 \`microi://codex/status\` 验证连接，读取 \`microi://codex/tools\` 查看工具，或使用资源模板 \`microi://codex/action/{action}/{params}\` 调用；params 为 URI 编码 JSON。
+- 资源模式与工具模式复用同一个 handler，写入确认、审计和回读规则完全一致。
 
 ## Redis 管理
 - **microi_redis_statistics / microi_redis_list_keys / microi_redis_get_key** — 统计、SCAN 分页与查看 String/Hash/List/Set/Sorted Set/Stream；默认操作当前租户 Redis
@@ -716,6 +755,69 @@ export function createMcpServer(client, context) {
             return {
                 content: [{ type: 'text', text: `Microi dispatcher failed: ${e instanceof Error ? e.message : String(e)}` }],
                 isError: true,
+            };
+        }
+    });
+    // Codex versions affected by the tool-only MCP discovery regression call
+    // resources/list instead of exposing server tools. Keep fixed discovery
+    // resources plus a template fallback that still routes through the original
+    // tool handlers and their validation/confirmation rules.
+    server.resource('microi_codex_status', 'microi://codex/status', {
+        title: `Microi ${osClient} status`,
+        description: 'Read-only connection status fallback for Codex clients that fail to inject MCP tools.',
+        mimeType: 'application/json',
+    }, async (uri) => {
+        const result = await toolRegistry.invoke('microi_get_status', {});
+        return {
+            contents: [{
+                    uri: uri.href,
+                    mimeType: 'application/json',
+                    text: toolResultResourceText(result),
+                }],
+        };
+    });
+    server.resource('microi_codex_tools', 'microi://codex/tools', {
+        title: `Microi ${osClient} tool catalog`,
+        description: 'Lists Microi tool names for Codex resource-mode fallback.',
+        mimeType: 'application/json',
+    }, async (uri) => ({
+        contents: [{
+                uri: uri.href,
+                mimeType: 'application/json',
+                text: JSON.stringify({
+                    tools: toolRegistry.list(),
+                    actionTemplate: 'microi://codex/action/{action}/{params}',
+                    params: 'URI-encoded JSON object. Example: microi://codex/action/microi_get_status/%7B%7D',
+                }, null, 2),
+            }],
+    }));
+    server.resource('microi_codex_action', new ResourceTemplate('microi://codex/action/{action}/{params}', { list: undefined }), {
+        title: `Microi ${osClient} action fallback`,
+        description: 'Invokes an original microi_* tool through a resource URI when Codex does not expose MCP tools. Write confirmations remain mandatory.',
+        mimeType: 'application/json',
+    }, async (uri, variables) => {
+        try {
+            const action = String(variables.action || '');
+            const params = parseResourceParams(variables.params);
+            const result = await toolRegistry.invoke(action, params);
+            return {
+                contents: [{
+                        uri: uri.href,
+                        mimeType: 'application/json',
+                        text: toolResultResourceText(result),
+                    }],
+            };
+        }
+        catch (e) {
+            return {
+                contents: [{
+                        uri: uri.href,
+                        mimeType: 'application/json',
+                        text: JSON.stringify({
+                            isError: true,
+                            error: e instanceof Error ? e.message : String(e),
+                        }, null, 2),
+                    }],
             };
         }
     });
@@ -1202,7 +1304,16 @@ export function createMcpServer(client, context) {
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: `✅ Engine "${apiEngineKey}" created successfully.` }] };
+            return {
+                content: [{
+                        type: 'text',
+                        text: [
+                            `✅ Engine "${apiEngineKey}" created successfully.`,
+                            result.Msg ? `\n${result.Msg}` : '',
+                            result.Data ? `\n${JSON.stringify(result.Data, null, 2)}` : '',
+                        ].join(''),
+                    }],
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -2015,7 +2126,7 @@ export function createMcpServer(client, context) {
     // Tool: 获取应用完整源码上下文
     // ========================
     server.tool('microi_get_application_context', `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}", with its full file manifest and all readable source-code contents by default. MicroService responses also include sys_microiservice runtime/pages. Use this after microi_list_applications before editing an existing app.`, {
-        appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+        appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
         includeContents: z.boolean().optional().default(true).describe('Read private HDFS source contents. Defaults to true.'),
         maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read per source file. Default 2MB.'),
         maxTotalBytes: z.number().int().positive().optional().describe('Maximum total bytes read for this app. Default 50MB.'),
@@ -2040,7 +2151,7 @@ export function createMcpServer(client, context) {
     // Tool: 获取单个应用文件
     // ========================
     server.tool('microi_get_application_file', `Read one exact source file from a Web, UniApp or MicroService online AI application for OsClient "${osClient}". Text code is returned as UTF-8 Content; binary files are returned as FileByteBase64.`, {
-        appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+        appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
         filePath: z.string().describe('Exact relative source path from the application file manifest.'),
         maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read. Default 10MB.'),
     }, async ({ appIdOrKey, filePath, maxFileBytes }) => {
@@ -2153,7 +2264,7 @@ export function createMcpServer(client, context) {
     registerDesignTools(server, client, context);
     registerAdvancedTools(server, client, context);
     registerBlueprintTools(server, client, context);
-    toolRegistry.flush();
+    toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
     return server;
 }
 //# sourceMappingURL=server.js.map

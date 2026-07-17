@@ -539,6 +539,13 @@ console.log('调试信息')                                  // 控制台输出�
 - 创建 `diy_field` 字段时，除非用户明确要求隐藏，否则 `Visible` 和 `AppVisible` 默认设为 `1`。
 - 字段较多的表单默认优先生成 `diy_table.Tabs`，并给字段写入 `Tab`；整行控件才使用 `FormWidth=24`。
 
+## MCP 连接与写入诊断规则
+
+- 优先使用标准 MCP 工具，写入超时后先回读，不得立即改走原生 HTTP、SQL 或一次性维护引擎。
+- 遇到 `ByteString` 或 `greater than 255` 时，先按异常字符索引检查 HTTP Header。Microi MCP 的设备标识来自 `did` / `MICROI_MCP_DID`；中文 Windows 主机名会从 `MCP:` 后第 4 个字符触发错误。
+- `MICROI_LABEL_BASE64` 只用于中文显示名，不是请求 Header。未核对调用链前不得把错误归因于 Label，也不得随意修改 Token、租户或服务器地址。
+- 连接恢复前禁止远端写入；恢复后先执行 `initialize`、`tools/list`、`microi_get_status` 和只读基线盘点，再按用户授权写入。
+
 
 ## MCP 在线应用默认发现与复杂页面规则
 

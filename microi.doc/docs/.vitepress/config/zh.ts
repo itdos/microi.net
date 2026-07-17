@@ -80,6 +80,7 @@ function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "首页", link: "/" },
 		{ text: "文档 🪧", link: "/doc/index" },
+		{ text: "AI应用", link: "/apps" },
 		{ text: "成功案例", link: "/case/case-index" },
 		{
 			text: "相关链接 🔗",

@@ -117,6 +117,73 @@
             <button class="link-btn" type="button" @click="resetSession">退出登录</button>
           </form>
 
+          <div v-else-if="forgotOpen" class="forgot-panel">
+            <button class="forgot-back" type="button" @click="closeForgotPassword">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              返回登录
+            </button>
+
+            <form class="phone-login-form" @submit.prevent="resetPassword">
+              <div class="input-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                </div>
+                <input v-model.trim="resetPhone" type="tel" placeholder="请输入绑定手机号" maxlength="11" class="login-input" autocomplete="tel" />
+              </div>
+
+              <div class="input-group captcha-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <input v-model.trim="captchaValue" type="text" placeholder="图形验证码" maxlength="6" class="login-input captcha-input" autocomplete="off" />
+                <button class="captcha-img-wrapper" type="button" aria-label="刷新图形验证码" @click="refreshCaptcha">
+                  <img v-if="captchaImgSrc" :src="captchaImgSrc" alt="验证码" class="captcha-img" />
+                  <span v-else class="captcha-loading"></span>
+                </button>
+              </div>
+
+              <div class="input-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <input v-model.trim="resetSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
+                <button class="sms-btn" type="button" :disabled="resetSmsCooldown > 0 || !resetPhone" @click="sendResetSmsCode">
+                  {{ resetSmsCooldown > 0 ? resetSmsCooldown + 's' : '获取验证码' }}
+                </button>
+              </div>
+
+              <div class="input-group">
+                <div class="input-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <input v-model="resetPasswordValue" type="password" placeholder="设置新密码（至少6位）" maxlength="32" class="login-input" autocomplete="new-password" />
+              </div>
+
+              <div class="input-group">
+                <div class="input-icon">✓</div>
+                <input v-model="resetConfirmPassword" type="password" placeholder="再次输入新密码" maxlength="32" class="login-input" autocomplete="new-password" />
+              </div>
+
+              <button class="login-btn" type="submit" :class="{ loading: isResetting }" :disabled="isResetting">
+                {{ isResetting ? '正在重置...' : '重置密码' }}
+              </button>
+              <p class="login-tip">只有图形验证码校验通过后才会发送短信，避免短信接口被盗刷。</p>
+            </form>
+          </div>
+
           <div v-else>
             <div class="auth-tabs" role="tablist" aria-label="登录注册切换">
               <button class="auth-tab" :class="{ active: authTab === 'login' }" type="button" @click="switchAuthTab('login')">登录</button>
@@ -124,81 +191,33 @@
             </div>
 
             <form v-if="authTab === 'login'" class="phone-login-form" @submit.prevent="handleLogin">
-              <div class="mode-switcher">
-                <button class="mode-btn" :class="{ active: loginType === 'sms' }" type="button" @click="switchLoginType('sms')">
+              <div class="input-group">
+                <div class="input-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                   </svg>
-                  验证码登录
-                </button>
-                <button class="mode-btn" :class="{ active: loginType === 'password' }" type="button" @click="switchLoginType('password')">
+                </div>
+                <input v-model.trim="loginAccount" placeholder="手机号或登录账号" maxlength="32" class="login-input" autocomplete="username" />
+              </div>
+
+              <div class="input-group">
+                <div class="input-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
-                  密码登录
-                </button>
+                </div>
+                <input v-model="loginPassword" type="password" placeholder="请输入登录密码" maxlength="32" class="login-input" autocomplete="current-password" />
               </div>
 
-              <template v-if="loginType === 'sms'">
-                <div class="input-group">
-                  <div class="input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                      <line x1="12" y1="18" x2="12.01" y2="18" />
-                    </svg>
-                  </div>
-                  <input v-model.trim="loginPhone" type="tel" placeholder="请输入手机号" maxlength="11" class="login-input" autocomplete="tel" />
-                </div>
-
-                <div v-if="!devSmsBypass" class="input-group captcha-group">
-                  <div class="input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </div>
-                  <input v-model.trim="captchaValue" type="text" placeholder="图形验证码" maxlength="6" class="login-input captcha-input" autocomplete="off" />
-                  <button class="captcha-img-wrapper" type="button" @click="refreshCaptcha">
-                    <img v-if="captchaImgSrc" :src="captchaImgSrc" alt="验证码" class="captcha-img" />
-                    <span v-else class="captcha-loading"></span>
-                  </button>
-                </div>
-
-                <div v-if="!devSmsBypass" class="input-group">
-                  <div class="input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                  </div>
-                  <input v-model.trim="loginSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
-                  <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !loginPhone" @click="sendSmsCode">
-                    {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
-                  </button>
-                </div>
-              </template>
-
-              <template v-else>
-                <div class="input-group">
-                  <div class="input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </div>
-                  <input v-model.trim="loginAccount" placeholder="手机号或登录账号" maxlength="32" class="login-input" autocomplete="username" />
-                </div>
-                <div class="input-group">
-                  <div class="input-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </div>
-                  <input v-model="loginPassword" type="password" placeholder="请输入登录密码" maxlength="32" class="login-input" autocomplete="current-password" />
-                </div>
-              </template>
+              <div class="login-options">
+                <label class="remember-option">
+                  <input v-model="rememberPassword" type="checkbox" />
+                  <span>记住密码</span>
+                </label>
+                <button class="forgot-link" type="button" @click="openForgotPassword">忘记密码？</button>
+              </div>
 
               <button class="login-btn" type="submit" :class="{ loading: isLogging }" :disabled="isLogging">
                 {{ isLogging ? '登录中...' : '登录' }}
@@ -237,7 +256,7 @@
                   </svg>
                 </div>
                 <input v-model.trim="registerSmsCode" type="text" placeholder="短信验证码" maxlength="6" class="login-input sms-input" autocomplete="one-time-code" />
-                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !registerPhone" @click="sendSmsCode">
+                <button class="sms-btn" type="button" :disabled="smsCooldown > 0 || !registerPhone" @click="sendRegisterSmsCode">
                   {{ smsCooldown > 0 ? smsCooldown + 's' : '获取验证码' }}
                 </button>
               </div>
@@ -290,11 +309,15 @@ const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
 const OS_CLIENT = 'iTdos'
 
 const authTab = ref('login')
-const loginType = ref('sms')
-const loginPhone = ref('')
 const loginAccount = ref('')
 const loginPassword = ref('')
-const loginSmsCode = ref('')
+const rememberPassword = ref(false)
+const forgotOpen = ref(false)
+const resetPhone = ref('')
+const resetSmsCode = ref('')
+const resetPasswordValue = ref('')
+const resetConfirmPassword = ref('')
+const resetSmsCooldown = ref(0)
 const registerPhone = ref('')
 const registerSmsCode = ref('')
 const captchaValue = ref('')
@@ -304,6 +327,7 @@ const smsCooldown = ref(0)
 const registerPassword = ref('')
 const confirmPassword = ref('')
 const isLogging = ref(false)
+const isResetting = ref(false)
 const isCreating = ref(false)
 const toastMsg = ref('')
 const toastType = ref('info')
@@ -320,6 +344,7 @@ const tenantProgressTick = ref(Date.now())
 const particleCanvas = ref(null)
 
 let smsTimer = null
+let resetSmsTimer = null
 let toastTimer = null
 let animFrame = null
 let resizeHandler = null
@@ -373,9 +398,9 @@ const titleText = computed(() => {
 const descText = computed(() => {
   if (tenantReady.value) return '你的独立低代码工作台已经准备好'
   if (isAuthed.value) return '填写系统信息，一键生成全新租户数据库'
-  return authTab.value === 'register' ? '手机号验证后设置登录密码' : '支持验证码登录或密码登录'
+  if (forgotOpen.value) return '验证绑定手机号后设置新的登录密码'
+  return authTab.value === 'register' ? '手机号验证后设置登录密码' : '使用账号和密码安全登录'
 })
-const activeSmsPhone = computed(() => authTab.value === 'register' ? registerPhone.value : loginPhone.value)
 const visibleTenantSteps = computed(() => isCreating.value || tenantSteps.value.some(step => step.Status !== 'pending'))
 const tenantStepSummary = computed(() => {
   const errorStep = tenantSteps.value.find(step => step.Status === 'error')
@@ -455,17 +480,10 @@ function apiEngineUrl(key) {
 
 function switchAuthTab(tab) {
   authTab.value = tab
+  forgotOpen.value = false
   captchaValue.value = ''
-  loginSmsCode.value = ''
   registerSmsCode.value = ''
-  if (!devSmsBypass.value) refreshCaptcha()
-}
-
-function switchLoginType(type) {
-  loginType.value = type
-  captchaValue.value = ''
-  loginSmsCode.value = ''
-  if (!devSmsBypass.value && type === 'sms') refreshCaptcha()
+  if (!devSmsBypass.value && tab === 'register') refreshCaptcha()
 }
 
 async function refreshCaptcha() {
@@ -481,9 +499,22 @@ async function refreshCaptcha() {
   }
 }
 
-async function sendSmsCode() {
-  const smsPhone = activeSmsPhone.value
-  if (!/^1\d{10}$/.test(smsPhone)) {
+function startCooldown(target, timerName) {
+  target.value = 60
+  const timer = setInterval(() => {
+    target.value -= 1
+    if (target.value <= 0) {
+      clearInterval(timer)
+      if (timerName === 'register') smsTimer = null
+      else resetSmsTimer = null
+    }
+  }, 1000)
+  if (timerName === 'register') smsTimer = timer
+  else resetSmsTimer = timer
+}
+
+async function sendRegisterSmsCode() {
+  if (!/^1\d{10}$/.test(registerPhone.value)) {
     showToast('请输入正确的11位手机号。', 'error')
     return
   }
@@ -496,7 +527,7 @@ async function sendSmsCode() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        Phone: smsPhone,
+        Phone: registerPhone.value,
         _CaptchaId: captchaId.value,
         _CaptchaValue: captchaValue.value,
         OsClient: OS_CLIENT
@@ -509,16 +540,107 @@ async function sendSmsCode() {
       return
     }
     showToast('验证码已发送。', 'success')
-    smsCooldown.value = 60
-    smsTimer = setInterval(() => {
-      smsCooldown.value -= 1
-      if (smsCooldown.value <= 0 && smsTimer) {
-        clearInterval(smsTimer)
-        smsTimer = null
-      }
-    }, 1000)
+    startCooldown(smsCooldown, 'register')
   } catch {
     showToast('网络异常，短信发送失败。', 'error')
+  }
+}
+
+function openForgotPassword() {
+  forgotOpen.value = true
+  resetPhone.value = /^1\d{10}$/.test(loginAccount.value) ? loginAccount.value : ''
+  resetSmsCode.value = ''
+  resetPasswordValue.value = ''
+  resetConfirmPassword.value = ''
+  captchaValue.value = ''
+  refreshCaptcha()
+}
+
+function closeForgotPassword() {
+  forgotOpen.value = false
+  captchaValue.value = ''
+  resetSmsCode.value = ''
+}
+
+async function sendResetSmsCode() {
+  if (!/^1\d{10}$/.test(resetPhone.value)) {
+    showToast('请输入正确的11位手机号。', 'error')
+    return
+  }
+  if (!captchaValue.value || !captchaId.value) {
+    showToast('请先输入图形验证码。', 'error')
+    return
+  }
+  try {
+    const resp = await fetch(apiEngineUrl('official_password_reset_send_sms'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Phone: resetPhone.value,
+        _CaptchaId: captchaId.value,
+        _CaptchaValue: captchaValue.value,
+        OsClient: OS_CLIENT
+      })
+    })
+    const result = await resp.json()
+    if (result.Code !== 1) {
+      showToast(result.Msg || '短信验证码发送失败。', 'error')
+      captchaValue.value = ''
+      refreshCaptcha()
+      return
+    }
+    showToast('验证码已发送。', 'success')
+    captchaValue.value = ''
+    startCooldown(resetSmsCooldown, 'reset')
+  } catch {
+    showToast('网络异常，短信发送失败。', 'error')
+  }
+}
+
+async function resetPassword() {
+  if (isResetting.value) return
+  if (!/^1\d{10}$/.test(resetPhone.value)) {
+    showToast('请输入正确的11位手机号。', 'error')
+    return
+  }
+  if (!resetSmsCode.value) {
+    showToast('请输入短信验证码。', 'error')
+    return
+  }
+  if (resetPasswordValue.value.length < 6) {
+    showToast('新密码长度不能少于6位。', 'error')
+    return
+  }
+  if (resetPasswordValue.value !== resetConfirmPassword.value) {
+    showToast('两次输入的新密码不一致。', 'error')
+    return
+  }
+  isResetting.value = true
+  try {
+    const resp = await fetch(apiEngineUrl('official_password_reset'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Phone: resetPhone.value,
+        SmsCode: resetSmsCode.value,
+        NewPassword: resetPasswordValue.value,
+        ConfirmPassword: resetConfirmPassword.value,
+        OsClient: OS_CLIENT
+      })
+    })
+    const result = await resp.json()
+    if (result.Code !== 1) {
+      showToast(result.Msg || '密码重置失败。', 'error')
+      return
+    }
+    loginAccount.value = resetPhone.value
+    loginPassword.value = ''
+    closeForgotPassword()
+    showToast('密码已重置，请使用新密码登录。', 'success')
+  } catch {
+    showToast('网络异常，密码重置失败。', 'error')
+  } finally {
+    isResetting.value = false
   }
 }
 
@@ -536,40 +658,23 @@ function validatePasswordFields() {
 
 async function handleLogin() {
   if (isLogging.value) return
-  if (loginType.value === 'sms') {
-    if (!/^1\d{10}$/.test(loginPhone.value)) {
-      showToast('请输入正确的11位手机号。', 'error')
-      return
-    }
-    if (!devSmsBypass.value && !loginSmsCode.value) {
-      showToast('请输入短信验证码。', 'error')
-      return
-    }
-  } else {
-    if (!loginAccount.value) {
-      showToast('请输入登录账号。', 'error')
-      return
-    }
-    if (!loginPassword.value) {
-      showToast('请输入登录密码。', 'error')
-      return
-    }
+  if (!loginAccount.value) {
+    showToast('请输入登录账号。', 'error')
+    return
+  }
+  if (!loginPassword.value) {
+    showToast('请输入登录密码。', 'error')
+    return
   }
 
   isLogging.value = true
   try {
     const payload = {
       Action: 'login',
-      LoginType: loginType.value,
+      LoginType: 'password',
+      Account: loginAccount.value,
+      Pwd: loginPassword.value,
       OsClient: OS_CLIENT
-    }
-    if (loginType.value === 'sms') {
-      payload.Phone = loginPhone.value
-      payload._CaptchaValue = devSmsBypass.value ? '' : loginSmsCode.value
-      payload._SmsCaptchaValue = devSmsBypass.value ? '' : loginSmsCode.value
-    } else {
-      payload.Account = loginAccount.value
-      payload.Pwd = loginPassword.value
     }
     const resp = await fetch(apiEngineUrl('official_sms_login'), {
       method: 'POST',
@@ -579,8 +684,21 @@ async function handleLogin() {
     const result = await resp.json()
     if (result.Code !== 1) {
       showToast(result.Msg || '登录失败，请重试。', 'error')
-      refreshCaptcha()
       return
+    }
+    if (rememberPassword.value) {
+      localStorage.setItem('microi_doc_remember_login', '1')
+      localStorage.setItem('microi_doc_login_account', loginAccount.value)
+      if (typeof PasswordCredential !== 'undefined' && navigator.credentials?.store) {
+        navigator.credentials.store(new PasswordCredential({
+          id: loginAccount.value,
+          password: loginPassword.value,
+          name: result.Data?.Name || loginAccount.value
+        })).catch(() => {})
+      }
+    } else {
+      localStorage.removeItem('microi_doc_remember_login')
+      localStorage.removeItem('microi_doc_login_account')
     }
     handleLoginSuccess(resp, result)
   } catch {
@@ -635,16 +753,15 @@ function handleLoginSuccess(resp, result) {
   const token = normalizeToken(resp.headers.get('authorization') || result.Data?.Authorization || result.DataAppend?.Token)
   authToken.value = token
   currentUser.value = result.Data || {}
-  tenantOsClient.value = result.DataAppend?.TenantOsClient || ''
-  tenantName.value = result.DataAppend?.TenantName || tenantOsClient.value
-  tenantUrl.value = result.DataAppend?.TenantUrl || result.DataAppend?.Url || (tenantOsClient.value ? `https://${tenantOsClient.value}.microi.net` : '')
+  const savedTenantOsClient = result.DataAppend?.TenantOsClient || ''
+  const savedTenantUrl = result.DataAppend?.TenantUrl || result.DataAppend?.Url || (savedTenantOsClient ? `https://${savedTenantOsClient}.microi.net` : '')
 
   localStorage.setItem('microi_doc_token', token)
   localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
-  localStorage.setItem('microi_doc_phone', result.Data?.Phone || registerPhone.value || loginPhone.value || loginAccount.value)
-  if (tenantOsClient.value) {
-    localStorage.setItem('microi_doc_tenant', tenantOsClient.value)
-    localStorage.setItem('microi_doc_tenant_url', tenantUrl.value)
+  localStorage.setItem('microi_doc_phone', result.Data?.Phone || registerPhone.value || loginAccount.value)
+  if (savedTenantOsClient) {
+    localStorage.setItem('microi_doc_tenant', savedTenantOsClient)
+    localStorage.setItem('microi_doc_tenant_url', savedTenantUrl)
   } else {
     localStorage.removeItem('microi_doc_tenant')
     localStorage.removeItem('microi_doc_tenant_url')
@@ -652,11 +769,8 @@ function handleLoginSuccess(resp, result) {
 
   window.dispatchEvent(new CustomEvent('microi-login-success', { detail: currentUser.value }))
   openClawAuthBridge?.notify()
-  showToast('登录成功，正在进入个人中心。', 'success')
   const redirect = getRedirectTarget()
-  window.setTimeout(() => {
-    window.location.href = redirect || '/profile.html#/overview'
-  }, 350)
+  window.location.replace(redirect || '/profile.html#/overview')
 }
 
 function getRedirectTarget() {
@@ -855,11 +969,9 @@ function resetSession() {
   tenantKey.value = ''
   systemName.value = ''
   authTab.value = 'login'
-  loginType.value = 'sms'
-  loginPhone.value = ''
   loginAccount.value = ''
   loginPassword.value = ''
-  loginSmsCode.value = ''
+  forgotOpen.value = false
   registerPhone.value = ''
   registerSmsCode.value = ''
   registerPassword.value = ''
@@ -974,6 +1086,10 @@ onMounted(() => {
   restoreSession()
   const query = new URLSearchParams(window.location.search)
   if (query.get('tab') === 'register') authTab.value = 'register'
+  rememberPassword.value = localStorage.getItem('microi_doc_remember_login') === '1'
+  if (rememberPassword.value) {
+    loginAccount.value = localStorage.getItem('microi_doc_login_account') || ''
+  }
   openClawAuthBridge = createOpenClawAuthBridge(() => ({
     token: authToken.value,
     user: currentUser.value,
@@ -988,7 +1104,7 @@ onMounted(() => {
   }
   nextTick(() => {
     if (siteStyle.value === 'classic') initParticles()
-    if (!devSmsBypass.value) {
+    if (!devSmsBypass.value && authTab.value === 'register') {
       refreshCaptcha()
     }
   })
@@ -998,6 +1114,7 @@ onUnmounted(() => {
   openClawAuthBridge?.destroy()
   openClawAuthBridge = null
   if (smsTimer) clearInterval(smsTimer)
+  if (resetSmsTimer) clearInterval(resetSmsTimer)
   if (toastTimer) clearTimeout(toastTimer)
   destroyParticles()
 })
@@ -1006,8 +1123,9 @@ onUnmounted(() => {
 <style scoped>
 .ai-login-page {
   position: fixed;
-  inset: 0;
-  min-height: 100dvh;
+  inset: 64px 0 0;
+  min-height: calc(100dvh - 64px);
+  height: calc(100dvh - 64px);
   width: 100vw;
   background: linear-gradient(135deg, #0a0a14 0%, #0d0d1a 40%, #1a0a2e 70%, #0a0a14 100%);
   display: flex;
@@ -1023,7 +1141,7 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   width: 100vw;
-  height: 100dvh;
+  height: calc(100dvh - 64px);
 }
 
 .particle-bg {
@@ -1322,6 +1440,62 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.forgot-panel {
+  position: relative;
+}
+
+.forgot-back,
+.forgot-link {
+  border: 0;
+  background: transparent;
+  color: #78d9ff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.forgot-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 16px;
+  padding: 0;
+  font-size: 13px;
+}
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  margin-top: -4px;
+}
+
+.remember-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(222, 222, 238, 0.72);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.remember-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #2673ff;
+}
+
+.forgot-link {
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.forgot-back:hover,
+.forgot-link:hover {
+  color: #b6efff;
 }
 
 .input-group {
@@ -1662,7 +1836,7 @@ onUnmounted(() => {
 
 .toast-msg {
   position: fixed;
-  top: 24px;
+  top: 84px;
   left: 50%;
   z-index: 100;
   transform: translateX(-50%);
@@ -1700,7 +1874,7 @@ onUnmounted(() => {
 
 @media (max-width: 860px) {
   .ai-login-page {
-    padding: 24px 0;
+    padding: 20px 0;
     align-items: flex-start;
     overflow-y: auto;
   }
