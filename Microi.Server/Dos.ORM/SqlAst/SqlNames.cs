@@ -11,7 +11,9 @@ namespace Dos.ORM.SqlAst
                 throw new ArgumentNullException(nameof(value));
             }
 
-            if (string.IsNullOrWhiteSpace(value) || ContainsInvalidCharacter(value))
+            if (string.IsNullOrWhiteSpace(value) ||
+                string.Equals(value, "*", StringComparison.Ordinal) ||
+                ContainsInvalidCharacter(value))
             {
                 throw new ArgumentException(
                     "Identifier must be one non-empty, unquoted segment.",
