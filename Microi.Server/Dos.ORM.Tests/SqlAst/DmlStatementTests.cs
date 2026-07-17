@@ -856,13 +856,8 @@ public sealed class DmlStatementTests
         Assert.Same(row, operation.Rows[0]);
         AssertReadOnly(operation.Columns, new SqlIdentifier("Other"));
         AssertReadOnly(operation.Rows, Row(Parameter("other")));
-        Assert.DoesNotContain(
-            typeof(BulkInsertOperation).GetProperties(),
-            property => property.PropertyType == typeof(ReturningClause));
-        Assert.DoesNotContain(
-            typeof(BulkInsertOperation).GetConstructors()
-                .SelectMany(constructor => constructor.GetParameters()),
-            parameter => parameter.ParameterType == typeof(ReturningClause));
+        AssertDeclaredPublicSurfaceExcludes(
+            typeof(BulkInsertOperation), typeof(ReturningClause));
         Assert.Null(typeof(BulkInsertOperation).Assembly.GetType(
             "Dos.ORM.SqlAst.BulkInsertStatement"));
     }
@@ -1080,20 +1075,14 @@ public sealed class DmlStatementTests
             {
                 var context = $"field {type.FullName}.{field.Name}";
                 AssertNeutralImplementationName(field.Name, context);
-                AssertNoRuntimeObjectHolder(field.FieldType, context);
-                Assert.False(
-                    field.FieldType == typeof(string),
-                    $"{context} must not hold SQL/provider text.");
+                AssertStructuredType(field.FieldType, context);
             }
 
             foreach (var property in type.GetProperties(flags))
             {
                 var context = $"property {type.FullName}.{property.Name}";
                 AssertNeutralImplementationName(property.Name, context);
-                AssertNoRuntimeObjectHolder(property.PropertyType, context);
-                Assert.False(
-                    property.PropertyType == typeof(string),
-                    $"{context} must not hold SQL/provider text.");
+                AssertStructuredType(property.PropertyType, context);
             }
 
             var methods = type.GetMethods(flags).Cast<MethodBase>()
@@ -1104,14 +1093,16 @@ public sealed class DmlStatementTests
                 AssertNeutralImplementationName(method.Name, context);
                 if (method is MethodInfo methodInfo)
                 {
-                    AssertNoRuntimeObjectHolder(
+                    AssertStructuredType(
                         methodInfo.ReturnType, $"return type of {context}");
                 }
 
                 Assert.All(method.GetParameters(), parameter =>
-                    AssertNoRuntimeObjectHolder(
+                    AssertStructuredType(
                         parameter.ParameterType,
-                        $"parameter {parameter.Name} on {context}"));
+                        $"parameter {parameter.Name} on {context}",
+                        allowDirectString:
+                            IsDmlGuardParameterName(method, parameter)));
 
                 foreach (var operand in ReadIlOperands(method))
                 {
@@ -1217,28 +1208,109 @@ public sealed class DmlStatementTests
 
     private static void AssertPublicSurfaceType(Type type, string context)
     {
-        Assert.False(
-            type == typeof(string) || type == typeof(object),
-            $"{context} exposes unstructured type {type.FullName}.");
-        AssertNoRuntimeObjectHolder(type, context);
+        AssertStructuredType(type, context);
     }
 
-    private static void AssertNoRuntimeObjectHolder(Type type, string context)
+    private static void AssertStructuredType(
+        Type type,
+        string context,
+        bool allowDirectString = false)
     {
         Assert.False(
             type == typeof(object),
             $"{context} stores an arbitrary runtime object.");
+        if (type == typeof(string))
+        {
+            Assert.True(
+                allowDirectString,
+                $"{context} exposes or stores unstructured text.");
+            return;
+        }
+
         AssertNeutralImplementationName(
             type.FullName ?? type.Name, context);
 
         if (type.HasElementType && type.GetElementType() is Type elementType)
         {
-            AssertNoRuntimeObjectHolder(elementType, context);
+            AssertStructuredType(elementType, context);
         }
 
         foreach (var argument in type.GetGenericArguments())
         {
-            AssertNoRuntimeObjectHolder(argument, context);
+            AssertStructuredType(argument, context);
+        }
+    }
+
+    private static bool IsDmlGuardParameterName(
+        MethodBase method, ParameterInfo parameter) =>
+        method.DeclaringType?.FullName == "Dos.ORM.SqlAst.DmlAstGuard" &&
+        parameter.Name == "parameterName" &&
+        parameter.ParameterType == typeof(string);
+
+    private static void AssertDeclaredPublicSurfaceExcludes(
+        Type declaringType, Type forbiddenType)
+    {
+        const BindingFlags flags = BindingFlags.Public |
+                                   BindingFlags.Instance |
+                                   BindingFlags.Static |
+                                   BindingFlags.DeclaredOnly;
+
+        foreach (var field in declaringType.GetFields(flags))
+        {
+            AssertTypeGraphExcludes(
+                field.FieldType, forbiddenType,
+                $"field {declaringType.FullName}.{field.Name}");
+        }
+
+        foreach (var property in declaringType.GetProperties(flags))
+        {
+            AssertTypeGraphExcludes(
+                property.PropertyType, forbiddenType,
+                $"property {declaringType.FullName}.{property.Name}");
+            Assert.All(property.GetIndexParameters(), parameter =>
+                AssertTypeGraphExcludes(
+                    parameter.ParameterType, forbiddenType,
+                    $"index parameter {parameter.Name} on " +
+                    $"{declaringType.FullName}.{property.Name}"));
+        }
+
+        foreach (var constructor in declaringType.GetConstructors(flags))
+        {
+            Assert.All(constructor.GetParameters(), parameter =>
+                AssertTypeGraphExcludes(
+                    parameter.ParameterType, forbiddenType,
+                    $"constructor parameter {parameter.Name} on " +
+                    declaringType.FullName));
+        }
+
+        foreach (var method in declaringType.GetMethods(flags))
+        {
+            AssertTypeGraphExcludes(
+                method.ReturnType, forbiddenType,
+                $"return type of {declaringType.FullName}.{method.Name}");
+            Assert.All(method.GetParameters(), parameter =>
+                AssertTypeGraphExcludes(
+                    parameter.ParameterType, forbiddenType,
+                    $"parameter {parameter.Name} on " +
+                    $"{declaringType.FullName}.{method.Name}"));
+        }
+    }
+
+    private static void AssertTypeGraphExcludes(
+        Type type, Type forbiddenType, string context)
+    {
+        Assert.False(
+            type == forbiddenType,
+            $"{context} contains forbidden type {forbiddenType.FullName}.");
+
+        if (type.HasElementType && type.GetElementType() is Type elementType)
+        {
+            AssertTypeGraphExcludes(elementType, forbiddenType, context);
+        }
+
+        foreach (var argument in type.GetGenericArguments())
+        {
+            AssertTypeGraphExcludes(argument, forbiddenType, context);
         }
     }
 
