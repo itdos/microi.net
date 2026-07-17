@@ -1,6 +1,8 @@
 using System.Collections;
+using System.Data;
 using System.Globalization;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Dos.ORM.SqlAst;
@@ -431,6 +433,16 @@ public sealed class SchemaAndAdminStatementTests
         Assert.Throws<ArgumentNullException>(() =>
             new ColumnDefinition(
                 Id("Id"), null!, ColumnNullability.Nullable));
+        Assert.Throws<ArgumentException>(() =>
+            new ColumnDefinition(
+                Id("Id"), Type(LogicalDbType.Int32),
+                ColumnNullability.Nullable,
+                generation: new UnknownGenerationDefinition()));
+        Assert.Throws<ArgumentException>(() =>
+            new ColumnDefinition(
+                Id("Id"), Type(LogicalDbType.Int32),
+                ColumnNullability.Nullable,
+                defaultValue: new UnknownDefaultDefinition()));
     }
 
     [Fact]
@@ -603,6 +615,9 @@ public sealed class SchemaAndAdminStatementTests
                 new IndexColumnDefinition(Id("Name"), SqlSortDirection.Descending)
             },
             IndexUniqueness.NonUnique));
+        Assert.Throws<ArgumentException>(() => new IndexDefinition(
+            Id("IX"), Array.Empty<IndexColumnDefinition>(),
+            IndexUniqueness.NonUnique));
 
         var primary = new PrimaryKeyDefinition(
             Id("PK_User"), new[] { Id("TenantId"), Id("Id") });
@@ -614,6 +629,11 @@ public sealed class SchemaAndAdminStatementTests
             unique.Columns.Select(item => item.Value));
         Assert.Throws<ArgumentException>(() =>
             new PrimaryKeyDefinition(Id("PK"), Array.Empty<SqlIdentifier>()));
+        Assert.Throws<ArgumentException>(() => new PrimaryKeyDefinition(
+            Id("PK"), new[] { Id("Id"), Id("Id") }));
+        Assert.Throws<ArgumentException>(() =>
+            new UniqueConstraintDefinition(
+                Id("UQ"), Array.Empty<SqlIdentifier>()));
         Assert.Throws<ArgumentException>(() => new UniqueConstraintDefinition(
             Id("UQ"), new[] { Id("Id"), Id("Id") }));
 
@@ -634,6 +654,12 @@ public sealed class SchemaAndAdminStatementTests
         Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
             new[] { Id("TenantId"), Id("RoleId") },
             new[] { Id("Id"), Id("Id") }));
+        Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
+            Array.Empty<SqlIdentifier>(), Array.Empty<SqlIdentifier>()));
+        Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
+            Array.Empty<SqlIdentifier>(), new[] { Id("Id") }));
+        Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
+            new[] { Id("RoleId") }, Array.Empty<SqlIdentifier>()));
 
         var columns = new List<ColumnDefinition>
         {
@@ -830,6 +856,22 @@ public sealed class SchemaAndAdminStatementTests
             Column("A", LogicalDbType.String, type: new SqlTypeDescriptor(LogicalDbType.String, 200)),
             DestructiveImpact.None);
         AssertAlterColumnImpact(
+            Column("A", LogicalDbType.String, type: new SqlTypeDescriptor(LogicalDbType.String, 100)),
+            Column("A", LogicalDbType.String, type: new SqlTypeDescriptor(LogicalDbType.String)),
+            DestructiveImpact.None);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal)),
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 10)),
+            DestructiveImpact.PotentialDataLoss);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 10)),
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal)),
+            DestructiveImpact.None);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 10, scale: 2)),
+            Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 12, scale: 2)),
+            DestructiveImpact.None);
+        AssertAlterColumnImpact(
             Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 10, scale: 2)),
             Column("A", LogicalDbType.Decimal, type: new SqlTypeDescriptor(LogicalDbType.Decimal, precision: 12, scale: 3)),
             DestructiveImpact.None);
@@ -845,6 +887,25 @@ public sealed class SchemaAndAdminStatementTests
             Column("A", LogicalDbType.Int32),
             Column("A", LogicalDbType.Int32, defaultValue: new Int64DefaultDefinition(1)),
             DestructiveImpact.CompatibilityRisk);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Int32, defaultValue: new Int64DefaultDefinition(1)),
+            Column("A", LogicalDbType.Int32),
+            DestructiveImpact.CompatibilityRisk);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Int32, defaultValue: new Int64DefaultDefinition(1)),
+            Column("A", LogicalDbType.Int32, defaultValue: new Int64DefaultDefinition(2)),
+            DestructiveImpact.CompatibilityRisk);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Int32,
+                generation: new IdentityGenerationDefinition(1, 1)),
+            Column("A", LogicalDbType.Int32),
+            DestructiveImpact.PotentialDataLoss);
+        AssertAlterColumnImpact(
+            Column("A", LogicalDbType.Int32,
+                generation: new IdentityGenerationDefinition(1, 1)),
+            Column("A", LogicalDbType.Int32,
+                generation: new IdentityGenerationDefinition(2, 1)),
+            DestructiveImpact.PotentialDataLoss);
         Assert.Throws<ArgumentException>(() => new AlterColumnOperation(
             table,
             Column("A", LogicalDbType.Int32, comment: new SchemaComment("before")),
@@ -869,18 +930,60 @@ public sealed class SchemaAndAdminStatementTests
                     SequenceCycleBehavior.NoCycle)).Impact);
         Assert.Equal(DestructiveImpact.PotentialDataLoss,
             new AlterSequenceOperation(baseline,
-                Seq(LogicalDbType.Int32, 10, 1,
-                    SequenceBounds.Between(10, 90), 10,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Between(1, 100), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.PotentialDataLoss,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Between(0, 99), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.None,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Between(-1, 100), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.None,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Between(0, 101), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.None,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Unbounded(), 10,
                     SequenceCycleBehavior.NoCycle)).Impact);
         Assert.Equal(DestructiveImpact.CompatibilityRisk,
             new AlterSequenceOperation(baseline,
-                Seq(LogicalDbType.Int32, 2, -1,
+                Seq(LogicalDbType.Int32, 2, 1,
+                    SequenceBounds.Between(0, 100), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.CompatibilityRisk,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 2,
+                    SequenceBounds.Between(0, 100), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.CompatibilityRisk,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, -1,
+                    SequenceBounds.Between(0, 100), 10,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        Assert.Equal(DestructiveImpact.CompatibilityRisk,
+            new AlterSequenceOperation(baseline,
+                Seq(LogicalDbType.Int32, 1, 1,
                     SequenceBounds.Between(0, 100), 10,
                     SequenceCycleBehavior.Cycle)).Impact);
         Assert.Equal(DestructiveImpact.None,
             new AlterSequenceOperation(baseline,
                 Seq(LogicalDbType.Int32, 1, 1,
-                    SequenceBounds.Unbounded(), 20,
+                    SequenceBounds.Between(0, 100), 20,
+                    SequenceCycleBehavior.NoCycle)).Impact);
+        var unbounded = Seq(LogicalDbType.Int32, 1, 1,
+            SequenceBounds.Unbounded(), 10, SequenceCycleBehavior.NoCycle);
+        Assert.Equal(DestructiveImpact.PotentialDataLoss,
+            new AlterSequenceOperation(unbounded,
+                Seq(LogicalDbType.Int32, 1, 1,
+                    SequenceBounds.Between(0, 100), 10,
                     SequenceCycleBehavior.NoCycle)).Impact);
         Assert.Throws<ArgumentException>(() => new AlterSequenceOperation(
             baseline,
@@ -1101,6 +1204,755 @@ public sealed class SchemaAndAdminStatementTests
     }
 
     [Fact]
+    public void Fingerprint_same_type_schema_definition_fields_are_all_bound()
+    {
+        var tableName = ObjectName("Users", "app", "catalog");
+        var baseColumn = Column(
+            "Value", LogicalDbType.Decimal, ColumnNullability.Nullable,
+            defaultValue: new DecimalDefaultDefinition(1.00m),
+            comment: new SchemaComment("value"),
+            type: Type(LogicalDbType.Decimal, precision: 12, scale: 2));
+        var baseIndex = new IndexDefinition(
+            Id("IX_Value"),
+            new[]
+            {
+                new IndexColumnDefinition(Id("Value"), SqlSortDirection.Ascending),
+                new IndexColumnDefinition(Id("Id"), SqlSortDirection.Descending)
+            },
+            IndexUniqueness.NonUnique);
+        var basePrimary = new PrimaryKeyDefinition(
+            Id("PK_Users"), new[] { Id("TenantId"), Id("Id") });
+        var baseUnique = new UniqueConstraintDefinition(
+            Id("UQ_Users"), new[] { Id("TenantId"), Id("Value") });
+        var baseForeign = new ForeignKeyDefinition(
+            Id("FK_Users_Role"), ObjectName("Roles", "app", "catalog"),
+            new ForeignKeyColumnSet(
+                new[] { Id("TenantId"), Id("RoleId") },
+                new[] { Id("TenantId"), Id("Id") }),
+            new ReferentialActions(
+                ReferentialAction.NoAction, ReferentialAction.Restrict));
+        TableDefinition Table(
+            ColumnDefinition? column = null,
+            IEnumerable<ConstraintDefinition>? constraints = null,
+            IEnumerable<IndexDefinition>? indexes = null,
+            SchemaComment? comment = null,
+            SqlObjectName? name = null) =>
+            new(name ?? tableName,
+                new[]
+                {
+                    Column("TenantId", LogicalDbType.Int64),
+                    Column("Id", LogicalDbType.Int64),
+                    Column("RoleId", LogicalDbType.Int64),
+                    column ?? baseColumn
+                },
+                constraints ?? new ConstraintDefinition[]
+                {
+                    basePrimary, baseUnique, baseForeign
+                },
+                indexes ?? new[] { baseIndex },
+                comment ?? new SchemaComment("users"));
+        var baseline = new CreateTableOperation(
+            Table(), CreateObjectBehavior.FailIfExists);
+
+        var variants = new List<SchemaOperation>
+        {
+            new CreateTableOperation(Table(name: ObjectName("Users", "app", "other")), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(comment: new SchemaComment("changed")), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Changed", LogicalDbType.Decimal,
+                defaultValue: new DecimalDefaultDefinition(1.00m),
+                comment: new SchemaComment("value"),
+                type: Type(LogicalDbType.Decimal, precision: 12, scale: 2))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Value", LogicalDbType.Double,
+                defaultValue: new DecimalDefaultDefinition(1.00m),
+                comment: new SchemaComment("value"))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Value", LogicalDbType.Decimal, ColumnNullability.NotNullable,
+                defaultValue: new DecimalDefaultDefinition(1.00m),
+                comment: new SchemaComment("value"),
+                type: Type(LogicalDbType.Decimal, precision: 12, scale: 2))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Value", LogicalDbType.Decimal,
+                defaultValue: new DecimalDefaultDefinition(2.00m),
+                comment: new SchemaComment("value"),
+                type: Type(LogicalDbType.Decimal, precision: 12, scale: 2))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Value", LogicalDbType.Decimal,
+                defaultValue: new DecimalDefaultDefinition(1.00m),
+                comment: new SchemaComment("changed"),
+                type: Type(LogicalDbType.Decimal, precision: 12, scale: 2))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(column: Column(
+                "Value", LogicalDbType.Decimal,
+                generation: new ComputedGenerationDefinition(
+                    BooleanExpression.True, ComputedStorageKind.Virtual),
+                type: Type(LogicalDbType.Decimal, precision: 12, scale: 2))), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(indexes: new[]
+            {
+                new IndexDefinition(Id("IX_Changed"), baseIndex.Columns, baseIndex.Uniqueness)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(indexes: new[]
+            {
+                new IndexDefinition(baseIndex.Name,
+                    baseIndex.Columns.Reverse(), baseIndex.Uniqueness)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(indexes: new[]
+            {
+                new IndexDefinition(baseIndex.Name, baseIndex.Columns, IndexUniqueness.Unique)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                new PrimaryKeyDefinition(basePrimary.Name, new[] { Id("Id"), Id("TenantId") }),
+                baseUnique, baseForeign
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary,
+                new UniqueConstraintDefinition(baseUnique.Name, new[] { Id("Value"), Id("TenantId") }),
+                baseForeign
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary, baseUnique,
+                new ForeignKeyDefinition(baseForeign.Name, ObjectName("Other", "app", "catalog"), baseForeign.Columns, baseForeign.Actions)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary, baseUnique,
+                new ForeignKeyDefinition(baseForeign.Name, baseForeign.ReferencedTable,
+                    new ForeignKeyColumnSet(
+                        new[] { Id("TenantId"), Id("Id") },
+                        baseForeign.Columns.ReferencedColumns), baseForeign.Actions)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary, baseUnique,
+                new ForeignKeyDefinition(baseForeign.Name, baseForeign.ReferencedTable,
+                    new ForeignKeyColumnSet(
+                        baseForeign.Columns.LocalColumns,
+                        new[] { Id("TenantId"), Id("OtherId") }), baseForeign.Actions)
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary, baseUnique,
+                new ForeignKeyDefinition(baseForeign.Name, baseForeign.ReferencedTable,
+                    baseForeign.Columns,
+                    new ReferentialActions(
+                        ReferentialAction.Cascade, ReferentialAction.Restrict))
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(Table(constraints: new ConstraintDefinition[]
+            {
+                basePrimary, baseUnique,
+                new ForeignKeyDefinition(baseForeign.Name, baseForeign.ReferencedTable,
+                    baseForeign.Columns,
+                    new ReferentialActions(
+                        ReferentialAction.NoAction, ReferentialAction.Cascade))
+            }), CreateObjectBehavior.FailIfExists),
+            new CreateTableOperation(new TableDefinition(
+                tableName, Table().Columns.Reverse(), Table().Constraints,
+                Table().Indexes, Table().Comment), CreateObjectBehavior.FailIfExists)
+        };
+
+        AssertOperationFingerprintChanges(baseline, variants);
+
+        var baseSequence = new SequenceDefinition(
+            ObjectName("S", "app", "catalog"), LogicalDbType.Int64,
+            new SequenceOptions(10, 2, SequenceBounds.Between(0, 100), 10,
+                SequenceCycleBehavior.NoCycle));
+        SequenceDefinition Sequence(
+            SqlObjectName? name = null,
+            LogicalDbType type = LogicalDbType.Int64,
+            long start = 10,
+            long increment = 2,
+            SequenceBounds? bounds = null,
+            int? cache = 10,
+            SequenceCycleBehavior cycle = SequenceCycleBehavior.NoCycle) =>
+            new(name ?? baseSequence.Name, type,
+                new SequenceOptions(start, increment,
+                    bounds ?? SequenceBounds.Between(0, 100), cache, cycle));
+        AssertOperationFingerprintChanges(
+            new CreateSequenceOperation(baseSequence, CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateSequenceOperation(Sequence(name: ObjectName("Other", "app", "catalog")), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(type: LogicalDbType.Int32), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(start: 11), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(increment: -2), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(bounds: SequenceBounds.Between(-1, 100)), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(bounds: SequenceBounds.Between(0, 101)), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(cache: 11), CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(Sequence(cycle: SequenceCycleBehavior.Cycle), CreateObjectBehavior.FailIfExists)
+            });
+    }
+
+    [Fact]
+    public void Fingerprint_same_type_schema_operation_fields_are_all_bound()
+    {
+        var table = SampleTable();
+        var otherTable = ObjectName("Other", "app");
+        var column = Column("Status", LogicalDbType.Int32);
+        var changedColumn = Column("Changed", LogicalDbType.Int32);
+        var constraint = new UniqueConstraintDefinition(
+            Id("UQ_Status"), new[] { Id("Status") });
+        var changedConstraint = new UniqueConstraintDefinition(
+            Id("UQ_Changed"), new[] { Id("Status") });
+        var index = new IndexDefinition(
+            Id("IX_Status"),
+            new[]
+            {
+                new IndexColumnDefinition(Id("Status"), SqlSortDirection.Ascending)
+            }, IndexUniqueness.NonUnique);
+        var changedIndex = new IndexDefinition(
+            Id("IX_Changed"), index.Columns, index.Uniqueness);
+        var sequence = SampleSequence();
+        var changedSequence = new SequenceDefinition(
+            ObjectName("ChangedSequence", "app"), sequence.IntegerType,
+            sequence.Options);
+
+        AssertOperationFingerprintChanges(
+            new CreateSchemaOperation(
+                new SchemaName(Id("app"), Id("catalog")),
+                CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateSchemaOperation(new SchemaName(Id("other"), Id("catalog")), CreateObjectBehavior.FailIfExists),
+                new CreateSchemaOperation(new SchemaName(Id("app"), Id("otherCatalog")), CreateObjectBehavior.FailIfExists),
+                new CreateSchemaOperation(new SchemaName(Id("app"), Id("catalog")), CreateObjectBehavior.AlreadySatisfiedIfExists)
+            });
+        AssertOperationFingerprintChanges(
+            new DropSchemaOperation(new SchemaName(Id("app")),
+                DropObjectBehavior.FailIfMissing, DropScope.Restrict),
+            new SchemaOperation[]
+            {
+                new DropSchemaOperation(new SchemaName(Id("other")), DropObjectBehavior.FailIfMissing, DropScope.Restrict),
+                new DropSchemaOperation(new SchemaName(Id("app")), DropObjectBehavior.AlreadySatisfiedIfMissing, DropScope.Restrict),
+                new DropSchemaOperation(new SchemaName(Id("app")), DropObjectBehavior.FailIfMissing, DropScope.Cascade)
+            });
+        AssertOperationFingerprintChanges(
+            new CreateTableOperation(table, CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateTableOperation(CloneTableWithName(table, otherTable), CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(table, CreateObjectBehavior.AlreadySatisfiedIfExists)
+            });
+        AssertOperationFingerprintChanges(
+            new RenameTableOperation(table.Name, otherTable),
+            new SchemaOperation[]
+            {
+                new RenameTableOperation(ObjectName("Source2", "app"), otherTable),
+                new RenameTableOperation(table.Name, ObjectName("Target2", "app"))
+            });
+        AssertOperationFingerprintChanges(
+            new DropTableOperation(table.Name, DropObjectBehavior.FailIfMissing, DropScope.Restrict),
+            new SchemaOperation[]
+            {
+                new DropTableOperation(otherTable, DropObjectBehavior.FailIfMissing, DropScope.Restrict),
+                new DropTableOperation(table.Name, DropObjectBehavior.AlreadySatisfiedIfMissing, DropScope.Restrict),
+                new DropTableOperation(table.Name, DropObjectBehavior.FailIfMissing, DropScope.Cascade)
+            });
+        AssertOperationFingerprintChanges(
+            new AddColumnOperation(table.Name, column),
+            new SchemaOperation[]
+            {
+                new AddColumnOperation(otherTable, column),
+                new AddColumnOperation(table.Name, changedColumn)
+            });
+
+        var before = Column("Status", LogicalDbType.Int32);
+        var after = Column("Status", LogicalDbType.Int32,
+            defaultValue: new Int64DefaultDefinition(1));
+        AssertOperationFingerprintChanges(
+            new AlterColumnOperation(table.Name, before, after),
+            new SchemaOperation[]
+            {
+                new AlterColumnOperation(otherTable, before, after),
+                new AlterColumnOperation(table.Name,
+                    Column("Status", LogicalDbType.Int64), after),
+                new AlterColumnOperation(table.Name, before,
+                    Column("Status", LogicalDbType.Int32,
+                        defaultValue: new Int64DefaultDefinition(2)))
+            });
+        AssertOperationFingerprintChanges(
+            new RenameColumnOperation(table.Name, Id("Old"), Id("New")),
+            new SchemaOperation[]
+            {
+                new RenameColumnOperation(otherTable, Id("Old"), Id("New")),
+                new RenameColumnOperation(table.Name, Id("Old2"), Id("New")),
+                new RenameColumnOperation(table.Name, Id("Old"), Id("New2"))
+            });
+        AssertOperationFingerprintChanges(
+            new DropColumnOperation(table.Name, Id("Old"), DropObjectBehavior.FailIfMissing),
+            new SchemaOperation[]
+            {
+                new DropColumnOperation(otherTable, Id("Old"), DropObjectBehavior.FailIfMissing),
+                new DropColumnOperation(table.Name, Id("Other"), DropObjectBehavior.FailIfMissing),
+                new DropColumnOperation(table.Name, Id("Old"), DropObjectBehavior.AlreadySatisfiedIfMissing)
+            });
+        AssertOperationFingerprintChanges(
+            new AddConstraintOperation(table.Name, constraint),
+            new SchemaOperation[]
+            {
+                new AddConstraintOperation(otherTable, constraint),
+                new AddConstraintOperation(table.Name, changedConstraint)
+            });
+        AssertOperationFingerprintChanges(
+            new DropConstraintOperation(table.Name, Id("UQ"), DropObjectBehavior.FailIfMissing),
+            new SchemaOperation[]
+            {
+                new DropConstraintOperation(otherTable, Id("UQ"), DropObjectBehavior.FailIfMissing),
+                new DropConstraintOperation(table.Name, Id("Other"), DropObjectBehavior.FailIfMissing),
+                new DropConstraintOperation(table.Name, Id("UQ"), DropObjectBehavior.AlreadySatisfiedIfMissing)
+            });
+        AssertOperationFingerprintChanges(
+            new CreateIndexOperation(table.Name, index, CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateIndexOperation(otherTable, index, CreateObjectBehavior.FailIfExists),
+                new CreateIndexOperation(table.Name, changedIndex, CreateObjectBehavior.FailIfExists),
+                new CreateIndexOperation(table.Name, index, CreateObjectBehavior.AlreadySatisfiedIfExists)
+            });
+        AssertOperationFingerprintChanges(
+            new DropIndexOperation(table.Name, Id("IX"), DropObjectBehavior.FailIfMissing),
+            new SchemaOperation[]
+            {
+                new DropIndexOperation(otherTable, Id("IX"), DropObjectBehavior.FailIfMissing),
+                new DropIndexOperation(table.Name, Id("Other"), DropObjectBehavior.FailIfMissing),
+                new DropIndexOperation(table.Name, Id("IX"), DropObjectBehavior.AlreadySatisfiedIfMissing)
+            });
+        AssertOperationFingerprintChanges(
+            new CreateSequenceOperation(sequence, CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateSequenceOperation(changedSequence, CreateObjectBehavior.FailIfExists),
+                new CreateSequenceOperation(sequence, CreateObjectBehavior.AlreadySatisfiedIfExists)
+            });
+        AssertOperationFingerprintChanges(
+            new AlterSequenceOperation(sequence,
+                new SequenceDefinition(sequence.Name, sequence.IntegerType,
+                    new SequenceOptions(1, 1, SequenceBounds.Unbounded(), 10,
+                        SequenceCycleBehavior.NoCycle))),
+            new SchemaOperation[]
+            {
+                new AlterSequenceOperation(
+                    new SequenceDefinition(sequence.Name, sequence.IntegerType,
+                        new SequenceOptions(2, 1, SequenceBounds.Unbounded(), null,
+                            SequenceCycleBehavior.NoCycle)),
+                    new SequenceDefinition(sequence.Name, sequence.IntegerType,
+                        new SequenceOptions(1, 1, SequenceBounds.Unbounded(), 10,
+                            SequenceCycleBehavior.NoCycle))),
+                new AlterSequenceOperation(sequence,
+                    new SequenceDefinition(sequence.Name, sequence.IntegerType,
+                        new SequenceOptions(1, 1, SequenceBounds.Unbounded(), 11,
+                            SequenceCycleBehavior.NoCycle)))
+            });
+        AssertOperationFingerprintChanges(
+            new DropSequenceOperation(sequence.Name, DropObjectBehavior.FailIfMissing),
+            new SchemaOperation[]
+            {
+                new DropSequenceOperation(changedSequence.Name, DropObjectBehavior.FailIfMissing),
+                new DropSequenceOperation(sequence.Name, DropObjectBehavior.AlreadySatisfiedIfMissing)
+            });
+        AssertOperationFingerprintChanges(
+            new SetTableCommentOperation(table.Name, new SchemaComment("one")),
+            new SchemaOperation[]
+            {
+                new SetTableCommentOperation(otherTable, new SchemaComment("one")),
+                new SetTableCommentOperation(table.Name, new SchemaComment("two"))
+            });
+        AssertOperationFingerprintChanges(
+            new RemoveTableCommentOperation(table.Name),
+            new SchemaOperation[] { new RemoveTableCommentOperation(otherTable) });
+        AssertOperationFingerprintChanges(
+            new SetColumnCommentOperation(table.Name, Id("Id"), new SchemaComment("one")),
+            new SchemaOperation[]
+            {
+                new SetColumnCommentOperation(otherTable, Id("Id"), new SchemaComment("one")),
+                new SetColumnCommentOperation(table.Name, Id("Other"), new SchemaComment("one")),
+                new SetColumnCommentOperation(table.Name, Id("Id"), new SchemaComment("two"))
+            });
+        AssertOperationFingerprintChanges(
+            new RemoveColumnCommentOperation(table.Name, Id("Id")),
+            new SchemaOperation[]
+            {
+                new RemoveColumnCommentOperation(otherTable, Id("Id")),
+                new RemoveColumnCommentOperation(table.Name, Id("Other"))
+            });
+
+        var operation = new SetTableCommentOperation(
+            table.Name, new SchemaComment("mode"));
+        Assert.NotEqual(
+            PlanForOperation("field-plan", "field-step", operation,
+                MigrationIdempotencyMode.RequireChange).Fingerprint.Value,
+            PlanForOperation("field-plan", "field-step", operation,
+                MigrationIdempotencyMode.AcceptAlreadySatisfied).Fingerprint.Value);
+
+        var strictBehavior = PlanForOperation(
+            "behavior-plan", "behavior-step",
+            new CreateSchemaOperation(
+                new SchemaName(Id("app")), CreateObjectBehavior.FailIfExists),
+            MigrationIdempotencyMode.RequireChange).Fingerprint.Value;
+        var satisfiedBehavior = PlanForOperation(
+            "behavior-plan", "behavior-step",
+            new CreateSchemaOperation(
+                new SchemaName(Id("app")),
+                CreateObjectBehavior.AlreadySatisfiedIfExists),
+            MigrationIdempotencyMode.AcceptAlreadySatisfied).Fingerprint.Value;
+        Assert.Equal(
+            "sha256:b24f00fb209254596278168c9aa394275f139c43c5a31bffcbfb85622d54d777",
+            strictBehavior);
+        Assert.Equal(
+            "sha256:d0b84389931a28ebdb3f0191ab729a4a2ced2fc86cb962dfb6aa4aae8f8892e7",
+            satisfiedBehavior);
+
+        var first = Step("first", MigrationIdempotencyMode.RequireChange);
+        var second = new MigrationStep(
+            new MigrationStepId("second"),
+            new SetTableCommentOperation(ObjectName("T"), new SchemaComment("y")),
+            MigrationIdempotencyMode.RequireChange);
+        Assert.NotEqual(
+            new MigrationPlan(new MigrationPlanId("order"),
+                new[] { first, second }).Fingerprint.Value,
+            new MigrationPlan(new MigrationPlanId("order"),
+                new[] { second, first }).Fingerprint.Value);
+    }
+
+    [Fact]
+    public void Fingerprint_computed_expression_and_query_fields_are_all_bound()
+    {
+        var intType = Type(LogicalDbType.Int32);
+        var expressionPairs = new (SqlExpression Before, SqlExpression After)[]
+        {
+            (ColumnExpression("A"), ColumnExpression("B")),
+            (ColumnExpression("A"), ColumnExpression("A", "t")),
+            (new ParameterExpression(new ParameterDefinition("p", intType)),
+                new ParameterExpression(new ParameterDefinition("q", intType))),
+            (new ParameterExpression(new ParameterDefinition("p", intType)),
+                new ParameterExpression(new ParameterDefinition("p", Type(LogicalDbType.Int64)))),
+            (new ParameterExpression(new ParameterDefinition("p", intType)),
+                new ParameterExpression(new ParameterDefinition(
+                    "p", intType, ParameterDirection.Output))),
+            (new ParameterExpression(new ParameterDefinition("p", intType)),
+                new ParameterExpression(new ParameterDefinition(
+                    "p", intType, isNullable: false))),
+            (BooleanExpression.True, BooleanExpression.False),
+            (new BinaryExpression(ColumnExpression("A"), SqlBinaryOperator.Add, ColumnExpression("B")),
+                new BinaryExpression(ColumnExpression("Changed"), SqlBinaryOperator.Add, ColumnExpression("B"))),
+            (new BinaryExpression(ColumnExpression("A"), SqlBinaryOperator.Add, ColumnExpression("B")),
+                new BinaryExpression(ColumnExpression("A"), SqlBinaryOperator.Subtract, ColumnExpression("B"))),
+            (new BinaryExpression(ColumnExpression("A"), SqlBinaryOperator.Add, ColumnExpression("B")),
+                new BinaryExpression(ColumnExpression("A"), SqlBinaryOperator.Add, ColumnExpression("Changed"))),
+            (new UnaryExpression(SqlUnaryOperator.Not, BooleanExpression.True),
+                new UnaryExpression(SqlUnaryOperator.IsNull, BooleanExpression.True)),
+            (new UnaryExpression(SqlUnaryOperator.Not, BooleanExpression.True),
+                new UnaryExpression(SqlUnaryOperator.Not, BooleanExpression.False)),
+            (new InExpression(ColumnExpression("A"), new SqlExpression[] { ColumnExpression("B"), ColumnExpression("C") }),
+                new InExpression(ColumnExpression("Changed"), new SqlExpression[] { ColumnExpression("B"), ColumnExpression("C") })),
+            (new InExpression(ColumnExpression("A"), new SqlExpression[] { ColumnExpression("B"), ColumnExpression("C") }),
+                new InExpression(ColumnExpression("A"), new SqlExpression[] { ColumnExpression("C"), ColumnExpression("B") })),
+            (new BetweenExpression(ColumnExpression("A"), ColumnExpression("B"), ColumnExpression("C")),
+                new BetweenExpression(ColumnExpression("Changed"), ColumnExpression("B"), ColumnExpression("C"))),
+            (new BetweenExpression(ColumnExpression("A"), ColumnExpression("B"), ColumnExpression("C")),
+                new BetweenExpression(ColumnExpression("A"), ColumnExpression("Changed"), ColumnExpression("C"))),
+            (new BetweenExpression(ColumnExpression("A"), ColumnExpression("B"), ColumnExpression("C")),
+                new BetweenExpression(ColumnExpression("A"), ColumnExpression("B"), ColumnExpression("Changed"))),
+            (CaseExpressionFor("input", "when", "then", "else"),
+                CaseExpressionFor("changed", "when", "then", "else")),
+            (CaseExpressionFor("input", "when", "then", "else"),
+                CaseExpressionFor("input", "changed", "then", "else")),
+            (CaseExpressionFor("input", "when", "then", "else"),
+                CaseExpressionFor("input", "when", "changed", "else")),
+            (CaseExpressionFor("input", "when", "then", "else"),
+                CaseExpressionFor("input", "when", "then", "changed")),
+            (new CastExpression(ColumnExpression("A"), intType),
+                new CastExpression(ColumnExpression("B"), intType)),
+            (new CastExpression(ColumnExpression("A"), intType),
+                new CastExpression(ColumnExpression("A"), Type(LogicalDbType.Int64))),
+            (new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("A")),
+                new AggregateExpression(SemanticFunctions.Avg, ColumnExpression("A"))),
+            (new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("A")),
+                new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("B"))),
+            (new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("A")),
+                new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("A"), distinct: true)),
+            (new FunctionExpression(SemanticFunctions.Coalesce,
+                    new SqlExpression[] { ColumnExpression("A"), ColumnExpression("B") }),
+                new FunctionExpression(SemanticFunctions.Concat,
+                    new SqlExpression[] { ColumnExpression("A"), ColumnExpression("B") })),
+            (new FunctionExpression(SemanticFunctions.Coalesce,
+                    new SqlExpression[] { ColumnExpression("A"), ColumnExpression("B") }),
+                new FunctionExpression(SemanticFunctions.Coalesce,
+                    new SqlExpression[] { ColumnExpression("B"), ColumnExpression("A") })),
+            (new WildcardExpression(), new WildcardExpression(new SqlAlias("t")))
+        };
+        Assert.All(expressionPairs, pair =>
+            AssertExpressionFingerprintChanges(pair.Before, pair.After));
+
+        Assert.NotEqual(
+            FingerprintForComputed(BooleanExpression.True, ComputedStorageKind.Virtual),
+            FingerprintForComputed(BooleanExpression.True, ComputedStorageKind.Stored));
+
+        var queryMutations = new[]
+        {
+            "fromName", "fromAlias", "projectionExpression", "projectionAlias",
+            "projectionOrder", "distinct", "where", "groupBy", "groupOrder",
+            "having", "orderExpression", "orderDirection", "orderNulls",
+            "orderOrder", "pageOffset", "pageLimit", "pageKind", "lockMode",
+            "lockWait", "cteName", "cteQuery", "cteColumns", "cteRecursive",
+            "cteOrder", "setOperator", "setQuery", "setOrder"
+        };
+        var baselineQuery = FingerprintQuery("base");
+        Assert.All(queryMutations, mutation => AssertExpressionFingerprintChanges(
+            new SubqueryExpression(baselineQuery),
+            new SubqueryExpression(FingerprintQuery(mutation))));
+
+        foreach (var mutation in new[] { "joinLeft", "joinType", "joinRight", "joinCondition" })
+        {
+            AssertExpressionFingerprintChanges(
+                new SubqueryExpression(FingerprintQuery("joinBase")),
+                new SubqueryExpression(FingerprintQuery(mutation)));
+        }
+        foreach (var mutation in new[] { "derivedQuery", "derivedAlias" })
+        {
+            AssertExpressionFingerprintChanges(
+                new SubqueryExpression(FingerprintQuery("derivedBase")),
+                new SubqueryExpression(FingerprintQuery(mutation)));
+        }
+        AssertExpressionFingerprintChanges(
+            new ExistsExpression(new SubqueryExpression(FingerprintQuery("base"))),
+            new ExistsExpression(new SubqueryExpression(FingerprintQuery("where"))));
+    }
+
+    [Fact]
+    public void Fingerprint_typed_defaults_types_generations_and_nested_order_are_all_bound()
+    {
+        void AssertDefaultChanges(
+            ColumnDefaultDefinition before,
+            ColumnDefaultDefinition after) =>
+            Assert.NotEqual(
+                PlanForDefault(before).Fingerprint.Value,
+                PlanForDefault(after).Fingerprint.Value);
+
+        AssertDefaultChanges(
+            new NullDefaultDefinition(), new BooleanDefaultDefinition(false));
+        AssertDefaultChanges(
+            new BooleanDefaultDefinition(false),
+            new BooleanDefaultDefinition(true));
+        AssertDefaultChanges(
+            new Int64DefaultDefinition(1), new Int64DefaultDefinition(2));
+        AssertDefaultChanges(
+            new DecimalDefaultDefinition(1.00m),
+            new DecimalDefaultDefinition(2.00m));
+        AssertDefaultChanges(
+            new StringDefaultDefinition("one"),
+            new StringDefaultDefinition("two"));
+        AssertDefaultChanges(
+            new GuidDefaultDefinition(
+                Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
+            new GuidDefaultDefinition(
+                Guid.Parse("10112233-4455-6677-8899-aabbccddeeff")));
+
+        const long ticks = 638712864000000000L;
+        AssertDefaultChanges(
+            new DateTimeDefaultDefinition(
+                new DateTime(ticks, DateTimeKind.Utc)),
+            new DateTimeDefaultDefinition(
+                new DateTime(ticks + 1, DateTimeKind.Utc)));
+        AssertDefaultChanges(
+            new DateTimeDefaultDefinition(
+                new DateTime(ticks, DateTimeKind.Utc)),
+            new DateTimeDefaultDefinition(
+                new DateTime(ticks, DateTimeKind.Local)));
+        AssertDefaultChanges(
+            new DateTimeOffsetDefaultDefinition(
+                new DateTimeOffset(ticks, TimeSpan.Zero)),
+            new DateTimeOffsetDefaultDefinition(
+                new DateTimeOffset(ticks + 1, TimeSpan.Zero)));
+        AssertDefaultChanges(
+            new DateTimeOffsetDefaultDefinition(
+                new DateTimeOffset(ticks, TimeSpan.Zero)),
+            new DateTimeOffsetDefaultDefinition(
+                new DateTimeOffset(ticks, TimeSpan.FromHours(1))));
+        AssertDefaultChanges(
+            new SemanticDefaultDefinition(SemanticDefaultKind.CurrentDate),
+            new SemanticDefaultDefinition(SemanticDefaultKind.CurrentDateTime));
+
+        Assert.NotEqual(
+            FingerprintForType(Type(LogicalDbType.String, length: 10)),
+            FingerprintForType(Type(LogicalDbType.String, length: 11)));
+        Assert.NotEqual(
+            FingerprintForType(Type(LogicalDbType.Decimal, precision: 10, scale: 2)),
+            FingerprintForType(Type(LogicalDbType.Decimal, precision: 11, scale: 2)));
+        Assert.NotEqual(
+            FingerprintForType(Type(LogicalDbType.Decimal, precision: 10, scale: 2)),
+            FingerprintForType(Type(LogicalDbType.Decimal, precision: 10, scale: 3)));
+
+        Assert.NotEqual(
+            FingerprintForGeneration(new IdentityGenerationDefinition(1, 2)),
+            FingerprintForGeneration(new IdentityGenerationDefinition(2, 2)));
+        Assert.NotEqual(
+            FingerprintForGeneration(new IdentityGenerationDefinition(1, 2)),
+            FingerprintForGeneration(new IdentityGenerationDefinition(1, 3)));
+        Assert.NotEqual(
+            FingerprintForGeneration(
+                new SequenceGenerationDefinition(ObjectName("S", "app", "catalog"))),
+            FingerprintForGeneration(
+                new SequenceGenerationDefinition(ObjectName("Other", "app", "catalog"))));
+
+        var tableName = ObjectName("Nested", "app");
+        var columns = new[]
+        {
+            Column("Id", LogicalDbType.Int64),
+            Column("TenantId", LogicalDbType.Int64),
+            Column("RoleId", LogicalDbType.Int64)
+        };
+        var primary = new PrimaryKeyDefinition(
+            Id("PK"), new[] { Id("TenantId"), Id("Id") });
+        var unique = new UniqueConstraintDefinition(
+            Id("UQ"), new[] { Id("TenantId"), Id("RoleId") });
+        var foreign = new ForeignKeyDefinition(
+            Id("FK"), ObjectName("Role", "app"),
+            new ForeignKeyColumnSet(
+                new[] { Id("TenantId"), Id("RoleId") },
+                new[] { Id("TenantId"), Id("Id") }),
+            new ReferentialActions(
+                ReferentialAction.NoAction, ReferentialAction.Restrict));
+        var firstIndex = new IndexDefinition(
+            Id("IX_One"),
+            new[]
+            {
+                new IndexColumnDefinition(
+                    Id("Id"), SqlSortDirection.Ascending)
+            }, IndexUniqueness.NonUnique);
+        var secondIndex = new IndexDefinition(
+            Id("IX_Two"),
+            new[]
+            {
+                new IndexColumnDefinition(
+                    Id("RoleId"), SqlSortDirection.Descending)
+            }, IndexUniqueness.NonUnique);
+        TableDefinition Nested(
+            IEnumerable<ConstraintDefinition> constraints,
+            IEnumerable<IndexDefinition> indexes) =>
+            new(tableName, columns, constraints, indexes);
+
+        AssertOperationFingerprintChanges(
+            new CreateTableOperation(
+                Nested(new ConstraintDefinition[] { primary, unique, foreign },
+                    new[] { firstIndex, secondIndex }),
+                CreateObjectBehavior.FailIfExists),
+            new SchemaOperation[]
+            {
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[]
+                        {
+                            new PrimaryKeyDefinition(
+                                Id("PK_Changed"), primary.Columns),
+                            unique, foreign
+                        }, new[] { firstIndex, secondIndex }),
+                    CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[]
+                        {
+                            primary,
+                            new UniqueConstraintDefinition(
+                                Id("UQ_Changed"), unique.Columns),
+                            foreign
+                        }, new[] { firstIndex, secondIndex }),
+                    CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[]
+                        {
+                            primary, unique,
+                            new ForeignKeyDefinition(
+                                Id("FK_Changed"), foreign.ReferencedTable,
+                                foreign.Columns, foreign.Actions)
+                        }, new[] { firstIndex, secondIndex }),
+                    CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[] { foreign, unique, primary },
+                        new[] { firstIndex, secondIndex }),
+                    CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[] { primary, unique, foreign },
+                        new[] { secondIndex, firstIndex }),
+                    CreateObjectBehavior.FailIfExists),
+                new CreateTableOperation(
+                    Nested(new ConstraintDefinition[] { primary, unique, foreign },
+                        new[]
+                        {
+                            new IndexDefinition(
+                                firstIndex.Name,
+                                new[]
+                                {
+                                    new IndexColumnDefinition(
+                                        Id("Id"), SqlSortDirection.Descending)
+                                }, firstIndex.Uniqueness),
+                            secondIndex
+                        }),
+                    CreateObjectBehavior.FailIfExists)
+            });
+    }
+
+    [Fact]
+    public void Fingerprint_encodes_every_concrete_expression_and_function_metadata_field()
+    {
+        var simpleQuery = new SelectStatement(new[]
+        {
+            new SelectProjection(BooleanExpression.True)
+        });
+        var expressions = new SqlExpression[]
+        {
+            ColumnExpression("A"),
+            new ParameterExpression(new ParameterDefinition(
+                "p", Type(LogicalDbType.Int32))),
+            NullExpression.Instance,
+            BooleanExpression.True,
+            new BinaryExpression(
+                ColumnExpression("A"), SqlBinaryOperator.Add,
+                ColumnExpression("B")),
+            new UnaryExpression(SqlUnaryOperator.Not, BooleanExpression.True),
+            new InExpression(
+                ColumnExpression("A"), new SqlExpression[] { ColumnExpression("B") }),
+            new BetweenExpression(
+                ColumnExpression("A"), ColumnExpression("B"), ColumnExpression("C")),
+            CaseExpressionFor("input", "when", "then", "else"),
+            new CastExpression(ColumnExpression("A"), Type(LogicalDbType.Int64)),
+            new SubqueryExpression(simpleQuery),
+            new ExistsExpression(new SubqueryExpression(simpleQuery)),
+            new AggregateExpression(SemanticFunctions.Sum, ColumnExpression("A")),
+            new FunctionExpression(
+                SemanticFunctions.Coalesce,
+                new SqlExpression[] { ColumnExpression("A"), ColumnExpression("B") }),
+            new WildcardExpression()
+        };
+        var fingerprints = expressions
+            .Select(expression => FingerprintForComputed(expression))
+            .ToArray();
+        var closedExpressionTypes = typeof(SqlExpression).Assembly.GetTypes()
+            .Where(type => type.IsSealed && typeof(SqlExpression).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            closedExpressionTypes,
+            expressions.Select(expression => expression.GetType())
+                .Distinct()
+                .OrderBy(type => type.FullName, StringComparer.Ordinal)
+                .ToArray());
+        Assert.Equal(
+            expressions.Length,
+            fingerprints.Distinct(StringComparer.Ordinal).ToArray().Length);
+
+        Assert.NotEqual(
+            FingerprintForUncheckedFunction("same", 1, 2, false),
+            FingerprintForUncheckedFunction("same", 2, 2, false));
+        Assert.NotEqual(
+            FingerprintForUncheckedFunction("same", 1, 2, false),
+            FingerprintForUncheckedFunction("same", 1, 3, false));
+        Assert.NotEqual(
+            FingerprintForUncheckedFunction("same", 1, 2, false),
+            FingerprintForUncheckedFunction("same", 1, 2, true));
+    }
+
+    [Fact]
     public void Destructive_approval_is_exact_partial_replaceable_and_stale_safe()
     {
         var safe = new MigrationStep(
@@ -1229,6 +2081,32 @@ public sealed class SchemaAndAdminStatementTests
             new MigrationStepResult(accept.Id, MigrationStepOutcome.Failed));
     }
 
+    [Theory]
+    [InlineData(MigrationStepOutcome.PreconditionFailed)]
+    [InlineData(MigrationStepOutcome.BlockedDestructive)]
+    [InlineData(MigrationStepOutcome.Unsupported)]
+    [InlineData(MigrationStepOutcome.Failed)]
+    public void Migration_terminal_outcomes_freeze_the_exact_boundary(
+        MigrationStepOutcome terminalOutcome)
+    {
+        var first = Step("terminal", MigrationIdempotencyMode.RequireChange);
+        var second = Step("unreached", MigrationIdempotencyMode.RequireChange);
+        var plan = new MigrationPlan(
+            new MigrationPlanId("terminal-plan"), new[] { first, second });
+        var terminal = new MigrationStepResult(
+            first.Id, terminalOutcome, Diagnostic());
+
+        var result = new MigrationResult(plan, new[] { terminal });
+
+        Assert.False(result.CanAdvanceVersion);
+        Assert.Same(terminal, result.FailureBoundary);
+        Assert.Throws<ArgumentException>(() => new MigrationResult(plan, new[]
+        {
+            terminal,
+            new MigrationStepResult(second.Id, MigrationStepOutcome.Applied)
+        }));
+    }
+
     [Fact]
     public void Metadata_requests_are_scoped_structured_and_separate_from_results()
     {
@@ -1262,6 +2140,14 @@ public sealed class SchemaAndAdminStatementTests
         Assert.Same(table, found.Value);
         Assert.Equal(MetadataLookupStatus.NotFound, missing.Status);
         Assert.Null(missing.Value);
+        AssertEqualAndHash(
+            found,
+            MetadataLookupResult<TableMetadata>.Found(
+                new TableMetadata(CloneTable(table.Definition))));
+        AssertEqualAndHash(
+            missing,
+            MetadataLookupResult<TableMetadata>.NotFound());
+        Assert.NotEqual(found, missing);
         Assert.Throws<ArgumentNullException>(() =>
             MetadataLookupResult<TableMetadata>.Found(null!));
         Assert.Equal(
@@ -1344,6 +2230,153 @@ public sealed class SchemaAndAdminStatementTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new ColumnMetadata(a.Definition.Name,
                 Column("Id", LogicalDbType.Int32), -1));
+    }
+
+    [Fact]
+    public void Every_metadata_value_and_result_has_structural_equality_and_field_sensitivity()
+    {
+        var tableName = ObjectName("T", "app");
+        var tableDefinition = new TableDefinition(
+            tableName, new[] { Column("Id", LogicalDbType.Int32) });
+        var columnDefinition = Column("Id", LogicalDbType.Int32);
+        var indexDefinition = Index("IX");
+
+        var column = new ColumnMetadata(tableName, columnDefinition, 0);
+        AssertEqualAndHash(
+            column,
+            new ColumnMetadata(
+                ObjectName("T", "app"),
+                Column("Id", LogicalDbType.Int32), 0));
+        Assert.NotEqual(column,
+            new ColumnMetadata(ObjectName("Other", "app"), columnDefinition, 0));
+        Assert.NotEqual(column,
+            new ColumnMetadata(tableName, Column("Other", LogicalDbType.Int32), 0));
+        Assert.NotEqual(column,
+            new ColumnMetadata(tableName, columnDefinition, 1));
+
+        var index = new IndexMetadata(tableName, indexDefinition);
+        AssertEqualAndHash(
+            index,
+            new IndexMetadata(ObjectName("T", "app"), Index("IX")));
+        Assert.NotEqual(index,
+            new IndexMetadata(ObjectName("Other", "app"), indexDefinition));
+        Assert.NotEqual(index,
+            new IndexMetadata(tableName, Index("Other")));
+
+        var table = new TableMetadata(tableDefinition);
+        AssertEqualAndHash(
+            table,
+            new TableMetadata(CloneTable(tableDefinition)));
+        Assert.NotEqual(table,
+            new TableMetadata(new TableDefinition(
+                ObjectName("Other", "app"), tableDefinition.Columns)));
+
+        var token = new SchemaToken("token");
+        var tableResult = new TableMetadataCollectionResult(
+            MetadataCollectionStatus.Found, token, new[] { table });
+        AssertEqualAndHash(
+            tableResult,
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("token"),
+                new[] { new TableMetadata(CloneTable(tableDefinition)) }));
+        Assert.NotEqual(tableResult,
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("other"), new[] { table }));
+        Assert.NotEqual(tableResult,
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                new[]
+                {
+                    new TableMetadata(new TableDefinition(
+                        ObjectName("Other", "app"), tableDefinition.Columns))
+                }));
+        Assert.NotEqual(
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                Array.Empty<TableMetadata>()),
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.TargetNotFound, token,
+                Array.Empty<TableMetadata>()));
+
+        var columnResult = new ColumnMetadataCollectionResult(
+            MetadataCollectionStatus.Found, token, new[] { column });
+        AssertEqualAndHash(
+            columnResult,
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("token"),
+                new[]
+                {
+                    new ColumnMetadata(
+                        ObjectName("T", "app"),
+                        Column("Id", LogicalDbType.Int32), 0)
+                }));
+        Assert.NotEqual(columnResult,
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("other"), new[] { column }));
+        Assert.NotEqual(columnResult,
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                new[]
+                {
+                    new ColumnMetadata(tableName, columnDefinition, 1)
+                }));
+        Assert.NotEqual(
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                Array.Empty<ColumnMetadata>()),
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.TargetNotFound, token,
+                Array.Empty<ColumnMetadata>()));
+
+        var indexResult = new IndexMetadataCollectionResult(
+            MetadataCollectionStatus.Found, token, new[] { index });
+        AssertEqualAndHash(
+            indexResult,
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("token"),
+                new[]
+                {
+                    new IndexMetadata(
+                        ObjectName("T", "app"), Index("IX"))
+                }));
+        Assert.NotEqual(indexResult,
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("other"), new[] { index }));
+        Assert.NotEqual(indexResult,
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                new[] { new IndexMetadata(tableName, Index("Other")) }));
+        Assert.NotEqual(
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token,
+                Array.Empty<IndexMetadata>()),
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.TargetNotFound, token,
+                Array.Empty<IndexMetadata>()));
+
+        var snapshot = new SchemaMetadataSnapshot(token, new[] { table });
+        AssertEqualAndHash(
+            snapshot,
+            new SchemaMetadataSnapshot(
+                new SchemaToken("token"),
+                new[] { new TableMetadata(CloneTable(tableDefinition)) }));
+        Assert.NotEqual(snapshot,
+            new SchemaMetadataSnapshot(
+                new SchemaToken("other"), new[] { table }));
+        Assert.NotEqual(snapshot,
+            new SchemaMetadataSnapshot(
+                token,
+                new[]
+                {
+                    new TableMetadata(new TableDefinition(
+                        ObjectName("Other", "app"), tableDefinition.Columns))
+                }));
     }
 
     [Fact]
@@ -1565,6 +2598,315 @@ public sealed class SchemaAndAdminStatementTests
     }
 
     [Fact]
+    public void Database_admin_base_constructor_cannot_be_used_as_boolean_approval()
+    {
+        var constructor = Assert.Single(typeof(DatabaseAdminOperation)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic |
+                             BindingFlags.DeclaredOnly));
+
+        Assert.True(constructor.IsFamilyAndAssembly);
+        Assert.False(constructor.IsFamily);
+        Assert.Equal(
+            new[] { typeof(DestructiveImpact), typeof(AdminTargetApproval) },
+            constructor.GetParameters().Select(parameter => parameter.ParameterType));
+        Assert.DoesNotContain(constructor.GetParameters(),
+            parameter => parameter.ParameterType == typeof(bool));
+    }
+
+    [Fact]
+    public void Admin_results_reject_unknown_admin_operation_subtypes()
+    {
+        var forged = CreateUninitializedAdminSubtype();
+
+        Assert.Throws<ArgumentException>(() => new DatabaseAdminResult(
+            forged, DatabaseAdminOutcome.Applied));
+        Assert.Throws<ArgumentException>(() => new DatabaseAdminResult(
+            forged, DatabaseAdminOutcome.Failed, Diagnostic()));
+    }
+
+    [Fact]
+    public void Every_task6_constructor_required_reference_is_null_guarded()
+    {
+        var constructors = typeof(MigrationPlan).Assembly.GetTypes()
+            .Where(type => Task6ConcreteTypeNames.Contains(type.Name))
+            .Where(type => !type.ContainsGenericParameters)
+            .SelectMany(type => type.GetConstructors())
+            .OrderBy(constructor => constructor.DeclaringType!.Name,
+                StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(constructors);
+        foreach (var constructor in constructors)
+        {
+            var baseline = ValidTask6ConstructorArguments(constructor);
+            Assert.Equal(constructor.GetParameters().Length, baseline.Length);
+            constructor.Invoke(baseline);
+
+            var parameters = constructor.GetParameters();
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var parameter = parameters[index];
+                if (parameter.ParameterType.IsValueType ||
+                    parameter.HasDefaultValue && parameter.DefaultValue == null)
+                {
+                    continue;
+                }
+
+                var mutated = (object?[])baseline.Clone();
+                mutated[index] = null;
+                var exception = Assert.Throws<TargetInvocationException>(() =>
+                    constructor.Invoke(mutated));
+                Assert.IsAssignableFrom<ArgumentNullException>(
+                    exception.InnerException);
+            }
+        }
+    }
+
+    [Fact]
+    public void Every_task6_factory_required_reference_is_null_guarded()
+    {
+        Assert.Throws<ArgumentNullException>(() => SchemaScope.ForSchema(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            SchemaScope.ForCatalogAndSchema(null!, Id("app")));
+        Assert.Throws<ArgumentNullException>(() =>
+            SchemaScope.ForCatalogAndSchema(Id("catalog"), null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            MetadataLookupResult<TableMetadata>.Found(null!));
+
+        var destructive = new MigrationPlan(
+            new MigrationPlanId("null-factory-plan"),
+            new[]
+            {
+                new MigrationStep(
+                    new MigrationStepId("drop"),
+                    new DropTableOperation(
+                        ObjectName("Old"),
+                        DropObjectBehavior.FailIfMissing,
+                        DropScope.Restrict),
+                    MigrationIdempotencyMode.RequireChange)
+            });
+        Assert.Throws<ArgumentNullException>(() =>
+            destructive.CreateDestructiveApproval(
+                null!, new ApprovalReference("audit")));
+        Assert.Throws<ArgumentNullException>(() =>
+            destructive.CreateDestructiveApproval(
+                destructive.DestructiveStepIds, null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            destructive.WithDestructiveApproval(null!));
+
+        var drop = new DropDatabaseOperation(
+            Id("db"), DropObjectBehavior.FailIfMissing);
+        Assert.Throws<ArgumentNullException>(() => drop.CreateApproval(null!));
+        Assert.Throws<ArgumentNullException>(() => drop.WithApproval(null!));
+
+        var replacement = new DatabaseImportOperation(
+            Id("db"),
+            Resource("00112233-4455-6677-8899-aabbccddeeff", 'a'),
+            DatabaseTransferFormat.PortableJson,
+            DatabaseTransferScope.SchemaAndData,
+            DatabaseImportConflictPolicy.ReplaceTargetDatabase);
+        Assert.Throws<ArgumentNullException>(() =>
+            replacement.CreateApproval(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            replacement.WithApproval(null!));
+    }
+
+    [Fact]
+    public void Every_task6_collection_is_defensively_copied_and_fully_read_only()
+    {
+        var indexColumn = new IndexColumnDefinition(
+            Id("Id"), SqlSortDirection.Ascending);
+        var indexColumns = new List<IndexColumnDefinition> { indexColumn };
+        var index = new IndexDefinition(
+            Id("IX"), indexColumns, IndexUniqueness.NonUnique);
+        indexColumns.Clear();
+        Assert.Single(index.Columns);
+        AssertFullyReadOnly(index.Columns, indexColumn);
+        Assert.Throws<ArgumentException>(() => new IndexDefinition(
+            Id("IX_Null"), new IndexColumnDefinition[] { null! },
+            IndexUniqueness.NonUnique));
+
+        var primaryColumn = Id("Id");
+        var primaryColumns = new List<SqlIdentifier> { primaryColumn };
+        var primary = new PrimaryKeyDefinition(Id("PK"), primaryColumns);
+        primaryColumns.Clear();
+        Assert.Single(primary.Columns);
+        AssertFullyReadOnly(primary.Columns, primaryColumn);
+        Assert.Throws<ArgumentException>(() => new PrimaryKeyDefinition(
+            Id("PK_Null"), new SqlIdentifier[] { null! }));
+
+        var uniqueColumn = Id("Value");
+        var uniqueColumns = new List<SqlIdentifier> { uniqueColumn };
+        var unique = new UniqueConstraintDefinition(Id("UQ"), uniqueColumns);
+        uniqueColumns.Clear();
+        Assert.Single(unique.Columns);
+        AssertFullyReadOnly(unique.Columns, uniqueColumn);
+        Assert.Throws<ArgumentException>(() => new UniqueConstraintDefinition(
+            Id("UQ_Null"), new SqlIdentifier[] { null! }));
+
+        var localColumn = Id("RoleId");
+        var referencedColumn = Id("Id");
+        var localColumns = new List<SqlIdentifier> { localColumn };
+        var referencedColumns = new List<SqlIdentifier> { referencedColumn };
+        var foreignColumns = new ForeignKeyColumnSet(
+            localColumns, referencedColumns);
+        localColumns.Clear();
+        referencedColumns.Clear();
+        Assert.Single(foreignColumns.LocalColumns);
+        Assert.Single(foreignColumns.ReferencedColumns);
+        AssertFullyReadOnly(foreignColumns.LocalColumns, localColumn);
+        AssertFullyReadOnly(foreignColumns.ReferencedColumns, referencedColumn);
+        Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
+            new SqlIdentifier[] { null! }, new[] { referencedColumn }));
+        Assert.Throws<ArgumentException>(() => new ForeignKeyColumnSet(
+            new[] { localColumn }, new SqlIdentifier[] { null! }));
+
+        var column = Column("Id", LogicalDbType.Int64);
+        var constraints = new List<ConstraintDefinition> { primary, unique };
+        var indexes = new List<IndexDefinition> { index };
+        var columns = new List<ColumnDefinition> { column };
+        var table = new TableDefinition(
+            ObjectName("T"), columns, constraints, indexes);
+        columns.Clear();
+        constraints.Clear();
+        indexes.Clear();
+        Assert.Single(table.Columns);
+        Assert.Equal(2, table.Constraints.Count);
+        Assert.Single(table.Indexes);
+        AssertFullyReadOnly(table.Columns, column);
+        AssertFullyReadOnly(table.Constraints, primary);
+        AssertFullyReadOnly(table.Indexes, index);
+        Assert.Throws<ArgumentException>(() => new TableDefinition(
+            ObjectName("NullColumn"), new ColumnDefinition[] { null! }));
+        Assert.Throws<ArgumentException>(() => new TableDefinition(
+            ObjectName("NullConstraint"), new[] { column },
+            new ConstraintDefinition[] { null! }));
+        Assert.Throws<ArgumentException>(() => new TableDefinition(
+            ObjectName("NullIndex"), new[] { column },
+            indexes: new IndexDefinition[] { null! }));
+
+        var minimalTable = new TableDefinition(
+            ObjectName("Minimal"), new[] { column });
+        AssertFullyReadOnly(minimalTable.Constraints, primary);
+        AssertFullyReadOnly(minimalTable.Indexes, index);
+
+        var step = new MigrationStep(
+            new MigrationStepId("drop"),
+            new DropTableOperation(
+                ObjectName("Old"), DropObjectBehavior.FailIfMissing,
+                DropScope.Restrict),
+            MigrationIdempotencyMode.RequireChange);
+        var stepInput = new List<MigrationStep> { step };
+        var plan = new MigrationPlan(
+            new MigrationPlanId("copy-plan"), stepInput);
+        stepInput.Clear();
+        Assert.Single(plan.Steps);
+        AssertFullyReadOnly(plan.Steps, step);
+        AssertFullyReadOnly(plan.DestructiveStepIds, step.Id);
+        Assert.Throws<ArgumentException>(() => new MigrationPlan(
+            new MigrationPlanId("null-step"),
+            new MigrationStep[] { null! }));
+
+        var approvalIds = new List<MigrationStepId> { step.Id };
+        var approval = plan.CreateDestructiveApproval(
+            approvalIds, new ApprovalReference("audit"));
+        approvalIds.Clear();
+        Assert.Single(approval.StepIds);
+        AssertFullyReadOnly(approval.StepIds, step.Id);
+        Assert.Throws<ArgumentException>(() =>
+            plan.CreateDestructiveApproval(
+                new MigrationStepId[] { null! },
+                new ApprovalReference("audit-null")));
+
+        var stepResult = new MigrationStepResult(
+            step.Id, MigrationStepOutcome.Applied);
+        var resultInput = new List<MigrationStepResult> { stepResult };
+        var migrationResult = new MigrationResult(plan, resultInput);
+        resultInput.Clear();
+        Assert.Single(migrationResult.Results);
+        AssertFullyReadOnly(migrationResult.Results, stepResult);
+        Assert.Throws<ArgumentException>(() => new MigrationResult(
+            plan, new MigrationStepResult[] { null! }));
+
+        var tableMetadata = new TableMetadata(table);
+        var tableItems = new List<TableMetadata> { tableMetadata };
+        var tableResult = new TableMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("tables"), tableItems);
+        tableItems.Clear();
+        Assert.Single(tableResult.Items);
+        AssertFullyReadOnly(tableResult.Items, tableMetadata);
+        Assert.Throws<ArgumentException>(() =>
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("null-table"),
+                new TableMetadata[] { null! }));
+
+        var columnMetadata = new ColumnMetadata(table.Name, column, 0);
+        var columnItems = new List<ColumnMetadata> { columnMetadata };
+        var columnResult = new ColumnMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("columns"), columnItems);
+        columnItems.Clear();
+        Assert.Single(columnResult.Items);
+        AssertFullyReadOnly(columnResult.Items, columnMetadata);
+        Assert.Throws<ArgumentException>(() =>
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("null-column"),
+                new ColumnMetadata[] { null! }));
+
+        var indexMetadata = new IndexMetadata(table.Name, index);
+        var indexItems = new List<IndexMetadata> { indexMetadata };
+        var indexResult = new IndexMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("indexes"), indexItems);
+        indexItems.Clear();
+        Assert.Single(indexResult.Items);
+        AssertFullyReadOnly(indexResult.Items, indexMetadata);
+        Assert.Throws<ArgumentException>(() =>
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found,
+                new SchemaToken("null-index"),
+                new IndexMetadata[] { null! }));
+
+        var snapshotItems = new List<TableMetadata> { tableMetadata };
+        var snapshot = new SchemaMetadataSnapshot(
+            new SchemaToken("snapshot"), snapshotItems);
+        snapshotItems.Clear();
+        Assert.Single(snapshot.Tables);
+        AssertFullyReadOnly(snapshot.Tables, tableMetadata);
+        Assert.Throws<ArgumentException>(() => new SchemaMetadataSnapshot(
+            new SchemaToken("null-snapshot"),
+            new TableMetadata[] { null! }));
+
+        var emptyPlan = new MigrationPlan(
+            new MigrationPlanId("empty-copy-plan"),
+            Array.Empty<MigrationStep>());
+        AssertFullyReadOnly(emptyPlan.Steps, step);
+        AssertFullyReadOnly(emptyPlan.DestructiveStepIds, step.Id);
+        var emptyMigrationResult = new MigrationResult(
+            emptyPlan, Array.Empty<MigrationStepResult>());
+        AssertFullyReadOnly(emptyMigrationResult.Results, stepResult);
+
+        var emptyTables = new TableMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("empty-tables"), Array.Empty<TableMetadata>());
+        var emptyColumns = new ColumnMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("empty-columns"), Array.Empty<ColumnMetadata>());
+        var emptyIndexes = new IndexMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            new SchemaToken("empty-indexes"), Array.Empty<IndexMetadata>());
+        var emptySnapshot = new SchemaMetadataSnapshot(
+            new SchemaToken("empty-snapshot"), Array.Empty<TableMetadata>());
+        AssertFullyReadOnly(emptyTables.Items, tableMetadata);
+        AssertFullyReadOnly(emptyColumns.Items, columnMetadata);
+        AssertFullyReadOnly(emptyIndexes.Items, indexMetadata);
+        AssertFullyReadOnly(emptySnapshot.Tables, tableMetadata);
+    }
+
+    [Fact]
     public void Every_task6_enum_input_rejects_undefined_values()
     {
         var table = SampleTable();
@@ -1626,6 +2968,42 @@ public sealed class SchemaAndAdminStatementTests
     }
 
     [Fact]
+    public void Every_task6_enum_taking_constructor_rejects_every_undefined_slot()
+    {
+        var constructors = typeof(MigrationPlan).Assembly.GetTypes()
+            .Where(type => Task6ConcreteTypeNames.Contains(type.Name))
+            .Where(type => !type.ContainsGenericParameters)
+            .SelectMany(type => type.GetConstructors())
+            .ToArray();
+        var enumSlots = 0;
+
+        foreach (var constructor in constructors)
+        {
+            var parameters = constructor.GetParameters();
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var enumType = parameters[index].ParameterType;
+                if (!enumType.IsEnum)
+                {
+                    continue;
+                }
+
+                enumSlots++;
+                var arguments = ValidTask6ConstructorArguments(constructor);
+                arguments[index] = Enum.ToObject(enumType, -1);
+                var exception = Assert.Throws<TargetInvocationException>(() =>
+                    constructor.Invoke(arguments));
+                Assert.True(
+                    exception.InnerException is ArgumentOutOfRangeException,
+                    $"{constructor.DeclaringType!.Name}.{parameters[index].Name} " +
+                    $"accepted an undefined {enumType.Name}: {exception.InnerException}");
+            }
+        }
+
+        Assert.True(enumSlots > 0);
+    }
+
+    [Fact]
     public void Task6_hierarchy_sealing_and_plain_runtime_results_are_exact()
     {
         var abstractNodes = new[]
@@ -1651,7 +3029,9 @@ public sealed class SchemaAndAdminStatementTests
             typeof(MigrationResult), typeof(ColumnMetadata), typeof(IndexMetadata),
             typeof(TableMetadata), typeof(TableMetadataCollectionResult),
             typeof(ColumnMetadataCollectionResult), typeof(IndexMetadataCollectionResult),
-            typeof(SchemaMetadataSnapshot), typeof(DatabaseDiagnosticResult),
+            typeof(SchemaMetadataSnapshot),
+            typeof(MetadataLookupResult<TableMetadata>),
+            typeof(DatabaseDiagnosticResult),
             typeof(DatabaseAdminResult)
         };
         Assert.All(runtimeResults, type =>
@@ -1695,11 +3075,43 @@ public sealed class SchemaAndAdminStatementTests
             typeof(ForeignKeyDefinition), typeof(TableDefinition),
             typeof(SequenceBounds), typeof(SequenceOptions), typeof(SequenceDefinition),
             typeof(ColumnMetadata), typeof(IndexMetadata), typeof(TableMetadata),
+            typeof(MetadataLookupResult<TableMetadata>),
             typeof(TableMetadataCollectionResult), typeof(ColumnMetadataCollectionResult),
             typeof(IndexMetadataCollectionResult), typeof(SchemaMetadataSnapshot)
         };
         Assert.All(structural, type => Assert.Contains(
             typeof(IEquatable<>).MakeGenericType(type), type.GetInterfaces()));
+
+        foreach (var type in structural)
+        {
+            var constructor = type.GetConstructors().SingleOrDefault();
+            if (constructor == null)
+            {
+                continue;
+            }
+
+            var first = constructor.Invoke(
+                ValidTask6ConstructorArguments(constructor));
+            var second = constructor.Invoke(
+                ValidTask6ConstructorArguments(constructor));
+            Assert.NotSame(first, second);
+            Assert.Equal(first, second);
+            Assert.Equal(first.GetHashCode(), second.GetHashCode());
+        }
+
+        AssertEqualAndHash(SchemaScope.All(), SchemaScope.All());
+        AssertEqualAndHash(
+            SequenceBounds.Between(-1, 1),
+            SequenceBounds.Between(-1, 1));
+        AssertEqualAndHash(
+            PlanForOperation(
+                "structural-fingerprint", "step",
+                new RemoveTableCommentOperation(ObjectName("T")),
+                MigrationIdempotencyMode.RequireChange).Fingerprint,
+            PlanForOperation(
+                "structural-fingerprint", "step",
+                new RemoveTableCommentOperation(ObjectName("T")),
+                MigrationIdempotencyMode.RequireChange).Fingerprint);
 
         var publicSurface = typeof(MigrationPlan).Assembly.GetTypes()
             .Where(type => Task6PublicTypeNames.Contains(type.Name))
@@ -1749,6 +3161,7 @@ public sealed class SchemaAndAdminStatementTests
             "GetTableMetadataOperation", "ListColumnsOperation", "GetColumnMetadataOperation",
             "ListIndexesOperation", "GetIndexMetadataOperation", "ColumnMetadata",
             "IndexMetadata", "TableMetadata", "TableMetadataCollectionResult",
+            "MetadataLookupResult`1",
             "ColumnMetadataCollectionResult", "IndexMetadataCollectionResult",
             "SchemaMetadataSnapshot", "DatabaseDiagnosticOperation", "DatabaseDiagnosticResult",
             "CreateDatabaseOperation", "DropDatabaseOperation", "DatabaseExportOperation",
@@ -1770,6 +3183,329 @@ public sealed class SchemaAndAdminStatementTests
         "Credential", "Password", "Secret", "Path", "Stream", "Driver",
         "ProviderType", "Placeholder", "ParameterBag", "BoundParameter"
     };
+
+    private static object?[] ValidTask6ConstructorArguments(
+        ConstructorInfo constructor)
+    {
+        var owner = constructor.DeclaringType!;
+        if (owner == typeof(RenameTableOperation))
+        {
+            return new object?[] { ObjectName("Before"), ObjectName("After") };
+        }
+        if (owner == typeof(AlterColumnOperation))
+        {
+            return new object?[]
+            {
+                ObjectName("T"),
+                Column("Value", LogicalDbType.Int32),
+                Column("Value", LogicalDbType.Int64)
+            };
+        }
+        if (owner == typeof(RenameColumnOperation))
+        {
+            return new object?[] { ObjectName("T"), Id("Before"), Id("After") };
+        }
+        if (owner == typeof(AlterSequenceOperation))
+        {
+            var before = SampleSequence();
+            return new object?[]
+            {
+                before,
+                new SequenceDefinition(
+                    before.Name,
+                    before.IntegerType,
+                    new SequenceOptions(
+                        2, 1, SequenceBounds.Unbounded(), null,
+                        SequenceCycleBehavior.NoCycle))
+            };
+        }
+
+        return constructor.GetParameters()
+            .Select(ValidTask6ParameterValue)
+            .ToArray();
+    }
+
+    private static object? ValidTask6ParameterValue(ParameterInfo parameter)
+    {
+        if (parameter.HasDefaultValue)
+        {
+            return parameter.DefaultValue;
+        }
+
+        var type = parameter.ParameterType;
+        var owner = parameter.Member.DeclaringType!;
+        if (type == typeof(string))
+        {
+            if (owner == typeof(ExpectedStructuralFingerprint))
+            {
+                return "sha256:" + new string('a', 64);
+            }
+            if (owner == typeof(ResourceContentDigest))
+            {
+                return new string('b', 64);
+            }
+            return "value";
+        }
+        if (type == typeof(Guid))
+        {
+            return Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+        }
+        if (type == typeof(DateTime))
+        {
+            return new DateTime(638712864000000000L, DateTimeKind.Utc);
+        }
+        if (type == typeof(DateTimeOffset))
+        {
+            return new DateTimeOffset(
+                638712864000000000L, TimeSpan.FromHours(8));
+        }
+        if (type == typeof(long))
+        {
+            return 1L;
+        }
+        if (type == typeof(decimal))
+        {
+            return 1m;
+        }
+        if (type == typeof(bool))
+        {
+            return true;
+        }
+        if (type == typeof(int))
+        {
+            return 0;
+        }
+        if (Nullable.GetUnderlyingType(type) != null)
+        {
+            return null;
+        }
+        if (type.IsEnum)
+        {
+            if (type == typeof(LogicalDbType))
+            {
+                return LogicalDbType.Int64;
+            }
+            return Enum.ToObject(type, 0);
+        }
+        if (type == typeof(SqlIdentifier))
+        {
+            return Id(parameter.Name ?? "Id");
+        }
+        if (type == typeof(SqlObjectName))
+        {
+            return ObjectName("T", "app");
+        }
+        if (type == typeof(SqlTypeDescriptor))
+        {
+            return Type(LogicalDbType.Int32);
+        }
+        if (type == typeof(SqlExpression))
+        {
+            return BooleanExpression.True;
+        }
+        if (type == typeof(ResourceContentDigest))
+        {
+            return new ResourceContentDigest(new string('b', 64));
+        }
+        if (type == typeof(SchemaComment))
+        {
+            return new SchemaComment("comment");
+        }
+        if (type == typeof(SchemaName))
+        {
+            return new SchemaName(Id("app"));
+        }
+        if (type == typeof(SchemaScope))
+        {
+            return SchemaScope.All();
+        }
+        if (type == typeof(ColumnDefinition))
+        {
+            return Column("Value", LogicalDbType.Int32);
+        }
+        if (type == typeof(TableDefinition))
+        {
+            return SampleTable();
+        }
+        if (type == typeof(ConstraintDefinition))
+        {
+            return new UniqueConstraintDefinition(Id("UQ"), new[] { Id("Id") });
+        }
+        if (type == typeof(IndexDefinition))
+        {
+            return Index("IX");
+        }
+        if (type == typeof(ForeignKeyColumnSet))
+        {
+            return new ForeignKeyColumnSet(
+                new[] { Id("RoleId") }, new[] { Id("Id") });
+        }
+        if (type == typeof(ReferentialActions))
+        {
+            return new ReferentialActions(
+                ReferentialAction.NoAction, ReferentialAction.Restrict);
+        }
+        if (type == typeof(SequenceBounds))
+        {
+            return SequenceBounds.Unbounded();
+        }
+        if (type == typeof(SequenceOptions))
+        {
+            return new SequenceOptions(
+                1, 1, SequenceBounds.Unbounded(), null,
+                SequenceCycleBehavior.NoCycle);
+        }
+        if (type == typeof(SequenceDefinition))
+        {
+            return SampleSequence();
+        }
+        if (type == typeof(MigrationPlanId))
+        {
+            return new MigrationPlanId("plan");
+        }
+        if (type == typeof(MigrationStepId))
+        {
+            return new MigrationStepId("step");
+        }
+        if (type == typeof(ApprovalReference))
+        {
+            return new ApprovalReference("audit");
+        }
+        if (type == typeof(SchemaToken))
+        {
+            return new SchemaToken("token");
+        }
+        if (type == typeof(DiagnosticCode))
+        {
+            return new DiagnosticCode("TEST");
+        }
+        if (type == typeof(DatabaseResourceHandle))
+        {
+            return Resource("00112233-4455-6677-8899-aabbccddeeff", 'a');
+        }
+        if (type == typeof(SchemaOperation))
+        {
+            return new SetTableCommentOperation(
+                ObjectName("T"), new SchemaComment("comment"));
+        }
+        if (type == typeof(MigrationPlan))
+        {
+            return PlanForOperation(
+                "plan", "step",
+                new SetTableCommentOperation(
+                    ObjectName("T"), new SchemaComment("comment")),
+                MigrationIdempotencyMode.RequireChange);
+        }
+        if (type == typeof(DatabaseAdminOperation))
+        {
+            return new CreateDatabaseOperation(
+                Id("db"), CreateObjectBehavior.FailIfExists);
+        }
+        if (type == typeof(TableMetadata))
+        {
+            return new TableMetadata(SampleTable());
+        }
+        if (type == typeof(ColumnMetadata))
+        {
+            return new ColumnMetadata(
+                ObjectName("T"), Column("Id", LogicalDbType.Int32), 0);
+        }
+        if (type == typeof(IndexMetadata))
+        {
+            return new IndexMetadata(ObjectName("T"), Index("IX"));
+        }
+        if (type.IsGenericType &&
+            type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+        {
+            return ValidTask6Enumerable(type.GetGenericArguments()[0]);
+        }
+
+        throw new InvalidOperationException(
+            $"No valid Task6 specimen for {owner.Name}.{parameter.Name}: {type}.");
+    }
+
+    private static object ValidTask6Enumerable(Type itemType)
+    {
+        if (itemType == typeof(IndexColumnDefinition))
+        {
+            return new[]
+            {
+                new IndexColumnDefinition(Id("Id"), SqlSortDirection.Ascending)
+            };
+        }
+        if (itemType == typeof(SqlIdentifier))
+        {
+            return new[] { Id("Id") };
+        }
+        if (itemType == typeof(ColumnDefinition))
+        {
+            return new[] { Column("Id", LogicalDbType.Int32) };
+        }
+        if (itemType == typeof(ConstraintDefinition))
+        {
+            return Array.Empty<ConstraintDefinition>();
+        }
+        if (itemType == typeof(IndexDefinition))
+        {
+            return Array.Empty<IndexDefinition>();
+        }
+        if (itemType == typeof(MigrationStep))
+        {
+            return new[]
+            {
+                new MigrationStep(
+                    new MigrationStepId("step"),
+                    new SetTableCommentOperation(
+                        ObjectName("T"), new SchemaComment("comment")),
+                    MigrationIdempotencyMode.RequireChange)
+            };
+        }
+        if (itemType == typeof(MigrationStepResult))
+        {
+            return new[]
+            {
+                new MigrationStepResult(
+                    new MigrationStepId("step"), MigrationStepOutcome.Applied)
+            };
+        }
+        if (itemType == typeof(TableMetadata))
+        {
+            return new[] { new TableMetadata(SampleTable()) };
+        }
+        if (itemType == typeof(ColumnMetadata))
+        {
+            return new[]
+            {
+                new ColumnMetadata(
+                    ObjectName("T"), Column("Id", LogicalDbType.Int32), 0)
+            };
+        }
+        if (itemType == typeof(IndexMetadata))
+        {
+            return new[]
+            {
+                new IndexMetadata(ObjectName("T"), Index("IX"))
+            };
+        }
+
+        throw new InvalidOperationException(
+            $"No valid Task6 enumerable specimen for {itemType}.");
+    }
+
+    private static void AssertFullyReadOnly<T>(
+        IReadOnlyList<T> values, T value)
+    {
+        var generic = Assert.IsAssignableFrom<IList<T>>(values);
+        Assert.True(generic.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => generic.Add(value));
+        Assert.Throws<NotSupportedException>(() => generic.Clear());
+
+        var nonGeneric = Assert.IsAssignableFrom<IList>(values);
+        Assert.True(nonGeneric.IsReadOnly);
+        Assert.True(nonGeneric.IsFixedSize);
+        Assert.Throws<NotSupportedException>(() => nonGeneric.Add(value));
+        Assert.Throws<NotSupportedException>(() => nonGeneric.Clear());
+    }
 
     private static SqlIdentifier Id(string value) => new(value);
 
@@ -1827,6 +3563,240 @@ public sealed class SchemaAndAdminStatementTests
                 column.DefaultValue, column.Comment)),
             table.Constraints, table.Indexes, table.Comment);
 
+    private static TableDefinition CloneTableWithName(
+        TableDefinition table, SqlObjectName name) =>
+        new(name, table.Columns, table.Constraints, table.Indexes, table.Comment);
+
+    private static void AssertOperationFingerprintChanges(
+        SchemaOperation baseline,
+        IEnumerable<SchemaOperation> variants)
+    {
+        var operations = new[] { baseline }.Concat(variants).ToArray();
+        var fingerprints = operations.Select(operation =>
+            PlanForOperation(
+                "field-plan",
+                "field-step",
+                operation,
+                CompatibleIdempotency(operation)).Fingerprint.Value).ToArray();
+
+        // Create/drop behavior and step idempotency are an intentional invariant:
+        // changing behavior must use the only compatible idempotency value.
+        Assert.Equal(
+            fingerprints.Length,
+            fingerprints.Distinct(StringComparer.Ordinal).ToArray().Length);
+    }
+
+    private static CaseExpression CaseExpressionFor(
+        string input, string when, string then, string @else) =>
+        new(
+            ColumnExpression(input),
+            new[]
+            {
+                new CaseWhenClause(
+                    ColumnExpression(when), ColumnExpression(then))
+            },
+            ColumnExpression(@else));
+
+    private static void AssertExpressionFingerprintChanges(
+        SqlExpression before, SqlExpression after) =>
+        Assert.NotEqual(FingerprintForComputed(before), FingerprintForComputed(after));
+
+    private static string FingerprintForComputed(
+        SqlExpression expression,
+        ComputedStorageKind storage = ComputedStorageKind.Virtual) =>
+        PlanForOperation(
+            "computed-plan",
+            "computed-step",
+            new AddColumnOperation(
+                ObjectName("ComputedTable", "app"),
+                Column(
+                    "ComputedValue",
+                    LogicalDbType.Int32,
+                    generation: new ComputedGenerationDefinition(
+                        expression, storage))),
+            MigrationIdempotencyMode.RequireChange).Fingerprint.Value;
+
+    private static string FingerprintForType(SqlTypeDescriptor type) =>
+        PlanForOperation(
+            "type-plan",
+            "type-step",
+            new AddColumnOperation(
+                ObjectName("TypedTable", "app"),
+                new ColumnDefinition(
+                    Id("Value"), type, ColumnNullability.Nullable)),
+            MigrationIdempotencyMode.RequireChange).Fingerprint.Value;
+
+    private static string FingerprintForGeneration(
+        ColumnGenerationDefinition generation) =>
+        PlanForOperation(
+            "generation-plan",
+            "generation-step",
+            new AddColumnOperation(
+                ObjectName("GeneratedTable", "app"),
+                Column(
+                    "GeneratedValue", LogicalDbType.Int64,
+                    generation: generation)),
+            MigrationIdempotencyMode.RequireChange).Fingerprint.Value;
+
+    private static string FingerprintForUncheckedFunction(
+        string key, int minArguments, int? maxArguments, bool isAggregate)
+    {
+        var semanticConstructor = Assert.Single(
+            typeof(SemanticFunctionId).GetConstructors(
+                BindingFlags.Instance | BindingFlags.NonPublic));
+        var semantic = (SemanticFunctionId)semanticConstructor.Invoke(
+            new object?[] { key, minArguments, maxArguments, isAggregate });
+        var function = (FunctionExpression)
+            RuntimeHelpers.GetUninitializedObject(typeof(FunctionExpression));
+        SetAutoProperty(function, nameof(FunctionExpression.Function), semantic);
+        SetAutoProperty(
+            function,
+            nameof(FunctionExpression.Arguments),
+            Array.AsReadOnly<SqlExpression>(new[] { BooleanExpression.True }));
+        var computed = (ComputedGenerationDefinition)
+            RuntimeHelpers.GetUninitializedObject(
+                typeof(ComputedGenerationDefinition));
+        SetAutoProperty(
+            computed,
+            nameof(ComputedGenerationDefinition.Expression),
+            function);
+        SetAutoProperty(
+            computed,
+            nameof(ComputedGenerationDefinition.Storage),
+            ComputedStorageKind.Virtual);
+        return FingerprintForGeneration(computed);
+    }
+
+    private static void SetAutoProperty(
+        object target, string propertyName, object value)
+    {
+        var field = target.GetType().GetField(
+            $"<{propertyName}>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(target, value);
+    }
+
+    private static SelectStatement FingerprintQuery(string mutation)
+    {
+        SelectStatement SimpleQuery(string marker) =>
+            new(new[]
+            {
+                new SelectProjection(ColumnExpression(marker), new SqlAlias("value"))
+            });
+
+        SqlTableSource from;
+        if (mutation is "joinBase" or "joinLeft" or "joinType" or
+            "joinRight" or "joinCondition")
+        {
+            from = new JoinSource(
+                new NamedTableSource(
+                    ObjectName(mutation == "joinLeft" ? "ChangedLeft" : "Left", "app"),
+                    new SqlAlias("l")),
+                mutation == "joinType" ? SqlJoinType.Left : SqlJoinType.Inner,
+                new NamedTableSource(
+                    ObjectName(mutation == "joinRight" ? "ChangedRight" : "Right", "app"),
+                    new SqlAlias("r")),
+                mutation == "joinCondition" ? BooleanExpression.False : BooleanExpression.True);
+        }
+        else if (mutation is "derivedBase" or "derivedQuery" or "derivedAlias")
+        {
+            from = new DerivedTableSource(
+                SimpleQuery(mutation == "derivedQuery" ? "Changed" : "Derived"),
+                new SqlAlias(mutation == "derivedAlias" ? "changed" : "d"));
+        }
+        else
+        {
+            from = new NamedTableSource(
+                ObjectName(mutation == "fromName" ? "Changed" : "Users", "app"),
+                new SqlAlias(mutation == "fromAlias" ? "changed" : "u"));
+        }
+
+        var firstProjection = new SelectProjection(
+            ColumnExpression(mutation == "projectionExpression" ? "Changed" : "A", "u"),
+            new SqlAlias(mutation == "projectionAlias" ? "changed" : "a"));
+        var secondProjection = new SelectProjection(
+            ColumnExpression("B", "u"), new SqlAlias("b"));
+        var projections = mutation == "projectionOrder"
+            ? new[] { secondProjection, firstProjection }
+            : new[] { firstProjection, secondProjection };
+
+        var firstGroup = ColumnExpression(
+            mutation == "groupBy" ? "Changed" : "A", "u");
+        var secondGroup = ColumnExpression("B", "u");
+        var groupBy = mutation == "groupOrder"
+            ? new SqlExpression[] { secondGroup, firstGroup }
+            : new SqlExpression[] { firstGroup, secondGroup };
+
+        var firstOrder = new OrderByExpression(
+            ColumnExpression(mutation == "orderExpression" ? "Changed" : "A", "u"),
+            mutation == "orderDirection"
+                ? SqlSortDirection.Descending
+                : SqlSortDirection.Ascending,
+            mutation == "orderNulls"
+                ? SqlNullSortOrder.First
+                : SqlNullSortOrder.Default);
+        var secondOrder = new OrderByExpression(
+            ColumnExpression("B", "u"),
+            SqlSortDirection.Descending,
+            SqlNullSortOrder.Last);
+        var orderBy = mutation == "orderOrder"
+            ? new[] { secondOrder, firstOrder }
+            : new[] { firstOrder, secondOrder };
+
+        PageSpec page = mutation switch
+        {
+            "pageOffset" => new OffsetPageSpec(2, 10),
+            "pageLimit" => new OffsetPageSpec(1, 11),
+            "pageKind" => new KeysetPageSpec(
+                new SqlExpression[] { ColumnExpression("A", "u") }, 10),
+            _ => new OffsetPageSpec(1, 10)
+        };
+
+        var lockSpec = new LockSpec(
+            mutation == "lockMode" ? SqlLockMode.Share : SqlLockMode.Update,
+            mutation == "lockWait" ? SqlLockWait.NoWait : SqlLockWait.Wait);
+
+        var firstCte = new CommonTableExpression(
+            Id(mutation == "cteName" ? "changed" : "cte_one"),
+            SimpleQuery(mutation == "cteQuery" ? "Changed" : "CteOne"),
+            mutation == "cteColumns"
+                ? new[] { Id("Changed"), Id("B") }
+                : new[] { Id("A"), Id("B") },
+            mutation == "cteRecursive");
+        var secondCte = new CommonTableExpression(
+            Id("cte_two"), SimpleQuery("CteTwo"), new[] { Id("C") });
+        var commonTableExpressions = mutation == "cteOrder"
+            ? new[] { secondCte, firstCte }
+            : new[] { firstCte, secondCte };
+
+        var firstSet = new SetOperationClause(
+            mutation == "setOperator" ? SqlSetOperator.Except : SqlSetOperator.Union,
+            SimpleQuery(mutation == "setQuery" ? "Changed" : "SetOne"));
+        var secondSet = new SetOperationClause(
+            SqlSetOperator.Intersect, SimpleQuery("SetTwo"));
+        var setOperations = mutation == "setOrder"
+            ? new[] { secondSet, firstSet }
+            : new[] { firstSet, secondSet };
+
+        return new SelectStatement(
+            from,
+            projections,
+            distinct: mutation == "distinct",
+            whereExpression: mutation == "where"
+                ? BooleanExpression.False
+                : BooleanExpression.True,
+            groupBy: groupBy,
+            havingExpression: mutation == "having"
+                ? BooleanExpression.False
+                : BooleanExpression.True,
+            orderBy: orderBy,
+            page: page,
+            lockSpec: lockSpec,
+            commonTableExpressions: commonTableExpressions,
+            setOperations: setOperations);
+    }
+
     private static SequenceDefinition SampleSequence() =>
         new(ObjectName("UserSequence", "app"), LogicalDbType.Int64,
             new SequenceOptions(1, 1, SequenceBounds.Unbounded(), null,
@@ -1837,6 +3807,41 @@ public sealed class SchemaAndAdminStatementTests
 
     private static DatabaseOperationDiagnostic Diagnostic() =>
         new(new DiagnosticCode("TEST"), "sanitized failure");
+
+    private static DatabaseAdminOperation CreateUninitializedAdminSubtype()
+    {
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName("DosOrmTask6ForgedAdmin"),
+            AssemblyBuilderAccess.Run);
+        var module = assembly.DefineDynamicModule("main");
+        var builder = module.DefineType(
+            "ForgedDatabaseAdminOperation",
+            TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed,
+            typeof(DatabaseAdminOperation));
+        var baseConstructor = Assert.Single(typeof(DatabaseAdminOperation)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic |
+                             BindingFlags.DeclaredOnly));
+        var constructor = builder.DefineConstructor(
+            MethodAttributes.Public,
+            CallingConventions.Standard,
+            System.Type.EmptyTypes);
+        var generator = constructor.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldc_I4, (int)DestructiveImpact.PotentialDataLoss);
+        if (baseConstructor.GetParameters()[1].ParameterType == typeof(bool))
+        {
+            generator.Emit(OpCodes.Ldc_I4_1);
+        }
+        else
+        {
+            generator.Emit(OpCodes.Ldnull);
+        }
+        generator.Emit(OpCodes.Call, baseConstructor);
+        generator.Emit(OpCodes.Ret);
+        var forgedType = builder.CreateType()!;
+        return (DatabaseAdminOperation)
+            RuntimeHelpers.GetUninitializedObject(forgedType);
+    }
 
     private static MigrationStep Step(
         string id, MigrationIdempotencyMode mode) =>
@@ -1948,6 +3953,14 @@ public sealed class SchemaAndAdminStatementTests
     }
 
     private sealed class UnknownExpression : SqlExpression
+    {
+    }
+
+    private sealed class UnknownDefaultDefinition : ColumnDefaultDefinition
+    {
+    }
+
+    private sealed class UnknownGenerationDefinition : ColumnGenerationDefinition
     {
     }
 
