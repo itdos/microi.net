@@ -196,15 +196,40 @@ public sealed class ExpressionAndFunctionTests
         var elseExpression = NullExpression.Instance;
         var inputExpression = Column("Status");
 
-        var searched = new CaseExpression(new[] { clause }, elseExpression: elseExpression);
-        var simple = new CaseExpression(
-            new[] { clause }, elseExpression: elseExpression, inputExpression: inputExpression);
+        var searched = new CaseExpression(new[] { clause }, elseExpression);
+        var simple = new CaseExpression(inputExpression, new[] { clause }, elseExpression);
 
         Assert.Null(searched.InputExpression);
         Assert.Same(elseExpression, searched.ElseExpression);
         Assert.Same(inputExpression, simple.InputExpression);
         Assert.Same(elseExpression, simple.ElseExpression);
         Assert.Same(clause, simple.WhenClauses[0]);
+    }
+
+    [Fact]
+    public void Case_expression_has_unambiguous_searched_and_simple_constructor_shapes()
+    {
+        var constructors = typeof(CaseExpression).GetConstructors();
+
+        Assert.Contains(constructors, constructor =>
+            constructor.GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(new[]
+                {
+                    typeof(IEnumerable<CaseWhenClause>),
+                    typeof(SqlExpression)
+                }));
+        Assert.Contains(constructors, constructor =>
+            constructor.GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual(new[]
+                {
+                    typeof(SqlExpression),
+                    typeof(IEnumerable<CaseWhenClause>),
+                    typeof(SqlExpression)
+                }));
+        Assert.DoesNotContain(constructors, constructor =>
+            constructor.GetParameters().Length == 3 &&
+            constructor.GetParameters()[0].ParameterType ==
+                typeof(IEnumerable<CaseWhenClause>));
     }
 
     [Fact]
@@ -223,6 +248,10 @@ public sealed class ExpressionAndFunctionTests
             new CaseExpression(Array.Empty<CaseWhenClause>()));
         Assert.Throws<ArgumentException>(() =>
             new CaseExpression(new CaseWhenClause[] { null! }));
+        Assert.Throws<ArgumentNullException>(() =>
+            new CaseExpression(null!, new[] { clause }));
+        Assert.Throws<ArgumentNullException>(() =>
+            new CaseExpression(Column("Status"), null!));
     }
 
     [Fact]
@@ -279,6 +308,17 @@ public sealed class ExpressionAndFunctionTests
         Assert.Throws<ArgumentException>(() =>
             new FunctionExpression(CreateSemanticFunction("Unregistered", 0, null, false),
                 Array.Empty<SqlExpression>()));
+    }
+
+    [Theory]
+    [MemberData(nameof(AggregateFunctionsForScalarRejection))]
+    public void Function_expression_rejects_aggregate_ids(
+        SemanticFunctionId aggregateFunction)
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new FunctionExpression(aggregateFunction, Array.Empty<SqlExpression>()));
+
+        Assert.Contains(nameof(AggregateExpression), exception.Message);
     }
 
     [Fact]
@@ -532,6 +572,12 @@ public sealed class ExpressionAndFunctionTests
     private static ColumnExpression Column(string name) =>
         new(new SqlIdentifier(name));
 
+    public static IEnumerable<object[]> AggregateFunctionsForScalarRejection()
+    {
+        yield return new object[] { SemanticFunctions.Count };
+        yield return new object[] { SemanticFunctions.Sum };
+    }
+
     private static ParameterDefinition Parameter(
         string name, LogicalDbType logicalType = LogicalDbType.String) =>
         new(name, new SqlTypeDescriptor(logicalType));
@@ -551,10 +597,29 @@ public sealed class ExpressionAndFunctionTests
 
     private static void AssertReadOnly<T>(IReadOnlyList<T> values, T additionalValue)
     {
-        Assert.False(values is List<T>);
-        var list = Assert.IsAssignableFrom<IList>(values);
-        Assert.True(list.IsReadOnly);
-        Assert.Throws<NotSupportedException>(() => list.Add(additionalValue));
+        if (values is ICollection<T> collection)
+        {
+            Assert.True(collection.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() => collection.Add(additionalValue));
+        }
+
+        if (values is IList<T> genericList && genericList.Count > 0)
+        {
+            Assert.True(genericList.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() =>
+                genericList[0] = additionalValue);
+        }
+
+        if (values is IList list)
+        {
+            Assert.True(list.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() => list.Add(additionalValue));
+            if (list.Count > 0)
+            {
+                Assert.Throws<NotSupportedException>(() =>
+                    list[0] = additionalValue);
+            }
+        }
     }
 
     private sealed class PlaceholderQueryNode : SqlNode
