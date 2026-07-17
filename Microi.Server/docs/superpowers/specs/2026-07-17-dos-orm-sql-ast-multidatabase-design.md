@@ -1,7 +1,7 @@
 # Dos.ORM 完整 SQL AST 与六数据库兼容架构设计
 
-日期：2026-07-17  
-状态：待用户书面审查  
+日期：2026-07-17
+状态：待用户书面审查
 范围：Microi.Server、Dos.ORM、本地六库集成测试、Microi.Client 端到端验收
 
 ## 1. 背景
@@ -133,7 +133,7 @@ DbProvider 只保留连接、命令、事务和驱动适配职责，不再自行
 - DiagnosticQueryStatement
 - SqlBatch
 
-SqlBatch 是命令序列，不等同于用分号拼接多条 SQL。执行器根据驱动能力决定逐条执行、多结果集或原生批处理，并保持同一事务。
+SqlBatch 是命令序列，不等同于用分号拼接多条 SQL。执行计划显式携带 AtomicityRequirement。只有全部步骤支持事务且使用同一连接时才保持同一事务；DDL 隐式提交或 Admin 跨管理连接时，编译器必须拒绝 Required 原子批次，或生成明确标注 BestEffort/None 的分段计划，不能暗示这些步骤可以整体回滚。
 
 ### 4.2 查询结构节点
 
@@ -231,7 +231,7 @@ DatabasePlanStep 包含：
 - SqlCommandStep：SQL 模板和无值 ParameterDefinition。
 - BulkStep：原生 Bulk 或 AST Insert 分批计划。
 - AdminStep：建删库、切换管理连接或导入导出。
-- NativeScriptStep：明确数据库和来源的原生脚本。
+- NativeScriptStep：仅用于用户提供并声明目标数据库的导入脚本，不允许承载平台升级或初始化逻辑。
 
 执行时由 ParameterBag 生成 BoundParameter。缓存只保存无值模板，不能保存 BoundParameter。
 
@@ -310,7 +310,6 @@ Dos.ORM 提供明确来源类型：
 ~~~csharp
 SqlText.UserProvided(sql)
 SqlText.LegacyAiGenerated(sql)
-SqlText.VendorMigration(resourceId, sql)
 SqlText.LegacyUnknown(sql)
 ~~~
 
@@ -319,7 +318,6 @@ SqlText.LegacyUnknown(sql)
 - V8.Db.FromSql 和 DataSource 用户输入标记为 UserProvided。
 - 新 NL2SQL 不输出 SQL 字符串。模型输出有版本的 PortableQueryDocument 结构化 JSON，经 Schema 白名单、只读语义和类型校验后转换成 Select AST，再由目标数据库编译器生成 SQL。
 - LegacyAiGenerated 只为迁移旧 NL2SQL 保留，属于调用者管理的当前数据库方言 SQL，不计入跨库兼容承诺；最终验收前平台默认路径必须清零。
-- 厂商原生迁移只允许位于 Dos.ORM 内部受控目录。
 - 现有 FromSql(string) 保持源码兼容，但标记为 LegacyUnknown；平台源码直接调用它会触发架构诊断。
 - 原生 SQL 不做正则方言翻译。
 - Dos.ORM 负责参数绑定、来源记录、事务、驱动多语句开关和审计。只读 DataSource 必须使用数据库只读账号或只读事务作为最终防线。
@@ -376,7 +374,7 @@ Schema diff 中的 rename、drop 和缩小字段长度属于破坏性操作。Mi
 - 任一步失败都不得推进 ServerVersion。
 - 同一旧库快照连续升级两次，第二次必须无副作用。
 
-确实无法中性表达的厂商原生脚本只能放在 Dos.ORM/Migrations/对应数据库目录，并通过 VendorMigration Id 调用。
+平台升级和初始化不保留厂商原生脚本例外。若某数据库功能无法由现有节点表达，必须在 Dos.ORM 增加中性语义节点或方言私有 Lowering 实现，并为六个 DialectProfile 提供明确实现或明确不支持错误；不得通过原生脚本绕过 AST。
 
 ## 10. Microi.Server 迁移边界
 
