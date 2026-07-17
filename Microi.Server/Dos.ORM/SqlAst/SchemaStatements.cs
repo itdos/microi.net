@@ -1305,6 +1305,16 @@ namespace Dos.ORM.SqlAst
             string parameterName)
         {
             var copy = Copy(items, parameterName);
+            var identities = new HashSet<SqlObjectName>();
+            foreach (var item in copy)
+            {
+                if (!identities.Add(item.Definition.Name))
+                {
+                    throw new ArgumentException(
+                        "Metadata collections cannot contain duplicate table names.",
+                        parameterName);
+                }
+            }
             copy.Sort((left, right) => CompareNames(
                 left.Definition.Name, right.Definition.Name));
             return new ReadOnlyCollection<TableMetadata>(copy);
@@ -1315,6 +1325,18 @@ namespace Dos.ORM.SqlAst
             string parameterName)
         {
             var copy = Copy(items, parameterName);
+            var identities = new HashSet<ColumnMetadataIdentity>();
+            foreach (var item in copy)
+            {
+                if (!identities.Add(new ColumnMetadataIdentity(
+                        item.Ordinal,
+                        item.Definition.Name.Value)))
+                {
+                    throw new ArgumentException(
+                        "Metadata collections cannot contain duplicate column keys.",
+                        parameterName);
+                }
+            }
             copy.Sort((left, right) =>
             {
                 var ordinal = left.Ordinal.CompareTo(right.Ordinal);
@@ -1332,6 +1354,16 @@ namespace Dos.ORM.SqlAst
             string parameterName)
         {
             var copy = Copy(items, parameterName);
+            var identities = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in copy)
+            {
+                if (!identities.Add(item.Definition.Name.Value))
+                {
+                    throw new ArgumentException(
+                        "Metadata collections cannot contain duplicate index names.",
+                        parameterName);
+                }
+            }
             copy.Sort((left, right) => StringComparer.Ordinal.Compare(
                 left.Definition.Name.Value, right.Definition.Name.Value));
             return new ReadOnlyCollection<IndexMetadata>(copy);
@@ -1379,6 +1411,39 @@ namespace Dos.ORM.SqlAst
             return right == null
                 ? 1
                 : StringComparer.Ordinal.Compare(left.Value, right.Value);
+        }
+
+        private readonly struct ColumnMetadataIdentity :
+            IEquatable<ColumnMetadataIdentity>
+        {
+            public ColumnMetadataIdentity(int ordinal, string name)
+            {
+                Ordinal = ordinal;
+                Name = name;
+            }
+
+            private int Ordinal { get; }
+
+            private string Name { get; }
+
+            public bool Equals(ColumnMetadataIdentity other)
+            {
+                return Ordinal == other.Ordinal &&
+                       string.Equals(Name, other.Name, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ColumnMetadataIdentity other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return Ordinal * 397 ^ StringComparer.Ordinal.GetHashCode(Name);
+                }
+            }
         }
     }
 
@@ -2108,6 +2173,8 @@ namespace Dos.ORM.SqlAst
             if (generation is ComputedGenerationDefinition computed)
             {
                 writer.Tag("ComputedGenerationDefinition");
+                SchemaExpressionCatalog.Validate(
+                    computed.Expression, nameof(computed.Expression));
                 WriteExpression(writer, computed.Expression);
                 writer.Enum(computed.Storage);
                 return;

@@ -1852,6 +1852,14 @@ namespace Dos.ORM.SqlAst
 
     internal static class SchemaExpressionCatalog
     {
+        // The root expression is depth zero. Depth 128 is accepted; the first
+        // child at depth 129 is rejected before it is scheduled for traversal.
+        private const int MaximumTraversalDepth = 128;
+
+        // Repeated references count as repeated logical occurrences so a
+        // compact shared DAG cannot expand into unbounded validation work.
+        private const int MaximumTraversalOccurrences = 4096;
+
         public static void Validate(SqlExpression expression, string parameterName)
         {
             if (expression == null)
@@ -1859,11 +1867,62 @@ namespace Dos.ORM.SqlAst
                 throw new ArgumentNullException(parameterName);
             }
 
-            ValidateExpression(expression, parameterName);
+            var pending = new Stack<TraversalItem>();
+            pending.Push(new TraversalItem(expression, 0));
+            var occurrences = 0;
+            while (pending.Count != 0)
+            {
+                var item = pending.Pop();
+                occurrences++;
+                if (occurrences > MaximumTraversalOccurrences)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        parameterName,
+                        "Computed expression exceeds the maximum traversal occurrence count.");
+                }
+
+                if (item.Node is SqlExpression currentExpression)
+                {
+                    ScheduleExpressionChildren(
+                        currentExpression,
+                        item.Depth,
+                        occurrences,
+                        pending,
+                        parameterName);
+                    continue;
+                }
+
+                if (item.Node is SelectStatement select)
+                {
+                    ScheduleSelectChildren(
+                        select,
+                        item.Depth,
+                        occurrences,
+                        pending,
+                        parameterName);
+                    continue;
+                }
+
+                if (item.Node is SqlTableSource source)
+                {
+                    ScheduleTableSourceChildren(
+                        source,
+                        item.Depth,
+                        occurrences,
+                        pending,
+                        parameterName);
+                    continue;
+                }
+
+                ThrowUnknown(parameterName);
+            }
         }
 
-        private static void ValidateExpression(
+        private static void ScheduleExpressionChildren(
             SqlExpression expression,
+            int depth,
+            int visitedOccurrences,
+            Stack<TraversalItem> pending,
             string parameterName)
         {
             if (expression is ColumnExpression ||
@@ -1877,50 +1936,111 @@ namespace Dos.ORM.SqlAst
 
             if (expression is BinaryExpression binary)
             {
-                ValidateExpression(binary.Left, parameterName);
-                ValidateExpression(binary.Right, parameterName);
+                PushChild(
+                    pending,
+                    binary.Right,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+                PushChild(
+                    pending,
+                    binary.Left,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (expression is UnaryExpression unary)
             {
-                ValidateExpression(unary.Operand, parameterName);
+                PushChild(
+                    pending,
+                    unary.Operand,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (expression is InExpression inExpression)
             {
-                ValidateExpression(inExpression.Operand, parameterName);
-                ValidateExpressions(inExpression.Values, parameterName);
+                PushExpressionsReverse(
+                    pending,
+                    inExpression.Values,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+                PushChild(
+                    pending,
+                    inExpression.Operand,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (expression is BetweenExpression between)
             {
-                ValidateExpression(between.Operand, parameterName);
-                ValidateExpression(between.Lower, parameterName);
-                ValidateExpression(between.Upper, parameterName);
+                PushChild(
+                    pending,
+                    between.Upper,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+                PushChild(
+                    pending,
+                    between.Lower,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+                PushChild(
+                    pending,
+                    between.Operand,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (expression is CaseExpression caseExpression)
             {
-                if (caseExpression.InputExpression != null)
-                {
-                    ValidateExpression(
-                        caseExpression.InputExpression, parameterName);
-                }
-
-                foreach (var clause in caseExpression.WhenClauses)
-                {
-                    ValidateExpression(clause.When, parameterName);
-                    ValidateExpression(clause.Then, parameterName);
-                }
-
                 if (caseExpression.ElseExpression != null)
                 {
-                    ValidateExpression(
-                        caseExpression.ElseExpression, parameterName);
+                    PushChild(
+                        pending,
+                        caseExpression.ElseExpression,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
+                }
+
+                for (var index = caseExpression.WhenClauses.Count - 1;
+                     index >= 0;
+                     index--)
+                {
+                    var clause = caseExpression.WhenClauses[index];
+                    PushChild(
+                        pending,
+                        clause.Then,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
+                    PushChild(
+                        pending,
+                        clause.When,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
+                }
+
+                if (caseExpression.InputExpression != null)
+                {
+                    PushChild(
+                        pending,
+                        caseExpression.InputExpression,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
                 }
 
                 return;
@@ -1928,7 +2048,12 @@ namespace Dos.ORM.SqlAst
 
             if (expression is CastExpression cast)
             {
-                ValidateExpression(cast.Expression, parameterName);
+                PushChild(
+                    pending,
+                    cast.Expression,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
@@ -1940,13 +2065,23 @@ namespace Dos.ORM.SqlAst
                     return;
                 }
 
-                ValidateSelect(select, parameterName);
+                PushChild(
+                    pending,
+                    select,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (expression is ExistsExpression exists)
             {
-                ValidateExpression(exists.Subquery, parameterName);
+                PushChild(
+                    pending,
+                    exists.Subquery,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
@@ -1954,7 +2089,12 @@ namespace Dos.ORM.SqlAst
             {
                 if (aggregate.Argument != null)
                 {
-                    ValidateExpression(aggregate.Argument, parameterName);
+                    PushChild(
+                        pending,
+                        aggregate.Argument,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
                 }
 
                 return;
@@ -1962,75 +2102,142 @@ namespace Dos.ORM.SqlAst
 
             if (expression is FunctionExpression function)
             {
-                ValidateExpressions(function.Arguments, parameterName);
+                PushExpressionsReverse(
+                    pending,
+                    function.Arguments,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             ThrowUnknown(parameterName);
         }
 
-        private static void ValidateExpressions(
+        private static void PushExpressionsReverse(
+            Stack<TraversalItem> pending,
             IReadOnlyList<SqlExpression> expressions,
+            int parentDepth,
+            int visitedOccurrences,
             string parameterName)
         {
-            foreach (var expression in expressions)
+            for (var index = expressions.Count - 1; index >= 0; index--)
             {
-                ValidateExpression(expression, parameterName);
+                PushChild(
+                    pending,
+                    expressions[index],
+                    parentDepth,
+                    visitedOccurrences,
+                    parameterName);
             }
         }
 
-        private static void ValidateSelect(
+        private static void ScheduleSelectChildren(
             SelectStatement select,
+            int depth,
+            int visitedOccurrences,
+            Stack<TraversalItem> pending,
             string parameterName)
         {
-            if (select.From != null)
+            for (var index = select.SetOperations.Count - 1; index >= 0; index--)
             {
-                ValidateTableSource(select.From, parameterName);
+                PushChild(
+                    pending,
+                    select.SetOperations[index].RightQuery,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
             }
 
-            foreach (var projection in select.Projections)
+            for (var index = select.CommonTableExpressions.Count - 1;
+                 index >= 0;
+                 index--)
             {
-                ValidateExpression(projection.Expression, parameterName);
-            }
-
-            if (select.Where != null)
-            {
-                ValidateExpression(select.Where, parameterName);
-            }
-
-            ValidateExpressions(select.GroupBy, parameterName);
-            if (select.Having != null)
-            {
-                ValidateExpression(select.Having, parameterName);
-            }
-
-            foreach (var orderBy in select.OrderBy)
-            {
-                ValidateExpression(orderBy.Expression, parameterName);
+                PushChild(
+                    pending,
+                    select.CommonTableExpressions[index].Query,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
             }
 
             if (select.Page is KeysetPageSpec keyset)
             {
-                ValidateExpressions(keyset.Boundaries, parameterName);
+                PushExpressionsReverse(
+                    pending,
+                    keyset.Boundaries,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
             }
             else if (select.Page != null && !(select.Page is OffsetPageSpec))
             {
                 ThrowUnknown(parameterName);
             }
 
-            foreach (var commonTableExpression in select.CommonTableExpressions)
+            for (var index = select.OrderBy.Count - 1; index >= 0; index--)
             {
-                ValidateSelect(commonTableExpression.Query, parameterName);
+                PushChild(
+                    pending,
+                    select.OrderBy[index].Expression,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
             }
 
-            foreach (var setOperation in select.SetOperations)
+            if (select.Having != null)
             {
-                ValidateSelect(setOperation.RightQuery, parameterName);
+                PushChild(
+                    pending,
+                    select.Having,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+            }
+
+            PushExpressionsReverse(
+                pending,
+                select.GroupBy,
+                depth,
+                visitedOccurrences,
+                parameterName);
+
+            if (select.Where != null)
+            {
+                PushChild(
+                    pending,
+                    select.Where,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+            }
+
+            for (var index = select.Projections.Count - 1; index >= 0; index--)
+            {
+                PushChild(
+                    pending,
+                    select.Projections[index].Expression,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+            }
+
+            if (select.From != null)
+            {
+                PushChild(
+                    pending,
+                    select.From,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
             }
         }
 
-        private static void ValidateTableSource(
+        private static void ScheduleTableSourceChildren(
             SqlTableSource source,
+            int depth,
+            int visitedOccurrences,
+            Stack<TraversalItem> pending,
             string parameterName)
         {
             if (source is NamedTableSource)
@@ -2040,18 +2247,38 @@ namespace Dos.ORM.SqlAst
 
             if (source is DerivedTableSource derived)
             {
-                ValidateSelect(derived.Query, parameterName);
+                PushChild(
+                    pending,
+                    derived.Query,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
                 return;
             }
 
             if (source is JoinSource join)
             {
-                ValidateTableSource(join.Left, parameterName);
-                ValidateTableSource(join.Right, parameterName);
                 if (join.Condition != null)
                 {
-                    ValidateExpression(join.Condition, parameterName);
+                    PushChild(
+                        pending,
+                        join.Condition,
+                        depth,
+                        visitedOccurrences,
+                        parameterName);
                 }
+                PushChild(
+                    pending,
+                    join.Right,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
+                PushChild(
+                    pending,
+                    join.Left,
+                    depth,
+                    visitedOccurrences,
+                    parameterName);
 
                 return;
             }
@@ -2059,11 +2286,50 @@ namespace Dos.ORM.SqlAst
             ThrowUnknown(parameterName);
         }
 
+        private static void PushChild(
+            Stack<TraversalItem> pending,
+            SqlNode child,
+            int parentDepth,
+            int visitedOccurrences,
+            string parameterName)
+        {
+            var childDepth = parentDepth + 1;
+            if (childDepth > MaximumTraversalDepth)
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName,
+                    "Computed expression exceeds the maximum traversal depth.");
+            }
+
+            if (visitedOccurrences + pending.Count >=
+                MaximumTraversalOccurrences)
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName,
+                    "Computed expression exceeds the maximum traversal occurrence count.");
+            }
+
+            pending.Push(new TraversalItem(child, childDepth));
+        }
+
         private static void ThrowUnknown(string parameterName)
         {
             throw new ArgumentException(
                 "Computed expressions may contain only the closed SQL expression and SELECT query catalog.",
                 parameterName);
+        }
+
+        private readonly struct TraversalItem
+        {
+            public TraversalItem(SqlNode node, int depth)
+            {
+                Node = node;
+                Depth = depth;
+            }
+
+            public SqlNode Node { get; }
+
+            public int Depth { get; }
         }
     }
 
