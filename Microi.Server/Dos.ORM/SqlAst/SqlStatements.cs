@@ -263,6 +263,15 @@ namespace Dos.ORM.SqlAst
         public ReturningClause Returning { get; }
     }
 
+    /// <summary>
+    /// Describes a structured bulk insert request and its caller-selected batch
+    /// upper bound.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="BatchSize"/> is a maximum, not an exact or minimum size. A
+    /// compiler may reduce a batch to satisfy provider or platform limits, but
+    /// it must never emit or request a batch larger than this value.
+    /// </remarks>
     public sealed class BulkInsertOperation : SqlStatement
     {
         public BulkInsertOperation(
@@ -293,6 +302,13 @@ namespace Dos.ORM.SqlAst
 
         public IReadOnlyList<SqlInsertRow> Rows { get; }
 
+        /// <summary>
+        /// Gets the caller-requested maximum number of rows per lowered batch.
+        /// </summary>
+        /// <remarks>
+        /// Lowering may choose a smaller value for platform limits, but must
+        /// never enlarge this upper bound.
+        /// </remarks>
         public int BatchSize { get; }
     }
 
