@@ -1,5 +1,8 @@
 using System.Collections;
 using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Dos.ORM.SqlAst;
 
 namespace Dos.ORM.Tests.SqlAst;
@@ -186,6 +189,38 @@ public sealed class DmlStatementTests
             InsertStatement.FromSelect(table, null!, source));
         Assert.Throws<ArgumentNullException>(() =>
             InsertStatement.FromSelect(table, columns, null!));
+    }
+
+    [Fact]
+    public void Insert_select_columns_reject_empty_null_items_and_duplicates()
+    {
+        var table = Table();
+        var source = SelectWithProjectionCount(1);
+
+        Assert.Throws<ArgumentException>(() =>
+            InsertStatement.FromSelect(
+                table, Array.Empty<SqlIdentifier>(), source));
+        Assert.Throws<ArgumentException>(() =>
+            InsertStatement.FromSelect(
+                table, new SqlIdentifier[] { null! }, source));
+        Assert.Throws<ArgumentException>(() =>
+            InsertStatement.FromSelect(
+                table, Columns("Id", "Id"), source));
+    }
+
+    [Fact]
+    public void Insert_select_columns_are_copied_and_read_only()
+    {
+        var column = new SqlIdentifier("Id");
+        var columns = new List<SqlIdentifier> { column };
+
+        var statement = InsertStatement.FromSelect(
+            Table(), columns, SelectWithProjectionCount(1));
+        columns.Clear();
+
+        Assert.Single(statement.Columns);
+        Assert.Same(column, statement.Columns[0]);
+        AssertReadOnly(statement.Columns, new SqlIdentifier("Other"));
     }
 
     [Fact]
@@ -786,7 +821,7 @@ public sealed class DmlStatementTests
     }
 
     [Fact]
-    public void Bulk_batch_size_is_a_positive_caller_maximum_hint()
+    public void Bulk_batch_size_records_the_positive_caller_maximum_request()
     {
         var operation = new BulkInsertOperation(
             Table(),
@@ -795,11 +830,11 @@ public sealed class DmlStatementTests
             batchSize: 250);
 
         Assert.Equal(250, operation.BatchSize);
-        Assert.DoesNotContain(
-            typeof(BulkInsertOperation).GetProperties(),
-            property =>
-                property.Name.Contains("Exact", StringComparison.OrdinalIgnoreCase) ||
-                property.Name.Contains("Minimum", StringComparison.OrdinalIgnoreCase));
+
+        // Mandatory later compiler acceptance tests must prove every emitted or
+        // native batch is <= BatchSize. They must also cover a platform limit
+        // below 250, proving lowering may shrink this request but never enlarge it.
+        // This AST-only test intentionally proves storage, not execution behavior.
     }
 
     [Fact]
@@ -886,12 +921,13 @@ public sealed class DmlStatementTests
     }
 
     [Fact]
-    public void Returning_clause_stays_projection_only_and_lowering_neutral()
+    public void Returning_clause_stays_projection_only_for_later_lowering_tests()
     {
-        // Compiler contract: insert/update/upsert return the written row image;
-        // delete returns the pre-delete image; multi-row order is undefined.
-        // If a dialect cannot do that atomically, compilation must report the
-        // feature as unsupported instead of using an unlocked write-then-read.
+        // Mandatory later compiler tests must verify written row images for
+        // insert/update/upsert, the pre-delete image for delete, zero rows for a
+        // DoNothing conflict, no ordering promise, and an unsupported-capability
+        // error instead of an unlocked write-then-read fallback.
+        // This AST-only test freezes only the projection/lowering-neutral shape.
         Assert.Equal(
             new[] { nameof(ReturningClause.Projections) },
             typeof(ReturningClause).GetProperties()
@@ -943,33 +979,184 @@ public sealed class DmlStatementTests
             type => Assert.True(
                 typeof(SqlStatement).IsAssignableFrom(type), type.FullName));
 
-        var publicParameters = concreteTypes
-            .SelectMany(type => type.GetConstructors())
-            .SelectMany(constructor => constructor.GetParameters())
-            .Concat(typeof(InsertStatement)
-                .GetMethods(BindingFlags.Public | BindingFlags.Static |
-                            BindingFlags.DeclaredOnly)
-                .SelectMany(method => method.GetParameters()))
-            .ToArray();
-        Assert.DoesNotContain(
-            publicParameters,
-            parameter => parameter.ParameterType == typeof(string) ||
-                         parameter.ParameterType == typeof(object));
-
         var properties = concreteTypes
-            .SelectMany(type => type.GetProperties())
+            .SelectMany(type => type.GetProperties(
+                BindingFlags.Public | BindingFlags.Instance |
+                BindingFlags.Static | BindingFlags.DeclaredOnly))
             .ToArray();
         var valueProperty = Assert.Single(
             properties, property => property.Name == "Value");
         Assert.Equal(typeof(SqlAssignment), valueProperty.DeclaringType);
         Assert.Equal(typeof(SqlExpression), valueProperty.PropertyType);
-        Assert.DoesNotContain(properties, property =>
-            property.Name.Contains("DatabaseType", StringComparison.OrdinalIgnoreCase) ||
-            property.Name.Contains("Provider", StringComparison.OrdinalIgnoreCase) ||
-            property.Name.Contains("Dialect", StringComparison.OrdinalIgnoreCase) ||
-            property.Name.Contains("RawSql", StringComparison.OrdinalIgnoreCase) ||
-            property.PropertyType == typeof(string) ||
-            property.PropertyType == typeof(object));
+    }
+
+    [Fact]
+    public void Dml_declared_public_surface_has_only_structured_neutral_types()
+    {
+        const BindingFlags flags = BindingFlags.Public |
+                                   BindingFlags.Instance |
+                                   BindingFlags.Static |
+                                   BindingFlags.DeclaredOnly;
+
+        foreach (var type in DmlPublicTypes())
+        {
+            foreach (var field in type.GetFields(flags))
+            {
+                AssertNeutralImplementationName(
+                    field.Name, $"public field {type.FullName}.{field.Name}");
+                AssertPublicSurfaceType(
+                    field.FieldType,
+                    $"public field {type.FullName}.{field.Name}");
+            }
+
+            foreach (var constructor in type.GetConstructors(flags))
+            {
+                AssertNeutralImplementationName(
+                    constructor.Name,
+                    $"public constructor {type.FullName}");
+                Assert.All(constructor.GetParameters(), parameter =>
+                {
+                    AssertNeutralImplementationName(
+                        parameter.Name ?? string.Empty,
+                        $"parameter on {type.FullName}.{constructor.Name}");
+                    AssertPublicSurfaceType(
+                        parameter.ParameterType,
+                        $"parameter {parameter.Name} on " +
+                        $"{type.FullName}.{constructor.Name}");
+                });
+            }
+
+            foreach (var method in type.GetMethods(flags))
+            {
+                AssertNeutralImplementationName(
+                    method.Name, $"public method {type.FullName}.{method.Name}");
+                AssertPublicSurfaceType(
+                    method.ReturnType,
+                    $"return type of {type.FullName}.{method.Name}");
+                Assert.All(method.GetParameters(), parameter =>
+                {
+                    AssertNeutralImplementationName(
+                        parameter.Name ?? string.Empty,
+                        $"parameter on {type.FullName}.{method.Name}");
+                    AssertPublicSurfaceType(
+                        parameter.ParameterType,
+                        $"parameter {parameter.Name} on " +
+                        $"{type.FullName}.{method.Name}");
+                });
+            }
+
+            foreach (var property in type.GetProperties(flags))
+            {
+                AssertNeutralImplementationName(
+                    property.Name,
+                    $"public property {type.FullName}.{property.Name}");
+                AssertPublicSurfaceType(
+                    property.PropertyType,
+                    $"public property {type.FullName}.{property.Name}");
+                Assert.All(property.GetIndexParameters(), parameter =>
+                    AssertPublicSurfaceType(
+                        parameter.ParameterType,
+                        $"index parameter {parameter.Name} on " +
+                        $"{type.FullName}.{property.Name}"));
+            }
+        }
+    }
+
+    [Fact]
+    public void Dml_declared_implementation_il_has_no_forbidden_dependencies()
+    {
+        const BindingFlags flags = BindingFlags.Public |
+                                   BindingFlags.NonPublic |
+                                   BindingFlags.Instance |
+                                   BindingFlags.Static |
+                                   BindingFlags.DeclaredOnly;
+
+        foreach (var type in DmlImplementationTypes())
+        {
+            AssertNeutralImplementationName(
+                type.FullName ?? type.Name, $"implementation type {type.Name}");
+
+            foreach (var field in type.GetFields(flags))
+            {
+                var context = $"field {type.FullName}.{field.Name}";
+                AssertNeutralImplementationName(field.Name, context);
+                AssertNoRuntimeObjectHolder(field.FieldType, context);
+                Assert.False(
+                    field.FieldType == typeof(string),
+                    $"{context} must not hold SQL/provider text.");
+            }
+
+            foreach (var property in type.GetProperties(flags))
+            {
+                var context = $"property {type.FullName}.{property.Name}";
+                AssertNeutralImplementationName(property.Name, context);
+                AssertNoRuntimeObjectHolder(property.PropertyType, context);
+                Assert.False(
+                    property.PropertyType == typeof(string),
+                    $"{context} must not hold SQL/provider text.");
+            }
+
+            var methods = type.GetMethods(flags).Cast<MethodBase>()
+                .Concat(type.GetConstructors(flags));
+            foreach (var method in methods)
+            {
+                var context = $"method {type.FullName}.{method.Name}";
+                AssertNeutralImplementationName(method.Name, context);
+                if (method is MethodInfo methodInfo)
+                {
+                    AssertNoRuntimeObjectHolder(
+                        methodInfo.ReturnType, $"return type of {context}");
+                }
+
+                Assert.All(method.GetParameters(), parameter =>
+                    AssertNoRuntimeObjectHolder(
+                        parameter.ParameterType,
+                        $"parameter {parameter.Name} on {context}"));
+
+                foreach (var operand in ReadIlOperands(method))
+                {
+                    if (operand is string literal)
+                    {
+                        AssertNeutralIlLiteral(literal, context);
+                    }
+                    else if (operand is MemberInfo referencedMember)
+                    {
+                        AssertNeutralImplementationName(
+                            referencedMember.Name,
+                            $"IL reference from {context}");
+                        if (referencedMember.DeclaringType != null)
+                        {
+                            AssertNeutralImplementationName(
+                                referencedMember.DeclaringType.FullName ??
+                                referencedMember.DeclaringType.Name,
+                                $"IL reference from {context}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void Dml_source_has_no_forbidden_dependencies_outside_comments()
+    {
+        var sourcePath = Task5ProductionSourcePath();
+        Assert.True(File.Exists(sourcePath), sourcePath);
+
+        var sourceWithoutComments = RemoveCSharpComments(
+            File.ReadAllText(sourcePath));
+
+        // XML API contracts may legitimately name compiler/provider concepts.
+        // Scanning comment-free source retains executable identifiers and string
+        // literals while avoiding false positives from that documentation.
+        AssertNeutralImplementationName(
+            sourceWithoutComments, "Task 5 production source");
+        AssertNeutralIlLiteral(
+            sourceWithoutComments, "Task 5 production source");
+        Assert.DoesNotContain(
+            ReadCSharpIdentifiers(sourceWithoutComments),
+            identifier => identifier.Equals(
+                "object", StringComparison.OrdinalIgnoreCase));
     }
 
     private static SqlObjectName Table(string name = "Users") =>
@@ -1005,6 +1192,332 @@ public sealed class DmlStatementTests
                     : BooleanExpression.False))
             .ToArray();
         return new SelectStatement(projections);
+    }
+
+    private static Type[] DmlPublicTypes() =>
+    [
+        typeof(ConflictPolicy),
+        typeof(SqlAssignment),
+        typeof(SqlInsertRow),
+        typeof(ReturningClause),
+        typeof(InsertStatement),
+        typeof(UpdateStatement),
+        typeof(DeleteStatement),
+        typeof(UpsertStatement),
+        typeof(BulkInsertOperation)
+    ];
+
+    private static Type[] DmlImplementationTypes()
+    {
+        var guard = typeof(SqlAssignment).Assembly.GetType(
+            "Dos.ORM.SqlAst.DmlAstGuard");
+        Assert.NotNull(guard);
+        return DmlPublicTypes().Append(guard).ToArray()!;
+    }
+
+    private static void AssertPublicSurfaceType(Type type, string context)
+    {
+        Assert.False(
+            type == typeof(string) || type == typeof(object),
+            $"{context} exposes unstructured type {type.FullName}.");
+        AssertNoRuntimeObjectHolder(type, context);
+    }
+
+    private static void AssertNoRuntimeObjectHolder(Type type, string context)
+    {
+        Assert.False(
+            type == typeof(object),
+            $"{context} stores an arbitrary runtime object.");
+        AssertNeutralImplementationName(
+            type.FullName ?? type.Name, context);
+
+        if (type.HasElementType && type.GetElementType() is Type elementType)
+        {
+            AssertNoRuntimeObjectHolder(elementType, context);
+        }
+
+        foreach (var argument in type.GetGenericArguments())
+        {
+            AssertNoRuntimeObjectHolder(argument, context);
+        }
+    }
+
+    private static void AssertNeutralImplementationName(
+        string value, string context)
+    {
+        var forbiddenTerms = new[]
+        {
+            "DatabaseType", "Provider", "Dialect", "RawSql", "SqlText",
+            "Render", "SqlCompiler", "Command", "Connection",
+            "DbParameter", "IDataParameter",
+            "SqlClient", "Npgsql", "MySql", "Oracle", "Postgre",
+            "Kingbase", "Dameng", "DmProvider", "RuntimeValue"
+        };
+        var forbiddenTerm = forbiddenTerms.FirstOrDefault(term =>
+            value.Contains(term, StringComparison.OrdinalIgnoreCase));
+        Assert.True(
+            forbiddenTerm == null,
+            $"{context} contains forbidden term {forbiddenTerm}.");
+        Assert.False(
+            value.StartsWith("Render", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("Compile", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("ToSql", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("BuildSql", StringComparison.OrdinalIgnoreCase),
+            $"{context} contains forbidden implementation name {value}.");
+    }
+
+    private static void AssertNeutralIlLiteral(string value, string context)
+    {
+        var forbiddenTerms = new[]
+        {
+            "database type", "provider", "dialect", "mysql", "oracle",
+            "postgres", "npgsql", "sql server", "sqlserver", "kingbase",
+            "dameng", "dmdb", "sqlite"
+        };
+        var forbiddenTerm = forbiddenTerms.FirstOrDefault(term =>
+            value.Contains(term, StringComparison.OrdinalIgnoreCase));
+        Assert.True(
+            forbiddenTerm == null,
+            $"{context} contains forbidden literal term {forbiddenTerm}.");
+
+        var containsSelect =
+            value.Contains("SELECT ", StringComparison.OrdinalIgnoreCase) &&
+            value.Contains(" FROM ", StringComparison.OrdinalIgnoreCase);
+        var containsUpdate =
+            value.Contains("UPDATE ", StringComparison.OrdinalIgnoreCase) &&
+            value.Contains(" SET ", StringComparison.OrdinalIgnoreCase);
+        var containsRawSql =
+            containsSelect || containsUpdate ||
+            value.Contains("INSERT INTO ", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("DELETE FROM ", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("MERGE INTO ", StringComparison.OrdinalIgnoreCase);
+        Assert.False(
+            containsRawSql,
+            $"{context} embeds raw SQL literal: {value}");
+    }
+
+    private static IEnumerable<object> ReadIlOperands(MethodBase method)
+    {
+        var body = method.GetMethodBody();
+        var il = body?.GetILAsByteArray();
+        if (il == null)
+        {
+            yield break;
+        }
+
+        var typeArguments = method.DeclaringType?.GetGenericArguments();
+        var methodArguments = method.IsGenericMethod
+            ? method.GetGenericArguments()
+            : null;
+        var offset = 0;
+        while (offset < il.Length)
+        {
+            short opcodeValue = il[offset++];
+            if (opcodeValue == 0xfe)
+            {
+                opcodeValue = unchecked((short)(0xfe00 | il[offset++]));
+            }
+
+            if (!IlOpCodes.TryGetValue(opcodeValue, out var opcode))
+            {
+                throw new InvalidOperationException(
+                    $"Unknown IL opcode 0x{opcodeValue:x4} in {method}.");
+            }
+
+            switch (opcode.OperandType)
+            {
+                case OperandType.InlineNone:
+                    break;
+                case OperandType.ShortInlineBrTarget:
+                case OperandType.ShortInlineI:
+                case OperandType.ShortInlineVar:
+                    offset += 1;
+                    break;
+                case OperandType.InlineVar:
+                    offset += 2;
+                    break;
+                case OperandType.InlineBrTarget:
+                case OperandType.InlineI:
+                case OperandType.ShortInlineR:
+                case OperandType.InlineSig:
+                    offset += 4;
+                    break;
+                case OperandType.InlineI8:
+                case OperandType.InlineR:
+                    offset += 8;
+                    break;
+                case OperandType.InlineSwitch:
+                    var targetCount = BitConverter.ToInt32(il, offset);
+                    offset += 4 + (targetCount * 4);
+                    break;
+                case OperandType.InlineString:
+                    var stringToken = BitConverter.ToInt32(il, offset);
+                    offset += 4;
+                    yield return method.Module.ResolveString(stringToken);
+                    break;
+                case OperandType.InlineField:
+                case OperandType.InlineMethod:
+                case OperandType.InlineTok:
+                case OperandType.InlineType:
+                    var memberToken = BitConverter.ToInt32(il, offset);
+                    offset += 4;
+                    var resolvedMember = method.Module.ResolveMember(
+                        memberToken, typeArguments, methodArguments);
+                    if (resolvedMember == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot resolve IL token {memberToken} in {method}.");
+                    }
+                    yield return resolvedMember;
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported IL operand {opcode.OperandType} in {method}.");
+            }
+        }
+    }
+
+    private static readonly IReadOnlyDictionary<short, OpCode> IlOpCodes =
+        typeof(OpCodes)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.FieldType == typeof(OpCode))
+            .Select(field => (OpCode)field.GetValue(null)!)
+            .ToDictionary(opcode => opcode.Value);
+
+    private static string Task5ProductionSourcePath(
+        [CallerFilePath] string testFilePath = "") =>
+        Path.GetFullPath(Path.Combine(
+            Path.GetDirectoryName(testFilePath)!,
+            "..", "..", "Dos.ORM", "SqlAst", "SqlStatements.cs"));
+
+    private static string RemoveCSharpComments(string source)
+    {
+        var result = new StringBuilder(source.Length);
+        var inLineComment = false;
+        var inBlockComment = false;
+        var inString = false;
+        var inVerbatimString = false;
+        var inCharacter = false;
+
+        for (var index = 0; index < source.Length; index++)
+        {
+            var current = source[index];
+            var next = index + 1 < source.Length
+                ? source[index + 1]
+                : '\0';
+
+            if (inLineComment)
+            {
+                if (current == '\r' || current == '\n')
+                {
+                    inLineComment = false;
+                    result.Append(current);
+                }
+                continue;
+            }
+
+            if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    inBlockComment = false;
+                    result.Append(' ');
+                    index++;
+                }
+                else if (current == '\r' || current == '\n')
+                {
+                    result.Append(current);
+                }
+                continue;
+            }
+
+            if (inVerbatimString)
+            {
+                result.Append(current);
+                if (current == '"')
+                {
+                    if (next == '"')
+                    {
+                        result.Append(next);
+                        index++;
+                    }
+                    else
+                    {
+                        inVerbatimString = false;
+                    }
+                }
+                continue;
+            }
+
+            if (inString || inCharacter)
+            {
+                result.Append(current);
+                if (current == '\\' && next != '\0')
+                {
+                    result.Append(next);
+                    index++;
+                }
+                else if (inString && current == '"')
+                {
+                    inString = false;
+                }
+                else if (inCharacter && current == '\'')
+                {
+                    inCharacter = false;
+                }
+                continue;
+            }
+
+            if (current == '/' && next == '/')
+            {
+                inLineComment = true;
+                result.Append(' ');
+                index++;
+            }
+            else if (current == '/' && next == '*')
+            {
+                inBlockComment = true;
+                result.Append(' ');
+                index++;
+            }
+            else if (current == '@' && next == '"')
+            {
+                inVerbatimString = true;
+                result.Append(current);
+                result.Append(next);
+                index++;
+            }
+            else
+            {
+                result.Append(current);
+                inString = current == '"';
+                inCharacter = current == '\'';
+            }
+        }
+
+        return result.ToString();
+    }
+
+    private static IEnumerable<string> ReadCSharpIdentifiers(string source)
+    {
+        var identifier = new StringBuilder();
+        foreach (var current in source)
+        {
+            if (char.IsLetterOrDigit(current) || current == '_')
+            {
+                identifier.Append(current);
+            }
+            else if (identifier.Length > 0)
+            {
+                yield return identifier.ToString();
+                identifier.Clear();
+            }
+        }
+
+        if (identifier.Length > 0)
+        {
+            yield return identifier.ToString();
+        }
     }
 
     private static void AssertReadOnly<T>(
