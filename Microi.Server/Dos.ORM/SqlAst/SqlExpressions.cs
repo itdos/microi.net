@@ -172,13 +172,23 @@ namespace Dos.ORM.SqlAst
     {
         public CaseExpression(
             IEnumerable<CaseWhenClause> whenClauses,
-            SqlExpression elseExpression = null,
-            SqlExpression inputExpression = null)
+            SqlExpression elseExpression = null)
         {
             WhenClauses = SqlAstCollection.Copy(
                 whenClauses, nameof(whenClauses), allowEmpty: false);
             ElseExpression = elseExpression;
-            InputExpression = inputExpression;
+        }
+
+        public CaseExpression(
+            SqlExpression inputExpression,
+            IEnumerable<CaseWhenClause> whenClauses,
+            SqlExpression elseExpression = null)
+        {
+            InputExpression = inputExpression ??
+                throw new ArgumentNullException(nameof(inputExpression));
+            WhenClauses = SqlAstCollection.Copy(
+                whenClauses, nameof(whenClauses), allowEmpty: false);
+            ElseExpression = elseExpression;
         }
 
         public IReadOnlyList<CaseWhenClause> WhenClauses { get; }
@@ -267,6 +277,13 @@ namespace Dos.ORM.SqlAst
             {
                 throw new ArgumentException(
                     "Function must be a registered semantic ID.", nameof(function));
+            }
+
+            if (function.IsAggregate)
+            {
+                throw new ArgumentException(
+                    "Aggregate semantic functions must use AggregateExpression.",
+                    nameof(function));
             }
 
             Function = function;
