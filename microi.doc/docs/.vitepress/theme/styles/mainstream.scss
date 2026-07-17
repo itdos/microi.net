@@ -1,87 +1,7 @@
 /**
- * Microi吾码官网“主流”主题。
- * 旧主题保留为 classic；本文件只在 data-mci-site-style="mainstream" 时覆盖。
+ * Microi吾码官网统一主题。
+ * 页面只保留 VitePress 自带的明亮 / 暗黑切换。
  */
-
-.site-style-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 34px;
-  margin-left: 10px;
-  padding: 3px;
-  border: 1px solid rgba(148, 163, 184, .24);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
-}
-
-.site-style-switch__option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 40px;
-  height: 28px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color .18s ease, background-color .18s ease, transform .18s ease;
-}
-
-.site-style-switch__option:hover {
-  color: #0f172a;
-  background: rgba(226, 232, 240, .72);
-}
-
-.site-style-switch__option:active {
-  transform: scale(.96);
-}
-
-.site-style-switch__option:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-.site-style-switch__option.active {
-  background: #fff;
-  color: #1557d8;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .10);
-}
-
-.site-style-switch--floating {
-  display: none;
-}
-
-html[data-mci-site-style="classic"] .site-style-switch {
-  border-color: rgba(255, 255, 255, .16);
-  background: rgba(15, 23, 42, .62);
-}
-
-html[data-mci-site-style="classic"] .site-style-switch__option {
-  color: rgba(226, 232, 240, .72);
-}
-
-html[data-mci-site-style="classic"] .site-style-switch__option.active {
-  background: rgba(255, 255, 255, .14);
-  color: #fff;
-  box-shadow: none;
-}
-
-body:has(.ai-login-page) .site-style-switch--floating {
-  position: fixed;
-  top: 20px;
-  right: 22px;
-  z-index: 1200;
-  display: inline-flex;
-  margin: 0;
-}
 
 html[data-mci-site-style="mainstream"] {
   color-scheme: light;
@@ -108,7 +28,7 @@ html[data-mci-site-style="mainstream"] {
   --mci-main-placeholder: #94a3b8;
   --mci-main-hover-border: #b9ccf8;
 
-  --vp-layout-max-width: 1440px;
+  --vp-layout-max-width: 100%;
   --vp-c-bg: #fff;
   --vp-c-bg-alt: #f7f9fc;
   --vp-c-bg-elv: #fff;
@@ -225,8 +145,9 @@ html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar:
 }
 
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .container {
-  max-width: 1320px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBarTitle .title,
@@ -287,7 +208,7 @@ html[data-mci-site-style="mainstream"] div[class*="VPHome"]::before {
 }
 
 html[data-mci-site-style="mainstream"] .VPHome .VPHero {
-  padding: 112px 32px 84px !important;
+  padding: 74px 32px 46px !important;
 }
 
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .container {
@@ -332,13 +253,21 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .name::before {
   vertical-align: 4px;
 }
 
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .name[data-injected3d] {
+  min-height: 64px;
+}
+
+html[data-mci-site-style="mainstream"] .VPHome .VPHero .name[data-injected3d]::before {
+  display: none;
+}
+
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .text,
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .text * {
   max-width: 680px;
-  margin-top: 22px;
+  margin-top: 14px;
   color: var(--mci-main-ink) !important;
   -webkit-text-fill-color: var(--mci-main-ink) !important;
-  font-size: clamp(42px, 5.1vw, 66px) !important;
+  font-size: clamp(38px, 4.5vw, 58px) !important;
   font-weight: 760 !important;
   line-height: 1.12 !important;
   letter-spacing: -.04em !important;
@@ -347,17 +276,17 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .text * {
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline,
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .tagline * {
   max-width: 660px;
-  margin-top: 26px;
+  margin-top: 15px;
   color: var(--mci-main-muted) !important;
   -webkit-text-fill-color: var(--mci-main-muted) !important;
-  font-size: 17px !important;
+  font-size: 15px !important;
   font-weight: 450 !important;
-  line-height: 1.85 !important;
+  line-height: 1.62 !important;
 }
 
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions {
   gap: 12px;
-  padding-top: 30px;
+  padding-top: 20px;
 }
 
 html[data-mci-site-style="mainstream"] .VPHome .VPHero .actions .action .VPButton {
@@ -428,8 +357,8 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
   position: relative;
   z-index: 3;
   max-width: 1200px;
-  margin: -18px auto 0;
-  padding: 0 32px 34px;
+  margin: -10px auto 0;
+  padding: 0 32px 10px;
 }
 
 .mainstream-proof-grid {
@@ -444,7 +373,7 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
 .mainstream-proof-item {
   position: relative;
   display: flex;
-  min-height: 98px;
+  min-height: 72px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -462,7 +391,7 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
 
 .mainstream-proof-item strong {
   color: var(--mci-main-ink) !important;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -473,7 +402,7 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
 
 .mainstream-section-intro {
   max-width: 760px;
-  margin: 100px auto 50px;
+  margin: 28px auto 18px;
   text-align: center;
 }
 
@@ -485,9 +414,9 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
 }
 
 .mainstream-section-intro h2 {
-  margin: 14px 0 14px;
+  margin: 8px 0 8px;
   color: var(--mci-main-ink) !important;
-  font-size: clamp(30px, 3.2vw, 42px);
+  font-size: clamp(26px, 2.6vw, 34px);
   line-height: 1.22;
   letter-spacing: -.03em;
 }
@@ -495,13 +424,13 @@ html[data-mci-site-style="mainstream"] .VPHome .VPHero .VPImage {
 .mainstream-section-intro p {
   margin: 0;
   color: var(--mci-main-muted) !important;
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 /* 首页能力卡片 */
 html[data-mci-site-style="mainstream"] .VPHome .VPFeatures {
-  padding: 0 32px 96px;
+  padding-top: 28px;
 }
 
 html[data-mci-site-style="mainstream"] .VPHome .VPFeatures .container {
@@ -1024,8 +953,22 @@ html[data-mci-site-style="mainstream"] .profile-page .side-menu-item {
 }
 
 html[data-mci-site-style="mainstream"] .profile-page .brand small,
-html[data-mci-site-style="mainstream"] .profile-page .sidebar-footer a {
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-token-card span,
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-token-card small {
   color: var(--mci-main-muted);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-token-card {
+  border-color: var(--mci-main-border);
+  background: var(--mci-main-soft);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-token-card strong {
+  color: var(--mci-main-ink);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-token-track {
+  background: color-mix(in srgb, var(--mci-main-muted) 18%, transparent);
 }
 
 html[data-mci-site-style="mainstream"] .profile-page .brand-mark {
@@ -1085,27 +1028,7 @@ html[data-mci-site-style="mainstream"] .profile-page .tenant-card {
   border-color: var(--mci-main-border);
 }
 
-/* 主流风格暗色模式：明暗只切换底色层，保留主流风格的结构与蓝色品牌识别。 */
-html.dark[data-mci-site-style="mainstream"] .site-style-switch {
-  border-color: var(--mci-main-border);
-  background: rgba(17, 24, 39, .92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
-}
-
-html.dark[data-mci-site-style="mainstream"] .site-style-switch__option {
-  color: var(--mci-main-muted);
-}
-
-html.dark[data-mci-site-style="mainstream"] .site-style-switch__option:hover {
-  color: var(--mci-main-ink);
-  background: var(--mci-main-soft);
-}
-
-html.dark[data-mci-site-style="mainstream"] .site-style-switch__option.active {
-  background: var(--mci-main-primary-soft);
-  color: var(--mci-main-primary-strong);
-  box-shadow: none;
-}
+/* 暗色模式：只切换底色层，保留统一的结构与蓝色品牌识别。 */
 
 html.dark[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .Layout::before {
   background:
@@ -1161,36 +1084,9 @@ html.dark[data-mci-site-style="mainstream"] .profile-page .token-stat-card {
 }
 
 @media (max-width: 768px) {
-  .site-style-switch__option {
-    min-width: 34px;
-    padding: 0 6px;
-    font-size: 11px;
-  }
-
-  /* 移动端导航空间有限：切换器移到右下角，避免挤压菜单按钮并保留随时切换能力。 */
-  body:not(:has(.ai-login-page)) .VPNavBar .site-style-switch {
-    display: none;
-  }
-
   /* 语言仍可从 VitePress 移动菜单进入，顶部只保留搜索、账号与菜单入口。 */
   body:not(:has(.ai-login-page)) .VPNavBar .profile-locale-switch {
     display: none !important;
-  }
-
-  body:not(:has(.ai-login-page)) .site-style-switch--floating {
-    position: fixed;
-    right: 14px;
-    bottom: 16px;
-    z-index: 1200;
-    display: inline-flex;
-    margin: 0;
-    background: var(--mci-main-glass);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
-  }
-
-  body:has(.ai-login-page) .site-style-switch--floating {
-    top: 12px;
-    right: 12px;
   }
 
   html[data-mci-site-style="mainstream"] .VPHome .VPHero {
@@ -1405,11 +1301,478 @@ html.dark[data-mci-site-style="mainstream"] .profile-page .token-stat-card {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-style-switch__option,
   html[data-mci-site-style="mainstream"] .VPFeature,
   html[data-mci-site-style="mainstream"] .product-card,
   html[data-mci-site-style="mainstream"] .VPButton {
     transition-duration: .01ms !important;
     animation: none !important;
+  }
+}
+
+/* 登录页、普通内容页和首页共用同一套可读导航色，避免相关链接、语言菜单在浅色背景上失去对比度。 */
+html[data-mci-site-style="mainstream"] .VPNav,
+html[data-mci-site-style="mainstream"] .VPNavBar,
+html[data-mci-site-style="mainstream"] .VPNavBar .container,
+html[data-mci-site-style="mainstream"] .VPNavBar .title {
+  background: var(--mci-main-surface) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPNavBar {
+  min-height: 64px;
+  border-bottom: 1px solid var(--mci-main-border) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPNavBarTitle .title,
+html[data-mci-site-style="mainstream"] .VPNavBarMenuLink,
+html[data-mci-site-style="mainstream"] .VPNavBarMenuGroup .button,
+html[data-mci-site-style="mainstream"] .VPNavBarTranslations .button,
+html[data-mci-site-style="mainstream"] .VPNavBarTranslations .text,
+html[data-mci-site-style="mainstream"] .VPNavBarTranslations svg,
+html[data-mci-site-style="mainstream"] .VPNavBar .VPNavBarMenu a {
+  color: var(--mci-main-ink) !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: var(--mci-main-ink) !important;
+  text-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPNavBarMenuLink:hover,
+html[data-mci-site-style="mainstream"] .VPNavBarMenuGroup .button:hover,
+html[data-mci-site-style="mainstream"] .VPNavBarTranslations .button:hover {
+  color: var(--mci-main-primary) !important;
+  -webkit-text-fill-color: var(--mci-main-primary) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPMenu {
+  border: 1px solid var(--mci-main-border) !important;
+  background: var(--mci-main-surface) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .14) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPMenuLink,
+html[data-mci-site-style="mainstream"] .VPMenuLink .text,
+html[data-mci-site-style="mainstream"] .VPMenuGroup .title {
+  color: var(--mci-main-text) !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: var(--mci-main-text) !important;
+}
+
+html[data-mci-site-style="mainstream"] .VPMenuLink:hover,
+html[data-mci-site-style="mainstream"] .VPMenuLink:hover .text {
+  color: var(--mci-main-primary) !important;
+  -webkit-text-fill-color: var(--mci-main-primary) !important;
+}
+
+/* VitePress 多语言菜单必须在明暗主题下保持明确对比度。 */
+html:not(.dark) .VPNavBarTranslations .VPMenu,
+html:not(.dark) .VPNavBarTranslations .VPFlyout .VPMenu {
+  border-color: #dce3ed !important;
+  background: #fff !important;
+}
+
+html:not(.dark) .VPNavBarTranslations .VPMenuLink,
+html:not(.dark) .VPNavBarTranslations .VPMenuLink .text,
+html:not(.dark) .VPNavBarTranslations .VPMenuGroup .title,
+html:not(.dark) .VPNavBarTranslations .VPMenu span,
+html:not(.dark) .VPNavBarTranslations .VPMenu a {
+  color: #172033 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #172033 !important;
+}
+
+html:not(.dark) .VPNavBarTranslations .VPMenuLink:hover,
+html:not(.dark) .VPNavBarTranslations .VPMenuLink:hover .text {
+  background: #f1f5fb !important;
+  color: #1769e0 !important;
+  -webkit-text-fill-color: #1769e0 !important;
+}
+
+html.dark .VPNavBarTranslations .VPMenu {
+  border-color: rgba(148, 163, 184, .2) !important;
+  background: #172033 !important;
+}
+
+html.dark .VPNavBarTranslations .VPMenuLink,
+html.dark .VPNavBarTranslations .VPMenuLink .text,
+html.dark .VPNavBarTranslations .VPMenuGroup .title,
+html.dark .VPNavBarTranslations .VPMenu span,
+html.dark .VPNavBarTranslations .VPMenu a {
+  color: #f4f7fb !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #f4f7fb !important;
+}
+
+/* AI 应用独立页使用全宽内容画布，与首页应用区保持同一对齐基线。 */
+html[data-mci-site-style="mainstream"] body:has(.mci-apps-page) .VPDoc,
+html[data-mci-site-style="mainstream"] body:has(.mci-apps-page) .VPDoc .container,
+html[data-mci-site-style="mainstream"] body:has(.mci-apps-page) .VPDoc .content,
+html[data-mci-site-style="mainstream"] body:has(.mci-apps-page) .VPDoc .content-container,
+html[data-mci-site-style="mainstream"] body:has(.mci-apps-page) .vp-doc,
+html[data-mci-site-style="mainstream"] body:has(.mci-profile-page) .VPDoc,
+html[data-mci-site-style="mainstream"] body:has(.mci-profile-page) .VPDoc .container,
+html[data-mci-site-style="mainstream"] body:has(.mci-profile-page) .VPDoc .content,
+html[data-mci-site-style="mainstream"] body:has(.mci-profile-page) .VPDoc .content-container,
+html[data-mci-site-style="mainstream"] body:has(.mci-profile-page) .vp-doc {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-mci-site-style="mainstream"] body:has(.VPHome) .app-market {
+  margin-inline: auto;
+}
+
+/* 个人中心：紧凑、低噪声、信息密度优先，统一覆盖概览、创建租户、AI 中转站和账号页。 */
+html[data-mci-site-style="mainstream"] .profile-page {
+  min-height: calc(100dvh - 64px);
+  grid-template-columns: 188px minmax(0, 1fr);
+  background: var(--mci-main-page);
+  font-family: Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-sidebar {
+  top: 64px;
+  height: calc(100dvh - 64px);
+  padding: 14px 12px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand {
+  gap: 9px;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand-mark,
+html[data-mci-site-style="mainstream"] .profile-page .brand-avatar-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand strong {
+  overflow: hidden;
+  max-width: 116px;
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .brand small {
+  margin-top: 2px;
+  font-size: 10.5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .side-menu {
+  gap: 3px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .side-menu-item {
+  min-height: 36px;
+  gap: 7px;
+  padding: 8px 9px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 580;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .menu-icon {
+  width: 20px;
+  color: var(--mci-main-muted);
+  font-size: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-footer {
+  gap: 6px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .sidebar-footer a {
+  padding: 3px 5px;
+  font-size: 11.5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-main {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding: 18px 22px 32px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-header {
+  gap: 14px;
+  margin-bottom: 13px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .eyebrow {
+  margin-bottom: 3px;
+  font-size: 9.5px;
+  letter-spacing: .04em;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-header h1 {
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .header-desc {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .header-actions {
+  gap: 7px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .primary-action,
+html[data-mci-site-style="mainstream"] .profile-page .ghost-action,
+html[data-mci-site-style="mainstream"] .profile-page .link-action {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero {
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero > div,
+html[data-mci-site-style="mainstream"] .profile-page .license-card {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero > div,
+html[data-mci-site-style="mainstream"] .profile-page .license-card {
+  padding: 15px 16px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero h2 {
+  font-size: 23px;
+  letter-spacing: -.03em;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .profile-hero p:not(.eyebrow),
+html[data-mci-site-style="mainstream"] .profile-page .license-card small {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .license-card span {
+  font-size: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .license-card strong {
+  margin: 5px 0 3px;
+  font-size: 19px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .overview-grid {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .stat-card {
+  min-height: 92px;
+  padding: 12px 13px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .stat-card span,
+html[data-mci-site-style="mainstream"] .profile-page .stat-card small {
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .stat-card strong {
+  margin: 5px 0 3px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .content-panel,
+html[data-mci-site-style="mainstream"] .profile-page .state-panel {
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .content-grid {
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  gap: 10px;
+  min-height: calc(100dvh - 150px);
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .panel-head {
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .panel-head h2,
+html[data-mci-site-style="mainstream"] .profile-page .state-panel h2,
+html[data-mci-site-style="mainstream"] .profile-page .content-panel h2 {
+  margin-bottom: 3px;
+  font-size: 15px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .panel-head p,
+html[data-mci-site-style="mainstream"] .profile-page .state-panel p {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-grid,
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-grid) {
+  gap: 9px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-card,
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-card) {
+  min-height: 164px;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-domain,
+html[data-mci-site-style="mainstream"] .profile-page .tenant-password-tip,
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-domain),
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-password-tip) {
+  gap: 4px 8px;
+  padding: 8px 9px;
+  border-radius: 7px;
+  font-size: 10.5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-card-actions,
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-card-actions) {
+  grid-template-columns: 1fr 88px;
+  gap: 7px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .tenant-open,
+html[data-mci-site-style="mainstream"] .profile-page .tenant-copy,
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-open),
+html[data-mci-site-style="mainstream"] .profile-page :deep(.tenant-copy) {
+  min-height: 30px;
+  border-radius: 7px;
+  font-size: 11px;
+  box-shadow: none;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .billing-strip {
+  gap: 9px;
+  margin-top: 10px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .billing-strip > div {
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .billing-strip span,
+html[data-mci-site-style="mainstream"] .profile-page .billing-strip small {
+  font-size: 10.5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .billing-strip strong {
+  margin: 3px 0;
+  font-size: 15px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .form-row {
+  gap: 5px;
+  margin-bottom: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .form-row label,
+html[data-mci-site-style="mainstream"] .profile-page .form-row small {
+  font-size: 11.5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .form-row input {
+  height: 36px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .step-list {
+  gap: 5px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .step-item {
+  grid-template-columns: 24px 1fr;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .step-item span {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .usage-section-title {
+  margin: 14px 0 7px;
+  font-size: 13px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .usage-table {
+  font-size: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .usage-table th,
+html[data-mci-site-style="mainstream"] .profile-page .usage-table td {
+  padding: 7px 8px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .usage-pagination {
+  gap: 7px;
+  margin-top: 9px;
+  font-size: 11px;
+}
+
+html[data-mci-site-style="mainstream"] .profile-page .usage-pagination select,
+html[data-mci-site-style="mainstream"] .profile-page .usage-pagination button {
+  min-height: 28px;
+  border-radius: 6px;
+  padding-inline: 8px;
+  font-size: 11px;
+}
+
+@media (max-width: 960px) {
+  html[data-mci-site-style="mainstream"] .profile-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .profile-sidebar {
+    position: relative;
+    top: auto;
+    height: auto;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .profile-main {
+    padding: 16px;
+  }
+
+  html[data-mci-site-style="mainstream"] .profile-page .profile-hero,
+  html[data-mci-site-style="mainstream"] .profile-page .content-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

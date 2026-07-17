@@ -19,20 +19,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vitepress'
-import { siteStyle } from '../site-style'
 
 const route = useRoute()
 const isVisible = computed(() => {
   const path = route.path || '/'
-  const isHome = path === '/' || path === '/index' || path === '/index.html'
-  return isHome && siteStyle.value === 'mainstream'
+  return path === '/' || path === '/index' || path === '/index.html'
 })
 
 const proofItems = [
   { value: '10+ 年', label: '持续产品演进' },
   { value: '20+', label: '核心系统引擎' },
-  { value: '3+', label: '主流数据库支持' },
+  { value: 'AI', label: '零代码AI编程' },
   { value: 'MIT', label: '开放源码协议' }
 ]
 </script>
-

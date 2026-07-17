@@ -50,5 +50,26 @@ function format(value: number) {
 .token-grid span { display:block; color:#64748b; font-size:13px; }
 .token-grid strong { display:block; margin-top:8px; font-size:22px; }
 .compact { margin-bottom:18px; }
+:global(html.dark .ai-summary) {
+  border-color: rgba(148, 163, 184, .18);
+  background: linear-gradient(145deg, #111827, #0f172a);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .24);
+}
+:global(html.dark .ai-summary .summary-head h2),
+:global(html.dark .ai-summary .token-grid strong) {
+  color: #f8fafc;
+}
+:global(html.dark .ai-summary .summary-head p),
+:global(html.dark .ai-summary .key-grid label),
+:global(html.dark .ai-summary .token-grid span) {
+  color: #94a3b8;
+}
+:global(html.dark .ai-summary .copy-button),
+:global(html.dark .ai-summary .key-grid code),
+:global(html.dark .ai-summary .token-grid article) {
+  border-color: rgba(148, 163, 184, .2);
+  background: #0b1220;
+  color: #e2e8f0;
+}
 @media (max-width:720px) { .summary-head { flex-direction:column; } .key-grid { grid-template-columns:1fr; } .token-grid { grid-template-columns:1fr; } }
 </style>

@@ -26,7 +26,7 @@ function validate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_004_002
+    if (versionNumber < 1_005_000
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -36,17 +36,30 @@ function validate(name, content) {
       || !content.includes('stableMenuUrl')
       || !content.includes('normalizeRouteMeta')
       || !content.includes('recoverBoundMicroserviceMenus')
-      || !content.includes('preservedLegacyUrl')) {
-      throw new Error(`${name} 低于 v1.4.2 或缺少旧库/在线应用归属/旧路由恢复/源码校验回读保护，拒绝降级本地基线`);
+      || !content.includes('preservedLegacyUrl')
+      || !content.includes("upsertApplicationRow('sys_microistore'")
+      || !content.includes('official_marketplace_install_stat')) {
+      throw new Error(`${name} 低于 v1.5.0 或缺少统一应用商城、旧路由恢复、源码校验及安装统计能力，拒绝降级本地基线`);
     }
   }
-  if (name === 'ai-app-publish-store.js'
-    && (!content.includes('ai_app_publish_store')
-      || !content.includes('Version: v1.1.6')
+  if (name === 'ai-app-publish-store.js') {
+    const versionMatch = content.match(/Version\s*:\s*v?(\d+)\.(\d+)\.(\d+)/i);
+    const versionNumber = versionMatch
+      ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
+      : 0;
+    if (!content.includes('ai_app_publish_store')
+      || versionNumber < 1_004_000
+      || !content.includes('selectionValues(existingStore.SelectTable')
+      || !content.includes('selectionValues(existingStore.SelectApiEngine')
       || !content.includes('IncludeSource: includeSource')
       || !content.includes("action === 'PackageOnly'")
-      || !content.includes('ReturnPackageModel'))) {
-    throw new Error(`${name} 缺少 v1.1.6 自包含源码低内存 PackageOnly 能力`);
+      || !content.includes('ReturnPackageModel')
+      || !content.includes("GetFormData('sys_microistore'")
+      || !content.includes('ApplicationType || app.AppType')
+      || !content.includes('PublishHdfsPath')
+      || !content.includes("Source: 'CompiledAssets'")) {
+    throw new Error(`${name} 缺少 v1.4.0 统一应用商城、关联表/接口自动打包、真实编译资产及自包含源码 PackageOnly 能力`);
+    }
   }
   if (name.endsWith('.json')) {
     const packageModel = JSON.parse(content);
@@ -64,11 +77,33 @@ function validate(name, content) {
       const versionNumber = (versionParts[0] || 0) * 1_000_000
         + (versionParts[1] || 0) * 1_000
         + (versionParts[2] || 0);
-      if (versionNumber < 6_002_009
+      const expectedTabs = ['平台应用', '我安装的应用', '我发布的应用', 'UniApp', 'Web', '微服务'];
+      const menus = Array.isArray(packageModel?.SysMenus) ? packageModel.SysMenus : [];
+      const menuTabsValid = menus.length === 3 && menus.every(menu => {
+        try {
+          const tabs = typeof menu.PageTabs === 'string' ? JSON.parse(menu.PageTabs) : menu.PageTabs;
+          return Array.isArray(tabs)
+            && tabs.map(tab => tab.Name).join('|') === expectedTabs.join('|');
+        } catch {
+          return false;
+        }
+      });
+      const fields = Array.isArray(packageModel?.DiyFields) ? packageModel.DiyFields : [];
+      const applicationType = fields.find(field => field.Name === 'ApplicationType');
+      const applicationTypeOptions = String(applicationType?.Data || '');
+      if (versionNumber < 6_004_000
         || !content.includes('TargetSysMenuId')
         || !content.includes('01KXFSG7MZ40CY8KCWCZZZJH2M')
-        || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')) {
-        throw new Error(`${name} 版本过旧或缺少页面Tab关联模块配置`);
+        || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')
+        || !content.includes('PublisherTypes')
+        || !content.includes('StoreInstallStatus')
+        || !menuTabsValid
+        || applicationType?.Component !== 'Radio'
+        || !applicationTypeOptions.includes('"Key":"Platform"')
+        || !applicationTypeOptions.includes('"Key":"UniApp"')
+        || !applicationTypeOptions.includes('"Key":"Web"')
+        || !applicationTypeOptions.includes('"Key":"MicroService"')) {
+        throw new Error(`${name} 版本过旧或缺少按平台应用、UniApp、Web、微服务分类的统一商城能力`);
       }
     }
   }

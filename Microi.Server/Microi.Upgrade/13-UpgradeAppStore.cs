@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.3.7.0";
+        public static string Version = "6.4.0.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -76,7 +76,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 4, 2) ||
+                    importerVersion < new System.Version(1, 5, 0) ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -89,7 +89,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("normalizeRouteMeta") ||
                     !code.Contains("recoverBoundMicroserviceMenus") ||
                     !code.Contains("preservedLegacyUrl") ||
-                    !code.Contains("preserve_existing_menu_visibility_"))
+                    !code.Contains("preserve_existing_menu_visibility_") ||
+                    !code.Contains("upsertApplicationRow('sys_microistore'") ||
+                    !code.Contains("official_marketplace_install_stat"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -115,11 +117,13 @@ WHERE `ApiEngineKey`=@p0 AND (`IsDeleted`=0 OR `IsDeleted` IS NULL)";
                 var publisherVersionMatch = Regex.Match(publisherCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 1, 6) ||
+                    publisherVersion < new System.Version(1, 2, 0) ||
                     !publisherCode.Contains("OfflineSelfContained") ||
                     !publisherCode.Contains("IncludeSource: includeSource") ||
                     !publisherCode.Contains("action === 'PackageOnly'") ||
                     !publisherCode.Contains("ReturnPackageModel") ||
+                    !publisherCode.Contains("GetFormData('sys_microistore'") ||
+                    !publisherCode.Contains("ApplicationType || app.AppType") ||
                     !HasExpectedPublisherSettings(publisherSettings))
                 {
                     return RefreshRequired(osClient, "AI应用离线发布器缺失、自包含能力过低或运行限额不足");
@@ -152,6 +156,19 @@ WHERE LOWER(Name)=LOWER(@p0) AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         .AddInParameter("p0", tableName)
                         .ToScalar();
                     if (!HasRows(tableCount)) return RefreshRequired(osClient, $"缺少表单元数据[{tableName}]");
+                }
+
+                var unifiedFieldCount = client.Db.FromSql(@"SELECT COUNT(1) FROM diy_field f
+INNER JOIN diy_table t ON t.Id=f.TableId
+WHERE LOWER(t.Name)=LOWER(@p0)
+  AND f.Name IN ('AppKey','ApplicationType','Category','PublisherType','ViewCount','InstallCount')
+  AND (t.IsDeleted=0 OR t.IsDeleted IS NULL)
+  AND (f.IsDeleted=0 OR f.IsDeleted IS NULL)")
+                    .AddInParameter("p0", "sys_microistore")
+                    .ToScalar();
+                if (!long.TryParse(unifiedFieldCount?.ToString(), out var unifiedFields) || unifiedFields < 6)
+                {
+                    return RefreshRequired(osClient, "应用商城缺少统一应用类型、分类或统计字段");
                 }
 
                 var menuId = client.Db.FromSql(@"SELECT Id FROM sys_menu
@@ -192,9 +209,23 @@ WHERE Id=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", menuId)
                     .ToScalar()?.ToString() ?? string.Empty;
                 if (!appStorePageTabs.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
-                    !appStorePageTabs.Contains("01KXFSG8153B3VZPZ45WNCCFHR"))
+                    !appStorePageTabs.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
+                    !appStorePageTabs.Contains("AI应用") ||
+                    appStorePageTabs.Contains("官方应用") ||
+                    appStorePageTabs.Contains("社区应用"))
                 {
-                    return RefreshRequired(osClient, "应用商城页面多Tab未关联本租户模块");
+                    return RefreshRequired(osClient, "应用商城页面多Tab尚未合并为AI应用");
+                }
+
+                var marketplaceListCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "get-microi-store")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                if (!marketplaceListCode.Contains("PublisherTypes") ||
+                    !marketplaceListCode.Contains("StoreInstallStatus") ||
+                    !marketplaceListCode.Contains("ApplicationTypes"))
+                {
+                    return RefreshRequired(osClient, "应用商城列表缺少统一筛选或安装状态兼容");
                 }
 
                 var roleLimitCount = client.Db.FromSql(@"SELECT COUNT(1) FROM sys_rolelimit
