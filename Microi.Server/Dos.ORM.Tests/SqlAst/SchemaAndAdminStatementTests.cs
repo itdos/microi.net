@@ -562,6 +562,90 @@ public sealed class SchemaAndAdminStatementTests
     }
 
     [Fact]
+    public void Computed_expression_depth_budget_accepts_boundary_and_rejects_next_depth()
+    {
+        const int maximumDepth = 128;
+        var accepted = new ComputedGenerationDefinition(
+            UnaryChain(maximumDepth), ComputedStorageKind.Virtual);
+        var equivalent = new ComputedGenerationDefinition(
+            UnaryChain(maximumDepth), ComputedStorageKind.Virtual);
+
+        AssertEqualAndHash(accepted, equivalent);
+        Assert.StartsWith("sha256:", FingerprintForComputed(accepted.Expression));
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ComputedGenerationDefinition(
+                UnaryChain(maximumDepth + 1),
+                ComputedStorageKind.Virtual));
+        Assert.Equal("expression", exception.ParamName);
+        Assert.DoesNotContain(nameof(UnaryExpression), exception.Message);
+    }
+
+    [Fact]
+    public void Computed_expression_occurrence_budget_counts_shared_dag_expansion()
+    {
+        var accepted = SharedBinaryDag(11);
+        var generation = new ComputedGenerationDefinition(
+            accepted, ComputedStorageKind.Virtual);
+        var equivalent = new ComputedGenerationDefinition(
+            SharedBinaryDag(11), ComputedStorageKind.Virtual);
+
+        AssertEqualAndHash(generation, equivalent);
+        Assert.StartsWith("sha256:", FingerprintForComputed(accepted));
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ComputedGenerationDefinition(
+                SharedBinaryDag(12), ComputedStorageKind.Virtual));
+        Assert.Equal("expression", exception.ParamName);
+        Assert.DoesNotContain(nameof(BinaryExpression), exception.Message);
+    }
+
+    [Fact]
+    public void Computed_expression_occurrence_budget_accepts_exact_boundary()
+    {
+        const int maximumOccurrences = 4096;
+        var accepted = new InExpression(
+            BooleanExpression.True,
+            Enumerable.Repeat<SqlExpression>(
+                BooleanExpression.False,
+                maximumOccurrences - 2));
+
+        Assert.StartsWith("sha256:", FingerprintForComputed(accepted));
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ComputedGenerationDefinition(
+                new InExpression(
+                    BooleanExpression.True,
+                    Enumerable.Repeat<SqlExpression>(
+                        BooleanExpression.False,
+                        maximumOccurrences - 1)),
+                ComputedStorageKind.Virtual));
+        Assert.Equal("expression", exception.ParamName);
+        Assert.DoesNotContain(nameof(InExpression), exception.Message);
+    }
+
+    [Fact]
+    public void Fingerprint_rechecks_computed_expression_budget_before_encoding()
+    {
+        var computed = (ComputedGenerationDefinition)
+            RuntimeHelpers.GetUninitializedObject(
+                typeof(ComputedGenerationDefinition));
+        SetAutoProperty(
+            computed,
+            nameof(ComputedGenerationDefinition.Expression),
+            UnaryChain(129));
+        SetAutoProperty(
+            computed,
+            nameof(ComputedGenerationDefinition.Storage),
+            ComputedStorageKind.Virtual);
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            FingerprintForGeneration(computed));
+        Assert.Equal("Expression", exception.ParamName);
+        Assert.DoesNotContain(nameof(UnaryExpression), exception.Message);
+    }
+
+    [Fact]
     public void Schema_scope_has_only_named_unambiguous_factories()
     {
         var all = SchemaScope.All();
@@ -2230,6 +2314,86 @@ public sealed class SchemaAndAdminStatementTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new ColumnMetadata(a.Definition.Name,
                 Column("Id", LogicalDbType.Int32), -1));
+    }
+
+    [Fact]
+    public void Metadata_collections_reject_duplicate_canonical_keys_in_both_orders()
+    {
+        var token = new SchemaToken("duplicate-key-token");
+        var tableName = ObjectName("Users", "app");
+        var firstTable = new TableMetadata(new TableDefinition(
+            tableName,
+            new[] { Column("Id", LogicalDbType.Int32) }));
+        var secondTable = new TableMetadata(new TableDefinition(
+            ObjectName("Users", "app"),
+            new[] { Column("Id", LogicalDbType.Int64) }));
+
+        AssertRejectedInBothOrders(firstTable, secondTable, items =>
+            new TableMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token, items));
+        AssertRejectedInBothOrders(firstTable, secondTable, items =>
+            new SchemaMetadataSnapshot(token, items));
+
+        var legalTables = new TableMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            token,
+            new[]
+            {
+                firstTable,
+                new TableMetadata(new TableDefinition(
+                    ObjectName("Users", "other"),
+                    new[] { Column("Id", LogicalDbType.Int32) })),
+                new TableMetadata(new TableDefinition(
+                    ObjectName("Users", "app", "catalog"),
+                    new[] { Column("Id", LogicalDbType.Int32) }))
+            });
+        Assert.Equal(3, legalTables.Items.Count);
+
+        var firstColumn = new ColumnMetadata(
+            tableName, Column("Status", LogicalDbType.Int32), 3);
+        var secondColumn = new ColumnMetadata(
+            tableName, Column("Status", LogicalDbType.String), 3);
+        AssertRejectedInBothOrders(firstColumn, secondColumn, items =>
+            new ColumnMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token, items));
+
+        var legalColumns = new ColumnMetadataCollectionResult(
+            MetadataCollectionStatus.Found,
+            token,
+            new[]
+            {
+                new ColumnMetadata(
+                    tableName, Column("Status", LogicalDbType.Int32), 3),
+                new ColumnMetadata(
+                    tableName, Column("Status", LogicalDbType.Int64), 4),
+                new ColumnMetadata(
+                    tableName, Column("Other", LogicalDbType.Int64), 3)
+            });
+        Assert.Equal(3, legalColumns.Items.Count);
+
+        var firstIndex = new IndexMetadata(
+            tableName,
+            new IndexDefinition(
+                Id("IX_Users_Status"),
+                new[]
+                {
+                    new IndexColumnDefinition(
+                        Id("Status"), SqlSortDirection.Ascending)
+                },
+                IndexUniqueness.NonUnique));
+        var secondIndex = new IndexMetadata(
+            tableName,
+            new IndexDefinition(
+                Id("IX_Users_Status"),
+                new[]
+                {
+                    new IndexColumnDefinition(
+                        Id("Status"), SqlSortDirection.Descending)
+                },
+                IndexUniqueness.Unique));
+        AssertRejectedInBothOrders(firstIndex, secondIndex, items =>
+            new IndexMetadataCollectionResult(
+                MetadataCollectionStatus.Found, token, items));
     }
 
     [Fact]
@@ -3950,6 +4114,40 @@ public sealed class SchemaAndAdminStatementTests
     {
         Assert.Equal(first, second);
         Assert.Equal(first!.GetHashCode(), second!.GetHashCode());
+    }
+
+    private static SqlExpression UnaryChain(int wrapperCount)
+    {
+        SqlExpression expression = BooleanExpression.True;
+        for (var index = 0; index < wrapperCount; index++)
+        {
+            expression = new UnaryExpression(SqlUnaryOperator.Not, expression);
+        }
+        return expression;
+    }
+
+    private static SqlExpression SharedBinaryDag(int wrapperCount)
+    {
+        SqlExpression expression = BooleanExpression.True;
+        for (var index = 0; index < wrapperCount; index++)
+        {
+            expression = new BinaryExpression(
+                expression, SqlBinaryOperator.And, expression);
+        }
+        return expression;
+    }
+
+    private static void AssertRejectedInBothOrders<T>(
+        T first,
+        T second,
+        Action<IEnumerable<T>> construct)
+    {
+        var forward = Assert.Throws<ArgumentException>(() =>
+            construct(new[] { first, second }));
+        var reverse = Assert.Throws<ArgumentException>(() =>
+            construct(new[] { second, first }));
+        Assert.Equal(forward.ParamName, reverse.ParamName);
+        Assert.Equal(forward.Message, reverse.Message);
     }
 
     private sealed class UnknownExpression : SqlExpression
