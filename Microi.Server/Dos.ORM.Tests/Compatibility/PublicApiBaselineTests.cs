@@ -19,17 +19,130 @@ public sealed class PublicApiBaselineTests
         Assert.Equal(8, (int)DatabaseType.KingBase);
     }
 
-    [Theory]
-    [InlineData(typeof(DbSession), "FromSql")]
-    [InlineData(typeof(DbTrans), "FromSql")]
-    [InlineData(typeof(ProviderFactory), "CreateDbProvider")]
-    [InlineData(typeof(DbProvider), "BuildParameterName")]
-    [InlineData(typeof(DbProvider), "BuildTableName")]
-    public void Legacy_public_members_remain_available(Type type, string member)
+    [Fact]
+    public void DbSession_FromSql_signature_is_stable()
     {
-        Assert.Contains(
-            type.GetMethods(BindingFlags.Instance | BindingFlags.Static |
-                            BindingFlags.Public | BindingFlags.NonPublic),
-            method => method.Name == member);
+        AssertPublicMethod(
+            typeof(DbSession),
+            nameof(DbSession.FromSql),
+            typeof(SqlSection),
+            isStatic: false,
+            isVirtual: false,
+            typeof(string));
+    }
+
+    [Fact]
+    public void DbTrans_FromSql_signature_is_stable()
+    {
+        AssertPublicMethod(
+            typeof(DbTrans),
+            nameof(DbTrans.FromSql),
+            typeof(SqlSection),
+            isStatic: false,
+            isVirtual: true,
+            typeof(string));
+    }
+
+    [Fact]
+    public void ProviderFactory_CreateDbProvider_signature_is_stable()
+    {
+        // The one-string overload is compiled only under NETFRAMEWORK. Dos.ORM
+        // currently targets netstandard2.1, so it is not part of this assembly's
+        // public contract. The four-parameter overload is the active contract.
+        AssertPublicMethod(
+            typeof(ProviderFactory),
+            nameof(ProviderFactory.CreateDbProvider),
+            typeof(DbProvider),
+            isStatic: true,
+            isVirtual: false,
+            typeof(string),
+            typeof(string),
+            typeof(string),
+            typeof(DatabaseType?));
+    }
+
+    [Fact]
+    public void DbProvider_BuildParameterName_signature_is_stable()
+    {
+        AssertPublicMethod(
+            typeof(DbProvider),
+            nameof(DbProvider.BuildParameterName),
+            typeof(string),
+            isStatic: false,
+            isVirtual: true,
+            typeof(string));
+    }
+
+    [Fact]
+    public void DbProvider_BuildTableName_signature_is_stable()
+    {
+        AssertPublicMethod(
+            typeof(DbProvider),
+            nameof(DbProvider.BuildTableName),
+            typeof(string),
+            isStatic: false,
+            isVirtual: true,
+            typeof(string),
+            typeof(string));
+    }
+
+    [Fact]
+    public void Public_signature_lookup_rejects_non_public_and_wrong_parameter_members()
+    {
+        Assert.Null(FindPublicDeclaredMethod(
+            typeof(SignatureSensitivityFixture),
+            "PrivateTarget",
+            isStatic: false,
+            typeof(string)));
+
+        Assert.Null(FindPublicDeclaredMethod(
+            typeof(SignatureSensitivityFixture),
+            nameof(SignatureSensitivityFixture.WrongParameterTarget),
+            isStatic: false,
+            typeof(string)));
+    }
+
+    private static void AssertPublicMethod(
+        Type declaringType,
+        string methodName,
+        Type returnType,
+        bool isStatic,
+        bool isVirtual,
+        params Type[] parameterTypes)
+    {
+        var method = FindPublicDeclaredMethod(
+            declaringType,
+            methodName,
+            isStatic,
+            parameterTypes);
+
+        Assert.NotNull(method);
+        Assert.Same(declaringType, method!.DeclaringType);
+        Assert.Same(returnType, method.ReturnType);
+        Assert.True(method.IsPublic);
+        Assert.Equal(isStatic, method.IsStatic);
+        Assert.Equal(isVirtual, method.IsVirtual);
+    }
+
+    private static MethodInfo? FindPublicDeclaredMethod(
+        Type declaringType,
+        string methodName,
+        bool isStatic,
+        params Type[] parameterTypes)
+    {
+        var scope = isStatic ? BindingFlags.Static : BindingFlags.Instance;
+        return declaringType.GetMethod(
+            methodName,
+            BindingFlags.Public | BindingFlags.DeclaredOnly | scope,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+    }
+
+    private sealed class SignatureSensitivityFixture
+    {
+        private string PrivateTarget(string value) => value;
+
+        public string WrongParameterTarget(int value) => value.ToString();
     }
 }
