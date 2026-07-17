@@ -30,6 +30,12 @@ namespace Dos.ORM.SqlAst
             int? precision = null,
             int? scale = null)
         {
+            if (!Enum.IsDefined(typeof(LogicalDbType), logicalType))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(logicalType), "Logical database type must be defined.");
+            }
+
             if (length.HasValue && length.Value <= 0)
             {
                 throw new ArgumentOutOfRangeException(
