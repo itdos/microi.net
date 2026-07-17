@@ -155,6 +155,11 @@ public sealed class NamesTypesParametersTests
         Assert.NotEqual(first, different);
     }
 
+    [Fact]
+    public void Type_descriptor_rejects_undefined_logical_type() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SqlTypeDescriptor((LogicalDbType)int.MaxValue));
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -218,6 +223,13 @@ public sealed class NamesTypesParametersTests
     public void Parameter_definition_requires_a_type() =>
         Assert.Throws<ArgumentNullException>(() =>
             new ParameterDefinition("p0", null!));
+
+    [Fact]
+    public void Parameter_definition_rejects_undefined_direction() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ParameterDefinition(
+                "p0", new SqlTypeDescriptor(LogicalDbType.String),
+                (ParameterDirection)int.MaxValue));
 
     [Fact]
     public void Parameter_bag_uses_immutable_copy_on_add()

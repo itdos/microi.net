@@ -14,6 +14,12 @@ namespace Dos.ORM.SqlAst
         {
             ParameterNameRules.Validate(name, nameof(name));
             Type = type ?? throw new ArgumentNullException(nameof(type));
+            if (!Enum.IsDefined(typeof(ParameterDirection), direction))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(direction), "Parameter direction must be defined.");
+            }
+
             Name = name;
             Direction = direction;
             IsNullable = isNullable;
