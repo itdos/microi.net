@@ -84,6 +84,7 @@ const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/form-engine/d
 const Fontawesome = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/dos.fontawesome/Fontawesome.vue"));
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy-field-component/diy-code-editor.vue"));
 const PrintEngineView = defineAsyncComponent(() => import("@/views/print-engine/renderer.vue"));
+const OpenIframe = defineAsyncComponent(() => import("@/views/page-engine/dialogiframe.vue"));
 
 // ==================== DIY组件（diy-components）====================
 const DiyLoadNonDiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-components/DiyLoadNonDiyTable.vue"));
@@ -195,6 +196,8 @@ function RegMicroiComponents(app) {
     app.component("Fontawesome", Fontawesome);
     app.component("DiyCodeEditor", DiyCodeEditor);
     app.component("PrintEngineView", PrintEngineView);
+    // 兼容历史 V8 弹窗入口；打印场景在组件内转交当前内置打印引擎。
+    app.component("OpenIframe", OpenIframe);
 
     // DIY组件
     app.component("DiyLoadNonDiyTable", DiyLoadNonDiyTable);

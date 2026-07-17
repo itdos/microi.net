@@ -161,7 +161,7 @@ AI 开始处理定制页面、弹窗、Web、UniApp、微服务或应用商城�
 | `microi_list_applications` | `appType` | 可选：`Web`、`UniApp`、`MicroService`；省略表示全部类型 |
 |  | `keyword` | 可选：按名称、`AppKey`、类型、描述筛选 |
 |  | `includeFiles` | 默认 `true`，返回每个应用完整文件清单 |
-| `microi_get_application_context` | `appIdOrKey` | 必填，支持 `mci_ai_app.Id` 或 `AppKey` |
+| `microi_get_application_context` | `appIdOrKey` | 必填，支持统一应用商城 `sys_microistore.Id` 或 `AppKey` |
 |  | `includeContents` | 默认 `true`；读取私有 HDFS 源码内容 |
 |  | `maxFileBytes` | 可选，默认单文件 2MB |
 |  | `maxTotalBytes` | 可选，默认单应用 50MB |
@@ -319,9 +319,15 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - 如果手动启动 `mcp-server.js` 能响应，而当前 AI 会话仍握手失败，应优先怀疑 MCP stdio 协议兼容、初始化响应格式/大小、服务器进程提前退出或插件生成的 Codex 配置顺序问题，而不是简单归因于“用户没启用”。
 - 当 MCP 工具数量较多时，`tools/list` 的前段必须优先返回通用建模和维护工具，例如 `microi_get_db_schema`、`microi_get_field_list`、`microi_add_field`、`microi_update_field`、`microi_refresh_schema_cache`、`microi_create_table`、`microi_create_module`、`microi_get_event_code`、`microi_save_event_code`。部分 AI 客户端或模型上下文只注入前若干个工具，若核心工具排在后面，会误报“缺少 MCP 工具”。
 - MCP 的初始化说明必须使用真实 `MICROI_OS_CLIENT` 作为租户边界。中文显示名通过 ASCII 的 `MICROI_LABEL_BASE64` 传输并在 MCP 内解码，旧版 `MICROI_LABEL` 只作兼容；显示名不能当成租户 Key 写入“只能管理某租户”的安全提示。
+- 遇到 `ByteString`、`greater than 255` 或“第 N 个字符无法写入 Header”时，必须先检查实际异常索引和所有 HTTP Header 来源。Microi MCP 的设备标识来自 `did` / `MICROI_MCP_DID`；默认值若直接拼接中文 Windows 主机名，会在 `MCP:` 后第 4 个字符报错。`MICROI_LABEL_BASE64` 只用于显示，不会作为业务 HTTP Header 发送，禁止在未核对调用链前把错误归因于中文 Label。插件和 MCP 必须把 DID 规范化为稳定的可打印 ASCII。
+- MCP 连接失败时，AI 在完成配置、进程、Header、`initialize`、`tools/list` 和只读状态调用的证据链之前，不得修改 Token、租户、服务器地址或执行远端写入。连接恢复后先完成只读基线盘点，再按用户授权开始写入。
 - 修复 Microi.VSCode 插件的 MCP 生成逻辑后，必须重新生成配置、重启对应 MCP server，并在当前 AI 会话中再次验证工具发现与一次只读工具调用。
 
 ## MCP 写入超时与降级约定
+
+- 写请求超时后的远端回读必须使用独立的短超时，不能继续沿用普通查询的长超时。否则一次 60 秒写超时后，每次回读还可能等待 120 秒，AI 会长期停留在“等待远端回读”，用户误以为菜单按钮或接口引擎完全写不进去。
+- `microi_create_engine` 必须与代码保存、事件保存、菜单更新一样使用写请求超时和远端回读确认。创建响应异常但按 `ApiEngineKey` 回读到相同代码时，返回 `RecoveredAfterTransportError:true`；禁止因超时重复创建同一个接口引擎。
+- 后端创建接口引擎时，数据库新增成功后的路由缓存刷新必须设置硬超时。缓存刷新失败或超时不能把已经成功入库的创建结果伪装成失败，更不能让 HTTP 请求无限等待；响应中应通过 `CacheRefresh` 报告缓存状态。
 
 - 接口引擎代码只用 `microi_save_engine_code`，表单事件只用 `microi_save_event_code`，菜单按钮和 Tab 只用 `microi_update_module`。这些标准工具负责版本、校验、缓存和超时回读。
 - 请求超时是“结果不确定”，不是“写入失败”。标准工具返回 `RecoveredAfterTransportError:true` 时，表示已经通过远端回读确认成功，不得再次写入。

@@ -559,8 +559,9 @@ BOUNDARY RULES:
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 
 ## MCP 写入超时与回读规则
-- \`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
+- \`microi_create_engine\`、\`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端短超时回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
 - 超时只代表客户端没有及时拿到响应，不等于服务器一定未写入。必须先用对应 get 工具回读，禁止立即重复创建表、字段、接口引擎或按钮。
+- 接口引擎数据库创建成功后，后端路由缓存刷新超时不能把创建结果伪装成失败；检查响应中的 \`CacheRefresh\`，不要重复创建同一个 ApiEngineKey。
 - 菜单按钮字段始终传明文 JSON 数组；不要根据租户 \`sys_menu\` 事件自行 Base64 编码。
 - 标准工具回读仍不能确认时，报告“写入结果不确定”并保留原始错误。不要擅自改走原生 FormEngine HTTP、直接 SQL 或新建一次性维护接口引擎。
 
@@ -1500,7 +1501,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
-        return { content: [{ type: 'text', text: `✅ Engine "${apiEngineKey}" created successfully.` }] };
+        return {
+          content: [{
+            type: 'text',
+            text: [
+              `✅ Engine "${apiEngineKey}" created successfully.`,
+              result.Msg ? `\n${result.Msg}` : '',
+              result.Data ? `\n${JSON.stringify(result.Data, null, 2)}` : '',
+            ].join(''),
+          }],
+        };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
@@ -2419,7 +2429,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     'microi_get_application_context',
     `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}", with its full file manifest and all readable source-code contents by default. MicroService responses also include sys_microiservice runtime/pages. Use this after microi_list_applications before editing an existing app.`,
     {
-      appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+      appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
       includeContents: z.boolean().optional().default(true).describe('Read private HDFS source contents. Defaults to true.'),
       maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read per source file. Default 2MB.'),
       maxTotalBytes: z.number().int().positive().optional().describe('Maximum total bytes read for this app. Default 50MB.'),
@@ -2449,7 +2459,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     'microi_get_application_file',
     `Read one exact source file from a Web, UniApp or MicroService online AI application for OsClient "${osClient}". Text code is returned as UTF-8 Content; binary files are returned as FileByteBase64.`,
     {
-      appIdOrKey: z.string().describe('mci_ai_app.Id or AppKey.'),
+      appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
       filePath: z.string().describe('Exact relative source path from the application file manifest.'),
       maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read. Default 10MB.'),
     },

@@ -327,6 +327,27 @@ namespace Microi.net
             }
         }
 
+        private static async Task<string> RefreshApiEngineRouteCacheWithTimeout(
+            string osClient, string apiEngineKey = null, string id = null, int timeoutMs = 3000)
+        {
+            try
+            {
+                var cacheTask = Task.Run(() => RefreshApiEngineRouteCache(osClient, apiEngineKey, id));
+                var completedTask = await Task.WhenAny(cacheTask, Task.Delay(timeoutMs));
+                if (completedTask != cacheTask)
+                {
+                    return "刷新接口缓存超时，数据已保存到数据库；接口路由缓存将在后续访问、刷新或重启后生效";
+                }
+
+                var cacheResult = await cacheTask;
+                return cacheResult.Code == 1 ? "OK" : cacheResult.Msg;
+            }
+            catch (Exception ex)
+            {
+                return "刷新接口缓存失败，数据已保存到数据库：" + ex.Message;
+            }
+        }
+
         private static async Task<DosResult<object>> RefreshDiyTableModelCache(string osClient, string tableName = null, string id = null)
         {
             try
@@ -738,21 +759,7 @@ namespace Microi.net
 #endif
                 }
 
-                var cacheRefreshStatus = "OK";
-                var cacheTask = Task.Run(() => RefreshApiEngineRouteCache(osClient, apiEngineKey, id));
-                var completedTask = await Task.WhenAny(cacheTask, Task.Delay(3000));
-                if (completedTask == cacheTask)
-                {
-                    var cacheResult = await cacheTask;
-                    if (cacheResult.Code != 1)
-                    {
-                        cacheRefreshStatus = cacheResult.Msg;
-                    }
-                }
-                else
-                {
-                    cacheRefreshStatus = "刷新接口缓存超时，代码已保存到数据库；接口路由缓存将在重启或后续刷新后生效";
-                }
+                var cacheRefreshStatus = await RefreshApiEngineRouteCacheWithTimeout(osClient, apiEngineKey, id);
 
                 return new DosResult<object>(1, new
                 {
@@ -833,18 +840,15 @@ namespace Microi.net
 
                 if (addResult.Code == 1)
                 {
-                    var cacheResult = await RefreshApiEngineRouteCache(osClient, apiEngineKey);
-                    if (cacheResult.Code != 1)
-                    {
-                        return new DosResult<object>(0, null, cacheResult.Msg);
-                    }
+                    var cacheRefreshStatus = await RefreshApiEngineRouteCacheWithTimeout(osClient, apiEngineKey);
 
                     return new DosResult<object>(1, new
                     {
                         Message = $"接口引擎 [{apiEngineKey}] 创建成功",
                         ApiEngineKey = apiEngineKey,
                         Version = resolvedVersion,
-                        Category = category ?? "未分类"
+                        Category = category ?? "未分类",
+                        CacheRefresh = cacheRefreshStatus
                     });
                 }
 
@@ -3996,14 +4000,14 @@ namespace Microi.net
         private static async Task<JObject> FindAiApplication(string osClient, string appIdOrKey)
         {
             if (IsBlank(appIdOrKey)) return null;
-            var byId = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+            var byId = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microistore", new
             {
                 OsClient = osClient,
                 Id = appIdOrKey
             });
             if (byId.Code == 1 && byId.Data != null) return JObject.FromObject(byId.Data);
 
-            var byKey = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+            var byKey = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microistore", new
             {
                 OsClient = osClient,
                 _Where = new List<object> { new List<object> { "AppKey", "=", appIdOrKey } }
@@ -4090,7 +4094,7 @@ namespace Microi.net
             try
             {
                 if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mci_ai_app", new
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microistore", new
                 {
                     OsClient = osClient,
                     _OrderBy = "UpdateTime",
@@ -4104,7 +4108,13 @@ namespace Microi.net
                 foreach (var token in apps)
                 {
                     if (!(token is JObject app)) continue;
-                    var type = SafeJString(app, "AppType");
+                    var type = SafeJString(app, "ApplicationType", SafeJString(app, "AppType"));
+                    app["Name"] = SafeJString(app, "AppName", SafeJString(app, "Name"));
+                    app["Description"] = SafeJString(app, "AppDetail", SafeJString(app, "Description"));
+                    app["AppKey"] = SafeJString(app, "AppKey", SafeJString(app, "AppId"));
+                    app["AppType"] = type;
+                    app["ApplicationType"] = type;
+                    if (string.Equals(type, "Platform", StringComparison.OrdinalIgnoreCase) && !string.Equals(appType, "Platform", StringComparison.OrdinalIgnoreCase)) continue;
                     if (!IsBlank(appType) && !string.Equals(type, appType, StringComparison.OrdinalIgnoreCase)) continue;
                     if (!IsBlank(keyword))
                     {
@@ -4158,7 +4168,7 @@ namespace Microi.net
                 }
 
                 JObject runtime = null;
-                if (string.Equals(SafeJString(app, "AppType"), "MicroService", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(SafeJString(app, "ApplicationType", SafeJString(app, "AppType")), "MicroService", StringComparison.OrdinalIgnoreCase))
                 {
                     var msResult = await GetMicroService(osClient, SafeJString(app, "AppKey"));
                     if (msResult.Code == 1 && msResult.Data != null) runtime = JObject.FromObject(msResult.Data);
@@ -4398,7 +4408,7 @@ namespace Microi.net
                 if (files.Count > 1000) return new DosResult<object>(0, null, "单次最多同步 1000 个源码文件");
 
                 var msName = source?["MsName"]?.Val<string>() ?? source?["Name"]?.Val<string>() ?? msKey;
-                var appResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app", new
+                var appResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microistore", new
                 {
                     OsClient = osClient,
                     _Where = new List<object> { new List<object> { "AppKey", "=", msKey } }
@@ -4410,9 +4420,15 @@ namespace Microi.net
                     ["OsClient"] = osClient,
                     ["Id"] = appId,
                     ["Name"] = msName,
+                    ["AppName"] = msName,
                     ["AppKey"] = msKey,
+                    ["AppId"] = msKey,
                     ["AppType"] = "MicroService",
+                    ["ApplicationType"] = "MicroService",
+                    ["Category"] = "platform",
+                    ["PublisherType"] = "官方应用",
                     ["Description"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
+                    ["AppDetail"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
                     ["Status"] = "Draft",
                     ["BuildStatus"] = "Changed",
                     ["PrivateSourcePath"] = $"ai-app-source/{appId}",
@@ -4427,7 +4443,7 @@ namespace Microi.net
                 catch { }
                 if (appResult.Code != 1 || appResult.Data == null) appData["CurrentVersion"] = 1;
 
-                var appUpsert = await UpsertRecordByIdOrKey(osClient, "mci_ai_app", appData, "AppKey", "在线 AI 微服务");
+                var appUpsert = await UpsertRecordByIdOrKey(osClient, "sys_microistore", appData, "AppKey", "在线 AI 微服务");
                 if (appUpsert.Code != 1) return appUpsert;
 
                 var syncedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

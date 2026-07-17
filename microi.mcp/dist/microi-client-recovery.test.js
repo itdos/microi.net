@@ -84,6 +84,103 @@ test('saveEventCode confirms an uncertain write by readback', async () => {
         globalThis.fetch = originalFetch;
     }
 });
+test('createEngine confirms an uncertain write by readback', async () => {
+    const originalFetch = globalThis.fetch;
+    let storedEngine;
+    try {
+        globalThis.fetch = async (input, init) => {
+            const url = String(input);
+            if (url.endsWith('/api/V8Engine/CreateApiEngine')) {
+                const payload = JSON.parse(String(init?.body || '{}'));
+                storedEngine = {
+                    ApiEngineKey: payload.ApiEngineKey,
+                    ApiName: payload.ApiName,
+                    ApiAddress: payload.ApiAddress,
+                    ApiV8Code: Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8'),
+                    Version: payload.Version,
+                };
+                throw new TypeError('connection reset after engine creation');
+            }
+            if (url.endsWith('/api/V8Engine/GetApiEngineCode')) {
+                return jsonResponse(storedEngine
+                    ? { Code: 1, Data: storedEngine, Msg: '' }
+                    : { Code: 0, Data: null, Msg: 'not found' });
+            }
+            throw new Error(`Unexpected URL: ${url}`);
+        };
+        const result = await createClient().createEngine({
+            ApiEngineKey: 'create-transport-probe',
+            ApiName: 'Create transport probe',
+            Code: 'return { Code: 1, Data: "ok" };',
+            functionDescription: '创建接口引擎传输恢复测试',
+        });
+        assert.equal(result.Code, 1);
+        assert.equal(result.Data.RecoveredAfterTransportError, true);
+        assert.equal(result.Data.Verified, true);
+        assert.match(String(storedEngine?.ApiV8Code || ''), /return \{ Code: 1, Data: "ok" \};/);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+test('createEngine bounds each recovery readback with the short timeout', async () => {
+    const originalFetch = globalThis.fetch;
+    let readbackCount = 0;
+    let storedEngine;
+    try {
+        globalThis.fetch = async (input, init) => {
+            const url = String(input);
+            if (url.endsWith('/api/V8Engine/CreateApiEngine')) {
+                const payload = JSON.parse(String(init?.body || '{}'));
+                storedEngine = {
+                    ApiEngineKey: payload.ApiEngineKey,
+                    ApiV8Code: Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8'),
+                };
+                throw new TypeError('write response lost');
+            }
+            if (url.endsWith('/api/V8Engine/GetApiEngineCode')) {
+                readbackCount++;
+                if (readbackCount === 1) {
+                    return await new Promise((_resolve, reject) => {
+                        const signal = init?.signal;
+                        const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+                        if (signal?.aborted) {
+                            abort();
+                            return;
+                        }
+                        signal?.addEventListener('abort', abort, { once: true });
+                    });
+                }
+                return jsonResponse({ Code: 1, Data: storedEngine, Msg: '' });
+            }
+            throw new Error(`Unexpected URL: ${url}`);
+        };
+        const client = new MicroiClient({
+            apiBaseUrl: 'https://microi.test',
+            username: '',
+            password: '',
+            osClient: 'demo',
+            token: 'test-token',
+            requestTimeoutMs: 120_000,
+            writeRequestTimeoutMs: 1_000,
+            readbackRequestTimeoutMs: 1_000,
+        });
+        const startedAt = Date.now();
+        const result = await client.createEngine({
+            ApiEngineKey: 'bounded-readback-probe',
+            ApiName: 'Bounded readback probe',
+            Code: 'return { Code: 1 };',
+        });
+        const elapsedMs = Date.now() - startedAt;
+        assert.equal(result.Code, 1);
+        assert.equal(readbackCount, 2);
+        assert.ok(elapsedMs >= 900, `expected first readback to time out, elapsed=${elapsedMs}ms`);
+        assert.ok(elapsedMs < 4_000, `recovery readback was not bounded, elapsed=${elapsedMs}ms`);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
 test('updateModule verifies menu JSON after an uncertain write', async () => {
     const originalFetch = globalThis.fetch;
     let storedModule = {

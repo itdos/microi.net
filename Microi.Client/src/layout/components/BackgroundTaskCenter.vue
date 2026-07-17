@@ -501,17 +501,18 @@ export default {
                 await this.loadInstalledVersions(force);
                 const result = await DiyCommon.PostAsync(MASTER_STORE_LIST_URL, {
                     _PageIndex: 1,
-                    _PageSize: 5000
+                    _PageSize: 5000,
+                    ApplicationTypes: ["Platform"]
                 }, null, null, "json");
                 if (result && result.Code === 1) {
                     const rows = Array.isArray(result.Data) ? result.Data : [];
                     this.storeNotices = rows
                         .map(this.normalizeOfficialAppNotice)
-                        .filter((item) => ["Uninstalled", "Outdated", "Abnormal"].includes(item.Status));
+                        .filter((item) => item.ApplicationType === "Platform" && item.Status === "Uninstalled");
                     this.lastStoreCheckTime = now;
                 }
             } catch (error) {
-                console.warn("[BackgroundTask] official app check failed", error);
+                console.warn("[BackgroundTask] platform app check failed", error);
             } finally {
                 this.storeLoading = false;
             }

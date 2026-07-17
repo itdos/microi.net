@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.4.2
+ * Version: v1.5.9
  * Function:
- * - 安装应用商城数据包，导入结构、菜单、流程、接口引擎、业务数据及在线 AI 应用；兼容目标租户历史物理字段，保证重复安装幂等，保护接口引擎多 Tab，并为安装的在线应用写入当前安装用户归属。
+ * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -115,13 +115,13 @@ var syncStoreMetaFromRow = function () {
 };
 
 var storeRow = syncStoreMetaFromRow();
+var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
+var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
 }
 if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     reportProgress(3, '正在从应用商城源获取应用数据包');
-    var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
-    var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
     var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
     var storeModelResult = V8.Http.Post({
         Url: storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
@@ -531,7 +531,7 @@ try {
         if (!bundle) return;
 
         var app = bundle.Application || bundle.App || {};
-        var appType = firstTextParam([bundle.ApplicationType, app.AppType, Package.PackageInfo.ApplicationType, 'Web']);
+        var appType = firstTextParam([bundle.ApplicationType, app.ApplicationType, app.AppType, Package.PackageInfo.ApplicationType, 'Web']);
         if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) {
             throw new Error('不支持的应用类型：' + appType);
         }
@@ -539,7 +539,7 @@ try {
         if (!appKey) throw new Error('ApplicationBundle.Application.AppKey 不能为空');
         var appId = firstTextParam([app.Id, bundle.AppId, V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid()]);
         var appName = firstTextParam([app.Name, app.MsName, Package.PackageInfo.Name, appKey]);
-        var existingApp = getApplicationRow('mci_ai_app', appId, [['AppKey', '=', appKey]]);
+        var existingApp = getApplicationRow('sys_microistore', appId, [['AppKey', '=', appKey]]);
         var preserveExistingNativeMenus = !!(existingApp && existingApp.Id);
         var previousAppKey = '';
         if (existingApp && existingApp.Id) {
@@ -559,6 +559,19 @@ try {
             || String(Package.PackageInfo.IncludeSource || '').toLowerCase() == 'true';
         if (sourceExpected && (!sourceFiles || !sourceFiles.length)) {
             throw new Error('安装包声明包含私有源码，但源码文件为空，已停止安装，避免只安装运行产物。');
+        }
+        // 应用安装是完整版本替换。先清理同一应用旧源码元数据，避免升级后已删除或
+        // 改名的文件继续参与编辑、打包；事务失败时平台会自动回滚这些元数据删除。
+        if (sourceFiles && sourceFiles.length) {
+            var staleSourceResult = V8.FormEngine.DelFormDataByWhere('mci_ai_app_file', {
+                _Where: [
+                    ['AppId', '=', appId],
+                    ['AND', 'FilePath', 'NotStartLike', 'dist/']
+                ]
+            });
+            if (!staleSourceResult || staleSourceResult.Code != 1) {
+                throw new Error('清理应用旧源码元数据失败：' + ((staleSourceResult && staleSourceResult.Msg) || '接口无返回'));
+            }
         }
         var uploadedSource = [];
         reportProgress(60, '正在写入' + appType + '应用私有源码');
@@ -596,11 +609,64 @@ try {
         var buildAssets = embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
             ? embeddedBuildAssets
             : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []);
+        // REPLACE_APPLICATION_ASSETS_V1：编译产物同样按完整版本替换，不能把旧 hash
+        // 文件留在 mci_ai_app_file 中，否则二次构建会把新旧两套资源混在一起。
+        if (buildAssets && buildAssets.length) {
+            var staleBuildResult = V8.FormEngine.DelFormDataByWhere('mci_ai_app_file', {
+                _Where: [
+                    ['AppId', '=', appId],
+                    ['AND', 'FilePath', 'StartLike', 'dist/']
+                ]
+            });
+            if (!staleBuildResult || staleBuildResult.Code != 1) {
+                throw new Error('清理应用旧编译元数据失败：' + ((staleBuildResult && staleBuildResult.Msg) || '接口无返回'));
+            }
+        }
         var uploadedBuild = [];
         reportProgress(65, '正在写入' + appType + '应用公有编译文件');
         for (var b = 0; b < buildAssets.length; b++) {
             var buildUpload = uploadApplicationAsset(buildRoot, buildAssets[b], false);
+            var normalizedBuildPath = normalizeApplicationPath(buildUpload.Path);
+            var stableBuildPath = appType == 'MicroService'
+                ? normalizeApplicationPath(buildRoot + '/' + normalizedBuildPath)
+                : String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath;
+            if (V8.Method.MoveObject && buildUpload.HdfsPath && stableBuildPath) {
+                try {
+                    var moveBuildResult = V8.Method.MoveObject({
+                        OsClient: V8.OsClient,
+                        FilePathName: buildUpload.HdfsPath,
+                        Path: stableBuildPath,
+                        Limit: false
+                    });
+                    if (moveBuildResult && moveBuildResult.Code == 1) buildUpload.HdfsPath = stableBuildPath;
+                } catch (moveBuildError) {
+                    // 老版本存储实现可能不支持 MoveObject；保留上传返回路径继续安装。
+                }
+            }
             uploadedBuild.push(buildUpload);
+            // 安装后的 Web/UniApp 仍须保留真实 dist 元数据，才能继续编辑源码、
+            // 重新构建并打包，而不是退回只生成一张兼容预览页。
+            var buildAssetRow = {
+                AppId: appId,
+                AppName: appName,
+                FilePath: 'dist/' + normalizedBuildPath,
+                FileName: applicationFileName(normalizedBuildPath),
+                FileType: applicationFileType(normalizedBuildPath),
+                HdfsPath: buildUpload.HdfsPath,
+                PublishHdfsPath: buildUpload.HdfsPath,
+                StorageScope: 'PrivateSource+PublicBuild',
+                ContentHash: buildUpload.Hash,
+                Size: buildUpload.Size,
+                IsDirectory: 0,
+                Version: 1
+            };
+            var buildAssetResult = upsertApplicationRow('mci_ai_app_file', [
+                ['AppId', '=', appId],
+                ['AND', 'FilePath', '=', buildAssetRow.FilePath]
+            ], buildAssetRow);
+            if (!buildAssetResult || buildAssetResult.Code != 1) {
+                throw new Error('写入应用编译资产元数据失败：' + normalizedBuildPath + '，' + ((buildAssetResult && buildAssetResult.Msg) || ''));
+            }
             stats.ApplicationBuildAssets++;
         }
 
@@ -625,20 +691,30 @@ try {
         var appRow = {
             Id: appId,
             Name: appName,
+            AppName: appName,
             AppKey: appKey,
+            AppId: appKey,
             AppType: appType,
+            ApplicationType: appType,
+            Category: firstTextParam([app.Category, bundle.Category, 'other']),
+            PublisherType: firstTextParam([app.PublisherType, bundle.PublisherType, '官方应用']),
             OwnerUserId: firstTextParam([existingApp && existingApp.OwnerUserId, installUser.Id, app.OwnerUserId, app.UserId]),
             OwnerName: firstTextParam([existingApp && existingApp.OwnerName, installUser.Name, installUser.Account, app.OwnerName, app.UserName]),
             Description: firstTextParam([app.Description, app.Remark, Package.PackageInfo.Description]),
+            AppDetail: firstTextParam([app.Description, app.Remark, Package.PackageInfo.Description]),
+            AppDetail: firstTextParam([app.Description, app.Remark, Package.PackageInfo.Description]),
+            AppDetail: firstTextParam([app.Description, app.Remark, Package.PackageInfo.Description]),
             Status: uploadedBuild.length ? 'Published' : 'Draft',
             BuildStatus: uploadedBuild.length ? 'Success' : 'Changed',
             CurrentVersion: parseInt(app.CurrentVersion || 1, 10) || 1,
+            AppVersion: versionNo,
+            IsApprove: uploadedBuild.length ? 1 : 0,
             PreviewUrl: previewUrl,
             PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
             PublicPublishPath: buildRoot
         };
-        var appResult = upsertApplicationRow('mci_ai_app', [['AppKey', '=', appKey]], appRow);
-        if (!appResult || appResult.Code != 1) throw new Error('写入在线 AI 应用失败：' + ((appResult && appResult.Msg) || ''));
+        var appResult = upsertApplicationRow('sys_microistore', [['AppKey', '=', appKey]], appRow);
+        if (!appResult || appResult.Code != 1) throw new Error('写入统一应用商城失败：' + ((appResult && appResult.Msg) || ''));
         if (sourceExpected) {
             var installedSources = V8.FormEngine.GetTableData('mci_ai_app_file', {
                 _Where: [['AppId', '=', appId]],
@@ -841,6 +917,37 @@ try {
             if (saveResult && saveResult.Code == 1) {
                 stats.VersionRecordUpdated++;
                 debugLog.version_record_result = '已写入应用安装版本：' + appName + ' ' + appVersion;
+                try {
+                    var statStoreId = firstTextParam([model.StoreId]);
+                    var statWhere = statStoreId ? [['Id', '=', statStoreId]] : [['AppId', '=', model.AppId]];
+                    var statStore = V8.FormEngine.GetFormData('sys_microistore', { _Where: statWhere });
+                    if (statStore && statStore.Code == 1 && statStore.Data) {
+                        V8.FormEngine.UptFormData('sys_microistore', {
+                            Id: statStore.Data.Id,
+                            InstallCount: parseInt(statStore.Data.InstallCount || 0, 10) + 1
+                        });
+                    }
+                    var installationKey = V8.EncryptHelper.SHA256(
+                        firstTextParam([model.StoreId, model.AppId]) + '|' + V8.OsClient + '|' + appVersion
+                    );
+                    var remoteStat = V8.Http.Post({
+                        Url: storeApiBase + '/apiengine/official_marketplace_install_stat?OsClient=' + encodeURIComponent(storeOsClient),
+                        PostParam: {
+                            StoreId: model.StoreId,
+                            AppId: model.AppId,
+                            AppVersion: appVersion,
+                            TargetOsClient: V8.OsClient,
+                            InstallationKey: installationKey
+                        },
+                        ParamType: 'json',
+                        Timeout: 30
+                    });
+                    debugLog.install_count_result = remoteStat && remoteStat.Code == 1
+                        ? '官方商城安装次数已累计'
+                        : '本地安装成功，官方商城统计稍后重试';
+                } catch (statError) {
+                    debugLog.install_count_error = statError.message || String(statError);
+                }
             } else {
                 debugLog.version_record_error = saveResult ? saveResult.Msg : '未知错误';
             }
@@ -2263,7 +2370,7 @@ try {
 
     // ==================== 步骤3：处理sys_menu数据 ====================
 
-    // 应用资产依赖 mci_ai_app / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
+    // 应用资产依赖 sys_microistore / mci_ai_app_file / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
     var applicationBundles = [];
     var packageBundles = Package.ApplicationBundles;
     if (packageBundles && packageBundles.length != null) {

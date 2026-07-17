@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { API } from './api-paths.js';
+import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
@@ -27,6 +28,7 @@ export class MicroiTransportError extends Error {
 }
 const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_WRITE_REQUEST_TIMEOUT_MS = 60_000;
+const DEFAULT_READBACK_REQUEST_TIMEOUT_MS = 5_000;
 const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
 const MENU_JSON_ARRAY_FIELDS = new Set([
     'MoreBtns',
@@ -98,14 +100,16 @@ export class MicroiClient {
     did;
     requestTimeoutMs;
     writeRequestTimeoutMs;
+    readbackRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     inflightRefresh;
     constructor(config) {
         this.config = config;
         this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
-        this.did = process.env.MICROI_MCP_DID || `MCP:${os.hostname() || 'Unknown'}`;
+        this.did = resolveMcpDid(process.env.MICROI_MCP_DID, os.hostname());
         this.requestTimeoutMs = resolveTimeoutMs(config.requestTimeoutMs ?? process.env.MICROI_MCP_HTTP_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS);
         this.writeRequestTimeoutMs = resolveTimeoutMs(config.writeRequestTimeoutMs ?? process.env.MICROI_MCP_WRITE_TIMEOUT_MS, DEFAULT_WRITE_REQUEST_TIMEOUT_MS);
+        this.readbackRequestTimeoutMs = resolveTimeoutMs(config.readbackRequestTimeoutMs ?? process.env.MICROI_MCP_READBACK_TIMEOUT_MS, DEFAULT_READBACK_REQUEST_TIMEOUT_MS);
         // 如果直接传入 token，跳过登录流程
         if (config.token) {
             this.token = normalizeAuthorizationToken(config.token);
@@ -401,6 +405,12 @@ export class MicroiClient {
     isUncertainWriteError(error) {
         return error instanceof MicroiTransportError && error.uncertainOutcome;
     }
+    readbackOptions(operationName) {
+        return {
+            timeoutMs: this.readbackRequestTimeoutMs,
+            operationName,
+        };
+    }
     async pollReadback(readback, matches) {
         let lastResponse;
         let lastError = '';
@@ -462,11 +472,11 @@ export class MicroiClient {
             ...(keyword ? { _SearchKey: keyword } : {}),
         });
     }
-    async getEngineCode(apiEngineKey) {
+    async getEngineCode(apiEngineKey, options = {}) {
         return this.post(API.GET_ENGINE_CODE, {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
-        });
+        }, options);
     }
     async executeEngine(apiEngineKey, params) {
         return this.post(API.EXECUTE_ENGINE, {
@@ -509,7 +519,7 @@ export class MicroiClient {
         catch (error) {
             if (!this.isUncertainWriteError(error))
                 throw error;
-            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey), (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
+            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey}`)), (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
                 === normalizeCodeForComparison(prepared.code));
             if (verification.matched) {
                 return this.recoveredWriteResult(`保存接口引擎 ${apiEngineKey}`, error, {
@@ -548,7 +558,51 @@ export class MicroiClient {
         payload.IsEnable = payload.IsEnable ?? 1;
         payload.StopHttp = payload.StopHttp ?? 0;
         payload.AllowAnonymous = payload.AllowAnonymous ?? 0;
-        return this.post(API.CREATE_ENGINE, payload);
+        const operation = `创建接口引擎 ${data.ApiEngineKey}`;
+        const verifyCreated = () => this.pollReadback(() => this.getEngineCode(data.ApiEngineKey, this.readbackOptions(`回读新建接口引擎 ${data.ApiEngineKey}`)), (remote) => String(remote?.ApiEngineKey || '') === data.ApiEngineKey
+            && normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code)
+                === normalizeCodeForComparison(prepared.code));
+        try {
+            const result = await this.post(API.CREATE_ENGINE, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: operation,
+            });
+            if (result.Code !== 1)
+                return result;
+            const verification = await verifyCreated();
+            if (!verification.matched) {
+                return {
+                    Code: 0,
+                    Data: {
+                        ApiEngineKey: data.ApiEngineKey,
+                        CreateResponse: result.Data,
+                    },
+                    Msg: `${operation} 接口返回成功，但远端回读未确认新记录：${verification.lastError || '记录或代码不一致'}`,
+                };
+            }
+            return {
+                ...result,
+                Data: {
+                    ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
+                    ApiEngineKey: data.ApiEngineKey,
+                    Verified: true,
+                    Verification: 'readback',
+                },
+            };
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const verification = await verifyCreated();
+            if (verification.matched) {
+                return this.recoveredWriteResult(operation, error, {
+                    ApiEngineKey: data.ApiEngineKey,
+                    Version: prepared.version,
+                    Verified: true,
+                });
+            }
+            throw this.uncertainWriteFailure(operation, error, verification.lastError);
+        }
     }
     async uploadFileBase64(data) {
         return this.post(API.UPLOAD_FILE_BASE64, {
@@ -619,12 +673,12 @@ export class MicroiClient {
             ...row,
         });
     }
-    async getEventCode(formEngineKey, eventType) {
+    async getEventCode(formEngineKey, eventType, options = {}) {
         return this.post(API.GET_EVENT_CODE, {
             OsClient: this.config.osClient,
             FormEngineKey: formEngineKey,
             EventType: eventType,
-        });
+        }, options);
     }
     async saveEventCode(formEngineKey, eventType, code, options) {
         let remote;
@@ -662,7 +716,7 @@ export class MicroiClient {
         catch (error) {
             if (!this.isUncertainWriteError(error))
                 throw error;
-            const verification = await this.pollReadback(() => this.getEventCode(formEngineKey, eventType), (data) => normalizeCodeForComparison(data?.V8Code || data?.Code)
+            const verification = await this.pollReadback(() => this.getEventCode(formEngineKey, eventType, this.readbackOptions(`回读 V8 事件 ${formEngineKey}/${eventType}`)), (data) => normalizeCodeForComparison(data?.V8Code || data?.Code)
                 === normalizeCodeForComparison(prepared.code));
             if (verification.matched) {
                 return this.recoveredWriteResult(`保存 V8 事件 ${formEngineKey}/${eventType}`, error, {
@@ -819,11 +873,11 @@ export class MicroiClient {
             ...(keyword ? { Keyword: keyword } : {}),
         });
     }
-    async getModule(moduleId) {
+    async getModule(moduleId, options = {}) {
         return this.post(API.GET_MODULE, {
             OsClient: this.config.osClient,
             ModuleId: moduleId,
-        });
+        }, options);
     }
     async updateModule(data) {
         const payload = {
@@ -836,7 +890,7 @@ export class MicroiClient {
             if (!moduleId)
                 return { matched: false, mismatches: ['ModuleId'] };
             try {
-                const response = await this.getModule(moduleId);
+                const response = await this.getModule(moduleId, this.readbackOptions(`回读菜单模块 ${moduleId}`));
                 if (response.Code !== 1 || !response.Data || typeof response.Data !== 'object') {
                     return { matched: false, mismatches: ['回读失败'], response };
                 }

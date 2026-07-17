@@ -12,6 +12,8 @@ export interface MicroiConfig {
     requestTimeoutMs?: number;
     /** V8 代码、菜单等写请求超时，默认 60 秒 */
     writeRequestTimeoutMs?: number;
+    /** 写请求响应不确定时，单次远端回读超时，默认 5 秒 */
+    readbackRequestTimeoutMs?: number;
 }
 export interface ApiResponse<T = unknown> {
     Code: number;
@@ -26,6 +28,10 @@ export interface ListEnvelope<T> {
     OsClientNetwork?: string;
     List?: T[];
     Total?: number;
+}
+interface RequestOptions {
+    timeoutMs?: number;
+    operationName?: string;
 }
 export declare class MicroiTransportError extends Error {
     readonly kind: 'timeout' | 'network';
@@ -180,6 +186,7 @@ export declare class MicroiClient {
     private readonly did;
     private readonly requestTimeoutMs;
     private readonly writeRequestTimeoutMs;
+    private readonly readbackRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     private inflightRefresh?;
     constructor(config: MicroiConfig);
@@ -217,6 +224,7 @@ export declare class MicroiClient {
     private get;
     private requestJson;
     private isUncertainWriteError;
+    private readbackOptions;
     private pollReadback;
     private recoveredWriteResult;
     private uncertainWriteFailure;
@@ -226,7 +234,7 @@ export declare class MicroiClient {
     }>>;
     getPlaywrightContext(keyword?: string, pageSize?: number): Promise<ApiResponse<PlaywrightContextData>>;
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
-    getEngineCode(apiEngineKey: string): Promise<ApiResponse<ApiEngine>>;
+    getEngineCode(apiEngineKey: string, options?: RequestOptions): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;
     saveEngineCode(apiEngineKey: string, code: string, options?: {
         functionDescription?: string;
@@ -261,7 +269,7 @@ export declare class MicroiClient {
     getTableData(tableName: string, query?: Record<string, unknown>): Promise<ApiResponse>;
     addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
     updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
-    getEventCode(formEngineKey: string, eventType: string): Promise<ApiResponse<V8Event>>;
+    getEventCode(formEngineKey: string, eventType: string, options?: RequestOptions): Promise<ApiResponse<V8Event>>;
     saveEventCode(formEngineKey: string, eventType: string, code: string, options?: {
         functionDescription?: string;
         changeSummary?: string;
@@ -350,7 +358,7 @@ export declare class MicroiClient {
     listRoles(keyword?: string): Promise<ApiResponse>;
     saveRole(data: Record<string, unknown>): Promise<ApiResponse>;
     listModules(keyword?: string): Promise<ApiResponse>;
-    getModule(moduleId: string): Promise<ApiResponse>;
+    getModule(moduleId: string, options?: RequestOptions): Promise<ApiResponse>;
     updateModule(data: Record<string, unknown>): Promise<ApiResponse>;
     listDataSources(keyword?: string): Promise<ApiResponse>;
     saveDataSource(data: Record<string, unknown>): Promise<ApiResponse>;
@@ -388,4 +396,5 @@ export declare class MicroiClient {
     validateBlueprint(blueprintId: string): Promise<ApiResponse>;
     destroy(): void;
 }
+export {};
 //# sourceMappingURL=microi-client.d.ts.map

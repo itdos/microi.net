@@ -6,6 +6,8 @@ export interface McpServerContext {
     apiBaseUrl: string;
     /** 服务器显示名称（SysTitle），与 mcp.json 中的 key 一致 */
     label: string;
+    /** Codex compatibility mode exposes only microi_codex at protocol level. */
+    codexMode?: boolean;
 }
 /**
  * 创建 MCP Server 并注册所有工具

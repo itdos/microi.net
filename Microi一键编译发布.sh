@@ -322,7 +322,19 @@ fi
 
 NEXT_VERSION=$(auto_increment_version "$CURRENT_VERSION")
 echo -e "  当前版本: ${BOLD}${CURRENT_VERSION}${NC}"
-echo -e "  下个版本: ${BOLD}${GREEN}${NEXT_VERSION}${NC}"
+echo -e "  默认版本: ${BOLD}${GREEN}${NEXT_VERSION}${NC}（自动递增）"
+
+echo ""
+read -r -p "  是否手动指定版本号？直接回车使用默认版本 ${NEXT_VERSION}: " _version_input
+if [ -n "$_version_input" ]; then
+    if [[ ! "$_version_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        print_fail "版本号格式无效: $_version_input（请输入三段数字，例如 6.4.3）"
+    fi
+    NEXT_VERSION="$_version_input"
+    print_success "已指定本次发布版本: $NEXT_VERSION"
+else
+    print_info "使用默认发布版本: $NEXT_VERSION"
+fi
 
 # ══════════════════════════════════════════════════════════════
 # 前置交互：所有需要人工选择的内容集中在此
@@ -333,16 +345,16 @@ echo -e "  ${BOLD}📋 请先完成以下选择，之后将全自动执行${NC}"
 echo -e "  ${BOLD}────────────────────────────────────────────────────────${NC}"
 echo ""
 
-# --- 发布模式（4选1）---
+# --- 发布模式（6选1）---
 echo -e "  ${BOLD}【发布模式】${NC}"
 echo "    1) 只编译前端和后端（含DLL加密+NuGet替换，不推送、版本号不变）"
-echo "    2) 只发布后端（推送Docker、推送NuGet、版本号+1）"
+echo "    2) 只发布后端（推送Docker、推送NuGet、更新版本号）"
 if [ "$HAS_CLIENT" = true ]; then
     echo "    3) 只发布前端（推送Docker、不推送NuGet、版本号不变）"
-    echo "    4) 发布前端和后端（推送Docker、推送NuGet、版本号+1）"
+    echo "    4) 发布前端和后端（推送Docker、推送NuGet、更新版本号）"
 else
     echo -e "    ${DIM}3) 只发布前端（未检测到前端源码，不可用）${NC}"
-    echo "    4) 只发布后端（推送Docker、推送NuGet、版本号+1）"
+    echo "    4) 只发布后端（推送Docker、推送NuGet、更新版本号）"
 fi
     echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
     echo "    6) 只编译和推送【官方网站文档】"
@@ -359,7 +371,7 @@ fi
     fi
 
 # --- 根据模式设置执行标志 ---
-BUMP_VERSION=false      # 是否递增版本号
+BUMP_VERSION=false      # 是否更新版本号
 BUILD_BACKEND=false     # 是否编译后端（dotnet build）
 BUILD_CLIENT=false      # 是否编译前端（npm run build）
 PUBLISH_BACKEND=false   # 是否发布后端（dotnet publish + 冒烟 + 加密）

@@ -71,6 +71,7 @@ function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "Home", link: "/en/" },
 		{ text: "Documentation 🪧", link: "/en/doc/index" },
+		{ text: "AI Apps", link: "/apps" },
 		{ text: "Success Stories", link: "/en/case/case-index" },
 		{
 			text: "Related Links 🔗",

@@ -25,7 +25,7 @@
             </header>
             <div class="app-gallery-grid" v-loading="appLoading">
                 <article
-                    v-for="app in apps"
+                    v-for="app in pagedApps"
                     :key="app.Id"
                     class="app-card"
                     :class="{ active: currentApp?.Id === app.Id }"
@@ -61,6 +61,15 @@
                     <el-button type="primary" @click="openCreate('UniApp')">创建第一个应用</el-button>
                 </el-empty>
             </div>
+            <el-pagination
+                v-if="apps.length > appPageSize"
+                v-model:current-page="appPageIndex"
+                class="app-gallery-pagination"
+                background
+                layout="total, prev, pager, next"
+                :page-size="appPageSize"
+                :total="apps.length"
+            />
         </section>
 
         <template v-else>
@@ -404,6 +413,16 @@
                 <el-form-item label="应用Key">
                     <el-input v-model="createForm.AppKey" placeholder="唯一英文Key，例如：beauty-booking" />
                 </el-form-item>
+                <el-form-item label="应用分类">
+                    <el-select v-model="createForm.Category" style="width: 100%">
+                        <el-option
+                            v-for="item in appCategoryOptions"
+                            :key="item.value"
+                            :label="item.label"
+                            :value="item.value"
+                        />
+                    </el-select>
+                </el-form-item>
                 <el-form-item label="需求描述">
                     <el-input
                         v-model="createForm.Description"
@@ -466,6 +485,8 @@ const appViewMode = ref("gallery");
 const appLoading = ref(false);
 const previewingAppId = ref("");
 const apps = ref([]);
+const appPageIndex = ref(1);
+const appPageSize = 12;
 const currentApp = ref(null);
 const files = ref([]);
 const versions = ref([]);
@@ -502,11 +523,24 @@ let appAbortController = null;
 
 const createForm = reactive({
     AppType: "UniApp",
+    Category: "business",
     Name: "美容美发预约UniApp应用",
     AppKey: "beauty-booking",
     Description: "面向美容美发门店的技师预约移动端应用，包含首页服务推荐、服务项目、技师列表、预约下单、个人中心等基础功能，接口统一预留吾码接口引擎调用。",
     WithStarter: true
 });
+const appCategoryOptions = [
+    { label: "游戏", value: "game" },
+    { label: "企业应用", value: "business" },
+    { label: "办公协同", value: "office" },
+    { label: "教育学习", value: "education" },
+    { label: "效率工具", value: "tools" },
+    { label: "生活服务", value: "lifestyle" },
+    { label: "创意设计", value: "creative" },
+    { label: "数据分析", value: "data" },
+    { label: "营销运营", value: "marketing" },
+    { label: "其它", value: "other" }
+];
 
 const currentAiModel = computed({
     get() {
@@ -590,6 +624,10 @@ const previewMicroAppData = computed(() => ({
     route: { microRoute: previewMicroRoute.value, microRoutePath: previewMicroRoute.value }
 }));
 const visibleFileTreeData = computed(() => buildFileTree(fileTreeMode.value === "build" ? buildFiles.value : files.value));
+const pagedApps = computed(() => {
+    const start = (appPageIndex.value - 1) * appPageSize;
+    return apps.value.slice(start, start + appPageSize);
+});
 const currentTreeFile = computed(() => fileTreeMode.value === "build" ? activeBuildFile.value : activeFile.value);
 const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
 const currentChatModelId = computed(() => (
@@ -883,7 +921,10 @@ async function loadApps() {
         });
         let unownedApps = [];
         try {
-            const unownedResult = await DiyCommon.FormEngine.GetTableData("mci_ai_app", {
+            const unownedResult = await DiyCommon.FormEngine.GetTableData("sys_microistore", {
+                _Where: [
+                    ["ApplicationType", "In", ["Web", "UniApp", "MicroService"]]
+                ],
                 _OrderBy: "UpdateTime",
                 _OrderByType: "DESC",
                 _PageIndex: 1,
@@ -900,6 +941,7 @@ async function loadApps() {
         apps.value = normalizeAppList(normalizedKeyword
             ? merged.filter((app) => `${app?.Name || ""} ${app?.Description || ""} ${app?.AppKey || ""}`.toLowerCase().includes(normalizedKeyword))
             : merged);
+        appPageIndex.value = 1;
         if (!currentApp.value && apps.value.length && appViewMode.value === "develop") {
             await selectApp(apps.value[0]);
         }
@@ -1121,15 +1163,16 @@ async function enterDevelop(app) {
     var appId = String(app?.Id || "").trim();
     if (!appId) return;
     var nextQuery = { ...route.query, workspace: "apps", appId };
+    appViewMode.value = "develop";
+    currentApp.value = app;
+    var detailPromise = selectApp(app);
     if (String(route.query.appId || "") !== appId || route.query.workspace !== "apps") {
-        await router.push({ path: route.path, query: nextQuery });
-        // 路由监听是开发工作台的唯一加载入口，避免点击时先加载一次、
-        // query 更新后又加载一次，造成页面和微应用 iframe 二次刷新。
-        return;
-    }
-    if (appViewMode.value !== "develop" || String(currentApp.value?.Id || "") !== appId) {
-        appViewMode.value = "develop";
-        await selectApp(app);
+        await Promise.all([
+            detailPromise,
+            router.push({ path: route.path, query: nextQuery })
+        ]);
+    } else {
+        await detailPromise;
     }
     if (previewUrl.value) {
         activeView.value = "preview";
@@ -1298,6 +1341,7 @@ function getEditorLanguage(filePath) {
 
 function openCreate(type) {
     createForm.AppType = type;
+    createForm.Category = type === "MicroService" ? "business" : createForm.Category || "business";
     createForm.Name = type === "UniApp" ? "美容美发预约UniApp应用" : type === "MicroService" ? "AI 微服务" : "AI Web应用";
     createForm.AppKey = makeAppKey(createForm.Name);
     createForm.Description = type === "UniApp"
@@ -1712,7 +1756,7 @@ function buildAppChatPrompt() {
     const fileNames = files.value.map((item) => item.FilePath).slice(0, 80).join("\n");
     return [
         "你是 Microi 吾码 AI 应用开发助手。",
-        "用户正在编辑一个线上 AI 应用，应用源码存储在 mci_ai_app_file 和 HDFS 私有桶中，发布文件存公有桶。",
+        "用户正在编辑一个线上 AI 应用，应用主数据存储在 sys_microistore，源码清单存储在 mci_ai_app_file 并对应 HDFS 私有桶，发布文件存公有桶。",
         `应用名称：${currentApp.value?.Name || ""}`,
         `应用类型：${currentApp.value?.AppType || ""}`,
         `应用描述：${currentApp.value?.Description || ""}`,
@@ -1893,6 +1937,11 @@ function scrollAppChat() {
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 14px;
     min-height: 320px;
+}
+
+.app-gallery-pagination {
+    justify-content: center;
+    margin-top: 18px;
 }
 
 .app-card {

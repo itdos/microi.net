@@ -23,8 +23,14 @@
         </button>
       </nav>
       <div class="sidebar-footer">
-        <a href="/login.html">{{ t('loginRegister') }}</a>
-        <a href="/">{{ t('backWebsite') }}</a>
+        <div class="sidebar-token-card">
+          <span>{{ t('remainingToken') }}</span>
+          <strong>{{ formatTokenNumber(relayToken.RemainingTokens) }}</strong>
+          <div class="sidebar-token-track" aria-hidden="true">
+            <i :style="{ width: `${tokenUsagePercent}%` }"></i>
+          </div>
+          <small>{{ t('tokenUsedTotal', { used: formatTokenNumber(relayToken.UsedTokens), total: formatTokenNumber(relayToken.GiftTokens) }) }}</small>
+        </div>
       </div>
     </aside>
 
@@ -339,6 +345,11 @@ const tenantStepMessages = {
 }
 
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
+const tokenUsagePercent = computed(() => {
+  const total = Math.max(0, Number(relayToken.value.GiftTokens || 0))
+  const used = Math.max(0, Number(relayToken.value.UsedTokens || 0))
+  return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
+})
 const canCreateFreeTenant = computed(() => tenants.value.length < (tenantCenter.value.FreeQuota || 1))
 const primaryTenantUrl = computed(() => tenants.value[0]?.Url || '')
 const profileName = computed(() => currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || 'Microi吾码')
@@ -1196,15 +1207,41 @@ onUnmounted(() => {
 
 .sidebar-footer {
   margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
-.sidebar-footer a {
-  color: rgba(255,255,255,0.68);
-  font-size: 13px;
-  text-decoration: none;
+.sidebar-token-card {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+}
+
+.sidebar-token-card span,
+.sidebar-token-card small {
+  color: rgba(255,255,255,.62);
+  font-size: 11px;
+}
+
+.sidebar-token-card strong {
+  color: #fff;
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+
+.sidebar-token-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+
+.sidebar-token-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f8cff, #62d4ff);
 }
 
 .profile-main {
