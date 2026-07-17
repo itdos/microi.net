@@ -209,6 +209,7 @@ public sealed class SelectStatementTests
         var page = new KeysetPageSpec(Array.Empty<SqlExpression>(), 25);
 
         Assert.Empty(page.Boundaries);
+        AssertReadOnly(page.Boundaries, NullExpression.Instance);
     }
 
     [Fact]
@@ -265,6 +266,7 @@ public sealed class SelectStatementTests
 
         Assert.Empty(cte.Columns);
         Assert.False(cte.Recursive);
+        AssertReadOnly(cte.Columns, new SqlIdentifier("Other"));
     }
 
     [Theory]
@@ -458,6 +460,18 @@ public sealed class SelectStatementTests
         Assert.Empty(statement.OrderBy);
         Assert.Empty(statement.CommonTableExpressions);
         Assert.Empty(statement.SetOperations);
+        AssertReadOnly(statement.GroupBy, BooleanExpression.True);
+        AssertReadOnly(
+            statement.OrderBy,
+            new OrderByExpression(BooleanExpression.True));
+        AssertReadOnly(
+            statement.CommonTableExpressions,
+            new CommonTableExpression(
+                new SqlIdentifier("other"), SelectWithoutFrom()));
+        AssertReadOnly(
+            statement.SetOperations,
+            new SetOperationClause(
+                SqlSetOperator.Union, SelectWithoutFrom()));
     }
 
     [Fact]
@@ -542,15 +556,29 @@ public sealed class SelectStatementTests
             page: new KeysetPageSpec(
                 new[] { new ParameterExpression(Parameter("afterId")) }, 20));
 
-        Assert.Contains(
-            SqlAstRules.ValidateShape(oneOrderNoBoundary),
-            diagnostic => diagnostic.Code == "AST_KEYSET_ARITY_MISMATCH");
-        Assert.Contains(
-            SqlAstRules.ValidateShape(noOrderOneBoundary),
-            diagnostic => diagnostic.Code == "AST_KEYSET_ARITY_MISMATCH");
-        Assert.Contains(
-            SqlAstRules.ValidateShape(twoOrdersOneBoundary),
-            diagnostic => diagnostic.Code == "AST_KEYSET_ARITY_MISMATCH");
+        Assert.Equal(
+            new[]
+            {
+                ("AST_KEYSET_BOUNDARY_REQUIRED", "$.Page"),
+                ("AST_KEYSET_ARITY_MISMATCH", "$.Page")
+            },
+            SqlAstRules.ValidateShape(oneOrderNoBoundary)
+                .Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Equal(
+            new[]
+            {
+                ("AST_KEYSET_ORDER_REQUIRED", "$.Page"),
+                ("AST_KEYSET_ARITY_MISMATCH", "$.Page")
+            },
+            SqlAstRules.ValidateShape(noOrderOneBoundary)
+                .Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Equal(
+            new[]
+            {
+                ("AST_KEYSET_ARITY_MISMATCH", "$.Page")
+            },
+            SqlAstRules.ValidateShape(twoOrdersOneBoundary)
+                .Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
     }
 
     [Fact]
@@ -567,7 +595,8 @@ public sealed class SelectStatementTests
     [Fact]
     public void Shape_validation_recurses_with_stable_preorder_paths()
     {
-        var cteQuery = InvalidOffsetQuery();
+        var recursiveCteQuery = InvalidOffsetQuery();
+        var ordinaryCteQuery = InvalidOffsetQuery();
         var leftQuery = InvalidOffsetQuery();
         var rightQuery = InvalidOffsetQuery();
         var setRightQuery = InvalidOffsetQuery();
@@ -584,8 +613,11 @@ public sealed class SelectStatementTests
             {
                 new CommonTableExpression(
                     new SqlIdentifier("recursive_source"),
-                    cteQuery,
-                    recursive: true)
+                    recursiveCteQuery,
+                    recursive: true),
+                new CommonTableExpression(
+                    new SqlIdentifier("ordinary_source"),
+                    ordinaryCteQuery)
             },
             setOperations: new[]
             {
@@ -600,6 +632,8 @@ public sealed class SelectStatementTests
                 ("AST_PAGE_ORDER_REQUIRED", "$.Page"),
                 ("AST_PAGE_ORDER_REQUIRED",
                     "$.CommonTableExpressions[0].Query.Page"),
+                ("AST_PAGE_ORDER_REQUIRED",
+                    "$.CommonTableExpressions[1].Query.Page"),
                 ("AST_PAGE_ORDER_REQUIRED", "$.From.Left.Query.Page"),
                 ("AST_PAGE_ORDER_REQUIRED", "$.From.Right.Query.Page"),
                 ("AST_PAGE_ORDER_REQUIRED",
