@@ -19,6 +19,14 @@
 - A SqlIdentifier represents exactly one unquoted segment and rejects dots, quote characters, brackets, control characters, empty text, and whitespace-only text.
 - Existing DbSession, DbProvider, ProviderFactory, FromSection, SqlFunc, CodeFirst, IMicroiORM, Upsert, and BulkCopy behavior is not changed by this plan.
 - User-authored raw SQL is opaque and is never parsed or translated by the AST pipeline.
+- At the later legacy-adapter Task 2 Step 0, after adapter Task 1 is green but
+  before Task 2 changes production or public API, its tests capture one
+  immutable canonical snapshot of the complete then-current Dos.ORM public/
+  protected type/member/base/interface/interface-map surface. This core plan
+  and the six-dialect plan are already green, so the exact compiler and plan-
+  model APIs—including legitimate plan returns—enter that baseline and are
+  never misclassified as managed execution delta; the Task 2 public authorizer
+  does not.
 
 ---
 
@@ -32,7 +40,11 @@
 
 **Interfaces:**
 - Consumes: Existing Dos.ORM public assembly.
-- Produces: A test project used by all later plans and a compatibility baseline for DatabaseType and legacy entry points.
+- Produces: A test project used by all later plans and initial compatibility
+  characterization for DatabaseType and selected legacy entry points. The
+  exhaustive assembly-wide canonical snapshot is deliberately captured later,
+  at legacy-adapter Task 2 Step 0 after core/compiler and adapter Task 1 exist
+  but before Task 2 introduces any production/API delta.
 
 - [ ] **Step 1: Create the test project**
 
@@ -98,6 +110,12 @@ public sealed class PublicApiBaselineTests
     }
 }
 ~~~
+
+These initial high-risk signature checks are not the exhaustive assembly gate.
+The legacy-adapter Task 2 Step 0 extends this test project with the canonical
+full-assembly snapshot/serializer and permanent baseline-subset assertion; no
+later task may regenerate that snapshot. Legacy Task 3 only adds the final
+literal exact-delta allowlist/assertion against the already-committed baseline.
 
 - [ ] **Step 3: Add the project to both solutions**
 
@@ -521,13 +539,21 @@ git commit -m "feat: model portable schema and admin operations"
 ### Task 7: Implement execution plans and the explicit native SQL boundary
 
 **Files:**
+- Create: Microi.Server/Dos.ORM/Platform/DialectProfile.cs
 - Create: Microi.Server/Dos.ORM/SqlCompilation/CompilationModels.cs
 - Create: Microi.Server/Dos.ORM/SqlCompilation/ISqlCompiler.cs
 - Create: Microi.Server/Dos.ORM/SqlAst/NativeSqlText.cs
 - Create: Microi.Server/Dos.ORM.Tests/SqlAst/ExecutionPlanAndNativeSqlTests.cs
 
 **Interfaces:**
-- Produces: DatabaseExecutionPlan, DatabasePlanStep, SqlCommandStep, BulkStep, AdminStep, NativeScriptStep, AtomicityRequirement, SqlResultShape, SqlSafetyOrigin, ISqlCompiler, NativeSqlText.
+- Produces: the one canonical DialectProfile; DatabaseExecutionPlan, DatabasePlanStep, SqlCommandStep, BulkStep, AdminStep, NativeScriptStep, AtomicityRequirement, SqlResultShape, ISqlCompiler, and NativeSqlText.
+- Namespace ownership: SqlSafetyOrigin and NativeSqlCommandKind are declared in Dos.ORM.SqlAst/NativeSqlText.cs; the seven plan-only enums are declared in Dos.ORM.SqlCompilation.
+- Downstream contract: the six-dialect plan consumes this DialectProfile
+  instead of creating it. Public migration/admin preview may return an
+  immutable plan for review, but every execution/materialization entry accepts
+  only the exact source, values, requested atomicity, and its distinct
+  compiled-approval overload; no execution entry accepts a caller-supplied
+  plan.
 
 - [ ] **Step 1: Write failing plan/value-separation tests**
 
@@ -535,26 +561,34 @@ git commit -m "feat: model portable schema and admin operations"
 [Fact]
 public void Cached_command_step_contains_definitions_but_not_values()
 {
-    var definition = new ParameterDefinition(
-        "p0", new SqlTypeDescriptor(LogicalDbType.String));
-    var step = new SqlCommandStep(
-        "SELECT * FROM T WHERE Name = @p0",
-        new[] { definition });
-
-    Assert.Single(step.Parameters);
-    Assert.DoesNotContain(step.GetType().GetProperties(),
-        property => property.Name == "Values");
+    Assert.DoesNotContain(
+        typeof(DatabasePlanStep).Assembly.GetTypes()
+            .Where(type => type.Namespace == "Dos.ORM.SqlCompilation")
+            .SelectMany(type => type.GetProperties()),
+        property => property.PropertyType == typeof(ParameterBag) ||
+                    property.PropertyType == typeof(BoundParameter));
 }
 
 [Fact]
-public void Native_script_is_only_for_caller_managed_database_specific_input()
+public void Native_script_is_bound_to_one_exact_profile_and_origin()
 {
+    var profile = new DialectProfile(
+        DatabaseType.PostgreSql, new Version(17, 2), string.Empty);
     var text = NativeSqlText.UserProvided(
-        "SELECT 1", DatabaseType.PostgreSql, NativeSqlCommandKind.Read);
+        "SELECT 1", profile, NativeSqlCommandKind.Read);
     Assert.Equal(SqlSafetyOrigin.UserProvided, text.Origin);
+    Assert.Same(profile, text.TargetProfile);
     Assert.Equal(DatabaseType.PostgreSql, text.TargetDatabase);
 }
 ~~~
+
+Also freeze private plan construction, the six named internal source-aware
+factories, exact family/safety/route coupling, requested-options identity,
+ordered `[Scalar, RowSet] -> MultipleResultSets` pagination, recursive bulk
+parameter-definition consistency, dual Task 6/compiled-impact gates, and the
+five literal v1 digest/fingerprint vectors from the controller-reviewed Task 7
+brief. Tests use reflection for internal contracts; do not add
+InternalsVisibleTo.
 
 - [ ] **Step 2: Run tests and verify RED**
 
@@ -576,10 +610,50 @@ public interface ISqlCompiler
     DatabaseExecutionPlan Compile(
         SqlStatement statement,
         SqlCompilationOptions options);
+
+    DatabaseExecutionPlan CompileMigration(
+        MigrationPlan plan,
+        SqlCompilationOptions options);
 }
 ~~~
 
-DatabaseExecutionPlan exposes read-only steps, result shape, safety origin, and AtomicityRequirement. NativeScriptStep rejects PlatformGenerated origin. NativeSqlText factories are UserProvided, LegacyAiGenerated, and LegacyUnknown; there is no platform migration raw-SQL factory.
+DatabaseExecutionPlan exposes read-only steps, result shape, safety origin,
+AtomicityRequirement, exact DialectProfile/SchemaToken, compiled fingerprint,
+and effective-impact gate. Its constructor is private. Named internal factories
+take the exact source plus SqlCompilationOptions and derive root identity;
+native derives its profile from NativeSqlText and requires atomicity None and
+null schema token. NativeSqlText factories are UserProvided,
+LegacyAiGenerated, and LegacyUnknown; there is no platform migration raw-SQL
+factory.
+
+Required is static plan evidence only: CurrentDatabase+Enlistable for every
+step. The later trusted executor must preflight one reference-identical live
+DbConnection+DbTransaction, exact detected profile, source/neutral gate,
+compiled gate, schema token, and plan fingerprint before creating any command.
+No live object enters Task 7 models or fingerprints.
+
+The later adapter must support deterministic source-safe approval handoff:
+preview compiles the exact source against the active live profile/schema and
+may return the closed plan; after external authorization the plan mints the
+audit-only `CompiledImpactApproval`; execution receives the original source
+and approval, recompiles against current live options, attaches only through
+`WithEffectiveImpactApproval`, reauthorizes and checks both Task 6/Task 7
+gates, then preflights. Missing/foreign/stale/needless approval creates zero
+commands. The existing public mutable-command `CommandCreator` API is a
+separate legacy boundary and never consumes this plan/ticket path.
+The later adapter freezes that exception as the sole constructor plus six
+complete public/protected/interface-aware `MethodInfo` descriptors. At its
+Task 2 Step 0, after this plan, all six compilers, and adapter Task 1 are green
+but before Task 2 changes production/API, it commits the canonical complete
+Dos.ORM public/protected type/member/base/interface/interface-map snapshot.
+Historical members, this plan's exact plan-model/`ISqlCompiler` returns, Task 1
+provider properties, and the legacy factories remain baseline-only; the public
+authorizer introduced later in Task 2 remains exact delta. The post-snapshot
+delta is exactly allowlisted, and a cycle-safe recursive
+type-graph scan starts from every delta signature. It rejects plans, commands,
+runtime contexts, object/open-generic/delegate/request wrappers, and static
+executor escapes at any reachable depth while treating `System.Object` only as
+the terminal base sentinel of an already accepted user DTO.
 
 - [ ] **Step 4: Run tests and verify GREEN**
 
@@ -594,7 +668,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ~~~powershell
-git add Microi.Server/Dos.ORM/SqlCompilation Microi.Server/Dos.ORM/SqlAst/NativeSqlText.cs Microi.Server/Dos.ORM.Tests/SqlAst/ExecutionPlanAndNativeSqlTests.cs
+git add Microi.Server/Dos.ORM/Platform/DialectProfile.cs Microi.Server/Dos.ORM/SqlCompilation Microi.Server/Dos.ORM/SqlAst/NativeSqlText.cs Microi.Server/Dos.ORM.Tests/SqlAst/ExecutionPlanAndNativeSqlTests.cs
 git commit -m "feat: add SQL execution plans and native boundary"
 ~~~
 

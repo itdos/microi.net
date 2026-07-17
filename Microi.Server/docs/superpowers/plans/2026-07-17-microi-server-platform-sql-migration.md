@@ -15,15 +15,39 @@
 - Framework-owned SQL outside Dos.ORM is forbidden.
 - Specific provider types outside Dos.ORM are forbidden.
 - V8.Db.FromSql and DataSource user SQL remain opaque, are marked UserProvided, and are never translated.
+- Native SQL is constructed from the session's exact detected DialectProfile and execution rechecks database type, Major, Minor, Build, Revision, and ordinal compatibility mode before creating a command; DatabaseType-only checks are forbidden.
+- Public platform preview code may receive an immutable DatabaseExecutionPlan
+  only from PreviewMigration/PreviewAdmin for review and approval minting.
+  Execution resubmits the exact source, values, requested atomicity, and the
+  distinct compiled approval overload; no platform execution/materialization
+  method accepts a plan, materializer, raw command list, or execution ticket.
+- Microi.Server outside Dos.ORM never references the public legacy
+  CommandCreator/Create*Command mutable-command escape hatch; all migrated
+  framework paths use managed source execution.
 - NL2SQL default output is PortableQueryDocument converted to SelectStatement; legacy generated SQL is not part of portability certification and is zero on the final default path.
 - Platform initialization and upgrades are AST-only with stable migration IDs and no vendor-script exception.
+- Migration/admin execution requires the current Task 6 neutral/admin gate, exact source fingerprint, Task 7 compiled-impact gate, exact SchemaToken and compiled fingerprint; Required also uses one reference-identical live connection/transaction scope validated before any command is created.
+- Elevated migration/admin flow is exact: preview current live options,
+  externally authorize the current operator and preview, mint audit-only
+  CompiledImpactApproval, execute from original source, deterministically
+  recompile current live options, reauthorize, attach, and complete preflight.
+  The preview plan is never execution input and approval is never a credential.
+- Platform architecture tests first run the immutable complete-Dos.ORM pre-
+  managed-delta public/protected baseline captured after legacy-adapter Task 1
+  and before Task 2 production/API edits, plus the exact-delta gate. They scan
+  every public/protected signature in the touched platform production inventory
+  and each reachable Microi-owned request type with cycle detection; discovery
+  never depends only on method names or a call graph. Direct, array, generic,
+  wrapper, object/dynamic, open-generic, delegate, dictionary, static-executor,
+  command, ticket, materializer, coordinator, and raw-context escapes all fail.
+  `System.Object` stops only a user DTO's base chain, never a payload slot.
 - Upgrade failure never advances ServerVersion.
 - Ignored Microi.net and Microi.AI files are part of the physical scan and are force-added individually when committed.
 - No test or log prints passwords, tokens, connection strings, or runtime parameter values.
 
 ---
 
-### Task 1: Add the physical inventory and four architecture rules
+### Task 1: Add the physical inventory and five architecture rules
 
 **Files:**
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Microi.DatabaseArchitecture.Tests.csproj
@@ -33,12 +57,14 @@
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Rules/PlatformSqlBoundaryRule.cs
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Rules/ProviderReferenceRule.cs
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Rules/SqlOriginRule.cs
+- Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Rules/LegacyCommandCreatorRule.cs
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/Baselines/database-findings.json
 - Create: Microi.Server/tests/Microi.DatabaseArchitecture.Tests/ArchitectureGateTests.cs
 - Modify: Microi.Server/Microi.net.sln
 
 **Interfaces:**
-- Produces: MICROI_DB001, MICROI_DB002, MICROI_DB003, MICROI_DB004 findings and a shrink-only baseline.
+- Produces: MICROI_DB001, MICROI_DB002, MICROI_DB003, MICROI_DB004,
+  MICROI_DB005 findings and a shrink-only baseline.
 
 - [ ] **Step 1: Create the Roslyn test project**
 
@@ -77,15 +103,34 @@ public void Inventory_includes_ignored_runtime_projects()
     Assert.DoesNotContain(files, path =>
         path.Contains("/bin/") || path.Contains("/obj/"));
 }
+
+[Fact]
+public void Platform_source_cannot_reference_legacy_CommandCreator()
+{
+    const string source = """
+        namespace Microi.Core;
+        internal sealed class BadPath
+        {
+            private readonly Dos.ORM.CommandCreator creator;
+        }
+        """;
+
+    var finding = ArchitectureRuleHarness.SingleFinding(
+        new LegacyCommandCreatorRule(), source,
+        "Microi.Server/Microi.Core/BadPath.cs");
+
+    Assert.Equal("MICROI_DB005", finding.Rule);
+}
 ~~~
 
 - [ ] **Step 3: Run and verify RED**
 
 ~~~powershell
-dotnet test .\tests\Microi.DatabaseArchitecture.Tests\Microi.DatabaseArchitecture.Tests.csproj --filter FullyQualifiedName~Inventory_includes_ignored_runtime_projects --nologo
+dotnet test .\tests\Microi.DatabaseArchitecture.Tests\Microi.DatabaseArchitecture.Tests.csproj --filter "FullyQualifiedName~Inventory_includes_ignored_runtime_projects|FullyQualifiedName~Platform_source_cannot_reference_legacy_CommandCreator" --nologo
 ~~~
 
-Expected: FAIL because PhysicalSourceInventory does not exist.
+Expected: FAIL because PhysicalSourceInventory and
+LegacyCommandCreatorRule do not exist.
 
 - [ ] **Step 4: Implement physical enumeration and semantic findings**
 
@@ -103,7 +148,17 @@ public static IReadOnlyList<string> Discover(string repositoryRoot)
 }
 ~~~
 
-DB001 detects database-type conditions affecting SQL/ADO/DDL/connection/execution. DB002 follows string construction into execution calls and detects vendor syntax. DB003 detects concrete provider symbols. DB004 detects raw SQL execution without NativeSqlText origin. Baseline entries contain rule, relative path, syntax fingerprint, and behavior fingerprint; tests fail on additions or changed-location evasion.
+DB001 detects database-type conditions affecting SQL/ADO/DDL/connection/execution.
+DB002 follows string construction into execution calls and detects vendor
+syntax. DB003 detects concrete provider symbols. DB004 detects raw SQL
+execution without NativeSqlText origin. DB005 uses Roslyn symbol identity to
+reject any `Dos.ORM.CommandCreator` type, constructor, or `Create*Command`
+reference in Microi.Server production sources outside
+`Microi.Server/Dos.ORM`; test projects that verify the boundary are not
+production findings, while spelling aliases and fully qualified names do not
+evade it. Baseline entries contain rule, relative path, syntax
+fingerprint, and behavior fingerprint; tests fail on additions or
+changed-location evasion. DB005 has no baseline exception at final migration.
 
 - [ ] **Step 5: Capture the audited initial baseline and commit**
 
@@ -302,7 +357,7 @@ git commit -m "refactor: migrate FormEngine writes and schema to AST"
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/PlatformSql/NativeSqlBoundaryTests.cs
 
 **Interfaces:**
-- Produces: FromNativeSql(NativeSqlText.UserProvided) call sites with declared target database and command kind.
+- Produces: FromNativeSql(NativeSqlText.UserProvided) call sites with the session's exact detected target profile, command kind, definitions, and invocation values.
 
 - [ ] **Step 1: Write failing passthrough tests**
 
@@ -311,10 +366,30 @@ git commit -m "refactor: migrate FormEngine writes and schema to AST"
 public void User_sql_is_passed_unchanged_with_explicit_origin()
 {
     const string sql = "select vendor_only_function(:p0)";
-    var capture = DataSourceHarness.Capture(sql, DatabaseType.Oracle);
+    var profile = new DialectProfile(
+        DatabaseType.Oracle, new Version(19, 22, 0, 0), string.Empty);
+    var capture = DataSourceHarness.Capture(sql, profile);
     Assert.Equal(sql, capture.NativeSql.Text);
     Assert.Equal(SqlSafetyOrigin.UserProvided, capture.NativeSql.Origin);
+    Assert.Same(profile, capture.NativeSql.TargetProfile);
     Assert.Equal(DatabaseType.Oracle, capture.NativeSql.TargetDatabase);
+}
+
+[Theory]
+[InlineData(NativeProfileMismatch.DatabaseType)]
+[InlineData(NativeProfileMismatch.Major)]
+[InlineData(NativeProfileMismatch.Minor)]
+[InlineData(NativeProfileMismatch.Build)]
+[InlineData(NativeProfileMismatch.Revision)]
+[InlineData(NativeProfileMismatch.CompatibilityModeCase)]
+[InlineData(NativeProfileMismatch.CompatibilityModeText)]
+public void Any_native_profile_mismatch_starts_no_command(
+    NativeProfileMismatch mismatch)
+{
+    var capture = DataSourceHarness.ProfileMismatch(mismatch);
+    Assert.Throws<InvalidOperationException>(() => capture.Execute());
+    Assert.Equal(0, capture.Driver.CreateCommandCalls);
+    Assert.Equal(0, capture.Driver.ExecuteCalls);
 }
 ~~~
 
@@ -324,7 +399,14 @@ Expected: old FromSql(string) path has no origin.
 
 - [ ] **Step 3: Wrap only user-owned SQL**
 
-DataSource read paths declare NativeSqlCommandKind.Read and use a read-only account or transaction. V8 preserves read/write capability according to its current authorization, declares command kind, and binds values through existing AddInParameter behavior. Do not add regex translation or regex security claims.
+DataSource read paths obtain the canonical detected profile from the active
+Dos.ORM session, declare NativeSqlCommandKind.Read, and use a read-only account
+or transaction. V8 preserves read/write capability according to its current
+authorization, declares command kind, and binds definitions/values through
+the typed native source API. The internal executor re-detects and compares
+type plus all four version components and ordinal mode before command creation.
+Do not construct a profile from DatabaseType alone, expose a compiled plan, or
+add regex translation/security claims.
 
 - [ ] **Step 4: Verify tests and DB004 findings**
 
@@ -466,12 +548,20 @@ git commit -m "refactor: migrate AI storage and NL2SQL to AST"
 - Modify: Microi.Server/Microi.Upgrade/Resource/app.microi.module-engine.json
 - Modify: Microi.Server/Microi.Upgrade/Resource/app.microi.form-engine.json
 - Create: Microi.Server/Microi.Upgrade/Migrations/MicroiMigrationCatalog.cs
+- Create: Microi.Server/Microi.Upgrade/Migrations/UpgradeSqlExecutionAuthorizer.cs
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/UpgradeHarness.cs
+- Create: Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformProductionSurfaceInventory.cs
+- Create: Microi.Server/tests/Microi.Server.IntegrationTests/TestInfrastructure/PlatformManagedExecutionSurfaceAssert.cs
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeIdempotencyTests.cs
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/UpgradeFailureTests.cs
 
 **Interfaces:**
-- Produces: stable migration IDs, MigrationPlan, SchemaOperation, typed data rows, and version advancement only after successful completion.
+- Consumes: the active session's exact `DialectProfile`, current `SchemaToken`,
+  neutral Task 6 approval, `ISqlCompiler.CompileMigration`, and the
+  current bootstrap/operator authorization context.
+- Produces: stable migration IDs, `MigrationPlan`, `SchemaOperation`, typed
+  data rows, a review-only preview plan, an audit-only compiled approval, and
+  version advancement only after successful source-based validated execution.
 
 - [ ] **Step 1: Write failing repeat/failure tests**
 
@@ -487,7 +577,134 @@ public async Task Upgrade_is_idempotent_and_failure_does_not_advance_version()
         failAtMigration: "microi.appstore.schema.v2");
     Assert.False(failed.VersionAdvanced);
 }
+
+[Theory]
+[InlineData(UpgradePreflightFailure.ProfileType)]
+[InlineData(UpgradePreflightFailure.ProfileMajor)]
+[InlineData(UpgradePreflightFailure.ProfileMinor)]
+[InlineData(UpgradePreflightFailure.ProfileBuild)]
+[InlineData(UpgradePreflightFailure.ProfileRevision)]
+[InlineData(UpgradePreflightFailure.CompatibilityMode)]
+[InlineData(UpgradePreflightFailure.Route)]
+[InlineData(UpgradePreflightFailure.Enlistment)]
+[InlineData(UpgradePreflightFailure.SourceFingerprint)]
+[InlineData(UpgradePreflightFailure.NeutralGate)]
+[InlineData(UpgradePreflightFailure.CompiledImpactGate)]
+[InlineData(UpgradePreflightFailure.SchemaToken)]
+[InlineData(UpgradePreflightFailure.CompiledFingerprint)]
+[InlineData(UpgradePreflightFailure.RequiredConnectionScope)]
+[InlineData(UpgradePreflightFailure.RequiredTransactionScope)]
+public async Task Upgrade_preflight_failure_creates_no_command_and_does_not_advance_version(
+    UpgradePreflightFailure failure)
+{
+    var failed = await UpgradeHarness.RunPreflightFailureAsync(failure);
+    Assert.Equal(0, failed.Driver.CreateCommandCalls);
+    Assert.Equal(0, failed.Driver.ExecuteCalls);
+    Assert.False(failed.VersionAdvanced);
+}
+
+[Fact]
+public async Task Elevated_upgrade_previews_authorizes_and_executes_from_source()
+{
+    var capture = UpgradeHarness.ElevatedMigration();
+    var preview = await capture.PreviewAsync();
+    Assert.True(preview.RequiresEffectiveImpactApproval);
+    Assert.Equal(0, capture.Driver.CreateCommandCalls);
+
+    capture.ExternalAuthorization.Authorize(preview);
+    var approval = preview.CreateEffectiveImpactApproval(
+        new ApprovalReference("upgrade-review-5"));
+    var result = await capture.ExecuteSourceAsync(approval);
+
+    Assert.True(result.VersionAdvanced);
+    Assert.Equal(1, capture.ExecutionAuthorizer.DemandCalls);
+}
+
+[Theory]
+[InlineData(UpgradeApprovalFailure.Missing)]
+[InlineData(UpgradeApprovalFailure.ForeignSource)]
+[InlineData(UpgradeApprovalFailure.SourceMutation)]
+[InlineData(UpgradeApprovalFailure.StalePreviewPlan)]
+[InlineData(UpgradeApprovalFailure.LiveProfile)]
+[InlineData(UpgradeApprovalFailure.SchemaToken)]
+[InlineData(UpgradeApprovalFailure.RequestedAtomicity)]
+[InlineData(UpgradeApprovalFailure.CompiledFingerprint)]
+[InlineData(UpgradeApprovalFailure.DeniedCurrentAuthorization)]
+[InlineData(UpgradeApprovalFailure.ClosedNeutralGate)]
+[InlineData(UpgradeApprovalFailure.NeedlessApproval)]
+[InlineData(UpgradeApprovalFailure.NeedlessForeignApproval)]
+public async Task Invalid_upgrade_approval_handoff_creates_no_command_or_version(
+    UpgradeApprovalFailure failure)
+{
+    var result = await UpgradeHarness.RunApprovalFailureAsync(failure);
+    Assert.Equal(0, result.Driver.CreateCommandCalls);
+    Assert.Equal(0, result.Driver.ExecuteCalls);
+    Assert.False(result.VersionAdvanced);
+}
+
+[Fact]
+public void Upgrade_managed_execution_graph_has_no_escape_shape()
+{
+    PlatformManagedExecutionSurfaceAssert.AssertClosedPlatformInventory(
+        PlatformProductionSurfaceInventory.Load(Repository.Root));
+}
+
+[Fact]
+public async Task Exact_upgrade_approval_can_be_reused_for_deterministic_retry()
+{
+    var capture = UpgradeHarness.ExactRetry();
+    var preview = await capture.PreviewAsync();
+    capture.ExternalAuthorization.Authorize(preview);
+    var approval = preview.CreateEffectiveImpactApproval(
+        new ApprovalReference("upgrade-retry-8"));
+
+    var first = await capture.ExecuteSourceAsync(approval);
+    var retry = await capture.RetrySourceAsync(approval);
+
+    Assert.True(first.VersionAdvanced);
+    Assert.True(retry.AlreadyApplied || retry.VersionAdvanced);
+}
 ~~~
+
+`PlatformProductionSurfaceInventory` loads the production projects from
+`Microi.net.sln` through Roslyn and overlays the ignored Microi.net/Microi.AI
+physical files already enumerated by Task 1; it excludes test projects,
+`bin`/`obj`, and generated sources. `AssertClosedPlatformInventory` treats
+every public/protected method, constructor, field,
+property/indexer, event/delegate, nested type, interface/base edge, operator,
+conversion, accessor, and extension method signature in the touched platform
+assemblies/files as a root. It does not require a managed-method call and does
+not filter by `Execute*`, `Preview*`, `Materialize*`, or `Create*Command` names,
+so an arbitrarily named wrapper is visible.
+
+Starting from every signature it uses a visited set; strips arrays, by-ref,
+pointers, nullable, and closed generics; recurses generic arguments, non-object
+base types/interfaces, instance fields/properties, events/delegates, public
+constructors, and public static factories of reachable Microi-owned request
+types. Microi-owned means the assembly/file inventory under test or the
+explicit mutation-fixture assembly; BCL containers contribute generic
+arguments but their implementation members are not scanned. Exact
+`System.Object` stops only the base edge of an already accepted user DTO;
+`object`/`dynamic` in every root/member/generic/constructor/factory payload slot
+is rejected.
+
+The walker rejects plans, tickets, materializers, coordinators, commands/
+command containers, raw connection/transaction contexts, open generics,
+untyped dictionaries, and delegates. Exact source/value/atomicity/approval
+types are leaves; exact return leaves are `void`, `int`, `SqlSection`,
+`MigrationResult`, and `DatabaseAdminResult`. `DatabaseExecutionPlan` is a leaf
+only as the direct return of the two exact Dos.ORM session previews, never a
+platform signature. Platform implementation code may hold that review value
+locally but no platform public/protected root accepts, returns, or wraps it.
+
+Apply and restore mutation REDs for
+`DatabaseExecutionPlan[]`, `List<DatabaseExecutionPlan>`, a request whose
+field/property/constructor contains a plan, `ExecuteUpgrade(object request)`,
+`ExecuteUpgrade<TRequest>(TRequest request)`, a public static executor, and a
+command-returning executor. Also add an arbitrarily named public wrapper that
+does not call a managed method. Every mutation must fail this inventory/type-
+graph test before any driver command is created; a harmless approved-leaf DTO
+whose base terminates at `System.Object` remains GREEN.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -495,11 +712,43 @@ Expected: vendor SQL and premature version advancement fail.
 
 - [ ] **Step 3: Convert every upgrade payload**
 
-Each migration has an immutable ID, expected prior state, AST schema/data steps, idempotency check, and success marker. JSON resources store neutral data, never executable MySQL SQL. DDL implicit-commit profiles use recoverable step state rather than false transaction claims.
+Each migration has an immutable ID, expected prior state, AST schema/data steps,
+idempotency check, and success marker. Compile it only through
+`ISqlCompiler.CompileMigration` with the active session's exact profile and the
+explicit atomicity selected by the migration catalog. JSON resources store
+neutral data, never executable MySQL SQL.
 
-- [ ] **Step 4: Run all upgrade tests and architecture gate**
+For provider-elevated impact, the upgrade service calls `PreviewMigration`
+with the exact approved Task 6 source and explicit atomicity, externally
+authorizes the current bootstrap/operator context plus preview, and mints the
+audit-only CompiledImpactApproval. It then calls the distinct source execution
+overload with that same source/values/atomicity/approval; it never passes the
+preview plan. `UpgradeSqlExecutionAuthorizer` rechecks the current trusted
+upgrade context during execution independently of the approval reference and
+defaults to denial outside that context.
 
-Expected: repeat upgrade is a no-op, injected failure leaves version unchanged, and Upgrade DB002 findings are zero.
+Before creating the first command, the internal executor revalidates the same
+source migration by recompiling exact current live options, attaches the
+compiled approval only through `WithEffectiveImpactApproval`, and revalidates
+profile fields, schema token, source fingerprint, neutral approval, current
+authorization, and compiled fingerprint. Missing, foreign, stale, or needless
+approval fails before command creation. A `Required` plan uses
+one live connection and one live transaction whose identities match every
+step and each other by reference. If the dialect cannot honor that contract,
+the catalog must select an explicit `BestEffort` design; execution never
+silently downgrades `Required`. DDL implicit-commit profiles use recoverable
+step state rather than false transaction claims. Any preflight failure creates
+and executes zero commands and leaves the success marker and `ServerVersion`
+unchanged.
+
+- [ ] **Step 4: Run all upgrade tests and both managed-surface architecture gates**
+
+Run the Dos.ORM `PublicApiBaselineTests` and `ManagedExecutionSurfaceTests` plus
+the platform integration and architecture suites. Expected: immutable complete-
+assembly baseline plus exact delta PASS, exact host/interface maps PASS, every
+public/protected platform inventory signature recursively closed, repeat
+upgrade no-op, injected failure leaves version unchanged, and Upgrade DB002
+findings are zero.
 
 - [ ] **Step 5: Commit**
 
@@ -513,6 +762,7 @@ git commit -m "refactor: migrate upgrades to portable AST plans"
 **Files:**
 - Modify: Microi.Server/Microi.net/Common/TenantProvisioningService.cs
 - Modify: Microi.Server/Microi.net/Common/DbConnectionDiagnostics.cs
+- Create: Microi.Server/Microi.net/Common/TenantSqlExecutionAuthorizer.cs
 - Modify: Microi.Server/Microi.Core/Services/EmptyDatabaseReleaseService.cs
 - Modify: Microi.Server/Microi.net.Api/Controllers/SystemMonitorController.cs
 - Modify: Microi.Server/Microi.net.Api/Controllers/OsController.cs
@@ -522,8 +772,14 @@ git commit -m "refactor: migrate upgrades to portable AST plans"
 - Create: Microi.Server/tests/Microi.Server.IntegrationTests/Lifecycle/DatabaseDiagnosticsContractTests.cs
 
 **Interfaces:**
-- Consumes: IDatabaseAdmin, IDatabaseDiagnostics, IConnectionPolicy, Schema and DML AST.
-- Produces: database-neutral create/drop/initialize/clone/import/export and unified diagnostics DTOs.
+- Consumes: `IDatabaseAdmin`, `IDatabaseDiagnostics`, `IConnectionPolicy`,
+  Schema and DML AST, the active session's exact `DialectProfile`, and current
+  Task 6 approvals/schema token plus authenticated tenant-operator policy.
+- Produces: database-neutral create/drop/initialize/clone/import/export and
+  unified diagnostics DTOs. Preview may return an immutable plan for external
+  review; execution submits source operations or `NativeSqlText` plus
+  definitions/values and optional-by-overload compiled approval. No execution
+  accepts a plan or exposes a ticket, materializer, or managed command list.
 
 - [ ] **Step 1: Write failing lifecycle and diagnostics contracts**
 
@@ -541,6 +797,86 @@ public async Task Tenant_lifecycle_delegates_all_vendor_behavior_to_DosOrm(
         operation => Assert.IsType<DatabaseImportOperation>(operation),
         operation => Assert.IsType<DropDatabaseOperation>(operation));
 }
+
+[Theory]
+[InlineData(LifecyclePreflightFailure.ProfileType)]
+[InlineData(LifecyclePreflightFailure.ProfileMajor)]
+[InlineData(LifecyclePreflightFailure.ProfileMinor)]
+[InlineData(LifecyclePreflightFailure.ProfileBuild)]
+[InlineData(LifecyclePreflightFailure.ProfileRevision)]
+[InlineData(LifecyclePreflightFailure.CompatibilityMode)]
+[InlineData(LifecyclePreflightFailure.Route)]
+[InlineData(LifecyclePreflightFailure.Enlistment)]
+[InlineData(LifecyclePreflightFailure.SourceFingerprint)]
+[InlineData(LifecyclePreflightFailure.NeutralGate)]
+[InlineData(LifecyclePreflightFailure.CompiledImpactGate)]
+[InlineData(LifecyclePreflightFailure.SchemaToken)]
+[InlineData(LifecyclePreflightFailure.CompiledFingerprint)]
+[InlineData(LifecyclePreflightFailure.AdminOperationBinding)]
+[InlineData(LifecyclePreflightFailure.RequiredConnectionScope)]
+[InlineData(LifecyclePreflightFailure.RequiredTransactionScope)]
+public async Task Lifecycle_preflight_failure_starts_no_command(
+    LifecyclePreflightFailure failure)
+{
+    var failed = await TenantHarness.RunPreflightFailureAsync(failure);
+    Assert.Equal(0, failed.Driver.CreateCommandCalls);
+    Assert.Equal(0, failed.Driver.ExecuteCalls);
+}
+
+[Theory]
+[InlineData(AdminElevationCase.DropDatabase)]
+[InlineData(AdminElevationCase.ReplaceImport)]
+public async Task Elevated_lifecycle_admin_uses_preview_approval_and_source_execution(
+    AdminElevationCase adminCase)
+{
+    var capture = TenantHarness.ElevatedAdmin(adminCase);
+    var preview = await capture.PreviewAsync();
+    capture.ExternalAuthorization.Authorize(preview);
+    var approval = preview.CreateEffectiveImpactApproval(
+        new ApprovalReference("tenant-admin-11"));
+
+    var result = await capture.ExecuteSourceAsync(approval);
+
+    Assert.Equal(DatabaseAdminOutcome.Applied, result.Outcome);
+    Assert.Equal(1, capture.ExecutionAuthorizer.DemandCalls);
+    Assert.False(capture.ExecutionAcceptedPreviewPlan);
+}
+
+[Theory]
+[InlineData(LifecycleApprovalFailure.Missing)]
+[InlineData(LifecycleApprovalFailure.ForeignSource)]
+[InlineData(LifecycleApprovalFailure.SourceMutation)]
+[InlineData(LifecycleApprovalFailure.StalePreviewPlan)]
+[InlineData(LifecycleApprovalFailure.LiveProfile)]
+[InlineData(LifecycleApprovalFailure.SchemaToken)]
+[InlineData(LifecycleApprovalFailure.RequestedAtomicity)]
+[InlineData(LifecycleApprovalFailure.CompiledFingerprint)]
+[InlineData(LifecycleApprovalFailure.EffectiveImpact)]
+[InlineData(LifecycleApprovalFailure.ClosedAdminGate)]
+[InlineData(LifecycleApprovalFailure.DeniedCurrentAuthorization)]
+[InlineData(LifecycleApprovalFailure.NeedlessApproval)]
+[InlineData(LifecycleApprovalFailure.NeedlessForeignApproval)]
+public async Task Invalid_lifecycle_approval_handoff_starts_no_command(
+    LifecycleApprovalFailure failure)
+{
+    var failed = await TenantHarness.RunApprovalFailureAsync(failure);
+    Assert.Equal(0, failed.Driver.CreateCommandCalls);
+    Assert.Equal(0, failed.Driver.ExecuteCalls);
+}
+
+[Fact]
+public void MicroiServer_framework_never_uses_legacy_CommandCreator()
+{
+    PlatformSqlArchitectureAssert.NoLegacyCommandCreatorReference(
+        Repository.Root, excludeDosOrm: true, productionOnly: true);
+}
+
+[Fact]
+public void Platform_lifecycle_managed_graph_has_no_escape_shape()
+{
+    PlatformManagedExecutionSurfaceAssert.AssertClosedPlatformInventory(
+        PlatformProductionSurfaceInventory.Load(Repository.Root));
+}
 ~~~
 
 - [ ] **Step 2: Run and verify RED**
@@ -549,18 +885,57 @@ Expected: direct MySqlConnection, script, metadata, and database branches fail.
 
 - [ ] **Step 3: Delegate lifecycle and monitoring**
 
-TenantProvisioning and EmptyDatabaseRelease submit neutral requests only. User-uploaded SQL imports declare source/target database and pass through NativeSqlText.UserProvided without translation. SystemMonitor calls IDatabaseDiagnostics and returns a common DTO; errors are explicit rather than converted to zero.
+TenantProvisioning and EmptyDatabaseRelease submit neutral source requests only.
+For elevated Drop/ReplaceImport, platform code calls `PreviewAdmin`, externally
+authorizes the current tenant operator and exact preview, mints the audit-only
+compiled approval, then calls the distinct source execution overload with the
+same source/values/atomicity/approval. `TenantSqlExecutionAuthorizer` rechecks
+the currently authenticated operator, tenant, target, and required permission
+during execution; it never treats ApprovalReference or approval possession as
+authorization.
+
+The internal coordinator recompiles against the active session's current exact
+profile/schema/options, attaches only an exact approval, then revalidates the
+source operation, full profile, neutral and effective compiled-impact gates,
+current authorization, source/compiled fingerprints, and exhaustive
+administrative-operation binding before it creates the first command. Missing,
+foreign, stale, or needless approval fails with zero commands. The preview
+plan is review data and is never execution input. `Required` lifecycle work
+additionally shares one
+reference-identical live connection and transaction across every step, with no
+partial prefix and no downgrade on mismatch.
+
+User-uploaded SQL imports declare their command kind and pass through
+`NativeSqlText.UserProvided`, constructed from that exact profile, without
+translation. The executor re-detects all profile fields before creating a
+command; a declared source/target database name is not a substitute for that
+profile check. SystemMonitor calls `IDatabaseDiagnostics` and returns a common
+DTO; errors are explicit rather than converted to zero. Outside the named
+preview methods no platform caller receives a compiled plan; no platform path
+receives an execution ticket, materializer, or managed command list, and no
+Microi.Server framework file uses the legacy public CommandCreator boundary.
+The lifecycle architecture test uses the same physical-inventory, all-
+public/protected-signatures, cycle-safe graph walker as the upgrade test. It
+does not depend on call reachability or method-name prefixes. A nested plan
+array/container/request, object payload/open generic/delegate/dictionary
+escape, public static executor, command return, or raw connection/transaction
+context fails even when the forbidden type is not a direct method parameter;
+only a user DTO's terminal `System.Object` base is ignored.
 
 - [ ] **Step 4: Clear the architecture baseline and run all builds**
 
-Remove each migrated fingerprint from database-findings.json. Run architecture tests with an empty baseline, all server integration tests, explicit Microi.net/Microi.AI builds, and Microi.net.Api build.
+Remove each migrated fingerprint from database-findings.json. Run Dos.ORM
+`PublicApiBaselineTests` plus `ManagedExecutionSurfaceTests`, platform
+architecture tests with an empty findings baseline, all server integration
+tests, explicit Microi.net/Microi.AI builds, and Microi.net.Api build.
 
-Expected: DB001=0, DB002=0, DB003=0, DB004=0 outside approved typed user boundaries.
+Expected: DB001=0, DB002=0, DB003=0, DB004=0 outside approved typed user
+boundaries, and DB005=0 without exception.
 
 - [ ] **Step 5: Commit all remaining exact files**
 
 ~~~powershell
 git add Microi.Server/Microi.Core Microi.Server/Microi.net.Api Microi.Server/tests
-git add -f Microi.Server/Microi.net/Common/TenantProvisioningService.cs Microi.Server/Microi.net/Common/DbConnectionDiagnostics.cs
+git add -f Microi.Server/Microi.net/Common/TenantProvisioningService.cs Microi.Server/Microi.net/Common/DbConnectionDiagnostics.cs Microi.Server/Microi.net/Common/TenantSqlExecutionAuthorizer.cs
 git commit -m "refactor: centralize database lifecycle and diagnostics"
 ~~~

@@ -4,7 +4,7 @@
 
 **Goal:** Compile the complete neutral AST into correct, parameterized execution plans for MySQL, SQL Server, Oracle, PostgreSQL, DM8, and KingbaseES V9.
 
-**Architecture:** A single registry resolves DatabaseType and DialectProfile to an immutable DatabasePlatformDescriptor. The shared compiler pipeline performs normalization, validation, lowering, parameter allocation, rendering, and plan construction; each database owns its renderer, type mapper, schema compiler, metadata compiler, admin compiler, and capability profile.
+**Architecture:** A single registry resolves the canonical Task 7 DialectProfile to an immutable DatabasePlatformDescriptor. The shared compiler pipeline performs normalization, validation, lowering, parameter allocation, rendering, effective-impact derivation, and source-aware plan construction; each database owns its renderer, type mapper, schema compiler, metadata compiler, admin compiler, and capability profile.
 
 **Tech Stack:** C# netstandard2.1, existing ADO.NET providers in Dos.ORM, xUnit golden and contract tests.
 
@@ -16,17 +16,23 @@
 - Oracle and DM8 are independently compiled and tested even when they share a family base.
 - PostgreSQL and KingbaseES are independently compiled and tested even when they share a family base.
 - DM8 compatibility mode and KingbaseES compatibility mode are part of DialectProfile.
+- DialectProfile is created only by SQL AST core Task 7. This plan consumes it and never declares a second profile type.
+- Registry/compiler/native/live checks compare database type, all four Version components, and ordinal compatibility mode; DatabaseType-only matching is forbidden.
 - Dynamic values never enter command text.
 - Compiler plans contain parameter definitions only; runtime values are bound later.
+- Recompiling the same exact source with structurally identical live
+  DialectProfile, SchemaToken, and requested atomicity is deterministic and
+  yields the identical compiled fingerprint; this is required for the public
+  preview-to-approval-to-source-execution flow. Any compiler-output change
+  intentionally invalidates the old compiled approval.
 - Platform DDL and migrations are AST-only; native scripts are not a compiler escape hatch.
 - Unsupported semantic equivalence throws UnsupportedDatabaseCapabilityException with dialect, version, feature, and AST node path.
 
 ---
 
-### Task 1: Add dialect profiles, capabilities, descriptors, and strict registry resolution
+### Task 1: Add capabilities, descriptors, and strict profile registry resolution
 
 **Files:**
-- Create: Microi.Server/Dos.ORM/Platform/DialectProfile.cs
 - Create: Microi.Server/Dos.ORM/Platform/DatabaseCapabilities.cs
 - Create: Microi.Server/Dos.ORM/Platform/DatabasePlatformDescriptor.cs
 - Create: Microi.Server/Dos.ORM/Platform/DatabasePlatformRegistry.cs
@@ -34,8 +40,8 @@
 - Create: Microi.Server/Dos.ORM.Tests/Platform/DatabasePlatformRegistryTests.cs
 
 **Interfaces:**
-- Consumes: DatabaseType and ISqlCompiler.
-- Produces: DialectProfile, DatabaseCapabilities, DatabasePlatformDescriptor, DatabasePlatformRegistry.Get/TryGet/Resolve.
+- Consumes: the canonical Task 7 DialectProfile and ISqlCompiler.
+- Produces: DatabaseCapabilities, DatabasePlatformDescriptor, and DatabasePlatformRegistry.Get/TryGet/Resolve using one exact profile argument.
 
 - [ ] **Step 1: Write failing registry tests**
 
@@ -50,13 +56,23 @@
 public void Alias_resolves_to_one_official_platform(
     string alias, DatabaseType expected)
 {
-    Assert.Equal(expected, DatabasePlatformRegistry.Resolve(alias).Type);
+    var profile = TestProfiles.For(expected);
+    var platform = DatabasePlatformRegistry.Resolve(alias, profile);
+    Assert.Equal(expected, platform.Type);
+    Assert.Same(profile, platform.Profile);
 }
 
 [Fact]
 public void Unknown_alias_fails_instead_of_falling_back() =>
     Assert.Throws<NotSupportedException>(() =>
-        DatabasePlatformRegistry.Resolve("unknown-db"));
+        DatabasePlatformRegistry.Resolve(
+            "unknown-db", TestProfiles.PostgreSql17));
+
+[Fact]
+public void Alias_and_profile_database_type_must_agree() =>
+    Assert.Throws<ArgumentException>(() =>
+        DatabasePlatformRegistry.Resolve(
+            "mysql", TestProfiles.PostgreSql17));
 ~~~
 
 - [ ] **Step 2: Run tests and verify RED**
@@ -67,39 +83,35 @@ Run:
 dotnet test .\Dos.ORM.Tests\Dos.ORM.Tests.csproj --filter FullyQualifiedName~DatabasePlatformRegistryTests --nologo
 ~~~
 
-Expected: FAIL because Platform types do not exist.
+Expected: FAIL because capability/descriptor/registry types do not exist.
 
 - [ ] **Step 3: Implement the strict profile and registry API**
 
 ~~~csharp
-public sealed class DialectProfile
-{
-    public DialectProfile(DatabaseType databaseType, Version serverVersion,
-        string compatibilityMode)
-    {
-        DatabaseType = databaseType;
-        ServerVersion = serverVersion ??
-            throw new ArgumentNullException(nameof(serverVersion));
-        CompatibilityMode = compatibilityMode ?? string.Empty;
-    }
-    public DatabaseType DatabaseType { get; }
-    public Version ServerVersion { get; }
-    public string CompatibilityMode { get; }
-}
-
 public static class DatabasePlatformRegistry
 {
     public static DatabasePlatformDescriptor Get(
-        DatabaseType type, DialectProfile profile);
+        DialectProfile profile);
     public static bool TryGet(
-        DatabaseType type, DialectProfile profile,
+        DialectProfile profile,
         out DatabasePlatformDescriptor platform);
     public static DatabasePlatformDescriptor Resolve(
-        string alias, DialectProfile profile = null);
+        string alias, DialectProfile profile);
 }
 ~~~
 
-Register aliases case-insensitively. MsAccess, Sqlite3, and SqlServer9 remain explicit legacy types; SqlServer9 may reuse a legacy SQL Server compiler profile but must not be reported as one of the six certified platforms.
+Profile is required; there is no null/default profile and no overload that
+accepts an independent DatabaseType. Resolve rejects an alias whose registered
+database type differs from `profile.DatabaseType`. Descriptor.Profile retains
+the exact profile instance. Register aliases case-insensitively. MsAccess,
+Sqlite3, and SqlServer9 remain explicit legacy types; SqlServer9 may reuse a
+legacy SQL Server compiler profile but must not be reported as one of the six
+certified platforms.
+
+Tests also prove database type, Major, Minor, Build, Revision,
+compatibility-mode case, and compatibility-mode text participate in
+descriptor/cache identity; null compatibility mode is already rejected by the
+consumed Task 7 profile and is never normalized here.
 
 - [ ] **Step 4: Run tests and verify GREEN**
 
@@ -127,7 +139,7 @@ git commit -m "feat: register strict database dialect profiles"
 
 **Interfaces:**
 - Consumes: SqlAstNormalizer, SqlAstValidator, SqlParameterAllocator.
-- Produces: SqlCompilerBase.Compile and abstract Lower/Render hooks.
+- Produces: both exact ISqlCompiler entries, effective-impact derivation, and abstract Lower/Render hooks.
 
 - [ ] **Step 1: Write a failing pipeline-order test**
 
@@ -143,6 +155,25 @@ public void Compiler_runs_all_stages_in_contract_order()
         "Bind", "Normalize", "Validate", "Lower",
         "Optimize", "AllocateParameters", "Render", "Plan"
     }, compiler.Events);
+}
+
+[Fact]
+public void Migration_compiler_preserves_options_and_derives_effective_impact()
+{
+    var compiler = new RecordingCompiler();
+    var source = AstSamples.OneStepMigration();
+    var options = new SqlCompilationOptions(
+        TestProfiles.PostgreSql17,
+        AtomicityRequirement.Required,
+        new SchemaToken("schema-v1"));
+
+    var plan = compiler.CompileMigration(source, options);
+
+    Assert.Same(options.DialectProfile, plan.DialectProfile);
+    Assert.Same(options.SchemaToken, plan.SchemaToken);
+    Assert.Equal(options.RequestedAtomicity, plan.Atomicity);
+    Assert.Equal(source.Fingerprint,
+        ((MigrationPlanSafetyBinding)plan.Safety).SourceFingerprint);
 }
 ~~~
 
@@ -169,7 +200,32 @@ public abstract class SqlCompilerBase : ISqlCompiler
         var optimized = Optimize(lowered, options);
         var allocated = AllocateParameters(optimized, options);
         var rendered = Render(allocated, options);
-        return BuildPlan(rendered, options);
+        return BuildSourceAwarePlan(statement, rendered, options);
+    }
+
+    public DatabaseExecutionPlan CompileMigration(
+        MigrationPlan plan, SqlCompilationOptions options)
+    {
+        var compiled = CompileOrderedMigrationSteps(plan, options);
+        return DatabaseExecutionPlan.ForMigration(
+            plan, compiled.Impacts, compiled.Steps, options);
+    }
+
+    protected abstract MigrationCompilation CompileOrderedMigrationSteps(
+        MigrationPlan plan, SqlCompilationOptions options);
+
+    protected abstract DatabaseExecutionPlan BuildSourceAwarePlan(
+        SqlStatement source, RenderedSql rendered,
+        SqlCompilationOptions options);
+
+    protected sealed class MigrationCompilation
+    {
+        internal MigrationCompilation(
+            IReadOnlyList<CompiledImpactEntry> impacts,
+            IReadOnlyList<SqlCommandStep> steps);
+
+        internal IReadOnlyList<CompiledImpactEntry> Impacts { get; }
+        internal IReadOnlyList<SqlCommandStep> Steps { get; }
     }
 
     protected abstract SqlNode Lower(
@@ -178,6 +234,30 @@ public abstract class SqlCompilerBase : ISqlCompiler
         AllocatedSqlNode node, SqlCompilationOptions options);
 }
 ~~~
+
+`CompileOrderedMigrationSteps` runs the same eight stages for each ordered
+SchemaOperation, preserves contiguous MigrationStepId correlation, and derives
+one CompiledImpactEntry per source step. Effective impact may equal or elevate
+neutral impact and never reduce it; unsupported/unprovable lowering is
+PotentialDataLoss or throws. `BuildSourceAwarePlan` dispatches to the exact
+Task 7 named factory for ordinary statement, neutral schema operation, bulk,
+or admin source; it never calls a generic plan constructor.
+
+Both entries require non-null source/options and enforce the postcondition
+that plan atomicity equals options.RequestedAtomicity, plan profile is the
+same options.DialectProfile instance, and plan schema token is the same
+nullable options.SchemaToken instance. Direct SchemaOperation compilation is
+allowed only when neutral and effective impact both remain None; other schema
+work must use CompileMigration.
+
+Both entries are pure with respect to source/options: no time, randomness,
+cache race, approval state, runtime value, or connection identity may alter
+the plan. Two compilations of structurally identical source/options produce
+the same command order, safety entries, and `CompiledPlanFingerprint`. The
+managed source executor defined by the legacy-adapter plan relies on this to
+attach an externally authorized preview
+approval only after recompiling the source against the current live options;
+the compiler itself never accepts an approval or a preview plan.
 
 SqlTextWriter exposes AppendKeyword, AppendIdentifierSegment, AppendParameter, AppendCommaSeparated, and AppendSpace. It must not accept arbitrary business SQL fragments.
 
@@ -423,7 +503,7 @@ git commit -m "feat: compile AST for Oracle and DM8"
 - Modify: all six compiler/type/schema files created in Tasks 3-6
 
 **Interfaces:**
-- Produces: complete compiler coverage for every platform-owned AST operation.
+- Produces: complete Compile and CompileMigration coverage, exact effective-impact evidence, and source-aware Task 7 plans for every platform-owned AST operation.
 
 - [ ] **Step 1: Write the six-dialect contract matrix**
 
@@ -441,6 +521,30 @@ public void Every_dialect_compiles_all_required_semantic_operations(
     PlanAssert.HasPlan(dialect.Compile(AstSamples.CreateContractTable()));
     PlanAssert.HasPlan(dialect.Compile(AstSamples.TableMetadataQuery()));
     PlanAssert.HasPlan(dialect.Compile(AstSamples.DatabaseDiagnostics()));
+
+    var migration = dialect.Compiler.CompileMigration(
+        AstSamples.ContractMigration(), dialect.Options);
+    Assert.Same(dialect.Options.DialectProfile,
+        migration.DialectProfile);
+    Assert.Same(dialect.Options.SchemaToken,
+        migration.SchemaToken);
+    Assert.Equal(dialect.Options.RequestedAtomicity,
+        migration.Atomicity);
+    Assert.IsType<MigrationPlanSafetyBinding>(migration.Safety);
+}
+
+[Theory]
+[MemberData(nameof(DialectCases.AllCertified))]
+public void Pagination_is_count_then_data_without_semicolon_batch(
+    CertifiedDialectCase dialect)
+{
+    var plan = dialect.Compile(AstSamples.PagedUsersWithCount());
+    Assert.Equal(SqlResultShape.MultipleResultSets, plan.ResultShape);
+    Assert.Collection(plan.Steps,
+        count => Assert.Equal(SqlResultShape.Scalar, count.ResultShape),
+        data => Assert.Equal(SqlResultShape.RowSet, data.ResultShape));
+    Assert.All(plan.Steps.Cast<SqlCommandStep>(),
+        step => Assert.DoesNotContain(";", step.CommandText));
 }
 ~~~
 
@@ -454,7 +558,22 @@ Expected: FAIL for every not-yet-rendered semantic operation.
 
 - [ ] **Step 3: Complete only the failing semantic mappings**
 
-Add Concat, Substring, Length, CurrentDateTime, DateAdd, DateDiff, Coalesce, Round, JsonValue, aggregates, Boolean, NULL ordering, returning semantics, parameter-limit batching, create/alter/drop schema operations, metadata DTO queries, database create/drop, and diagnostics. If a profile cannot preserve semantics, throw UnsupportedDatabaseCapabilityException rather than emit guessed SQL.
+Add Concat, Substring, Length, CurrentDateTime, DateAdd, DateDiff, Coalesce,
+Round, JsonValue, aggregates, Boolean, NULL ordering, returning semantics,
+parameter-limit batching, create/alter/drop schema operations, metadata DTO
+queries, database create/drop, and diagnostics. Compile migrations through
+the exact named entry, preserve ordered source step IDs, derive effective
+impact for the exact full profile, and use only the Task 7 source-aware plan
+factories. Count pagination emits separate Scalar then RowSet commands and
+never a semicolon batch. If a profile cannot preserve semantics or Required
+plan evidence, throw UnsupportedDatabaseCapabilityException rather than emit
+guessed SQL or downgrade atomicity.
+
+Cross-dialect tests mutate only Build, Revision, compatibility-mode case, and
+compatibility-mode text to prove profile-specific plan/fingerprint/effective
+impact identity. They also prove Drop/Import safety references the exact admin
+operation, Create/Export cannot be elevated, bulk batches never exceed the
+caller maximum, and native SQL is never used as a schema/admin escape hatch.
 
 - [ ] **Step 4: Run focused and total regression**
 
