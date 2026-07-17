@@ -1429,12 +1429,12 @@ namespace Dos.ORM.SqlAst
 
     public abstract class DatabaseAdminOperation : SqlStatement
     {
-        protected DatabaseAdminOperation(
+        private protected DatabaseAdminOperation(
             DestructiveImpact impact,
-            bool approved)
+            AdminTargetApproval approval)
         {
             Impact = impact;
-            CanExecute = impact == DestructiveImpact.None || approved;
+            CanExecute = impact == DestructiveImpact.None || approval != null;
         }
 
         public DestructiveImpact Impact { get; }
@@ -1446,7 +1446,7 @@ namespace Dos.ORM.SqlAst
         public CreateDatabaseOperation(
             SqlIdentifier database,
             CreateObjectBehavior behavior)
-            : base(DestructiveImpact.None, true)
+            : base(DestructiveImpact.None, null)
         {
             Database = database ?? throw new ArgumentNullException(nameof(database));
             SchemaStatementGuards.Defined(behavior, nameof(behavior));
@@ -1494,7 +1494,7 @@ namespace Dos.ORM.SqlAst
             DropObjectBehavior behavior,
             ExpectedStructuralFingerprint expectedFingerprint,
             AdminTargetApproval approval)
-            : base(DestructiveImpact.PotentialDataLoss, approval != null)
+            : base(DestructiveImpact.PotentialDataLoss, approval)
         {
             Database = database ?? throw new ArgumentNullException(nameof(database));
             SchemaStatementGuards.Defined(behavior, nameof(behavior));
@@ -1552,7 +1552,7 @@ namespace Dos.ORM.SqlAst
             DatabaseResourceHandle resource,
             DatabaseTransferFormat format,
             DatabaseTransferScope scope)
-            : base(DestructiveImpact.None, true)
+            : base(DestructiveImpact.None, null)
         {
             Database = database ?? throw new ArgumentNullException(nameof(database));
             Resource = resource ?? throw new ArgumentNullException(nameof(resource));
@@ -1602,7 +1602,7 @@ namespace Dos.ORM.SqlAst
                 policy == DatabaseImportConflictPolicy.ReplaceTargetDatabase
                     ? DestructiveImpact.PotentialDataLoss
                     : DestructiveImpact.None,
-                approval != null)
+                approval)
         {
             Database = database ?? throw new ArgumentNullException(nameof(database));
             Resource = resource ?? throw new ArgumentNullException(nameof(resource));
@@ -1682,6 +1682,15 @@ namespace Dos.ORM.SqlAst
             DatabaseOperationDiagnostic diagnostic = null)
         {
             Request = request ?? throw new ArgumentNullException(nameof(request));
+            if (!(request is CreateDatabaseOperation) &&
+                !(request is DropDatabaseOperation) &&
+                !(request is DatabaseExportOperation) &&
+                !(request is DatabaseImportOperation))
+            {
+                throw new ArgumentException(
+                    "Admin results require a known closed admin operation.",
+                    nameof(request));
+            }
             SchemaStatementGuards.Defined(outcome, nameof(outcome));
             var success = outcome == DatabaseAdminOutcome.Applied ||
                           outcome == DatabaseAdminOutcome.AlreadySatisfied;
