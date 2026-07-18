@@ -1,0 +1,294 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+
+namespace Dos.ORM.SeedConversion
+{
+    public enum SeedDatabaseTarget
+    {
+        SqlServer2022 = 0,
+        PostgreSql17 = 1,
+        Oracle19c = 2,
+        Dm8 = 3,
+        KingbaseEs = 4
+    }
+
+    public sealed class SeedConversionResult
+    {
+        internal SeedConversionResult(
+            SeedDatabaseTarget target,
+            int tableCount,
+            long rowCount,
+            IDictionary<string, long> tableRowCounts)
+        {
+            Target = target;
+            TableCount = tableCount;
+            RowCount = rowCount;
+            TableRowCounts = new ReadOnlyDictionary<string, long>(
+                new Dictionary<string, long>(
+                    tableRowCounts,
+                    StringComparer.OrdinalIgnoreCase));
+        }
+
+        public SeedDatabaseTarget Target { get; }
+
+        public int TableCount { get; }
+
+        public long RowCount { get; }
+
+        public IReadOnlyDictionary<string, long> TableRowCounts { get; }
+
+        public bool RequiresNonEmptyEnvelopeRuntime
+        {
+            get
+            {
+                return Target == SeedDatabaseTarget.Oracle19c;
+            }
+        }
+    }
+
+    public sealed class SeedConversionException : Exception
+    {
+        internal SeedConversionException(
+            int statementNumber,
+            string message,
+            Exception innerException = null)
+            : base(
+                "MySQL 5.7 seed statement " + statementNumber + ": " + message,
+                innerException)
+        {
+            StatementNumber = statementNumber;
+        }
+
+        public int StatementNumber { get; }
+    }
+
+    internal sealed class SeedDatabase
+    {
+        internal SeedDatabase()
+        {
+            Tables = new List<SeedTable>();
+            TablesByName = new Dictionary<string, SeedTable>(
+                StringComparer.OrdinalIgnoreCase);
+            Inserts = new List<SeedInsert>();
+        }
+
+        internal List<SeedTable> Tables { get; }
+
+        internal Dictionary<string, SeedTable> TablesByName { get; }
+
+        internal List<SeedInsert> Inserts { get; }
+    }
+
+    internal sealed class SeedTable
+    {
+        internal SeedTable(string name)
+        {
+            Name = name;
+            Columns = new List<SeedColumn>();
+            ColumnsByName = new Dictionary<string, SeedColumn>(
+                StringComparer.OrdinalIgnoreCase);
+            PrimaryKey = new List<SeedIndexColumn>();
+            Indexes = new List<SeedIndex>();
+            ForeignKeys = new List<SeedForeignKey>();
+        }
+
+        internal string Name { get; }
+
+        internal string Comment { get; set; }
+
+        internal List<SeedColumn> Columns { get; }
+
+        internal Dictionary<string, SeedColumn> ColumnsByName { get; }
+
+        internal List<SeedIndexColumn> PrimaryKey { get; }
+
+        internal List<SeedIndex> Indexes { get; }
+
+        internal List<SeedForeignKey> ForeignKeys { get; }
+    }
+
+    internal sealed class SeedColumn
+    {
+        internal SeedColumn(string name, SeedColumnType type)
+        {
+            Name = name;
+            Type = type;
+            IsNullable = true;
+        }
+
+        internal string Name { get; }
+
+        internal SeedColumnType Type { get; }
+
+        internal bool IsNullable { get; set; }
+
+        internal SeedDefaultValue DefaultValue { get; set; }
+
+        internal string Comment { get; set; }
+
+        internal bool UpdateWithCurrentTimestamp { get; set; }
+    }
+
+    internal sealed class SeedColumnType
+    {
+        internal SeedColumnType(string name, IReadOnlyList<int> arguments)
+        {
+            Name = name;
+            Arguments = arguments;
+        }
+
+        internal string Name { get; }
+
+        internal IReadOnlyList<int> Arguments { get; }
+
+        internal bool IsText
+        {
+            get
+            {
+                return string.Equals(Name, "varchar", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "mediumtext", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "longtext", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        internal bool IsBoolean
+        {
+            get
+            {
+                return string.Equals(Name, "bit", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        internal bool IsNumeric
+        {
+            get
+            {
+                return string.Equals(Name, "tinyint", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "smallint", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "int", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "bigint", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "decimal", StringComparison.OrdinalIgnoreCase)
+                    || IsBoolean;
+            }
+        }
+    }
+
+    internal enum SeedDefaultKind
+    {
+        Null = 0,
+        String = 1,
+        Number = 2,
+        Boolean = 3,
+        CurrentTimestamp = 4
+    }
+
+    internal sealed class SeedDefaultValue
+    {
+        internal SeedDefaultValue(SeedDefaultKind kind, string value = null)
+        {
+            Kind = kind;
+            Value = value;
+        }
+
+        internal SeedDefaultKind Kind { get; }
+
+        internal string Value { get; }
+    }
+
+    internal sealed class SeedIndexColumn
+    {
+        internal SeedIndexColumn(string name, int? prefixLength)
+        {
+            Name = name;
+            PrefixLength = prefixLength;
+        }
+
+        internal string Name { get; }
+
+        internal int? PrefixLength { get; }
+    }
+
+    internal sealed class SeedIndex
+    {
+        internal SeedIndex(
+            string name,
+            bool isUnique,
+            IReadOnlyList<SeedIndexColumn> columns)
+        {
+            Name = name;
+            IsUnique = isUnique;
+            Columns = columns;
+        }
+
+        internal string Name { get; }
+
+        internal bool IsUnique { get; }
+
+        internal IReadOnlyList<SeedIndexColumn> Columns { get; }
+    }
+
+    internal sealed class SeedForeignKey
+    {
+        internal SeedForeignKey(
+            string name,
+            IReadOnlyList<SeedIndexColumn> columns,
+            string referencedTable,
+            IReadOnlyList<SeedIndexColumn> referencedColumns)
+        {
+            Name = name;
+            Columns = columns;
+            ReferencedTable = referencedTable;
+            ReferencedColumns = referencedColumns;
+        }
+
+        internal string Name { get; }
+
+        internal IReadOnlyList<SeedIndexColumn> Columns { get; }
+
+        internal string ReferencedTable { get; }
+
+        internal IReadOnlyList<SeedIndexColumn> ReferencedColumns { get; }
+    }
+
+    internal enum SeedValueKind
+    {
+        Null = 0,
+        String = 1,
+        Number = 2,
+        Boolean = 3,
+        Binary = 4
+    }
+
+    internal sealed class SeedValue
+    {
+        internal SeedValue(SeedValueKind kind, string value = null)
+        {
+            Kind = kind;
+            Value = value;
+        }
+
+        internal SeedValueKind Kind { get; }
+
+        internal string Value { get; }
+    }
+
+    internal sealed class SeedInsert
+    {
+        internal SeedInsert(
+            SeedTable table,
+            IReadOnlyList<SeedColumn> columns,
+            IReadOnlyList<IReadOnlyList<SeedValue>> rows)
+        {
+            Table = table;
+            Columns = columns;
+            Rows = rows;
+        }
+
+        internal SeedTable Table { get; }
+
+        internal IReadOnlyList<SeedColumn> Columns { get; }
+
+        internal IReadOnlyList<IReadOnlyList<SeedValue>> Rows { get; }
+    }
+}
