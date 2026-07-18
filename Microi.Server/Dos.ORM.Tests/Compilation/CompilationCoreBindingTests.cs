@@ -2,11 +2,233 @@ using System.Data;
 using System.Globalization;
 using Dos.ORM.SqlAst;
 using Dos.ORM.SqlCompilation;
+using Dos.ORM.Tests.TestInfrastructure;
 
 namespace Dos.ORM.Tests.Compilation;
 
 public sealed partial class CompilationCoreTests
 {
+    [Fact]
+    public void Ast_binder_null_root_uses_exact_parameter_name()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            new SqlAstBinder().Bind(null!));
+
+        Assert.Equal("root", exception.ParamName);
+    }
+
+    [Fact]
+    public void Ast_binder_clones_graph_and_fills_sole_visible_alias()
+    {
+        var alias = new SqlAlias("u");
+        var source = new SelectStatement(
+            new NamedTableSource(AstSamples.ObjectName("Sys_User"), alias),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Account")))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        Assert.Empty(result.Diagnostics);
+        var bound = Assert.IsType<SelectStatement>(result.Root);
+        Assert.NotSame(source, bound);
+        var column = Assert.IsType<ColumnExpression>(
+            Assert.Single(bound.Projections).Expression);
+        Assert.Equal(alias, column.Source);
+        Assert.NotSame(source.Projections[0].Expression, column);
+    }
+
+    [Fact]
+    public void Ast_binder_preserves_existing_visible_alias()
+    {
+        var alias = new SqlAlias("u");
+        var source = new SelectStatement(
+            new NamedTableSource(AstSamples.ObjectName("Sys_User"), alias),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Account"), alias))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        Assert.Empty(result.Diagnostics);
+        var bound = Assert.IsType<SelectStatement>(result.Root);
+        var column = Assert.IsType<ColumnExpression>(
+            Assert.Single(bound.Projections).Expression);
+        Assert.Equal(alias, column.Source);
+    }
+
+    [Fact]
+    public void Ast_binder_reports_value_free_unresolved_explicit_alias()
+    {
+        const string sentinel = "DO-NOT-LEAK-BINDER-OWNER";
+        var visible = new SqlAlias("u");
+        var missing = new SqlAlias(sentinel);
+        var source = new SelectStatement(
+            new NamedTableSource(AstSamples.ObjectName("Sys_User"), visible),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Account"), missing))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AST_BIND_COLUMN_OWNER_UNRESOLVED", diagnostic.Code);
+        Assert.Equal(
+            "Column reference does not have a visible alias owner.",
+            diagnostic.Message);
+        Assert.Equal("$.Projections[0].Expression", diagnostic.Path);
+        Assert.DoesNotContain(sentinel, diagnostic.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(sentinel, diagnostic.Path,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ast_binder_reports_value_free_ambiguous_unqualified_column()
+    {
+        var left = new NamedTableSource(
+            AstSamples.ObjectName("Users"), new SqlAlias("u"));
+        var right = new NamedTableSource(
+            AstSamples.ObjectName("Roles"), new SqlAlias("r"));
+        var source = new SelectStatement(
+            new JoinSource(left, SqlJoinType.Inner, right,
+                BooleanExpression.True),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Id")))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AST_BIND_COLUMN_OWNER_AMBIGUOUS", diagnostic.Code);
+        Assert.Equal(
+            "Column reference has multiple visible alias owners.",
+            diagnostic.Message);
+        Assert.Equal("$.Projections[0].Expression", diagnostic.Path);
+    }
+
+    [Fact]
+    public void Ast_binder_keeps_same_table_self_join_occurrences_ambiguous()
+    {
+        var left = new NamedTableSource(AstSamples.ObjectName("Users"));
+        var right = new NamedTableSource(AstSamples.ObjectName("Users"));
+        var source = new SelectStatement(
+            new JoinSource(
+                left, SqlJoinType.Inner, right, BooleanExpression.True),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Id")))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AST_BIND_COLUMN_OWNER_AMBIGUOUS", diagnostic.Code);
+        Assert.Equal("$.Projections[0].Expression", diagnostic.Path);
+    }
+
+    [Fact]
+    public void Ast_binder_rejects_duplicate_explicit_alias_as_ambiguous()
+    {
+        var duplicate = new SqlAlias("same");
+        var source = new SelectStatement(
+            new JoinSource(
+                new NamedTableSource(
+                    AstSamples.ObjectName("Users"), duplicate),
+                SqlJoinType.Inner,
+                new NamedTableSource(
+                    AstSamples.ObjectName("Roles"), duplicate),
+                BooleanExpression.True),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(AstSamples.Id("Id"), duplicate))
+            });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AST_BIND_COLUMN_OWNER_AMBIGUOUS", diagnostic.Code);
+        Assert.Equal("$.Projections[0].Expression", diagnostic.Path);
+    }
+
+    [Fact]
+    public void Ast_binder_reports_unresolved_column_when_no_source_is_visible()
+    {
+        var source = new SelectStatement(new[]
+        {
+            new SelectProjection(new ColumnExpression(AstSamples.Id("Id")))
+        });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AST_BIND_COLUMN_OWNER_UNRESOLVED", diagnostic.Code);
+        Assert.Equal("$.Projections[0].Expression", diagnostic.Path);
+    }
+
+    [Fact]
+    public void Ast_binder_preserves_parameter_definition_and_type_instances()
+    {
+        var parameterType = new SqlTypeDescriptor(
+            LogicalDbType.Decimal, precision: 18, scale: 4);
+        var castType = new SqlTypeDescriptor(LogicalDbType.String, length: 64);
+        var definition = new ParameterDefinition(
+            "amount", parameterType, ParameterDirection.Input,
+            isNullable: false);
+        var source = new SelectStatement(new[]
+        {
+            new SelectProjection(new CastExpression(
+                new ParameterExpression(definition), castType))
+        });
+
+        var result = new SqlAstBinder().Bind(source);
+
+        Assert.Empty(result.Diagnostics);
+        var bound = Assert.IsType<SelectStatement>(result.Root);
+        var cast = Assert.IsType<CastExpression>(
+            Assert.Single(bound.Projections).Expression);
+        var parameter = Assert.IsType<ParameterExpression>(cast.Expression);
+        Assert.Same(definition, parameter.Definition);
+        Assert.Same(parameterType, parameter.Definition.Type);
+        Assert.Same(castType, cast.Type);
+    }
+
+    [Fact]
+    public void Ast_binder_has_a_disposition_for_all_93_neutral_node_types()
+    {
+        var samples = AstSamples.AllConcreteNodes();
+        var productionTypes = typeof(SqlNode).Assembly.GetTypes()
+            .Where(type => type.IsClass && !type.IsAbstract &&
+                typeof(SqlNode).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(93, productionTypes.Length);
+        Assert.Equal(productionTypes,
+            samples.Select(sample => sample.GetType()).Distinct()
+                .OrderBy(type => type.FullName, StringComparer.Ordinal));
+
+        var binder = new SqlAstBinder();
+        foreach (var sample in samples)
+        {
+            var result = binder.Bind(sample);
+            Assert.IsType(sample.GetType(), result.Root);
+            Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+                diagnostic.Code != "AST_BIND_COLUMN_OWNER_UNRESOLVED" &&
+                diagnostic.Code != "AST_BIND_COLUMN_OWNER_AMBIGUOUS");
+        }
+    }
+
     [Fact]
     public void Bind_null_arguments_use_exact_parameter_names()
     {

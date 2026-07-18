@@ -39,6 +39,87 @@ internal static class AstSamples
                     new ParameterExpression(status))));
     }
 
+    internal static SelectStatement SimpleSelect() =>
+        UserByAccountAndStatus();
+
+    internal static SelectStatement InvalidSelectWithSensitiveMetadata(
+        string sentinel)
+    {
+        if (sentinel == null)
+            throw new ArgumentNullException(nameof(sentinel));
+
+        var invalid = Id("Invalid");
+        SetAutoProperty(
+            invalid,
+            nameof(SqlIdentifier.Value),
+            sentinel + ".invalid");
+        return new SelectStatement(new[]
+        {
+            new SelectProjection(new ColumnExpression(invalid))
+        });
+    }
+
+    internal static MigrationPlan OneStepMigration()
+    {
+        var step = new MigrationStep(
+            new MigrationStepId("create-app-schema"),
+            new CreateSchemaOperation(
+                new SchemaName(Id("app")),
+                CreateObjectBehavior.FailIfExists),
+            MigrationIdempotencyMode.RequireChange);
+        return new MigrationPlan(
+            new MigrationPlanId("one-step-migration"),
+            new[] { step });
+    }
+
+    internal static MigrationPlan ThreeStepMigration()
+    {
+        var table = ObjectName("PipelineTable");
+        var id = Id("Id");
+        var tableDefinition = new TableDefinition(
+            table,
+            new[]
+            {
+                new ColumnDefinition(
+                    id,
+                    new SqlTypeDescriptor(LogicalDbType.Int32),
+                    ColumnNullability.NotNullable)
+            });
+        var sequence = new SequenceDefinition(
+            ObjectName("PipelineSequence"),
+            LogicalDbType.Int64,
+            new SequenceOptions(
+                1,
+                1,
+                SequenceBounds.Unbounded(),
+                10,
+                SequenceCycleBehavior.NoCycle));
+        var steps = new[]
+        {
+            new MigrationStep(
+                new MigrationStepId("create-schema"),
+                new CreateSchemaOperation(
+                    new SchemaName(Id("app")),
+                    CreateObjectBehavior.FailIfExists),
+                MigrationIdempotencyMode.RequireChange),
+            new MigrationStep(
+                new MigrationStepId("create-table"),
+                new CreateTableOperation(
+                    tableDefinition,
+                    CreateObjectBehavior.FailIfExists),
+                MigrationIdempotencyMode.RequireChange),
+            new MigrationStep(
+                new MigrationStepId("create-sequence"),
+                new CreateSequenceOperation(
+                    sequence,
+                    CreateObjectBehavior.FailIfExists),
+                MigrationIdempotencyMode.RequireChange)
+        };
+        return new MigrationPlan(
+            new MigrationPlanId("three-step-migration"),
+            steps);
+    }
+
     internal static IReadOnlyList<SqlNode> AllConcreteNodes()
     {
         var id = Id("Id");
