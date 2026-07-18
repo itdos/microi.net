@@ -180,6 +180,7 @@ public sealed class SqlTextWriterTests
 
         AssertKeyword(SqlKeyword.AutoIncrement, "AUTO_INCREMENT");
         AssertKeyword(SqlKeyword.CurrentTimestamp, "CURRENT_TIMESTAMP");
+        AssertKeyword(SqlKeyword.DateTimeOffset, "DATETIMEOFFSET");
         AssertKeyword(SqlKeyword.DoublePrecision, "DOUBLE PRECISION");
         AssertKeyword(SqlKeyword.JsonExtract, "JSON_EXTRACT");
         AssertKeyword(SqlKeyword.JsonUnquote, "JSON_UNQUOTE");
