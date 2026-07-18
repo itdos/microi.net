@@ -285,8 +285,11 @@ public sealed class ExecutionPlanAndNativeSqlTests
             typeof(CompiledPlanFingerprint), typeof(PlanSafetyBinding),
             typeof(CompiledImpactApproval));
 
-        Assert.Empty(typeof(DatabaseExecutionPlan).Assembly
-            .GetCustomAttributes<System.Runtime.CompilerServices.InternalsVisibleToAttribute>());
+        Assert.Equal(new[] { "Dos.ORM.Tests" },
+            typeof(DatabaseExecutionPlan).Assembly
+                .GetCustomAttributes<InternalsVisibleToAttribute>()
+                .Select(x => x.AssemblyName)
+                .OrderBy(x => x, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -3932,8 +3935,11 @@ public sealed class ExecutionPlanAndNativeSqlTests
 
         Assert.Contains("<TargetFramework>netstandard2.1</TargetFramework>",
             text, StringComparison.Ordinal);
-        Assert.Empty(typeof(DatabaseExecutionPlan).Assembly
-            .GetCustomAttributes<InternalsVisibleToAttribute>());
+        Assert.Equal(new[] { "Dos.ORM.Tests" },
+            typeof(DatabaseExecutionPlan).Assembly
+                .GetCustomAttributes<InternalsVisibleToAttribute>()
+                .Select(x => x.AssemblyName)
+                .OrderBy(x => x, StringComparer.Ordinal));
     }
 
     [Fact]
