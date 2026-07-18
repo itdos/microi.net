@@ -185,7 +185,24 @@ public sealed class MySql57SeedConverterTests
             "microi_empty_postgresql17.sql",
             DatabaseSeedConverter.GetOutputFileName(
                 SeedDatabaseTarget.PostgreSql17));
+        Assert.Equal(
+            "microi_empty_oracle19c.sql.zip",
+            DatabaseSeedConverter.GetOutputZipFileName(
+                SeedDatabaseTarget.Oracle19c));
+        Assert.Equal(
+            "达梦 DM8",
+            DatabaseSeedConverter.GetDisplayName(SeedDatabaseTarget.Dm8));
         Assert.Equal(5, DatabaseSeedConverter.SupportedTargets.Count);
+        Assert.Equal(
+            new[]
+            {
+                SeedDatabaseTarget.SqlServer2022,
+                SeedDatabaseTarget.Oracle19c,
+                SeedDatabaseTarget.Dm8,
+                SeedDatabaseTarget.PostgreSql17,
+                SeedDatabaseTarget.KingbaseEs
+            },
+            DatabaseSeedConverter.SupportedTargets);
         Assert.Equal(
             SeedDatabaseTarget.SqlServer2022,
             DatabaseSeedConverter.GetTarget(DatabaseType.SqlServer));

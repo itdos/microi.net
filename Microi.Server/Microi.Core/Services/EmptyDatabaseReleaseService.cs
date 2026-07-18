@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Dos.Common;
+using Dos.ORM.SeedConversion;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
 
@@ -18,7 +19,8 @@ namespace Microi.net
     /// 主库空数据库发布服务。
     ///
     /// 安全边界：调用方不能指定源库、目标库、临时目录或 HDFS 路径；脱敏 SQL 由内部接口引擎提供并在执行前校验。
-    /// 任何失败都会删除可能包含未脱敏数据的临时数据库，同时保留线上上一版 ZIP。
+    /// 任何脱敏前失败都会删除可能包含未脱敏数据的临时数据库。发布前会先在本地生成并校验全部数据库包；
+    /// OSS 不支持跨对象事务，上传阶段失败时会返回已完成的文件清单，未上传文件保持线上上一版。
     /// </summary>
     public sealed class EmptyDatabaseReleaseService
     {
@@ -29,6 +31,8 @@ namespace Microi.net
         internal const string ZipFileName = "microi_empty_temp.sql.zip";
         internal const string PublicObjectPath = "/install/microi_empty_temp.sql.zip";
         internal const string PublicDownloadUrl = "https://static.itdos.com/install/microi_empty_temp.sql.zip";
+        internal const string PublicObjectDirectory = "/install/";
+        internal const string PublicDownloadBaseUrl = "https://static.itdos.com/install/";
 
         private readonly string _backgroundTaskId;
 
@@ -121,6 +125,7 @@ namespace Microi.net
             }
 
             string workDirectory = null;
+            var uploadedFiles = new List<string>();
             try
             {
                 var sourceBuilder = BuildAndValidateSourceConnection();
@@ -128,35 +133,63 @@ namespace Microi.net
                 workDirectory = Path.Combine(Path.GetTempPath(), "microi-empty-release", Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(workDirectory);
                 var sqlPath = Path.Combine(workDirectory, SqlFileName);
-                var zipPath = Path.Combine(workDirectory, ZipFileName);
 
                 Report(6, 8, "正在导出脱敏后的表结构和数据");
                 var exportResult = ExportDatabase(sourceBuilder, sqlPath);
-                Report(7, 8, "正在压缩并上传公开发布包");
-                CreateZip(sqlPath, zipPath);
-                var zipSize = new FileInfo(zipPath).Length;
-                var sha256 = ComputeFileSha256(zipPath);
-                UploadPublicPackage(zipPath);
-                Report(8, 8, "发布完成，可下载最新空数据库");
+                Report(7, 8, "正在生成并校验全部数据库发布包");
+                var packages = CreateReleasePackages(sqlPath, workDirectory, exportResult);
+                for (var packageIndex = 0; packageIndex < packages.Count; packageIndex++)
+                {
+                    var package = packages[packageIndex];
+                    var progress = 88 + Convert.ToInt32(Math.Floor(
+                        packageIndex * 11m / Math.Max(1, packages.Count)));
+                    BackgroundTaskRuntime.TryUpdateProgress(
+                        _backgroundTaskId,
+                        progress,
+                        $"正在上传 {package.DatabaseName} 发布包（{packageIndex + 1}/{packages.Count}）",
+                        packageIndex + 1,
+                        packages.Count);
+                    UploadPublicPackage(package.LocalZipPath, package.HdfsPath);
+                    uploadedFiles.Add(package.FileName);
+                }
+                Report(8, 8, "全部数据库发布包上传完成");
+
+                var primaryPackage = packages[0];
 
                 return new DosResult(1, new
                 {
-                    DownloadUrl = PublicDownloadUrl,
-                    FileName = ZipFileName,
-                    HdfsPath = PublicObjectPath,
-                    Sha256 = sha256,
-                    ZipSize = zipSize,
+                    DownloadUrl = primaryPackage.DownloadUrl,
+                    FileName = primaryPackage.FileName,
+                    HdfsPath = primaryPackage.HdfsPath,
+                    Sha256 = primaryPackage.Sha256,
+                    ZipSize = primaryPackage.ZipSize,
                     PublishedTableCount = exportResult.TableCount,
                     PublishedRowCount = exportResult.RowCount,
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
+                    PackageCount = packages.Count,
+                    Packages = packages.Select(package => new
+                    {
+                        package.DatabaseType,
+                        package.DatabaseName,
+                        package.FileName,
+                        package.HdfsPath,
+                        package.DownloadUrl,
+                        package.Sha256,
+                        package.ZipSize,
+                        package.TableCount,
+                        package.RowCount
+                    }).ToList(),
                     CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                }, "主库空数据库制作并发布成功，请点击下载产物。");
+                }, $"主库空数据库制作成功，已发布 {packages.Count} 个数据库 ZIP 包。");
             }
             catch (Exception ex)
             {
-                Report(0, 8, "导出或发布失败，线上旧文件保持不变");
+                Report(0, 8, "生成或上传数据库发布包失败");
                 Console.WriteLine($"Microi：发布主库空数据库失败：{ex.Message}");
-                return new DosResult(0, null, "发布主库空数据库失败，未覆盖线上旧文件。错误：" + ex.Message);
+                return new DosResult(0, new
+                {
+                    UploadedFiles = uploadedFiles
+                }, "发布主库空数据库失败；已上传文件已列入 Data，未上传文件保持线上旧版。错误：" + ex.Message);
             }
             finally
             {
@@ -570,17 +603,139 @@ namespace Microi.net
                 || string.Equals(dataTypeName, "TIMESTAMP", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void CreateZip(string sqlPath, string zipPath)
+        private IReadOnlyList<ReleasePackageArtifact> CreateReleasePackages(
+            string mysqlSqlPath,
+            string workDirectory,
+            ExportResult exportResult)
+        {
+            var packages = new List<ReleasePackageArtifact>();
+            var mysqlZipPath = Path.Combine(workDirectory, ZipFileName);
+            CreateZip(mysqlSqlPath, mysqlZipPath, SqlFileName);
+            packages.Add(CreatePackageArtifact(
+                "mysql",
+                "MySQL 5.7 / 8.0",
+                mysqlZipPath,
+                ZipFileName,
+                exportResult.TableCount,
+                exportResult.RowCount));
+
+            var outputPaths = new Dictionary<SeedDatabaseTarget, string>();
+            var writers = new Dictionary<SeedDatabaseTarget, TextWriter>();
+            IReadOnlyList<SeedConversionResult> conversionResults;
+            try
+            {
+                foreach (var target in DatabaseSeedConverter.SupportedTargets)
+                {
+                    var outputPath = Path.Combine(
+                        workDirectory,
+                        DatabaseSeedConverter.GetOutputFileName(target));
+                    outputPaths.Add(target, outputPath);
+                    writers.Add(target, new StreamWriter(
+                        outputPath,
+                        false,
+                        new UTF8Encoding(false),
+                        1024 * 1024));
+                }
+
+                using var source = new StreamReader(
+                    mysqlSqlPath,
+                    Encoding.UTF8,
+                    true,
+                    1024 * 1024);
+                conversionResults = DatabaseSeedConverter.ConvertMySql57(source, writers);
+            }
+            finally
+            {
+                foreach (var writer in writers.Values)
+                {
+                    writer.Dispose();
+                }
+            }
+
+            foreach (var target in DatabaseSeedConverter.SupportedTargets)
+            {
+                var conversion = conversionResults.First(result => result.Target == target);
+                if (conversion.TableCount != exportResult.TableCount
+                    || conversion.RowCount != exportResult.RowCount)
+                {
+                    throw new InvalidDataException(
+                        DatabaseSeedConverter.GetDisplayName(target)
+                        + " 转换结果与 MySQL 源数据计数不一致。"
+                        + $"源={exportResult.TableCount}/{exportResult.RowCount}，"
+                        + $"目标={conversion.TableCount}/{conversion.RowCount}。");
+                }
+
+                var sqlPath = outputPaths[target];
+                var zipFileName = DatabaseSeedConverter.GetOutputZipFileName(target);
+                var zipPath = Path.Combine(workDirectory, zipFileName);
+                CreateZip(
+                    sqlPath,
+                    zipPath,
+                    DatabaseSeedConverter.GetOutputFileName(target));
+                packages.Add(CreatePackageArtifact(
+                    GetDatabaseTypeKey(target),
+                    DatabaseSeedConverter.GetDisplayName(target),
+                    zipPath,
+                    zipFileName,
+                    conversion.TableCount,
+                    conversion.RowCount));
+            }
+            return packages.AsReadOnly();
+        }
+
+        private static ReleasePackageArtifact CreatePackageArtifact(
+            string databaseType,
+            string databaseName,
+            string zipPath,
+            string fileName,
+            int tableCount,
+            long rowCount)
+        {
+            return new ReleasePackageArtifact
+            {
+                DatabaseType = databaseType,
+                DatabaseName = databaseName,
+                LocalZipPath = zipPath,
+                FileName = fileName,
+                HdfsPath = PublicObjectDirectory + fileName,
+                DownloadUrl = PublicDownloadBaseUrl + fileName,
+                Sha256 = ComputeFileSha256(zipPath),
+                ZipSize = new FileInfo(zipPath).Length,
+                TableCount = tableCount,
+                RowCount = rowCount
+            };
+        }
+
+        private static string GetDatabaseTypeKey(SeedDatabaseTarget target)
+        {
+            switch (target)
+            {
+                case SeedDatabaseTarget.SqlServer2022:
+                    return "sqlserver";
+                case SeedDatabaseTarget.Oracle19c:
+                    return "oracle";
+                case SeedDatabaseTarget.Dm8:
+                    return "dameng";
+                case SeedDatabaseTarget.PostgreSql17:
+                    return "postgresql";
+                case SeedDatabaseTarget.KingbaseEs:
+                    return "kingbase";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(target));
+            }
+        }
+
+        private static void CreateZip(string sqlPath, string zipPath, string entryFileName)
         {
             using var output = new FileStream(zipPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             using var archive = new ZipArchive(output, ZipArchiveMode.Create, false, new UTF8Encoding(false));
-            var entry = archive.CreateEntry(SqlFileName, CompressionLevel.Optimal);
+            var entry = archive.CreateEntry(entryFileName, CompressionLevel.Optimal);
             using var entryStream = entry.Open();
             using var input = new FileStream(sqlPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             input.CopyTo(entryStream);
         }
 
-        private static void UploadPublicPackage(string zipPath)
+        private static void UploadPublicPackage(string zipPath, string objectPath)
         {
             var clientModel = OsClientExtend.GetClient(RequiredOsClient);
             if (clientModel == null)
@@ -600,7 +755,7 @@ namespace Microi.net
                 ClientModel = clientModel,
                 Limit = false,
                 Preview = false,
-                FileFullPath = PublicObjectPath,
+                FileFullPath = objectPath,
                 FileStream = stream
             }).GetAwaiter().GetResult();
             if (result == null || result.Code != 1)
@@ -753,6 +908,20 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
 
         private sealed class ExportResult
         {
+            public int TableCount { get; set; }
+            public long RowCount { get; set; }
+        }
+
+        private sealed class ReleasePackageArtifact
+        {
+            public string DatabaseType { get; set; }
+            public string DatabaseName { get; set; }
+            public string LocalZipPath { get; set; }
+            public string FileName { get; set; }
+            public string HdfsPath { get; set; }
+            public string DownloadUrl { get; set; }
+            public string Sha256 { get; set; }
+            public long ZipSize { get; set; }
             public int TableCount { get; set; }
             public long RowCount { get; set; }
         }

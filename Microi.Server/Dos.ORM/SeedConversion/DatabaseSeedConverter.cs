@@ -15,9 +15,9 @@ namespace Dos.ORM.SeedConversion
             Array.AsReadOnly(new[]
             {
                 SeedDatabaseTarget.SqlServer2022,
-                SeedDatabaseTarget.PostgreSql17,
                 SeedDatabaseTarget.Oracle19c,
                 SeedDatabaseTarget.Dm8,
+                SeedDatabaseTarget.PostgreSql17,
                 SeedDatabaseTarget.KingbaseEs
             });
 
@@ -154,6 +154,31 @@ namespace Dos.ORM.SeedConversion
                     return "microi_empty_dm8.sql";
                 case SeedDatabaseTarget.KingbaseEs:
                     return "microi_empty_kingbasees.sql";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(target));
+            }
+        }
+
+        public static string GetOutputZipFileName(SeedDatabaseTarget target)
+        {
+            return GetOutputFileName(target) + ".zip";
+        }
+
+        public static string GetDisplayName(SeedDatabaseTarget target)
+        {
+            EnsureTarget(target);
+            switch (target)
+            {
+                case SeedDatabaseTarget.SqlServer2022:
+                    return "SQL Server 2022";
+                case SeedDatabaseTarget.Oracle19c:
+                    return "Oracle 19c";
+                case SeedDatabaseTarget.Dm8:
+                    return "达梦 DM8";
+                case SeedDatabaseTarget.PostgreSql17:
+                    return "PostgreSQL 17";
+                case SeedDatabaseTarget.KingbaseEs:
+                    return "人大金仓 KingbaseES V9";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(target));
             }
