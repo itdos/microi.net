@@ -184,7 +184,9 @@ public sealed class SqlTextWriterTests
         AssertKeyword(SqlKeyword.JsonExtract, "JSON_EXTRACT");
         AssertKeyword(SqlKeyword.JsonUnquote, "JSON_UNQUOTE");
         AssertKeyword(SqlKeyword.JsonValue, "JSON_VALUE");
+        AssertKeyword(SqlKeyword.Serializable, "SERIALIZABLE");
         AssertKeyword(SqlKeyword.SkipLocked, "SKIP LOCKED");
+        AssertKeyword(SqlKeyword.Updlock, "UPDLOCK");
     }
 
     [Fact]
