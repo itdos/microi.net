@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dos.Common;
+using Dos.ORM.Dialects.Dm8;
 
 namespace Dos.ORM
 {
@@ -39,11 +40,17 @@ namespace Dos.ORM
 
         public string GetFieldName(string fieldName)
         {
-            if (DefaultFieldNames.Contains(fieldName))
+            var physicalName =
+                Dm8IdentifierCompatibility.ToPhysicalColumn(fieldName);
+            if (!string.Equals(
+                    physicalName,
+                    fieldName,
+                    StringComparison.Ordinal) ||
+                DefaultFieldNames.Contains(physicalName))
             {
-                return $"\"{fieldName}\"";
+                return $"\"{physicalName}\"";
             }
-            return fieldName;
+            return physicalName;
         }
 
         public string GetTableName(string tableName, string userName = null)
@@ -131,7 +138,8 @@ namespace Dos.ORM
                 return new DosResult(0, null, "表名或字段名不合法");
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
-            var sql = $"ALTER TABLE {param.TableName} ADD {param.FieldName} {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
+            var physicalFieldName = GetFieldName(param.FieldName);
+            var sql = $"ALTER TABLE {param.TableName} ADD {physicalFieldName} {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
 
             try
             {
@@ -140,7 +148,7 @@ namespace Dos.ORM
 
                 if (!param.FieldLabel.DosIsNullOrWhiteSpace())
                 {
-                    var commentSql = $"COMMENT ON COLUMN {param.TableName}.{param.FieldName} IS '{param.FieldLabel.Replace("'", "''")}' ";
+                    var commentSql = $"COMMENT ON COLUMN {param.TableName}.{physicalFieldName} IS '{param.FieldLabel.Replace("'", "''")}' ";
                     try { session.FromSql(commentSql).ExecuteNonQuery(); } catch { }
                 }
                 return new DosResult(1);
@@ -253,6 +261,14 @@ namespace Dos.ORM
                                             WHERE a.OWNER = USER
                                               AND a.table_name = UPPER('{0}')";
             var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
+            foreach (var column in realFieldList)
+            {
+                if (column?.column_name != null)
+                {
+                    column.column_name =
+                        Dm8IdentifierCompatibility.ToLogicalColumn(column.column_name);
+                }
+            }
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 
@@ -312,7 +328,7 @@ namespace Dos.ORM
                 var columns = param.IndexColumns.Split(',').Select(c => c.Trim()).ToArray();
                 foreach (var col in columns)
                     if (!IsValidIdentifier(col)) return new DosResult(0, null, $"字段名不合法: {col}");
-                var columnsSql = string.Join(", ", columns);
+                var columnsSql = string.Join(", ", columns.Select(GetFieldName));
                 var uniqueStr = param.IndexUnique ? "UNIQUE " : "";
                 var sql = $"CREATE {uniqueStr}INDEX {param.IndexName} ON {param.TableName} ({columnsSql})";
 

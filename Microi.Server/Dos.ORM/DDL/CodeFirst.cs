@@ -18,6 +18,7 @@
  ******************************************************/
 
 using Dos.ORM.Common;
+using Dos.ORM.Dialects.Dm8;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -193,9 +194,13 @@ WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
                         "ColumnExists 不支持数据库类型：" + dbSession.Db.DbProvider.DatabaseType);
             }
 
+            var physicalColumnName =
+                dbSession.Db.DbProvider.DatabaseType == DatabaseType.DaMeng
+                    ? Dm8IdentifierCompatibility.ToPhysicalColumn(columnName)
+                    : columnName;
             return dbSession.FromSql(sql)
                 .AddInParameter("p0", tableName)
-                .AddInParameter("p1", columnName)
+                .AddInParameter("p1", physicalColumnName)
                 .ToScalar<int>() > 0;
         }
 
@@ -248,7 +253,9 @@ WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
             {
                 if (i > 0) sb.Append(',');
                 var f = fields[i];
-                sb.Append(L).Append(f.PropertyName).Append(R).Append(' ');
+                sb.Append(L)
+                  .Append(PhysicalColumnName(dbType, f.PropertyName))
+                  .Append(R).Append(' ');
                 sb.Append(MapColumnType(dbType, f, props.TryGetValue(f.PropertyName, out var pi) ? pi.PropertyType : typeof(string)));
                 if (hasIdentity && string.Equals(f.PropertyName, identity.PropertyName, StringComparison.OrdinalIgnoreCase))
                 {
@@ -264,7 +271,9 @@ WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
                 for (int i = 0; i < pkFields.Length; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    sb.Append(L).Append(pkFields[i].PropertyName).Append(R);
+                    sb.Append(L)
+                      .Append(PhysicalColumnName(dbType, pkFields[i].PropertyName))
+                      .Append(R);
                 }
                 sb.Append(')');
             }
@@ -288,7 +297,9 @@ WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
             for (int i = 0; i < idx.Columns.Length; i++)
             {
                 if (i > 0) sb.Append(',');
-                sb.Append(L).Append(idx.Columns[i]).Append(R);
+                sb.Append(L)
+                  .Append(PhysicalColumnName(dbType, idx.Columns[i]))
+                  .Append(R);
             }
             sb.Append(')');
             return sb.ToString();
@@ -305,6 +316,15 @@ WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
                 case DatabaseType.MySql:    return ('`', '`');
                 default:                    return ('"', '"');
             }
+        }
+
+        private static string PhysicalColumnName(
+            DatabaseType dbType,
+            string logicalName)
+        {
+            return dbType == DatabaseType.DaMeng
+                ? Dm8IdentifierCompatibility.ToPhysicalColumn(logicalName)
+                : logicalName;
         }
 
         private static string IdentityClause(DatabaseType dbType)
