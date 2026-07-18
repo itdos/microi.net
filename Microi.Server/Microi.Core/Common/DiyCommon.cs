@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
 using Dos.ORM;
+using Dos.ORM.Platform;
 
 namespace Microi.net
 {
@@ -30,55 +31,7 @@ namespace Microi.net
         public const int SlowSqlThresholdMs = 5000;
         public static DbInfo GetDbInfo(string dbType)
         {
-            if (dbType.ToLower() == "mysql")
-                return new DbInfo()
-                {
-                    L = '`',
-                    R = '`',
-                    P = '?',
-                    DbType = DatabaseType.MySql,
-                };
-            else if (dbType.ToLower().DosContains("sqlserver"))
-                return new DbInfo()
-                {
-                    L = '[',
-                    R = ']',
-                    P = '@',
-                    DbType = DatabaseType.SqlServer,
-                };
-            else if (dbType.ToLower().DosContains("oracle"))
-                return new DbInfo()
-                {
-                    L = '"',
-                    R = '"',
-                    P = ':',
-                    DbType = DatabaseType.Oracle,
-                };
-            else if (dbType.ToLower().DosContains("postgresql") || dbType.ToLower().DosContains("pgsql"))
-                return new DbInfo()
-                {
-                    L = '"',
-                    R = '"',
-                    P = '@',
-                    DbType = DatabaseType.PostgreSql,
-                };
-            else if (dbType.ToLower().DosContains("dameng") || dbType.ToLower() == "dm")
-                return new DbInfo()
-                {
-                    L = '"',
-                    R = '"',
-                    P = ':',
-                    DbType = DatabaseType.DaMeng,
-                };
-            else if (dbType.ToLower().DosContains("kingbase") || dbType.ToLower().DosContains("kdbndp"))
-                return new DbInfo()
-                {
-                    L = '"',
-                    R = '"',
-                    P = ':',
-                    DbType = DatabaseType.KingBase,
-                };
-            throw new Exception("DbType value error.");
+            return DatabaseConfigurationResolver.Resolve(dbType);
         }
 
         /// <summary>
@@ -383,35 +336,7 @@ namespace Microi.net
         /// <returns></returns>
         public static DatabaseType GetDbType(string dbType)
         {
-            if (dbType.DosIsNullOrWhiteSpace())
-            {
-                return DatabaseType.MySql;
-            }
-            else if (dbType.ToLower() == "mysql")
-            {
-                return DatabaseType.MySql;
-            }
-            else if (dbType.ToLower() == "sqlserver9")
-            {
-                return DatabaseType.SqlServer9;
-            }
-            else if (dbType.ToLower() == "sqlserver")
-            {
-                return DatabaseType.SqlServer;
-            }
-            else if (dbType.ToLower() == "sqlite3")
-            {
-                return DatabaseType.Sqlite3;
-            }
-            else if (dbType.ToLower() == "oracle")
-            {
-                return DatabaseType.Oracle;
-            }
-            else if (dbType.ToLower() == "msaccess")
-            {
-                return DatabaseType.MsAccess;
-            }
-            return DatabaseType.MySql;
+            return DatabaseConfigurationResolver.Resolve(dbType).DbType;
         }
         /// <summary>
         /// 
