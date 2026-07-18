@@ -2454,7 +2454,10 @@ namespace Dos.ORM
         /// <returns></returns>
         public SqlSection FromSql(string sql)
         {
-            return new SqlSection(this, sql);
+            var compatibleSql = LegacySqlDialectRewriter.Rewrite(
+                sql,
+                db.DbProvider.DatabaseType);
+            return new SqlSection(this, compatibleSql);
         }
 
         #endregion
