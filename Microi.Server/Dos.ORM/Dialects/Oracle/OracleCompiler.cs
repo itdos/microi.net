@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Dos.ORM.Platform;
+using Dos.ORM.Dialects.Dm8;
 using Dos.ORM.SqlAst;
 using Dos.ORM.SqlCompilation;
 
@@ -665,11 +666,11 @@ namespace Dos.ORM.Dialects.Oracle
                     && TryGetEncodedColumnContract(
                         column, context, out _, out _))
                 {
-                    WriteDecodedColumn(column, writer);
+                    WriteDecodedColumn(column, writer, dialect);
                 }
                 else
                 {
-                    WriteColumn(column, writer);
+                    WriteColumn(column, writer, dialect);
                 }
                 return;
             }
@@ -1175,25 +1176,28 @@ namespace Dos.ORM.Dialects.Oracle
 
         private static void WriteColumn(
             ColumnExpression column,
-            SqlTextWriter writer)
+            SqlTextWriter writer,
+            OracleFamilyDialect dialect)
         {
             if (column.Source != null)
             {
                 writer.AppendIdentifierSegment(column.Source.Identifier.Value);
                 writer.AppendDot();
             }
-            writer.AppendIdentifierSegment(column.Name.Value);
+            writer.AppendIdentifierSegment(
+                PhysicalColumnName(column.Name.Value, dialect));
         }
 
         private static void WriteDecodedColumn(
             ColumnExpression column,
-            SqlTextWriter writer)
+            SqlTextWriter writer,
+            OracleFamilyDialect dialect)
         {
             writer.AppendKeyword(SqlKeyword.Case);
             writer.AppendSpace();
             writer.AppendKeyword(SqlKeyword.When);
             writer.AppendSpace();
-            WriteColumn(column, writer);
+            WriteColumn(column, writer, dialect);
             writer.AppendSpace();
             writer.AppendKeyword(SqlKeyword.Is);
             writer.AppendSpace();
@@ -1207,7 +1211,7 @@ namespace Dos.ORM.Dialects.Oracle
             writer.AppendSpace();
             writer.AppendKeyword(SqlKeyword.Substring);
             writer.AppendOpenParenthesis();
-            WriteColumn(column, writer);
+            WriteColumn(column, writer, dialect);
             writer.AppendComma();
             writer.AppendStructuralInt(2);
             writer.AppendCloseParenthesis();
@@ -1253,6 +1257,15 @@ namespace Dos.ORM.Dialects.Oracle
                 writer.AppendDot();
             }
             writer.AppendIdentifierSegment(name.Name.Value);
+        }
+
+        private static string PhysicalColumnName(
+            string logicalName,
+            OracleFamilyDialect dialect)
+        {
+            return dialect == OracleFamilyDialect.Dm8
+                ? Dm8IdentifierCompatibility.ToPhysicalColumn(logicalName)
+                : logicalName;
         }
 
         private static SqlTextWriter NewWriter()

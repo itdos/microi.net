@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Dos.ORM.Dialects.Dm8;
 
 namespace Dos.ORM
 {
@@ -307,6 +308,10 @@ namespace Dos.ORM
                 ? tokenText.Substring(1, tokenText.Length - 2)
                     .Replace("``", "`")
                 : string.Empty;
+            if (targetDatabase == DatabaseType.DaMeng)
+            {
+                value = Dm8IdentifierCompatibility.ToPhysicalColumn(value);
+            }
             if (IsSqlServer(targetDatabase))
             {
                 return "[" + value.Replace("]", "]]" ) + "]";
