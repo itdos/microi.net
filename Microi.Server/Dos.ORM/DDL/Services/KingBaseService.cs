@@ -232,13 +232,15 @@ namespace Dos.ORM
                             '' AS column_key,
                             '' AS extra,
                             c.is_nullable,
-                            c.udt_name AS column_type
+                            c.udt_name AS column_type,
+                            c.character_maximum_length
                         FROM information_schema.columns c
                         LEFT JOIN pg_catalog.pg_statio_all_tables st 
                             ON st.relname = c.table_name AND st.schemaname = c.table_schema
                         LEFT JOIN pg_catalog.pg_description pgd 
                             ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
-                        WHERE c.table_name = '{param.TableName}'
+                        WHERE c.table_schema = current_schema()
+                          AND c.table_name = '{param.TableName}'
                         ORDER BY c.ordinal_position";
             var realFieldList = param.DbSession.FromSql(sql).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);

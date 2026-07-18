@@ -809,9 +809,10 @@ namespace Microi.net
             });
         }
 
-        private static string QuoteMysqlIdentifier(string identifier)
+        private static IMicroiORM ResolveDatabaseOrm(DbSession db)
         {
-            return $"`{(identifier ?? "").Replace("`", "``")}`";
+            if (db == null) throw new ArgumentNullException(nameof(db));
+            return MicroiEngine.ORM(db.Db.DbProvider.DatabaseType);
         }
 
         private static string ResolvePhysicalTableName(DbSession db, string tableName)
@@ -822,18 +823,9 @@ namespace Microi.net
             }
             try
             {
-                var row = db.FromSql(@"SELECT TABLE_NAME
-                        FROM information_schema.TABLES
-                        WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)
-                        LIMIT 1")
-                    .AddInParameter("p0", tableName)
-                    .ToList<dynamic>()
-                    ?.FirstOrDefault();
-                var table = TokenString(ToJObjectSafe(row), "TABLE_NAME");
-                if (IsBlank(table))
-                {
-                    table = TokenString(ToJObjectSafe(row), "TableName");
-                }
+                var result = ResolveDatabaseOrm(db).GetTables(new DbServiceParam { DbSession = db });
+                var table = result?.Data?.FirstOrDefault(name =>
+                    string.Equals(name, tableName, StringComparison.OrdinalIgnoreCase));
                 return IsBlank(table) ? tableName : table;
             }
             catch
@@ -846,14 +838,13 @@ namespace Microi.net
         {
             try
             {
-                return db.FromSql(@"SELECT COUNT(*)
-                        FROM information_schema.COLUMNS
-                        WHERE TABLE_SCHEMA = DATABASE()
-                          AND LOWER(TABLE_NAME) = LOWER(@p0)
-                          AND LOWER(COLUMN_NAME) = LOWER(@p1)")
-                    .AddInParameter("p0", tableName)
-                    .AddInParameter("p1", fieldName)
-                    .ToScalar<int>() > 0;
+                var result = ResolveDatabaseOrm(db).GetColumns(new DbServiceParam
+                {
+                    DbSession = db,
+                    TableName = tableName
+                });
+                return result?.Data?.Any(column => string.Equals(
+                    column.column_name, fieldName, StringComparison.OrdinalIgnoreCase)) == true;
             }
             catch
             {
@@ -875,21 +866,15 @@ namespace Microi.net
             try
             {
                 var physicalTableName = ResolvePhysicalTableName(db, tableName);
-                var rows = db.FromSql(@"SELECT COLUMN_NAME
-                        FROM information_schema.COLUMNS
-                        WHERE TABLE_SCHEMA = DATABASE()
-                          AND LOWER(TABLE_NAME) = LOWER(@p0)")
-                    .AddInParameter("p0", physicalTableName)
-                    .ToList<dynamic>();
-                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var item in rows ?? new List<dynamic>())
+                var result = ResolveDatabaseOrm(db).GetColumns(new DbServiceParam
                 {
-                    var row = ToJObjectSafe(item);
-                    var name = TokenString(row, "COLUMN_NAME");
-                    if (IsBlank(name))
-                    {
-                        name = TokenString(row, "ColumnName");
-                    }
+                    DbSession = db,
+                    TableName = physicalTableName
+                });
+                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in result?.Data ?? new List<information_schema_columns>())
+                {
+                    var name = item?.column_name;
                     if (!IsBlank(name))
                     {
                         columns.Add(name);
@@ -921,8 +906,16 @@ namespace Microi.net
                 {
                     return;
                 }
-                db.FromSql($"ALTER TABLE {QuoteMysqlIdentifier(physicalTableName)} ADD COLUMN {QuoteMysqlIdentifier(fieldName)} {type} NULL")
-                    .ExecuteNonQuery();
+                var result = ResolveDatabaseOrm(db).AddColumn(new DbServiceParam
+                {
+                    DbSession = db,
+                    TableName = physicalTableName,
+                    FieldName = fieldName,
+                    FieldType = type,
+                    FieldNotNull = false
+                });
+                if (result.Code != 1)
+                    throw new InvalidOperationException(result.Msg ?? "添加物理字段失败");
             }
             catch (Exception ex)
             {
@@ -1227,41 +1220,30 @@ namespace Microi.net
             {
                 await RunDiyLangDbOperationAsync(osClient, () =>
                 {
-                    var clientModel = OsClientExtend.GetClient(osClient);
-                    var db = clientModel.Db;
-                    var dbType = TokenString(clientModel.OsClientModel?["DbType"]);
-                    if (IsBlank(dbType))
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var orm = ResolveDatabaseOrm(db);
+                    var columns = orm.GetColumns(new DbServiceParam
                     {
-                        dbType = TokenString(clientModel.OsClientModel?["DbReadType"]);
-                    }
-                    var dbTypeLower = (dbType ?? "").ToLowerInvariant();
-                    if (dbTypeLower.Contains("mysql"))
+                        DbSession = db,
+                        TableName = tableName
+                    });
+                    var column = columns?.Data?.FirstOrDefault(item => string.Equals(
+                        item.column_name, fieldName, StringComparison.OrdinalIgnoreCase));
+                    var length = column?.character_maximum_length;
+                    if (length.HasValue && length.Value > 0 && length.Value < minLength)
                     {
-                        var length = db.FromSql(@"SELECT CHARACTER_MAXIMUM_LENGTH
-                                FROM INFORMATION_SCHEMA.COLUMNS
-                                WHERE TABLE_SCHEMA = DATABASE()
-                                  AND TABLE_NAME = @p0
-                                  AND COLUMN_NAME = @p1")
-                            .AddInParameter("p0", tableName)
-                            .AddInParameter("p1", fieldName)
-                            .ToScalar<int?>();
-                        if (length.HasValue && length.Value > 0 && length.Value < minLength)
+                        var result = orm.ChangeColumn(new DbServiceParam
                         {
-                            db.FromSql($"ALTER TABLE `{tableName}` MODIFY COLUMN `{fieldName}` varchar({minLength}) NULL")
-                                .ExecuteNonQuery();
-                        }
-                    }
-                    else if (dbTypeLower.Contains("sqlserver") || dbTypeLower.Contains("mssql"))
-                    {
-                        var length = db.FromSql("SELECT COL_LENGTH(@p0, @p1)")
-                            .AddInParameter("p0", tableName)
-                            .AddInParameter("p1", fieldName)
-                            .ToScalar<int?>();
-                        if (length.HasValue && length.Value > 0 && length.Value < minLength)
-                        {
-                            db.FromSql($"ALTER TABLE [{tableName}] ALTER COLUMN [{fieldName}] varchar({minLength}) NULL")
-                                .ExecuteNonQuery();
-                        }
+                            DbSession = db,
+                            TableName = tableName,
+                            FieldName = fieldName,
+                            NewFieldName = fieldName,
+                            OldFieldType = column.column_type ?? column.data_type ?? string.Empty,
+                            FieldType = $"varchar({minLength})",
+                            FieldNotNull = string.Equals(column.is_nullable, "NO", StringComparison.OrdinalIgnoreCase)
+                        });
+                        if (result.Code != 1)
+                            throw new InvalidOperationException(result.Msg ?? "扩展字段长度失败");
                     }
                     return Task.FromResult(1);
                 });
