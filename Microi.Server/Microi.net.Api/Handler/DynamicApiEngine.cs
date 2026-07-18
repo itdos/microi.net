@@ -93,15 +93,6 @@ namespace Microi.net.Api
                             Type = "<>"
                         }
                     };
-                if (clientModel.OsClientModel["DbType"].Val<string>() != "Oracle")
-                {
-                    _where.Add(new DiyWhere()
-                    {
-                        Name = "ApiAddress",
-                        Value = "",
-                        Type = "<>"
-                    });
-                }
                 var sysApiEngineListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
                 {
                     FormEngineKey = "sys_apiengine",
@@ -118,6 +109,10 @@ namespace Microi.net.Api
                         var tasks = new List<Task>(sysApiEngineList.Count * 2);
                         foreach (var item in sysApiEngineList)
                         {
+                            if (string.IsNullOrWhiteSpace((string)item.ApiAddress))
+                            {
+                                continue;
+                            }
                             var apiEngineKey = ((string)item.ApiEngineKey).ToLower();
                             var apiAddress = ((string)item.ApiAddress).ToLower();
 
