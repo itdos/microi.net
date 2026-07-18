@@ -84,6 +84,7 @@ namespace Dos.ORM.SqlCompilation
         DateDiff,
         DateTime,
         DateTime2,
+        DateTimeOffset,
         Decimal,
         Default,
         Delete,
@@ -723,6 +724,7 @@ namespace Dos.ORM.SqlCompilation
                 case SqlKeyword.DateDiff: return "DATEDIFF";
                 case SqlKeyword.DateTime: return "DATETIME";
                 case SqlKeyword.DateTime2: return "DATETIME2";
+                case SqlKeyword.DateTimeOffset: return "DATETIMEOFFSET";
                 case SqlKeyword.Decimal: return "DECIMAL";
                 case SqlKeyword.Default: return "DEFAULT";
                 case SqlKeyword.Delete: return "DELETE";
