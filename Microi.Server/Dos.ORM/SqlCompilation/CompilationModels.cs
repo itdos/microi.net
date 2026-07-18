@@ -177,6 +177,8 @@ namespace Dos.ORM.SqlCompilation
             CommandText = commandText;
             Parameters = CompilationModelGuard.CopyUniqueParameters(
                 parameters, nameof(parameters));
+            InternalParameterPlaceholders =
+                SqlParameterPlaceholderMap.Dense(Parameters.Count);
             InternalValueContract = SqlCommandValueContract.Native(Parameters);
         }
 
@@ -204,6 +206,40 @@ namespace Dos.ORM.SqlCompilation
             CommandText = commandText;
             Parameters = CompilationModelGuard.CopyUniqueParameters(
                 parameters, nameof(parameters));
+            InternalParameterPlaceholders =
+                SqlParameterPlaceholderMap.Dense(Parameters.Count);
+            ValidateValueContract(Parameters, valueContract);
+            InternalValueContract = valueContract;
+        }
+
+        internal SqlCommandStep(
+            string commandText,
+            IEnumerable<ParameterDefinition> parameters,
+            IEnumerable<string> parameterPlaceholders,
+            SqlResultShape resultShape,
+            PlanResultRole resultRole,
+            PlanConnectionRole connectionRole,
+            PlanTransactionBehavior transactionBehavior,
+            MigrationStepId sourceMigrationStepId,
+            SqlCommandValueContract valueContract)
+            : base(resultShape, resultRole, connectionRole,
+                transactionBehavior, sourceMigrationStepId)
+        {
+            CompilationModelGuard.EnsureCommandText(
+                commandText, nameof(commandText));
+            PlanCompositionValidator.ValidateCommandResult(
+                resultShape, resultRole);
+            if (valueContract == null)
+            {
+                throw new ArgumentNullException(nameof(valueContract));
+            }
+
+            CommandText = commandText;
+            Parameters = CompilationModelGuard.CopyUniqueParameters(
+                parameters, nameof(parameters));
+            InternalParameterPlaceholders = SqlParameterPlaceholderMap.Copy(
+                parameterPlaceholders, Parameters.Count,
+                nameof(parameterPlaceholders));
             ValidateValueContract(Parameters, valueContract);
             InternalValueContract = valueContract;
         }
@@ -213,6 +249,12 @@ namespace Dos.ORM.SqlCompilation
         public IReadOnlyList<ParameterDefinition> Parameters { get; }
 
         internal SqlCommandValueContract InternalValueContract { get; }
+
+        internal IReadOnlyList<string> InternalParameterPlaceholders { get; }
+
+        internal bool RequiresParameterPlaceholderExtension =>
+            !SqlParameterPlaceholderMap.IsDense(
+                InternalParameterPlaceholders);
 
         public override string ToString()
         {
@@ -1653,7 +1695,7 @@ namespace Dos.ORM.SqlCompilation
                 if (commands.Count != 2
                     || commands[0].ResultRole != PlanResultRole.Aggregate
                     || commands[0].ResultShape != SqlResultShape.Scalar
-                    || commands[1].ResultRole != PlanResultRole.Aggregate
+                    || commands[1].ResultRole != PlanResultRole.Final
                     || commands[1].ResultShape != SqlResultShape.RowSet)
                 {
                     throw new ArgumentException(
@@ -2918,6 +2960,19 @@ namespace Dos.ORM.SqlCompilation
                 wire.WriteUtf8("command-value-contract-v1");
                 wire.WriteUtf8(
                     command.InternalValueContract.Fingerprint.Value);
+            }
+            if (command.RequiresParameterPlaceholderExtension)
+            {
+                wire.WriteUtf8("command-parameter-placeholders-v1");
+                WriteCount(
+                    wire, command.InternalParameterPlaceholders.Count);
+                for (var index = 0;
+                     index < command.InternalParameterPlaceholders.Count;
+                     index++)
+                {
+                    wire.WriteUtf8(
+                        command.InternalParameterPlaceholders[index]);
+                }
             }
         }
 

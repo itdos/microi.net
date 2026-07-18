@@ -358,6 +358,75 @@ public sealed class SqlValueContractTests
     }
 
     [Fact]
+    public void Command_parameter_placeholder_mapping_is_defensive_and_fingerprinted()
+    {
+        var definitions = new[]
+        {
+            new ParameterDefinition(
+                "late", new SqlTypeDescriptor(LogicalDbType.String)),
+            new ParameterDefinition(
+                "early", new SqlTypeDescriptor(LogicalDbType.Int32))
+        };
+        var profile = TestProfiles.PostgreSql17;
+        var storage = DatabaseStorageContract.Native(profile);
+        var options = new SqlCompilationOptions(
+            profile, AtomicityRequirement.None, null, storage);
+        var contract = SqlCommandValueContract.Native(storage, definitions);
+        var source = new SelectStatement(new[]
+        {
+            new SelectProjection(BooleanExpression.True)
+        });
+        var placeholders = new List<string> { "p7", "p2" };
+
+        var sparse = new SqlCommandStep(
+            "SELECT @p7,@p2", definitions, placeholders,
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract);
+        placeholders[0] = "p0";
+        var swapped = new SqlCommandStep(
+            "SELECT @p7,@p2", definitions, new[] { "p2", "p7" },
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract);
+        var denseLegacy = new SqlCommandStep(
+            "SELECT @p0,@p1", definitions,
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract);
+        var denseExplicit = new SqlCommandStep(
+            "SELECT @p0,@p1", definitions, new[] { "p0", "p1" },
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract);
+
+        Assert.Equal(new[] { "p7", "p2" },
+            sparse.InternalParameterPlaceholders);
+        Assert.NotEqual(
+            Command(sparse, source, options).Fingerprint,
+            Command(swapped, source, options).Fingerprint);
+        Assert.Equal(
+            Command(denseLegacy, source, options).Fingerprint,
+            Command(denseExplicit, source, options).Fingerprint);
+
+        Assert.Throws<ArgumentException>(() => new SqlCommandStep(
+            "SELECT @p0", definitions, new[] { "p0" },
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract));
+        Assert.Throws<ArgumentException>(() => new SqlCommandStep(
+            "SELECT @p0,@p0", definitions, new[] { "p0", "p0" },
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract));
+        Assert.Throws<ArgumentException>(() => new SqlCommandStep(
+            "SELECT @p01,@p2", definitions, new[] { "p01", "p2" },
+            SqlResultShape.RowSet, PlanResultRole.Final,
+            PlanConnectionRole.CurrentDatabase,
+            PlanTransactionBehavior.Enlistable, null, contract));
+    }
+
+    [Fact]
     public void Compilation_options_reject_a_storage_contract_for_another_profile()
     {
         Assert.Throws<ArgumentException>(() =>

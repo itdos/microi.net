@@ -2174,13 +2174,15 @@ public sealed class ExecutionPlanAndNativeSqlTests
             PlanResultRole.Aggregate);
         var data = Command(
             "SELECT id FROM items LIMIT 10", [], SqlResultShape.RowSet,
-            PlanResultRole.Aggregate);
+            PlanResultRole.Final);
 
         var plan = StatementPlan(source, [count, data], options);
         Assert.Equal(SqlResultShape.MultipleResultSets, plan.ResultShape);
         Assert.Equal(2, plan.Steps.Count);
         Assert.Same(count, plan.Steps[0]);
         Assert.Same(data, plan.Steps[1]);
+        Assert.Equal(PlanResultRole.Aggregate, plan.Steps[0].ResultRole);
+        Assert.Equal(PlanResultRole.Final, plan.Steps[1].ResultRole);
         Assert.DoesNotContain(';', ((SqlCommandStep)plan.Steps[0]).CommandText);
         Assert.DoesNotContain(';', ((SqlCommandStep)plan.Steps[1]).CommandText);
 
@@ -2212,7 +2214,7 @@ public sealed class ExecutionPlanAndNativeSqlTests
         var data = Command(
             "SELECT \"id;legacy\" FROM \"items;archive\" " +
             "ORDER BY \"id;legacy\" LIMIT 10;", [],
-            SqlResultShape.RowSet, PlanResultRole.Aggregate);
+            SqlResultShape.RowSet, PlanResultRole.Final);
 
         var plan = StatementPlan(source, [count, data], Options());
 
@@ -2231,7 +2233,7 @@ public sealed class ExecutionPlanAndNativeSqlTests
             SqlResultShape.Scalar, PlanResultRole.Aggregate);
         var data = Command(
             "SELECT \"id;legacy\" FROM \"items;archive\" LIMIT 10;", [],
-            SqlResultShape.RowSet, PlanResultRole.Aggregate);
+            SqlResultShape.RowSet, PlanResultRole.Final);
 
         Assert.Throws<ArgumentException>(() => StatementPlan(
             source, [data, count], Options()));

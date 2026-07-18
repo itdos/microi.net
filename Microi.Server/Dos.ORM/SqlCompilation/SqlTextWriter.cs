@@ -128,6 +128,7 @@ namespace Dos.ORM.SqlCompilation
         Json,
         JsonB,
         JsonExtract,
+        JsonUnquote,
         JsonbExtractPathText,
         JsonValue,
         Key,
@@ -289,7 +290,8 @@ namespace Dos.ORM.SqlCompilation
     {
         internal SqlCommandTextSnapshot(
             string commandText,
-            IEnumerable<ParameterDefinition> parameters)
+            IEnumerable<ParameterDefinition> parameters,
+            IEnumerable<string> parameterPlaceholders)
         {
             if (commandText == null)
             {
@@ -315,11 +317,114 @@ namespace Dos.ORM.SqlCompilation
 
             CommandText = commandText;
             Parameters = new ReadOnlyCollection<ParameterDefinition>(copied);
+            ParameterPlaceholders = SqlParameterPlaceholderMap.Copy(
+                parameterPlaceholders, copied.Count,
+                nameof(parameterPlaceholders));
         }
 
         internal string CommandText { get; }
 
         internal IReadOnlyList<ParameterDefinition> Parameters { get; }
+
+        internal IReadOnlyList<string> ParameterPlaceholders { get; }
+    }
+
+    internal static class SqlParameterPlaceholderMap
+    {
+        internal static IReadOnlyList<string> Dense(int count)
+        {
+            if (count < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            var values = new List<string>(count);
+            for (var index = 0; index < count; index++)
+            {
+                values.Add(Format(index));
+            }
+            return new ReadOnlyCollection<string>(values);
+        }
+
+        internal static IReadOnlyList<string> Copy(
+            IEnumerable<string> values,
+            int expectedCount,
+            string parameterName)
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(parameterName);
+            }
+            if (expectedCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(expectedCount));
+            }
+
+            var copy = new List<string>();
+            var unique = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var value in values)
+            {
+                if (!IsCanonical(value) || !unique.Add(value))
+                {
+                    throw new ArgumentException(
+                        "Parameter placeholders must be unique canonical pN values.",
+                        parameterName);
+                }
+                copy.Add(value);
+            }
+            if (copy.Count != expectedCount)
+            {
+                throw new ArgumentException(
+                    "Parameter placeholders must match the ordered parameter count.",
+                    parameterName);
+            }
+            return new ReadOnlyCollection<string>(copy);
+        }
+
+        internal static bool IsDense(IReadOnlyList<string> values)
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+            for (var index = 0; index < values.Count; index++)
+            {
+                if (!string.Equals(
+                        values[index], Format(index),
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool IsCanonical(string value)
+        {
+            if (string.IsNullOrEmpty(value)
+                || value.Length < 2
+                || value[0] != 'p')
+            {
+                return false;
+            }
+
+            int ordinal;
+            if (!int.TryParse(
+                    value.Substring(1),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out ordinal)
+                || ordinal < 0)
+            {
+                return false;
+            }
+            return string.Equals(value, Format(ordinal), StringComparison.Ordinal);
+        }
+
+        private static string Format(int ordinal)
+        {
+            return "p" + ordinal.ToString(CultureInfo.InvariantCulture);
+        }
     }
 
     internal sealed class SqlTextWriter
@@ -328,6 +433,8 @@ namespace Dos.ORM.SqlCompilation
         private readonly StringBuilder _text = new StringBuilder();
         private readonly List<ParameterDefinition> _parameters =
             new List<ParameterDefinition>();
+        private readonly List<string> _parameterPlaceholders =
+            new List<string>();
         private readonly Dictionary<string, ParameterDefinition>
             _parametersByPlaceholder =
                 new Dictionary<string, ParameterDefinition>(
@@ -399,6 +506,7 @@ namespace Dos.ORM.SqlCompilation
                 _parametersByPlaceholder.Add(
                     slot.Placeholder, slot.Definition);
                 _parameters.Add(slot.Definition);
+                _parameterPlaceholders.Add(slot.Placeholder);
             }
 
             _text.Append(ParameterPrefix(_family));
@@ -495,7 +603,7 @@ namespace Dos.ORM.SqlCompilation
             }
 
             var snapshot = new SqlCommandTextSnapshot(
-                _text.ToString(), _parameters);
+                _text.ToString(), _parameters, _parameterPlaceholders);
             _isTerminal = true;
             return snapshot;
         }
@@ -657,6 +765,7 @@ namespace Dos.ORM.SqlCompilation
                 case SqlKeyword.Json: return "JSON";
                 case SqlKeyword.JsonB: return "JSONB";
                 case SqlKeyword.JsonExtract: return "JSON_EXTRACT";
+                case SqlKeyword.JsonUnquote: return "JSON_UNQUOTE";
                 case SqlKeyword.JsonbExtractPathText: return "JSONB_EXTRACT_PATH_TEXT";
                 case SqlKeyword.JsonValue: return "JSON_VALUE";
                 case SqlKeyword.Key: return "KEY";
