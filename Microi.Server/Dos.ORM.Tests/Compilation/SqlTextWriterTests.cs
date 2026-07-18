@@ -113,6 +113,28 @@ public sealed class SqlTextWriterTests
     }
 
     [Fact]
+    public void Snapshot_preserves_sparse_parameter_placeholders_in_first_use_order()
+    {
+        var late = Parameter("late");
+        var early = Parameter("early");
+        var writer = new SqlTextWriter(SqlTextDialectFamily.PostgreSql);
+
+        writer.AppendParameter(Slot(7, late));
+        writer.AppendComma();
+        writer.AppendParameter(Slot(2, early));
+        writer.AppendComma();
+        writer.AppendParameter(Slot(7, late));
+
+        var snapshot = writer.Snapshot();
+
+        Assert.Equal("@p7,@p2,@p7", snapshot.CommandText);
+        Assert.Equal(new[] { "late", "early" },
+            snapshot.Parameters.Select(parameter => parameter.Name));
+        Assert.Equal(new[] { "p7", "p2" },
+            snapshot.ParameterPlaceholders);
+    }
+
+    [Fact]
     public void Every_operator_has_an_exact_closed_mapping()
     {
         var expected = new Dictionary<SqlOperatorToken, string>
@@ -160,6 +182,7 @@ public sealed class SqlTextWriterTests
         AssertKeyword(SqlKeyword.CurrentTimestamp, "CURRENT_TIMESTAMP");
         AssertKeyword(SqlKeyword.DoublePrecision, "DOUBLE PRECISION");
         AssertKeyword(SqlKeyword.JsonExtract, "JSON_EXTRACT");
+        AssertKeyword(SqlKeyword.JsonUnquote, "JSON_UNQUOTE");
         AssertKeyword(SqlKeyword.JsonValue, "JSON_VALUE");
         AssertKeyword(SqlKeyword.SkipLocked, "SKIP LOCKED");
     }
