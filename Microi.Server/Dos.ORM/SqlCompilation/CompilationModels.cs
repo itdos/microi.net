@@ -67,10 +67,36 @@ namespace Dos.ORM.SqlCompilation
             DialectProfile dialectProfile,
             AtomicityRequirement requestedAtomicity = AtomicityRequirement.None,
             SchemaToken schemaToken = null)
+            : this(
+                dialectProfile,
+                requestedAtomicity,
+                schemaToken,
+                DatabaseStorageContract.Native(dialectProfile))
+        {
+        }
+
+        internal SqlCompilationOptions(
+            DialectProfile dialectProfile,
+            AtomicityRequirement requestedAtomicity,
+            SchemaToken schemaToken,
+            DatabaseStorageContract storageContract)
         {
             if (dialectProfile == null)
             {
                 throw new ArgumentNullException(nameof(dialectProfile));
+            }
+            if (storageContract == null)
+            {
+                throw new ArgumentNullException(nameof(storageContract));
+            }
+            if (!string.Equals(
+                    storageContract.TargetProfileFingerprint,
+                    dialectProfile.Fingerprint,
+                    StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "Storage contract target profile does not match the dialect profile.",
+                    nameof(storageContract));
             }
 
             CompilationModelGuard.EnsureDefined(
@@ -80,6 +106,7 @@ namespace Dos.ORM.SqlCompilation
             DialectProfile = dialectProfile;
             RequestedAtomicity = requestedAtomicity;
             SchemaToken = schemaToken;
+            StorageContract = storageContract;
         }
 
         public DialectProfile DialectProfile { get; }
@@ -87,6 +114,8 @@ namespace Dos.ORM.SqlCompilation
         public AtomicityRequirement RequestedAtomicity { get; }
 
         public SchemaToken SchemaToken { get; }
+
+        internal DatabaseStorageContract StorageContract { get; }
     }
 
     public abstract class DatabasePlanStep
@@ -148,11 +177,42 @@ namespace Dos.ORM.SqlCompilation
             CommandText = commandText;
             Parameters = CompilationModelGuard.CopyUniqueParameters(
                 parameters, nameof(parameters));
+            InternalValueContract = SqlCommandValueContract.Native(Parameters);
+        }
+
+        internal SqlCommandStep(
+            string commandText,
+            IEnumerable<ParameterDefinition> parameters,
+            SqlResultShape resultShape,
+            PlanResultRole resultRole,
+            PlanConnectionRole connectionRole,
+            PlanTransactionBehavior transactionBehavior,
+            MigrationStepId sourceMigrationStepId,
+            SqlCommandValueContract valueContract)
+            : base(resultShape, resultRole, connectionRole,
+                transactionBehavior, sourceMigrationStepId)
+        {
+            CompilationModelGuard.EnsureCommandText(
+                commandText, nameof(commandText));
+            PlanCompositionValidator.ValidateCommandResult(
+                resultShape, resultRole);
+            if (valueContract == null)
+            {
+                throw new ArgumentNullException(nameof(valueContract));
+            }
+
+            CommandText = commandText;
+            Parameters = CompilationModelGuard.CopyUniqueParameters(
+                parameters, nameof(parameters));
+            ValidateValueContract(Parameters, valueContract);
+            InternalValueContract = valueContract;
         }
 
         public string CommandText { get; }
 
         public IReadOnlyList<ParameterDefinition> Parameters { get; }
+
+        internal SqlCommandValueContract InternalValueContract { get; }
 
         public override string ToString()
         {
@@ -165,6 +225,35 @@ namespace Dos.ORM.SqlCompilation
                 + ", CommandDigest="
                 + CompilationModelGuard.CommandTemplateDigest(CommandText)
                 + ")";
+        }
+
+        private static void ValidateValueContract(
+            IReadOnlyList<ParameterDefinition> parameters,
+            SqlCommandValueContract valueContract)
+        {
+            if (parameters.Count != valueContract.Parameters.Count)
+            {
+                throw new ArgumentException(
+                    "Command parameters and value contracts must have equal counts.",
+                    nameof(valueContract));
+            }
+            for (var index = 0; index < parameters.Count; index++)
+            {
+                var definition = parameters[index];
+                var contracted = valueContract.Parameters[index].Definition;
+                if (!string.Equals(
+                        definition.Name,
+                        contracted.Name,
+                        StringComparison.Ordinal)
+                    || !Equals(definition.Type, contracted.Type)
+                    || definition.Direction != contracted.Direction
+                    || definition.IsNullable != contracted.IsNullable)
+                {
+                    throw new ArgumentException(
+                        "Command parameter contracts must match ordered definitions.",
+                        nameof(valueContract));
+                }
+            }
         }
     }
 
@@ -2818,11 +2907,17 @@ namespace Dos.ORM.SqlCompilation
             wire.WriteUtf8(command.CommandText);
             WriteCount(wire, command.Parameters.Count);
             for (var index = 0;
-                index < command.Parameters.Count;
-                index++)
+                 index < command.Parameters.Count;
+                 index++)
             {
                 BulkSqlTreeWalker.WriteParameter(
                     wire, command.Parameters[index]);
+            }
+            if (command.InternalValueContract.RequiresPlanExtension)
+            {
+                wire.WriteUtf8("command-value-contract-v1");
+                wire.WriteUtf8(
+                    command.InternalValueContract.Fingerprint.Value);
             }
         }
 
