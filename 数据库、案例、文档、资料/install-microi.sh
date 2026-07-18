@@ -4,10 +4,10 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-15
+# 版本：v2026-07-19
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
-#   microi-install-mysql      - MySQL 5.7 / 8.0 数据库（安装前选择）
+#   microi-install-database   - 主数据库（安装前按编号选择）
 #   microi-install-redis      - Redis 7.4.2 缓存
 #   microi-install-mongodb    - MongoDB 数据库
 #   microi-install-minio      - MinIO 对象存储
@@ -19,14 +19,202 @@
 # 端口分配规则：
 #   默认从 7000 开始顺序 +1 分配 7 个端口；如安装在线 AI 引擎则分配 10 个端口
 #   若存在端口被占用，则自动从 7100 开始重新检测，以此类推
-#   基础端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console, API, Web
-#   在线 AI 端口顺序: MySQL, Redis, MongoDB, MinIO-API, MinIO-Console,
+#   基础端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, API, Web
+#   在线 AI 端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
 #                  Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="v2026-07-15"
+SCRIPT_VERSION="v2026-07-19"
+
+# ============================================================
+# 数据库安装配置
+# ============================================================
+# 该配置层同时供交互安装与无副作用自动化检查使用。新增数据库时只在这里
+# 维护名称、Dos.ORM 数据库类型和发布包名称，避免选择菜单与下载地址漂移。
+configure_database_profile() {
+  local choice="${1:-1}"
+
+  DATABASE_CHOICE="${choice}"
+  DATABASE_AUTO_INSTALL_SUPPORTED=0
+  DATABASE_LICENSED_IMAGE_ENV=""
+  DATABASE_BLOCK_REASON=""
+  DATABASE_IMAGE=""
+  DATABASE_INTERNAL_PORT=""
+  DATABASE_CONTAINER_NAME=""
+  DATABASE_USER=""
+  DATABASE_DATA_OWNER=""
+  SQL_ZIP_BASE_URL="https://static.itdos.com/install"
+
+  case "${choice}" in
+    1)
+      DATABASE_DISPLAY_NAME="MySQL 5.7"
+      DATABASE_TYPE="MySql"
+      DATABASE_ENGINE_KEY="mysql57"
+      DATABASE_PORT_NAME="MySQL"
+      SQL_ZIP_FILE_NAME="microi_empty_temp.sql.zip"
+      SQL_FILE_NAME="microi_empty_temp.sql"
+      MYSQL_VERSION="5.7"
+      MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7"
+      MYSQL_CONTAINER_NAME="microi-install-mysql57"
+      DATABASE_IMAGE="${MYSQL_IMAGE}"
+      DATABASE_INTERNAL_PORT="3306"
+      DATABASE_CONTAINER_NAME="${MYSQL_CONTAINER_NAME}"
+      DATABASE_USER="root"
+      DATABASE_DATA_OWNER="999:999"
+      DATABASE_AUTO_INSTALL_SUPPORTED=1
+      ;;
+    2)
+      DATABASE_DISPLAY_NAME="MySQL 8.0"
+      DATABASE_TYPE="MySql"
+      DATABASE_ENGINE_KEY="mysql80"
+      DATABASE_PORT_NAME="MySQL"
+      # MySQL 8.0 复用兼容 MySQL 5.7 的标准空库包。
+      SQL_ZIP_FILE_NAME="microi_empty_temp.sql.zip"
+      SQL_FILE_NAME="microi_empty_temp.sql"
+      MYSQL_VERSION="8.0"
+      MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0"
+      MYSQL_CONTAINER_NAME="microi-install-mysql80"
+      DATABASE_IMAGE="${MYSQL_IMAGE}"
+      DATABASE_INTERNAL_PORT="3306"
+      DATABASE_CONTAINER_NAME="${MYSQL_CONTAINER_NAME}"
+      DATABASE_USER="root"
+      DATABASE_DATA_OWNER="999:999"
+      DATABASE_AUTO_INSTALL_SUPPORTED=1
+      ;;
+    3)
+      DATABASE_DISPLAY_NAME="SQL Server 2022"
+      DATABASE_TYPE="SqlServer"
+      DATABASE_ENGINE_KEY="sqlserver2022"
+      DATABASE_PORT_NAME="SQL Server"
+      SQL_ZIP_FILE_NAME="microi_empty_sqlserver2022.sql.zip"
+      SQL_FILE_NAME="microi_empty_sqlserver2022.sql"
+      DATABASE_IMAGE="${MICROI_SQLSERVER_IMAGE_REF:-mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04@sha256:7c29dfbac885ad7519e219c7fe4aee0e67283e21a10e9c252d13b0fbde1866f8}"
+      DATABASE_INTERNAL_PORT="1433"
+      DATABASE_CONTAINER_NAME="microi-install-sqlserver2022"
+      DATABASE_USER="sa"
+      DATABASE_DATA_OWNER="10001:0"
+      DATABASE_AUTO_INSTALL_SUPPORTED=1
+      ;;
+    4)
+      DATABASE_DISPLAY_NAME="Oracle 19c"
+      DATABASE_TYPE="Oracle"
+      DATABASE_ENGINE_KEY="oracle19c"
+      DATABASE_PORT_NAME="Oracle"
+      SQL_ZIP_FILE_NAME="microi_empty_oracle19c.sql.zip"
+      SQL_FILE_NAME="microi_empty_oracle19c.sql"
+      DATABASE_LICENSED_IMAGE_ENV="MICROI_ORACLE_IMAGE_REF"
+      DATABASE_BLOCK_REASON="Oracle 19c 的 Dos.ORM NonEmptyEnvelopeV1 运行时参数编码和结果解码尚未完整接入，当前保持 fail-closed，避免安装出可导入但无法正常登录的系统。"
+      ;;
+    5)
+      DATABASE_DISPLAY_NAME="达梦 DM8"
+      DATABASE_TYPE="DaMeng"
+      DATABASE_ENGINE_KEY="dm8"
+      DATABASE_PORT_NAME="达梦 DM8"
+      SQL_ZIP_FILE_NAME="microi_empty_dm8.sql.zip"
+      SQL_FILE_NAME="microi_empty_dm8.sql"
+      DATABASE_LICENSED_IMAGE_ENV="MICROI_DM8_IMAGE_REF"
+      DATABASE_IMAGE="${MICROI_DM8_IMAGE_REF:-}"
+      DATABASE_INTERNAL_PORT="5236"
+      DATABASE_CONTAINER_NAME="microi-install-dm8"
+      DATABASE_USER="SYSDBA"
+      DATABASE_DATA_OWNER="1000:1000"
+      DATABASE_AUTO_INSTALL_SUPPORTED=1
+      ;;
+    6)
+      DATABASE_DISPLAY_NAME="PostgreSQL 17"
+      DATABASE_TYPE="PostgreSql"
+      DATABASE_ENGINE_KEY="postgresql17"
+      DATABASE_PORT_NAME="PostgreSQL"
+      SQL_ZIP_FILE_NAME="microi_empty_postgresql17.sql.zip"
+      SQL_FILE_NAME="microi_empty_postgresql17.sql"
+      DATABASE_IMAGE="${MICROI_POSTGRES_IMAGE_REF:-postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929}"
+      DATABASE_INTERNAL_PORT="5432"
+      DATABASE_CONTAINER_NAME="microi-install-postgresql17"
+      DATABASE_USER="postgres"
+      DATABASE_DATA_OWNER="999:999"
+      DATABASE_AUTO_INSTALL_SUPPORTED=1
+      ;;
+    7)
+      DATABASE_DISPLAY_NAME="人大金仓 KingbaseES V9"
+      DATABASE_TYPE="KingBase"
+      DATABASE_ENGINE_KEY="kingbasees"
+      DATABASE_PORT_NAME="人大金仓"
+      SQL_ZIP_FILE_NAME="microi_empty_kingbasees.sql.zip"
+      SQL_FILE_NAME="microi_empty_kingbasees.sql"
+      DATABASE_LICENSED_IMAGE_ENV="MICROI_KINGBASE_IMAGE_REF"
+      DATABASE_BLOCK_REASON="人大金仓 KingbaseES V9 的 Docker 建库、还原和安装后配置链路尚未在本脚本中通过验收；本次不会修改 Docker。"
+      ;;
+    *)
+      echo "Microi：错误：无效的数据库编号 ${choice}，请输入 1-7。" >&2
+      return 1
+      ;;
+  esac
+
+  SQL_ZIP_URL="${SQL_ZIP_BASE_URL}/${SQL_ZIP_FILE_NAME}"
+}
+
+print_database_profile() {
+  echo "DATABASE_CHOICE=${DATABASE_CHOICE}"
+  echo "DATABASE_NAME=${DATABASE_DISPLAY_NAME}"
+  echo "DATABASE_TYPE=${DATABASE_TYPE}"
+  echo "DATABASE_ENGINE_KEY=${DATABASE_ENGINE_KEY}"
+  echo "SQL_ZIP_FILE_NAME=${SQL_ZIP_FILE_NAME}"
+  echo "SQL_FILE_NAME=${SQL_FILE_NAME}"
+  echo "SQL_ZIP_URL=${SQL_ZIP_URL}"
+  echo "AUTO_INSTALL_SUPPORTED=${DATABASE_AUTO_INSTALL_SUPPORTED}"
+  echo "LICENSED_IMAGE_ENV=${DATABASE_LICENSED_IMAGE_ENV}"
+  echo "DATABASE_IMAGE=${DATABASE_IMAGE}"
+  echo "DATABASE_CONTAINER_NAME=${DATABASE_CONTAINER_NAME}"
+  echo "DATABASE_INTERNAL_PORT=${DATABASE_INTERNAL_PORT}"
+}
+
+validate_database_install_preflight() {
+  local image_ref=""
+
+  if [ "${DATABASE_CHOICE}" = "3" ]; then
+    case "$(uname -m)" in
+      x86_64|amd64) ;;
+      *)
+        echo "Microi：错误：SQL Server 2022 Linux 容器当前只支持 x86_64/amd64，当前架构为 $(uname -m)。"
+        return 1
+        ;;
+    esac
+    local total_mem_kb
+    total_mem_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ "${total_mem_kb:-0}" -lt 2097152 ]; then
+      echo "Microi：错误：SQL Server 2022 至少需要约 2GB 可用主机内存，当前 MemTotal=${total_mem_kb:-0}KB。"
+      return 1
+    fi
+  fi
+
+  if [ -n "${DATABASE_LICENSED_IMAGE_ENV}" ]; then
+    image_ref="${!DATABASE_LICENSED_IMAGE_ENV}"
+    if [ -z "${image_ref}" ]; then
+      echo "Microi：错误：${DATABASE_DISPLAY_NAME} 属于需授权的软件，必须先提供您有权使用的镜像：export ${DATABASE_LICENSED_IMAGE_ENV}=<合法镜像引用>。"
+      echo 'Microi：未提供合法镜像，已在任何 Docker 变更前停止。'
+      return 1
+    fi
+    if [[ ! "${image_ref}" =~ ^[A-Za-z0-9._/@:-]+$ ]]; then
+      echo "Microi：错误：${DATABASE_LICENSED_IMAGE_ENV} 不是安全、有效的 Docker 镜像引用。"
+      return 1
+    fi
+  fi
+
+  if [ "${DATABASE_AUTO_INSTALL_SUPPORTED}" != "1" ]; then
+    echo "Microi：错误：${DATABASE_BLOCK_REASON}"
+    echo "Microi：对应空数据库包地址：${SQL_ZIP_URL}"
+    return 1
+  fi
+}
+
+# CI/维护人员可验证全部数据库映射，不探测网络、不读取输入、不修改 Docker。
+if [ "${MICROI_INSTALL_PROFILE_ONLY:-0}" = "1" ]; then
+  configure_database_profile "${MICROI_DATABASE_CHOICE:-1}"
+  print_database_profile
+  exit 0
+fi
 
 # === 修复中文显示：确保终端使用 UTF-8 编码 ===
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
@@ -163,25 +351,32 @@ if [[ ! "${OS_CLIENT}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$ ]]; then
 fi
 echo "Microi：主租户 OsClient/ClientName 将设置为 ${OS_CLIENT} ✓"
 
-# === MySQL 版本选择 ===
+# === 主数据库选择 ===
 echo ''
-echo 'Microi：请选择要安装的 MySQL 版本。'
-echo 'Microi：输入 5 安装 MySQL 5.7，输入 8 安装 MySQL 8.0：'
-read -r mysql_version_input
-
-if [ "${mysql_version_input}" == "5" ]; then
-  MYSQL_VERSION="5.7"
-  MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7"
-  MYSQL_CONTAINER_NAME="microi-install-mysql57"
-elif [ "${mysql_version_input}" == "8" ]; then
-  MYSQL_VERSION="8.0"
-  MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0"
-  MYSQL_CONTAINER_NAME="microi-install-mysql80"
+echo 'Microi：请选择主数据库类型（强烈推荐 MySQL 5.7 / MySQL 8.0）：'
+echo '  1. MySQL 5.7（默认，强烈推荐）'
+echo '  2. MySQL 8.0（强烈推荐）'
+echo '  3. SQL Server 2022'
+echo '  4. Oracle 19c'
+echo '  5. 达梦 DM8'
+echo '  6. PostgreSQL 17'
+echo '  7. 人大金仓 KingbaseES V9'
+echo 'Microi：请输入 1-7，直接按 Enter 默认选择 1（MySQL 5.7）：'
+if [ -n "${MICROI_DATABASE_CHOICE:-}" ]; then
+  database_choice_input="${MICROI_DATABASE_CHOICE}"
+  echo "Microi：使用环境变量 MICROI_DATABASE_CHOICE=${database_choice_input}"
 else
-  echo 'Microi：错误：无效的 MySQL 版本，请输入 5 或 8，脚本退出。'
+  read -r database_choice_input
+fi
+
+configure_database_profile "${database_choice_input:-1}"
+echo "Microi：已选择 ${DATABASE_DISPLAY_NAME}，Dos.ORM 类型 ${DATABASE_TYPE} ✓"
+echo "Microi：对应标准空数据库包：${SQL_ZIP_URL}"
+
+# 所有未完成的数据库适配都在 Docker 安装/网络创建之前失败，绝不以跳过冒充成功。
+if ! validate_database_install_preflight; then
   exit 1
 fi
-echo "Microi：将安装 MySQL ${MYSQL_VERSION} ✓"
 
 # === 可选的 Microi Docker 固定网段 ===
 echo ''
@@ -243,11 +438,9 @@ else
   exit 1
 fi
 
-# === 数据库类型：固定安装空数据库 ===
+# === 数据库类型：安装标准空数据库 ===
 echo ''
-SQL_ZIP_URL="https://static.itdos.com/install/microi_empty_temp.sql.zip"
-SQL_FILE_NAME="microi_empty_temp.sql"
-echo 'Microi：将安装空数据库（干净数据库，适合正式项目）✓'
+echo "Microi：将安装 ${DATABASE_DISPLAY_NAME} 空数据库（干净数据库，适合正式项目）✓"
 
 echo ''
 echo '[步骤1/11] 环境检测完成 ✓'
@@ -516,7 +709,10 @@ echo '------------------------------------------------------------------'
 
 # 工具函数
 generate_random_password() {
-  openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c16
+  local random_hex
+  random_hex=$(openssl rand -hex 16)
+  # 固定包含大写、小写、数字三类字符，兼容 SQL Server 密码复杂度要求。
+  printf 'Aa1%s' "${random_hex:0:13}"
 }
 
 generate_random_data_dir() {
@@ -529,10 +725,10 @@ generate_random_data_dir() {
 # === 端口检测 ===
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   PORT_COUNT=10
-  PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
+  PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
 else
   PORT_COUNT=7
-  PORT_LABELS=("MySQL" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "API" "Web")
+  PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "API" "Web")
 fi
 
 check_port_in_use() {
@@ -592,6 +788,7 @@ fi
 
 # 分配端口
 MYSQL_PORT=$((PORT_BASE + 0))
+DATABASE_PORT=${MYSQL_PORT}
 REDIS_PORT=$((PORT_BASE + 1))
 MONGO_PORT=$((PORT_BASE + 2))
 MINIO_PORT=$((PORT_BASE + 3))
@@ -613,7 +810,7 @@ fi
 echo ''
 echo 'Microi：端口分配方案：'
 echo '------------------------------------------------------------------'
-printf '  %-18s %s\n' "MySQL:"         "${MYSQL_PORT}"
+printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
 printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
 printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
@@ -643,7 +840,9 @@ echo ''
 echo '[步骤4/11] 生成密码与数据目录'
 echo '------------------------------------------------------------------'
 
-MYSQL_ROOT_PASSWORD=$(generate_random_password)
+DATABASE_PASSWORD=$(generate_random_password)
+# 保留旧变量名，避免 MySQL 5.7/8.0 既有安装路径发生兼容性回退。
+MYSQL_ROOT_PASSWORD="${DATABASE_PASSWORD}"
 REDIS_PASSWORD=$(generate_random_password)
 MONGO_ROOT_PASSWORD=$(generate_random_password)
 MINIO_ACCESS_KEY=$(generate_random_password)
@@ -655,7 +854,7 @@ else
 fi
 
 # 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
-_REQUIRED_PW_VARS="MYSQL_ROOT_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
+_REQUIRED_PW_VARS="DATABASE_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   _REQUIRED_PW_VARS="${_REQUIRED_PW_VARS} QDRANT_API_KEY"
 fi
@@ -668,7 +867,8 @@ for _pw_var in ${_REQUIRED_PW_VARS}; do
 done
 echo 'Microi：各服务密码/密钥已随机生成 ✓'
 
-MYSQL_DATA_DIR=$(generate_random_data_dir "mysql")
+DATABASE_DATA_DIR=$(generate_random_data_dir "database-${DATABASE_ENGINE_KEY}")
+MYSQL_DATA_DIR="${DATABASE_DATA_DIR}"
 REDIS_DATA_DIR=$(generate_random_data_dir "redis")
 MONGO_DATA_DIR=$(generate_random_data_dir "mongodb")
 MINIO_DATA_DIR=$(generate_random_data_dir "minio")
@@ -1036,61 +1236,55 @@ echo '=================================================================='
 
 
 # ============================================================
-# 步骤6：部署用户选择的 MySQL 编排
+# 步骤6：部署用户选择的主数据库编排
 # ============================================================
 echo ''
-echo "[步骤6/11] 部署 MySQL ${MYSQL_VERSION}"
+echo "[步骤6/11] 部署 ${DATABASE_DISPLAY_NAME}"
 echo '------------------------------------------------------------------'
 
-MYSQL_DIR="${COMPOSE_BASE_DIR}/microi-install-mysql"
+DATABASE_DIR="${COMPOSE_BASE_DIR}/microi-install-database"
 
-# 检查磁盘可用空间（MySQL初始化至少需要1GB）
-MYSQL_DATA_MOUNT=$(df -P "${MYSQL_DATA_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
-if [ -n "${MYSQL_DATA_MOUNT}" ]; then
-  DISK_AVAIL_MB=$((MYSQL_DATA_MOUNT / 1024))
-  echo "Microi：MySQL 数据目录所在磁盘可用空间: ${DISK_AVAIL_MB}MB"
+# 检查磁盘可用空间（数据库初始化至少需要1GB）
+DATABASE_DATA_MOUNT=$(df -P "${DATABASE_DATA_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
+if [ -n "${DATABASE_DATA_MOUNT}" ]; then
+  DISK_AVAIL_MB=$((DATABASE_DATA_MOUNT / 1024))
+  echo "Microi：数据库数据目录所在磁盘可用空间: ${DISK_AVAIL_MB}MB"
   if [ ${DISK_AVAIL_MB} -lt 1024 ]; then
-    echo "Microi：错误：磁盘可用空间不足 1GB（当前 ${DISK_AVAIL_MB}MB），MySQL初始化可能失败。"
-    echo "Microi：请清理磁盘空间后重试，或更换数据目录至空间充足的磁盘。"
+    echo "Microi：错误：磁盘可用空间不足 1GB（当前 ${DISK_AVAIL_MB}MB），数据库初始化可能失败。"
     exit 1
   fi
 else
-  echo "Microi：警告：无法检测磁盘可用空间，继续安装..."
+  echo 'Microi：警告：无法检测磁盘可用空间，继续安装...'
 fi
 
-rm -rf "${MYSQL_DATA_DIR}"
-mkdir -p "${MYSQL_DATA_DIR}"
-sudo chown -R 999:999 "${MYSQL_DATA_DIR}"
-sudo chmod 755 "${MYSQL_DATA_DIR}"
-echo "Microi：MySQL 数据目录已初始化: ${MYSQL_DATA_DIR} ✓"
+rm -rf "${DATABASE_DATA_DIR}"
+mkdir -p "${DATABASE_DATA_DIR}"
+sudo chown -R "${DATABASE_DATA_OWNER}" "${DATABASE_DATA_DIR}"
+sudo chmod 770 "${DATABASE_DATA_DIR}"
+mkdir -p "${DATABASE_DIR}"
 
-mkdir -p "${MYSQL_DIR}"
-
-# 根据服务器内存和所选版本自动生成 MySQL 配置
-generate_mysql_config > "${MYSQL_DIR}/my_microi.cnf"
-echo "Microi：MySQL ${MYSQL_VERSION} 配置文件已生成 ✓"
-
-echo "Microi：MySQL 端口: ${MYSQL_PORT}, Root密码: ${MYSQL_ROOT_PASSWORD}"
-
-cat > "${MYSQL_DIR}/docker-compose.yml" <<EOF
+case "${DATABASE_CHOICE}" in
+  1|2)
+    generate_mysql_config > "${DATABASE_DIR}/my_microi.cnf"
+    cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
 services:
-  ${MYSQL_CONTAINER_NAME}:
-    image: ${MYSQL_IMAGE}
-    container_name: ${MYSQL_CONTAINER_NAME}
+  ${DATABASE_CONTAINER_NAME}:
+    image: ${DATABASE_IMAGE}
+    container_name: ${DATABASE_CONTAINER_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
     privileged: true
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD}
       - MYSQL_ROOT_HOST=%
       - MYSQL_TIME_ZONE=Asia/Shanghai
     volumes:
-      - ${MYSQL_DATA_DIR}:/var/lib/mysql
+      - ${DATABASE_DATA_DIR}:/var/lib/mysql
       - ./my_microi.cnf:/etc/mysql/conf.d/my_microi.cnf
     logging:
       driver: "json-file"
@@ -1099,140 +1293,251 @@ ${COMPOSE_SERVICE_NETWORK}
         max-file: "10"
 ${COMPOSE_EXTERNAL_NETWORKS}
 EOF
-echo "Microi：MySQL 编排文件已生成: ${MYSQL_DIR}/docker-compose.yml ✓"
+    ;;
+  3)
+    cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
+version: '3.8'
+services:
+  ${DATABASE_CONTAINER_NAME}:
+    image: ${DATABASE_IMAGE}
+    container_name: ${DATABASE_CONTAINER_NAME}
+${COMPOSE_SERVICE_NETWORK}
+    restart: always
+    ports:
+      - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${DATABASE_PASSWORD}
+      - MSSQL_PID=Developer
+      - MSSQL_COLLATION=Chinese_PRC_CI_AS
+    volumes:
+      - ${DATABASE_DATA_DIR}:/var/opt/mssql
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
+EOF
+    ;;
+  5)
+    cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
+version: '3.8'
+services:
+  ${DATABASE_CONTAINER_NAME}:
+    image: ${DATABASE_IMAGE}
+    container_name: ${DATABASE_CONTAINER_NAME}
+${COMPOSE_SERVICE_NETWORK}
+    restart: always
+    privileged: true
+    mem_limit: 3g
+    shm_size: 1g
+    ports:
+      - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
+    environment:
+      - MODE=dmsingle
+      - INSTANCE_NAME=MICROI
+      - SYSDBA_PWD=${DATABASE_PASSWORD}
+      - DM_USER_PWD=${DATABASE_PASSWORD}
+      - PAGE_SIZE=32
+      - CASE_SENSITIVE=1
+      - UNICODE_FLAG=1
+      - EXTENT_SIZE=16
+      - BLANK_PAD_MODE=0
+      - LOG_SIZE=256
+      - BUFFER=1000
+    volumes:
+      - ${DATABASE_DATA_DIR}:/opt/dmdbms/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
+EOF
+    ;;
+  6)
+    cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
+version: '3.8'
+services:
+  ${DATABASE_CONTAINER_NAME}:
+    image: ${DATABASE_IMAGE}
+    container_name: ${DATABASE_CONTAINER_NAME}
+${COMPOSE_SERVICE_NETWORK}
+    restart: always
+    ports:
+      - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
+    environment:
+      - POSTGRES_USER=${DATABASE_USER}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=microi_demo
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
+    volumes:
+      - ${DATABASE_DATA_DIR}:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+${COMPOSE_EXTERNAL_NETWORKS}
+EOF
+    ;;
+  *)
+    echo "Microi：错误：${DATABASE_DISPLAY_NAME} 未通过自动安装前置检查。"
+    exit 1
+    ;;
+esac
+echo "Microi：数据库编排文件已生成: ${DATABASE_DIR}/docker-compose.yml ✓"
 
-compose_up "${MYSQL_DIR}"
+compose_up "${DATABASE_DIR}"
 
-# === 等待MySQL启动并初始化数据 ===
-echo ''
-echo 'Microi：等待MySQL容器启动...'
+echo "Microi：等待 ${DATABASE_DISPLAY_NAME} 容器启动..."
 sleep 5
-
-# 先检查容器是否还在运行（避免空等60秒）
-if ! docker ps --format '{{.Names}}' | grep -qx "${MYSQL_CONTAINER_NAME}"; then
-  echo 'Microi：错误：MySQL 容器启动后立即退出，以下是容器日志：'
-  echo '------------------------------------------------------------------'
-  docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
-  echo '------------------------------------------------------------------'
-  echo 'Microi：正在清理失败的MySQL部署...'
-  docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-  docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-  rm -rf "${MYSQL_DATA_DIR}"
-  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
+if ! docker ps --format '{{.Names}}' | grep -qx "${DATABASE_CONTAINER_NAME}"; then
+  echo "Microi：错误：${DATABASE_DISPLAY_NAME} 容器启动后立即退出，以下是容器日志："
+  docker logs "${DATABASE_CONTAINER_NAME}" 2>&1 | tail -50
   exit 1
 fi
 
-MYSQL_READY=false
-for i in $(seq 1 30); do
-  # 每轮检查容器是否仍在运行
-  if ! docker ps --format '{{.Names}}' | grep -qx "${MYSQL_CONTAINER_NAME}"; then
-    echo 'Microi：错误：MySQL 容器在等待过程中退出，以下是容器日志：'
-    echo '------------------------------------------------------------------'
-    docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
-    echo '------------------------------------------------------------------'
-    echo 'Microi：正在清理失败的MySQL部署...'
-    docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-    docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-    rm -rf "${MYSQL_DATA_DIR}"
-    echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
+SQLCMD_PATH=""
+if [ "${DATABASE_CHOICE}" = "3" ]; then
+  SQLCMD_PATH=$(docker exec "${DATABASE_CONTAINER_NAME}" sh -c 'for p in /opt/mssql-tools18/bin/sqlcmd /opt/mssql-tools/bin/sqlcmd; do if [ -x "$p" ]; then echo "$p"; exit 0; fi; done; exit 1' || true)
+  if [ -z "${SQLCMD_PATH}" ]; then
+    echo 'Microi：错误：SQL Server 镜像中未找到 sqlcmd，无法执行空数据库还原。'
     exit 1
   fi
-  if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
-    MYSQL_READY=true
+fi
+
+DATABASE_READY=false
+for i in $(seq 1 60); do
+  if ! docker ps --format '{{.Names}}' | grep -qx "${DATABASE_CONTAINER_NAME}"; then
+    echo "Microi：错误：${DATABASE_DISPLAY_NAME} 容器在等待过程中退出。"
+    docker logs "${DATABASE_CONTAINER_NAME}" 2>&1 | tail -50
+    exit 1
+  fi
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
+      ;;
+    3)
+      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
+      ;;
+    5)
+      printf 'SELECT 1 OK FROM DUAL;\nEXIT;\n' | docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}" > /dev/null 2>&1 && DATABASE_READY=true
+      ;;
+    6)
+      docker exec -i "${DATABASE_CONTAINER_NAME}" pg_isready -U "${DATABASE_USER}" -d microi_demo > /dev/null 2>&1 && DATABASE_READY=true
+      ;;
+  esac
+  if [ "${DATABASE_READY}" = true ]; then
     break
   fi
-  echo "Microi：等待MySQL就绪中... (${i}/30)"
+  echo "Microi：等待 ${DATABASE_DISPLAY_NAME} 就绪中... (${i}/60)"
   sleep 2
 done
-
-if [ "${MYSQL_READY}" = false ]; then
-  echo 'Microi：错误：MySQL 在 60 秒内未能启动就绪。以下是容器日志：'
-  echo '------------------------------------------------------------------'
-  docker logs "${MYSQL_CONTAINER_NAME}" 2>&1 | tail -50
-  echo '------------------------------------------------------------------'
-  echo 'Microi：正在清理失败的MySQL部署...'
-  docker stop "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-  docker rm -f "${MYSQL_CONTAINER_NAME}" > /dev/null 2>&1 || true
-  rm -rf "${MYSQL_DATA_DIR}"
-  echo 'Microi：已停止容器并清理数据目录，请排查错误后重新运行脚本。'
+if [ "${DATABASE_READY}" != true ]; then
+  echo "Microi：错误：${DATABASE_DISPLAY_NAME} 在 120 秒内未能启动就绪。"
+  docker logs "${DATABASE_CONTAINER_NAME}" 2>&1 | tail -50
   exit 1
 fi
-echo 'Microi：MySQL 容器已启动就绪 ✓'
+echo "Microi：${DATABASE_DISPLAY_NAME} 已启动就绪 ✓"
 
-echo 'Microi：配置MySQL远程访问权限...'
-if [ "${MYSQL_VERSION}" == "8.0" ]; then
-  MYSQL_GRANT_SQL="CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}'; ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
-else
-  MYSQL_GRANT_SQL="USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"
-fi
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "${MYSQL_GRANT_SQL}"; then
-  echo 'Microi：MySQL 远程访问权限已配置 ✓'
-else
-  echo 'Microi：警告：MySQL 远程访问权限配置失败，请稍后手动配置'
-fi
-docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;" > /dev/null 2>&1 || true
+# 后续安装阶段统一通过此函数执行数据库配置，不在业务服务层散落数据库方言。
+database_exec_sql() {
+  local sql="$1"
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" microi_demo -e "${sql}"
+      ;;
+    3)
+      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d microi_demo -Q "${sql}"
+      ;;
+    5)
+      printf 'WHENEVER SQLERROR EXIT SQL.SQLCODE;\n%s\nCOMMIT;\nEXIT;\n' "${sql}" | docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}"
+      ;;
+    6)
+      docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d microi_demo -c "${sql}"
+      ;;
+  esac
+}
 
-# 下载并还原数据库
-SQL_ZIP_FILE="/tmp/mysql_backup.zip"
-SQL_TMP_DIR="/tmp/mysql_backup"
+if [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; then
+  echo 'Microi：配置 MySQL 远程访问权限...'
+  if [ "${MYSQL_VERSION}" = "8.0" ]; then
+    MYSQL_GRANT_SQL="CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${DATABASE_PASSWORD}'; ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${DATABASE_PASSWORD}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
+  else
+    MYSQL_GRANT_SQL="USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${DATABASE_PASSWORD}' WITH GRANT OPTION;"
+  fi
+  docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e "${MYSQL_GRANT_SQL}"
+  docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
+fi
+
+# 下载并还原与所选数据库严格匹配的 Dos.ORM 发布包。
+SQL_ZIP_FILE="/tmp/${SQL_ZIP_FILE_NAME}"
+SQL_TMP_DIR="/tmp/microi_empty_database_${DATABASE_ENGINE_KEY}"
 SQL_FILE="${SQL_TMP_DIR}/${SQL_FILE_NAME}"
-
 mkdir -p "${SQL_TMP_DIR}"
 echo "Microi：下载数据库备份文件: ${SQL_ZIP_URL}"
-if curl -fSL -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"; then
-  echo 'Microi：数据库备份文件下载完成 ✓'
-else
-  echo 'Microi：错误：数据库备份文件下载失败，请检查网络连接。'
-  exit 1
-fi
-
-echo 'Microi：解压数据库备份文件...'
-if unzip -o -d "${SQL_TMP_DIR}" "${SQL_ZIP_FILE}"; then
-  echo 'Microi：解压完成 ✓'
-else
-  echo 'Microi：错误：数据库备份文件解压失败。'
-  exit 1
-fi
-
+curl -fSL -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"
+unzip -o -d "${SQL_TMP_DIR}" "${SQL_ZIP_FILE}"
 if [ ! -f "${SQL_FILE}" ]; then
   echo "Microi：错误：解压后未找到 SQL 文件: ${SQL_FILE_NAME}"
-  echo "Microi：解压目录内容:"
   ls -la "${SQL_TMP_DIR}/"
   exit 1
 fi
 
-echo 'Microi：创建数据库 microi_demo...'
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
-  echo 'Microi：数据库 microi_demo 已创建 ✓'
-else
-  echo 'Microi：错误：数据库创建失败。'
-  exit 1
-fi
-
-echo 'Microi：还原MySQL数据库备份（可能需要几分钟）...'
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo < "${SQL_FILE}"; then
-  echo 'Microi：数据库还原完成 ✓'
-else
-  echo 'Microi：错误：数据库还原失败，请检查 SQL 文件。'
-  exit 1
-fi
+echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 标准空数据库（可能需要几分钟）..."
+case "${DATABASE_CHOICE}" in
+  1|2)
+    docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+    docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" microi_demo < "${SQL_FILE}"
+    ;;
+  3)
+    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "IF DB_ID(N'microi_demo') IS NULL CREATE DATABASE [microi_demo] COLLATE Chinese_PRC_CI_AS; ALTER DATABASE [microi_demo] SET COMPATIBILITY_LEVEL = 160;"
+    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d microi_demo < "${SQL_FILE}"
+    ;;
+  5)
+    DM8_IMPORT_LOG="/tmp/microi_dm8_import.log"
+    DM8_CONTAINER_SQL="/tmp/${SQL_FILE_NAME}"
+    DM8_SCRIPT_ARG="$(printf '\140')${DM8_CONTAINER_SQL}"
+    docker cp "${SQL_FILE}" "${DATABASE_CONTAINER_NAME}:${DM8_CONTAINER_SQL}"
+    set +e
+    docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql -S "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}" "${DM8_SCRIPT_ARG}" 2>&1 | tee "${DM8_IMPORT_LOG}"
+    DM8_PIPE_STATUSES=("${PIPESTATUS[@]}")
+    set -e
+    if [ "${DM8_PIPE_STATUSES[0]:-1}" -ne 0 ] || [ "${DM8_PIPE_STATUSES[1]:-1}" -ne 0 ]; then
+      echo 'Microi：错误：达梦 DM8 导入命令或日志写入失败。'
+      exit 1
+    fi
+    if grep -Eiq '\[-[0-9]+\]|SQLSTATE|error|错误' "${DM8_IMPORT_LOG}"; then
+      echo "Microi：错误：达梦 DM8 导入日志包含 SQL 错误，请检查 ${DM8_IMPORT_LOG}。"
+      exit 1
+    fi
+    docker exec "${DATABASE_CONTAINER_NAME}" rm -f "${DM8_CONTAINER_SQL}" > /dev/null 2>&1 || true
+    rm -f "${DM8_IMPORT_LOG}"
+    ;;
+  6)
+    docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d microi_demo < "${SQL_FILE}"
+    ;;
+esac
+echo 'Microi：数据库还原完成 ✓'
 
 echo "Microi：更新 SaaS 主租户为 ${OS_CLIENT}..."
-OS_CLIENT_SQL="UPDATE sys_osclients SET OsClient='${OS_CLIENT}', ClientName='${OS_CLIENT}' WHERE IFNULL(IsDeleted, 0) = 0;"
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${OS_CLIENT_SQL}"; then
-  echo 'Microi：SaaS 主租户 OsClient、ClientName 更新完成 ✓'
-else
-  echo 'Microi：错误：SaaS 主租户配置更新失败。'
-  exit 1
-fi
+case "${DATABASE_CHOICE}" in
+  1|2) OS_CLIENT_SQL="UPDATE sys_osclients SET OsClient='${OS_CLIENT}', ClientName='${OS_CLIENT}' WHERE IFNULL(IsDeleted, 0) = 0;" ;;
+  3) OS_CLIENT_SQL="UPDATE [dbo].[sys_osclients] SET [OsClient]=N'${OS_CLIENT}', [ClientName]=N'${OS_CLIENT}' WHERE COALESCE([IsDeleted], 0) = 0;" ;;
+  5) OS_CLIENT_SQL="UPDATE \"sys_osclients\" SET \"OsClient\"='${OS_CLIENT}', \"ClientName\"='${OS_CLIENT}' WHERE COALESCE(\"IsDeleted\", 0) = 0;" ;;
+  6) OS_CLIENT_SQL="UPDATE \"sys_osclients\" SET \"OsClient\"='${OS_CLIENT}', \"ClientName\"='${OS_CLIENT}' WHERE COALESCE(\"IsDeleted\", 0) = 0;" ;;
+esac
+database_exec_sql "${OS_CLIENT_SQL}"
+echo 'Microi：SaaS 主租户 OsClient、ClientName 更新完成 ✓'
 
-# 清理临时文件
 rm -f "${SQL_ZIP_FILE}"
 rm -rf "${SQL_TMP_DIR}"
 echo 'Microi：临时文件已清理 ✓'
 
 echo ''
-echo '[步骤6/11] MySQL 部署完成 ✓'
+echo "[步骤6/11] ${DATABASE_DISPLAY_NAME} 部署完成 ✓"
 
 
 # ============================================================
@@ -1487,9 +1792,19 @@ else
 fi
 MINIO_INTERNAL_ENDPOINT="${LAN_IP}:${MINIO_PORT}"
 MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
-MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='', NetworkIsInternet=${MINIO_NETWORK_IS_INTERNET} WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
+case "${DATABASE_CHOICE}" in
+  1|2)
+    MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='', NetworkIsInternet=${MINIO_NETWORK_IS_INTERNET} WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
+    ;;
+  3)
+    MINIO_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [HDFS]=N'MinIO', [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}', [MinIOSecretKey]=N'${MINIO_SECRET_KEY}', [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}', [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}', [MinIOEndPointSSL]=0, [MinIOPrivateEndPointSSL]=0, [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}', [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}', [MinIORegion]=N'', [NetworkIsInternet]=${MINIO_NETWORK_IS_INTERNET} WHERE [OsClient]=N'${OS_CLIENT}' AND COALESCE([IsDeleted], 0) = 0;"
+    ;;
+  5|6)
+    MINIO_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"HDFS\"='MinIO', \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}', \"MinIOSecretKey\"='${MINIO_SECRET_KEY}', \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}', \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}', \"MinIOEndPointSSL\"=0, \"MinIOPrivateEndPointSSL\"=0, \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}', \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}', \"MinIORegion\"='', \"NetworkIsInternet\"=${MINIO_NETWORK_IS_INTERNET} WHERE \"OsClient\"='${OS_CLIENT}' AND COALESCE(\"IsDeleted\", 0) = 0;"
+    ;;
+esac
 echo 'Microi：写入 SaaS 引擎 MinIO 配置...'
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${MINIO_CONFIG_SQL}"; then
+if database_exec_sql "${MINIO_CONFIG_SQL}"; then
   echo 'Microi：SaaS 引擎 MinIO 配置更新完成 ✓'
 else
   echo 'Microi：错误：SaaS 引擎 MinIO 配置更新失败。'
@@ -1498,9 +1813,13 @@ fi
 
 SYS_CONFIG_API_BASE="http://${ACCESS_IP}:${API_PORT}"
 SYS_CONFIG_FILE_SERVER="http://${ACCESS_IP}:${MINIO_PORT}/${MINIO_PUBLIC_BUCKET}"
-SYS_CONFIG_SQL="UPDATE sys_config SET ApiBase='${SYS_CONFIG_API_BASE}', FileServer='${SYS_CONFIG_FILE_SERVER}' WHERE IFNULL(IsDeleted, 0) = 0;"
+case "${DATABASE_CHOICE}" in
+  1|2) SYS_CONFIG_SQL="UPDATE sys_config SET ApiBase='${SYS_CONFIG_API_BASE}', FileServer='${SYS_CONFIG_FILE_SERVER}' WHERE IFNULL(IsDeleted, 0) = 0;" ;;
+  3) SYS_CONFIG_SQL="UPDATE [dbo].[sys_config] SET [ApiBase]=N'${SYS_CONFIG_API_BASE}', [FileServer]=N'${SYS_CONFIG_FILE_SERVER}' WHERE COALESCE([IsDeleted], 0) = 0;" ;;
+  5|6) SYS_CONFIG_SQL="UPDATE \"sys_config\" SET \"ApiBase\"='${SYS_CONFIG_API_BASE}', \"FileServer\"='${SYS_CONFIG_FILE_SERVER}' WHERE COALESCE(\"IsDeleted\", 0) = 0;" ;;
+esac
 echo 'Microi：写入系统设置 API 与文件服务地址...'
-if docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" microi_demo -e "${SYS_CONFIG_SQL}"; then
+if database_exec_sql "${SYS_CONFIG_SQL}"; then
   echo "Microi：系统设置更新完成：ApiBase=${SYS_CONFIG_API_BASE}, FileServer=${SYS_CONFIG_FILE_SERVER} ✓"
 else
   echo 'Microi：错误：系统设置 ApiBase、FileServer 更新失败。'
@@ -1640,7 +1959,20 @@ echo '------------------------------------------------------------------'
 
 APP_DIR="${COMPOSE_BASE_DIR}/microi-install-app"
 
-OS_CLIENT_DB_CONN="Data Source=${LAN_IP};Database=microi_demo;User Id=root;Password=${MYSQL_ROOT_PASSWORD};Port=${MYSQL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+case "${DATABASE_CHOICE}" in
+  1|2)
+    OS_CLIENT_DB_CONN="Data Source=${LAN_IP};Database=microi_demo;User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+    ;;
+  3)
+    OS_CLIENT_DB_CONN="Data Source=${LAN_IP},${DATABASE_PORT};Initial Catalog=microi_demo;User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
+    ;;
+  5)
+    OS_CLIENT_DB_CONN="Server=${LAN_IP};Port=${DATABASE_PORT};User Id=SYSDBA;Password=${DATABASE_PASSWORD};Schema=SYSDBA;"
+    ;;
+  6)
+    OS_CLIENT_DB_CONN="Host=${LAN_IP};Port=${DATABASE_PORT};Database=microi_demo;Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
+    ;;
+esac
 
 echo "Microi：API端口: ${API_PORT}, Web端口: ${VUE_PORT}"
 
@@ -1662,6 +1994,7 @@ ${COMPOSE_SERVICE_NETWORK}
       - OsClient=${OS_CLIENT}
       - OsClientType=Product
       - OsClientNetwork=Internal
+      - OsClientDbType=${DATABASE_TYPE}
       - OsClientDbConn=${OS_CLIENT_DB_CONN}
       - OsClientRedisHost=${LAN_IP}
       - OsClientRedisPort=${REDIS_PORT}
@@ -1777,7 +2110,7 @@ echo ''
 echo '------------------------------------------------------------------'
 echo "端口分配（从 ${PORT_BASE} 开始顺序分配）："
 echo '------------------------------------------------------------------'
-printf '  %-18s %s\n' "MySQL:"         "${MYSQL_PORT}"
+printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
 printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
 printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
@@ -1793,9 +2126,10 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '服务信息：'
 echo '------------------------------------------------------------------'
-echo "MySQL ${MYSQL_VERSION}:  容器 ${MYSQL_CONTAINER_NAME},    端口 ${MYSQL_PORT},  Root密码: ${MYSQL_ROOT_PASSWORD}"
-echo "             数据目录: ${MYSQL_DATA_DIR}"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-mysql/"
+echo "${DATABASE_DISPLAY_NAME}:  Dos.ORM类型 ${DATABASE_TYPE}, 容器 ${DATABASE_CONTAINER_NAME}, 端口 ${DATABASE_PORT}, 管理员密码: ${DATABASE_PASSWORD}"
+echo "             空数据库包: ${SQL_ZIP_URL}"
+echo "             数据目录: ${DATABASE_DATA_DIR}"
+echo "             编排目录: ${DATABASE_DIR}/"
 echo ""
 echo "Redis:       容器 microi-install-redis,      端口 ${REDIS_PORT},  密码: ${REDIS_PASSWORD}"
 echo "             数据目录: ${REDIS_DATA_DIR}"
