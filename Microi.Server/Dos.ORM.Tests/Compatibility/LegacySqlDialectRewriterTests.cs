@@ -165,4 +165,21 @@ public sealed class LegacySqlDialectRewriterTests
 
         Assert.Equal("SELECT \"Id\" FROM \"Users\" LIMIT 1", command.CommandText);
     }
+
+    [Theory]
+    [InlineData(DatabaseType.MySql, "SELECT `RowId` FROM `AuditLog`")]
+    [InlineData(DatabaseType.SqlServer, "SELECT [RowId] FROM [AuditLog]")]
+    [InlineData(DatabaseType.PostgreSql, "SELECT \"RowId\" FROM \"AuditLog\"")]
+    [InlineData(DatabaseType.KingBase, "SELECT \"RowId\" FROM \"AuditLog\"")]
+    [InlineData(DatabaseType.Oracle, "SELECT \"RowId\" FROM \"AuditLog\"")]
+    [InlineData(DatabaseType.DaMeng, "SELECT \"Row_Id\" FROM \"AuditLog\"")]
+    public void Only_Dm8_maps_the_legacy_backtick_RowId_identifier(
+        DatabaseType databaseType,
+        string expected)
+    {
+        Assert.Equal(expected,
+            LegacySqlDialectRewriter.Rewrite(
+                "SELECT `RowId` FROM `AuditLog`",
+                databaseType));
+    }
 }

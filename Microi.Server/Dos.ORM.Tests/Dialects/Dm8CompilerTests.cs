@@ -3,6 +3,8 @@ using Dos.ORM.Platform;
 using Dos.ORM.SqlAst;
 using Dos.ORM.SqlCompilation;
 using Dos.ORM.Tests.TestInfrastructure;
+using System.Data;
+using System.Reflection;
 
 namespace Dos.ORM.Tests.Dialects;
 
@@ -72,6 +74,80 @@ public sealed class Dm8CompilerTests
         PlanAssert.IsCountThenData(plan);
     }
 
+    [Fact]
+    public void Dm8_maps_the_RowId_model_column_without_changing_Oracle()
+    {
+        var row = new SqlAlias("r");
+        var statement = new SelectStatement(
+            new NamedTableSource(
+                new SqlObjectName(new SqlIdentifier("AuditLog")), row),
+            new[]
+            {
+                new SelectProjection(
+                    new ColumnExpression(new SqlIdentifier("RowId"), row),
+                    new SqlAlias("RowId"))
+            });
+
+        var dm = PlanAssert.SingleSql(new Dm8Compiler().Compile(
+            statement,
+            StorageContractTestOptions.For(TestProfiles.Dm8)));
+        var oracle = PlanAssert.SingleSql(new Dos.ORM.Dialects.Oracle.OracleCompiler().Compile(
+            statement,
+            StorageContractTestOptions.For(TestProfiles.Oracle19c)));
+
+        Assert.Contains("\"r\".\"Row_Id\" AS \"RowId\"", dm.CommandText);
+        Assert.DoesNotContain("\"r\".\"RowId\"", dm.CommandText);
+        Assert.Contains("\"r\".\"RowId\" AS \"RowId\"", oracle.CommandText);
+        Assert.DoesNotContain("Row_Id", oracle.CommandText);
+    }
+
+    [Fact]
+    public void Dm8_ddl_maps_RowId_columns_in_service_table_and_index_sql()
+    {
+        Assert.Equal("Row_Id",
+            Dm8IdentifierCompatibility.ToPhysicalColumn("ROWID"));
+        Assert.Equal("RowId",
+            Dm8IdentifierCompatibility.ToLogicalColumn("ROW_ID"));
+        Assert.Equal("ParentRowId",
+            Dm8IdentifierCompatibility.ToPhysicalColumn("ParentRowId"));
+        Assert.Equal("\"Row_Id\"", new DaMengService().GetFieldName("RowId"));
+        Assert.Equal("Normal", new DaMengService().GetFieldName("Normal"));
+
+        var field = new Field(
+            "RowId", "AuditLog", DbType.String, 36, "RowId");
+        var createTable = typeof(CodeFirstExtensions).GetMethod(
+            "BuildCreateTableSql",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var createIndex = typeof(CodeFirstExtensions).GetMethod(
+            "BuildCreateIndexSql",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        var tableSql = Assert.IsType<string>(createTable!.Invoke(
+            null,
+            new object?[]
+            {
+                DatabaseType.DaMeng,
+                "AuditLog",
+                new[] { field },
+                null,
+                new[] { field },
+                typeof(DmRowIdEntity)
+            }));
+        var indexSql = Assert.IsType<string>(createIndex!.Invoke(
+            null,
+            new object[]
+            {
+                DatabaseType.DaMeng,
+                "AuditLog",
+                new IndexAttribute("IX_AuditLog_RowId", "RowId")
+            }));
+
+        Assert.Contains("\"Row_Id\"", tableSql);
+        Assert.DoesNotContain("\"RowId\"", tableSql);
+        Assert.Contains("(\"Row_Id\")", indexSql);
+        Assert.DoesNotContain("(\"RowId\")", indexSql);
+    }
+
     [Theory]
     [MemberData(nameof(RejectedProfiles))]
     public void Dm8_rejects_wrong_type_version_mode_or_mode_case(
@@ -106,5 +182,23 @@ public sealed class Dm8CompilerTests
         {
             new DialectProfile(DatabaseType.Oracle, new Version(8, 1, 3, 140), "Oracle")
         };
+    }
+
+    private sealed class DmRowIdEntity : Entity
+    {
+        public string RowId { get; set; }
+
+        public override Field[] GetFields()
+        {
+            return new[]
+            {
+                new Field("RowId", "AuditLog", DbType.String, 36, "RowId")
+            };
+        }
+
+        public override object[] GetValues()
+        {
+            return new object[] { RowId };
+        }
     }
 }
