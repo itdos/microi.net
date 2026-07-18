@@ -191,6 +191,7 @@ namespace Dos.ORM.SqlCompilation
         Schema,
         Select,
         Sequence,
+        Serializable,
         Set,
         Share,
         Skip,
@@ -217,6 +218,7 @@ namespace Dos.ORM.SqlCompilation
         UnionAll,
         Unique,
         UniqueIdentifier,
+        Updlock,
         Update,
         Using,
         Uuid,
@@ -828,6 +830,7 @@ namespace Dos.ORM.SqlCompilation
                 case SqlKeyword.Schema: return "SCHEMA";
                 case SqlKeyword.Select: return "SELECT";
                 case SqlKeyword.Sequence: return "SEQUENCE";
+                case SqlKeyword.Serializable: return "SERIALIZABLE";
                 case SqlKeyword.Set: return "SET";
                 case SqlKeyword.Share: return "SHARE";
                 case SqlKeyword.Skip: return "SKIP";
@@ -854,6 +857,7 @@ namespace Dos.ORM.SqlCompilation
                 case SqlKeyword.UnionAll: return "UNION ALL";
                 case SqlKeyword.Unique: return "UNIQUE";
                 case SqlKeyword.UniqueIdentifier: return "UNIQUEIDENTIFIER";
+                case SqlKeyword.Updlock: return "UPDLOCK";
                 case SqlKeyword.Update: return "UPDATE";
                 case SqlKeyword.Using: return "USING";
                 case SqlKeyword.Uuid: return "UUID";
