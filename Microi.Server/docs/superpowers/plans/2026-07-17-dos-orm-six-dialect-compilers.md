@@ -587,7 +587,7 @@ public void Validation_diagnostics_throw_before_lower_and_are_value_safe()
     var observer = new RecordingStageObserver();
     var compiler = new RecordingCompiler(observer);
     var runtimeSentinel = "DO-NOT-LEAK-8f4cc3";
-    var source = AstSamples.InvalidSelectWithRuntimeValue(runtimeSentinel);
+    var source = AstSamples.InvalidSelectWithSensitiveMetadata(runtimeSentinel);
 
     var error = Assert.Throws<SqlAstValidationException>(() =>
         compiler.Compile(source,
@@ -671,12 +671,13 @@ public void Migration_compiler_preserves_options_and_derives_effective_impact()
 public void Value_contract_is_internal_immutable_and_part_of_command_identity()
 {
     var contract = StorageContractSamples.NonEmptyEnvelopeV1();
-    var command = PlanTestFactory.CommandWithStorageContract(contract);
+    var plan = PlanTestFactory.StatementWithStorageContract(contract);
+    var command = Assert.IsType<SqlCommandStep>(Assert.Single(plan.Steps));
 
     Assert.Equal(contract.Fingerprint,
         command.InternalValueContract.StorageContractFingerprint);
-    Assert.NotEqual(command.Fingerprint,
-        PlanTestFactory.CommandWithStorageContract(
+    Assert.NotEqual(plan.Fingerprint,
+        PlanTestFactory.StatementWithStorageContract(
             StorageContractSamples.Native()).Fingerprint);
     PublicSurfaceAssert.HasNoPublicStorageContractDelta();
 }
@@ -726,7 +727,14 @@ ordinal deterministic fingerprint; `DatabaseStorageContract` freezes version,
 encoding, catalog/profile fingerprint, exact encoded column keys, and its own
 fingerprint. Every collection is defensively copied and duplicate columns or
 ordinals fail. `SqlCommandStep` gains only an internal value-contract property,
-and command/plan fingerprints include it.
+and the existing plan wire includes that command value contract. There is no
+new `SqlCommandStep.Fingerprint` property. To preserve already frozen plan
+fingerprints, only the compatibility/default Native shape—ordered parameter
+contracts derived from the command definitions and no result contracts—emits
+no extension segment. Every non-Native contract and every non-default Native
+contract emits one version-tagged segment, so changing storage or result
+materialization metadata deterministically changes the enclosing plan
+fingerprint.
 
 The same internal file freezes `DatabaseStorageContractState` to exactly
 `PendingImport=0` and `Active=1`, plus an internal immutable
@@ -840,12 +848,19 @@ Legacy `Field`/`WhereClip`/`FromSection` objects never enter this compiler;
 the legacy plan's source adapters construct the neutral AST first. Bind here
 accepts only the already supplied 93-node neutral graph and uses a new
 deterministic internal closed-set binder to resolve column references to their
-alias owners plus structural type metadata. It emits another neutral graph,
-rejects unresolved/ambiguous owners with value-safe diagnostics, preserves
-parameter definitions, has an exact disposition for all 93 nodes, and is not
-an identity/no-op stage. If no external catalog is required, resolution is
-limited to aliases/type metadata present in the AST; it never opens a database,
-reads runtime values, or accepts a legacy source object.
+alias owners. It preserves every `SqlTypeDescriptor` already carried by
+parameters, casts, column definitions, and other neutral nodes; because
+`ColumnExpression` has no type slot, Task 2 neither invents a catalog-derived
+column type nor adds a metadata sidecar. A sole visible alias is filled onto an
+unqualified column; an explicit alias must exist; an unqualified column with
+multiple visible sources is rejected as ambiguous; one with no visible source
+is rejected as unresolved. The two binder diagnostics are exactly
+`AST_BIND_COLUMN_OWNER_UNRESOLVED` and
+`AST_BIND_COLUMN_OWNER_AMBIGUOUS`, with fixed value-free messages. The binder
+emits another neutral graph, preserves parameter definitions, has an exact
+disposition for all 93 nodes, and is not an identity/no-op stage. Resolution is
+limited to aliases and type metadata already present in the AST; it never opens
+a database, reads runtime values, or accepts a legacy source object.
 
 `SqlCompilationStage` is an internal eight-value enum. The base's internal
 virtual `Observe(SqlCompilationStage stage)` receives only that enum—no node,
@@ -889,8 +904,8 @@ Constructors reject null profile/server version; validation additionally
 rejects a null/empty diagnostic list, and unsupported-capability rejects a
 null/blank feature or structural path. Validation defensively copies the full,
 ordered diagnostic list into a read-only snapshot by recreating each
-`SqlAstDiagnostic` from a known validator code, its fixed value-free message,
-and validated structural path. `Feature`/`NodePath` are the first diagnostic's
+`SqlAstDiagnostic` from a known validator or binder code, its fixed value-free
+message, and validated structural path. `Feature`/`NodePath` are the first diagnostic's
 code/path. Both exceptions copy all four version components and exact mode and
 build a fixed-format Message only from safe profile/feature/path/count data.
 They have no public constructor, SQL/value property, custom serialization
@@ -965,7 +980,14 @@ attach an externally authorized preview
 approval only after recompiling the source against the current live options;
 the compiler itself never accepts an approval or a preview plan.
 
-`SqlTextWriter` has a closed internal token API:
+`SqlTextWriter` has a closed internal token API. Its only constructor accepts
+the closed internal enum `SqlTextDialectFamily` with exactly `MySql`,
+`PostgreSql`, `KingbaseEs`, `SqlServer`, and `Oracle`; DM8 maps to `Oracle`.
+KingbaseES remains a distinct family because its `:` parameter prefix differs
+from PostgreSQL's `@`, despite sharing identifier and literal syntax. Quote
+tokens, parameter prefix, and schema-literal escaping
+are fixed inside that mapping. The writer cannot accept arbitrary quote or
+prefix strings, delegates, providers, or runtime configuration. Its token API is:
 `AppendKeyword(SqlKeyword)`, `AppendIdentifierSegment(string)`,
 `AppendParameter(SqlParameterSlot)`,
 `AppendOperator(SqlOperatorToken)`, `AppendOpenParenthesis()`,
