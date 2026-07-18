@@ -6,6 +6,121 @@ namespace Dos.ORM.Tests.TestInfrastructure;
 
 internal static class AstSamples
 {
+    internal sealed class Oracle11gPagingSample
+    {
+        internal Oracle11gPagingSample(
+            SelectStatement statement,
+            ParameterDefinition whereParameterDefinition)
+        {
+            Statement = statement ?? throw new ArgumentNullException(nameof(statement));
+            WhereParameterDefinition = whereParameterDefinition
+                ?? throw new ArgumentNullException(nameof(whereParameterDefinition));
+        }
+
+        internal SelectStatement Statement { get; }
+
+        internal ParameterDefinition WhereParameterDefinition { get; }
+    }
+
+    internal static SelectStatement PagedUsers()
+    {
+        var user = new SqlAlias("u");
+        var id = new ColumnExpression(Id("Id"), user);
+        return new SelectStatement(
+            new NamedTableSource(ObjectName("Sys_User"), user),
+            new[]
+            {
+                new SelectProjection(id),
+                new SelectProjection(new ColumnExpression(Id("Name"), user))
+            },
+            orderBy: new[]
+            {
+                new OrderByExpression(id, SqlSortDirection.Ascending)
+            },
+            page: new OffsetPageSpec(40, 20));
+    }
+
+    internal static SelectStatement UserById()
+    {
+        var user = new SqlAlias("u");
+        var id = new ParameterDefinition(
+            "id",
+            new SqlTypeDescriptor(LogicalDbType.Guid),
+            ParameterDirection.Input,
+            isNullable: false);
+        return new SelectStatement(
+            new NamedTableSource(ObjectName("Sys_User"), user),
+            new[]
+            {
+                new SelectProjection(new ColumnExpression(Id("Id"), user))
+            },
+            whereExpression: new BinaryExpression(
+                new ColumnExpression(Id("Id"), user),
+                SqlBinaryOperator.Equal,
+                new ParameterExpression(id)));
+    }
+
+    internal static SelectStatement LogicalTextRoundTripAndPredicates()
+    {
+        var user = new SqlAlias("u");
+        var nameColumn = new ColumnExpression(Id("Name"), user);
+        var name = new ParameterDefinition(
+            "name",
+            new SqlTypeDescriptor(LogicalDbType.String, length: 200),
+            ParameterDirection.Input,
+            isNullable: true);
+        return new SelectStatement(
+            new NamedTableSource(ObjectName("Sys_User"), user),
+            new[]
+            {
+                new SelectProjection(nameColumn, new SqlAlias("logical_name")),
+                new SelectProjection(
+                    new FunctionExpression(
+                        SemanticFunctions.Length,
+                        new SqlExpression[] { nameColumn }),
+                    new SqlAlias("logical_length"))
+            },
+            whereExpression: new BinaryExpression(
+                nameColumn,
+                SqlBinaryOperator.Like,
+                new ParameterExpression(name)),
+            orderBy: new[]
+            {
+                new OrderByExpression(
+                    nameColumn,
+                    SqlSortDirection.Ascending,
+                    SqlNullSortOrder.Last)
+            });
+    }
+
+    internal static Oracle11gPagingSample Oracle11gPagedUsersWithWhere()
+    {
+        var user = new SqlAlias("u");
+        var whereId = new ParameterDefinition(
+            "whereId",
+            new SqlTypeDescriptor(LogicalDbType.Guid),
+            ParameterDirection.Input,
+            isNullable: false);
+        var idColumn = new ColumnExpression(Id("Id"), user);
+        var statement = new SelectStatement(
+            new NamedTableSource(ObjectName("Sys_User"), user),
+            new[]
+            {
+                new SelectProjection(idColumn),
+                new SelectProjection(new ColumnExpression(Id("Name"), user))
+            },
+            whereExpression: new BinaryExpression(
+                idColumn,
+                SqlBinaryOperator.Equal,
+                new ParameterExpression(whereId)),
+            orderBy: new[]
+            {
+                new OrderByExpression(idColumn, SqlSortDirection.Ascending)
+            },
+            page: new OffsetPageSpec(40, 20));
+        return new Oracle11gPagingSample(statement, whereId);
+    }
+
     internal static SelectStatement UserByAccountAndStatus()
     {
         var user = new SqlAlias("u");
