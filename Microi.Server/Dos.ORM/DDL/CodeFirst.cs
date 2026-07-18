@@ -129,14 +129,14 @@ namespace Dos.ORM
                     break;
                 case DatabaseType.PostgreSql:
                 case DatabaseType.KingBase:
-                    sql = $"SELECT COUNT(1) FROM information_schema.tables WHERE table_name='{tableName.Replace("'", "''").ToLower()}'";
+                    sql = $"SELECT COUNT(1) FROM information_schema.tables WHERE table_schema=current_schema() AND lower(table_name)=lower('{tableName.Replace("'", "''")}')";
                     break;
                 case DatabaseType.Sqlite3:
                     sql = $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{tableName.Replace("'", "''")}'";
                     break;
                 case DatabaseType.Oracle:
                 case DatabaseType.DaMeng:
-                    sql = $"SELECT COUNT(1) FROM user_tables WHERE table_name=UPPER('{tableName.Replace("'", "''")}')";
+                    sql = $"SELECT COUNT(1) FROM user_tables WHERE lower(table_name)=lower('{tableName.Replace("'", "''")}')";
                     break;
                 default:
                     return false;
@@ -147,6 +147,56 @@ namespace Dos.ORM
                 return v > 0;
             }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// 检查当前 schema 中指定列是否存在。数据库元数据差异统一封装在 Dos.ORM，
+        /// 业务层无需再拼接 SHOW COLUMNS、COL_LENGTH 或 information_schema 方言。
+        /// </summary>
+        public static bool ColumnExists(this DbSession dbSession, string tableName, string columnName)
+        {
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentException("表名不能为空。", nameof(tableName));
+            if (string.IsNullOrWhiteSpace(columnName)) throw new ArgumentException("列名不能为空。", nameof(columnName));
+
+            string sql;
+            switch (dbSession.Db.DbProvider.DatabaseType)
+            {
+                case DatabaseType.SqlServer:
+                case DatabaseType.SqlServer9:
+                    sql = @"SELECT COUNT(1)
+FROM sys.columns
+WHERE object_id = OBJECT_ID(@p0, 'U') AND name = @p1";
+                    break;
+                case DatabaseType.MySql:
+                    sql = @"SELECT COUNT(1)
+FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = @p0 AND column_name = @p1";
+                    break;
+                case DatabaseType.PostgreSql:
+                case DatabaseType.KingBase:
+                    sql = @"SELECT COUNT(1)
+FROM information_schema.columns
+WHERE table_schema = current_schema() AND lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
+                    break;
+                case DatabaseType.Oracle:
+                case DatabaseType.DaMeng:
+                    sql = @"SELECT COUNT(1)
+FROM user_tab_columns
+WHERE lower(table_name) = lower(@p0) AND lower(column_name) = lower(@p1)";
+                    break;
+                case DatabaseType.Sqlite3:
+                    sql = "SELECT COUNT(1) FROM pragma_table_info(@p0) WHERE lower(name) = lower(@p1)";
+                    break;
+                default:
+                    throw new NotSupportedException(
+                        "ColumnExists 不支持数据库类型：" + dbSession.Db.DbProvider.DatabaseType);
+            }
+
+            return dbSession.FromSql(sql)
+                .AddInParameter("p0", tableName)
+                .AddInParameter("p1", columnName)
+                .ToScalar<int>() > 0;
         }
 
         private static void ExecuteSilent(DbSession dbSession, string sql)
