@@ -138,7 +138,9 @@ namespace Dos.ORM
             //修改列名：EXEC sp_rename ‘表名.[原有列名]’, ‘新列名’ , ‘COLUMN’;
             //exec sp_rename 'People.[PeopleBirthday]','PeopleBirth','column';
 
-            var sql = $"EXEC sp_rename '[{param.TableName}].[{param.FieldName}]', '{param.NewFieldName}', 'COLUMN';";
+            var sql = string.Empty;
+            if (!param.FieldName.Equals(param.NewFieldName, StringComparison.OrdinalIgnoreCase))
+                sql = $"EXEC sp_rename '[{param.TableName}].[{param.FieldName}]', '{param.NewFieldName}', 'COLUMN';";
 
             sql += $@"ALTER TABLE [{param.TableName}] ALTER COLUMN [{param.NewFieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")};";
 
@@ -147,36 +149,21 @@ namespace Dos.ORM
                 sql += $@"EXEC sp_updateextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.NewFieldName}';";
             }
 
-            if (_trans != null)
-            {
-                var count = _trans.FromSql(sql).ExecuteNonQuery();
-                return new DosResult(1);
-            }
-            else
-            {
-                if (param.OsClient.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
-                }
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                DbSession dbSession = param.OsClientModel.Db;
-                //在客户数据库中创建表
-                var count = dbSession.FromSql(sql).ExecuteNonQuery();
-                return new DosResult(1);
-            }
+            dynamic session = (object)_trans ?? param.DbSession;
+            if (session == null)
+                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
+
+            session.FromSql(sql).ExecuteNonQuery();
+            return new DosResult(1);
         }
 
         public DosResultList<string> GetTables(DbServiceParam param)
         {
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
+            if (param.DbSession == null)
                 return new DosResultList<string>(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
             //取所有表
-            var sql = @"select TABLE_NAME from information_schema.TABLES";
-            //var dbSession = OsClient.GetClient(param.OsClient).DbRead;
-            var dbSession = param.OsClientModel.DbRead;
-            var result = dbSession.FromSql(sql).ToList<string>();
+            var sql = @"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = SCHEMA_NAME()";
+            var result = param.DbSession.FromSql(sql).ToList<string>();
             return new DosResultList<string>(1, result);
         }
 
@@ -214,16 +201,18 @@ namespace Dos.ORM
             if (!IsValidIdentifier(param.TableName))
                 return new DosResultList<information_schema_columns>(0, null, "表名不合法");
 
-            var sql = $@"SELECT 
-                            column_name, 
+            var sql = $@"SELECT
+                            column_name,
                             data_type,
-                            column_name as column_comment,
-                            column_key,
-                            '' as extra,
+                            column_name AS column_comment,
+                            '' AS column_key,
+                            '' AS extra,
                             is_nullable,
-                            data_type as column_type
+                            data_type AS column_type,
+                            character_maximum_length
                         FROM information_schema.columns
-                        WHERE table_name = '{param.TableName}'
+                        WHERE table_schema = SCHEMA_NAME()
+                          AND table_name = '{param.TableName}'
                         ORDER BY ordinal_position";
 
             try

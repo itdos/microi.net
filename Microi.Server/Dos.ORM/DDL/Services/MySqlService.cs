@@ -313,7 +313,8 @@ namespace Dos.ORM
                                    column_key,
                                    extra,
                                    is_nullable,
-                                   column_type 
+                                   column_type,
+                                   character_maximum_length
                                 from information_schema.columns
                                 where table_name = '{0}' 
                                    and table_schema = (select database()) 

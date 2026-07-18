@@ -157,20 +157,11 @@ namespace Microi.net.Api
                 // 表单数据量排行（取前10，通过diy_table的DataCount字段）
                 try
                 {
-                    var tableRankSql = @"SELECT 
-    d.Name,
-    d.Description AS Label,
-    t.TABLE_ROWS AS DataCount
-FROM 
-    diy_table d
-    INNER JOIN information_schema.TABLES t 
-        ON d.Name = t.TABLE_NAME 
-        AND t.TABLE_SCHEMA = DATABASE()  -- 替换为您的数据库名
-WHERE 
-    d.IsDeleted <> 1
-    AND t.TABLE_ROWS > 0
-ORDER BY 
-    t.TABLE_ROWS DESC
+                    var tableRankSql = @"SELECT Name, Description AS Label, DataCount
+FROM diy_table
+WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
+  AND COALESCE(DataCount, 0) > 0
+ORDER BY DataCount DESC
 LIMIT 10;";
                     dynamic[] tableRank = db.FromSql(tableRankSql).ToArray();
                     var tableRankArr = new JArray();
