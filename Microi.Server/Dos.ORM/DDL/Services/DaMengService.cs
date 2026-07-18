@@ -245,11 +245,13 @@ namespace Dos.ORM
                                             a.DATA_TYPE as ""data_type"",
                                             NVL(b.COMMENTS, a.COLUMN_NAME) as ""column_comment"",
                                             'YES' as ""is_nullable"",
-                                            a.DATA_TYPE as ""column_type""
+                                            a.DATA_TYPE as ""column_type"",
+                                            a.CHAR_LENGTH as ""character_maximum_length""
                                             FROM all_tab_columns a
                                             LEFT JOIN all_col_comments b 
                                                 ON a.TABLE_NAME = b.TABLE_NAME AND a.COLUMN_NAME = b.COLUMN_NAME
-                                            WHERE a.table_name = '{0}'";
+                                            WHERE a.OWNER = USER
+                                              AND a.table_name = UPPER('{0}')";
             var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }

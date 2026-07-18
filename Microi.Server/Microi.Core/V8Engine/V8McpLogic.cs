@@ -121,11 +121,15 @@ namespace Microi.net
             {
                 var client = OsClientExtend.GetClient(osClient);
                 if (client?.Db == null) return false;
-                var section = client.Db.FromSql("SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?table AND COLUMN_NAME = ?column")
-                    .AddInParameter("?table", "sys_apiengine")
-                    .AddInParameter("?column", columnName);
-                section.SetCommandTimeout(10);
-                return section.ToScalar<int>() > 0;
+                var columns = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType)
+                    .GetColumns(new Dos.ORM.DbServiceParam
+                    {
+                        DbSession = client.Db,
+                        TableName = "sys_apiengine",
+                        OsClient = osClient
+                    });
+                return columns?.Data?.Any(column => string.Equals(
+                    column.column_name, columnName, StringComparison.OrdinalIgnoreCase)) == true;
             }
             catch
             {

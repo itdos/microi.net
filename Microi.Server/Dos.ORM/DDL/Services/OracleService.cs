@@ -400,10 +400,8 @@ namespace Dos.ORM
         /// <returns></returns>
         public DosResultList<string> GetTables(DbServiceParam param)
         {
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
+            if (param.DbSession == null)
                 return new DosResultList<string>(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
             //取所有表
             //var sql = @"select TABLE_NAME from information_schema.TABLES";
             var sql = @"SELECT table_name FROM user_tables";
@@ -433,9 +431,11 @@ namespace Dos.ORM
                                             DATA_TYPE as ""data_type"",
                                             COLUMN_NAME as ""column_comment"",
                                             'YES' as ""is_nullable"",
-                                            DATA_TYPE as ""column_type""
+                                            DATA_TYPE as ""column_type"",
+                                            CHAR_LENGTH as ""character_maximum_length""
                                             FROM all_tab_columns
-                                            WHERE table_name = '{0}'";
+                                            WHERE OWNER = USER
+                                              AND table_name = UPPER('{0}')";
             var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }

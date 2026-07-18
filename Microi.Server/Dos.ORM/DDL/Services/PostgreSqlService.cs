@@ -237,17 +237,19 @@ namespace Dos.ORM
         /// </summary>
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
-            var sql = $@"SELECT 
-                            column_name,
-                            data_type,
-                            col_description((table_schema||'.'||table_name)::regclass, ordinal_position) AS column_comment,
+            var sql = $@"SELECT
+                            c.column_name,
+                            c.data_type,
+                            col_description((c.table_schema||'.'||c.table_name)::regclass, c.ordinal_position) AS column_comment,
                             '' AS column_key,
                             '' AS extra,
-                            is_nullable,
-                            udt_name AS column_type
-                        FROM information_schema.columns
-                        WHERE table_name = '{param.TableName}'
-                        ORDER BY ordinal_position";
+                            c.is_nullable,
+                            c.udt_name AS column_type,
+                            c.character_maximum_length
+                        FROM information_schema.columns c
+                        WHERE c.table_schema = current_schema()
+                          AND c.table_name = '{param.TableName}'
+                        ORDER BY c.ordinal_position";
             var realFieldList = param.DbSession.FromSql(sql).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
