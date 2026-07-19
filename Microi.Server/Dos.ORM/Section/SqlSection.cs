@@ -105,6 +105,27 @@ namespace Dos.ORM
             return this;
         }
 
+        /// <summary>
+        /// 添加不会在普通 SQL 日志、慢 SQL 参数或可执行 SQL 中显示明文值的输入参数。
+        /// 适用于密码、连接串、Token、AuthSecret 等敏感信息。
+        /// </summary>
+        public SqlSection AddSensitiveInParameter(string parameterName, object value)
+        {
+            return AddSensitiveInParameter(parameterName, DbType.String, 0, value);
+        }
+
+        public SqlSection AddSensitiveInParameter(string parameterName, DbType dbType, object value)
+        {
+            return AddSensitiveInParameter(parameterName, dbType, 0, value);
+        }
+
+        public SqlSection AddSensitiveInParameter(string parameterName, DbType dbType, int size, object value)
+        {
+            AddInParameter(parameterName, dbType, size, value);
+            MarkSensitiveParameter(parameterName);
+            return this;
+        }
+
         #endregion
 
         #region 多结果集
