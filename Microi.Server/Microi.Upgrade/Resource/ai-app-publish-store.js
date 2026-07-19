@@ -1,10 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.4.0
+ * Version: v1.4.4
  * Function:
- * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
- * - 优先从 mci_ai_app_file.PublishHdfsPath 打包真实 dist 编译资产，保证跨租户安装后可直接预览和重新编译。
+ * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP，并保留可移植安装所需表、接口和版本元数据。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -35,6 +34,22 @@ function normalizePath(value) {
     safe.push(parts[i].replace(/[:*?"<>|]/g, '_'));
   }
   return safe.join('/');
+}
+/* SOURCE_BUILD_ARCHIVE_ROOTS_V1 */
+function buildArchivePath(value) {
+  var path = normalizePath(value);
+  var lower = path.toLowerCase();
+  var roots = ['unpackage/dist/build/h5/', 'dist/', 'build/'];
+  for (var i = 0; i < roots.length; i++) {
+    if (lower.indexOf(roots[i]) === 0) return path.substring(roots[i].length);
+  }
+  return '';
+}
+function sourceArchivePath(value) {
+  var path = normalizePath(value);
+  if (isBlank(path) || !isBlank(buildArchivePath(path))) return '';
+  if (path.toLowerCase().indexOf('source/') === 0) return path.substring(7);
+  return path;
 }
 function safeFileName(value) {
   return text(value, 'microi-app').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').substring(0, 100) || 'microi-app';
@@ -175,15 +190,10 @@ function getBuildAssets(app, latestVersion, runtime) {
       : [];
     for (var c = 0; c < compiledFiles.length; c++) {
       var compiledFile = compiledFiles[c] || {};
-      var sourcePath = normalizePath(compiledFile.FilePath);
-      var publishPath = text(compiledFile.PublishHdfsPath);
-      if (isBlank(sourcePath) || isBlank(publishPath)) continue;
-      var lowerSourcePath = sourcePath.toLowerCase();
-      var buildPath = '';
-      if (lowerSourcePath.indexOf('dist/') === 0) buildPath = sourcePath.substring(5);
-      else if (lowerSourcePath.indexOf('build/') === 0) buildPath = sourcePath.substring(6);
-      else if (lowerSourcePath.indexOf('unpackage/dist/build/h5/') === 0) buildPath = sourcePath.substring(24);
+      var buildPath = buildArchivePath(compiledFile.FilePath);
+      var publishPath = text(compiledFile.PublishHdfsPath || compiledFile.HdfsPath);
       if (isBlank(buildPath)) continue;
+      if (isBlank(publishPath)) continue;
       assets.push({
         Path: buildPath,
         FileName: compiledFile.FileName || buildPath.substring(buildPath.lastIndexOf('/') + 1),
@@ -470,7 +480,7 @@ if (isOfflineAction) {
     var storedSourceRows = storedSourceFiles && storedSourceFiles.Code === 1 ? toArray(storedSourceFiles.Data) : [];
     for (var sourceIndex = 0; sourceIndex < storedSourceRows.length; sourceIndex++) {
       var storedSource = storedSourceRows[sourceIndex] || {};
-      var sourcePath = normalizePath(storedSource.FilePath || storedSource.FileName || ('source-' + sourceIndex));
+      var sourcePath = sourceArchivePath(storedSource.FilePath || storedSource.FileName || ('source-' + sourceIndex));
       var sourceHdfsPath = storedSource.HdfsPath || storedSource.FilePathName || storedSource.PublishHdfsPath || '';
       if (!sourcePath || !sourceHdfsPath) continue;
       sourceFiles.push({

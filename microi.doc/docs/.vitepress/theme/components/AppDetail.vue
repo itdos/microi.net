@@ -69,7 +69,7 @@
                   <span>{{ app.Name }}</span>
                 </div>
                 <iframe
-                  :src="app.PreviewUrl"
+                  :src="versionedPreviewUrl"
                   :title="`${app.Name}在线预览`"
                   loading="eager"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -115,6 +115,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
+import { withPreviewVersion } from '../utils/app-preview-url.js'
 
 const route = useRoute()
 const APP_API_BASE = import.meta.env.VITE_MICROI_PUBLIC_API_BASE || 'https://api.itdos.com'
@@ -129,6 +130,12 @@ const updatedDate = computed(() => {
   const value = app.value?.AppUpdateTime || app.value?.UpdateTime
   return value ? String(value).slice(0, 10) : '持续更新'
 })
+const versionedPreviewUrl = computed(() => withPreviewVersion(
+  app.value?.PreviewUrl,
+  app.value || {},
+  typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
+  { apiBase: APP_API_BASE, osClient: OS_CLIENT }
+))
 
 function queryAppKey() {
   if (typeof window === 'undefined') return ''
@@ -224,8 +231,8 @@ async function recordView() {
 }
 
 function openPreview() {
-  if (!app.value?.PreviewUrl) return
-  window.open(new URL(app.value.PreviewUrl, window.location.origin).href, '_blank', 'noopener,noreferrer')
+  if (!versionedPreviewUrl.value) return
+  window.open(versionedPreviewUrl.value, '_blank', 'noopener,noreferrer')
 }
 
 function typeLabel(value) {
