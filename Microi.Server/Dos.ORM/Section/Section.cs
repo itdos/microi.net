@@ -28,6 +28,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -53,6 +54,46 @@ namespace Dos.ORM
         /// 慢SQL回调：(DbCommand, 耗时ms, 方法名)
         /// </summary>
         public static Action<DbCommand, long, string> OnSlowSql;
+
+        private sealed class SensitiveParameterNames
+        {
+            internal readonly HashSet<string> Names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static readonly ConditionalWeakTable<DbCommand, SensitiveParameterNames> SensitiveParameters
+            = new ConditionalWeakTable<DbCommand, SensitiveParameterNames>();
+
+        /// <summary>
+        /// 标记当前命令的敏感参数。日志、慢 SQL 与诊断输出必须调用
+        /// <see cref="IsSensitiveParameter"/> 后再读取参数值。
+        /// </summary>
+        protected void MarkSensitiveParameter(string parameterName)
+        {
+            if (cmd == null || string.IsNullOrWhiteSpace(parameterName)) return;
+            var names = SensitiveParameters.GetOrCreateValue(cmd);
+            lock (names.Names)
+            {
+                names.Names.Add(NormalizeParameterName(parameterName));
+            }
+        }
+
+        /// <summary>
+        /// 判断命令参数是否已被调用方标记为敏感信息。
+        /// </summary>
+        public static bool IsSensitiveParameter(DbCommand command, string parameterName)
+        {
+            if (command == null || string.IsNullOrWhiteSpace(parameterName)) return false;
+            if (!SensitiveParameters.TryGetValue(command, out var names)) return false;
+            lock (names.Names)
+            {
+                return names.Names.Contains(NormalizeParameterName(parameterName));
+            }
+        }
+
+        private static string NormalizeParameterName(string parameterName)
+        {
+            return (parameterName ?? string.Empty).Trim().TrimStart('@', '?', ':');
+        }
 
         [ThreadStatic] private static bool _isTiming;
         private T ExecuteWithTiming<T>(Func<T> action, string method)

@@ -703,6 +703,11 @@ namespace Microi.net.Api
                 {
                     return Json(new DosResult(1001, null, "请先登录！"));
                 }
+                if (!string.Equals(currentToken.OsClient, OsClientDefault.OsClient,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return Json(new DosResult(1002, null, "仅主租户允许创建SaaS租户。"));
+                }
 
                 var currentUser = currentToken.CurrentUser;
                 var userId = currentUser?["Id"]?.ToString();
