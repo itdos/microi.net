@@ -611,7 +611,7 @@ ParameterExpression-only、中性优先、共享预算、unknown-before-Render�
 Render 自行发现参数。
 
 标准空业务库另有正式 seed-converter 阶段。它每次从
-`https://static.itdos.com/install/microi_empty_temp.sql.zip` 安全下载当前 MySQL
+`https://static.itdos.com/install/microi_empty_mysql57.sql.zip` 安全下载当前 MySQL
 5.7 源，防 ZIP Slip/炸弹/多 SQL entry/截断/编码异常，使用 streaming MySQL 5.7
 lexer/parser 构造 value-free neutral schema + typed rows + manifest。默认客户命令
 生成五个当前非 MySQL 目标库确定性 artifact（SQL Server、Oracle、PostgreSQL、

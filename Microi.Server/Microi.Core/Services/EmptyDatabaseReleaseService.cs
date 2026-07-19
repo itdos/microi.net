@@ -27,12 +27,9 @@ namespace Microi.net
         internal const string RequiredOsClient = "iTdos";
         internal const string RequiredSourceDatabase = "itdos";
         internal const string TargetDatabase = "microi_empty_temp";
-        internal const string SqlFileName = "microi_empty_temp.sql";
-        internal const string ZipFileName = "microi_empty_temp.sql.zip";
-        internal const string PublicObjectPath = "/install/microi_empty_temp.sql.zip";
-        internal const string PublicDownloadUrl = "https://static.itdos.com/install/microi_empty_temp.sql.zip";
+        internal const string SqlFileName = DatabaseSeedConverter.MySql57SqlFileName;
         internal const string PublicObjectDirectory = "/install/";
-        internal const string PublicDownloadBaseUrl = "https://static.itdos.com/install/";
+        internal const string PublicDownloadBaseUrl = DatabaseSeedConverter.PublicReleaseBaseUrl;
 
         private readonly string _backgroundTaskId;
 
@@ -101,8 +98,15 @@ namespace Microi.net
                 var validation = ValidateSanitizedDatabase(sourceBuilder);
                 return new DosResult(1, new
                 {
-                    RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers
-                }, "脱敏 SQL 已完整执行并通过核心校验。");
+                    validation.RemainingNonTemplateUsers,
+                    validation.RemainingAppPhysicalTables,
+                    validation.RemainingAppApiEngines,
+                    validation.RemainingAppTableDefinitions,
+                    validation.RemainingAppFieldDefinitions,
+                    validation.RemainingAiStoreApps,
+                    validation.RemainingLegacyAiRows,
+                    validation.PlatformServiceCount
+                }, "脱敏 SQL 已完整执行并通过零残留与平台应用保留校验。");
             }
             catch (Exception ex)
             {
@@ -166,6 +170,8 @@ namespace Microi.net
                     PublishedTableCount = exportResult.TableCount,
                     PublishedRowCount = exportResult.RowCount,
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
+                    RemainingAppArtifacts = validation.RemainingAppArtifacts,
+                    PlatformServiceCount = validation.PlatformServiceCount,
                     PackageCount = packages.Count,
                     Packages = packages.Select(package => new
                     {
@@ -458,22 +464,98 @@ namespace Microi.net
         {
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
             var tables = GetBaseTables(connection, TargetDatabase);
-            var requiredTables = new[] { "sys_user", "sys_menu", "sys_apiengine", "diy_table", "diy_field" };
+            var requiredTables = new[]
+            {
+                "sys_user", "sys_menu", "sys_apiengine", "diy_table", "diy_field", "sys_microistore"
+            };
             var missing = requiredTables.Where(required => !tables.Contains(required, StringComparer.OrdinalIgnoreCase)).ToList();
             if (missing.Count > 0)
             {
                 throw new InvalidOperationException("脱敏后缺少核心表：" + string.Join(",", missing));
             }
 
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT COUNT(*) FROM `sys_user` WHERE LOWER(IFNULL(`Account`,'')) NOT IN ('admin','demo');";
-            command.CommandTimeout = 0;
-            var remainingUsers = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (remainingUsers > 0)
+            var validation = new SanitizationValidation
             {
-                throw new InvalidOperationException($"脱敏校验失败：sys_user 仍有 {remainingUsers} 个非模板账号。");
+                RemainingNonTemplateUsers = ExecuteScalarCount(connection,
+                    "SELECT COUNT(*) FROM `sys_user` WHERE LOWER(IFNULL(`Account`,'')) NOT IN ('admin','demo');"),
+                RemainingAppPhysicalTables = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_TYPE = 'BASE TABLE'
+  AND LEFT(LOWER(TABLE_NAME), 4) = 'app_';"),
+                RemainingAppApiEngines = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_apiengine`
+WHERE LEFT(LOWER(COALESCE(`ApiEngineKey`, '')), 4) = 'app_'
+   OR LEFT(LOWER(COALESCE(`ApiName`, '')), 4) = 'app_';"),
+                RemainingAppTableDefinitions = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `diy_table`
+WHERE LEFT(LOWER(COALESCE(`Name`, '')), 4) = 'app_';"),
+                RemainingAppFieldDefinitions = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `diy_field`
+WHERE LEFT(LOWER(COALESCE(`TableName`, '')), 4) = 'app_';"),
+                RemainingAiStoreApps = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_microistore`
+WHERE COALESCE(`PublisherType`, '') = 'AI应用';"),
+                PlatformServiceCount = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_microistore`
+WHERE `AppKey` = 'microi-platform-service';")
+            };
+
+            validation.RemainingLegacyAiRows = new[]
+            {
+                "mci_ai_app", "mci_ai_app_file", "mci_ai_app_version"
             }
-            return new SanitizationValidation { RemainingNonTemplateUsers = remainingUsers };
+            .Where(table => tables.Contains(table, StringComparer.OrdinalIgnoreCase))
+            .Sum(table => ExecuteScalarCount(connection,
+                "SELECT COUNT(*) FROM " + QuoteIdentifier(table) + ";"));
+
+            var violations = new List<string>();
+            if (validation.RemainingNonTemplateUsers > 0)
+            {
+                violations.Add($"sys_user 非模板账号={validation.RemainingNonTemplateUsers}");
+            }
+            if (validation.RemainingAppPhysicalTables > 0)
+            {
+                violations.Add($"app_ 物理表={validation.RemainingAppPhysicalTables}");
+            }
+            if (validation.RemainingAppApiEngines > 0)
+            {
+                violations.Add($"app_ 接口引擎={validation.RemainingAppApiEngines}");
+            }
+            if (validation.RemainingAppTableDefinitions > 0)
+            {
+                violations.Add($"app_ 表定义={validation.RemainingAppTableDefinitions}");
+            }
+            if (validation.RemainingAppFieldDefinitions > 0)
+            {
+                violations.Add($"app_ 字段定义={validation.RemainingAppFieldDefinitions}");
+            }
+            if (validation.RemainingAiStoreApps > 0)
+            {
+                violations.Add($"AI 应用商城记录={validation.RemainingAiStoreApps}");
+            }
+            if (validation.RemainingLegacyAiRows > 0)
+            {
+                violations.Add($"旧 AI 应用表记录={validation.RemainingLegacyAiRows}");
+            }
+            if (validation.PlatformServiceCount == 0)
+            {
+                violations.Add("官方 microi-platform-service 已被误删");
+            }
+            if (violations.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "脱敏发布门禁未通过：" + string.Join("；", violations) + "。");
+            }
+            return validation;
+        }
+
+        private static long ExecuteScalarCount(MySqlConnection connection, string sql)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = 0;
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 
         private ExportResult ExportDatabase(MySqlConnectionStringBuilder sourceBuilder, string sqlPath)
@@ -608,17 +690,6 @@ namespace Microi.net
             string workDirectory,
             ExportResult exportResult)
         {
-            var packages = new List<ReleasePackageArtifact>();
-            var mysqlZipPath = Path.Combine(workDirectory, ZipFileName);
-            CreateZip(mysqlSqlPath, mysqlZipPath, SqlFileName);
-            packages.Add(CreatePackageArtifact(
-                "mysql",
-                "MySQL 5.7 / 8.0",
-                mysqlZipPath,
-                ZipFileName,
-                exportResult.TableCount,
-                exportResult.RowCount));
-
             var outputPaths = new Dictionary<SeedDatabaseTarget, string>();
             var writers = new Dictionary<SeedDatabaseTarget, TextWriter>();
             IReadOnlyList<SeedConversionResult> conversionResults;
@@ -652,9 +723,10 @@ namespace Microi.net
                 }
             }
 
+            var conversionByTarget = conversionResults.ToDictionary(result => result.Target);
             foreach (var target in DatabaseSeedConverter.SupportedTargets)
             {
-                var conversion = conversionResults.First(result => result.Target == target);
+                var conversion = conversionByTarget[target];
                 if (conversion.TableCount != exportResult.TableCount
                     || conversion.RowCount != exportResult.RowCount)
                 {
@@ -664,21 +736,29 @@ namespace Microi.net
                         + $"源={exportResult.TableCount}/{exportResult.RowCount}，"
                         + $"目标={conversion.TableCount}/{conversion.RowCount}。");
                 }
+            }
 
-                var sqlPath = outputPaths[target];
-                var zipFileName = DatabaseSeedConverter.GetOutputZipFileName(target);
-                var zipPath = Path.Combine(workDirectory, zipFileName);
+            var packages = new List<ReleasePackageArtifact>();
+            foreach (var definition in DatabaseSeedConverter.SupportedReleasePackages)
+            {
+                var sqlPath = definition.ConversionTarget.HasValue
+                    ? outputPaths[definition.ConversionTarget.Value]
+                    : mysqlSqlPath;
+                var zipPath = Path.Combine(workDirectory, definition.ZipFileName);
                 CreateZip(
                     sqlPath,
                     zipPath,
-                    DatabaseSeedConverter.GetOutputFileName(target));
+                    definition.SqlFileName);
+                var conversion = definition.ConversionTarget.HasValue
+                    ? conversionByTarget[definition.ConversionTarget.Value]
+                    : null;
                 packages.Add(CreatePackageArtifact(
-                    GetDatabaseTypeKey(target),
-                    DatabaseSeedConverter.GetDisplayName(target),
+                    definition.DatabaseType,
+                    definition.DisplayName,
                     zipPath,
-                    zipFileName,
-                    conversion.TableCount,
-                    conversion.RowCount));
+                    definition.ZipFileName,
+                    conversion?.TableCount ?? exportResult.TableCount,
+                    conversion?.RowCount ?? exportResult.RowCount));
             }
             return packages.AsReadOnly();
         }
@@ -704,25 +784,6 @@ namespace Microi.net
                 TableCount = tableCount,
                 RowCount = rowCount
             };
-        }
-
-        private static string GetDatabaseTypeKey(SeedDatabaseTarget target)
-        {
-            switch (target)
-            {
-                case SeedDatabaseTarget.SqlServer2022:
-                    return "sqlserver";
-                case SeedDatabaseTarget.Oracle19c:
-                    return "oracle";
-                case SeedDatabaseTarget.Dm8:
-                    return "dameng";
-                case SeedDatabaseTarget.PostgreSql17:
-                    return "postgresql";
-                case SeedDatabaseTarget.KingbaseEs:
-                    return "kingbase";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(target));
-            }
         }
 
         private static void CreateZip(string sqlPath, string zipPath, string entryFileName)
@@ -929,6 +990,21 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
         private sealed class SanitizationValidation
         {
             public long RemainingNonTemplateUsers { get; set; }
+            public long RemainingAppPhysicalTables { get; set; }
+            public long RemainingAppApiEngines { get; set; }
+            public long RemainingAppTableDefinitions { get; set; }
+            public long RemainingAppFieldDefinitions { get; set; }
+            public long RemainingAiStoreApps { get; set; }
+            public long RemainingLegacyAiRows { get; set; }
+            public long PlatformServiceCount { get; set; }
+
+            public long RemainingAppArtifacts =>
+                RemainingAppPhysicalTables
+                + RemainingAppApiEngines
+                + RemainingAppTableDefinitions
+                + RemainingAppFieldDefinitions
+                + RemainingAiStoreApps
+                + RemainingLegacyAiRows;
         }
     }
 }

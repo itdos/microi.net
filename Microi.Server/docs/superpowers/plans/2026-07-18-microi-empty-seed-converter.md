@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** Convert the continuously updated official MySQL 5.7
-`microi_empty_temp.sql.zip` into deterministic, complete schema-and-data
+`microi_empty_mysql57.sql.zip` into deterministic, complete schema-and-data
 artifacts for SQL Server 2022, Oracle 19c, PostgreSQL 17, DM8, and KingbaseES
 V9, with all database semantics implemented inside Dos.ORM.
 
@@ -27,7 +27,7 @@ tests, System.IO.Compression, SHA-256, PowerShell 7, real serial database lanes.
   `Microi.Server/...`, and private-repository pathspecs are relative to their
   explicit `git -C ./Microi.Server/{Microi.net|Microi.AI}` root.
 - The authoritative default source is
-  `https://static.itdos.com/install/microi_empty_temp.sql.zip`; an explicit
+  `https://static.itdos.com/install/microi_empty_mysql57.sql.zip`; an explicit
   local `.zip`/`.sql` override and offline content-addressed cache are supported.
 - The audited 2026-07-18 source SHA fixture contains 133 tables, 2,403 columns,
   85 INSERT statements, and 16,083 rows. Those numbers belong only to that
@@ -128,7 +128,7 @@ exist.
 - [ ] **Step 3: Implement bounded archive and lexical state machines**
 
 The v1 archive accepts exactly one non-empty entry named
-`microi_empty_temp.sql`; v2 additionally accepts exactly `manifest.json`.
+`microi_empty_mysql57.sql`; v2 additionally accepts exactly `manifest.json`.
 The downloader enforces HTTPS, exact host/path, same-origin bounded redirects,
 connect/read timeout, maximum wire bytes, content-addressed temp file + atomic
 cache publish, and optional expected SHA before opening the ZIP.
