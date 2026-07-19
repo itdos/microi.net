@@ -119,7 +119,9 @@ namespace Microi.net
                         {
                             var paramDict = new System.Collections.Generic.Dictionary<string, string>();
                             foreach (DbParameter p in cmd.Parameters)
-                                paramDict[p.ParameterName] = p.Value?.ToString() ?? "NULL";
+                                paramDict[p.ParameterName] = Section.IsSensitiveParameter(cmd, p.ParameterName)
+                                    ? "[REDACTED]"
+                                    : p.Value?.ToString() ?? "NULL";
                             paramText = System.Text.Json.JsonSerializer.Serialize(paramDict);
 
                             executableSql = cmd.CommandText ?? "";
@@ -129,7 +131,8 @@ namespace Microi.net
                             {
                                 var val = p.Value;
                                 string replacement;
-                                if (val == null || val == System.DBNull.Value) replacement = "NULL";
+                                if (Section.IsSensitiveParameter(cmd, p.ParameterName)) replacement = "'[REDACTED]'";
+                                else if (val == null || val == System.DBNull.Value) replacement = "NULL";
                                 else if (val is string || val is DateTime || val is Guid) replacement = $"'{val.ToString().Replace("'", "''")}'";
                                 else replacement = val.ToString();
                                 executableSql = System.Text.RegularExpressions.Regex.Replace(

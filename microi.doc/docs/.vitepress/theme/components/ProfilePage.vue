@@ -328,16 +328,16 @@ const routeAliases = { tenants: 'overview', billing: 'overview' }
 const tenantStepMessages = {
   'zh-CN': [
     ['validate', '校验账号与租户Key', '检查登录态、租户Key格式和系统名称。'], ['quota', '检查免费开通额度', '每个账号可免费创建一个租户，第二个起按 9.9 元/年。'],
-    ['columns', '检查主库字段', '补齐官网开通所需的租户归属字段。'], ['database-info', '生成数据库信息', '生成数据库名、连接串和访问域名。'],
-    ['create-database', '创建租户数据库', '在当前数据库服务中创建独立租户库。'], ['import-template', '下载并导入空库模板', '每次都从 CDN 获取最新 microi_empty_temp.sql.zip。'],
+    ['columns', '检查主库字段', '补齐官网开通所需的租户归属字段。'], ['database-info', '生成数据库信息', '生成数据库名、专属账号名和访问域名，不返回主库连接串。'],
+    ['create-database', '创建租户数据库', '创建独立租户库、随机密码账号，并仅授权当前租户库。'], ['import-template', '下载并导入空库模板', '每次都获取最新 microi_empty_mysql57.sql.zip。'],
     ['create-osclient', '写入SaaS引擎配置', '复制主租户公共配置并写入租户域名、连接串和JWT密钥。'], ['owner', '绑定账号与租户', '记录租户归属，后续个人中心按账号展示。'],
     ['admin', '关联默认管理员', '复用空库模板中的默认 admin 账号，不额外插入管理员数据。'], ['sys-config', '初始化系统设置', '复制主库系统设置并归一化为一条启用配置。'],
     ['reload', '刷新SaaS引擎缓存', '让新租户无需重启即可访问。']
   ],
   'en-US': [
     ['validate', 'Validate account and tenant key', 'Check the session, tenant key format, and system name.'], ['quota', 'Check free quota', 'Each account has one free tenant; additional tenants cost ¥9.9/year.'],
-    ['columns', 'Check main database fields', 'Add the ownership fields required by website provisioning.'], ['database-info', 'Generate database information', 'Generate the database name, connection string, and domain.'],
-    ['create-database', 'Create tenant database', 'Create an independent tenant database on the current server.'], ['import-template', 'Import the empty template', 'Download the latest microi_empty_temp.sql.zip from CDN.'],
+    ['columns', 'Check main database fields', 'Add the ownership fields required by website provisioning.'], ['database-info', 'Generate database information', 'Generate the database name, dedicated account, and domain without exposing the main connection.'],
+    ['create-database', 'Create tenant database', 'Create an independent database and a random-password account limited to this tenant database.'], ['import-template', 'Import the empty template', 'Fetch the latest microi_empty_mysql57.sql.zip.'],
     ['create-osclient', 'Write SaaS configuration', 'Copy shared settings and write the domain, connection string, and JWT secret.'], ['owner', 'Bind account and tenant', 'Save tenant ownership for the personal center.'],
     ['admin', 'Bind default administrator', 'Reuse the admin account from the empty template.'], ['sys-config', 'Initialize system settings', 'Copy and normalize the enabled system configuration.'],
     ['reload', 'Refresh SaaS cache', 'Make the new tenant available without restarting.']

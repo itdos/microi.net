@@ -128,7 +128,10 @@ namespace Dos.ORM
                 sb.Append("Parameters:\r\n");
                 foreach (DbParameter p in command.Parameters)
                 {
-                    sb.Append($"{p.ParameterName}[{p.DbType}] = {p.Value}\r\n");
+                    var value = Section.IsSensitiveParameter(command, p.ParameterName)
+                        ? "[REDACTED]"
+                        : p.Value;
+                    sb.Append($"{p.ParameterName}[{p.DbType}] = {value}\r\n");
                 }
             }
             sb.Append("\r\n");

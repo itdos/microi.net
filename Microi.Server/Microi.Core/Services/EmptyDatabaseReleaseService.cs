@@ -105,7 +105,9 @@ namespace Microi.net
                     validation.RemainingAppFieldDefinitions,
                     validation.RemainingAiStoreApps,
                     validation.RemainingLegacyAiRows,
-                    validation.PlatformServiceCount
+                    validation.PlatformServiceCount,
+                    validation.PlatformServiceRuntimeCount,
+                    validation.PlatformServiceSourceFileCount
                 }, "脱敏 SQL 已完整执行并通过零残留与平台应用保留校验。");
             }
             catch (Exception ex)
@@ -495,19 +497,60 @@ SELECT COUNT(*) FROM `diy_field`
 WHERE LEFT(LOWER(COALESCE(`TableName`, '')), 4) = 'app_';"),
                 RemainingAiStoreApps = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
-WHERE COALESCE(`PublisherType`, '') = 'AI应用';"),
+WHERE LOWER(COALESCE(`AppKey`, '')) <> 'microi-platform-service'
+  AND (
+    COALESCE(`PublisherType`, '') = 'AI应用'
+    OR COALESCE(`AppType`, '') = 'AI应用'
+    OR COALESCE(`ApplicationType`, '') IN ('UniApp', 'Web', 'MicroService')
+  );"),
                 PlatformServiceCount = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE `AppKey` = 'microi-platform-service';")
             };
 
-            validation.RemainingLegacyAiRows = new[]
-            {
-                "mci_ai_app", "mci_ai_app_file", "mci_ai_app_version"
-            }
-            .Where(table => tables.Contains(table, StringComparer.OrdinalIgnoreCase))
-            .Sum(table => ExecuteScalarCount(connection,
-                "SELECT COUNT(*) FROM " + QuoteIdentifier(table) + ";"));
+            validation.RemainingLegacyAiRows =
+                (tables.Contains("mci_ai_app", StringComparer.OrdinalIgnoreCase)
+                    ? ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `mci_ai_app`
+WHERE LOWER(COALESCE(`AppKey`, '')) <> 'microi-platform-service';")
+                    : 0)
+                + (tables.Contains("mci_ai_app_file", StringComparer.OrdinalIgnoreCase)
+                    ? ExecuteScalarCount(connection, @"
+SELECT COUNT(*)
+FROM `mci_ai_app_file` f
+LEFT JOIN `sys_microistore` p
+  ON (p.`Id` = f.`AppId` OR p.`AppKey` = f.`AppId`)
+ AND LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service'
+WHERE p.`Id` IS NULL;")
+                    : 0)
+                + (tables.Contains("mci_ai_app_version", StringComparer.OrdinalIgnoreCase)
+                    ? ExecuteScalarCount(connection, @"
+SELECT COUNT(*)
+FROM `mci_ai_app_version` v
+LEFT JOIN `sys_microistore` p
+  ON (p.`Id` = v.`AppId` OR p.`AppKey` = v.`AppId`)
+ AND LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service'
+WHERE p.`Id` IS NULL;")
+                    : 0)
+                + (tables.Contains("mci_ai_project", StringComparer.OrdinalIgnoreCase)
+                    ? ExecuteScalarCount(connection, "SELECT COUNT(*) FROM `mci_ai_project`;")
+                    : 0)
+                + (tables.Contains("mci_ai_project_file", StringComparer.OrdinalIgnoreCase)
+                    ? ExecuteScalarCount(connection, "SELECT COUNT(*) FROM `mci_ai_project_file`;")
+                    : 0);
+
+            validation.PlatformServiceRuntimeCount = tables.Contains("sys_microiservice", StringComparer.OrdinalIgnoreCase)
+                ? ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_microiservice`
+WHERE LOWER(COALESCE(`MsKey`, '')) = 'microi-platform-service';")
+                : 0;
+            validation.PlatformServiceSourceFileCount = tables.Contains("mci_ai_app_file", StringComparer.OrdinalIgnoreCase)
+                ? ExecuteScalarCount(connection, @"
+SELECT COUNT(*)
+FROM `mci_ai_app_file` f
+JOIN `sys_microistore` p ON p.`Id` = f.`AppId` OR p.`AppKey` = f.`AppId`
+WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
+                : 0;
 
             var violations = new List<string>();
             if (validation.RemainingNonTemplateUsers > 0)
@@ -541,6 +584,14 @@ WHERE `AppKey` = 'microi-platform-service';")
             if (validation.PlatformServiceCount == 0)
             {
                 violations.Add("官方 microi-platform-service 已被误删");
+            }
+            if (validation.PlatformServiceRuntimeCount == 0)
+            {
+                violations.Add("官方 microi-platform-service 运行时已被误删");
+            }
+            if (validation.PlatformServiceSourceFileCount == 0)
+            {
+                violations.Add("官方 microi-platform-service 源码已被误删");
             }
             if (violations.Count > 0)
             {
@@ -997,6 +1048,8 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
             public long RemainingAiStoreApps { get; set; }
             public long RemainingLegacyAiRows { get; set; }
             public long PlatformServiceCount { get; set; }
+            public long PlatformServiceRuntimeCount { get; set; }
+            public long PlatformServiceSourceFileCount { get; set; }
 
             public long RemainingAppArtifacts =>
                 RemainingAppPhysicalTables
