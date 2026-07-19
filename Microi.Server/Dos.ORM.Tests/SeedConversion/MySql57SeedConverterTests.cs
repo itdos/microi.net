@@ -192,6 +192,9 @@ public sealed class MySql57SeedConverterTests
         Assert.Equal(
             "达梦 DM8",
             DatabaseSeedConverter.GetDisplayName(SeedDatabaseTarget.Dm8));
+        Assert.Equal(
+            "https://static.itdos.com/install/microi_empty_mysql57.sql.zip",
+            DatabaseSeedConverter.DefaultSourceUrl);
         Assert.Equal(5, DatabaseSeedConverter.SupportedTargets.Count);
         Assert.Equal(
             new[]
@@ -203,6 +206,29 @@ public sealed class MySql57SeedConverterTests
                 SeedDatabaseTarget.KingbaseEs
             },
             DatabaseSeedConverter.SupportedTargets);
+        Assert.Collection(
+            DatabaseSeedConverter.SupportedReleasePackages,
+            package =>
+            {
+                Assert.Equal("mysql57", package.DatabaseType);
+                Assert.Equal("MySQL 5.7", package.DisplayName);
+                Assert.Equal("microi_empty_mysql57.sql", package.SqlFileName);
+                Assert.Equal("microi_empty_mysql57.sql.zip", package.ZipFileName);
+                Assert.Null(package.ConversionTarget);
+            },
+            package =>
+            {
+                Assert.Equal("mysql80", package.DatabaseType);
+                Assert.Equal("MySQL 8.0", package.DisplayName);
+                Assert.Equal("microi_empty_mysql80.sql", package.SqlFileName);
+                Assert.Equal("microi_empty_mysql80.sql.zip", package.ZipFileName);
+                Assert.Null(package.ConversionTarget);
+            },
+            package => Assert.Equal(SeedDatabaseTarget.SqlServer2022, package.ConversionTarget),
+            package => Assert.Equal(SeedDatabaseTarget.Oracle19c, package.ConversionTarget),
+            package => Assert.Equal(SeedDatabaseTarget.Dm8, package.ConversionTarget),
+            package => Assert.Equal(SeedDatabaseTarget.PostgreSql17, package.ConversionTarget),
+            package => Assert.Equal(SeedDatabaseTarget.KingbaseEs, package.ConversionTarget));
         Assert.Equal(
             SeedDatabaseTarget.SqlServer2022,
             DatabaseSeedConverter.GetTarget(DatabaseType.SqlServer));
