@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.4.4
+ * Version: v1.5.1
  * Function:
  * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP，并保留可移植安装所需表、接口和版本元数据。
  */
@@ -59,6 +59,23 @@ function normalizeVersion(value) {
   var match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i.exec(version);
   if (!match) return 'v1.0.0';
   return 'v' + parseInt(match[1] || '1', 10) + '.' + parseInt(match[2] || '0', 10) + '.' + parseInt(match[3] || '0', 10);
+}
+function highestVersion(values) {
+  var selected = 'v1.0.0';
+  var selectedWeight = -1;
+  for (var i = 0; i < values.length; i++) {
+    if (isBlank(values[i])) continue;
+    var normalized = normalizeVersion(values[i]);
+    var parts = normalized.substring(1).split('.');
+    var weight = parseInt(parts[0] || '0', 10) * 1000000
+      + parseInt(parts[1] || '0', 10) * 1000
+      + parseInt(parts[2] || '0', 10);
+    if (weight > selectedWeight) {
+      selected = normalized;
+      selectedWeight = weight;
+    }
+  }
+  return selected;
 }
 function getApp(appIdOrKey) {
   var result = V8.FormEngine.GetFormData('sys_microistore', {
@@ -240,6 +257,36 @@ function parseArray(value) {
   }
   return toArray(value);
 }
+/* REUSE_FRESH_PREPARED_ASSETS_V1
+ * 大型应用重新逐文件下载、压缩、上传 ZIP 可能耗时数分钟。仅当既有 ZIP
+ * 晚于最近一次成功构建时复用，避免同步发布超过反向代理超时。
+ */
+function reusablePreparedAssets(store, app, latestVersion, includeSource) {
+  if (!store || isBlank(store.AiAppPackageManifest)) return null;
+  var manifest;
+  try { manifest = parseArray(store.AiAppPackageManifest); }
+  catch (error) { return null; }
+  var latestBuildTime = text(latestVersion && latestVersion.CreateTime);
+  for (var i = 0; i < manifest.length; i++) {
+    var item = manifest[i] || {};
+    var sameApp = text(item.AppId) === text(app.Id)
+      || text(item.AppKey).toLowerCase() === text(app.AppKey).toLowerCase();
+    if (!sameApp || !item.BuildZip) continue;
+    var buildPath = text(item.BuildZip.Path || item.BuildZip.FullPath || item.BuildZip.FilePathName);
+    if (isBlank(buildPath)) continue;
+    if (includeSource) {
+      var sourcePath = item.SourceZip
+        ? text(item.SourceZip.Path || item.SourceZip.FullPath || item.SourceZip.FilePathName)
+        : '';
+      if (isBlank(sourcePath)) continue;
+    }
+    var preparedTime = text(item.PreparedTime);
+    if (isBlank(preparedTime)) continue;
+    if (!isBlank(latestBuildTime) && preparedTime < latestBuildTime) continue;
+    return item;
+  }
+  return null;
+}
 function selectionValues(value, keys) {
   var rows = parseArray(value);
   var values = [];
@@ -331,6 +378,7 @@ var runtime = appType === 'MicroService' ? getMicroService(app.AppKey) : { Servi
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
 var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
 var action = text(V8.Param.Action || 'Package');
+var existingStore = getExistingStore(app.AppKey);
 // 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
 // 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
 var isOfflineAction = action === 'OfflinePackage' || action === 'Download' || action === 'PackageOnly';
@@ -345,6 +393,14 @@ for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++
 }
 if (!packageAssets && V8.Param.PreparedAssets && !Array.isArray(V8.Param.PreparedAssets) && typeof V8.Param.PreparedAssets === 'object') {
   packageAssets = V8.Param.PreparedAssets;
+}
+var forcePrepareAssets = V8.Param.ForcePrepareAssets === true
+  || V8.Param.ForcePrepareAssets === 1
+  || text(V8.Param.ForcePrepareAssets).toLowerCase() === 'true';
+var reusedPreparedAssets = false;
+if (!packageAssets && !isOfflineAction && !forcePrepareAssets) {
+  packageAssets = reusablePreparedAssets(existingStore, app, latestVersion, includeSource);
+  reusedPreparedAssets = !!packageAssets;
 }
 // 自包含离线包直接读取已发布运行资产，无须先生成或下载公网 ZIP。
 // 这也允许微服务源码后来有修改时，继续基于最近一次成功发布产物制作离线包。
@@ -363,19 +419,22 @@ if (!isOfflineAction && (!packageAssets || !packageAssets.BuildZip)) return fail
 var sourceFiles = [];
 var buildAssets = [];
 var infrastructure = getApplicationInfrastructure();
-var versionNo = normalizeVersion(
-  V8.Param.AppVersion ||
-  (appType === 'MicroService' && runtime.Service && runtime.Service.BuildVersion) ||
-  (latestVersion && latestVersion.VersionNo) ||
-  'v1.0.0'
-);
+// 微服务以真实运行态 BuildVersion 为准；其它应用比较最近构建版本与商城
+// 语义版本，既不接受旧调用参数降级，也不把 v3.0.0 降成构建流水号 v1.0.4。
+var versionNo = appType === 'MicroService' && runtime.Service && !isBlank(runtime.Service.BuildVersion)
+  ? normalizeVersion(runtime.Service.BuildVersion)
+  : highestVersion([
+      latestVersion ? latestVersion.VersionNo : '',
+      V8.Param.AppVersion,
+      existingStore ? existingStore.AppVersion : '',
+      app.AppVersion
+    ]);
 var entryPath = text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
 var dataSelections = parseArray(V8.Param.DataSelections || V8.Param.DataSets);
 var menuIds = parseArray(V8.Param.MenuIds);
 var tableIds = parseArray(V8.Param.TableIds);
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
-var existingStore = getExistingStore(app.AppKey);
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
 }
@@ -517,6 +576,14 @@ if (isOfflineAction) {
 }
 
 if (action === 'Publish') {
+  /* PRESERVE_STORE_METADATA_V1
+   * 批量补包只更新安装包和发布状态；调用方未显式传值时，保留商城原有
+   * 预览图、分类、作者和价格等元数据，避免无参发布把字段降级为空或默认值。
+   */
+  var preservedStore = existingStore || app || {};
+  var hasParam = function (name) {
+    return V8.Param[name] !== undefined && V8.Param[name] !== null && !isBlank(V8.Param[name]);
+  };
   var storeRow = {
     AppName: packageModel.PackageInfo.Name,
     Name: packageModel.PackageInfo.Name,
@@ -525,24 +592,24 @@ if (action === 'Publish') {
     AppVersion: versionNo,
     AppType: appType,
     ApplicationType: appType,
-    Category: text(V8.Param.Category || app.Category || 'other'),
-    PublisherType: text(V8.Param.PublisherType || V8.Param.StoreCategory || app.PublisherType || '官方应用'),
-    AppAuthor: text(V8.Param.AppAuthor || currentUser.Name || currentUser.Account),
-    OwnerUserId: text(app.OwnerUserId || currentUser.Id),
-    OwnerName: text(app.OwnerName || currentUser.Name || currentUser.Account),
-    AppDetail: text(V8.Param.AppDetail || app.AppDetail || app.Description),
-    Description: text(V8.Param.AppDetail || app.AppDetail || app.Description),
-    AppPrice: V8.Param.AppPrice || 0,
-    AppOriPrice: V8.Param.AppOriPrice || 0,
-    AppRate: V8.Param.AppRate || 5,
-    AppPreview: V8.Param.AppPreview || '',
-    IsApprove: V8.Param.IsApprove || '是',
+    Category: text(V8.Param.Category || preservedStore.Category || app.Category || 'other'),
+    PublisherType: text(V8.Param.PublisherType || V8.Param.StoreCategory || preservedStore.PublisherType || app.PublisherType || '官方应用'),
+    AppAuthor: text(V8.Param.AppAuthor || preservedStore.AppAuthor || app.AppAuthor || currentUser.Name || currentUser.Account),
+    OwnerUserId: text(preservedStore.OwnerUserId || app.OwnerUserId || currentUser.Id),
+    OwnerName: text(preservedStore.OwnerName || app.OwnerName || currentUser.Name || currentUser.Account),
+    AppDetail: text(V8.Param.AppDetail || preservedStore.AppDetail || app.AppDetail || app.Description),
+    Description: text(V8.Param.AppDetail || preservedStore.Description || app.AppDetail || app.Description),
+    AppPrice: hasParam('AppPrice') ? V8.Param.AppPrice : (preservedStore.AppPrice || 0),
+    AppOriPrice: hasParam('AppOriPrice') ? V8.Param.AppOriPrice : (preservedStore.AppOriPrice || 0),
+    AppRate: hasParam('AppRate') ? V8.Param.AppRate : (preservedStore.AppRate || 5),
+    AppPreview: hasParam('AppPreview') ? V8.Param.AppPreview : (preservedStore.AppPreview || app.AppPreview || ''),
+    IsApprove: hasParam('IsApprove') ? V8.Param.IsApprove : (preservedStore.IsApprove || '是'),
     Status: 'Published',
     BuildStatus: 'Success',
-    CurrentVersion: app.CurrentVersion || 1,
-    PreviewUrl: app.PreviewUrl || '',
-    PublicPublishPath: app.PublicPublishPath || '',
-    PrivateSourcePath: app.PrivateSourcePath || '',
+    CurrentVersion: preservedStore.CurrentVersion || app.CurrentVersion || 1,
+    PreviewUrl: preservedStore.PreviewUrl || app.PreviewUrl || '',
+    PublicPublishPath: preservedStore.PublicPublishPath || app.PublicPublishPath || '',
+    PrivateSourcePath: preservedStore.PrivateSourcePath || app.PrivateSourcePath || '',
     AppPublishTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppUpdateTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppPakcet: JSON.stringify(packageModel),
@@ -554,7 +621,14 @@ if (action === 'Publish') {
   };
   var publishResult = upsertStore(storeRow);
   if (!publishResult || publishResult.Code !== 1) return publishResult || fail('发布到应用商城失败');
-  return ok({ Store: publishResult.Data || storeRow, Package: packageModel }, '应用已发布到应用商城');
+  return ok({
+    Store: publishResult.Data || storeRow,
+    Package: packageModel,
+    PreparedAssetsReused: reusedPreparedAssets,
+    PreparedTime: packageAssets.PreparedTime || '',
+    AppVersion: versionNo,
+    CurrentVersion: app.CurrentVersion || 1
+  }, '应用已发布到应用商城');
 }
 
 return ok({ Package: packageModel, SourceZipIncluded: !!packageAssets.SourceZip, BuildZipIncluded: true }, '统一应用包已生成');
