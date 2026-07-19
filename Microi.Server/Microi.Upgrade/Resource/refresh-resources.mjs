@@ -26,7 +26,7 @@ function validate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_005_000
+    if (versionNumber < 1_006_003
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -38,8 +38,10 @@ function validate(name, content) {
       || !content.includes('recoverBoundMicroserviceMenus')
       || !content.includes('preservedLegacyUrl')
       || !content.includes("upsertApplicationRow('sys_microistore'")
-      || !content.includes('official_marketplace_install_stat')) {
-      throw new Error(`${name} 低于 v1.5.0 或缺少统一应用商城、旧路由恢复、源码校验及安装统计能力，拒绝降级本地基线`);
+      || !content.includes('official_marketplace_install_stat')
+      || !content.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
+      || !content.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')) {
+      throw new Error(`${name} 低于 v1.6.3 或缺少断点复用、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -48,7 +50,7 @@ function validate(name, content) {
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
     if (!content.includes('ai_app_publish_store')
-      || versionNumber < 1_004_000
+      || versionNumber < 1_004_004
       || !content.includes('selectionValues(existingStore.SelectTable')
       || !content.includes('selectionValues(existingStore.SelectApiEngine')
       || !content.includes('IncludeSource: includeSource')
@@ -57,8 +59,9 @@ function validate(name, content) {
       || !content.includes("GetFormData('sys_microistore'")
       || !content.includes('ApplicationType || app.AppType')
       || !content.includes('PublishHdfsPath')
-      || !content.includes("Source: 'CompiledAssets'")) {
-    throw new Error(`${name} 缺少 v1.4.0 统一应用商城、关联表/接口自动打包、真实编译资产及自包含源码 PackageOnly 能力`);
+      || !content.includes("Source: 'CompiledAssets'")
+      || !content.includes('SOURCE_BUILD_ARCHIVE_ROOTS_V1')) {
+    throw new Error(`${name} 缺少 v1.4.4 统一应用商城、历史 BuildLog 兼容入口、严格源码/编译分根目录及自包含 PackageOnly 能力`);
     }
   }
   if (name.endsWith('.json')) {
@@ -91,7 +94,17 @@ function validate(name, content) {
       const fields = Array.isArray(packageModel?.DiyFields) ? packageModel.DiyFields : [];
       const applicationType = fields.find(field => field.Name === 'ApplicationType');
       const applicationTypeOptions = String(applicationType?.Data || '');
-      if (versionNumber < 6_004_000
+      const engines = Array.isArray(packageModel?.SysApiEngines) ? packageModel.SysApiEngines : [];
+      const buildZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_build_zip');
+      const sourceZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_source_zip');
+      const importerEngine = engines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
+      const importerVersion = String(importerEngine?.Version || '').replace(/^v/i, '');
+      const importerVersionParts = importerVersion.split('.').map(item => Number(item) || 0);
+      const importerVersionNumber = (importerVersionParts[0] || 0) * 1_000_000
+        + (importerVersionParts[1] || 0) * 1_000
+        + (importerVersionParts[2] || 0);
+      const importerCode = String(importerEngine?.ApiV8Code || '');
+      if (versionNumber < 6_005_008
         || !content.includes('TargetSysMenuId')
         || !content.includes('01KXFSG7MZ40CY8KCWCZZZJH2M')
         || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')
@@ -102,8 +115,15 @@ function validate(name, content) {
         || !applicationTypeOptions.includes('"Key":"Platform"')
         || !applicationTypeOptions.includes('"Key":"UniApp"')
         || !applicationTypeOptions.includes('"Key":"Web"')
-        || !applicationTypeOptions.includes('"Key":"MicroService"')) {
-        throw new Error(`${name} 版本过旧或缺少按平台应用、UniApp、Web、微服务分类的统一商城能力`);
+        || !applicationTypeOptions.includes('"Key":"MicroService"')
+        || buildZipEngine?.Version !== 'v1.2.0'
+        || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
+        || sourceZipEngine?.Version !== 'v1.2.0'
+        || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
+        || importerVersionNumber < 1_006_003
+        || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
+        || !importerCode.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')) {
+        throw new Error(`${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力`);
       }
     }
   }

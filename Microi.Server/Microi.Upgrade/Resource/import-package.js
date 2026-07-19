@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.5.9
+ * Version: v1.6.3
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -13,6 +13,10 @@ var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪�
 
 // 执行日志收集（用于最终构建中文报告）
 var debugLog = {};
+// 大型源码包可能超过反向代理的单次请求时限。默认启用可恢复安装：同一
+// AppId + FilePath 且摘要一致的文件直接复用，完整上传后再清理旧版本残留。
+var resumeInstall = V8.Param.ResumeInstall !== false
+    && String(V8.Param.ResumeInstall || '').toLowerCase() != 'false';
 
 var invokeType = String(V8.InvokeType || V8.Param._InvokeType || '').toLowerCase();
 if (invokeType == 'client') {
@@ -317,7 +321,10 @@ try {
         VersionRecordUpdated: 0,
         ApplicationInstalled: 0,
         ApplicationSourceFiles: 0,
+        ApplicationSourceFilesReused: 0,
         ApplicationBuildAssets: 0,
+        ApplicationBuildAssetsReused: 0,
+        AssetRowsPruned: 0,
         MicroServicePages: 0,
         MicroServiceMenus: 0,
         MicroServiceMenusPreserved: 0,
@@ -462,6 +469,63 @@ try {
         }, 'app_add_' + tableName + '_' + (row.Id || 'new'));
     };
 
+    var loadExistingApplicationAssets = function (appId) {
+        var existingApplicationAssets = {};
+        if (!resumeInstall || !appId) return existingApplicationAssets;
+        var result = V8.FormEngine.GetTableData('mci_ai_app_file', {
+            _Where: [['AppId', '=', appId]],
+            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'ContentHash', 'Size'],
+            _PageIndex: 1,
+            _PageSize: 20000
+        });
+        var rows = result && result.Code == 1 && result.Data ? result.Data : [];
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            var path = normalizeApplicationPath(row.FilePath);
+            if (path) existingApplicationAssets[path.toLowerCase()] = row;
+        }
+        return existingApplicationAssets;
+    };
+
+    var reuseApplicationAsset = function (existingApplicationAssets, filePath, file) {
+        if (!resumeInstall) return null;
+        var normalizedPath = normalizeApplicationPath(filePath);
+        var existing = existingApplicationAssets[normalizedPath.toLowerCase()];
+        if (!existing || !existing.Id || !existing.HdfsPath) return null;
+        var expectedHash = firstTextParam([file && file.Sha256, file && file.Hash, file && file.ContentHash]).toLowerCase();
+        var actualHash = firstTextParam([existing.ContentHash]).toLowerCase();
+        if (expectedHash && actualHash != expectedHash) return null;
+        var expectedSize = Number((file && file.Size) || 0);
+        var actualSize = Number(existing.Size || 0);
+        if (!expectedHash && expectedSize > 0 && actualSize != expectedSize) return null;
+        if (!expectedHash && expectedSize <= 0) return null;
+        return {
+            Path: normalizedPath,
+            HdfsPath: existing.HdfsPath,
+            FilePathName: existing.HdfsPath,
+            Size: actualSize,
+            Hash: actualHash,
+            Reused: true
+        };
+    };
+
+    var pruneApplicationAssets = function (appId, expectedPaths) {
+        if (!resumeInstall || !appId) return;
+        var existingApplicationAssets = loadExistingApplicationAssets(appId);
+        var staleIds = [];
+        for (var existingPath in existingApplicationAssets) {
+            if (!expectedPaths[existingPath]) staleIds.push(String(existingApplicationAssets[existingPath].Id));
+        }
+        if (!staleIds.length) return;
+        // PRUNE_ASSET_IDS_WITH_DELFORM_V1：Jint 数组无法稳定匹配 DelTableData 的
+        // .NET 重载；统一走 DelFormData + Ids 批量删除，避免后台任务在清理阶段失败。
+        var pruneResult = V8.FormEngine.DelFormData('mci_ai_app_file', { Ids: staleIds });
+        if (!pruneResult || pruneResult.Code != 1) {
+            throw new Error('清理应用旧文件元数据失败：' + ((pruneResult && pruneResult.Msg) || '接口无返回'));
+        }
+        stats.AssetRowsPruned += staleIds.length;
+    };
+
     var getApplicationAssetUrl = function (asset) {
         asset = asset || {};
         var direct = firstTextParam([asset.FullPath, asset.Url, asset.url, asset.FileUrl]);
@@ -547,6 +611,8 @@ try {
             previousAppKey = firstTextParam([existingApp.AppKey]);
         }
         var sourceRoot = 'ai-app-source/' + appId;
+        var existingApplicationAssets = loadExistingApplicationAssets(appId);
+        var expectedApplicationPaths = {};
         var packageAssets = parsePackageAssets(bundle.PackageAssets || bundle.ZipAssets || null);
         // 真离线包优先使用 JSON 内嵌文件；没有内嵌文件时才兼容商城公网 ZIP。
         var embeddedSourceFiles = bundle.SourceFiles || bundle.Files || [];
@@ -560,25 +626,19 @@ try {
         if (sourceExpected && (!sourceFiles || !sourceFiles.length)) {
             throw new Error('安装包声明包含私有源码，但源码文件为空，已停止安装，避免只安装运行产物。');
         }
-        // 应用安装是完整版本替换。先清理同一应用旧源码元数据，避免升级后已删除或
-        // 改名的文件继续参与编辑、打包；事务失败时平台会自动回滚这些元数据删除。
-        if (sourceFiles && sourceFiles.length) {
-            var staleSourceResult = V8.FormEngine.DelFormDataByWhere('mci_ai_app_file', {
-                _Where: [
-                    ['AppId', '=', appId],
-                    ['AND', 'FilePath', 'NotStartLike', 'dist/']
-                ]
-            });
-            if (!staleSourceResult || staleSourceResult.Code != 1) {
-                throw new Error('清理应用旧源码元数据失败：' + ((staleSourceResult && staleSourceResult.Msg) || '接口无返回'));
-            }
-        }
         var uploadedSource = [];
         reportProgress(60, '正在写入' + appType + '应用私有源码');
         for (var i = 0; i < sourceFiles.length; i++) {
-            var sourceUpload = uploadApplicationAsset(sourceRoot, sourceFiles[i], true);
-            uploadedSource.push(sourceUpload);
             var sourceFile = sourceFiles[i] || {};
+            var sourcePath = normalizeApplicationPath(sourceFile.Path || sourceFile.FilePath || sourceFile.RelativePath || sourceFile.FileName);
+            expectedApplicationPaths[sourcePath.toLowerCase()] = true;
+            var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile)
+                || uploadApplicationAsset(sourceRoot, sourceFile, true);
+            uploadedSource.push(sourceUpload);
+            if (sourceUpload.Reused) {
+                stats.ApplicationSourceFilesReused++;
+                continue;
+            }
             var sourceRow = {
                 AppId: appId,
                 AppName: appName,
@@ -609,28 +669,27 @@ try {
         var buildAssets = embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
             ? embeddedBuildAssets
             : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []);
-        // REPLACE_APPLICATION_ASSETS_V1：编译产物同样按完整版本替换，不能把旧 hash
-        // 文件留在 mci_ai_app_file 中，否则二次构建会把新旧两套资源混在一起。
-        if (buildAssets && buildAssets.length) {
-            var staleBuildResult = V8.FormEngine.DelFormDataByWhere('mci_ai_app_file', {
-                _Where: [
-                    ['AppId', '=', appId],
-                    ['AND', 'FilePath', 'StartLike', 'dist/']
-                ]
-            });
-            if (!staleBuildResult || staleBuildResult.Code != 1) {
-                throw new Error('清理应用旧编译元数据失败：' + ((staleBuildResult && staleBuildResult.Msg) || '接口无返回'));
-            }
-        }
         var uploadedBuild = [];
         reportProgress(65, '正在写入' + appType + '应用公有编译文件');
         for (var b = 0; b < buildAssets.length; b++) {
-            var buildUpload = uploadApplicationAsset(buildRoot, buildAssets[b], false);
+            var buildFile = buildAssets[b] || {};
+            var buildRelativePath = normalizeApplicationPath(buildFile.Path || buildFile.FilePath || buildFile.RelativePath || buildFile.FileName);
+            var buildMetadataPath = 'dist/' + buildRelativePath;
+            expectedApplicationPaths[buildMetadataPath.toLowerCase()] = true;
+            var buildUpload = reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile);
+            if (buildUpload) {
+                buildUpload.Path = buildRelativePath;
+                stats.ApplicationBuildAssetsReused++;
+            } else {
+                buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
+            }
             var normalizedBuildPath = normalizeApplicationPath(buildUpload.Path);
             var stableBuildPath = appType == 'MicroService'
                 ? normalizeApplicationPath(buildRoot + '/' + normalizedBuildPath)
                 : String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath;
-            if (V8.Method.MoveObject && buildUpload.HdfsPath && stableBuildPath) {
+            // SKIP_MOVE_FOR_REUSED_BUILD_V1：断点续装命中已有 build 元数据时，
+            // 对象已位于上一次成功写入的稳定路径，不能再次逐文件 MoveObject。
+            if (!buildUpload.Reused && V8.Method.MoveObject && buildUpload.HdfsPath && stableBuildPath) {
                 try {
                     var moveBuildResult = V8.Method.MoveObject({
                         OsClient: V8.OsClient,
@@ -644,6 +703,7 @@ try {
                 }
             }
             uploadedBuild.push(buildUpload);
+            if (buildUpload.Reused) continue;
             // 安装后的 Web/UniApp 仍须保留真实 dist 元数据，才能继续编辑源码、
             // 重新构建并打包，而不是退回只生成一张兼容预览页。
             var buildAssetRow = {
@@ -669,6 +729,10 @@ try {
             }
             stats.ApplicationBuildAssets++;
         }
+
+        // 只有源码和编译产物都完整走完后才移除旧路径。请求中途超时时，已上传
+        // 文件仍保留并可在下一次 ResumeInstall 调用中复用，不会形成无限重传。
+        pruneApplicationAssets(appId, expectedApplicationPaths);
 
         var entryPath = firstTextParam([bundle.EntryPath, app.EntryPath, 'index.html']);
         var entryHdfsPath = '';
@@ -3189,7 +3253,7 @@ try {
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated + '条',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
-            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码' + stats.ApplicationSourceFiles + '个，公有编译文件' + stats.ApplicationBuildAssets + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
+            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };
