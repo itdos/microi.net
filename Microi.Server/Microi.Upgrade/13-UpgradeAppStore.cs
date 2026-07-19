@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.0.0";
+        public static string Version = "6.4.3.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -28,6 +28,7 @@ namespace Microi.net
         private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
         private const string ImportPackageResourceName = "import-package.js";
         private const string PublishAiAppResourceName = "ai-app-publish-store.js";
+        private const string BuildAiAppResourceName = "ai-app-build.js";
         private const string FormEnginePackageResourceName = "app.microi.form-engine.json";
         private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
@@ -36,6 +37,7 @@ namespace Microi.net
         {
             ImportPackageResourceName,
             PublishAiAppResourceName,
+            BuildAiAppResourceName,
             FormEnginePackageResourceName,
             ModuleEnginePackageResourceName,
             AppStorePackageResourceName
@@ -76,7 +78,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 5, 0) ||
+                    importerVersion < new System.Version(1, 6, 3) ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -91,7 +93,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("preservedLegacyUrl") ||
                     !code.Contains("preserve_existing_menu_visibility_") ||
                     !code.Contains("upsertApplicationRow('sys_microistore'") ||
-                    !code.Contains("official_marketplace_install_stat"))
+                    !code.Contains("official_marketplace_install_stat") ||
+                    !code.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !code.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -117,16 +121,32 @@ WHERE `ApiEngineKey`=@p0 AND (`IsDeleted`=0 OR `IsDeleted` IS NULL)";
                 var publisherVersionMatch = Regex.Match(publisherCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 2, 0) ||
+                    publisherVersion < new System.Version(1, 4, 4) ||
                     !publisherCode.Contains("OfflineSelfContained") ||
                     !publisherCode.Contains("IncludeSource: includeSource") ||
                     !publisherCode.Contains("action === 'PackageOnly'") ||
                     !publisherCode.Contains("ReturnPackageModel") ||
                     !publisherCode.Contains("GetFormData('sys_microistore'") ||
                     !publisherCode.Contains("ApplicationType || app.AppType") ||
+                    !publisherCode.Contains("SOURCE_BUILD_ARCHIVE_ROOTS_V1") ||
                     !HasExpectedPublisherSettings(publisherSettings))
                 {
                     return RefreshRequired(osClient, "AI应用离线发布器缺失、自包含能力过低或运行限额不足");
+                }
+
+                var builderCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "ai_app_build")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                var builderVersionMatch = Regex.Match(builderCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                if (!builderVersionMatch.Success ||
+                    !System.Version.TryParse(builderVersionMatch.Groups[1].Value, out var builderVersion) ||
+                    builderVersion < new System.Version(1, 2, 9) ||
+                    !builderCode.Contains("TENANT_RUNTIME_CONTEXT_V1") ||
+                    !builderCode.Contains("injectRuntimeContext") ||
+                    !builderCode.Contains("V8.SysConfig && V8.SysConfig.ApiBase"))
+                {
+                    return RefreshRequired(osClient, "AI应用构建器缺少按当前租户注入运行时上下文的能力");
                 }
 
                 foreach (var engineKey in new[]
@@ -145,6 +165,20 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                             || engineCode.Contains("new System.IO.MemoryStream")))
                     {
                         return RefreshRequired(osClient, $"AI应用打包接口[{engineKey}]仍依赖客户全局DateNow或System.IO");
+                    }
+                    if (string.Equals(engineKey, "ai_app_download_build_zip", StringComparison.Ordinal)
+                        && (!engineCode.Contains("Version: v1.2.0")
+                            || !engineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1")
+                            || !engineCode.Contains("buildArchivePath")))
+                    {
+                        return RefreshRequired(osClient, "AI应用 BuildZip 仍未携带完整真实编译资产");
+                    }
+                    if (string.Equals(engineKey, "ai_app_download_source_zip", StringComparison.Ordinal)
+                        && (!engineCode.Contains("Version: v1.2.0")
+                            || !engineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1")
+                            || !engineCode.Contains("sourceArchivePath")))
+                    {
+                        return RefreshRequired(osClient, "AI应用 SourceZip 仍混入包装根目录或编译资产");
                     }
                 }
 
@@ -324,10 +358,16 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             var bundledResources = LoadBundledResources();
             try
             {
-                var pairs = await Task.WhenAll(RequiredResourceNames.Select(async resourceName =>
+                var onlineResourceNames = RequiredResourceNames
+                    .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal));
+                var pairs = await Task.WhenAll(onlineResourceNames.Select(async resourceName =>
                     new KeyValuePair<string, string>(resourceName, await DownloadOfficialResourceAsync(resourceName))));
                 Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
-                return pairs.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+                var resources = pairs.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+                // 构建器随当前服务器版本发布，确保客户即使连接到较旧的官方资源服务，
+                // 也不会再次安装缺少租户 ApiBase/OsClient 上下文的旧入口发布逻辑。
+                resources[BuildAiAppResourceName] = bundledResources[BuildAiAppResourceName];
+                return resources;
             }
             catch (Exception ex)
             {
@@ -409,7 +449,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 4, 2) ||
+                    importerVersion < new System.Version(1, 6, 3) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -422,7 +462,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("normalizeRouteMeta") ||
                     !content.Contains("recoverBoundMicroserviceMenus") ||
                     !content.Contains("preservedLegacyUrl") ||
-                    !content.Contains("preserve_existing_menu_visibility_"))
+                    !content.Contains("preserve_existing_menu_visibility_") ||
+                    !content.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !content.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -435,13 +477,30 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!content.Contains("ai_app_publish_store") ||
                     !publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 1, 6) ||
+                    publisherVersion < new System.Version(1, 4, 4) ||
                     !content.Contains("OfflineSelfContained") ||
                     !content.Contains("IncludeSource: includeSource") ||
                     !content.Contains("action === 'PackageOnly'") ||
-                    !content.Contains("ReturnPackageModel"))
+                    !content.Contains("ReturnPackageModel") ||
+                    !content.Contains("SOURCE_BUILD_ARCHIVE_ROOTS_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                }
+                return;
+            }
+
+            if (string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal))
+            {
+                var builderVersionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                if (!content.Contains("ApiEngineKey: ai_app_build") ||
+                    !builderVersionMatch.Success ||
+                    !System.Version.TryParse(builderVersionMatch.Groups[1].Value, out var builderVersion) ||
+                    builderVersion < new System.Version(1, 2, 9) ||
+                    !content.Contains("TENANT_RUNTIME_CONTEXT_V1") ||
+                    !content.Contains("injectRuntimeContext") ||
+                    !content.Contains("V8.SysConfig && V8.SysConfig.ApiBase"))
+                {
+                    throw new InvalidOperationException($"升级资源[{resourceName}]缺少当前租户运行时上下文注入能力。");
                 }
                 return;
             }
@@ -466,11 +525,28 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             if (string.Equals(resourceName, AppStorePackageResourceName, StringComparison.Ordinal))
             {
                 var packageVersionText = package["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var packageEngines = package["SysApiEngines"] as JArray;
+                var buildZipEngineCode = packageEngines?
+                    .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "ai_app_download_build_zip", StringComparison.Ordinal))?
+                    ["ApiV8Code"]?.ToString() ?? string.Empty;
+                var sourceZipEngineCode = packageEngines?
+                    .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "ai_app_download_source_zip", StringComparison.Ordinal))?
+                    ["ApiV8Code"]?.ToString() ?? string.Empty;
+                var importerEngine = packageEngines?
+                    .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "import-microi-store-package", StringComparison.Ordinal));
+                var importerEngineCode = importerEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
+                var importerEngineVersionText = importerEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(6, 2, 9) ||
+                    packageVersion < new System.Version(6, 5, 8) ||
+                    !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
+                    embeddedImporterVersion < new System.Version(1, 6, 3) ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
-                    !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR"))
+                    !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
+                    !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
+                    !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
+                    !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !importerEngineCode.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
                 }
@@ -527,6 +603,78 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 .AddInParameter("p3", 10000)
                 .AddInParameter("p4", "ai_app_publish_store")
                 .ExecuteNonQuery();
+        }
+
+        private static async Task EnsureAiAppBuilderAsync(
+            string osClient,
+            List<string> msgs,
+            IReadOnlyDictionary<string, string> resources)
+        {
+            var engineCode = resources[BuildAiAppResourceName];
+            var existing = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
+            {
+                OsClient = osClient,
+                _Where = new List<object>
+                {
+                    new List<object> { "ApiEngineKey", "=", "ai_app_build" }
+                },
+                _SelectFields = new[] { "Id" }
+            });
+            var model = new
+            {
+                OsClient = osClient,
+                ApiName = "AI应用构建发布",
+                ApiEngineKey = "ai_app_build",
+                ApiAddress = "/apiengine/ai_app_build",
+                IsEnable = 1,
+                StopHttp = 0,
+                AllowAnonymous = 0,
+                Timeout = 600,
+                MaxStatements = 100000000,
+                LimitMemory = 2048,
+                LimitRecursion = 10000,
+                Lock = 0,
+                Version = "v1.2.9",
+                ApiV8Code = engineCode
+            };
+            DosResult result;
+            if (existing.Code == 1 && existing.Data != null)
+            {
+                result = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
+                {
+                    Id = (string)existing.Data.Id,
+                    model.OsClient,
+                    model.ApiName,
+                    model.ApiEngineKey,
+                    model.ApiAddress,
+                    model.IsEnable,
+                    model.StopHttp,
+                    model.AllowAnonymous,
+                    model.Timeout,
+                    model.MaxStatements,
+                    model.LimitMemory,
+                    model.LimitRecursion,
+                    model.Lock,
+                    model.Version,
+                    model.ApiV8Code
+                });
+            }
+            else
+            {
+                result = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", model);
+            }
+            if (result.Code != 1)
+            {
+                msgs.Add("AI应用构建器升级失败：" + result.Msg);
+                return;
+            }
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:ai_app_build");
+            await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/ai_app_build");
+            if (existing.Code == 1 && existing.Data != null)
+            {
+                await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{(string)existing.Data.Id}");
+            }
         }
 
         private static async Task EnsureAiPackagingTimeFallback(string osClient, List<string> msgs)
@@ -763,6 +911,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 表单引擎、模块引擎及可选 AI 发布器均排在其后。
             #region 应用商城 数据包
             await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            await EnsureAiAppBuilderAsync(osClient, msgs, resources);
             if (msgs.Count > 0) return msgs;
             await EnsureAiPackagingTimeFallback(osClient, msgs);
             if (msgs.Count > 0) return msgs;
