@@ -495,8 +495,8 @@ MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 
 - [AI 编程指南](https://microi.net/doc/v8-engine/ai-apiengine)
 - [Gitee 源码](https://gitee.com/ITdos/microi.net)
 - [版本更新日志](https://microi.net/doc/about/update-log.html)
-- [插件内部开发文档](DEVELOPMENT.md)
+- [插件内部开发文档](https://git.itdos.net:88/anderson/microi.vscode/-/blob/master/DEVELOPMENT.md)
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://opensource.org/license/mit)

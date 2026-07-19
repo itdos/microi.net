@@ -11,10 +11,11 @@
 	"license": "MIT",
 	"homepage": "https://microi.net/",
 	"scripts": {
-		"docs:dev": "vitepress dev docs --host",
-		"dev": "vitepress dev docs --host",
-		"docs:build": "vitepress build docs",
-		"build": "vitepress build docs",
+		"check:links": "node scripts/check-dead-links.mjs",
+		"docs:dev": "npm run check:links && vitepress dev docs --host",
+		"dev": "npm run check:links && vitepress dev docs --host",
+		"docs:build": "npm run check:links && vitepress build docs",
+		"build": "npm run check:links && vitepress build docs",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {

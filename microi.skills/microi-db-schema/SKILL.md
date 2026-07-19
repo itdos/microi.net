@@ -23,6 +23,14 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 - `microi_database` 将扩展数据库 key 映射到 `V8.Dbs.<DbKey>`。
 - `wf_*` 表存储工作流设计、节点、连线、实例、待办和历史。
 
+## AI 应用持久化表创建规则（强制）
+
+- AI 创建的应用、业务模块或演示项目，只要需要持久化业务数据，默认必须通过 `microi_create_table`、Manifest + `microi_generate_system` 等 MCP 标准建模入口创建表，确保物理表、`diy_table` 和 `diy_field` 同步落地。不得只执行 `CREATE TABLE`、只导入物理表，或只写 `diy_table` 元数据。
+- 这样创建的业务表必须能在表单引擎中查看，并能由 `V8.FormEngine` / FormEngine HTTP API 正常查询和写入。接口引擎应优先通过 FormEngine 操作这些表；只有联表、聚合或 FormEngine 无法表达的场景才使用参数化 SQL。
+- 平台框架表、第三方组件自维护表、迁移中间表、数据库运维表等确实不适合表单引擎的物理表可以例外，但必须在交付记录中说明用途和例外原因，不能把普通 AI 应用业务表归入例外。
+- 建模完成后必须回读验收：`microi_get_db_schema` 能看到物理表及字段；`diy_table.Name` 唯一对应物理表；`diy_field.TableId` 均正确关联；至少执行一次 FormEngine 查询或可回滚 CRUD 验证。发现“物理表存在、表单引擎不可见”时，应补齐标准元数据或删除孤儿物理表，不能把它当作已交付。
+- 统计表数量时必须区分三个口径：物理表总数、有效 `diy_table` 元数据数、应用安装包内表引用数。安装包引用数可能包含平台基础表并跨应用重复，不能直接相加后当成租户实际唯一表数。
+
 ## diy_table 命名规则
 
 创建或修复 `diy_table` 时必须区分三个字段职责：

@@ -69,7 +69,7 @@
         </div>
 
         <div
-          v-if="isLoading"
+          v-if="showInitialSkeleton"
           class="app-grid app-grid-skeleton"
           aria-label="正在读取应用"
           aria-busy="true"
@@ -91,7 +91,12 @@
         <div v-else-if="loadError" class="market-state">{{ loadError }}</div>
         <div v-else-if="liveApps.length === 0" class="market-state">没有找到匹配的应用。</div>
 
-        <div v-else class="app-grid">
+        <div
+          v-else
+          class="app-grid"
+          :class="{ 'app-grid-refreshing': isLoading }"
+          :aria-busy="isLoading"
+        >
           <article
             v-for="app in liveApps"
             :key="app.AppKey"
@@ -138,13 +143,14 @@
         </div>
 
         <nav
-          v-if="!isLoading && !loadError && totalCount > 0"
+          v-if="!loadError && totalCount > 0"
           class="market-pagination"
           aria-label="AI应用分页"
+          :aria-busy="isLoading"
         >
-          <button type="button" :disabled="pageIndex <= 1" @click="changePage(pageIndex - 1)">上一页</button>
+          <button type="button" :disabled="isLoading || pageIndex <= 1" @click="changePage(pageIndex - 1)">上一页</button>
           <span>第 {{ pageIndex }} / {{ pageCount }} 页 · 共 {{ totalCount }} 个应用</span>
-          <button type="button" :disabled="pageIndex >= pageCount" @click="changePage(pageIndex + 1)">下一页</button>
+          <button type="button" :disabled="isLoading || pageIndex >= pageCount" @click="changePage(pageIndex + 1)">下一页</button>
         </nav>
       </div>
     </section>
@@ -205,6 +211,7 @@ const shouldRender = computed(() => isHomePage.value || isAppsPage.value)
 const pageSize = computed(() => isHomePage.value ? 6 : 12)
 const skeletonCount = computed(() => pageSize.value)
 const pageCount = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)))
+const showInitialSkeleton = computed(() => isLoading.value && liveApps.value.length === 0)
 
 function plainText(value) {
   return String(value || '')
@@ -664,9 +671,33 @@ onBeforeUnmount(() => {
 }
 
 .app-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
+}
+
+.app-grid-refreshing::before {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--market-primary), transparent);
+  transform: translateX(-120%);
+  animation: market-page-refresh .9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.app-grid-refreshing .app-card {
+  pointer-events: none;
+}
+
+@keyframes market-page-refresh {
+  to { transform: translateX(430%); }
 }
 
 .app-card {
@@ -1006,6 +1037,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .market-more-glow::before,
+  .app-grid-refreshing::before,
   .skeleton-block::after {
     animation: none;
   }
