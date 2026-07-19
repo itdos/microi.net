@@ -1,5 +1,23 @@
 # 更新日志
 
+## v6.4.4
+
+更新日期：2026-07-19
+
+- **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.4；Microi VS Code 插件与内置 Skills 升级至 v3.9.5。
+- **Dos.ORM 跨数据库中性架构（补记根仓库 `7ab57de` 起的遗漏提交）**：新增不可变 SQL AST，统一表达名称、类型、参数、表达式、语义函数、SELECT、INSERT／UPDATE／DELETE、DDL、数据库管理与原生 SQL 边界；编译流水线补齐规范化、校验、参数分配、绑定、能力判断、执行计划和受控原生 SQL 入口，并冻结旧公开 API 基线，保证新增架构不破坏历史调用。
+- **六类数据库编译器与能力注册**：为 MySQL、SQL Server、PostgreSQL、人大金仓 KingbaseES、Oracle、达梦 DM8 建立独立能力描述、类型映射和 SQL 编译器，覆盖查询、分页、锁、DML、建表改表、数据库管理及大文本等差异；补齐 SQL Server 锁提示／`datetimeoffset`、Oracle／DM8 逻辑长文本和达梦禁用行标识符映射，并用大规模 AST、方言、边界和分配回归测试锁定行为。
+- **数据库兼容能力下沉 Dos.ORM**：平台的数据库类型解析、连接字符串规范化、数据库创建／删除、字段与表结构访问、分页、标识符、空值函数、方言提示和历史 SQL 重写统一收口到 Dos.ORM；FormEngine、MCP、系统监控、动态接口和租户初始化不再分散维护 MySQL／SQL Server／Oracle 特判，移除 Oracle 专属接口路由过滤并避免配置解析静默回退。
+- **多数据库空库转换与发布**：新增流式 MySQL 5.7 dump 解析、标准中性模型、确定性 SQL 输出和导入工具，可从官方空库源生成 SQL Server 2022、Oracle 19c、PostgreSQL 17、达梦 DM8、人大金仓 KingbaseES 完整结构与数据包；发布流程统一生成 MySQL 5.7、MySQL 8.0 及五个转换目标共 7 个规范 ZIP，并校验目标表数、行数与源库一致。
+- **空库脱敏零残留门禁**：官方空库源更名为 `microi_empty_mysql57.sql.zip`，MySQL 8.0 使用独立规范包 `microi_empty_mysql80.sql.zip`；发布前除模板账号外，进一步检查并拒绝残留 `app_` 物理表、接口引擎、表／字段元数据、AI 应用商城记录和旧 AI 应用表数据，同时强制保留 `microi-platform-service`。一键安装脚本按所选数据库下载对应规范包，不再复用含义模糊的 `microi_empty_temp` 文件名。
+- **Microi.net 数据库中立化（补记 `9ca1898`）**：租户连接、数据库创建删除、空库导入、字段补齐、表结构检查和 FormEngine CRUD 的数据库差异改由 Dos.ORM 统一处理；租户配置查询移除 `LIMIT/TOP`、反引号和 `SHOW COLUMNS` 等硬编码，并通过标准种子导入器校验核心表和数据完整性。
+- **Microi.AI 数据库中立化（补记 `2650632`）**：AI 中转站账户／Token 流水改用 ORM 实体自动建表和补字段，统一表名／字段引用、空值函数与分页方言；用户 AI API Key、模型读取、额度查询及审计写入不再依赖 MySQL 语法，Token 扣减改为带余额条件的原子更新，降低并发超扣风险。
+- **AI 应用构建、离线包与断点续装（补记根仓库 `dc33187`）**：应用构建器向入口页、嵌套页面和历史路径安全注入当前租户 `ApiBase/OsClient` 运行上下文并防止 XSS；SourceZip 只保留可编译源码根，BuildZip 携带全部真实编译资产并剥离构建包装目录。大型安装支持按路径、大小和哈希复用已上传源码／产物，复用文件不再重复移动，全部写完后再以 Jint 兼容方式清理旧元数据，升级器同步提高构建器、发布器、导入器和商城包能力门槛。
+- **官网 AI 应用预览与广场体验**：应用详情预览 URL 自动携带版本、当前 API 地址和租户参数，避免旧缓存或错误租户上下文；AI 应用广场仅首次加载显示骨架，分页刷新时保留现有卡片并显示进度、禁用重复翻页，减少页面闪空。官网同时完善 Codex、跨数据库和分布式能力说明。
+- **VS Code MCP 进程生命周期（补记 `348643c`）**：插件版本由 v3.9.1 升至 v3.9.3，并在本次发布继续升至 v3.9.5；Codex stdio 适配器在标准输入关闭、父进程退出、管道断开或收到终止信号时同步关闭子 MCP Server，设置强制回收兜底，新增生命周期回归测试，避免重载和断连后孤儿进程持续占用构建内存。
+- **VS Code 文档与 AI 指令模板**：插件 README 重写为完整中文安装、AI 编程、80+ MCP 工具、多服务器、同步、调试、Playwright 和性能测试指南；插件生成的 Agents、Claude、Copilot、Cursor 知识库及 Cursor Skill 规则新增 Microi 工作进度播报规范，确保初始化或重新生成后规则不丢失。
+- **官方文档质量门禁（补记根仓库 `54a4ded`）**：新增独立 VS Code 插件使用文档并修复内部开发文档、License 等失效相对链接；文档开发与构建前自动扫描全部 Markdown 页面死链，官网首页和 Skills 同步补充 Codex、六数据库能力及 AI 应用持久化必须走标准低代码建模的规则。
+
 ## v6.4.3
 
 更新日期：2026-07-17

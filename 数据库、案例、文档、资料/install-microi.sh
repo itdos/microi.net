@@ -53,8 +53,8 @@ configure_database_profile() {
       DATABASE_TYPE="MySql"
       DATABASE_ENGINE_KEY="mysql57"
       DATABASE_PORT_NAME="MySQL"
-      SQL_ZIP_FILE_NAME="microi_empty_temp.sql.zip"
-      SQL_FILE_NAME="microi_empty_temp.sql"
+      SQL_ZIP_FILE_NAME="microi_empty_mysql57.sql.zip"
+      SQL_FILE_NAME="microi_empty_mysql57.sql"
       MYSQL_VERSION="5.7"
       MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7"
       MYSQL_CONTAINER_NAME="microi-install-mysql57"
@@ -70,9 +70,9 @@ configure_database_profile() {
       DATABASE_TYPE="MySql"
       DATABASE_ENGINE_KEY="mysql80"
       DATABASE_PORT_NAME="MySQL"
-      # MySQL 8.0 复用兼容 MySQL 5.7 的标准空库包。
-      SQL_ZIP_FILE_NAME="microi_empty_temp.sql.zip"
-      SQL_FILE_NAME="microi_empty_temp.sql"
+      # 内容保持 MySQL 5.7/8.0 双兼容，但发布为独立规范包，便于版本选择和校验。
+      SQL_ZIP_FILE_NAME="microi_empty_mysql80.sql.zip"
+      SQL_FILE_NAME="microi_empty_mysql80.sql"
       MYSQL_VERSION="8.0"
       MYSQL_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0"
       MYSQL_CONTAINER_NAME="microi-install-mysql80"

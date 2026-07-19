@@ -12,7 +12,7 @@
 
 - Every command runs from workspace root D:\Work\microi.net.all. Every repository path in a command starts with ./Microi.Server or ./Microi.Client.
 - The prerequisite seed implementation is ./Microi.Server/docs/superpowers/plans/2026-07-18-microi-empty-seed-converter.md. Full and ReleaseFull must consume its current official source, neutral manifest, compilers, artifacts, and source-only apply/diagnostic facade; they may not recreate a converter in certification code.
-- The authoritative source is https://static.itdos.com/install/microi_empty_temp.sql.zip. Full and ReleaseFull download it for the run, record ZIP and SQL SHA-256, and derive all object/row expectations dynamically. Historic counts such as 133 tables and 16,083 rows are evidence from one version, never acceptance constants.
+- The authoritative source is https://static.itdos.com/install/microi_empty_mysql57.sql.zip. Full and ReleaseFull download it for the run, record ZIP and SQL SHA-256, and derive all object/row expectations dynamically. Historic counts such as 133 tables and 16,083 rows are evidence from one version, never acceptance constants.
 - Full runs a MySQL 5.7 reference import first, then MySQL 8.0, SQL Server 2022, Oracle 19c, PostgreSQL 17, DM8, and KingbaseES V9. ReleaseFull runs the same reference and Full lanes, then SQL Server 2017, Oracle 11g R2 11.2.0.4, and PostgreSQL 14; its reference lane also executes the MySQL 5.7 functional/API/UI contracts.
 - Every target restores the complete current structure and data. Acceptance
   compares every logical application table's canonical schema fingerprint, row

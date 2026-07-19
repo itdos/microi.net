@@ -8,8 +8,17 @@ namespace Dos.ORM.SeedConversion
 {
     public static class DatabaseSeedConverter
     {
+        public const string PublicReleaseBaseUrl =
+            "https://static.itdos.com/install/";
+
+        public const string MySql57SqlFileName =
+            "microi_empty_mysql57.sql";
+
+        public const string MySql80SqlFileName =
+            "microi_empty_mysql80.sql";
+
         public const string DefaultSourceUrl =
-            "https://static.itdos.com/install/microi_empty_temp.sql.zip";
+            PublicReleaseBaseUrl + MySql57SqlFileName + ".zip";
 
         private static readonly IReadOnlyList<SeedDatabaseTarget> Targets =
             Array.AsReadOnly(new[]
@@ -21,7 +30,35 @@ namespace Dos.ORM.SeedConversion
                 SeedDatabaseTarget.KingbaseEs
             });
 
+        private static readonly IReadOnlyList<SeedReleasePackageDefinition>
+            ReleasePackageDefinitions = Array.AsReadOnly(new[]
+            {
+                new SeedReleasePackageDefinition(
+                    "mysql57",
+                    "MySQL 5.7",
+                    MySql57SqlFileName,
+                    null),
+                new SeedReleasePackageDefinition(
+                    "mysql80",
+                    "MySQL 8.0",
+                    MySql80SqlFileName,
+                    null),
+                CreateReleasePackageDefinition(SeedDatabaseTarget.SqlServer2022),
+                CreateReleasePackageDefinition(SeedDatabaseTarget.Oracle19c),
+                CreateReleasePackageDefinition(SeedDatabaseTarget.Dm8),
+                CreateReleasePackageDefinition(SeedDatabaseTarget.PostgreSql17),
+                CreateReleasePackageDefinition(SeedDatabaseTarget.KingbaseEs)
+            });
+
         public static IReadOnlyList<SeedDatabaseTarget> SupportedTargets => Targets;
+
+        /// <summary>
+        /// Canonical public artifact order and names. Keeping this list in
+        /// Dos.ORM prevents the installer and application layers from defining
+        /// database-specific release conventions independently.
+        /// </summary>
+        public static IReadOnlyList<SeedReleasePackageDefinition>
+            SupportedReleasePackages => ReleasePackageDefinitions;
 
         public static SeedConversionResult ConvertMySql57(
             TextReader source,
@@ -179,6 +216,35 @@ namespace Dos.ORM.SeedConversion
                     return "PostgreSQL 17";
                 case SeedDatabaseTarget.KingbaseEs:
                     return "人大金仓 KingbaseES V9";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(target));
+            }
+        }
+
+        private static SeedReleasePackageDefinition CreateReleasePackageDefinition(
+            SeedDatabaseTarget target)
+        {
+            return new SeedReleasePackageDefinition(
+                GetDatabaseTypeKey(target),
+                GetDisplayName(target),
+                GetOutputFileName(target),
+                target);
+        }
+
+        private static string GetDatabaseTypeKey(SeedDatabaseTarget target)
+        {
+            switch (target)
+            {
+                case SeedDatabaseTarget.SqlServer2022:
+                    return "sqlserver";
+                case SeedDatabaseTarget.Oracle19c:
+                    return "oracle";
+                case SeedDatabaseTarget.Dm8:
+                    return "dameng";
+                case SeedDatabaseTarget.PostgreSql17:
+                    return "postgresql";
+                case SeedDatabaseTarget.KingbaseEs:
+                    return "kingbase";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(target));
             }
