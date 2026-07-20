@@ -776,7 +776,11 @@ namespace Microi.net
 
                 }
                 #endregion
-
+                if (result?.Code == 1 && param.Limit != false && param.ReturnFileType != "Byte"
+                    && MicroiEngine.PrivateFileAuditLink != null)
+                {
+                    result = await MicroiEngine.PrivateFileAuditLink.WrapAsync(result, param);
+                }
                 return result;
             }
             catch (Exception ex)

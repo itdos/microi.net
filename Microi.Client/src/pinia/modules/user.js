@@ -56,7 +56,11 @@ export const useUserStore = defineStore("user", {
         },
 
         // user logout
-        logout() {
+        async logout() {
+            // 先让后端吊销当前终端并记录本次登录时长；即使网络异常也必须继续清理本地登录态。
+            try {
+                await DiyCommon.PostAsync(DiyApi.Logout(), {}, null, null, "json");
+            } catch (e) {}
             return new Promise((resolve) => {
                 this.setToken("");
                 this.setRoles([]);

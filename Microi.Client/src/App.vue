@@ -70,7 +70,9 @@ export default {
             // plusready 事件处理函数引用
             plusreadyHandler: null,
             // 浏览器标签页从休眠/后台恢复时立即检查 Token 是否需要续签
-            authResumeHandler: null
+            authResumeHandler: null,
+            behaviorVisibilityHandler: null,
+            behaviorPageHideHandler: null
         };
     },
     watch: {},
@@ -128,6 +130,16 @@ export default {
         document.addEventListener("visibilitychange", self.authResumeHandler, false);
         window.addEventListener("focus", self.authResumeHandler, false);
         window.addEventListener("pageshow", self.authResumeHandler, false);
+        self.behaviorVisibilityHandler = function () {
+            self.DiyCommon.UserBehaviorSignal({
+                Action: document.visibilityState === "hidden" ? "PageHidden" : "PageVisible"
+            }, document.visibilityState === "hidden");
+        };
+        self.behaviorPageHideHandler = function () {
+            self.DiyCommon.UserBehaviorSignal({ Action: "PageClosed" }, true);
+        };
+        document.addEventListener("visibilitychange", self.behaviorVisibilityHandler, false);
+        window.addEventListener("pagehide", self.behaviorPageHideHandler, false);
 
         // ===== 5+App 返回键：Vue Router 路由感知处理 =====
         // permission.js 的 router.afterEach 在每次路由完成后设置 window.__microi_isRootPage
@@ -187,6 +199,12 @@ export default {
             document.removeEventListener("visibilitychange", self.authResumeHandler, false);
             window.removeEventListener("focus", self.authResumeHandler, false);
             window.removeEventListener("pageshow", self.authResumeHandler, false);
+        }
+        if (self.behaviorVisibilityHandler) {
+            document.removeEventListener("visibilitychange", self.behaviorVisibilityHandler, false);
+        }
+        if (self.behaviorPageHideHandler) {
+            window.removeEventListener("pagehide", self.behaviorPageHideHandler, false);
         }
         // 清理 Android 返回键处理
         window.__microi_handleBack = null;

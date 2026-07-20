@@ -606,12 +606,20 @@ namespace Microi.net
                 {
                     workbook.Write(stream);
                     var buf = stream.ToArray();
+                    UserBehaviorAudit.Track(param, "Data", "DataExport", "导出数据", "Table",
+                        param.TableId.DosIsNullOrWhiteSpace(param.FormEngineKey),
+                        $"导出了表[{sysMenuModel?.Name.DosIsNullOrWhiteSpace(param.FormEngineKey)}]的[{result.Count}]条数据",
+                        new { TableId = param.TableId, Table = param.FormEngineKey, MenuId = param._SysMenuId, Count = result.Count });
                     return new DosResult<byte[]>(1, buf);
                 }
                 #endregion
             }
             catch (Exception ex)
             {
+                UserBehaviorAudit.Track(param, "Data", "DataExport", "导出数据", "Table",
+                    param?.TableId.DosIsNullOrWhiteSpace(param?.FormEngineKey),
+                    $"导出表[{param?.FormEngineKey}]的数据失败",
+                    new { TableId = param?.TableId, Table = param?.FormEngineKey, Error = ex.Message }, false);
                 return new DosResult<byte[]>(0, null, ex.Message);
             }
         }
@@ -636,12 +644,17 @@ namespace Microi.net
                 IWorkbook workbook = new XSSFWorkbook();
                 var sysConfig = (await MicroiEngine.FormEngine.GetSysConfig(parentParam.OsClient)).Data;
                 var sheetIndex = 1;
+                var totalCount = 0;
                 foreach (var sheet in sheets)
                 {
                     ApplyExcelSheetDefaults(parentParam, sheet);
                     var sheetDataResult = await GetExportExcelSheetDataAsync(sheet);
                     if (sheetDataResult.Code != 1)
                     {
+                        UserBehaviorAudit.Track(parentParam, "Data", "DataExport", "导出数据", "Table",
+                            parentParam.TableId.DosIsNullOrWhiteSpace(parentParam.FormEngineKey),
+                            "导出多工作表数据失败",
+                            new { TableId = parentParam.TableId, Table = parentParam.FormEngineKey, Error = sheetDataResult.Msg }, false);
                         return new DosResult<byte[]>(0, null, sheetDataResult.Msg);
                     }
                     var sheetName = GetSafeExcelSheetName(workbook, sheet.SheetName, sheetIndex);
@@ -653,16 +666,25 @@ namespace Microi.net
                         sheet.ExcelHeader == null,
                         sysConfig
                     );
+                    totalCount += sheetDataResult.Data.ExcelData?.Count ?? 0;
                     sheetIndex++;
                 }
                 using (var stream = new MemoryStream())
                 {
                     workbook.Write(stream);
+                    UserBehaviorAudit.Track(parentParam, "Data", "DataExport", "导出数据", "Table",
+                        parentParam.TableId.DosIsNullOrWhiteSpace(parentParam.FormEngineKey),
+                        $"导出了[{sheets.Count}]个工作表、共[{totalCount}]条数据",
+                        new { TableId = parentParam.TableId, Table = parentParam.FormEngineKey, SheetCount = sheets.Count, Count = totalCount });
                     return new DosResult<byte[]>(1, stream.ToArray());
                 }
             }
             catch (Exception ex)
             {
+                UserBehaviorAudit.Track(parentParam, "Data", "DataExport", "导出数据", "Table",
+                    parentParam?.TableId.DosIsNullOrWhiteSpace(parentParam?.FormEngineKey),
+                    "导出多工作表数据失败",
+                    new { TableId = parentParam?.TableId, Table = parentParam?.FormEngineKey, Error = ex.Message }, false);
                 return new DosResult<byte[]>(0, null, ex.Message);
             }
         }
@@ -2196,6 +2218,9 @@ namespace Microi.net
                     }
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：成功导入【{tIndex1}】条数据！");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：其中【{tUptIndex1}】条数据为修改！");
+                    UserBehaviorAudit.Track(param, "Data", "DataImport", "导入数据", "Table", param.TableId,
+                        $"向表[{diyTableModel?.Name}/{param.TableId}]导入了[{tIndex1}]条数据，其中修改[{tUptIndex1}]条、新增[{tIndex1 - tUptIndex1}]条",
+                        new { TableId = param.TableId, Table = diyTableModel?.Name, Count = tIndex1, Updated = tUptIndex1, Added = tIndex1 - tUptIndex1 });
                     await diyCacheBase.SetAsync(stepSign, importStepList);
 
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已全部成功结束！线程关闭。");
@@ -2204,6 +2229,9 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    UserBehaviorAudit.Track(param, "Data", "DataImport", "导入数据", "Table", param.TableId,
+                        $"向表[{diyTableModel?.Name}/{param.TableId}]导入数据失败",
+                        new { TableId = param.TableId, Table = diyTableModel?.Name, Error = ex.Message }, false);
                     await diyCacheBase.SetAsync(startSign, "0");
                     Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]失败：{ex.Message}");
                     Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]lastSql：{lastSqlLog}");

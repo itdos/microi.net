@@ -119,6 +119,12 @@ services.AddMicroiORM();//【必须】注入【数据库ORM】插件
 services.AddMicroiCache();//【必须】注入【分布式缓存】插件
 services.AddMicroiHttp();//【必须】注入【Http】插件
 services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
+// 所有SysLog/用户行为日志统一由单消费者后台服务批量、幂等持久化。
+services.AddSingleton<SysLogQueueService>();
+services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
+services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
+services.AddSingleton<UserBehaviorSessionTracker>();
+services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
 services.AddMicroiWeChat();//【可选】注入【微信公众号平台】插件
 services.AddMicroiOffice();//【可选】注入【Office】插件

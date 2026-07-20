@@ -20,6 +20,11 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class SysLogController : Controller
     {
+        private static readonly HashSet<string> ReservedBehaviorTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "访问菜单", "点击V8按钮", "查看数据", "数据操作", "导入数据", "导出数据",
+            "用户登录", "用户退出", "登录失效", "私有附件", "登录失败"
+        };
         /// <summary>
         ///
         /// </summary>
@@ -79,13 +84,28 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddSysLog(SysLogParam paramLog)
         {
             var param = paramLog;
+            if (param == null) return Json(new DosResult(0, null, "日志参数不能为空。"));
+            if (!param.Category.DosIsNullOrWhiteSpace() || !param.Action.DosIsNullOrWhiteSpace()
+                || ReservedBehaviorTypes.Contains(param.Type ?? ""))
+            {
+                return Json(new DosResult(0, null, "平台用户行为日志只能由后端可信执行点生成。"));
+            }
             var currentToken = await DiyToken.GetCurrentToken();
-            if (currentToken != null)
+            if (currentToken?.CurrentUser != null)
             {
                 param.OsClient = currentToken.OsClient;
-                param.UserName = currentToken.CurrentUser["Name"].Val<string>();
+                param.UserName = UserBehaviorAudit.FormatUser(currentToken.CurrentUser);
                 param.UserId = currentToken.CurrentUser["Id"].Val<string>();
             }
+            else
+            {
+                param.UserId = null;
+                param.UserName = "匿名";
+                param.Source = "LegacyAnonymousEndpoint";
+            }
+            param.Category = "Legacy";
+            param.Action = "ClientLog";
+            if (currentToken?.CurrentUser != null) param.Source = "LegacyClientEndpoint";
 
             // 记录IP
             if (string.IsNullOrWhiteSpace(param.IP))
@@ -96,6 +116,28 @@ namespace Microi.net.Api
 
             var result = await MicroiEngine.MongoDB.AddSysLog(param);
             return Json(result);
+        }
+
+        /// <summary>管理员查看异步日志队列健康度，不暴露服务器磁盘路径。</summary>
+        [HttpGet]
+        public async Task<JsonResult> GetQueueHealth()
+        {
+            var token = await DiyToken.GetCurrentToken().ConfigureAwait(false);
+            if (token?.CurrentUser == null || token.CurrentUser["Level"].Val<int>() < 9999)
+                return Json(new DosResult(0, null, "仅系统管理员可查看日志队列状态。"));
+            var health = MicroiEngine.SysLogQueue?.GetHealth();
+            return Json(new DosResult(1, health == null ? null : new
+            {
+                health.NodeId,
+                health.Enqueued,
+                health.Persisted,
+                health.Retried,
+                health.Pending,
+                health.OverflowPending,
+                health.FailedBatches,
+                health.LastError,
+                health.LastPersistedAt
+            }));
         }
 
         /// <summary>

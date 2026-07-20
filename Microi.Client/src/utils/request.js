@@ -57,7 +57,13 @@ service.interceptors.response.use(
         // 修复：适配 Microi 后端返回格式 { Code: 1, Data, Msg }
         // 原模板代码使用 res.code !== 20000 与实际不符，会导致所有请求被误报，且 Token 失效不能重登录。
         if (res && res.Code !== 1) {
-            const isAuthFailure = res.Code === 1001 || res.Code === 1002;
+            const authMessage = String(res.Msg || res.Message || "").toLowerCase();
+            const isAuthFailure = res.Code === 1001
+                || res.Code === 1002
+                || authMessage.includes("nologin")
+                || authMessage.includes("token签名")
+                || authMessage.includes("token失效")
+                || authMessage.includes("请重新登录");
             const requestToken = response.config && response.config.__microiRequestToken;
             const tokenChanged = isAuthFailure
                 && DiyCommon
