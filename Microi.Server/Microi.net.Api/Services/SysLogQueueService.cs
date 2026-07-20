@@ -311,6 +311,12 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         var now = source.OccurredAt ?? DateTime.Now;
         Microsoft.AspNetCore.Http.HttpContext? context = null;
         try { context = DiyHttpContext.Current; } catch { /* 非Web宿主或极早期启动阶段没有HttpContextAccessor。 */ }
+        var osClient = source.OsClient;
+        if (string.IsNullOrWhiteSpace(osClient))
+        {
+            // 兼容历史 AddSysLog 调用：旧的直写实现会从当前请求/任务上下文补齐租户。
+            try { osClient = DiyToken.GetCurrentOsClient(); } catch { /* 无上下文时由 Enqueue 明确拒绝。 */ }
+        }
         var userId = source.UserId;
         var userName = source.UserName;
         try
@@ -341,7 +347,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             Success = source.Success,
             TraceId = Limit(source.TraceId ?? context?.TraceIdentifier, 128),
             OccurredAt = now,
-            OsClient = Limit(source.OsClient, 128),
+            OsClient = Limit(osClient, 128),
             AppId = Limit(source.AppId, 256),
             Api = Limit(source.Api, 1024),
             Param = Sanitize(source.Param, 8192),
