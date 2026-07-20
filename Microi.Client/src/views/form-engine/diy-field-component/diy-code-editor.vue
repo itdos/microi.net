@@ -265,9 +265,6 @@
                 <div class="code-version-subtitle">{{ CodeVersionTableName || CodeVersionTableId }} / {{ CodeVersionDataId }}</div>
             </div>
             <div class="code-version-toolbar-actions">
-                <el-button :loading="codeVersionSaving" type="primary" @click="saveCodeVersion">
-                    保存当前版本
-                </el-button>
                 <el-button :loading="codeVersionLoading" @click="loadCodeVersionList">
                     刷新
                 </el-button>
@@ -311,28 +308,27 @@
         width="860px"
         append-to-body
         destroy-on-close
+        @opened="initCodeVersionPreviewEditor"
+        @closed="disposeCodeVersionPreviewEditor"
     >
-        <pre class="code-version-preview-code">{{ codeVersionPreviewCode }}</pre>
+        <div ref="codeVersionPreviewEditorRef" class="code-version-preview-editor"></div>
     </el-dialog>
 
     <el-dialog
         v-model="codeVersionDiffVisible"
         class="code-version-diff-dialog"
         :title="'代码对比 ' + ((codeVersionCurrentItem && codeVersionCurrentItem.Version) || '')"
-        width="1100px"
+        width="92%"
         append-to-body
         destroy-on-close
+        @opened="initCodeVersionDiffEditor"
+        @closed="disposeCodeVersionDiffEditor"
     >
-        <div class="code-version-diff-grid">
-            <div class="code-version-diff-pane">
-                <div class="code-version-diff-title is-current">当前代码</div>
-                <pre>{{ codeVersionCurrentCode }}</pre>
-            </div>
-            <div class="code-version-diff-pane">
-                <div class="code-version-diff-title is-version">版本代码</div>
-                <pre>{{ codeVersionPreviewCode }}</pre>
-            </div>
+        <div class="code-version-diff-legend">
+            <span class="is-version">左侧：历史版本</span>
+            <span class="is-current">右侧：当前代码</span>
         </div>
+        <div ref="codeVersionDiffEditorRef" class="code-version-diff-editor"></div>
     </el-dialog>
 
     <DiyCodeDesign
@@ -617,6 +613,7 @@ onBeforeUnmount(() => {
         }
         monacoEditor = null;
     }
+    disposeCodeVersionEditors();
     
     // 清理聊天消息中的 reactive 对象引用，释放内存
     chatMessages.value = [];
@@ -1149,11 +1146,14 @@ const codeVersionDialogVisible = ref(false);
 const codeVersionPreviewVisible = ref(false);
 const codeVersionDiffVisible = ref(false);
 const codeVersionLoading = ref(false);
-const codeVersionSaving = ref(false);
 const codeVersionList = ref([]);
 const codeVersionCurrentItem = ref(null);
 const codeVersionPreviewCode = ref('');
 const codeVersionCurrentCode = ref('');
+const codeVersionPreviewEditorRef = ref(null);
+const codeVersionDiffEditorRef = ref(null);
+let codeVersionPreviewEditor = null;
+let codeVersionDiffEditor = null;
 
 const CodeVersionFieldName = computed(() => props.field?.Name || '');
 const CodeVersionFieldLabel = computed(() => props.field?.Label || props.field?.Name || '代码');
@@ -1221,43 +1221,6 @@ const normalizeCodeVersionItem = (item) => {
     };
 };
 
-const incrementCodeVersion = (latestVersion) => {
-    if (!latestVersion) return '1.0.0';
-    const parts = String(latestVersion).split('.');
-    if (parts.length !== 3) return '1.0.0';
-    let major = parseInt(parts[0], 10);
-    let minor = parseInt(parts[1], 10);
-    let patch = parseInt(parts[2], 10);
-    if (Number.isNaN(major) || Number.isNaN(minor) || Number.isNaN(patch)) {
-        return '1.0.0';
-    }
-    patch += 1;
-    if (patch > 9) {
-        patch = 0;
-        minor += 1;
-    }
-    if (minor > 9) {
-        minor = 0;
-        major += 1;
-    }
-    return `${major}.${minor}.${patch}`;
-};
-
-const getNextCodeVersion = async () => {
-    const result = await DiyCommon.FormEngine.GetTableData('mic_data_version', {
-        _Where: buildCodeVersionWhere(),
-        _SelectFields: ['Id', 'Version'],
-        _OrderBy: 'CreateTime',
-        _OrderByType: 'DESC',
-        _PageIndex: 1,
-        _PageSize: 1
-    });
-    if (result && result.Code == 1 && result.Data && result.Data.length > 0) {
-        return incrementCodeVersion(result.Data[0].Version);
-    }
-    return '1.0.0';
-};
-
 const loadCodeVersionList = async () => {
     if (!CanUseCodeVersion.value || codeVersionLoading.value) return;
     try {
@@ -1292,45 +1255,6 @@ const openCodeVersionDialog = () => {
     codeVersionDialogVisible.value = true;
 };
 
-const buildCodeVersionSnapshot = () => {
-    const fieldName = CodeVersionFieldName.value;
-    return {
-        Id: CodeVersionDataId.value,
-        [fieldName]: getEditorCode(),
-        __CodeEditorFieldName: fieldName,
-        __CodeEditorFieldLabel: CodeVersionFieldLabel.value,
-        __CodeEditorLanguage: props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript'
-    };
-};
-
-const saveCodeVersion = async () => {
-    if (!CanUseCodeVersion.value || codeVersionSaving.value) return;
-    try {
-        codeVersionSaving.value = true;
-        const version = await getNextCodeVersion();
-        const result = await DiyCommon.FormEngine.AddFormData('mic_data_version', {
-            TableId: CodeVersionTableId.value,
-            TableName: CodeVersionTableName.value,
-            TableRowId: CodeVersionDataId.value,
-            Version: version,
-            Action: 'Update',
-            Data: JSON.stringify(buildCodeVersionSnapshot()),
-            Remark: '代码编辑器保存：' + CodeVersionFieldLabel.value
-        });
-        if (result && result.Code == 1) {
-            DiyCommon.Tips('代码版本已保存', true);
-            await loadCodeVersionList();
-        } else {
-            DiyCommon.Tips((result && result.Msg) || '代码版本保存失败', false);
-        }
-    } catch (error) {
-        console.error('[CodeEditor] 保存代码版本失败:', error);
-        DiyCommon.Tips('保存代码版本失败：' + error.message, false);
-    } finally {
-        codeVersionSaving.value = false;
-    }
-};
-
 const previewCodeVersion = (item) => {
     codeVersionCurrentItem.value = item;
     codeVersionPreviewCode.value = item.__CodeValue || '';
@@ -1342,6 +1266,79 @@ const openCodeVersionDiff = (item) => {
     codeVersionCurrentCode.value = getEditorCode();
     codeVersionPreviewCode.value = item.__CodeValue || '';
     codeVersionDiffVisible.value = true;
+};
+
+const getCodeVersionLanguage = () => {
+    return props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript';
+};
+
+const disposeCodeVersionPreviewEditor = () => {
+    if (!codeVersionPreviewEditor) return;
+    const model = codeVersionPreviewEditor.getModel();
+    codeVersionPreviewEditor.dispose();
+    if (model) model.dispose();
+    codeVersionPreviewEditor = null;
+};
+
+const disposeCodeVersionDiffEditor = () => {
+    if (!codeVersionDiffEditor) return;
+    const models = codeVersionDiffEditor.getModel();
+    codeVersionDiffEditor.dispose();
+    if (models?.original) models.original.dispose();
+    if (models?.modified) models.modified.dispose();
+    codeVersionDiffEditor = null;
+};
+
+const disposeCodeVersionEditors = () => {
+    disposeCodeVersionPreviewEditor();
+    disposeCodeVersionDiffEditor();
+};
+
+const initCodeVersionPreviewEditor = async () => {
+    await nextTick();
+    const monacoApi = await initMonaco();
+    if (!codeVersionPreviewEditorRef.value) return;
+    disposeCodeVersionPreviewEditor();
+    const model = monacoApi.editor.createModel(codeVersionPreviewCode.value || '', getCodeVersionLanguage());
+    codeVersionPreviewEditor = monacoApi.editor.create(codeVersionPreviewEditorRef.value, {
+        model,
+        theme: EditorOption.theme || 'vs-dark',
+        readOnly: true,
+        domReadOnly: true,
+        automaticLayout: true,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        renderLineHighlight: 'none',
+        fontSize: currentFontSize.value,
+        lineHeight: 20,
+        wordWrap: 'off'
+    });
+};
+
+const initCodeVersionDiffEditor = async () => {
+    await nextTick();
+    const monacoApi = await initMonaco();
+    if (!codeVersionDiffEditorRef.value) return;
+    disposeCodeVersionDiffEditor();
+    const original = monacoApi.editor.createModel(codeVersionPreviewCode.value || '', getCodeVersionLanguage());
+    const modified = monacoApi.editor.createModel(codeVersionCurrentCode.value || '', getCodeVersionLanguage());
+    codeVersionDiffEditor = monacoApi.editor.createDiffEditor(codeVersionDiffEditorRef.value, {
+        theme: EditorOption.theme || 'vs-dark',
+        readOnly: true,
+        originalEditable: false,
+        automaticLayout: true,
+        renderSideBySide: true,
+        enableSplitViewResizing: true,
+        renderOverviewRuler: true,
+        renderIndicators: true,
+        ignoreTrimWhitespace: false,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        fontSize: currentFontSize.value,
+        lineHeight: 20,
+        wordWrap: 'off'
+    });
+    codeVersionDiffEditor.setModel({ original, modified });
 };
 
 const restoreCodeVersion = async (item) => {
@@ -2677,74 +2674,44 @@ defineExpose({
 .code-version-diff-dialog {
     .el-dialog__body {
         padding: 12px;
-        background: var(--el-fill-color-extra-light, #fafafa);
+        background: #1e1e1e;
     }
 }
 
-.code-version-preview-code {
-    min-height: 360px;
-    max-height: 70vh;
-    margin: 0;
-    overflow: auto;
-    padding: 12px;
-    border: 1px solid var(--el-border-color-lighter, #ebeef5);
-    border-radius: 8px;
-    background: #1e1e1e;
-    color: #d4d4d4;
-    font-family: Consolas, Monaco, "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre;
-    tab-size: 4;
-}
-
-.code-version-diff-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    height: min(680px, 72vh);
-    min-height: 360px;
-}
-
-.code-version-diff-pane {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 0;
+.code-version-preview-editor,
+.code-version-diff-editor {
+    width: 100%;
+    height: min(720px, 72vh);
+    min-height: 420px;
     border: 1px solid var(--el-border-color-lighter, #ebeef5);
     border-radius: 8px;
     overflow: hidden;
-    background: #1e1e1e;
-
-    pre {
-        flex: 1;
-        min-height: 0;
-        margin: 0;
-        overflow: auto;
-        padding: 12px;
-        color: #d4d4d4;
-        font-family: Consolas, Monaco, "Courier New", monospace;
-        font-size: 12px;
-        line-height: 1.6;
-        white-space: pre;
-        tab-size: 4;
-    }
 }
 
-.code-version-diff-title {
-    flex: 0 0 auto;
-    padding: 9px 12px;
-    border-bottom: 1px solid #3c3c3c;
-    color: #fff;
+.code-version-diff-legend {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 4px 10px;
+    color: #d4d4d4;
     font-size: 13px;
-    font-weight: 600;
 
-    &.is-current {
-        background: #2d2d30;
+    span::before {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 6px;
+        border-radius: 2px;
+        content: "";
+        vertical-align: -1px;
     }
 
-    &.is-version {
-        background: #3a2f16;
+    .is-version::before {
+        background: rgba(255, 70, 70, 0.7);
+    }
+
+    .is-current::before {
+        background: rgba(70, 170, 90, 0.8);
     }
 }
 
@@ -2770,10 +2737,10 @@ defineExpose({
         width: 94vw !important;
     }
 
-    .code-version-diff-grid {
-        grid-template-columns: 1fr;
-        height: 74vh;
-        min-height: 0;
+    .code-version-preview-editor,
+    .code-version-diff-editor {
+        height: 70vh;
+        min-height: 320px;
     }
 }
 </style>

@@ -50,6 +50,8 @@ namespace Microi.net
         /// <returns>表数据列表结果</returns>
         DosResultList<dynamic> GetTableData(dynamic dynamicParam);
         Task<DosResult> AddSysLog(SysLogParam param);
+        /// <summary>批量、幂等写入系统日志；仅供后台审计队列消费。</summary>
+        Task<DosResult> AddSysLogs(IReadOnlyCollection<SysLogParam> parameters);
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
         Task<DosResult> GetSysLogTypes(SysLogParam param);
         /// <summary>

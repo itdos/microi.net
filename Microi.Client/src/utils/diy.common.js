@@ -97,6 +97,7 @@ var DiyCommon = {
     TokenExpiresKey: "Microi.Token.Expires",
     // 401 重登录節流标志：避免并发请求 Token 同时失效时弹出 N 个登录框
     _LoginPending: false,
+    _AuthRedirecting: false,
     _LangBundleStatus: {},
     _LangBundlePromises: {},
     _LangBundleCacheMinutes: 30,
@@ -1853,7 +1854,14 @@ var DiyCommon = {
         if (result.Success || result.IsSuccess || result.Code == 1) {
             return true;
         } else {
-            if (result.Code == 1001 || result.Code == 1002) {
+            var authMessage = String(result.Msg || result.Message || "").toLowerCase();
+            var isAuthenticationFailure = result.Code == 1001
+                || result.Code == 1002
+                || authMessage.indexOf("nologin") > -1
+                || authMessage.indexOf("token签名") > -1
+                || authMessage.indexOf("token失效") > -1
+                || authMessage.indexOf("请重新登录") > -1;
+            if (isAuthenticationFailure) {
                 // 多 Tab/并发请求场景：旧请求失败返回时，另一个请求可能已经完成续签并写入新 Token。
                 // 此时不能让旧响应清空共享的新登录态。
                 if (DiyCommon.HasTokenChangedSinceRequest(result.__MicroiRequestToken)) {
@@ -1921,38 +1929,32 @@ var DiyCommon = {
         }
     },
     OpenLogin: function () {
-        var self = this;
-        // $('#divLogin').animate({'top':'0%'},700);
-        // isNeedLogin = true
-        // if (firstLoginCover == false) {
-        //     $('#divLogin').css({
-        //         'top': '0%'// 盖下来
-        //     })
-        // }
-        // setTimeout(function(){
-        // 	layx.html('divTips','技术架构',$('#divTips')[0],{
-        // 		floatTarget:$('.bottomTipsITdos')[0],
-        // 		width:$('.divLoginCenter').width(),
-        // 		height:180,
-        //    });
-        // },1000);
+        if (DiyCommon.IsRedisManagerRoute()) return Promise.resolve(false);
+        if (DiyCommon._AuthRedirecting) return Promise.resolve(false);
+        DiyCommon._AuthRedirecting = true;
         store.commit("DiyStore/SetCurrentUser", {});
-        //注意这里不能跳转，否则会一直无限跳转。跳转前要先判断当前是不是已经登录了，已经登录的状态才需要跳转
-        // store.push(`/login?redirect=`)//${store.route.fullPath}
-        // location.reload();
-        //如果不是登录界面，需要跳转到登录？ 2022-04-10改成不在这里跳转
-        if (!(location.href.indexOf("login") > -1)) {
-            // location.reload();
-            // new Router().push(`/login`);
-            // self.$router.push(`/login`);
-            //2022-04-10注释
-            // if (window.location.href.indexOf('OsClient') > -1) {
-            //     // window.location.href = `/?OsClient=${DiyCommon.GetOsClient()}#/login`;
-            //     window.location.href = window.location.origin + window.location.pathname + `?OsClient=${DiyCommon.GetOsClient()}#/login`;
-            // }else{
-            //     window.location.href = window.location.origin + window.location.pathname + "#/login";
-            // }
+        DiyCommon.removeToken();
+        LocalStorageManager.remove("TokenExpires");
+
+        if (typeof window === "undefined" || !window.location) {
+            DiyCommon._AuthRedirecting = false;
+            return Promise.resolve(false);
         }
+
+        var hashRoute = String(window.location.hash || "").replace(/^#/, "");
+        if (!hashRoute || hashRoute.indexOf("/login") === 0) {
+            hashRoute = "/";
+        }
+        var redirectQuery = hashRoute === "/" ? "" : "?redirect=" + encodeURIComponent(hashRoute);
+        var loginUrl = window.location.origin
+            + window.location.pathname
+            + window.location.search
+            + "#/login"
+            + redirectQuery;
+
+        // 完整重载可同时清理旧页签中已经失效的动态路由与组件状态；replace 不污染浏览器历史。
+        window.location.replace(loginUrl);
+        return Promise.resolve(true);
     },
     Post: function (url, param, callback, errorCallback, other, paramType) {
         var self = this;
@@ -5185,6 +5187,31 @@ var DiyCommon = {
                 }
             }
         });
+    },
+    // 用户行为只提交给后端可信审计入口；前端不再直接写MongoDB日志。
+    UserBehaviorSignal(param, keepalive) {
+        try {
+            var token = DiyCommon.getToken();
+            if (DiyCommon.IsNull(token)) return Promise.resolve();
+            var url = DiyCommon.GetApiBase() + "/api/UserBehavior/Signal";
+            if (keepalive === true && typeof fetch === "function") {
+                return fetch(url, {
+                    method: "POST",
+                    keepalive: true,
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                        authorization: "Bearer " + token,
+                        did: DiyCommon.GetDid(),
+                        lang: DiyCommon.GetCurrentLang()
+                    },
+                    body: JSON.stringify(param || {})
+                }).catch(function () {});
+            }
+            return DiyCommon.PostAsync(url, param || {}, null, null, "json").catch(function () {});
+        } catch (e) {
+            return Promise.resolve();
+        }
     },
     ConvertRowModel(rowModel) {
         var newRowModel = {};

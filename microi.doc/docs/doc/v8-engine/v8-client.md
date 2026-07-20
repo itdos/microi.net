@@ -29,13 +29,17 @@ var oldName = V8.OldForm.UserName;
 
 ## V8.FormSet
 >* 给当前表单字段赋值，并且会触发被赋值字段的值变更事件
->* 使用V8.Form.UserName = '张三'; 则不会触发UserName字段的值变更事件
->* 强烈不建议在字段的值变更事件中使用FormSet再次对此字段赋值，否则有可能会死循环，此时一定要使用V8.Form.UserName = '张三';这种方式赋值。
+>* 下拉框可以赋值对象；对象至少应包含该下拉框配置的存储字段（`SelectSaveField`）和显示字段（`SelectLabel`），字段 V8 还会读取其它业务属性时也要一并传入
+>* 直接使用 `V8.Form.UserName = value`（包括对象）同样会响应式更新表单，但不会触发该字段的值变更事件，也不会执行 `FormSet` 的下拉选项注入、修改字段记录和模板通知，适合需要“静默赋值”的场景
+>* 前端已阻止字段值变更 V8 同步执行期间再次 `FormSet` 当前字段所造成的直接重入；但异步回写和多字段互相赋值仍可能形成循环，字段自身事件中仍建议直接写 `V8.Form.字段名`
 ```js
 //给文本框赋值
 V8.FormSet('UserName', '张三');
-//给下拉框赋值（其中Id和Name就是下拉框组件中字段属性配置的存储字段与显示字段名称）
-V8.FormSet('UserName', { Id : 1, Name : '张三' });
+//给下拉框赋值（Id和Name分别对应存储字段、显示字段）
+V8.FormSet('SelectUser', { Id : 1, Name : '张三', DeptId : 'dept-1' });
+
+//静默赋值：界面会更新，但不会触发SelectUser的值变更V8
+V8.Form.SelectUser = { Id : 1, Name : '张三', DeptId : 'dept-1' };
 ```
 
 ## V8.Field

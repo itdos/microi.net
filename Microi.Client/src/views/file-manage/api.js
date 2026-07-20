@@ -44,6 +44,16 @@ const arrayBufferToDataUrl = (buffer, contentType = 'image/png') => {
 
 const getBucketScope = (limit = true) => limit ? 'private' : 'public'
 
+const getMinioConnection = (platform = {}) => ({
+  Endpoint: platform.endpoint || '',
+  AccessKey: platform.accessKey || '',
+  SecretKey: platform.secretKey || '',
+  Region: platform.region || '',
+  PrivateBucketName: platform.privateBucket || '',
+  PublicBucketName: platform.publicBucket || '',
+  RootPath: platform.rootPath || ''
+})
+
 const getUploadHeaders = () => ({
   authorization: 'Bearer ' + DiyCommon.Authorization()
 })
@@ -267,7 +277,29 @@ export const fileSyncApi = {
     return responseJson(resp, '远程文件系统请求失败')
   },
 
+  async postCurrentHdfs(url, param = {}) {
+    const { result } = await postByDiyCommon(url, param)
+    return result
+  },
+
+  probeMinio(platform, ensureBuckets = false) {
+    return this.postCurrentHdfs(`${API_BASE}/ProbeMinio`, {
+      Connection: getMinioConnection(platform),
+      EnsureBuckets: ensureBuckets
+    })
+  },
+
   listObjects(platform, path, limit = true, keyword = '', marker = '', recursive = false) {
+    if (platform?.platformType === 'minio') {
+      return this.postCurrentHdfs(`${API_BASE}/ListMinioObjects`, {
+        Connection: getMinioConnection(platform),
+        Path: path || '',
+        Limit: limit,
+        Keyword: keyword,
+        Recursive: recursive,
+        MaxKeys: 10000
+      })
+    }
     return this.postHdfs(platform, `${API_BASE}/ListObjects`, {
       Path: path || '',
       Limit: limit,
@@ -278,6 +310,13 @@ export const fileSyncApi = {
   },
 
   createFolder(platform, fullPath, limit = true) {
+    if (platform?.platformType === 'minio') {
+      return this.postCurrentHdfs(`${API_BASE}/CreateMinioFolder`, {
+        Connection: getMinioConnection(platform),
+        FilePathName: fullPath,
+        Limit: limit
+      })
+    }
     return this.postHdfs(platform, `${API_BASE}/CreateFolder`, {
       FilePathName: fullPath,
       Limit: limit
@@ -289,6 +328,24 @@ export const fileSyncApi = {
       FilePathName: sourcePath,
       Path: destPath,
       Limit: limit
+    })
+  },
+
+  syncMinioObject(param = {}) {
+    return this.postCurrentHdfs(`${API_BASE}/SyncMinioObject`, {
+      SourcePlatformType: param.sourcePlatform?.platformType || '',
+      TargetPlatformType: param.targetPlatform?.platformType || '',
+      SourceConnection: param.sourcePlatform?.platformType === 'minio'
+        ? getMinioConnection(param.sourcePlatform)
+        : null,
+      TargetConnection: param.targetPlatform?.platformType === 'minio'
+        ? getMinioConnection(param.targetPlatform)
+        : null,
+      SourcePath: param.sourcePath || '',
+      TargetPath: param.targetPath || '',
+      SourceLimit: param.sourceLimit !== false,
+      TargetLimit: param.targetLimit !== false,
+      SyncRule: param.syncRule || 'ignore'
     })
   },
 
@@ -482,6 +539,17 @@ export const fileManageApi = {
       _PageSize: 20,
       _OrderBy: 'CreateTime',
       _OrderByType: 'DESC',
+      ...param
+    })
+  },
+
+  getSyncItems(taskId, param = {}) {
+    return DiyCommon.FormEngine.GetTableData('mci_file_sync_item', {
+      _Where: [['TaskId', '=', taskId]],
+      _PageIndex: 1,
+      _PageSize: 10000,
+      _OrderBy: 'CreateTime',
+      _OrderByType: 'ASC',
       ...param
     })
   }

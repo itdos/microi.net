@@ -136,6 +136,12 @@ V8.Method.AddSysLog({
 	Level : 1,//日志等级
 });
 ```
+
+`GetPrivateFileUrl` 返回的是后端短期票据代理地址，而不是可泄露的对象存储真实签名地址。后端会分别记录链接签发和实际 `GET/HEAD` 打开/下载行为；登录用户记录为 `Name(Account)`，转发链接被无身份访问时记录为匿名访问。代理支持 `Range` 流式响应并对分片请求短时去重，失败时不会退回未经审计的真实签名地址。`Limit:false` 的公有文件仍可直接走 CDN/公有桶，不记录此类行为日志。
+
+系统日志调用会先进入后端有界内存队列，由单一后台消费者按批次写入 MongoDB；请求线程不等待 MongoDB。每批日志在写 MongoDB 前先写入本地 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。可通过环境变量 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录，容器部署时应把该目录挂载到持久卷；多节点实例还应设置稳定且唯一的 `MICROI_NODE_ID`。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
+
+平台内置用户行为日志还会记录 `Category`、`Action`、`Source`、`TargetType`、`TargetId`、`SessionId`、`DurationSeconds`、`Success`、`OccurredAt` 等结构化字段。用户显示统一采用 `Name(Account)`；密码、Token、Authorization、Secret、ApiKey、连接字符串等敏感内容会在进入队列时脱敏和限长。
 :::
 
 ## V8.Base64

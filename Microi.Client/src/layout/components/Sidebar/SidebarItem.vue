@@ -4,7 +4,7 @@
             <!-- :to="resolvePath(DiyCommon.IsNull(onlyOneChild.Link) ? onlyOneChild.path : onlyOneChild.Link)" -->
             <!-- :to="resolvePath(onlyOneChild.path)" -->
             <!-- @click="GotoLink(onlyOneChild.path)" -->
-            <span @click="MenuClick(item)">
+            <span>
                 <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
                     <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }">
                         <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" />
@@ -77,16 +77,6 @@ export default {
         return {};
     },
     methods: {
-        MenuClick(item) {
-            var self = this;
-            if (self.SysConfig.EnableUserClickLog) {
-                self.DiyCommon.AddSysLog({
-                    Type: `访问菜单`,
-                    Title: `用户[${self.GetCurrentUser.Name}]访问菜单[${item?.meta?.title}]`,
-                    Content: ""
-                });
-            }
-        },
         hasOneShowingChild(children = [], parent) {
             const showingChildren = children.filter((item) => {
                 // 检查 Display 属性 (1 显示, 0 隐藏) 和 hidden 属性

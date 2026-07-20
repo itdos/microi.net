@@ -167,7 +167,7 @@ V8.RefreshTable({ _PageIndex: 1 });
 |-----|------|
 | `V8.Tips(msg, ok?)` | 浮层提示。`ok=true` 绿色 |
 | `V8.ConfirmTips(msg, cb)` | 确认弹窗 |
-| `V8.FormSet(field, value)` | 设置表单字段值 |
+| `V8.FormSet(field, value)` | 设置表单字段值并触发目标字段的值变更 V8；下拉框可传对象 |
 | `V8.FieldSet(field, prop, value)` | 设置字段属性（Visible/Required/Disabled/Data） |
 | `V8.FormSubmit({CloseForm:true})` | 提交当前表单 |
 | `V8.RefreshTable({_PageIndex:1})` | 刷新表格（-1 保持当前页） |
@@ -222,8 +222,20 @@ V8.FormEngine.GetTableData('Product', { _PageSize: 10 }, function(r) {
 ## 死循环陷阱
 
 ❌ **禁止** 在 `SubmitFormV8.js` 里调用 `V8.FormSubmit()` —— 会无限递归
-❌ **禁止** 在 `FieldValueChange` 里 `V8.FormSet(同字段)` —— 会循环触发自身
+⚠️ **避免** 在 `FieldValueChange` 里 `V8.FormSet(同字段)` —— 前端会阻止同步直接重入，但异步回写或多字段互相赋值仍可能形成循环；需要静默赋值时使用 `V8.Form.字段名 = value`
 ❌ **禁止** 在 `InFormV8.js` 里写大量同步 `V8.FormEngine.Get*` —— 阻塞渲染
+
+### 下拉框对象赋值
+
+```javascript
+// 会更新下拉选项并触发 SelectUser 的值变更 V8。
+// 对象至少包含 SelectSaveField、SelectLabel 对应的属性；字段事件需要的其它属性也要传入。
+V8.FormSet('SelectUser', { Id: 'u1', Name: '张三', DeptId: 'd1' });
+
+// 响应式静默赋值：界面会更新，但不触发目标字段 V8，
+// 也不会执行 FormSet 的修改字段记录、模板通知等处理。
+V8.Form.SelectUser = { Id: 'u1', Name: '张三', DeptId: 'd1' };
+```
 
 ## 设计模式保护（CRITICAL）
 

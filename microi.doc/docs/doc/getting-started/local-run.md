@@ -75,10 +75,14 @@
 
 | 环境 | 影响功能 |
 | :-- | :-- |
-| 无 MongoDB | 无法使用系统日志 |
+| 无 MongoDB | 系统日志暂存到后端 spool，MongoDB 恢复后自动重放；持续不可用时无法在系统日志页查询 |
 | 无 MinIO / 阿里云 OSS | 无法使用文件/图片上传 |
 | 无 RabbitMQ | 无法使用消息队列 |
 | 无 Elasticsearch | 无法使用搜索引擎 |
+
+::: warning 系统日志 spool
+生产/容器环境请将后端 `logs/syslog-spool` 挂载到持久卷，或通过 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录。该目录用于 MongoDB 故障和服务正常重启时的日志重放，不应放在容器临时层。多节点部署还应为每个实例配置稳定且唯一的 `MICROI_NODE_ID`（StatefulSet 可用稳定 Pod 名），用于定位各节点 spool；所有节点连接同一 MongoDB 时按全局 `EventId` 幂等写入。
+:::
 
 ---
 

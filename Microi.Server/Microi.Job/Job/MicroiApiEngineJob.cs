@@ -12,6 +12,11 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
+    /// <summary>
+    /// Quartz集群会在共享JobStore中抢占触发器；本特性进一步保证同一JobKey在整个集群中不重叠执行。
+    /// 任务脚本仍必须使用业务幂等键，防止节点失联、锁超时或执行成功但确认失败后的重试副作用。
+    /// </summary>
+    [DisallowConcurrentExecution]
     public class MicroiApiEngineJob : IJob
     {
         public async Task Execute(IJobExecutionContext context)

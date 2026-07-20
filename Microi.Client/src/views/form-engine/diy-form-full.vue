@@ -1515,6 +1515,14 @@ export default {
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
                     var buttonRow = self.GetCurrentFormButtonRow(row);
+                    self.DiyCommon.UserBehaviorSignal({
+                        Action: "V8ButtonClick",
+                        Name: btn.Name,
+                        TargetId: btn.Id || btn.ApiEngineKey || "",
+                        Table: self.CurrentDiyTableModel?.Name || self.DiyTableModel?.Name || self.TableName || "",
+                        RowId: buttonRow?.Id || "",
+                        MenuId: self.SysMenuModel?.Id || ""
+                    });
                     V8.Form = self.DeleteFormProperty(buttonRow);
                     V8.FormSet = (fieldName, value) => {
                         return self.FormSet(fieldName, value, buttonRow);

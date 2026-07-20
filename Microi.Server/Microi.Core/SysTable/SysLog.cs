@@ -21,6 +21,19 @@ namespace Microi.net
 	public partial class SysLog
 	{
 		public string Id { get; set; }
+		public string EventId { get; set; }
+		public string SessionId { get; set; }
+		public string Category { get; set; }
+		public string Action { get; set; }
+		public string Source { get; set; }
+		public string ClientType { get; set; }
+		public string Did { get; set; }
+		public string TargetType { get; set; }
+		public string TargetId { get; set; }
+		public long? DurationSeconds { get; set; }
+		public bool? Success { get; set; }
+		public string TraceId { get; set; }
+		public DateTime? OccurredAt { get; set; }
 		public string AppId { get; set; }
 		public string Api { get; set; }
 		public string Param { get; set; }
