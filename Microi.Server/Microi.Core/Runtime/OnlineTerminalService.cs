@@ -76,6 +76,7 @@ namespace Microi.net
             clientInfo.ConnectionIds.Insert(0, connectionId);
             clientInfo.ConnectionIds = clientInfo.ConnectionIds.Take(20).ToList();
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
+            RemoveNullTerminals(clientInfo);
             var tokenHash = HashToken(token);
             var clientTypeValue = clientType.DosIsNullOrWhiteSpace("PC");
             var didValue = did.DosIsNullOrWhiteSpace(deviceClientId.DosIsNullOrWhiteSpace("Empty"));
@@ -132,6 +133,7 @@ namespace Microi.net
 
             clientInfo.ConnectionIds ??= new List<string>();
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
+            RemoveNullTerminals(clientInfo);
             clientInfo.ConnectionIds.Remove(connectionId);
             clientInfo.Terminals.RemoveAll(d => d.ConnectionId == connectionId);
             if (clientInfo.LastConnectionId == connectionId)
@@ -238,6 +240,7 @@ namespace Microi.net
             clientInfo.UserAvatar = avatar;
             clientInfo.Ip = requestIp.DosIsNullOrWhiteSpace(claimIp);
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
+            RemoveNullTerminals(clientInfo);
 
             var activeHashes = tokenEntries
                 .Select(d => HashToken(d.Token))
@@ -550,6 +553,7 @@ namespace Microi.net
             clientInfo.Level = currentUser["Level"]?.Val<int>() ?? clientInfo.Level;
             clientInfo.UserAvatar = currentUser["Avatar"]?.Val<string>() ?? clientInfo.UserAvatar;
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
+            RemoveNullTerminals(clientInfo);
 
             var activeHashes = activeTokens
                 .Select(d => HashToken(d.Token))
@@ -654,6 +658,7 @@ namespace Microi.net
 
             clientInfo.ConnectionIds ??= new List<string>();
             clientInfo.Terminals ??= new List<ClientTerminalInfo>();
+            RemoveNullTerminals(clientInfo);
             var targetTerminal = clientInfo.Terminals.FirstOrDefault(d => d.ConnectionId == connectionId);
             if (targetTerminal == null && !clientInfo.ConnectionIds.Contains(connectionId))
             {
@@ -849,6 +854,18 @@ namespace Microi.net
                 .Select(d => d.First())
                 .OrderByDescending(d => d.LastActiveTime == default ? d.ConnectedTime : d.LastActiveTime)
                 .Take(20)
+                .ToList();
+        }
+
+        private static void RemoveNullTerminals(ClientInfo clientInfo)
+        {
+            if (clientInfo == null)
+            {
+                return;
+            }
+
+            clientInfo.Terminals = (clientInfo.Terminals ?? new List<ClientTerminalInfo>())
+                .Where(d => d != null)
                 .ToList();
         }
 
