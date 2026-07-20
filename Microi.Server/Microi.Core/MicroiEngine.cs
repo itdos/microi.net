@@ -19,6 +19,10 @@ namespace Microi.net
                 throw new InvalidOperationException("Microi：【Error异常】ServiceLocator未初始化！");
             return _serviceProvider.GetRequiredService<T>();
         }
+        public static T TryGetService<T>() where T : class
+        {
+            return _serviceProvider?.GetService<T>();
+        }
         // public static IMicroiPlugins Plugins => GetService<IMicroiPlugins>();
         public static IApiEngine ApiEngine => GetService<IApiEngine>();
         internal static IBackgroundTaskApiEngineRunner BackgroundTaskApiEngine => GetService<IBackgroundTaskApiEngineRunner>();
@@ -36,6 +40,15 @@ namespace Microi.net
         public static IWFEngine WFEngine => GetService<IWFEngine>();
         public static IMicroiJob Job => GetService<IMicroiJob>();
         public static IMongoDB MongoDB => GetService<IMongoDB>();
+        public static ISysLogQueue SysLogQueue => TryGetService<ISysLogQueue>();
+        public static IPrivateFileAuditLinkService PrivateFileAuditLink => TryGetService<IPrivateFileAuditLinkService>();
+        /// <summary>
+        /// 将日志交给后台批量队列。极早期启动阶段未注入队列时返回false，由调用方决定降级策略。
+        /// </summary>
+        public static bool QueueSysLog(SysLogParam param)
+        {
+            return param != null && SysLogQueue?.Enqueue(param) == true;
+        }
         public static IMicroiLock Lock => GetService<IMicroiLock>();
 
         public static IMicroiORM ORM(DatabaseType dbType) => GetService<IDbFactory>().Create(dbType);

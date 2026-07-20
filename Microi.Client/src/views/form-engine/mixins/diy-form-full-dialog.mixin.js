@@ -467,8 +467,23 @@ export default {
                 });
             }
         },
+        TrackDetailClose(tableRowId) {
+            var self = this;
+            try {
+                var rowId = tableRowId || self.TableRowId || self.CurrentRowModel?.Id || "";
+                if (self.DiyCommon.IsNull(rowId)) return;
+                var table = self.CurrentDiyTableModel?.Name || self.DiyTableModel?.Name || self.TableName || "";
+                var key = table + "|" + rowId;
+                self._auditClosedRows = self._auditClosedRows || {};
+                if (self._auditClosedRows[key]) return;
+                self._auditClosedRows[key] = true;
+                setTimeout(function () { try { delete self._auditClosedRows[key]; } catch (e) {} }, 2000);
+                self.DiyCommon.UserBehaviorSignal({ Action: "DetailClose", Table: table, RowId: rowId }, true);
+            } catch (e) {}
+        },
         async CloseFieldFormHandler(dialogId, actionType, tableRowId, isPopstate) {
             var self = this;
+            self.TrackDetailClose(tableRowId);
             self._cancelFieldFormOpen();
             // 移动端关闭Drawer时：如果是通过代码关闭（非popstate触发），需要回退pushState推入的历史记录
                         // if (dialogId === 'ShowFieldFormDrawer' && self._drawerPopstateHandler) {

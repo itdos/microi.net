@@ -669,6 +669,19 @@ namespace Microi.net
 
                         }
                     }
+                    if (rotateFromToken.DosIsNullOrWhiteSpace())
+                    {
+                        UserBehaviorAudit.Track(new BaseParam
+                        {
+                            OsClient = osClient,
+                            _CurrentUser = currentUser,
+                            _ClientType = clientType,
+                            _InvokeType = InvokeType.Client.ToString()
+                        }, "Session", "Login", "用户登录", "Session", UserBehaviorAudit.HashIdentifier(access_token),
+                            $"登录系统，终端[{clientType}]", new { ClientType = clientType, Did = did, IP = ip }, true, null,
+                            "TokenLifecycle", UserBehaviorAudit.HashIdentifier(access_token), did,
+                            UserBehaviorAudit.DeterministicEventId($"session-login|{osClient}|{UserBehaviorAudit.HashIdentifier(access_token)}"));
+                    }
                     return new DosResult<CurrentToken>(1, tokenModel);
                 }
             }

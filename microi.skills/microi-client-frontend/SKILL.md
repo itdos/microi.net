@@ -333,7 +333,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - PC 登录传 `_ClientType:'PC'`；`diyStore.IsPhoneView` 的移动自适应登录传 `_ClientType:'Mobile'`。完整协议以 `microi-frontend-sdk/SKILL.md` 为准。
 - `TokenExpires` 表示“下次应检查续签的时间”，不能固定成所有终端 15 分钟；应从 JWT `exp` 和 `MicroiTokenIssuedAt` 按 10% 提前量计算，最少 5 分钟、最多 1 天。
 - `App.vue` 除一分钟维护定时器外，还必须监听 `visibilitychange`、`focus`、`pageshow`。标签页从浏览器休眠恢复时先走 single-flight RefreshToken，再发业务请求。
-- `Code=1001/1002` 时展示后端原始 `Msg`。提示必须保留已过期时长或 `TenantMismatch` 的 Token 租户/当前租户信息，不能统一覆盖成“登录身份已过期”。
+- `Code=1001/1002` 或明确的 `NoLogin / Token签名验证失败` 时展示后端原始 `Msg`。确认失败响应对应的仍是当前 Token 后，必须清理 Token，并携带当前 Hash 用 `location.replace` 完整进入登录页，重建旧页签的动态路由与组件状态，禁止停留在空白页。
 - 多 Tab 共享 Token 时，旧请求返回不得覆盖新 Token，也不得因旧 Token 的失效响应清除另一个 Tab 已写入的新 Token。
 
 ## Microi 前端 SDK 约束

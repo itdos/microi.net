@@ -306,7 +306,43 @@ namespace Microi.net.Api
                     OsClient = param.OsClient
                 });
             }
+            if (result.Code != 1)
+            {
+                QueueLoginFailed(param, result.Msg);
+            }
             return Json(result);
+        }
+
+        private void QueueLoginFailed(SysUserParam param, string reason)
+        {
+            if (param?.OsClient.DosIsNullOrWhiteSpace() != false) return;
+            var account = (param.Account ?? "").Trim();
+            if (account.Length > 128) account = account.Substring(0, 128);
+            var actor = account.DosIsNullOrWhiteSpace() ? "匿名" : $"匿名({account})";
+            MicroiEngine.QueueSysLog(new SysLogParam
+            {
+                OsClient = param.OsClient,
+                UserName = actor,
+                Category = "Security",
+                Action = "LoginFailed",
+                Source = "ServerEndpoint",
+                ClientType = param._ClientType,
+                TargetType = "Session",
+                TargetId = UserBehaviorAudit.HashIdentifier(account),
+                Type = "登录失败",
+                Title = $"用户[{actor}]登录失败",
+                Content = Newtonsoft.Json.JsonConvert.SerializeObject(new
+                {
+                    Account = account,
+                    IP = param.LastLoginIP,
+                    ClientType = param._ClientType,
+                    Reason = reason
+                }),
+                IP = param.LastLoginIP,
+                Success = false,
+                OccurredAt = DateTime.Now,
+                Level = 2
+            });
         }
 
         /// <summary>
@@ -527,6 +563,7 @@ namespace Microi.net.Api
                 });
                 if (getTokenResult.Code != 1)
                 {
+                    QueueLoginFailed(param, getTokenResult.Msg ?? "登录令牌生成失败");
                     return Json(getTokenResult);
                 }
 
@@ -973,8 +1010,12 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> Logout(SysUserParam param)
         {
-            //吊销token：将redis LoginTokenSysUser中相关的数据删除，注意多设备登录
-            return Json(new DosResult(1));
+            var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            var requestToken = Request.Headers["Authorization"].ToString();
+            if (requestToken.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                requestToken = Request.Form["authorization"].ToString();
+            var result = await OnlineTerminalService.LogoutCurrentTokenAsync(currentToken, requestToken).ConfigureAwait(false);
+            return Json(result);
         }
 
         /// <summary>

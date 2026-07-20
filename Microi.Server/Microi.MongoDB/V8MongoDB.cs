@@ -287,57 +287,88 @@ namespace Microi.net
         }
         public async Task<DosResult> AddSysLog(SysLogParam param)
         {
+            if (param == null) return new DosResult(0, null, "日志参数不能为空。");
+
+            // 所有历史调用统一收口到后台队列，避免调用方忘记await而造成不可控并发和日志丢失。
+            var queue = MicroiEngine.SysLogQueue;
+            if (queue != null)
+            {
+                return queue.Enqueue(param)
+                    ? new DosResult(1, param.EventId, "日志已进入异步持久化队列。")
+                    : new DosResult(0, null, "日志队列拒绝了该事件。");
+            }
+
+            // 单元测试、迁移工具等未启动Web宿主的场景仍保持可用。
+            return await AddSysLogs(new[] { param }).ConfigureAwait(false);
+        }
+
+        public async Task<DosResult> AddSysLogs(IReadOnlyCollection<SysLogParam> parameters)
+        {
             try
             {
-                if (param.OsClient.DosIsNullOrWhiteSpace())
+                var items = parameters?.Where(d => d != null).ToList() ?? new List<SysLogParam>();
+                if (items.Count == 0) return new DosResult(1, 0);
+
+                foreach (var param in items)
                 {
-                    param.OsClient = DiyToken.GetCurrentOsClient();
+                    if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = DiyToken.GetCurrentOsClient();
+                    if (param.OsClient.DosIsNullOrWhiteSpace())
+                        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                    if (param.OccurredAt == null) param.OccurredAt = DateTime.Now;
+                    if (param.EventId.DosIsNullOrWhiteSpace()) param.EventId = Ulid.NewUlid().ToString();
                 }
 
-                if (param.OsClient.DosIsNullOrWhiteSpace())
+                var persisted = 0;
+                var groups = items.GroupBy(d => new
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                    OsClient = d.OsClient.ToLowerInvariant(),
+                    Month = d.OccurredAt.GetValueOrDefault().ToString("yyyyMM")
+                });
+
+                foreach (var group in groups)
+                {
+                    var client = Microi.net.OsClient.GetClient(group.Key.OsClient);
+                    var host = new MongodbHost
+                    {
+                        Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
+                        DataBase = "sys_log_" + group.Key.OsClient,
+                        Table = "log_" + group.Key.Month
+                    };
+                    var circuitKey = host.Connection + "|" + host.DataBase;
+                    if (_sysLogCircuitOpenUntil.TryGetValue(circuitKey, out var openUntil) && openUntil > DateTime.UtcNow)
+                        return new DosResult(0, null, "MongoDB sys log is temporarily unavailable.");
+
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var writes = new List<WriteModel<SysLog>>();
+                    foreach (var param in group)
+                    {
+                        var model = MapperHelper.Map<SysLogParam, SysLog>(param);
+                        model.Id = param.EventId;
+                        model.EventId = param.EventId;
+                        model.CreateTime = param.OccurredAt.GetValueOrDefault();
+                        writes.Add(new ReplaceOneModel<SysLog>(
+                            Builders<SysLog>.Filter.Eq(d => d.Id, model.Id), model)
+                        { IsUpsert = true });
+                    }
+
+                    try
+                    {
+                        await collection.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false }).ConfigureAwait(false);
+                        await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+                        _sysLogCircuitOpenUntil.TryRemove(circuitKey, out _);
+                        persisted += writes.Count;
+                    }
+                    catch
+                    {
+                        _sysLogCircuitOpenUntil[circuitKey] = DateTime.UtcNow.Add(SysLogCircuitBreakDuration);
+                        throw;
+                    }
                 }
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                #region  通用新增
-                var model = MapperHelper.Map<SysLogParam, SysLog>(param);
-                model.Id = Ulid.NewUlid().ToString();
-                #endregion end
 
-                DateTime localTime = DateTime.Now;
-                DateTime utcTime = localTime.ToUniversalTime();
-                model.CreateTime = localTime;// DateTime.Now;
-                //var count = dbSession.Insert(model);
-
-                var host = new MongodbHost()
-                {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),//链接字符串
-                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
-                    Table = "log_" + DateTime.Now.ToString("yyyyMM")//表名
-                };
-
-                var circuitKey = host.Connection + "|" + host.DataBase;
-                if (_sysLogCircuitOpenUntil.TryGetValue(circuitKey, out var openUntil) && openUntil > DateTime.UtcNow)
-                {
-                    return new DosResult(0, null, "MongoDB sys log is temporarily unavailable.");
-                }
-
-                var result = await TMongodbHelper<SysLog>.InsertAsync(host, model);
-                if (result.Code != 1)
-                {
-                    _sysLogCircuitOpenUntil[circuitKey] = DateTime.UtcNow.Add(SysLogCircuitBreakDuration);
-                }
-                else
-                {
-                    _sysLogCircuitOpenUntil.TryRemove(circuitKey, out _);
-                }
-
-                return result;
+                return new DosResult(1, persisted);
             }
             catch (Exception ex)
             {
-
-                //LogHelper.Error(ex.Message, "AddSysLog_");
                 return new DosResult(0, null, ex.Message);
             }
         }
@@ -694,6 +725,14 @@ namespace Microi.net
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Ascending(d => d.Level).Descending(d => d.CreateTime),
                         new CreateIndexOptions { Name = "idx_Level_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_Category_Action_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.Category).Ascending(d => d.Action).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_Category_Action_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_UserId_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.UserId).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_UserId_CreateTime" }));
 
                 if (toCreate.Count > 0)
                     await collection.Indexes.CreateManyAsync(toCreate);

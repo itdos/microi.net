@@ -37,6 +37,25 @@ namespace Microi.net
 
     public partial class SysLogParam : BaseParam
     {
+        /// <summary>全局唯一事件Id，用于异步重放时幂等去重。</summary>
+        public string EventId { get; set; }
+        /// <summary>登录会话Id（通常为服务端Token摘要或终端会话Id，不保存原始Token）。</summary>
+        public string SessionId { get; set; }
+        /// <summary>行为大类，例如 Navigation/Data/Session/File/Security。</summary>
+        public string Category { get; set; }
+        /// <summary>结构化行为，例如 MenuVisit/DataUpdate/PrivateFileOpen。</summary>
+        public string Action { get; set; }
+        /// <summary>可信事件来源，例如 Server/ClientSignal/TokenLifecycle。</summary>
+        public string Source { get; set; }
+        public string ClientType { get; set; }
+        public string Did { get; set; }
+        public string TargetType { get; set; }
+        public string TargetId { get; set; }
+        public long? DurationSeconds { get; set; }
+        public bool? Success { get; set; }
+        public string TraceId { get; set; }
+        /// <summary>行为实际发生时间。异步重试时不得改成重试时间。</summary>
+        public DateTime? OccurredAt { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string AppId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]

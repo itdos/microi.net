@@ -1036,6 +1036,7 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "不存在的Field！");
             }
+            var oldFieldVersionSnapshot = JObject.FromObject(fieldModel);
             param.Name = DiyCommon.FilterTableFieldName(param.Name.DosTrim());
             // if (CantAddField.Contains(param.Name))
             // {
@@ -1165,6 +1166,17 @@ namespace Microi.net
                                 {
                                     ["TableId"] = fieldModel.TableId,
                                 });
+                        var codeVersionResult = await V8CodeVersionService.SaveChangedVersionsAsync(
+                            param.OsClient,
+                            "diy_field",
+                            oldFieldVersionSnapshot,
+                            JObject.FromObject(fieldModel),
+                            param._CurrentUser,
+                            "Update");
+                        if (codeVersionResult.Code != 1)
+                        {
+                            Console.WriteLine($"Microi: 保存字段V8代码版本失败。FieldId={fieldModel.Id}, Msg={codeVersionResult.Msg}");
+                        }
                         QueueDiyFieldLangSync(param.OsClient, diyTableModel.Name, fieldModel.Name, fieldModel.Label);
                         return new DosResult(1, fieldModel, "");
                     }
@@ -1375,6 +1387,17 @@ namespace Microi.net
                         foreach (var newField in newFieldList)
                         {
                             QueueDiyFieldLangSync(param.OsClient, diyTableModel.Name, newField["Name"].Val<string>(), newField["Label"].Val<string>());
+                        }
+                        var codeVersionResult = await V8CodeVersionService.SaveChangedVersionsBatchAsync(
+                            param.OsClient,
+                            "diy_field",
+                            oldFieldList.Cast<object>().Select(row => JObject.FromObject(row)),
+                            newFieldList,
+                            param._CurrentUser,
+                            "Update");
+                        if (codeVersionResult.Code != 1)
+                        {
+                            Console.WriteLine($"Microi: 批量保存字段V8代码版本失败。TableId={diyTableModel.Id}, Msg={codeVersionResult.Msg}");
                         }
                         return new DosResult(1);
                     }

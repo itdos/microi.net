@@ -24,16 +24,16 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 | 按钮显隐 | `<按钮Name>_显隐判断（<按钮Id>）` | `指派_显隐判断（01K3X...）.js` |
 | 按钮分类目录 | `<按钮类型中文>（<EnglishField>）` | `[行]更多按钮（MoreBtns）/` |
 
-### 0.1 6 类表单 V8 事件中文名
+### 0.1 7 类表单 V8 事件中文名（以 `diy_table` 对应 `diy_field.Label` 为准）
 
 | EventType | 中文名 |
 |-----------|--------|
 | InFormV8 | 前端表单进入V8事件 |
-| SubmitFormV8 | 前端表单提交V8事件 |
-| SubmitBeforeServerV8 | 后端提交前V8事件 |
-| SubmitAfterServerV8 | 后端提交后V8事件 |
-| ServerDataV8 | 后端数据V8事件 |
-| OutFormV8 | 前端表单退出V8事件 |
+| SubmitFormV8 | 前端表单提交前V8事件 |
+| SubmitBeforeServerV8 | 后端表单提交前V8事件 |
+| SubmitAfterServerV8 | 后端表单提交后V8事件 |
+| ServerDataV8 | 后端数据处理V8事件 |
+| OutFormV8 | 前端表单提交后V8事件 |
 | DataFilterV8 | 后端数据过滤V8事件 |
 
 > 统一用“后端”，不要再生成“服务端”或“服务器端”可见目录/文件名。
@@ -82,11 +82,11 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 │   └── <表Label>（<表Name>）/
 │       ├── 表单V8事件/
 │       │   ├── 前端表单进入V8事件（InFormV8）.js              // 仅远端非空代码生成文件
-│       │   ├── 前端表单提交V8事件（SubmitFormV8）.js
-│       │   ├── 后端提交前V8事件（SubmitBeforeServerV8）.js
-│       │   ├── 后端提交后V8事件（SubmitAfterServerV8）.js
-│       │   ├── 后端数据V8事件（ServerDataV8）.js
-│       │   ├── 前端表单退出V8事件（OutFormV8）.js
+│       │   ├── 前端表单提交前V8事件（SubmitFormV8）.js
+│       │   ├── 后端表单提交前V8事件（SubmitBeforeServerV8）.js
+│       │   ├── 后端表单提交后V8事件（SubmitAfterServerV8）.js
+│       │   ├── 后端数据处理V8事件（ServerDataV8）.js
+│       │   ├── 前端表单提交后V8事件（OutFormV8）.js
 │       │   └── 后端数据过滤V8事件（DataFilterV8）.js
 │       └── 字段V8事件/
 │           └── <字段Label>（<字段Name>）/

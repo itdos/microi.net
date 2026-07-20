@@ -1397,6 +1397,11 @@ export default {
                 self.SetV8DefaultValue(V8, field);
 
                 var result = null;
+                var runningFieldName = field && field.Name;
+                if (runningFieldName) {
+                    self._runningFieldV8Counts = self._runningFieldV8Counts || Object.create(null);
+                    self._runningFieldV8Counts[runningFieldName] = (self._runningFieldV8Counts[runningFieldName] || 0) + 1;
+                }
                 try {
                     //eval(field.Config.V8Code)
                     var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
@@ -1415,8 +1420,12 @@ export default {
                     self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                     callback && callback(null);
                 } finally {
-
-
+                    if (runningFieldName && self._runningFieldV8Counts) {
+                        self._runningFieldV8Counts[runningFieldName]--;
+                        if (self._runningFieldV8Counts[runningFieldName] <= 0) {
+                            delete self._runningFieldV8Counts[runningFieldName];
+                        }
+                    }
                 }
                 return result;
             }
@@ -1530,6 +1539,11 @@ export default {
         },
         FormSet(fieldName, value, field) {
             var self = this;
+            if (!field) {
+                field = _.find(self.DiyFieldList, function (item2) {
+                    return item2.Name == fieldName;
+                });
+            }
             formTrace("diy-form:form-set", {
                 table: self.DiyTableModel && self.DiyTableModel.Name,
                 field: fieldName,
@@ -1540,15 +1554,15 @@ export default {
             try {
                 // self.$refs['ref_' + fieldName].trigger('change');
                 // self.$refs['ref_' + fieldName].dispatchEvent(new MouseEvent('change'));
-                if (!field) {
-                    field = _.find(self.DiyFieldList, function (item2) {
-                        return item2.Name == fieldName;
-                    });
-                }
                 if (field) {
-                    if (self.$refs["ref_" + fieldName]) {
+                    var fieldRef = self.$refs["ref_" + fieldName];
+                    if (Array.isArray(fieldRef)) {
+                        fieldRef = fieldRef[0];
+                    }
+                    var isCurrentFieldV8Running = !!(self._runningFieldV8Counts && self._runningFieldV8Counts[fieldName] > 0);
+                    if (fieldRef && typeof fieldRef.CommonV8CodeChange == "function" && !isCurrentFieldV8Running) {
                         try {
-                            self.$refs["ref_" + fieldName][0].CommonV8CodeChange(value, field);
+                            fieldRef.CommonV8CodeChange(value, field);
                         } catch (error) {}
                     }
                     //2022-08-18：如果是给下拉单选框赋值了，并且下拉Data中不包含这条数据，那么这里就push一下

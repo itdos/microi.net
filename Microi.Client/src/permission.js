@@ -16,7 +16,13 @@ function isAuthenticationFailure(error) {
     if (error.isAuthFailure === true) return true;
     if ([1001, 1002].includes(Number(error.code))) return true;
     var message = String(error.message || error.Msg || "").trim().toLowerCase();
-    return message === "nologin" || message.includes("未登录") || message.includes("token失效") || message.includes("身份验证失败");
+    return message === "nologin"
+        || message.includes("nologin")
+        || message.includes("未登录")
+        || message.includes("token失效")
+        || message.includes("token签名")
+        || message.includes("身份验证失败")
+        || message.includes("请重新登录");
 }
 
 function normalizeIframeRouteUrl(url) {

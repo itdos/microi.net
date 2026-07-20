@@ -1,6 +1,7 @@
 export default {
 beforeUnmount() {
         var self = this;
+        try { self.TrackDetailClose && self.TrackDetailClose(); } catch (e) {}
         self._isDestroyed = true;
         try { self._cancelFieldFormOpen && self._cancelFieldFormOpen(); } catch (e) {}
         try { self.ShowFieldForm = false; self.ShowFieldFormDrawer = false; } catch (e) {}

@@ -1038,13 +1038,13 @@ namespace Microi.net
         /// </summary>
         private static string GetEventDisplayName(string field) => field switch
         {
-            "SubmitBeforeServerV8" => "后端表单提交前",
-            "SubmitAfterServerV8" => "后端表单提交后",
-            "SubmitFormV8" => "前端表单提交",
-            "ServerDataV8" => "后端数据",
-            "InFormV8" => "进入表单",
-            "OutFormV8" => "离开表单",
-            "DataFilterV8" => "数据过滤/脱敏",
+            "SubmitBeforeServerV8" => "后端表单提交前V8事件",
+            "SubmitAfterServerV8" => "后端表单提交后V8事件",
+            "SubmitFormV8" => "前端表单提交前V8事件",
+            "ServerDataV8" => "后端数据处理V8事件",
+            "InFormV8" => "前端表单进入V8事件",
+            "OutFormV8" => "前端表单提交后V8事件",
+            "DataFilterV8" => "后端数据过滤V8事件",
             _ => field
         };
 

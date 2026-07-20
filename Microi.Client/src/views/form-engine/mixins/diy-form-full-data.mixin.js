@@ -152,7 +152,8 @@ export default {
         },
         CallbackRefreshTable(param) {
             var self = this;
-            // self.GetDiyTableRow(param);
+            // DiyForm 内的 V8.RefreshTable 需要继续转发给持有实际列表的父组件。
+            self.$emit("CallbackGetDiyTableRow", param || {});
         },
         CallbackParentFormSubmit(param) {
             var self = this;

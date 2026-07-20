@@ -538,13 +538,14 @@ IsPermission(type) {
                 var hasBuiltInAppStoreInstall = self.IsMicroiStoreInstallButton(btn, row);
                 var hasBuiltInOfflineInstall = self.IsMicroiStoreOfflineInstallButton(btn);
                 if (!self.DiyCommon.IsNull(btn.V8Code) || hasBackgroundApiEngine || hasBuiltInAppStoreInstall || hasBuiltInOfflineInstall) {
-                    if (self.SysConfig.EnableUserClickLog) {
-                        self.DiyCommon.AddSysLog({
-                            Type: `点击V8按钮`,
-                            Title: `用户[${self.GetCurrentUser.Name}]点击了[${self.SysMenuModel.Name}]的V8按钮[${btn.Name}]`,
-                            Content: ""
-                        });
-                    }
+                    self.DiyCommon.UserBehaviorSignal({
+                        Action: "V8ButtonClick",
+                        Name: btn.Name,
+                        TargetId: btn.Id || btn.ApiEngineKey || "",
+                        Table: self.DiyTableModel?.Name || self.TableName || "",
+                        RowId: row?.Id || "",
+                        MenuId: self.SysMenuModel?.Id || ""
+                    });
                     // V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
                     V8.Form = row; // 当前Form表单所有字段值
                     V8.FormSet = (fieldName, value) => {

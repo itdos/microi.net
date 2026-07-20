@@ -23,7 +23,7 @@
                 <el-button
                   :icon="Refresh"
                   :loading="loadingSource"
-                  :disabled="form.source.platformType === 'remote' && !form.source.isLoggedIn"
+                  :disabled="!platformReady(form.source)"
                   @click="loadSourceTree"
                 >
                   加载源树
@@ -32,6 +32,7 @@
               <el-radio-group v-model="form.source.platformType" class="platform-toggle">
                 <el-radio-button value="current">当前平台</el-radio-button>
                 <el-radio-button value="remote">远程平台</el-radio-button>
+                <el-radio-button value="minio">MinIO</el-radio-button>
               </el-radio-group>
               <div v-if="form.source.platformType === 'remote'" class="remote-session">
                 <div class="connection-toolbar">
@@ -109,7 +110,38 @@
                   show-icon
                 />
               </div>
-              <el-radio-group v-model="form.source.limit" class="bucket-switch">
+              <div v-if="form.source.platformType === 'minio'" class="minio-session">
+                <div class="credential-grid">
+                  <el-input v-model="form.source.endpoint" placeholder="Endpoint，例如 http://127.0.0.1:9000" />
+                  <el-input v-model="form.source.accessKey" placeholder="帐号 / AccessKey" />
+                  <el-input
+                    v-model="form.source.secretKey"
+                    name="source-minio-secret-key"
+                    autocomplete="new-password"
+                    placeholder="密码 / SecretKey"
+                    type="password"
+                    show-password
+                  />
+                  <el-input v-model="form.source.region" placeholder="Region（可选）" />
+                  <el-select v-model="form.source.privateBucket" placeholder="私有桶" filterable allow-create default-first-option>
+                    <el-option v-for="bucket in form.source.buckets" :key="bucket" :label="bucket" :value="bucket" />
+                  </el-select>
+                  <el-select v-model="form.source.publicBucket" placeholder="公有桶" filterable allow-create default-first-option>
+                    <el-option v-for="bucket in form.source.buckets" :key="bucket" :label="bucket" :value="bucket" />
+                  </el-select>
+                  <el-input v-model="form.source.rootPath" placeholder="根路径，例如 qiqiang/" />
+                </div>
+                <div class="minio-actions">
+                  <span>凭据仅用于本次会话，不写入同步记录</span>
+                  <el-button :icon="Link" :loading="form.source.testingMinio" @click="testMinio(form.source, false)">测试连接</el-button>
+                </div>
+                <el-alert v-if="form.source.minioConnected" title="MinIO 已连接" type="success" :closable="false" show-icon />
+              </div>
+              <el-radio-group
+                v-model="form.source.limit"
+                class="bucket-switch"
+                @change="handleSourceBucketChange"
+              >
                 <el-radio-button :value="true">私有桶</el-radio-button>
                 <el-radio-button :value="false">公有桶</el-radio-button>
               </el-radio-group>
@@ -128,7 +160,7 @@
                 <el-button
                   :icon="Refresh"
                   :loading="loadingTarget"
-                  :disabled="form.target.platformType === 'remote' && !form.target.isLoggedIn"
+                  :disabled="!platformReady(form.target)"
                   @click="loadTargetTree"
                 >
                   加载目标树
@@ -137,6 +169,7 @@
               <el-radio-group v-model="form.target.platformType" class="platform-toggle">
                 <el-radio-button value="current">当前平台</el-radio-button>
                 <el-radio-button value="remote">远程平台</el-radio-button>
+                <el-radio-button value="minio">MinIO</el-radio-button>
               </el-radio-group>
               <div v-if="form.target.platformType === 'remote'" class="remote-session">
                 <div class="connection-toolbar">
@@ -214,6 +247,36 @@
                   show-icon
                 />
               </div>
+              <div v-if="form.target.platformType === 'minio'" class="minio-session">
+                <div class="credential-grid">
+                  <el-input v-model="form.target.endpoint" placeholder="Endpoint，例如 http://127.0.0.1:9000" />
+                  <el-input v-model="form.target.accessKey" placeholder="帐号 / AccessKey" />
+                  <el-input
+                    v-model="form.target.secretKey"
+                    name="target-minio-secret-key"
+                    autocomplete="new-password"
+                    placeholder="密码 / SecretKey"
+                    type="password"
+                    show-password
+                  />
+                  <el-input v-model="form.target.region" placeholder="Region（可选）" />
+                  <el-select v-model="form.target.privateBucket" placeholder="私有桶" filterable allow-create default-first-option>
+                    <el-option v-for="bucket in form.target.buckets" :key="bucket" :label="bucket" :value="bucket" />
+                  </el-select>
+                  <el-select v-model="form.target.publicBucket" placeholder="公有桶" filterable allow-create default-first-option>
+                    <el-option v-for="bucket in form.target.buckets" :key="bucket" :label="bucket" :value="bucket" />
+                  </el-select>
+                  <el-input v-model="form.target.rootPath" placeholder="根路径，例如 qiqiang/" />
+                </div>
+                <div class="minio-actions">
+                  <span>目标桶不存在时，可按所填名称创建</span>
+                  <div>
+                    <el-button :icon="Link" :loading="form.target.testingMinio" @click="testMinio(form.target, false)">测试连接</el-button>
+                    <el-button type="primary" plain :loading="form.target.testingMinio" @click="testMinio(form.target, true)">创建缺失桶</el-button>
+                  </div>
+                </div>
+                <el-alert v-if="form.target.minioConnected" title="MinIO 已连接" type="success" :closable="false" show-icon />
+              </div>
               <el-radio-group
                 v-model="form.target.limit"
                 class="bucket-switch"
@@ -251,6 +314,10 @@
                 <div>
                   <strong>源文件树</strong>
                   <span>已选 {{ checkedSourceRows.length }} 项</span>
+                </div>
+                <div class="tree-actions">
+                  <el-button text @click="clearSourceSelection">清空</el-button>
+                  <el-button type="primary" plain @click="selectAllSource">全选</el-button>
                 </div>
               </div>
               <el-scrollbar v-loading="loadingSource" class="tree-body">
@@ -354,7 +421,34 @@
               刷新记录
             </el-button>
           </div>
-          <el-table v-loading="logsLoading" class="log-table" :data="syncLogs" height="520">
+          <el-table
+            v-loading="logsLoading"
+            class="log-table"
+            :data="syncLogs"
+            height="520"
+            row-key="Id"
+            @expand-change="handleLogExpand"
+          >
+            <el-table-column type="expand" width="46">
+              <template #default="{ row }">
+                <div class="log-detail">
+                  <el-table v-loading="syncLogItemsLoading[row.Id]" :data="syncLogItems[row.Id] || []" size="small">
+                    <el-table-column prop="Name" label="名称" min-width="170" show-overflow-tooltip />
+                    <el-table-column prop="SourcePath" label="源路径" min-width="240" show-overflow-tooltip />
+                    <el-table-column prop="TargetPath" label="目标路径" min-width="240" show-overflow-tooltip />
+                    <el-table-column label="大小" width="100">
+                      <template #default="scope">{{ formatFileSize(scope.row.Size) }}</template>
+                    </el-table-column>
+                    <el-table-column label="结果" width="90">
+                      <template #default="scope">
+                        <el-tag :type="statusTagType(scope.row.Status)">{{ resultLabel(scope.row.Status) }}</el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="Message" label="说明" min-width="180" show-overflow-tooltip />
+                  </el-table>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="TaskNo" label="任务号" width="180" show-overflow-tooltip />
             <el-table-column label="状态" width="110">
               <template #default="{ row }">
@@ -404,6 +498,7 @@ import {
   Document,
   FolderOpened,
   Key,
+  Link,
   Loading,
   Refresh,
   Switch,
@@ -431,6 +526,10 @@ const emit = defineEmits(['update:modelValue', 'finished'])
 
 const currentPlatform = fileSyncApi.getCurrentPlatform()
 const MAX_TREE_NODES = 10000
+const defaultMinioRoot = String(currentPlatform.osClient || '')
+  .toLowerCase()
+  .replace(/\\/g, '/')
+  .replace(/^\/+|\/+$/g, '') + '/'
 
 const activeTab = ref('sync')
 const sourceTreeRef = ref(null)
@@ -446,6 +545,8 @@ const logsLoading = ref(false)
 const syncing = ref(false)
 const results = ref([])
 const syncLogs = ref([])
+const syncLogItems = reactive({})
+const syncLogItemsLoading = reactive({})
 const savedConnections = ref([])
 const savedConnectionsLoading = ref(false)
 
@@ -476,6 +577,16 @@ const form = reactive({
     captchaValue: '',
     captchaImage: '',
     loadingCaptcha: false,
+    endpoint: '',
+    accessKey: '',
+    secretKey: '',
+    region: '',
+    privateBucket: '',
+    publicBucket: '',
+    rootPath: defaultMinioRoot,
+    buckets: [],
+    minioConnected: false,
+    testingMinio: false,
     limit: true
   },
   target: {
@@ -499,6 +610,16 @@ const form = reactive({
     captchaValue: '',
     captchaImage: '',
     loadingCaptcha: false,
+    endpoint: '',
+    accessKey: '',
+    secretKey: '',
+    region: '',
+    privateBucket: '',
+    publicBucket: '',
+    rootPath: defaultMinioRoot,
+    buckets: [],
+    minioConnected: false,
+    testingMinio: false,
     limit: true,
   },
   rule: 'ignore'
@@ -516,12 +637,12 @@ const task = reactive({
 })
 
 let targetListCache = new Map()
+let recordedResultCount = 0
 const loginConfigRequests = new WeakMap()
 
 const targetRootPath = computed(() => {
-  const osClient = form.target.platformType === 'current'
-    ? currentPlatform.osClient
-    : form.target.osClient
+  if (form.target.platformType === 'minio') return normalizeFolder(form.target.rootPath)
+  const osClient = form.target.platformType === 'current' ? currentPlatform.osClient : form.target.osClient
   return normalizeFolder(String(osClient || '').toLowerCase())
 })
 const hasTargetSelection = computed(() => targetTree.value.length > 0 && !!selectedTargetNodeKey.value)
@@ -540,6 +661,7 @@ watch(
     sourceTree.value = []
     targetTree.value = []
     results.value = []
+    recordedResultCount = 0
     resetTask()
     loadSyncLogs()
     loadRemoteConnections()
@@ -558,6 +680,11 @@ const resetRemoteLoginState = (platformConfig) => {
   platformConfig.captchaId = ''
   platformConfig.captchaValue = ''
   platformConfig.captchaImage = ''
+}
+
+const resetMinioState = (platformConfig) => {
+  platformConfig.minioConnected = false
+  platformConfig.buckets = []
 }
 
 watch(
@@ -595,6 +722,46 @@ watch(
   () => {
     if (form.target.suspendEndpointReset || form.target.isLoggedIn) return
     form.target.authorization = ''
+  }
+)
+
+watch(
+  () => [
+    form.source.platformType,
+    form.source.endpoint,
+    form.source.accessKey,
+    form.source.secretKey,
+    form.source.region,
+    form.source.privateBucket,
+    form.source.publicBucket,
+    form.source.rootPath
+  ],
+  () => {
+    if (form.source.suspendEndpointReset) return
+    resetMinioState(form.source)
+    sourceTree.value = []
+    checkedSourceRows.value = []
+  }
+)
+
+watch(
+  () => [
+    form.target.platformType,
+    form.target.endpoint,
+    form.target.accessKey,
+    form.target.secretKey,
+    form.target.region,
+    form.target.privateBucket,
+    form.target.publicBucket,
+    form.target.rootPath
+  ],
+  () => {
+    if (form.target.suspendEndpointReset) return
+    resetMinioState(form.target)
+    targetTree.value = []
+    selectedTargetPath.value = ''
+    selectedTargetNodeKey.value = ''
+    targetListCache = new Map()
   }
 )
 
@@ -660,6 +827,11 @@ const platformSummary = (platformConfig) => {
   if (platformConfig.platformType === 'current') {
     return currentPlatform.osClient || '当前租户'
   }
+  if (platformConfig.platformType === 'minio') {
+    return platformConfig.minioConnected
+      ? `${platformConfig.endpoint} · 已连接`
+      : (platformConfig.endpoint || 'MinIO直连')
+  }
   if (platformConfig.isLoggedIn) {
     return `${platformConfig.osClient || '远程平台'} · ${remoteUserLabel(platformConfig)}`
   }
@@ -667,6 +839,11 @@ const platformSummary = (platformConfig) => {
 }
 
 const bucketLabel = (limit) => limit ? '私有桶' : '公有桶'
+const platformReady = (platformConfig) => {
+  if (platformConfig.platformType === 'remote') return platformConfig.isLoggedIn
+  if (platformConfig.platformType === 'minio') return platformConfig.minioConnected
+  return true
+}
 const REQUIRED_FILE_CABINET_PROTOCOL = 2
 
 const remoteUserLabel = (platformConfig) => {
@@ -987,12 +1164,78 @@ const handleRemoteEndpointBlur = async (platformConfig) => {
   }
 }
 
+const validateMinioConfig = (platformConfig) => {
+  if (!platformConfig.endpoint || !platformConfig.accessKey || !platformConfig.secretKey) {
+    throw new Error('请完整填写 MinIO Endpoint、帐号和密码')
+  }
+  if (!platformConfig.privateBucket || !platformConfig.publicBucket) {
+    throw new Error('请选择或填写 MinIO 私有桶和公有桶')
+  }
+  if (!normalizeFolder(platformConfig.rootPath)) {
+    throw new Error('请填写 MinIO 根路径，例如 qiqiang/')
+  }
+}
+
+const testMinio = async (platformConfig, ensureBuckets = false, silent = false) => {
+  if (platformConfig.testingMinio) return false
+  platformConfig.testingMinio = true
+  try {
+    if (!platformConfig.endpoint || !platformConfig.accessKey || !platformConfig.secretKey) {
+      throw new Error('请完整填写 MinIO Endpoint、帐号和密码')
+    }
+    if (ensureBuckets && (!platformConfig.privateBucket || !platformConfig.publicBucket)) {
+      throw new Error('创建目标桶前，请填写私有桶和公有桶名称')
+    }
+    const result = await fileSyncApi.probeMinio(platformConfig, ensureBuckets)
+    if (result?.Code !== 1) throw new Error(result?.Msg || 'MinIO连接失败')
+    const data = result.Data || {}
+    platformConfig.suspendEndpointReset = true
+    platformConfig.buckets = data.Buckets || []
+    if (!platformConfig.privateBucket && data.PrivateBucketName) platformConfig.privateBucket = data.PrivateBucketName
+    if (!platformConfig.publicBucket && data.PublicBucketName) platformConfig.publicBucket = data.PublicBucketName
+    platformConfig.rootPath = normalizeFolder(platformConfig.rootPath)
+    validateMinioConfig(platformConfig)
+    await nextTick()
+    platformConfig.suspendEndpointReset = false
+    platformConfig.minioConnected = true
+    if (!silent) ElMessage.success(ensureBuckets ? 'MinIO连接成功，目标桶已就绪' : 'MinIO连接成功')
+    return true
+  } catch (error) {
+    platformConfig.suspendEndpointReset = false
+    platformConfig.minioConnected = false
+    if (!silent) ElMessage.error(error.message || 'MinIO连接失败')
+    return false
+  } finally {
+    platformConfig.testingMinio = false
+  }
+}
+
 const preparePlatform = async (platformConfig, role = 'source') => {
   if (platformConfig.platformType === 'current') {
     return {
       platformType: 'current',
       apiBase: currentPlatform.apiBase,
       osClient: currentPlatform.osClient,
+      authorization: ''
+    }
+  }
+
+  if (platformConfig.platformType === 'minio') {
+    validateMinioConfig(platformConfig)
+    if (!platformConfig.minioConnected && !await testMinio(platformConfig, false, true)) {
+      throw new Error('MinIO连接校验失败，请重新测试连接')
+    }
+    return {
+      platformType: 'minio',
+      apiBase: platformConfig.endpoint,
+      osClient: normalizeFolder(platformConfig.rootPath).replace(/\/$/, ''),
+      endpoint: platformConfig.endpoint,
+      accessKey: platformConfig.accessKey,
+      secretKey: platformConfig.secretKey,
+      region: platformConfig.region,
+      privateBucket: platformConfig.privateBucket,
+      publicBucket: platformConfig.publicBucket,
+      rootPath: normalizeFolder(platformConfig.rootPath),
       authorization: ''
     }
   }
@@ -1215,7 +1458,9 @@ const loadSourceTree = async () => {
   checkedSourceRows.value = []
   try {
     const sourcePlatform = await preparePlatform(form.source, 'source')
-    const sourceRoot = normalizeFolder(String(sourcePlatform.osClient || '').toLowerCase())
+    const sourceRoot = sourcePlatform.platformType === 'minio'
+      ? normalizeFolder(sourcePlatform.rootPath)
+      : normalizeFolder(String(sourcePlatform.osClient || '').toLowerCase())
     sourceTree.value = await buildFileTree(sourcePlatform, sourceRoot, form.source.limit, true)
     ElMessage.success('源文件树加载完成')
   } catch (error) {
@@ -1233,7 +1478,9 @@ const loadTargetTree = async () => {
   loadingTarget.value = true
   try {
     const targetPlatform = await preparePlatform(form.target, 'target')
-    const rootPath = normalizeFolder(String(targetPlatform.osClient || '').toLowerCase())
+    const rootPath = targetPlatform.platformType === 'minio'
+      ? normalizeFolder(targetPlatform.rootPath)
+      : normalizeFolder(String(targetPlatform.osClient || '').toLowerCase())
     targetTree.value = await buildFileTree(targetPlatform, rootPath, form.target.limit, true)
     selectedTargetPath.value = rootPath
     selectedTargetNodeKey.value = folderNodeId(selectedTargetPath.value)
@@ -1254,6 +1501,20 @@ const handleSourceCheck = () => {
     .filter(row => !row.root)
 }
 
+const selectAllSource = async () => {
+  const root = sourceTree.value[0]
+  if (!root) return
+  sourceTreeRef.value?.setCheckedKeys((root.children || []).map(row => row.id), false)
+  await nextTick()
+  handleSourceCheck()
+}
+
+const clearSourceSelection = async () => {
+  sourceTreeRef.value?.setCheckedKeys([], false)
+  await nextTick()
+  handleSourceCheck()
+}
+
 const handleTargetNodeClick = (node) => {
   if (node.isFolder) {
     selectedTargetPath.value = normalizeFolder(node.filePath)
@@ -1272,6 +1533,13 @@ const handleTargetBucketChange = () => {
   selectedTargetNodeKey.value = ''
   targetListCache = new Map()
   if (shouldReload) loadTargetTree()
+}
+
+const handleSourceBucketChange = () => {
+  const shouldReload = sourceTree.value.length > 0
+  sourceTree.value = []
+  checkedSourceRows.value = []
+  if (shouldReload) loadSourceTree()
 }
 
 const hasCheckedAncestor = (row, checkedFolderPaths) => {
@@ -1305,6 +1573,8 @@ const getTargetRows = async (targetPlatform, targetFolder) => {
     targetPlatform.platformType,
     targetPlatform.apiBase,
     targetPlatform.osClient,
+    targetPlatform.privateBucket,
+    targetPlatform.publicBucket,
     form.target.limit ? 'private' : 'public',
     normalizeFolder(targetFolder)
   ].join('|')
@@ -1325,6 +1595,9 @@ const addResult = (row, targetPath, status, message) => {
     name: row.name,
     sourcePath: row.filePath,
     targetPath,
+    isFolder: row.isFolder,
+    size: Number(row.size || 0),
+    type: row.type || '',
     status,
     message: message || ''
   })
@@ -1344,12 +1617,25 @@ const updateProgress = async (sourcePlatform, status = 'Running') => {
     SuccessCount: task.successCount,
     FailCount: task.failCount,
     Progress: task.progress,
-    Summary: JSON.stringify(results.value)
+    Summary: JSON.stringify(results.value),
+    Items: results.value.slice(recordedResultCount).map(item => ({
+      SourcePath: item.sourcePath,
+      TargetPath: item.targetPath,
+      Name: item.name,
+      IsFolder: item.isFolder,
+      Size: item.size,
+      FileType: item.type,
+      Status: item.status,
+      Message: item.message,
+      EndTime: new Date().toISOString()
+    }))
   }
   try {
     await fileSyncApi.runApiEngine('mci_file_sync_record', payload, sourcePlatform)
+    recordedResultCount = results.value.length
   } catch (error) {
     await fileSyncApi.runApiEngine('mci_file_sync_record', payload)
+    recordedResultCount = results.value.length
   }
 }
 
@@ -1389,6 +1675,26 @@ const createTaskRecord = async (sourcePlatform, targetPlatform, selectedRows) =>
 
 const syncFile = async (row, sourcePlatform, targetPlatform, targetFolder) => {
   const targetPath = joinPath(targetFolder, row.name)
+  if (sourcePlatform.platformType === 'minio' || targetPlatform.platformType === 'minio') {
+    if (sourcePlatform.platformType === 'remote' || targetPlatform.platformType === 'remote') {
+      throw new Error('MinIO直连暂不支持与远程吾码平台直接组合，请将吾码平台设为当前平台')
+    }
+    const result = await fileSyncApi.syncMinioObject({
+      sourcePlatform,
+      targetPlatform,
+      sourcePath: row.filePath,
+      targetPath,
+      sourceLimit: form.source.limit,
+      targetLimit: form.target.limit,
+      syncRule: form.rule
+    })
+    if (result?.Code !== 1) throw new Error(result?.Msg || 'MinIO服务端同步失败')
+    const status = result.Data?.Status || 'Success'
+    targetListCache = new Map()
+    task.successCount++
+    addResult(row, targetPath, status, result.Msg || (status === 'Ignored' ? '目标已存在，已忽略' : '同步成功'))
+    return
+  }
   const exists = await targetExists(targetPlatform, targetFolder, row.name, false)
   if (exists && form.rule === 'ignore') {
     task.successCount++
@@ -1479,6 +1785,7 @@ const startSync = async () => {
   syncing.value = true
   targetListCache = new Map()
   results.value = []
+  recordedResultCount = 0
   Object.assign(task, {
     progressVisible: true,
     statusText: '准备同步...',
@@ -1527,6 +1834,24 @@ const loadSyncLogs = async () => {
   }
 }
 
+const handleLogExpand = async (row, expandedRows) => {
+  const expanded = Array.isArray(expandedRows)
+    ? expandedRows.some(item => item.Id === row.Id)
+    : !!expandedRows
+  if (!expanded || syncLogItems[row.Id] || syncLogItemsLoading[row.Id]) return
+  syncLogItemsLoading[row.Id] = true
+  try {
+    const result = await fileManageApi.getSyncItems(row.Id)
+    syncLogItems[row.Id] = result?.Code === 1 ? (result.Data || []) : []
+    if (result?.Code !== 1) throw new Error(result?.Msg || '加载同步明细失败')
+  } catch (error) {
+    syncLogItems[row.Id] = []
+    ElMessage.error(error.message || '加载同步明细失败')
+  } finally {
+    syncLogItemsLoading[row.Id] = false
+  }
+}
+
 const formatFileSize = (bytes) => {
   if (!bytes || Number(bytes) <= 0) return '0 B'
   const k = 1024
@@ -1558,7 +1883,8 @@ const taskStatusLabel = (status) => {
 const ruleLabel = (rule) => rule === 'overwrite' ? '重名覆盖' : '重名忽略'
 
 const platformLogLabel = (row, prefix) => {
-  const type = row[`${prefix}PlatformType`] === 'remote' ? '远程' : '当前'
+  const platformType = row[`${prefix}PlatformType`]
+  const type = platformType === 'remote' ? '远程' : platformType === 'minio' ? 'MinIO' : '当前'
   const osClient = row[`${prefix}OsClient`] || '-'
   const bucket = row[`${prefix}BucketScope`] === 'public' ? '公有桶' : '私有桶'
   return `${type} / ${osClient} / ${bucket}`
@@ -1661,7 +1987,6 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
 .rule-toggle {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
   padding: 4px;
   border-radius: 8px;
   background: #edf2f7;
@@ -1688,6 +2013,14 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   }
 }
 
+.platform-toggle {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rule-toggle {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .credential-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1698,6 +2031,28 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   display: flex;
   flex-direction: column;
   gap: var(--mci-space-3, 10px);
+}
+
+.minio-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mci-space-3, 10px);
+  padding: 12px;
+  border: 1px solid var(--mci-border-color, #dfe8f1);
+  border-radius: var(--mci-shape-panel, 8px);
+  background: var(--mci-bg-soft, #f7fafc);
+}
+
+.minio-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  span {
+    color: var(--mci-text-tertiary, #7b8b9b);
+    font-size: 12px;
+  }
 }
 
 .connection-toolbar {
@@ -1873,6 +2228,12 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   border-bottom: 1px solid #edf2f7;
 }
 
+.tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .tree-body {
   height: 360px;
   padding: 8px 8px 12px;
@@ -1955,6 +2316,11 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
   background: #ffffff;
 }
 
+.log-detail {
+  padding: 10px 18px 14px 46px;
+  background: #f7fafc;
+}
+
 @media (max-width: 1100px) {
   .sync-config-grid,
   .tree-grid {
@@ -1973,6 +2339,11 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
 @media (max-width: 700px) {
   .credential-grid {
     grid-template-columns: 1fr;
+  }
+
+  .minio-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .captcha-field {

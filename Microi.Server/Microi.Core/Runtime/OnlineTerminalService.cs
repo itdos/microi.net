@@ -687,6 +687,80 @@ namespace Microi.net
             return new DosResult(1, null, "已踢掉该终端");
         }
 
+        /// <summary>仅注销当前请求对应终端，保留同一用户的其它设备登录态。</summary>
+        public static async Task<DosResult> LogoutCurrentTokenAsync(CurrentToken currentToken, string requestToken)
+        {
+            requestToken = (requestToken ?? "").Trim();
+            if (requestToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) requestToken = requestToken.Substring(7).Trim();
+            var osClient = currentToken?.OsClient;
+            var user = currentToken?.CurrentUser;
+            var userId = user?["Id"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace() || requestToken.DosIsNullOrWhiteSpace())
+                return new DosResult(1001, null, "登录身份已过期");
+
+            var entry = currentToken.Tokens?.FirstOrDefault(d => d != null && string.Equals(d.Token, requestToken, StringComparison.Ordinal));
+            if (entry == null && string.Equals(currentToken.Token, requestToken, StringComparison.Ordinal))
+            {
+                entry = new TokensModel
+                {
+                    Token = requestToken,
+                    CreateTime = currentToken.CreateTime,
+                    UpdateTime = currentToken.UpdateTime,
+                    ClientType = "Empty",
+                    Did = "Empty"
+                };
+            }
+            if (entry == null) return new DosResult(1001, null, "未找到当前终端登录态");
+            var durationSeconds = Math.Max(0, (long)(DateTime.Now - entry.CreateTime).TotalSeconds);
+            var clientType = entry.ClientType.DosIsNullOrWhiteSpace("Empty");
+            var did = entry.Did.DosIsNullOrWhiteSpace("Empty");
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var key = GetLoginTokenKey(osClient, userId);
+
+            currentToken.Tokens = currentToken.Tokens?
+                .Where(d => d != null && !(string.Equals(d.Token, requestToken, StringComparison.Ordinal)
+                                            || (IsMeaningfulDid(did)
+                                                && string.Equals(d.Did, did, StringComparison.Ordinal)
+                                                && string.Equals(d.ClientType, clientType, StringComparison.Ordinal))))
+                .ToList() ?? new List<TokensModel>();
+            if (currentToken.Tokens.Count == 0)
+            {
+                await cache.RemoveAsync(key).ConfigureAwait(false);
+            }
+            else
+            {
+                currentToken.Token = currentToken.Tokens[0].Token;
+                currentToken.UpdateTime = DateTime.Now;
+                await cache.SetAsync(key, currentToken).ConfigureAwait(false);
+            }
+
+            var clientInfo = await cache.GetAsync<ClientInfo>(GetChatOnlineKey(osClient, userId)).ConfigureAwait(false)
+                             ?? cache.HashGet<ClientInfo>(GetOnlineHashKey(osClient), userId);
+            if (clientInfo != null)
+            {
+                var tokenHash = HashToken(requestToken);
+                clientInfo.Terminals?.RemoveAll(d => d != null &&
+                    (string.Equals(d.TokenHash, tokenHash, StringComparison.OrdinalIgnoreCase)
+                     || (IsMeaningfulDid(did) && string.Equals(d.Did, did, StringComparison.Ordinal)
+                         && string.Equals(d.ClientType, clientType, StringComparison.Ordinal))));
+                if ((clientInfo.Terminals?.Count ?? 0) == 0 && (clientInfo.ConnectionIds?.Count ?? 0) == 0)
+                {
+                    await cache.RemoveAsync(GetChatOnlineKey(osClient, userId)).ConfigureAwait(false);
+                    cache.HashDelete(GetOnlineHashKey(osClient), userId);
+                }
+                else await SaveClientInfoAsync(cache, osClient, clientInfo).ConfigureAwait(false);
+            }
+
+            var context = new BaseParam { OsClient = osClient, _CurrentUser = user, _ClientType = clientType, _InvokeType = InvokeType.Client.ToString() };
+            var duration = UserBehaviorAudit.FormatDuration(durationSeconds);
+            UserBehaviorAudit.Track(context, "Session", "Logout", "用户退出", "Session", UserBehaviorAudit.HashIdentifier(requestToken),
+                $"退出登录，本次登录共计{duration}", new { Duration = duration, ClientType = clientType, Did = did }, true,
+                durationSeconds, "TokenLifecycle", UserBehaviorAudit.HashIdentifier(requestToken), did,
+                UserBehaviorAudit.DeterministicEventId($"session-logout|{osClient}|{UserBehaviorAudit.HashIdentifier(requestToken)}"));
+            await NotifyOnlineChangedAsync(osClient, userId).ConfigureAwait(false);
+            return new DosResult(1, new { DurationSeconds = durationSeconds, Duration = duration }, "退出登录成功");
+        }
+
         /// <summary>
         /// 清除指定用户的全部终端登录信息，立即吊销其所有 Token，并向在线终端推送强制退出事件。
         /// </summary>
@@ -800,6 +874,28 @@ namespace Microi.net
                             && !d.Token.DosIsNullOrWhiteSpace()
                             && IsTokenEntryStillActive(d, clientModel))
                 .ToList() ?? new List<TokensModel>();
+
+            if (before > 0 && tokenModel?.CurrentUser != null)
+            {
+                foreach (var expired in tokenModel.Tokens.Where(d => d != null && !d.RetiredTime.HasValue && !activeTokens.Contains(d)))
+                {
+                    var startedAt = expired.CreateTime == default ? tokenModel.CreateTime : expired.CreateTime;
+                    var seconds = startedAt == default ? 0 : Math.Max(0, (long)(DateTime.Now - startedAt).TotalSeconds);
+                    var context = new BaseParam
+                    {
+                        OsClient = osClient,
+                        _CurrentUser = tokenModel.CurrentUser,
+                        _ClientType = expired.ClientType,
+                        _InvokeType = InvokeType.Client.ToString()
+                    };
+                    var duration = UserBehaviorAudit.FormatDuration(seconds);
+                    UserBehaviorAudit.Track(context, "Session", "SessionExpired", "登录失效", "Session",
+                        UserBehaviorAudit.HashIdentifier(expired.Token), $"登录状态因超时失效，本次登录共计{duration}",
+                        new { Duration = duration, ClientType = expired.ClientType, Did = expired.Did }, true, seconds,
+                        "TokenLifecycle", UserBehaviorAudit.HashIdentifier(expired.Token), expired.Did,
+                        UserBehaviorAudit.DeterministicEventId($"session-expired|{osClient}|{UserBehaviorAudit.HashIdentifier(expired.Token)}"));
+                }
+            }
 
             if (before > 0 && activeTokens.Count != before)
             {

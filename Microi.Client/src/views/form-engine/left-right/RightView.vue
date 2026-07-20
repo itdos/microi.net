@@ -954,6 +954,14 @@ export default {
             var V8 = v8 ? v8 : {};
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
+                    self.DiyCommon.UserBehaviorSignal({
+                        Action: "V8ButtonClick",
+                        Name: btn.Name,
+                        TargetId: btn.Id || btn.ApiEngineKey || "",
+                        Table: self.CurrentDiyTableModel?.Name || self.DiyTableModel?.Name || self.TableName || "",
+                        RowId: row?.Id || "",
+                        MenuId: self.SysMenuModel?.Id || ""
+                    });
                     V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
                     V8.FormSet = (fieldName, value) => {
                         return self.FormSet(fieldName, value, row);

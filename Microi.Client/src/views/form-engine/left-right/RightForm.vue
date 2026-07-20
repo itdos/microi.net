@@ -1117,6 +1117,11 @@ export default {
         },
         async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
             var self = this;
+            self.DiyCommon.UserBehaviorSignal({
+                Action: "DetailClose",
+                Table: self.CurrentDiyTableModel?.Name || self.DiyTableModel?.Name || self.TableName || "",
+                RowId: tableRowId || self.TableRowId || self.CurrentRowModel?.Id || ""
+            }, true);
             //执行离开Form V8。 为什么注释？
             //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
             //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
@@ -1146,6 +1151,14 @@ export default {
             var V8 = v8 ? v8 : {};
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
+                    self.DiyCommon.UserBehaviorSignal({
+                        Action: "V8ButtonClick",
+                        Name: btn.Name,
+                        TargetId: btn.Id || btn.ApiEngineKey || "",
+                        Table: self.CurrentDiyTableModel?.Name || self.DiyTableModel?.Name || self.TableName || "",
+                        RowId: row?.Id || "",
+                        MenuId: self.SysMenuModel?.Id || ""
+                    });
                     V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
                     V8.FormSet = (fieldName, value) => {
                         return self.FormSet(fieldName, value, row);
