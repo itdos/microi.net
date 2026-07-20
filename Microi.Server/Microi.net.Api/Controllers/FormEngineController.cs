@@ -723,20 +723,29 @@ namespace Microi.net.Api
             }
             var lang = param["_RawMetadata"].Val<bool>() ? DiyMessage.Lang : param["_Lang"].Val<string>();
             var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>(), lang);
-            if (result?.Code == 1 && param["_RawMetadata"].Val<bool>() != true && param["_CurrentUser"] is JObject currentUser)
+            try
             {
-                var menu = result.Data == null ? null : JObject.FromObject(result.Data);
-                var menuId = menu?["Id"].Val<string>() ?? idOrKey;
-                var menuName = menu?["Name"].Val<string>() ?? menu?["Title"].Val<string>() ?? idOrKey;
-                var tracker = MicroiEngine.TryGetService<UserBehaviorSessionTracker>();
-                var dedupKey = $"menu|{param["OsClient"]}|{currentUser["Id"]}|{menuId}";
-                if (tracker?.ShouldLogOnce(dedupKey, TimeSpan.FromSeconds(3)) != false)
+                if (result?.Code == 1 && param["_RawMetadata"].Val<bool>() != true && param["_CurrentUser"] is JObject currentUser)
                 {
-                    var context = param.ToObject<DiyTableRowParam>();
-                    UserBehaviorAudit.Track(context, "Navigation", "MenuVisit", "访问菜单", "Menu", menuId,
-                        $"访问菜单[{menuName}]", new { MenuId = menuId, MenuName = menuName }, eventId:
-                        UserBehaviorAudit.DeterministicEventId(dedupKey, TimeSpan.FromSeconds(3)));
+                    // result.Data 是 dynamic；必须先强类型落地，否则 JValue.Val<T>() 会进入运行时动态绑定并抛异常。
+                    JObject menu = result.Data == null ? null : JObject.FromObject((object)result.Data);
+                    string menuId = menu?.Value<string>("Id") ?? idOrKey;
+                    string menuName = menu?.Value<string>("Name") ?? menu?.Value<string>("Title") ?? idOrKey;
+                    var tracker = MicroiEngine.TryGetService<UserBehaviorSessionTracker>();
+                    var dedupKey = $"menu|{param["OsClient"]}|{currentUser["Id"]}|{menuId}";
+                    if (tracker?.ShouldLogOnce(dedupKey, TimeSpan.FromSeconds(3)) != false)
+                    {
+                        var context = param.ToObject<DiyTableRowParam>();
+                        UserBehaviorAudit.Track(context, "Navigation", "MenuVisit", "访问菜单", "Menu", menuId,
+                            $"访问菜单[{menuName}]", new { MenuId = menuId, MenuName = menuName }, eventId:
+                            UserBehaviorAudit.DeterministicEventId(dedupKey, TimeSpan.FromSeconds(3)));
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                // 审计属于旁路能力，任何数据兼容或日志故障都不能破坏菜单主请求。
+                Console.WriteLine($"Microi: 菜单访问审计失败，已放行业务响应。{ex.Message}");
             }
             return Json(result);
         }
@@ -1139,27 +1148,35 @@ namespace Microi.net.Api
             return Json(result);
         }
 
-        private async Task TrackDetailOpened(DiyTableRowParam param, dynamic result)
+        private async Task TrackDetailOpened(DiyTableRowParam param, DosResult<dynamic> result)
         {
-            if (param == null || param._CurrentUser == null || result?.Code != 1 || result.Data == null) return;
-            var row = JObject.FromObject(result.Data);
-            var rowId = row.GetValue("Id", StringComparison.OrdinalIgnoreCase).Val<string>()
-                .DosIsNullOrWhiteSpace(param.Id.DosIsNullOrWhiteSpace(param._TableRowId));
-            if (rowId.DosIsNullOrWhiteSpace()) return;
-            var table = param.FormEngineKey.DosIsNullOrWhiteSpace(param._TableName).DosIsNullOrWhiteSpace("未知表");
-            var tracker = MicroiEngine.TryGetService<UserBehaviorSessionTracker>();
-            var dedupKey = $"detail|{param.OsClient}|{param._CurrentUser["Id"]}|{table}|{rowId}";
-            if (tracker?.ShouldLogOnce(dedupKey, TimeSpan.FromSeconds(2)) == false) return;
-
-            var preview = UserBehaviorAudit.BuildRowPreview(row);
-            UserBehaviorAudit.Track(param, "Data", "DetailView", "查看数据", "DataRow", rowId,
-                $"查看表[{table}]的数据[{rowId}]", new { Table = table, RowId = rowId, Preview = preview }, eventId:
-                UserBehaviorAudit.DeterministicEventId(dedupKey, TimeSpan.FromSeconds(2)));
-            if (tracker != null)
+            try
             {
-                var did = Request?.Headers?["did"].ToString();
-                await tracker.OpenDetailAsync(param.OsClient, param._CurrentUser, table, rowId, row,
-                    param._ClientType, did).ConfigureAwait(false);
+                if (param == null || param._CurrentUser == null || result?.Code != 1 || result.Data == null) return;
+                JObject row = JObject.FromObject((object)result.Data);
+                string rowId = row.Value<string>("Id")
+                    .DosIsNullOrWhiteSpace(param.Id.DosIsNullOrWhiteSpace(param._TableRowId));
+                if (rowId.DosIsNullOrWhiteSpace()) return;
+                string table = param.FormEngineKey.DosIsNullOrWhiteSpace(param._TableName).DosIsNullOrWhiteSpace("未知表");
+                var tracker = MicroiEngine.TryGetService<UserBehaviorSessionTracker>();
+                var dedupKey = $"detail|{param.OsClient}|{param._CurrentUser["Id"]}|{table}|{rowId}";
+                if (tracker?.ShouldLogOnce(dedupKey, TimeSpan.FromSeconds(2)) == false) return;
+
+                var preview = UserBehaviorAudit.BuildRowPreview(row);
+                UserBehaviorAudit.Track(param, "Data", "DetailView", "查看数据", "DataRow", rowId,
+                    $"查看表[{table}]的数据[{rowId}]", new { Table = table, RowId = rowId, Preview = preview }, eventId:
+                    UserBehaviorAudit.DeterministicEventId(dedupKey, TimeSpan.FromSeconds(2)));
+                if (tracker != null)
+                {
+                    var did = Request?.Headers?["did"].ToString();
+                    await tracker.OpenDetailAsync(param.OsClient, param._CurrentUser, table, rowId, row,
+                        param._ClientType, did).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 详情审计失败只能降级，不能把已经成功查询出的业务数据改成500。
+                Console.WriteLine($"Microi: 数据详情审计失败，已放行业务响应。{ex.Message}");
             }
         }
 
