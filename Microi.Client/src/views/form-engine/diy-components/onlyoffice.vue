@@ -1,5 +1,5 @@
 <template>
-    <div class="onlyoffice-preview-page">
+    <div class="onlyoffice-preview-page" :class="{ 'anonymous-view': !isAuthenticated }">
         <div class="onlyoffice-file-bar">
             <div class="file-summary">
                 <div class="file-icon-wrap">
@@ -109,12 +109,15 @@ export default {
             fileType: "",
             fileSize: "",
             sourceFilePath: "",
+            sourceApiUrl: "",
             isPrivate: false,
             hdfs: "",
             formEngineKey: "",
             formDataId: "",
             fieldId: "",
             canEdit: false,
+            requestedCanEdit: false,
+            isAuthenticated: false,
             enableVersion: false,
             officeFileMeta: null,
             officeVersions: [],
@@ -162,6 +165,8 @@ export default {
     async mounted() {
         const sessionPayload = this.readOfficeSessionPayload();
         this.applyRoutePayload(sessionPayload || {});
+        const canOpen = await this.validateOfficeAccess();
+        if (!canOpen) return;
         await this.loadOfficeFileMeta();
         await this.openCurrentFile();
     },
@@ -192,7 +197,11 @@ export default {
         },
         applyRoutePayload(payload) {
             const query = this.$route.query || {};
-            const routeFilePath = this.safeDecode(query.filePath || payload.filePath || payload.url || "");
+            const explicitFileUrl = this.safeDecode(
+                query.fileUrl || query.documentUrl || query.sourceUrl ||
+                payload.fileUrl || payload.documentUrl || payload.sourceUrl || ""
+            );
+            const routeFilePath = explicitFileUrl || this.safeDecode(query.filePath || payload.filePath || payload.url || "");
             let sourceFilePath = this.safeDecode(query.filePathName || query.sourceFilePath || query.storagePath || payload.filePathName || payload.sourceFilePath || "");
             let isPrivate = this.parseBoolean(query.isPrivate || query.limit || query.Limit || payload.isPrivate || payload.Limit);
 
@@ -202,15 +211,19 @@ export default {
             }
 
             this.sourceFilePath = sourceFilePath;
+            this.sourceApiUrl = this.isApiEngineSource(routeFilePath) ? routeFilePath : "";
             this.isPrivate = isPrivate;
             this.hdfs = this.safeDecode(query.hdfs || query.HDFS || payload.hdfs || payload.HDFS || "");
             this.formEngineKey = this.safeDecode(query.formEngineKey || query.FormEngineKey || payload.formEngineKey || payload.FormEngineKey || "");
             this.formDataId = this.safeDecode(query.formDataId || query.FormDataId || payload.formDataId || payload.FormDataId || "");
             this.fieldId = this.safeDecode(query.fieldId || query.FieldId || payload.fieldId || payload.FieldId || "");
-            this.canEdit = this.parseBoolean(query.canEdit || query.allowEdit || query.edit || query.CanEdit || payload.canEdit || payload.AllowEdit);
+            this.requestedCanEdit = this.parseBoolean(query.canEdit || query.allowEdit || query.edit || query.CanEdit || payload.canEdit || payload.AllowEdit);
+            this.canEdit = false;
             this.enableVersion = this.parseBoolean(query.enableOfficeVersion || query.EnableOfficeVersion || payload.enableOfficeVersion || payload.EnableOfficeVersion);
             this.fileName = this.safeDecode(query.fileName || query.name || payload.fileName || payload.Name || "") || this.getFileNameFromUrl(sourceFilePath || routeFilePath);
-            this.fileType = this.getFileExtension(this.fileName || sourceFilePath || routeFilePath);
+            if (!this.fileName && this.sourceApiUrl) this.fileName = "接口引擎导出.xlsx";
+            this.fileType = this.safeDecode(query.fileType || payload.fileType || "") || this.getFileExtension(this.fileName || sourceFilePath || routeFilePath);
+            if (!this.fileType && this.sourceApiUrl) this.fileType = "xlsx";
             this.fileSize = query.fileSize || query.size || payload.fileSize || payload.Size || "";
             this.filePath = routeFilePath;
             if (this.enableVersion && !this.selectedVersion) {
@@ -227,8 +240,213 @@ export default {
                 document.title = this.fileName + " - 在线文档";
             }
         },
+        async validateOfficeAccess() {
+            this.previewError = "";
+            this.isAuthenticated = await this.validateCurrentUser();
+            this.canEdit = this.requestedCanEdit && this.isAuthenticated;
+
+            if (!this.isAuthenticated && this.isPrivate) {
+                this.previewError = "私有文件需要登录后查看";
+                this.Load = false;
+                return false;
+            }
+            if (this.sourceApiUrl) {
+                try {
+                    const normalizedSourceUrl = this.resolveApiEnginePreviewUrl(this.sourceApiUrl);
+                    const prepared = await this.prepareApiEnginePreview(normalizedSourceUrl);
+                    this.filePath = prepared.FileUrl;
+                    this.sourceFilePath = prepared.FilePathName || this.sourceFilePath;
+                    this.fileName = prepared.FileName || this.fileName;
+                    this.fileType = prepared.FileType || this.getFileExtension(this.fileName) || this.fileType;
+                    this.fileSize = prepared.FileSize || this.fileSize;
+                    this.isPrivate = false;
+                    return true;
+                } catch (error) {
+                    this.previewError = error?.message || "接口引擎文件地址不可用于在线预览";
+                    this.Load = false;
+                    return false;
+                }
+            }
+            if (!this.isAuthenticated && !this.validateAnonymousPublicSource()) {
+                this.previewError = "匿名预览只允许访问当前租户的公有文件";
+                this.Load = false;
+                return false;
+            }
+            if (!this.isAuthenticated && this.sourceFilePath) {
+                // 匿名场景只使用经过校验的公有存储路径，忽略 URL 中可伪造的 filePath。
+                this.filePath = this.toPublicFileUrl(this.sourceFilePath);
+            }
+            return true;
+        },
+        isApiEngineSource(value) {
+            if (!value) return false;
+            try {
+                const apiBase = this.getRuntimeApiBase() || window.location.origin;
+                const parsed = new URL(String(value), apiBase);
+                return /^\/apiengine\//i.test(parsed.pathname || "");
+            } catch (error) {
+                return false;
+            }
+        },
+        getRuntimeApiBase() {
+            return String(this.DiyCommon?.GetApiBase?.() || "").trim().replace(/\/+$/, "");
+        },
+        getPublicApiBase() {
+            const candidates = [
+                this.SysConfig && this.SysConfig.ApiBase,
+                this.getRuntimeApiBase()
+            ];
+            for (let i = 0; i < candidates.length; i++) {
+                const value = String(candidates[i] || "").trim();
+                if (!value) continue;
+                try {
+                    const parsed = new URL(value, window.location.origin);
+                    if (/^https?:$/.test(parsed.protocol) && !this.isLoopbackHost(parsed.hostname)) {
+                        return parsed.origin + parsed.pathname.replace(/\/+$/, "");
+                    }
+                } catch (error) {}
+            }
+            return "";
+        },
+        isLoopbackHost(hostname) {
+            const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+            return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0";
+        },
+        resolveApiEnginePreviewUrl(value) {
+            const raw = String(value || "").trim();
+            if (!raw || raw.includes("\\") || raw.includes("..")) {
+                throw new Error("接口引擎文件地址不合法");
+            }
+            const runtimeApiBase = this.getRuntimeApiBase();
+            const publicApiBase = this.getPublicApiBase();
+            const base = runtimeApiBase || publicApiBase || window.location.origin;
+            let source;
+            try {
+                source = new URL(raw, base);
+            } catch (error) {
+                throw new Error("接口引擎文件地址格式错误");
+            }
+            if (!/^https?:$/.test(source.protocol) || source.username || source.password || source.hash) {
+                throw new Error("接口引擎文件地址只允许 HTTP/HTTPS 且不能包含认证信息或片段");
+            }
+            let decodedPath = "";
+            try {
+                decodedPath = decodeURIComponent(source.pathname || "");
+            } catch (error) {
+                throw new Error("接口引擎文件地址编码错误");
+            }
+            if (!/^\/apiengine\/[^/]+\/?$/i.test(decodedPath) || decodedPath.includes("..") || decodedPath.includes("\\")) {
+                throw new Error("在线预览只允许当前平台的接口引擎文件地址");
+            }
+
+            const osClient = String(this.OsClient || this.DiyCommon?.GetOsClient?.() || "").trim();
+            const lowerPath = decodedPath.toLowerCase();
+            const marker = ("--OsClient--" + osClient + "--").toLowerCase();
+            const queryTenant = String(source.searchParams.get("OsClient") || source.searchParams.get("osClient") || "");
+            if (!osClient || (!lowerPath.includes(marker) && queryTenant.toLowerCase() !== osClient.toLowerCase())) {
+                throw new Error("接口引擎地址必须显式指定当前 OsClient");
+            }
+
+            const allowedOrigins = [];
+            [runtimeApiBase, publicApiBase].forEach((candidate) => {
+                if (!candidate) return;
+                try {
+                    const origin = new URL(candidate, window.location.origin).origin;
+                    if (!allowedOrigins.includes(origin)) allowedOrigins.push(origin);
+                } catch (error) {}
+            });
+            if (!this.isLoopbackHost(source.hostname) && !allowedOrigins.includes(source.origin)) {
+                throw new Error("匿名预览只允许当前平台 ApiBase 下的接口引擎");
+            }
+            return source.toString();
+        },
+        async prepareApiEnginePreview(fileUrl) {
+            const osClient = String(this.OsClient || this.DiyCommon?.GetOsClient?.() || "").trim();
+            const apiBase = this.getRuntimeApiBase() || String(this.SysConfig?.ApiBase || "").trim().replace(/\/+$/, "");
+            if (!apiBase || !osClient) throw new Error("当前平台 ApiBase 或 OsClient 未就绪");
+            this.previewLoading = true;
+            try {
+                const response = await fetch(apiBase + "/api/HDFS/PrepareOfficePreviewFromUrl", {
+                    method: "POST",
+                    credentials: "omit",
+                    headers: {
+                        "Content-Type": "application/json",
+                        OsClient: osClient
+                    },
+                    body: JSON.stringify({
+                        OsClient: osClient,
+                        FileUrl: fileUrl,
+                        FileName: this.fileName
+                    })
+                });
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (error) {
+                    throw new Error("预览文件准备接口返回格式错误");
+                }
+                if (!response.ok || result?.Code !== 1 || !result.Data?.FileUrl) {
+                    throw new Error(result?.Msg || "接口引擎文件准备失败");
+                }
+                return result.Data;
+            } finally {
+                this.previewLoading = false;
+            }
+        },
+        async validateCurrentUser() {
+            const token = this.DiyCommon?.getToken?.() || "";
+            if (!token) return false;
+            const osClient = this.OsClient || this.DiyCommon?.GetOsClient?.() || "";
+            const apiBase = this.DiyCommon?.GetApiBase?.() || "";
+            const url = apiBase ? apiBase.replace(/\/+$/, "") + "/api/SysUser/GetCurrentUser" : "/api/SysUser/GetCurrentUser";
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        authorization: /^Bearer\s/i.test(token) ? token : "Bearer " + token,
+                        OsClient: osClient
+                    },
+                    body: JSON.stringify({ OsClient: osClient })
+                });
+                const result = await response.json();
+                if (response.ok && result?.Code === 1 && result.Data?.Id) {
+                    this.diyStore.setCurrentUser(result.Data);
+                    return true;
+                }
+            } catch (error) {
+                console.warn("在线文档登录态校验失败", error);
+            }
+            // 只清理本次校验的旧 Token，避免另一个并发请求已续签时误删新 Token。
+            if ((this.DiyCommon?.getToken?.() || "") === token) {
+                this.DiyCommon?.removeToken?.();
+                this.diyStore.setCurrentUser({ Id: "", Avatar: "", NickName: "" });
+            }
+            return false;
+        },
+        validateAnonymousPublicSource() {
+            const raw = String(this.sourceFilePath || this.filePath || "").trim();
+            if (!raw || raw.includes("..") || raw.includes("\\")) return false;
+            const osClient = String(this.OsClient || this.DiyCommon?.GetOsClient?.() || "").trim().toLowerCase();
+            const isTenantPath = (path) => {
+                try {
+                    const normalized = decodeURIComponent(String(path || "")).replace(/^\/+/, "").toLowerCase();
+                    return !!osClient && (normalized === osClient || normalized.startsWith(osClient + "/"));
+                } catch (error) {
+                    return false;
+                }
+            };
+            if (!/^https?:\/\//i.test(raw)) return isTenantPath(raw);
+            try {
+                const source = new URL(raw);
+                const fileServer = new URL((this.SysConfig && this.SysConfig.FileServer) || "", window.location.origin);
+                return source.origin === fileServer.origin && isTenantPath(source.pathname);
+            } catch (error) {
+                return false;
+            }
+        },
         async loadOfficeFileMeta() {
-            if (!this.formEngineKey || !this.formDataId || !this.fieldId || !this.DiyCommon?.Post) return;
+            if (!this.isAuthenticated || !this.formEngineKey || !this.formDataId || !this.fieldId || !this.DiyCommon?.Post) return;
             try {
                 const result = await this.postJson("/api/HDFS/GetOfficeFileMeta", {
                     FormEngineKey: this.formEngineKey,
@@ -364,6 +582,9 @@ export default {
             return fileServer ? fileServer.replace(/\/+$/, "") + "/" + String(filePathName).replace(/^\/+/, "") : filePathName;
         },
         resolvePreviewFilePath(fallbackUrl) {
+            if (this.sourceApiUrl) {
+                return Promise.resolve(fallbackUrl || this.filePath || "");
+            }
             if (!this.sourceFilePath || (!this.isPrivate && !this.isExpiringSignedUrl(fallbackUrl))) {
                 return Promise.resolve(fallbackUrl || this.toPublicFileUrl(this.sourceFilePath) || "");
             }
@@ -386,7 +607,9 @@ export default {
                 FormEngineKey: this.formEngineKey,
                 FormDataId: this.formDataId,
                 FieldId: this.fieldId,
-                Limit: true
+                Limit: true,
+                ForOfficePreview: true,
+                OsClient: this.OsClient || this.DiyCommon?.GetOsClient?.() || ""
             }).then((result) => {
                 if ((this.DiyCommon.Result && this.DiyCommon.Result(result)) || result?.Code === 1) {
                     return result.Data;
@@ -456,7 +679,8 @@ export default {
             return value.toFixed(precision) + " " + units[unitIndex];
         },
         loadRemoteFileSize() {
-            if (!this.filePath || this.fileSize) return;
+            // 接口引擎响应文件通常每次请求都会重新生成，不能为探测大小额外执行一次 HEAD。
+            if (!this.filePath || this.fileSize || this.sourceApiUrl) return;
             fetch(this.filePath, { method: "HEAD" })
                 .then((response) => {
                     const length = response.headers.get("content-length");
@@ -587,6 +811,7 @@ export default {
             return {
                 fileName: this.fileName,
                 fileSize: this.fileSize,
+                fileUrl: this.sourceApiUrl,
                 filePathName: this.sourceFilePath,
                 hdfs: this.hdfs,
                 isPrivate: this.isPrivate,
@@ -609,6 +834,7 @@ export default {
                 ...this.$route.query,
                 fileName: this.fileName || undefined,
                 fileSize: this.fileSize || undefined,
+                fileUrl: this.sourceApiUrl || undefined,
                 filePathName: this.sourceFilePath || undefined,
                 fileType: this.fileType || undefined,
                 hdfs: this.hdfs || undefined,
@@ -618,6 +844,8 @@ export default {
                 officeSessionKey: sessionKey
             };
             delete query.filePath;
+            delete query.documentUrl;
+            delete query.sourceUrl;
             Object.keys(query).forEach((key) => {
                 if (query[key] === undefined || query[key] === null || query[key] === "") delete query[key];
             });
@@ -663,13 +891,20 @@ export default {
 
 <style scoped lang="scss">
 .onlyoffice-preview-page {
-    height: calc(100vh - 100px);
+    height: calc(100vh - 70px);
     min-height: 560px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 0 6px 10px;
+    padding: 0;
     overflow: hidden;
+}
+
+.onlyoffice-preview-page.anonymous-view {
+    height: calc(100vh - 20px);
+    min-height: 0;
+    padding: 10px;
+    background: #f5f7fa;
 }
 
 .onlyoffice-file-bar {

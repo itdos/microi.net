@@ -107,6 +107,8 @@ ApiAddress: /wechat/notify
 
 后端会统一处理响应头和文件头校验：图片/PDF 浏览器直接打开，其它文件下载；V8 代码只返回文件三字段，不要在接口里手写复杂的魔数判断。`ContentType` 必须匹配真实字节，金蝶 PLM `KD_C_PLM` 等业务封装流不能伪装成 `application/pdf`。
 
+响应文件动态路由必须同时接受 `GET` 和 `HEAD`。OnlyOffice 等服务端预览器可能先用 `HEAD` 探测文件类型、长度和可达性；如果浏览器直接下载正常但 `HEAD` 返回 `405`，在线预览仍可能一直停在“加载文档”。
+
 ```javascript
 // 必须返回特定结构
 return {

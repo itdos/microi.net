@@ -96,6 +96,10 @@ namespace Microi.net
             {
                 return await ExportExcelSheetsAsync(param, excelSheets);
             }
+            if (param.ExcelLayout != null)
+            {
+                return ExportExcelLayout(param);
+            }
 
             List<dynamic> result;
             SysMenu sysMenuModel = null;
@@ -199,7 +203,8 @@ namespace Microi.net
                 //-----END
                 #region 开始导出
                 IWorkbook workbook = new XSSFWorkbook();
-                ISheet sheet = workbook.CreateSheet("Sheet1");
+                var sheetName = GetSafeExcelSheetName(workbook, param.ExcelOptions?.SheetName, 1);
+                ISheet sheet = workbook.CreateSheet(sheetName);
                 sheet.SetColumnWidth(0, 20 * 256);
                 var row = sheet.CreateRow(0);
                 //先计算所有图片
@@ -267,7 +272,7 @@ namespace Microi.net
                             index++;
                         }
                         //开始合并列
-                        if (index - dicFieldImgs[field["Name"].Val<string>()] > index - 1)
+                        if (index - dicFieldImgs[field["Name"].Val<string>()] < index - 1)
                         {
                             // 创建单元格范围地址
                             CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field["Name"].Val<string>()], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
@@ -601,6 +606,14 @@ namespace Microi.net
                     }
                     i++;
                 }
+                ApplyExcelSheetFormatting(
+                    workbook,
+                    sheet,
+                    result.Count,
+                    fieldList,
+                    dicFieldImgs,
+                    param.ExcelHeader == null,
+                    param.ExcelOptions);
                 //转为字节数组  
                 using (var stream = new MemoryStream())
                 {
@@ -645,9 +658,18 @@ namespace Microi.net
                 var sysConfig = (await MicroiEngine.FormEngine.GetSysConfig(parentParam.OsClient)).Data;
                 var sheetIndex = 1;
                 var totalCount = 0;
+                var totalLayoutCellCount = 0;
                 foreach (var sheet in sheets)
                 {
                     ApplyExcelSheetDefaults(parentParam, sheet);
+                    var sheetName = GetSafeExcelSheetName(workbook, sheet.SheetName, sheetIndex);
+                    if (sheet.ExcelLayout != null)
+                    {
+                        WriteExportExcelLayoutSheet(workbook, sheetName, sheet.ExcelLayout, sheet.ExcelOptions);
+                        totalLayoutCellCount += sheet.ExcelLayout.Cells?.Count ?? 0;
+                        sheetIndex++;
+                        continue;
+                    }
                     var sheetDataResult = await GetExportExcelSheetDataAsync(sheet);
                     if (sheetDataResult.Code != 1)
                     {
@@ -657,14 +679,14 @@ namespace Microi.net
                             new { TableId = parentParam.TableId, Table = parentParam.FormEngineKey, Error = sheetDataResult.Msg }, false);
                         return new DosResult<byte[]>(0, null, sheetDataResult.Msg);
                     }
-                    var sheetName = GetSafeExcelSheetName(workbook, sheet.SheetName, sheetIndex);
                     await WriteExportExcelSheetAsync(
                         workbook,
                         sheetName,
                         sheetDataResult.Data.ExcelData,
                         sheetDataResult.Data.ExcelHeader,
                         sheet.ExcelHeader == null,
-                        sysConfig
+                        sysConfig,
+                        sheet.ExcelOptions
                     );
                     totalCount += sheetDataResult.Data.ExcelData?.Count ?? 0;
                     sheetIndex++;
@@ -674,8 +696,15 @@ namespace Microi.net
                     workbook.Write(stream);
                     UserBehaviorAudit.Track(parentParam, "Data", "DataExport", "导出数据", "Table",
                         parentParam.TableId.DosIsNullOrWhiteSpace(parentParam.FormEngineKey),
-                        $"导出了[{sheets.Count}]个工作表、共[{totalCount}]条数据",
-                        new { TableId = parentParam.TableId, Table = parentParam.FormEngineKey, SheetCount = sheets.Count, Count = totalCount });
+                        $"导出了[{sheets.Count}]个工作表、共[{totalCount}]条数据、[{totalLayoutCellCount}]个布局单元配置",
+                        new
+                        {
+                            TableId = parentParam.TableId,
+                            Table = parentParam.FormEngineKey,
+                            SheetCount = sheets.Count,
+                            Count = totalCount,
+                            LayoutCellCount = totalLayoutCellCount
+                        });
                     return new DosResult<byte[]>(1, stream.ToArray());
                 }
             }
@@ -718,6 +747,13 @@ namespace Microi.net
             if (sheet.ExcelHeader == null && parentParam.ExcelHeader != null)
             {
                 sheet.ExcelHeader = parentParam.ExcelHeader;
+            }
+            sheet.ExcelOptions = MergeExcelExportOptions(parentParam.ExcelOptions, sheet.ExcelOptions);
+            if (sheet.SheetName.DosIsNullOrWhiteSpace()
+                && sheet.ExcelOptions != null
+                && !sheet.ExcelOptions.SheetName.DosIsNullOrWhiteSpace())
+            {
+                sheet.SheetName = sheet.ExcelOptions.SheetName;
             }
         }
 
@@ -847,7 +883,14 @@ namespace Microi.net
             });
         }
 
-        private async Task WriteExportExcelSheetAsync(IWorkbook workbook, string sheetName, List<dynamic> result, List<JObject> fieldList, bool appendDefaultFields, dynamic sysConfig)
+        private async Task WriteExportExcelSheetAsync(
+            IWorkbook workbook,
+            string sheetName,
+            List<dynamic> result,
+            List<JObject> fieldList,
+            bool appendDefaultFields,
+            dynamic sysConfig,
+            OfficeExcelExportOptionsParam options)
         {
             ISheet sheet = workbook.CreateSheet(sheetName);
             sheet.SetColumnWidth(0, 20 * 256);
@@ -907,7 +950,7 @@ namespace Microi.net
                         row.CreateCell(index, CellType.String).SetCellValue(field["Label"].Val<string>());
                         index++;
                     }
-                    if (index - dicFieldImgs[field["Name"].Val<string>()] > index - 1)
+                    if (index - dicFieldImgs[field["Name"].Val<string>()] < index - 1)
                     {
                         CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field["Name"].Val<string>()], index - 1);
                         sheet.AddMergedRegion(cellRangeAddress);
@@ -1193,6 +1236,14 @@ namespace Microi.net
                 }
                 i++;
             }
+            ApplyExcelSheetFormatting(
+                workbook,
+                sheet,
+                result.Count,
+                fieldList,
+                dicFieldImgs,
+                appendDefaultFields,
+                options);
         }
 
         /// <summary>

@@ -43,7 +43,7 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
                 };
                 var key = PrivateFileAuditTicket.CacheKey(param.OsClient, ticketId);
                 await MicroiEngine.CacheTenant.Cache(param.OsClient).SetAsync(key, ticket, TicketLifetime).ConfigureAwait(false);
-                wrapped.Add(await BuildProxyUrlAsync(param.OsClient, ticketId).ConfigureAwait(false));
+                wrapped.Add(await BuildProxyUrlAsync(param.OsClient, ticketId, param.ForOfficePreview == true).ConfigureAwait(false));
                 UserBehaviorAudit.Track(param, "File", "PrivateFileUrlIssued", "私有附件", "PrivateFile", path,
                     $"获取了私有附件[{ticket.FileName}]的临时访问地址", new { FilePath = path, TicketExpiresAt = ticket.ExpiresAt },
                     true, null, "ServerFileGateway", eventId:
@@ -74,11 +74,24 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         }
     }
 
-    private async Task<string> BuildProxyUrlAsync(string osClient, string ticketId)
+    private async Task<string> BuildProxyUrlAsync(string osClient, string ticketId, bool preferConfiguredApiBase)
     {
         var request = _httpContextAccessor.HttpContext?.Request;
-        var apiBase = request == null ? null : $"{request.Scheme}://{request.Host}{request.PathBase}";
-        if (apiBase.DosIsNullOrWhiteSpace())
+        string apiBase = null;
+        if (preferConfiguredApiBase)
+        {
+            try
+            {
+                var config = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
+                apiBase = DynamicHelper.GetDynamicStringValue(config?.Data, "ApiBase");
+            }
+            catch { }
+        }
+        if (!IsHttpBaseUrl(apiBase) && request != null)
+        {
+            apiBase = $"{request.Scheme}://{request.Host}{request.PathBase}";
+        }
+        if (!IsHttpBaseUrl(apiBase))
         {
             try
             {
@@ -89,6 +102,13 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         }
         if (apiBase.DosIsNullOrWhiteSpace()) return $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";
         return apiBase.TrimEnd('/') + $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";
+    }
+
+    private static bool IsHttpBaseUrl(string value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            && !string.IsNullOrWhiteSpace(uri.Host);
     }
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');

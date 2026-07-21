@@ -5,6 +5,119 @@ using System.Collections.Generic;
 
 namespace Microi.net
 {
+    /// <summary>
+    /// Excel 导出单元格样式。颜色使用 6 位十六进制 RGB（可带 #）。
+    /// </summary>
+    public class OfficeExcelCellStyleParam
+    {
+        public string FontName { get; set; }
+        public double? FontSize { get; set; }
+        public string FontColor { get; set; }
+        public bool? Bold { get; set; }
+        public bool? Italic { get; set; }
+        public bool? Underline { get; set; }
+        public string BackgroundColor { get; set; }
+        public string HorizontalAlignment { get; set; }
+        public string VerticalAlignment { get; set; }
+        public bool? WrapText { get; set; }
+        public bool? ShrinkToFit { get; set; }
+        public short? Rotation { get; set; }
+        public string NumberFormat { get; set; }
+        public string BorderStyle { get; set; }
+        public string BorderColor { get; set; }
+        public string BorderTopStyle { get; set; }
+        public string BorderTopColor { get; set; }
+        public string BorderRightStyle { get; set; }
+        public string BorderRightColor { get; set; }
+        public string BorderBottomStyle { get; set; }
+        public string BorderBottomColor { get; set; }
+        public string BorderLeftStyle { get; set; }
+        public string BorderLeftColor { get; set; }
+    }
+
+    /// <summary>
+    /// Excel 工作表导出选项。列宽单位为 Excel 字符宽度，行高单位为磅。
+    /// </summary>
+    public class OfficeExcelExportOptionsParam
+    {
+        public string SheetName { get; set; }
+        public double? DefaultColumnWidth { get; set; }
+        public double? DefaultRowHeight { get; set; }
+        public double? HeaderRowHeight { get; set; }
+        public double? DataRowHeight { get; set; }
+        public bool? FreezeHeader { get; set; }
+        public int? FreezeRows { get; set; }
+        public int? FreezeColumns { get; set; }
+        public bool? AutoFilter { get; set; }
+        public string AutoFilterRange { get; set; }
+        public bool? AutoSizeColumns { get; set; }
+        public bool? ShowGridLines { get; set; }
+        public int? Zoom { get; set; }
+        public string PrintOrientation { get; set; }
+        public string PaperSize { get; set; }
+        public int? FitToWidth { get; set; }
+        public int? FitToHeight { get; set; }
+        public string PrintArea { get; set; }
+        public double? MarginTop { get; set; }
+        public double? MarginRight { get; set; }
+        public double? MarginBottom { get; set; }
+        public double? MarginLeft { get; set; }
+        public bool? CenterHorizontally { get; set; }
+        public bool? CenterVertically { get; set; }
+        public string HeaderText { get; set; }
+        public string FooterText { get; set; }
+        public bool? ShowPageNumber { get; set; }
+        public OfficeExcelCellStyleParam HeaderStyle { get; set; }
+        public OfficeExcelCellStyleParam CellStyle { get; set; }
+    }
+
+    /// <summary>
+    /// Excel 高级布局。所有行列序号均从 1 开始，Range 使用 A1 或 A1:K10。
+    /// </summary>
+    public class OfficeExcelLayoutParam
+    {
+        public List<OfficeExcelLayoutCellParam> Cells { get; set; } = new List<OfficeExcelLayoutCellParam>();
+        public List<string> MergedRanges { get; set; } = new List<string>();
+        public List<OfficeExcelLayoutColumnParam> Columns { get; set; } = new List<OfficeExcelLayoutColumnParam>();
+        public List<OfficeExcelLayoutRowParam> Rows { get; set; } = new List<OfficeExcelLayoutRowParam>();
+        public List<OfficeExcelLayoutRowGroupParam> RowGroups { get; set; } = new List<OfficeExcelLayoutRowGroupParam>();
+    }
+
+    public class OfficeExcelLayoutCellParam
+    {
+        public string Range { get; set; }
+        public object Value { get; set; }
+        public string Formula { get; set; }
+        public string DataType { get; set; }
+        public bool? Merge { get; set; }
+        public OfficeExcelCellStyleParam Style { get; set; }
+    }
+
+    public class OfficeExcelLayoutColumnParam
+    {
+        public string Column { get; set; }
+        public int? Index { get; set; }
+        public double? Width { get; set; }
+        public bool? Hidden { get; set; }
+        public bool? AutoSize { get; set; }
+        public double? MinWidth { get; set; }
+        public double? MaxWidth { get; set; }
+    }
+
+    public class OfficeExcelLayoutRowParam
+    {
+        public int Row { get; set; }
+        public double? Height { get; set; }
+        public bool? Hidden { get; set; }
+    }
+
+    public class OfficeExcelLayoutRowGroupParam
+    {
+        public int StartRow { get; set; }
+        public int EndRow { get; set; }
+        public bool? Collapsed { get; set; }
+    }
+
     public partial class OfficeExportParam : BaseParam
     {
         public string FormEngineKey { get; set; }

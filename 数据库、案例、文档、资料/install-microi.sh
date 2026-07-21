@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-19
+# 版本：v2026-07-20
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
 #   microi-install-database   - 主数据库（安装前按编号选择）
@@ -26,7 +26,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-07-19"
+SCRIPT_VERSION="v2026-07-20"
 
 # ============================================================
 # 数据库安装配置
@@ -209,6 +209,294 @@ validate_database_install_preflight() {
   fi
 }
 
+# 校验数据库 ZIP：只允许一个普通 .sql 文件，拒绝目录穿越、绝对路径和加密/损坏压缩包。
+# 校验结果通过 SQL_ARCHIVE_ENTRY、SQL_UNCOMPRESSED_BYTES 返回。
+validate_sql_zip_archive() {
+  local archive_path="$1"
+  local entry=""
+  local entry_count=0
+  local part=""
+
+  if [ ! -f "${archive_path}" ]; then
+    echo "Microi：错误：数据库压缩包不存在或不是文件：${archive_path}" >&2
+    return 1
+  fi
+  if ! command -v unzip >/dev/null 2>&1; then
+    echo 'Microi：错误：缺少 unzip，无法校验数据库压缩包。' >&2
+    return 1
+  fi
+  if ! unzip -tqq "${archive_path}" >/dev/null 2>&1; then
+    echo 'Microi：错误：数据库压缩包已损坏、被加密或无法完整解压。' >&2
+    return 1
+  fi
+
+  while IFS= read -r entry; do
+    [ -z "${entry}" ] && continue
+    if [[ "${entry}" == */ ]]; then
+      echo "Microi：错误：ZIP 内不能包含目录，只能包含一个 .sql 文件：${entry}" >&2
+      return 1
+    fi
+    entry_count=$((entry_count + 1))
+    SQL_ARCHIVE_ENTRY="${entry}"
+  done < <(unzip -Z1 "${archive_path}")
+
+  if [ "${entry_count}" -ne 1 ]; then
+    echo "Microi：错误：ZIP 内必须且只能有一个 .sql 文件，当前检测到 ${entry_count} 个文件。" >&2
+    return 1
+  fi
+  if [[ ! "${SQL_ARCHIVE_ENTRY,,}" =~ \.sql$ ]]; then
+    echo "Microi：错误：ZIP 内唯一文件不是 .sql：${SQL_ARCHIVE_ENTRY}" >&2
+    return 1
+  fi
+  if [[ "${SQL_ARCHIVE_ENTRY}" == /* || "${SQL_ARCHIVE_ENTRY}" =~ ^[A-Za-z]: || "${SQL_ARCHIVE_ENTRY}" == *\\* ]]; then
+    echo "Microi：错误：ZIP 内 SQL 文件名包含不安全路径：${SQL_ARCHIVE_ENTRY}" >&2
+    return 1
+  fi
+  IFS='/' read -r -a _sql_path_parts <<< "${SQL_ARCHIVE_ENTRY}"
+  for part in "${_sql_path_parts[@]}"; do
+    if [ -z "${part}" ] || [ "${part}" = "." ] || [ "${part}" = ".." ]; then
+      echo "Microi：错误：ZIP 内 SQL 文件名包含目录穿越片段：${SQL_ARCHIVE_ENTRY}" >&2
+      return 1
+    fi
+  done
+
+  SQL_UNCOMPRESSED_BYTES=$(unzip -Z -l "${archive_path}" | awk 'NR > 2 && $1 ~ /^-/ {print $4; exit}')
+  if [[ ! "${SQL_UNCOMPRESSED_BYTES:-}" =~ ^[0-9]+$ ]] || [ "${SQL_UNCOMPRESSED_BYTES}" -le 0 ]; then
+    echo 'Microi：错误：无法读取 SQL 解压后大小，或 SQL 文件为空。' >&2
+    return 1
+  fi
+}
+
+detect_physical_cpu_cores() {
+  local cores="${MICROI_HOST_PHYSICAL_CORES_OVERRIDE:-}"
+  if [[ "${cores}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "${cores}"
+    return
+  fi
+  cores=$(awk '
+    /^physical id[[:space:]]*:/ { physical=$NF }
+    /^core id[[:space:]]*:/ { if (physical != "") seen[physical ":" $NF]=1 }
+    END { for (key in seen) count++; print count+0 }
+  ' /proc/cpuinfo 2>/dev/null || echo 0)
+  if [[ ! "${cores}" =~ ^[1-9][0-9]*$ ]] && command -v lscpu >/dev/null 2>&1; then
+    cores=$(lscpu -p=CORE,SOCKET 2>/dev/null | awk -F, '!/^#/ { seen[$1 ":" $2]=1 } END { for (key in seen) count++; print count+0 }')
+  fi
+  if [[ ! "${cores}" =~ ^[1-9][0-9]*$ ]]; then
+    cores=$(nproc 2>/dev/null || echo 1)
+  fi
+  echo "${cores}"
+}
+
+detect_storage_type() {
+  local target_path="${1:-/}"
+  local override="${MICROI_HOST_DISK_TYPE_OVERRIDE:-}"
+  local source_device=""
+  local rota_values=""
+  local rota_count=0
+  local rota_sum=0
+
+  case "${override,,}" in
+    ssd|nvme) echo 'ssd'; return ;;
+    hdd) echo 'hdd'; return ;;
+    unknown) echo 'unknown'; return ;;
+  esac
+  if command -v findmnt >/dev/null 2>&1 && command -v lsblk >/dev/null 2>&1; then
+    source_device=$(findmnt -T "${target_path}" -n -o SOURCE 2>/dev/null | head -1)
+    rota_values=$(lsblk -n -o ROTA "${source_device}" 2>/dev/null | awk '$1 == 0 || $1 == 1 { print $1 }')
+    while IFS= read -r _rota; do
+      [ -z "${_rota}" ] && continue
+      rota_count=$((rota_count + 1))
+      rota_sum=$((rota_sum + _rota))
+    done <<< "${rota_values}"
+    if [ "${rota_count}" -gt 0 ]; then
+      if [ "${rota_sum}" -eq 0 ]; then echo 'ssd'; else echo 'hdd'; fi
+      return
+    fi
+  fi
+  echo 'unknown'
+}
+
+# MySQL 与整套 Microi 服务共机部署，缓冲池保留 Redis/Mongo/API/系统空间；
+# CPU 决定连接及 I/O 线程，真实块设备 ROTA 决定 SSD/HDD I/O 参数。
+generate_mysql_config() {
+  local total_mem_mb="${MICROI_HOST_MEMORY_MB_OVERRIDE:-}"
+  local logical_cpus="${MICROI_HOST_LOGICAL_CPUS_OVERRIDE:-}"
+  local physical_cores
+  local disk_type
+  local buffer_pool_mb
+  local buffer_pool_percent
+  local innodb_log_buffer_size
+  local innodb_log_file_mb
+  local innodb_buffer_pool_instances
+  local buffer_pool_alignment_mb
+  local max_connections
+  local memory_connection_cap
+  local thread_cache_size
+  local table_open_cache
+  local io_threads
+  local purge_threads
+  local innodb_io_capacity
+  local innodb_io_capacity_max
+  local innodb_flush_neighbors
+  local tmp_table_size
+  local durability_mode="${MICROI_MYSQL_DURABILITY:-safe}"
+  local flush_log_at_trx_commit=1
+  local sync_binlog=1
+
+  if [[ ! "${total_mem_mb}" =~ ^[1-9][0-9]*$ ]]; then
+    total_mem_mb=$(awk '/MemTotal/ {print int($2 / 1024); exit}' /proc/meminfo 2>/dev/null || echo 2048)
+  fi
+  if [[ ! "${logical_cpus}" =~ ^[1-9][0-9]*$ ]]; then
+    logical_cpus=$(nproc 2>/dev/null || echo 1)
+  fi
+  physical_cores=$(detect_physical_cpu_cores)
+  disk_type=$(detect_storage_type "${DATABASE_DATA_DIR:-/}")
+
+  if [ "${total_mem_mb}" -le 2048 ]; then buffer_pool_percent=20
+  elif [ "${total_mem_mb}" -le 4096 ]; then buffer_pool_percent=25
+  elif [ "${total_mem_mb}" -le 8192 ]; then buffer_pool_percent=30
+  elif [ "${total_mem_mb}" -le 16384 ]; then buffer_pool_percent=35
+  else buffer_pool_percent=45
+  fi
+  buffer_pool_mb=$((total_mem_mb * buffer_pool_percent / 100))
+  [ "${buffer_pool_mb}" -lt 128 ] && buffer_pool_mb=128
+
+  memory_connection_cap=$((total_mem_mb / 64))
+  [ "${memory_connection_cap}" -lt 100 ] && memory_connection_cap=100
+  max_connections=$((logical_cpus * 25))
+  [ "${max_connections}" -lt 100 ] && max_connections=100
+  [ "${max_connections}" -gt "${memory_connection_cap}" ] && max_connections="${memory_connection_cap}"
+  [ "${max_connections}" -gt 800 ] && max_connections=800
+
+  thread_cache_size=$((logical_cpus * 8))
+  [ "${thread_cache_size}" -lt 32 ] && thread_cache_size=32
+  [ "${thread_cache_size}" -gt 256 ] && thread_cache_size=256
+  table_open_cache=$((physical_cores * 256))
+  [ "${table_open_cache}" -lt 512 ] && table_open_cache=512
+  [ "${table_open_cache}" -gt 8192 ] && table_open_cache=8192
+  io_threads="${physical_cores}"
+  [ "${io_threads}" -lt 4 ] && io_threads=4
+  [ "${io_threads}" -gt 16 ] && io_threads=16
+  purge_threads=$(((physical_cores + 1) / 2))
+  [ "${purge_threads}" -lt 2 ] && purge_threads=2
+  [ "${purge_threads}" -gt 8 ] && purge_threads=8
+
+  innodb_buffer_pool_instances=$((buffer_pool_mb / 1024))
+  [ "${innodb_buffer_pool_instances}" -lt 1 ] && innodb_buffer_pool_instances=1
+  [ "${innodb_buffer_pool_instances}" -gt 16 ] && innodb_buffer_pool_instances=16
+  # MySQL 8 会把 Buffer Pool 自动调整为 chunk(默认 128M) * instances 的整数倍。
+  # 主动向下对齐，避免启动时被隐式向上扩容，导致实际内存超过脚本显示值。
+  buffer_pool_alignment_mb=$((128 * innodb_buffer_pool_instances))
+  buffer_pool_mb=$((buffer_pool_mb / buffer_pool_alignment_mb * buffer_pool_alignment_mb))
+  [ "${buffer_pool_mb}" -lt 128 ] && buffer_pool_mb=128
+  innodb_log_file_mb=$((buffer_pool_mb / 16))
+  [ "${innodb_log_file_mb}" -lt 128 ] && innodb_log_file_mb=128
+  [ "${innodb_log_file_mb}" -gt 4096 ] && innodb_log_file_mb=4096
+  if [ "${total_mem_mb}" -le 4096 ]; then innodb_log_buffer_size='32M'; tmp_table_size='32M'
+  elif [ "${total_mem_mb}" -le 16384 ]; then innodb_log_buffer_size='64M'; tmp_table_size='64M'
+  else innodb_log_buffer_size='256M'; tmp_table_size='128M'
+  fi
+
+  case "${disk_type}" in
+    ssd)
+      innodb_io_capacity=$((physical_cores * 500))
+      [ "${innodb_io_capacity}" -lt 2000 ] && innodb_io_capacity=2000
+      [ "${innodb_io_capacity}" -gt 10000 ] && innodb_io_capacity=10000
+      innodb_io_capacity_max=$((innodb_io_capacity * 2))
+      innodb_flush_neighbors=0
+      ;;
+    hdd)
+      innodb_io_capacity=400
+      innodb_io_capacity_max=800
+      innodb_flush_neighbors=1
+      [ "${io_threads}" -gt 8 ] && io_threads=8
+      ;;
+    *)
+      innodb_io_capacity=1000
+      innodb_io_capacity_max=2000
+      innodb_flush_neighbors=0
+      ;;
+  esac
+  if [ "${durability_mode,,}" = 'performance' ]; then
+    flush_log_at_trx_commit=2
+    sync_binlog=100
+  fi
+
+  echo "Microi：MySQL 自适应配置：内存 ${total_mem_mb}MB，物理核 ${physical_cores}，逻辑核 ${logical_cpus}，磁盘 ${disk_type}，Buffer Pool ${buffer_pool_mb}MB，最大连接 ${max_connections}" >&2
+  cat <<MYSQLCNF
+[mysqld]
+# Microi 自适应配置：RAM=${total_mem_mb}MB, physical=${physical_cores}, logical=${logical_cpus}, disk=${disk_type}
+lower_case_table_names = 1
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+max_allowed_packet = 512M
+skip_name_resolve = ON
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+# 连接与表缓存（连接数同时受 CPU、内存上限约束）
+max_connections = ${max_connections}
+max_connect_errors = 100000
+thread_cache_size = ${thread_cache_size}
+table_open_cache = ${table_open_cache}
+
+# 全局内存；每连接缓冲保持保守值，避免高并发 OOM
+innodb_buffer_pool_size = ${buffer_pool_mb}M
+innodb_log_buffer_size = ${innodb_log_buffer_size}
+key_buffer_size = 64M
+tmp_table_size = ${tmp_table_size}
+max_heap_table_size = ${tmp_table_size}
+sort_buffer_size = 512K
+read_buffer_size = 512K
+read_rnd_buffer_size = 512K
+join_buffer_size = 512K
+thread_stack = 512K
+
+# 按物理核心与 SSD/HDD 自动调节的 InnoDB I/O
+innodb_buffer_pool_instances = ${innodb_buffer_pool_instances}
+innodb_log_file_size = ${innodb_log_file_mb}M
+innodb_log_files_in_group = 2
+innodb_io_capacity = ${innodb_io_capacity}
+innodb_io_capacity_max = ${innodb_io_capacity_max}
+innodb_flush_method = O_DIRECT
+innodb_flush_neighbors = ${innodb_flush_neighbors}
+innodb_read_io_threads = ${io_threads}
+innodb_write_io_threads = ${io_threads}
+innodb_purge_threads = ${purge_threads}
+innodb_adaptive_flushing = ON
+
+# 默认 safe 保证事务/binlog 每次提交落盘；MICROI_MYSQL_DURABILITY=performance 可显式换取吞吐
+innodb_flush_log_at_trx_commit = ${flush_log_at_trx_commit}
+sync_binlog = ${sync_binlog}
+innodb_doublewrite = 1
+log_bin_trust_function_creators = ON
+performance_schema = ON
+MYSQLCNF
+  if [ "${MYSQL_VERSION}" = '5.7' ]; then
+    cat <<'MYSQL57ONLY'
+query_cache_type = 0
+query_cache_size = 0
+MYSQL57ONLY
+  else
+    cat <<'MYSQL8ONLY'
+default_authentication_plugin = mysql_native_password
+MYSQL8ONLY
+  fi
+}
+
+# 自动化验收入口：不读取交互、不访问网络、不修改 Docker。
+if [ "${MICROI_INSTALL_VALIDATE_SQL_ZIP_ONLY:-0}" = "1" ]; then
+  validate_sql_zip_archive "${MICROI_SQL_ZIP_PATH:?MICROI_SQL_ZIP_PATH is required}"
+  echo "SQL_ARCHIVE_ENTRY=${SQL_ARCHIVE_ENTRY}"
+  echo "SQL_UNCOMPRESSED_BYTES=${SQL_UNCOMPRESSED_BYTES}"
+  exit 0
+fi
+if [ "${MICROI_INSTALL_MYSQL_CONFIG_ONLY:-0}" = "1" ]; then
+  configure_database_profile "${MICROI_DATABASE_CHOICE:-2}"
+  DATABASE_DATA_DIR="${MICROI_DATABASE_DATA_DIR_FOR_DETECTION:-/}"
+  generate_mysql_config
+  exit 0
+fi
+
 # CI/维护人员可验证全部数据库映射，不探测网络、不读取输入、不修改 Docker。
 if [ "${MICROI_INSTALL_PROFILE_ONLY:-0}" = "1" ]; then
   configure_database_profile "${MICROI_DATABASE_CHOICE:-1}"
@@ -378,6 +666,60 @@ if ! validate_database_install_preflight; then
   exit 1
 fi
 
+# === 数据库初始化包选择（最后一个人工确认项之一，之后保持全自动） ===
+echo ''
+echo 'Microi：请选择数据库初始化包来源：'
+echo "  1. 使用吾码最新的 ${DATABASE_DISPLAY_NAME} 标准空业务数据库（默认，从 CDN 下载）"
+echo '  2. 使用服务器上已上传的数据库 .zip（ZIP 内必须且只能有一个 .sql，文件名不限）'
+echo 'Microi：请输入 1 或 2，直接按 Enter 默认选择 1：'
+if [ -n "${MICROI_SQL_ZIP_PATH:-}" ] && [ -z "${MICROI_SQL_SOURCE:-}" ]; then
+  MICROI_SQL_SOURCE='custom'
+fi
+case "${MICROI_SQL_SOURCE:-}" in
+  official|1)
+    sql_source_input=1
+    echo 'Microi：使用环境变量 MICROI_SQL_SOURCE=official'
+    ;;
+  custom|2)
+    sql_source_input=2
+    echo 'Microi：使用环境变量 MICROI_SQL_SOURCE=custom'
+    ;;
+  '') read -r sql_source_input ;;
+  *)
+    echo 'Microi：错误：MICROI_SQL_SOURCE 只能是 official 或 custom。'
+    exit 1
+    ;;
+esac
+
+if [ "${sql_source_input:-1}" = '1' ]; then
+  SQL_SOURCE_MODE='official'
+  SQL_SOURCE_DISPLAY="${SQL_ZIP_URL}"
+  echo 'Microi：将使用吾码最新标准空业务数据库 ✓'
+elif [ "${sql_source_input}" = '2' ]; then
+  SQL_SOURCE_MODE='custom'
+  if [ -n "${MICROI_SQL_ZIP_PATH:-}" ]; then
+    sql_zip_path_input="${MICROI_SQL_ZIP_PATH}"
+    echo "Microi：使用环境变量 MICROI_SQL_ZIP_PATH=${sql_zip_path_input}"
+  else
+    echo 'Microi：请输入数据库压缩包绝对路径（例如 /home/xxx.zip）：'
+    read -r sql_zip_path_input
+  fi
+  if [[ "${sql_zip_path_input}" != /* ]] || [[ "${sql_zip_path_input,,}" != *.zip ]]; then
+    echo 'Microi：错误：数据库压缩包必须是以 .zip 结尾的 Linux 绝对路径。'
+    exit 1
+  fi
+  if [ ! -f "${sql_zip_path_input}" ]; then
+    echo "Microi：错误：找不到数据库压缩包：${sql_zip_path_input}"
+    exit 1
+  fi
+  SQL_CUSTOM_ZIP_PATH=$(readlink -f "${sql_zip_path_input}")
+  SQL_SOURCE_DISPLAY="${SQL_CUSTOM_ZIP_PATH}"
+  echo "Microi：将使用自定义数据库压缩包：${SQL_CUSTOM_ZIP_PATH} ✓"
+else
+  echo 'Microi：错误：无效的数据库初始化包来源，脚本退出。'
+  exit 1
+fi
+
 # === 可选的 Microi Docker 固定网段 ===
 echo ''
 echo 'Microi：是否创建并让所有编排使用指定网段的 microi Docker 网络？'
@@ -438,9 +780,9 @@ else
   exit 1
 fi
 
-# === 数据库类型：安装标准空数据库 ===
+# === 数据库类型与初始化包最终确认 ===
 echo ''
-echo "Microi：将安装 ${DATABASE_DISPLAY_NAME} 空数据库（干净数据库，适合正式项目）✓"
+echo "Microi：将安装 ${DATABASE_DISPLAY_NAME}，数据库初始化包：${SQL_SOURCE_DISPLAY} ✓"
 
 echo ''
 echo '[步骤1/11] 环境检测完成 ✓'
@@ -682,6 +1024,15 @@ install_deps() {
 }
 install_deps
 
+# 在开始拉取镜像和创建数据库前完成自定义包的完整安全校验。
+SQL_REQUIRED_FREE_MB=2048
+if [ "${SQL_SOURCE_MODE}" = 'custom' ]; then
+  validate_sql_zip_archive "${SQL_CUSTOM_ZIP_PATH}"
+  SQL_REQUIRED_FREE_MB=$(((SQL_UNCOMPRESSED_BYTES * 3 + 1048575) / 1048576 + 1024))
+  [ "${SQL_REQUIRED_FREE_MB}" -lt 2048 ] && SQL_REQUIRED_FREE_MB=2048
+  echo "Microi：数据库包校验通过：${SQL_ARCHIVE_ENTRY}，解压后约 $(((SQL_UNCOMPRESSED_BYTES + 1048575) / 1048576))MB ✓"
+fi
+
 echo ''
 echo '[步骤2/11] Docker 环境就绪 ✓'
 
@@ -695,9 +1046,12 @@ fi
 ROOT_AVAIL_MB=$((ROOT_AVAIL_KB / 1024))
 echo "Microi：/home 分区可用空间: ${ROOT_AVAIL_MB}MB"
 if [ ${ROOT_AVAIL_MB} -lt 2048 ]; then
-  echo "Microi：警告：磁盘可用空间不足 2GB（当前 ${ROOT_AVAIL_MB}MB）。"
-  echo "Microi：MySQL初始化、Docker镜像拉取等操作需要较多磁盘空间。"
-  echo "Microi：建议至少保留 5GB 以上可用空间。如空间不足可能导致安装失败。"
+  echo "Microi：错误：磁盘可用空间不足（当前 ${ROOT_AVAIL_MB}MB，至少需要 2048MB）。"
+  exit 1
+elif [ ${ROOT_AVAIL_MB} -lt ${SQL_REQUIRED_FREE_MB} ]; then
+  echo "Microi：错误：自定义数据库包较大，当前可用 ${ROOT_AVAIL_MB}MB，至少需要 ${SQL_REQUIRED_FREE_MB}MB。"
+  echo 'Microi：所需空间按 SQL 解压大小、导入膨胀和 1GB 安全余量计算。'
+  exit 1
 fi
 
 # ============================================================
@@ -877,250 +1231,6 @@ echo 'Microi：各服务数据目录已创建 ✓'
 echo ''
 echo '[步骤4/11] 密码与数据目录就绪 ✓'
 
-# ============================================================
-# 自动检测服务器内存并生成MySQL配置
-# ============================================================
-generate_mysql_config() {
-  # 获取服务器总内存（MB）
-  local total_mem_kb
-  total_mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "2097152")
-  if [ -z "${total_mem_kb}" ]; then
-    total_mem_kb=2097152
-    echo "Microi：警告：无法读取 /proc/meminfo，使用默认 2GB 内存配置" >&2
-  fi
-  local total_mem_mb=$((total_mem_kb / 1024))
-  echo "Microi：检测到服务器内存: ${total_mem_mb}MB" >&2
-
-  # 根据内存分配MySQL参数
-  local innodb_buffer_pool_size
-  local innodb_log_buffer_size
-  local key_buffer_size
-  local tmp_table_size
-  local max_heap_table_size
-  local max_connections
-  local thread_cache_size
-  local table_open_cache
-  local sort_buffer_size
-  local read_buffer_size
-  local join_buffer_size
-  local innodb_log_file_size
-  local innodb_buffer_pool_instances
-  local innodb_io_capacity
-  local innodb_io_capacity_max
-
-  if [ ${total_mem_mb} -le 1024 ]; then
-    echo "Microi：MySQL配置模式: 极低配(≤1GB内存)" >&2
-    innodb_buffer_pool_size="128M"
-    innodb_log_buffer_size="16M"
-    innodb_log_file_size="48M"
-    key_buffer_size="16M"
-    tmp_table_size="16M"
-    max_heap_table_size="16M"
-    max_connections=100
-    thread_cache_size=16
-    table_open_cache=256
-    sort_buffer_size="256K"
-    read_buffer_size="256K"
-    join_buffer_size="256K"
-  elif [ ${total_mem_mb} -le 2048 ]; then
-    echo "Microi：MySQL配置模式: 低配(2GB内存)" >&2
-    innodb_buffer_pool_size="256M"
-    innodb_log_buffer_size="32M"
-    innodb_log_file_size="64M"
-    key_buffer_size="32M"
-    tmp_table_size="32M"
-    max_heap_table_size="32M"
-    max_connections=200
-    thread_cache_size=32
-    table_open_cache=512
-    sort_buffer_size="512K"
-    read_buffer_size="512K"
-    join_buffer_size="512K"
-  elif [ ${total_mem_mb} -le 4096 ]; then
-    echo "Microi：MySQL配置模式: 标准(4GB内存)" >&2
-    innodb_buffer_pool_size="512M"
-    innodb_log_buffer_size="64M"
-    innodb_log_file_size="128M"
-    key_buffer_size="64M"
-    tmp_table_size="64M"
-    max_heap_table_size="64M"
-    max_connections=300
-    thread_cache_size=64
-    table_open_cache=1024
-    sort_buffer_size="1M"
-    read_buffer_size="1M"
-    join_buffer_size="1M"
-  elif [ ${total_mem_mb} -le 8192 ]; then
-    echo "Microi：MySQL配置模式: 中配(8GB内存)" >&2
-    innodb_buffer_pool_size="1G"
-    innodb_log_buffer_size="128M"
-    innodb_log_file_size="256M"
-    key_buffer_size="128M"
-    tmp_table_size="128M"
-    max_heap_table_size="128M"
-    max_connections=500
-    thread_cache_size=128
-    table_open_cache=2048
-    sort_buffer_size="2M"
-    read_buffer_size="2M"
-    join_buffer_size="2M"
-  elif [ ${total_mem_mb} -le 16384 ]; then
-    echo "Microi：MySQL配置模式: 高配(16GB内存)" >&2
-    innodb_buffer_pool_size="3G"
-    innodb_log_buffer_size="256M"
-    innodb_log_file_size="256M"
-    key_buffer_size="256M"
-    tmp_table_size="256M"
-    max_heap_table_size="256M"
-    max_connections=800
-    thread_cache_size=192
-    table_open_cache=4096
-    sort_buffer_size="4M"
-    read_buffer_size="2M"
-    join_buffer_size="4M"
-  else
-    echo "Microi：MySQL配置模式: 超高配(>16GB内存)" >&2
-    innodb_buffer_pool_size="5G"
-    innodb_log_buffer_size="256M"
-    innodb_log_file_size="512M"
-    key_buffer_size="256M"
-    tmp_table_size="256M"
-    max_heap_table_size="256M"
-    max_connections=1000
-    thread_cache_size=256
-    table_open_cache=4096
-    sort_buffer_size="4M"
-    read_buffer_size="2M"
-    join_buffer_size="4M"
-  fi
-
-  if [ ${total_mem_mb} -le 2048 ]; then
-    innodb_buffer_pool_instances=1
-    innodb_io_capacity=500
-    innodb_io_capacity_max=1000
-  elif [ ${total_mem_mb} -le 4096 ]; then
-    innodb_buffer_pool_instances=2
-    innodb_io_capacity=1000
-    innodb_io_capacity_max=2000
-  elif [ ${total_mem_mb} -le 8192 ]; then
-    innodb_buffer_pool_instances=4
-    innodb_io_capacity=4000
-    innodb_io_capacity_max=8000
-  else
-    innodb_buffer_pool_instances=8
-    innodb_io_capacity=4000
-    innodb_io_capacity_max=8000
-  fi
-
-  if [ "${MYSQL_VERSION}" == "8.0" ]; then
-    cat <<MYSQL8CNF
-[mysqld]
-# 基础配置（MySQL 8.0）
-lower_case_table_names = 1
-character_set_server = utf8mb4
-collation_server = utf8mb4_unicode_ci
-max_allowed_packet = 512M
-net_buffer_length = 16384
-skip_name_resolve = ON
-sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
-
-# 连接配置（根据${total_mem_mb}MB内存自动生成）
-max_connections = ${max_connections}
-max_connect_errors = 100000
-thread_cache_size = ${thread_cache_size}
-table_open_cache = ${table_open_cache}
-table_open_cache_instances = 16
-
-# 内存配置
-innodb_buffer_pool_size = ${innodb_buffer_pool_size}
-innodb_log_buffer_size = ${innodb_log_buffer_size}
-key_buffer_size = ${key_buffer_size}
-tmp_table_size = ${tmp_table_size}
-max_heap_table_size = ${max_heap_table_size}
-
-# InnoDB I/O 优化
-innodb_io_capacity = ${innodb_io_capacity}
-innodb_io_capacity_max = ${innodb_io_capacity_max}
-innodb_flush_method = O_DIRECT
-innodb_flush_neighbors = 0
-innodb_log_file_size = ${innodb_log_file_size}
-innodb_log_files_in_group = 2
-innodb_buffer_pool_instances = ${innodb_buffer_pool_instances}
-innodb_read_io_threads = 8
-innodb_write_io_threads = 8
-innodb_purge_threads = 4
-innodb_adaptive_flushing = ON
-
-# 缓冲配置
-sort_buffer_size = ${sort_buffer_size}
-read_buffer_size = ${read_buffer_size}
-read_rnd_buffer_size = ${read_buffer_size}
-join_buffer_size = ${join_buffer_size}
-thread_stack = 512K
-binlog_cache_size = 2M
-
-# SSD 持久化优化
-innodb_flush_log_at_trx_commit = 2
-sync_binlog = 1000
-innodb_doublewrite = 1
-
-# MySQL 8.0 兼容与运行配置
-default_authentication_plugin = mysql_native_password
-innodb_dedicated_server = ON
-log_bin_trust_function_creators = ON
-performance_schema = ON
-MYSQL8CNF
-  else
-    cat <<MYSQL57CNF
-[mysqld]
-# 基础配置（MySQL 5.7）
-lower_case_table_names = 1
-character_set_server = utf8mb4
-collation_server = utf8mb4_unicode_ci
-max_allowed_packet = 512M
-skip_name_resolve = ON
-sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
-
-# 连接配置（根据${total_mem_mb}MB内存自动生成）
-max_connections = ${max_connections}
-max_connect_errors = 100000
-thread_cache_size = ${thread_cache_size}
-table_open_cache = ${table_open_cache}
-
-# 内存配置
-innodb_buffer_pool_size = ${innodb_buffer_pool_size}
-innodb_log_buffer_size = ${innodb_log_buffer_size}
-key_buffer_size = ${key_buffer_size}
-query_cache_type = 0
-query_cache_size = 0
-tmp_table_size = ${tmp_table_size}
-max_heap_table_size = ${max_heap_table_size}
-
-# InnoDB 优化
-innodb_flush_method = O_DIRECT
-innodb_flush_neighbors = 0
-innodb_log_file_size = ${innodb_log_file_size}
-innodb_log_files_in_group = 2
-innodb_read_io_threads = 4
-innodb_write_io_threads = 4
-innodb_purge_threads = 2
-innodb_adaptive_flushing = ON
-
-# 缓冲配置
-sort_buffer_size = ${sort_buffer_size}
-read_buffer_size = ${read_buffer_size}
-read_rnd_buffer_size = ${read_buffer_size}
-join_buffer_size = ${join_buffer_size}
-thread_stack = 512K
-binlog_cache_size = 196608
-
-# 持久化优化
-innodb_flush_log_at_trx_commit = 2
-sync_binlog = 1000
-innodb_doublewrite = 1
-MYSQL57CNF
-  fi
-}
 
 # ============================================================
 # 防火墙端口开放函数
@@ -1244,13 +1354,13 @@ echo '------------------------------------------------------------------'
 
 DATABASE_DIR="${COMPOSE_BASE_DIR}/microi-install-database"
 
-# 检查磁盘可用空间（数据库初始化至少需要1GB）
+# 检查数据库数据盘空间；大 SQL 包按解压大小动态提高门槛。
 DATABASE_DATA_MOUNT=$(df -P "${DATABASE_DATA_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
 if [ -n "${DATABASE_DATA_MOUNT}" ]; then
   DISK_AVAIL_MB=$((DATABASE_DATA_MOUNT / 1024))
   echo "Microi：数据库数据目录所在磁盘可用空间: ${DISK_AVAIL_MB}MB"
-  if [ ${DISK_AVAIL_MB} -lt 1024 ]; then
-    echo "Microi：错误：磁盘可用空间不足 1GB（当前 ${DISK_AVAIL_MB}MB），数据库初始化可能失败。"
+  if [ ${DISK_AVAIL_MB} -lt ${SQL_REQUIRED_FREE_MB} ]; then
+    echo "Microi：错误：数据库数据盘可用空间不足（当前 ${DISK_AVAIL_MB}MB，至少需要 ${SQL_REQUIRED_FREE_MB}MB）。"
     exit 1
   fi
 else
@@ -1472,25 +1582,101 @@ if [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; then
   docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
 fi
 
-# 下载并还原与所选数据库严格匹配的 Dos.ORM 发布包。
-SQL_ZIP_FILE="/tmp/${SQL_ZIP_FILE_NAME}"
-SQL_TMP_DIR="/tmp/microi_empty_database_${DATABASE_ENGINE_KEY}"
-SQL_FILE="${SQL_TMP_DIR}/${SQL_FILE_NAME}"
-mkdir -p "${SQL_TMP_DIR}"
-echo "Microi：下载数据库备份文件: ${SQL_ZIP_URL}"
-curl -fSL -o "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"
-unzip -o -d "${SQL_TMP_DIR}" "${SQL_ZIP_FILE}"
-if [ ! -f "${SQL_FILE}" ]; then
-  echo "Microi：错误：解压后未找到 SQL 文件: ${SQL_FILE_NAME}"
-  ls -la "${SQL_TMP_DIR}/"
+# 获取、复核并安全展开数据库包。自定义原文件只读使用，清理时绝不删除。
+SQL_ZIP_IS_TEMP=0
+SQL_TMP_DIR=$(mktemp -d "/tmp/microi_database_${DATABASE_ENGINE_KEY}.XXXXXX")
+SQL_FILE="${SQL_TMP_DIR}/microi-database-init.sql"
+cleanup_database_import_temp() {
+  rm -rf "${SQL_TMP_DIR:-/tmp/microi-no-such-dir}"
+  if [ "${SQL_ZIP_IS_TEMP:-0}" = '1' ] && [ -n "${SQL_ZIP_FILE:-}" ]; then
+    rm -f "${SQL_ZIP_FILE}"
+  fi
+}
+trap cleanup_database_import_temp EXIT
+
+if [ "${SQL_SOURCE_MODE}" = 'custom' ]; then
+  SQL_ZIP_FILE="${SQL_CUSTOM_ZIP_PATH}"
+  echo "Microi：读取自定义数据库包：${SQL_ZIP_FILE}"
+else
+  SQL_ZIP_FILE=$(mktemp "/tmp/${SQL_ZIP_FILE_NAME}.XXXXXX")
+  SQL_ZIP_IS_TEMP=1
+  echo "Microi：下载数据库备份文件：${SQL_ZIP_URL}"
+  curl --fail --location --retry 3 --retry-delay 2 --output "${SQL_ZIP_FILE}" "${SQL_ZIP_URL}"
+fi
+
+# 二次校验可防止预检后文件被替换；unzip -p 输出到固定文件名，不信任 ZIP 内路径。
+validate_sql_zip_archive "${SQL_ZIP_FILE}"
+if ! unzip -p "${SQL_ZIP_FILE}" "${SQL_ARCHIVE_ENTRY}" > "${SQL_FILE}"; then
+  echo 'Microi：错误：数据库 SQL 解压失败。'
+  exit 1
+fi
+SQL_EXTRACTED_BYTES=$(wc -c < "${SQL_FILE}" | tr -d ' ')
+if [ "${SQL_EXTRACTED_BYTES}" != "${SQL_UNCOMPRESSED_BYTES}" ]; then
+  echo "Microi：错误：SQL 解压后大小不一致（期望 ${SQL_UNCOMPRESSED_BYTES}，实际 ${SQL_EXTRACTED_BYTES}）。"
   exit 1
 fi
 
-echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 标准空数据库（可能需要几分钟）..."
+echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 数据库（${SQL_ARCHIVE_ENTRY}，可能需要几分钟）..."
 case "${DATABASE_CHOICE}" in
   1|2)
     docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
-    docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" microi_demo < "${SQL_FILE}"
+    # 仅本次恢复会话关闭 InnoDB 严格建表校验，兼容来源库中已存在的超宽 Dynamic 表；
+    # 同时关闭本会话 binlog 并按事务批量提交，避免几十万条单行 INSERT 每条 fsync。
+    # 不修改 global 配置，平台恢复完成后的所有新连接仍保持 MySQL 默认严格和安全落盘行为。
+    emit_mysql_import_preamble() {
+      printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET SESSION sql_log_bin=0; SET autocommit=0;\n"
+    }
+    run_mysql_import_stream() {
+      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql --binary-mode=1 -uroot -p"${DATABASE_PASSWORD}" microi_demo
+    }
+    set +e
+    if grep -q '^-- View structure' "${SQL_FILE}"; then
+      # Navicat 可能把依赖视图排在被依赖视图之前。先严格导入表和数据，再用一次
+      # --force 播种全部视图，最后严格重放视图段确认不存在真实 SQL 错误。
+      {
+        emit_mysql_import_preamble
+        sed -e '/^-- View structure/,$d' -e '/^[[:space:]]*SET[[:space:]]\+AUTOCOMMIT[[:space:]]*=/Id' "${SQL_FILE}"
+        printf '\nCOMMIT;\n'
+      } | run_mysql_import_stream
+      MYSQL_MAIN_PIPE_STATUSES=("${PIPESTATUS[@]}")
+
+      {
+        emit_mysql_import_preamble
+        sed -n '/^-- View structure/,$p' "${SQL_FILE}"
+        printf '\nCOMMIT;\n'
+      } | docker exec -i "${DATABASE_CONTAINER_NAME}" mysql --force --binary-mode=1 -uroot -p"${DATABASE_PASSWORD}" microi_demo > "${SQL_TMP_DIR}/view-seed.log" 2>&1
+      MYSQL_VIEW_SEED_PIPE_STATUSES=("${PIPESTATUS[@]}")
+
+      {
+        emit_mysql_import_preamble
+        sed -n '/^-- View structure/,$p' "${SQL_FILE}"
+        printf '\nCOMMIT;\n'
+      } | run_mysql_import_stream
+      MYSQL_VIEW_VERIFY_PIPE_STATUSES=("${PIPESTATUS[@]}")
+      MYSQL_IMPORT_FAILED=0
+      if [ "${MYSQL_MAIN_PIPE_STATUSES[0]:-1}" -ne 0 ] || [ "${MYSQL_MAIN_PIPE_STATUSES[1]:-1}" -ne 0 ] \
+        || [ "${MYSQL_VIEW_SEED_PIPE_STATUSES[0]:-1}" -ne 0 ] || [ "${MYSQL_VIEW_SEED_PIPE_STATUSES[1]:-1}" -ne 0 ] \
+        || [ "${MYSQL_VIEW_VERIFY_PIPE_STATUSES[0]:-1}" -ne 0 ] || [ "${MYSQL_VIEW_VERIFY_PIPE_STATUSES[1]:-1}" -ne 0 ]; then
+        MYSQL_IMPORT_FAILED=1
+      fi
+    else
+      {
+        emit_mysql_import_preamble
+        sed '/^[[:space:]]*SET[[:space:]]\+AUTOCOMMIT[[:space:]]*=/Id' "${SQL_FILE}"
+        printf '\nCOMMIT;\n'
+      } | run_mysql_import_stream
+      MYSQL_IMPORT_PIPE_STATUSES=("${PIPESTATUS[@]}")
+      MYSQL_IMPORT_FAILED=0
+      if [ "${MYSQL_IMPORT_PIPE_STATUSES[0]:-1}" -ne 0 ] || [ "${MYSQL_IMPORT_PIPE_STATUSES[1]:-1}" -ne 0 ]; then
+        MYSQL_IMPORT_FAILED=1
+      fi
+    fi
+    set -e
+    if [ "${MYSQL_IMPORT_FAILED:-1}" -ne 0 ]; then
+      echo 'Microi：错误：MySQL 数据库导入失败，已停止后续安装。'
+      if [ -s "${SQL_TMP_DIR}/view-seed.log" ]; then tail -n 30 "${SQL_TMP_DIR}/view-seed.log"; fi
+      exit 1
+    fi
     ;;
   3)
     docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "IF DB_ID(N'microi_demo') IS NULL CREATE DATABASE [microi_demo] COLLATE Chinese_PRC_CI_AS; ALTER DATABASE [microi_demo] SET COMPATIBILITY_LEVEL = 160;"
@@ -1498,7 +1684,7 @@ case "${DATABASE_CHOICE}" in
     ;;
   5)
     DM8_IMPORT_LOG="/tmp/microi_dm8_import.log"
-    DM8_CONTAINER_SQL="/tmp/${SQL_FILE_NAME}"
+    DM8_CONTAINER_SQL="/tmp/microi-database-init.sql"
     DM8_SCRIPT_ARG="$(printf '\140')${DM8_CONTAINER_SQL}"
     docker cp "${SQL_FILE}" "${DATABASE_CONTAINER_NAME}:${DM8_CONTAINER_SQL}"
     set +e
@@ -1522,6 +1708,17 @@ case "${DATABASE_CHOICE}" in
 esac
 echo 'Microi：数据库还原完成 ✓'
 
+# 客户库可能带有原环境的调度状态；必须在 API/Worker 启动前全部暂停，
+# 避免刚恢复就执行旧环境任务。执行失败时终止安装，不带病启动平台。
+echo 'Microi：暂停恢复库中的定时任务...'
+case "${DATABASE_CHOICE}" in
+  1|2) PAUSE_SCHEDULE_SQL="UPDATE diy_schedule_job SET Status='暂停'; UPDATE microi_job_triggers SET TRIGGER_STATE='PAUSED';" ;;
+  3) PAUSE_SCHEDULE_SQL="UPDATE [dbo].[diy_schedule_job] SET [Status]=N'暂停'; UPDATE [dbo].[microi_job_triggers] SET [TRIGGER_STATE]=N'PAUSED';" ;;
+  5|6) PAUSE_SCHEDULE_SQL="UPDATE \"diy_schedule_job\" SET \"Status\"='暂停'; UPDATE \"microi_job_triggers\" SET \"TRIGGER_STATE\"='PAUSED';" ;;
+esac
+database_exec_sql "${PAUSE_SCHEDULE_SQL}"
+echo 'Microi：定时任务已全部暂停 ✓'
+
 echo "Microi：更新 SaaS 主租户为 ${OS_CLIENT}..."
 case "${DATABASE_CHOICE}" in
   1|2) OS_CLIENT_SQL="UPDATE sys_osclients SET OsClient='${OS_CLIENT}', ClientName='${OS_CLIENT}' WHERE IFNULL(IsDeleted, 0) = 0;" ;;
@@ -1532,8 +1729,8 @@ esac
 database_exec_sql "${OS_CLIENT_SQL}"
 echo 'Microi：SaaS 主租户 OsClient、ClientName 更新完成 ✓'
 
-rm -f "${SQL_ZIP_FILE}"
-rm -rf "${SQL_TMP_DIR}"
+cleanup_database_import_temp
+trap - EXIT
 echo 'Microi：临时文件已清理 ✓'
 
 echo ''
@@ -2127,7 +2324,7 @@ echo '------------------------------------------------------------------'
 echo '服务信息：'
 echo '------------------------------------------------------------------'
 echo "${DATABASE_DISPLAY_NAME}:  Dos.ORM类型 ${DATABASE_TYPE}, 容器 ${DATABASE_CONTAINER_NAME}, 端口 ${DATABASE_PORT}, 管理员密码: ${DATABASE_PASSWORD}"
-echo "             空数据库包: ${SQL_ZIP_URL}"
+echo "             初始化包来源: ${SQL_SOURCE_DISPLAY}"
 echo "             数据目录: ${DATABASE_DATA_DIR}"
 echo "             编排目录: ${DATABASE_DIR}/"
 echo ""
