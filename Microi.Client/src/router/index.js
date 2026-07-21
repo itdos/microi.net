@@ -57,7 +57,7 @@ export const constantRoutes = [
                 path: "",
                 name: "online_office",
                 component: () => import("@/views/form-engine/diy-components/onlyoffice.vue"),
-                meta: { title: "在线文档", keepAlive: false }
+                meta: { title: "在线文档", keepAlive: false, anonymous: true, hideShellForAnonymous: true }
             }
         ]
     },

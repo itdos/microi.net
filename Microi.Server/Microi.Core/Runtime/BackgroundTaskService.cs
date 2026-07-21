@@ -23,6 +23,7 @@ namespace Microi.net
         public int Current { get; set; }
         public int Total { get; set; }
         public string Msg { get; set; }
+        public string Log { get; set; }
         public DateTime CreateTime { get; set; }
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
@@ -41,6 +42,9 @@ namespace Microi.net
         static BackgroundTaskService()
         {
             BackgroundTaskRuntime.UpdateProgressHandler = UpdateProgress;
+            BackgroundTaskRuntime.AppendLogHandler = AppendLog;
+            BackgroundTaskRuntime.IsCancellationRequestedHandler = taskId =>
+                Tasks.TryGetValue(taskId ?? "", out var task) && task.CancelRequested;
         }
 
         public static BackgroundTaskItem StartApiEngine(
@@ -199,7 +203,32 @@ namespace Microi.net
             if (!msg.DosIsNullOrWhiteSpace())
             {
                 item.Msg = msg;
+                if (item.Status == "Running")
+                {
+                    item.StatusText = msg.Contains("排队") || msg.Contains("等待上一个数据库备份")
+                        ? "排队中"
+                        : "执行中";
+                }
             }
+            NotifyUser(item);
+            return true;
+        }
+
+        public static bool AppendLog(string taskId, string message)
+        {
+            if (taskId.DosIsNullOrWhiteSpace()
+                || message.DosIsNullOrWhiteSpace()
+                || !Tasks.TryGetValue(taskId, out var item))
+            {
+                return false;
+            }
+
+            const int maxLogChars = 120000;
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message.Trim()}";
+            var combined = item.Log.DosIsNullOrWhiteSpace() ? line : item.Log + Environment.NewLine + line;
+            item.Log = combined.Length <= maxLogChars
+                ? combined
+                : "[较早日志已截断]" + Environment.NewLine + combined.Substring(combined.Length - maxLogChars);
             NotifyUser(item);
             return true;
         }
@@ -248,9 +277,13 @@ namespace Microi.net
                 {
                     serialGate = SerialApiEngineGates.GetOrAdd(serialKey, _ => new SemaphoreSlim(1, 1));
                     item.Status = "Pending";
-                    item.StatusText = "等待同租户其它应用安装完成";
+                    item.StatusText = string.Equals(apiParam?["ApiEngineKey"]?.ToString(), DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                        ? "等待上一个数据库备份完成"
+                        : "等待同租户其它应用安装完成";
                     item.Progress = Math.Max(item.Progress, 5);
-                    item.Msg = "应用安装已排队，将按顺序执行，避免旧库并发DDL和元数据写入死锁。";
+                    item.Msg = string.Equals(apiParam?["ApiEngineKey"]?.ToString(), DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                        ? "数据库备份已排队，上一个备份完成后自动执行。"
+                        : "应用安装已排队，将按顺序执行，避免旧库并发DDL和元数据写入死锁。";
                     NotifyUser(item);
                     await serialGate.WaitAsync(cancellationToken).ConfigureAwait(false);
                     serialGateAcquired = true;
@@ -342,7 +375,8 @@ namespace Microi.net
         private static string GetSerialApiEngineKey(BackgroundTaskItem item, JObject apiParam)
         {
             var apiEngineKey = apiParam?["ApiEngineKey"]?.ToString();
-            if (!string.Equals(apiEngineKey, "import-microi-store-package", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(apiEngineKey, "import-microi-store-package", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(apiEngineKey, DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase))
             {
                 return "";
             }

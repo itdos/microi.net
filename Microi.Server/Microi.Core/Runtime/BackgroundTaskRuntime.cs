@@ -8,6 +8,8 @@ namespace Microi.net
     public static class BackgroundTaskRuntime
     {
         public static Func<string, int?, string, int?, int?, bool> UpdateProgressHandler { get; set; }
+        public static Func<string, string, bool> AppendLogHandler { get; set; }
+        public static Func<string, bool> IsCancellationRequestedHandler { get; set; }
 
         public static bool TryUpdateProgress(string taskId, int? progress, string msg)
         {
@@ -22,6 +24,21 @@ namespace Microi.net
                 return false;
             }
             return handler(taskId, progress, msg, current, total);
+        }
+
+        public static bool IsCancellationRequested(string taskId)
+        {
+            var handler = IsCancellationRequestedHandler;
+            return handler != null && !string.IsNullOrWhiteSpace(taskId) && handler(taskId);
+        }
+
+        public static bool TryAppendLog(string taskId, string message)
+        {
+            var handler = AppendLogHandler;
+            return handler != null
+                   && !string.IsNullOrWhiteSpace(taskId)
+                   && !string.IsNullOrWhiteSpace(message)
+                   && handler(taskId, message);
         }
     }
 }

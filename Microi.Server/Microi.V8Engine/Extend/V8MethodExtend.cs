@@ -76,6 +76,107 @@ namespace Microi.net
             }
         }
 
+        /// <summary>
+        /// 执行全部 SaaS 数据库在线备份。实际并发、租约、节流、HDFS 私有上传由 C# 服务强制控制。
+        /// </summary>
+        public DosResult RunDatabaseBackup(dynamic dynamicParam)
+        {
+            try
+            {
+                var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                var currentUser = param["CurrentUser"] as JObject
+                                  ?? param["_CurrentUser"] as JObject
+                                  ?? new JObject();
+                var osClient = param["OsClient"]?.ToString() ?? "";
+                var backgroundTaskId = param["_BackgroundTaskId"]?.ToString()
+                                           ?? param["BackgroundTaskId"]?.ToString()
+                                           ?? "";
+                var retainCountText = param["RetainCount"]?.ToString();
+                int retainCount;
+                int.TryParse(retainCountText, out retainCount);
+                return new DatabaseBackupService(backgroundTaskId).Run(
+                    currentUser,
+                    osClient,
+                    param["TriggerType"]?.ToString() ?? "Manual",
+                    retainCount);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "执行数据库备份失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 仅接受固定任务 Id，将计划任务转换为后台任务，使管理员可在通知中心看到日志、进度和结果。
+        /// </summary>
+        public DosResult QueueScheduledDatabaseBackup(dynamic dynamicParam)
+        {
+            try
+            {
+                var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                var osClient = param["OsClient"]?.ToString() ?? "";
+                var jobId = param["Id"]?.ToString() ?? param["JobId"]?.ToString() ?? "";
+                if (!string.Equals(osClient, DatabaseBackupService.RequiredOsClient, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(jobId, DatabaseBackupService.ScheduledJobId, StringComparison.Ordinal))
+                {
+                    return new DosResult(0, null, "仅固定的 iTdos 数据库备份任务可投递后台任务。");
+                }
+
+                var client = OsClientExtend.GetClient(DatabaseBackupService.RequiredOsClient);
+                if (client?.DbRead == null)
+                {
+                    return new DosResult(0, null, "iTdos 主租户读取连接不可用。");
+                }
+                var admin = client.DbRead.FromSql(@"SELECT `Id`,`Account`,`Name`,`Level`
+FROM `Sys_User` WHERE (`IsDeleted`=0 OR `IsDeleted` IS NULL) AND `Level`>=9999
+ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
+                if (admin == null)
+                {
+                    return new DosResult(0, null, "未找到可接收定时备份通知的超级管理员。");
+                }
+                var trustedUser = JObject.FromObject(admin);
+                var userId = trustedUser["Id"]?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return new DosResult(0, null, "定时备份通知管理员 Id 为空。");
+                }
+
+                var retainCount = 7;
+                var jobParamText = param["JobParam"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(jobParamText))
+                {
+                    try
+                    {
+                        var settings = JObject.Parse(jobParamText);
+                        int.TryParse(settings["RetainCount"]?.ToString(), out retainCount);
+                    }
+                    catch { }
+                }
+                retainCount = Math.Max(1, Math.Min(100, retainCount <= 0 ? 7 : retainCount));
+                var task = BackgroundTaskService.StartApiEngine(
+                    DatabaseBackupService.RequiredOsClient,
+                    userId,
+                    "数据库定时备份",
+                    new JObject
+                    {
+                        ["ApiEngineKey"] = DatabaseBackupService.WorkerApiEngineKey,
+                        ["TriggerType"] = "Scheduled",
+                        ["RetainCount"] = retainCount
+                    },
+                    trustedUser);
+                return new DosResult(1, new
+                {
+                    TaskId = task.Id,
+                    task.Status,
+                    task.StatusText
+                }, "数据库定时备份已进入后台任务队列。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "投递数据库定时备份失败：" + ex.Message);
+            }
+        }
+
         private static EmptyDatabaseReleaseRequest ParseEmptyDatabaseReleaseRequest(object dynamicParam)
         {
             var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();

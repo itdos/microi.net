@@ -41,6 +41,7 @@ router.beforeEach(async (to, from, next) => {
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {
+    const isAnonymousRoute = to.matched.some((record) => record.meta?.anonymous === true);
     //   document.title = getPageTitle(to.meta.title)
     //2022-09-14 所有页面均需要token自动登录
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
@@ -224,7 +225,11 @@ router.beforeEach(async (to, from, next) => {
                     // 菜单接口明确返回 NoLogin/1001/1002 时必须清理并跳登录页，否则 next(false) 会留下空白页。
                     if (!DiyCommon.getToken() || isAuthenticationFailure(error)) {
                         await userStore.resetToken();
-                        next({ path: "/login", query: { redirect: to.fullPath } });
+                        if (isAnonymousRoute) {
+                            next({ ...to, replace: true });
+                        } else {
+                            next({ path: "/login", query: { redirect: to.fullPath } });
+                        }
                     } else {
                         next(false);
                     }
@@ -232,7 +237,7 @@ router.beforeEach(async (to, from, next) => {
             }
         }
     } else {
-        if (whiteList.indexOf(to.path) !== -1) {
+        if (isAnonymousRoute || whiteList.indexOf(to.path) !== -1) {
             next();
         } else {
             next({ path: "/login", query: { redirect: to.fullPath } }); //2022-03-31
@@ -242,7 +247,7 @@ router.beforeEach(async (to, from, next) => {
         // 守卫顶层错误兜底，避免 next 未调用导致整站卡死
         console.error("[router.beforeEach] 守卫异常：", e);
         try {
-            if (to.path === "/login" || (whiteList && whiteList.indexOf(to.path) !== -1)) {
+            if (to.path === "/login" || to.matched.some((record) => record.meta?.anonymous === true) || (whiteList && whiteList.indexOf(to.path) !== -1)) {
                 next();
             } else {
                 next({ path: "/login", query: { redirect: to.fullPath || "/" } });

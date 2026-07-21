@@ -306,11 +306,23 @@ export default {
         },
         async PageInit() {
             var self = this;
+            // 匿名路由由页面组件自行做静默登录态校验。这里不能调用全局
+            // GetCurrentUser，否则无 Token 的公有 OnlyOffice 预览会弹出“请重新登录”。
+            if (self.IsAnonymousRoute()) return;
             await self.RefreshTokenWithLock();
             self.GetCurrentUserApp();
             // 保存定时器引用，防止内存泄漏
             var refreshTokenTimer = window.setInterval(self.RefreshToken, 1000 * 60);
             self.timers.push(refreshTokenTimer);
+        },
+        IsAnonymousRoute() {
+            var matched = this.$route && this.$route.matched;
+            if (Array.isArray(matched) && matched.some(function (record) {
+                return record && record.meta && record.meta.anonymous === true;
+            })) return true;
+            // App mounted 可能早于 Hash 路由完成首次匹配，使用当前 hash 做启动期兜底。
+            var hashPath = typeof window !== "undefined" ? String(window.location.hash || "").split("?")[0] : "";
+            return hashPath === "#/online-office" || hashPath === "#/online-office/";
         },
         GetCurrentUserApp() {
             var self = this;

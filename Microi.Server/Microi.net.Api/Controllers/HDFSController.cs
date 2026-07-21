@@ -217,6 +217,7 @@ namespace Microi.net.Api
             if (param.Path.DosIsNullOrWhiteSpace()) param.Path = json["Path"]?.Val<string>();
             if (param.Limit == null && json["Limit"] != null) param.Limit = json["Limit"]?.Val<bool>();
             if (param.Preview == null && json["Preview"] != null) param.Preview = json["Preview"]?.Val<bool>();
+            if (param.ForOfficePreview == null && json["ForOfficePreview"] != null) param.ForOfficePreview = json["ForOfficePreview"]?.Val<bool>();
         }
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。

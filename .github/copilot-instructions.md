@@ -325,12 +325,19 @@ V8.Office.SendEmail({
   EmailSubject:'标题', EmailBody:'<b>HTML内容</b>',
   Receivers:['a@qq.com']
 });
-// 多 Sheet Excel（单 Sheet 仍可传 ExcelData + ExcelHeader）
+// 多 Sheet Excel：标准表格与高级 ExcelLayout 可以混用
 var excelResult = V8.Office.ExportExcel({
   OsClient: V8.OsClient,
   ExcelSheets: [
-    { SheetName:'订单', ExcelData:orderList, ExcelHeader:[{Name:'OrderNo',Label:'订单号',Component:'Text'}] },
-    { SheetName:'客户', ExcelData:customerList, ExcelHeader:[{Name:'Name',Label:'客户名称',Component:'Text'}] }
+    { SheetName:'审批单', ExcelLayout:{
+      Cells:[
+        {Range:'A1:H1',Value:'盘盈亏及报废申请表',Merge:true,Style:{Bold:true,FontSize:18,HorizontalAlignment:'Center',BorderStyle:'Thin'}},
+        {Range:'A2:H8',Style:{BorderStyle:'Thin',BorderColor:'7F8C9A'}},
+        {Range:'A8:G8',Value:'合计',Merge:true},{Range:'H8',Formula:'SUM(H3:H7)',Style:{NumberFormat:'#,##0.00'}}
+      ],
+      Columns:[{Column:'A',Width:10},{Column:'H',Width:16}], Rows:[{Row:1,Height:42}]
+    },ExcelOptions:{FreezeRows:2,PrintOrientation:'Landscape',PrintArea:'A1:H8'}},
+    { SheetName:'客户', ExcelData:customerList, ExcelHeader:[{Name:'Name',Label:'客户名称',Component:'Text',Width:24}] }
   ]
 });
 var rows = V8.Office.ExcelToList({ FileByteBase64: base64, SheetIndex: 0 });
@@ -542,10 +549,16 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 
 - 启动 Node.js、Vite、Webpack、dotnet build、Java、Docker build、浏览器自动化或压测等重任务前，先检查物理内存、当前占用、可用内存和已有同类进程；已有服务可复用时禁止重复启动。
 - 默认只运行一个高资源任务，显式限制 Worker/并发，优先按包、模块、测试分组或文件分片执行，禁止并行跑多个全量构建。
-- 必须为 VS Code、Codex 和操作系统保留至少 `max(6 GB, 物理内存的 20%)`。全机内存占用达 75% 或可用内存低于保留值时，立即终止 AI 启动的重任务及子进程，不得等待 OOM。
+- 启动重任务时仍以保留至少 `max(6 GB, 物理内存的 20%)` 给 VS Code、Codex 和操作系统为规划目标；低于该目标时停止新增并发重任务、优先降级为定向验证，但不作为强制终止已启动任务的硬门限。全机内存占用达到 95% 时，立即终止 AI 启动的重任务及子进程，不得等待 OOM。
 - 禁止为强行通过构建而无限抬高 `--max-old-space-size`、JVM heap、Docker memory 或 Worker 数。未获用户明确授权时，单个 AI 启动的进程树不得持续占用超过物理内存的 25%。
 - 后台/长任务必须记录根 PID、子进程、启动时间和独立日志，每 15-30 秒监测进程树内存与全机可用内存；任务失败、中断或达阈值时必须停止整个子进程树。
 - 全量构建无法在阈值内完成时，改用定向 lint、类型检查、按模块构建或按测试文件验证；完整验收交由 CI/专用构建机或经用户明确同意的独占时段执行。
+
+## 版本更新日志保护规则（强制）
+
+- 日常功能开发、缺陷修复、测试、普通文档补充、Skill 完善和代码重构期间，不得修改 `microi.doc/docs/doc/about/update-log.md`。
+- 只有用户明确提出“发布版本”“准备发版”“更新版本日志”或直接点名要求修改该文件时，才允许编辑更新日志；“完善文档”或“补充官网说明”不等于授权修改版本日志。
+- 如果本轮误改了更新日志，收尾前只撤回本轮由 AI 新增的改动；必须保留用户或其它任务已有的未提交内容，不得整文件覆盖或回退。
 
 
 ---

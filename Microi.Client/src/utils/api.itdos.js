@@ -103,7 +103,9 @@ var DiyApi = {
      */
     // Logout: '/api/' + joinUrl + 'SysUser/Logout',
     Logout: function () {
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysUser/Logout";
+        // 登录、TokenLogin、GetCurrentUser 和后端控制器都使用统一的非租户前缀路由；
+        // 租户身份由 Authorization/OsClient 解析。拼入 qiqiang 等 OsClient 会产生 404。
+        return "/api/SysUser/Logout";
     },
     /**
      * 获取微信菜单

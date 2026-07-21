@@ -1,15 +1,15 @@
 <template>
     <!-- WebOS 模式：如果 webos 模块存在且当前为 macOS/Windows 风格，渲染 WebOS 应用容器 -->
-    <component :is="WebOSAppContainer" v-if="isWebOS && WebOSAppContainer" />
+    <component :is="WebOSAppContainer" v-if="isWebOS && WebOSAppContainer && !hideShellForAnonymous" />
     <!-- 经典传统模式（仅当非 WebOS 时渲染，避免 WebOS 异步加载期间闪烁经典传统布局） -->
-    <div v-else-if="!isWebOS" :class="classObj" class="app-wrapper-microi">
+    <div v-else-if="!isWebOS || hideShellForAnonymous" :class="classObj" class="app-wrapper-microi">
         <!-- 遮罩层：仅在移动端且菜单展开时显示 -->
         <div v-if="diyStore.IsPhoneView && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
         <!-- 左边菜单区域（移动端不显示） -->
-        <sidebar v-if="ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
-        <div :class="{ hasTagsView: needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
+        <sidebar v-if="!hideShellForAnonymous && ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
+        <div :class="{ hasTagsView: !hideShellForAnonymous && needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView, 'anonymous-shell-hidden': hideShellForAnonymous }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
             <!-- 顶部导航区域（移动端不显示） -->
-            <div v-if="!diyStore.IsPhoneView" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
+            <div v-if="!hideShellForAnonymous && !diyStore.IsPhoneView" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
                 <!-- 面包屑区域 -->
                 <navbar />
                 <!-- 页签+内容区域（TagsView 内部已包含 router-view，PC 端内容在这里渲染） -->
@@ -17,7 +17,7 @@
             </div>
 
             <!-- 页面主内容区域：移动端或PC端没有TagsView时使用（因为TagsView内部已有router-view） -->
-            <app-main v-if="diyStore.IsPhoneView || !needTagsView" />
+            <app-main v-if="hideShellForAnonymous || diyStore.IsPhoneView || !needTagsView" />
 
             <!-- 右边设置区域（Settings 组件已移除）-->
             <!-- <right-panel v-if="showSettings">
@@ -26,7 +26,7 @@
         </div>
         
         <!-- 移动端底部导航栏 -->
-        <mobile-tab-bar />
+        <mobile-tab-bar v-if="!hideShellForAnonymous" />
     </div>
 </template>
 
@@ -109,6 +109,13 @@ export default {
                 mobile: this.diyStore.IsPhoneView,
                 'phone-view': this.diyStore.IsPhoneView
             };
+        },
+        hideShellForAnonymous() {
+            const routeRequiresHiddenShell = this.$route?.matched?.some((record) => record.meta?.hideShellForAnonymous === true);
+            if (!routeRequiresHiddenShell) return false;
+            const token = this.diyStore.Token || "";
+            const user = this.diyStore.GetCurrentUser || {};
+            return !token || !user.Id;
         }
     },
     mounted() {
@@ -132,6 +139,11 @@ export default {
         GetMainContainerMicroiStyle() {
             var self = this;
             var result = {};
+
+            if (self.hideShellForAnonymous) {
+                result["marginLeft"] = "0px";
+                return result;
+            }
             
             // 移动端不需要设置左边距
             if (self.diyStore.IsPhoneView) {
@@ -218,5 +230,14 @@ export default {
 .mobile-view {
     margin-left: 0 !important;
     // padding-bottom: 60px; // 为底部导航栏留出空间
+}
+
+.anonymous-shell-hidden {
+    margin-left: 0 !important;
+
+    :deep(.app-main-microi) {
+        min-height: 100vh;
+        padding-top: 0 !important;
+    }
 }
 </style>

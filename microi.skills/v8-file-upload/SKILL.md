@@ -252,6 +252,17 @@ return { Code: 1, Data: savedPaths };
 - 开启版本号时，保存文件必须生成带版本号后缀的新文件，例如 `contract_v1.0.1.docx`，字段 JSON 的 `Path` 指向最新版本，`Versions` 保留历史版本路径。
 - 在线 Office 路由和文件上传字段都要能读取 `Versions`，用于右上角切换历史版本预览/编辑。
 
+### OnlyOffice 服务端取文件与匿名预览规则
+
+- OnlyOffice 文档服务器会在服务端再次下载文件。浏览器可以下载但 OnlyOffice 提示“下载失败”时，优先检查生成地址是否为 `localhost/127.0.0.1/内网域名`。
+- OnlyOffice 可能先对文档地址发起 `HEAD` 探测。响应文件接口除了 `GET 200`，还必须让 `HEAD` 返回相同的 `Content-Type/Content-Length/Content-Disposition`，不能返回 `405`。
+- 私有文件在线预览调用 `GetPrivateFileUrl` 或 `/api/HDFS/GetPrivateFileUrl` 时传 `ForOfficePreview:true`。审计代理应优先使用租户系统配置的公网 `ApiBase`，但仍把真实对象存储签名地址保存在共享 Redis ticket 中，禁止直接返回真实签名地址。
+- `/online-office` 可以匿名访问。公有存储模式只允许当前 `OsClient` 目录下的 `filePathName`；接口模式通过 `fileUrl` 接收当前平台正式 `ApiBase`，或由同端口本地后端读取的 loopback `/apiengine/...` 响应文件地址，并要求 URL 显式携带当前 `OsClient`。两种模式都拒绝跨租户、路径穿越和任意第三方 URL；`isPrivate=1` 必须登录。
+- 匿名接口引擎预览不要求 V8 代码先上传 HDFS：接口开启【响应文件】和【允许匿名】后，完整地址 URL 编码传给 `fileUrl`，同时传 `fileName/fileType`。页面通过匿名安全中转让当前后端限域读取源文件，并以确定性路径缓存到当前租户公有对象存储；OnlyOffice 只接收公网 `FileServer` 地址。loopback 仅允许同端口本地后端访问，禁止开放任意 URL 代理。
+- `canEdit` 只是前端请求参数，不是权限。最终编辑条件必须是“有效登录态 && canEdit=true”；匿名始终只读，不能因 URL 参数放开编辑。
+- 匿名预览页隐藏左侧菜单、顶部导航和页签；已登录用户保持原系统布局。
+- 匿名导出响应接口应配置频率限制或保证生成逻辑足够轻量，不能让单个公网 URL 无界消耗 CPU/内存；如业务仍需要落盘缓存，缓存事实必须进入共享 Redis/HDFS，不能用进程内变量。
+
 字段 JSON 示例：
 
 ```json
