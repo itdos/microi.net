@@ -512,7 +512,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet, HttpDelete, HttpPut, HttpPatch]
+        [HttpPost, HttpGet, HttpHead, HttpDelete, HttpPut, HttpPatch]
         [AllowAnonymous]
         public async Task<ActionResult> Run_Response_File()
         {

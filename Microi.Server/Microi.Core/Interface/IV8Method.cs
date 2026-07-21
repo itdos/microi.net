@@ -129,5 +129,15 @@ namespace Microi.net
         /// 清理固定临时空数据库，供接口引擎异常补偿使用。
         /// </summary>
         DosResult CleanupEmptyDatabaseRelease(dynamic dynamicParam);
+
+        /// <summary>
+        /// 超级管理员执行全部 SaaS MySQL 数据库串行备份；结果不包含私有文件地址。
+        /// </summary>
+        DosResult RunDatabaseBackup(dynamic dynamicParam);
+
+        /// <summary>
+        /// 固定 Quartz 任务将定时备份投递到右上角后台任务中心。
+        /// </summary>
+        DosResult QueueScheduledDatabaseBackup(dynamic dynamicParam);
     }
 }

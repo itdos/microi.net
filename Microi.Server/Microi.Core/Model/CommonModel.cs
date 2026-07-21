@@ -195,6 +195,11 @@ namespace Microi.net
         public bool? Limit { get; set; }
         public bool? Multiple { get; set; }
         /// <summary>
+        /// 是否用于 OnlyOffice 等服务端在线预览。开启后私有文件审计代理优先返回系统配置的公网 ApiBase，
+        /// 避免文档服务器拿到 localhost/内网请求地址后无法下载文件。
+        /// </summary>
+        public bool? ForOfficePreview { get; set; }
+        /// <summary>
         /// 是否是预览图，如果是预览图则压缩
         /// </summary>
         public bool? Preview { get; set; }

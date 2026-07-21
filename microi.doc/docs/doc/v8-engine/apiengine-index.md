@@ -179,6 +179,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 >* 目前平台的通用导出功能是直接导出表格展现的字段以及内容，某些情况下并不满足复杂业务逻辑导出的需求，因此提供了两种自定义导出方式
 >* 2024-11-04开始支持导出单图、多图，且多图会自动生成列、合并列，通过计算定位自动浮在表格上对应的单元格
 >* 2026-06-24开始支持一次导出多个页签：传入 `ExcelSheets` 或 `Sheets` 数组即可。老的 `ExcelData + ExcelHeader` 写法保持单页签导出不变。
+>* 2026-07-20开始支持 `ExcelOptions` 工作表配置，以及 `ExcelHeader` 的列宽、行高、隐藏、自动宽度、数字格式和列级样式。完整参数以 [后端V8：V8.Office 导出 Excel](./v8-server.md#导出-excel) 为准。
 >* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
 
 ### 效果图
@@ -199,7 +200,9 @@ if(dataListResult.Code != 1){
 var dataList = dataListResult.Data;
 //动态设置表头，数据可来源于【diy_field】表，也可以自己组装，这里使用JOSN示例数据
 var header = [{
-  Name: 'Biaoti', Label : '标题', Component : 'Text'
+  Name: 'Biaoti', Label : '标题', Component : 'Text', Width: 30,
+  HeaderStyle: { BackgroundColor: '17365D', FontColor: 'FFFFFF' },
+  Style: { WrapText: true }
 },{
   Name: 'ImgUpload57', Label : '公有单图', Component : 'ImgUpload', 
   //传入Config.ImgUpload.Multiple=1会自动处理多图生成列、合并列，且通过计算定位自动浮在表格上对应的单元格
@@ -223,6 +226,15 @@ var excelResult = V8.Office.ExportExcel({
   OsClient : V8.OsClient,
   ExcelData : dataList,//传入动态数据源
   ExcelHeader : header,//传入动态表头
+  ExcelOptions : {
+    SheetName : '测试数据',
+    DefaultColumnWidth : 14,
+    HeaderRowHeight : 30,//磅（pt）
+    DataRowHeight : 24,//磅（pt）
+    FreezeHeader : true,
+    AutoFilter : true,
+    HeaderStyle : { Bold: true, HorizontalAlignment: 'Center' }
+  }
 });
 if(excelResult.Code != 1){
   return excelResult;
@@ -247,10 +259,16 @@ return {
 // ExcelSheets 也可以写成 Sheets。
 var excelResult = V8.Office.ExportExcel({
   OsClient : V8.OsClient,
+  ExcelOptions : {
+    DefaultColumnWidth : 14,
+    HeaderRowHeight : 28,
+    HeaderStyle : { Bold: true, BackgroundColor: 'D9EAF7' }
+  },
   ExcelSheets : [{
     SheetName : '五金计划',
     ExcelData : wujinList,
-    ExcelHeader : wujinHeader
+    ExcelHeader : wujinHeader,
+    ExcelOptions : { FreezeHeader: true, AutoFilter: true }
   },{
     SheetName : '喷塑计划',
     ExcelData : pensuList,
@@ -270,6 +288,8 @@ return {
 };
 ```
 
+外层 `ExcelOptions` 会作为所有页签的默认配置，页签内 `ExcelOptions` 只覆盖已传属性。列级可配置 `Width/AutoSize/MinWidth/MaxWidth/Hidden/HeaderHeight/RowHeight/NumberFormat/HeaderStyle/Style`；颜色使用 `RRGGBB` 或 `#RRGGBB`。自动列宽需要遍历单元格，大数据量导出建议显式设置 `Width`。
+
 如果某个页签不传 `ExcelHeader`，可以传入 `TableId` / `_SysMenuId` / `ModuleEngineKey`，导出引擎会按表单字段和菜单显示列自动生成表头，并追加默认导出字段：
 ```javascript
 var excelResult = V8.Office.ExportExcel({
@@ -287,6 +307,66 @@ var excelResult = V8.Office.ExportExcel({
   }]
 });
 ```
+:::
+
+### 高级 Excel 自由布局、合并单元格与自定义边框
+::: details 展开查看 JavaScript 代码
+```javascript
+// ExcelLayout 适合审批单、套打表、主子表、复杂表头等不规则版式。
+// Range 使用 A1 写法；Style 可重叠叠加，Merge=true 合并该区域。
+var excelResult = V8.Office.ExportExcel({
+  OsClient : V8.OsClient,
+  ExcelSheets : [{
+    SheetName : '审批单',
+    ExcelLayout : {
+      Cells : [
+        { Range:'A1:H10', Style:{
+          FontName:'Microsoft YaHei', BorderStyle:'Thin', BorderColor:'7F8C9A',
+          VerticalAlignment:'Center', WrapText:true
+        }},
+        { Range:'A1:H1', Value:'盘盈亏及报废申请表', Merge:true, Style:{
+          FontSize:18, Bold:true, HorizontalAlignment:'Center', BackgroundColor:'EEF2F7'
+        }},
+        { Range:'A2', Value:'序号', Style:{Bold:true,HorizontalAlignment:'Center'} },
+        { Range:'B2', Value:'物料编码', Style:{Bold:true,HorizontalAlignment:'Center'} },
+        { Range:'G2', Value:'数量', Style:{Bold:true,HorizontalAlignment:'Center'} },
+        { Range:'H2', Value:'金额', Style:{Bold:true,HorizontalAlignment:'Center'} },
+        { Range:'A3', Value:1 }, { Range:'B3', Value:'V3-MAT-1200' },
+        { Range:'G3', Value:2 },
+        { Range:'H3', Formula:'G3*1200', Style:{NumberFormat:'#,##0.00'} },
+        { Range:'A8:G8', Value:'合计', Merge:true, Style:{Bold:true,HorizontalAlignment:'Right'} },
+        { Range:'H8', Formula:'SUM(H3:H7)', Style:{Bold:true,NumberFormat:'#,##0.00'} },
+        { Range:'A9:D9', Value:'(1) 申请人：张三（已电子签）', Merge:true },
+        { Range:'E9:H9', Value:'(2) 主管意见：同意（已电子签）', Merge:true },
+        // 上/右/下/左边框可以分别设置类型与颜色
+        { Range:'A10:H10', Value:'备注：审批完成后交财务归档。', Merge:true, Style:{
+          BorderTopStyle:'Medium', BorderTopColor:'C00000',
+          BorderBottomStyle:'Double', BorderBottomColor:'203864'
+        }}
+      ],
+      Columns:[{Column:'A',Width:9},{Column:'B',Width:22},{Column:'H',Width:16}],
+      Rows:[{Row:1,Height:42},{Row:2,Height:32}],
+      RowGroups:[{StartRow:3,EndRow:7,Collapsed:false}]
+    },
+    ExcelOptions:{
+      ShowGridLines:false, FreezeRows:2, FreezeColumns:1,
+      AutoFilterRange:'A2:H8', PrintOrientation:'Landscape', PaperSize:'A4',
+      FitToWidth:1, PrintArea:'A1:H10', ShowPageNumber:true
+    }
+  }]
+});
+if(excelResult.Code != 1) return excelResult;
+return {
+  Code:1,
+  Data:{
+    FileName:'高级审批单.xlsx',
+    ContentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    FileByteBase64:System.Convert.ToBase64String(excelResult.Data)
+  }
+};
+```
+
+官方完整接口引擎 `export-excel-advanced-demo` 会导出 5 张 Sheet，覆盖截图同款申请单、可展开/折叠的主子表、复杂多级合并表头、标准数据表以及多种边框/卡片样式。完整参数表见 [V8.Office Excel 高级布局](./v8-server.md#excellayout-高级自由布局)。
 :::
 
 #### 使用定制接口替换导出接口

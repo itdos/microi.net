@@ -746,7 +746,7 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 
 | 方法 | 说明 |
 |---|---|
-| `ExportExcel({...})` | 导出 `.xlsx`，支持单 Sheet、多 Sheet、图片和动态表头 |
+| `ExportExcel({...})` | 导出 `.xlsx`，支持单/多 Sheet、标准表格、高级自由布局、图片、公式、合并、边框、打印和行分组 |
 | `ExcelToList({...})` | 解析 Excel；`SheetIndex` 从 `0` 开始 |
 | `ExportWordText({...})` | 旧版纯文本 Word 导出，继续兼容 |
 | `ExportWord({...})` | 导出 `.docx`，支持段落、章节、表格、图片、页眉页脚、页码 |
@@ -755,16 +755,57 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 
 ### 导出 Excel
 
-单 Sheet：
+`ExportExcel` 提供两种可在同一工作簿混用的模式：
+
+- **标准表格模式**：继续使用 `ExcelData + ExcelHeader`，适合数据列表、图片列和常规报表，完全兼容旧代码。
+- **高级布局模式**：使用 `ExcelLayout` 按 A1 区域写入任意单元格、公式、样式和合并区域，适合审批单、套打表、主子表、多级表头、统计卡片及截图同款复杂版式。
+
+需要控制工作表名称、列宽、行高、冻结窗格、筛选、打印和公共样式时传 `ExcelOptions`；标准表格中某一列的宽度、隐藏、数字格式或样式仍在 `ExcelHeader` 对应项中配置。
+
+完整单 Sheet 示例：
 
 ```js
 var excelResult = V8.Office.ExportExcel({
   OsClient: V8.OsClient,
   ExcelData: dataList,
   ExcelHeader: [
-    { Name: 'Name', Label: '姓名', Component: 'Text' },
-    { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal' }
-  ]
+    {
+      Name: 'Name', Label: '姓名', Component: 'Text',
+      Width: 18, MinWidth: 12, MaxWidth: 30,
+      HeaderStyle: { BackgroundColor: '17365D', FontColor: 'FFFFFF' },
+      Style: { WrapText: true, VerticalAlignment: 'Center' }
+    },
+    {
+      Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal',
+      Width: 16,
+      NumberFormat: '#,##0.00',
+      Style: { HorizontalAlignment: 'Right' }
+    },
+    {
+      Name: 'Remark', Label: '备注', Component: 'Textarea',
+      AutoSize: true, MinWidth: 20, MaxWidth: 50,
+      Style: { WrapText: true }
+    }
+  ],
+  ExcelOptions: {
+    SheetName: '销售明细',
+    DefaultColumnWidth: 14, // 未设置 Width 的列，单位为 Excel 字符宽度
+    HeaderRowHeight: 30,   // 单位：磅（pt）
+    DataRowHeight: 24,     // 单位：磅（pt）
+    FreezeHeader: true,
+    FreezeColumns: 1,
+    AutoFilter: true,
+    ShowGridLines: false,
+    HeaderStyle: {
+      FontName: 'Microsoft YaHei', FontSize: 11, Bold: true,
+      HorizontalAlignment: 'Center', VerticalAlignment: 'Center',
+      BorderStyle: 'Thin', BorderColor: 'B7C9D6'
+    },
+    CellStyle: {
+      FontName: 'Microsoft YaHei', FontSize: 10,
+      VerticalAlignment: 'Center'
+    }
+  }
 });
 if (excelResult.Code !== 1) return excelResult;
 
@@ -778,27 +819,193 @@ return {
 };
 ```
 
-多 Sheet：
+#### `ExcelOptions` 工作表配置
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `SheetName` | string | 单 Sheet 名称；多 Sheet 通常直接使用每项的 `SheetName` |
+| `DefaultColumnWidth` | number | 默认列宽，单位为 Excel 字符宽度；有效范围 `0.1~255` |
+| `DefaultRowHeight` | number | 默认行高，单位为磅（pt）；最大 `409.5` |
+| `HeaderRowHeight` | number | 表头行高，单位为磅（pt）；最大 `409.5` |
+| `DataRowHeight` | number | 数据行高，单位为磅（pt）；最大 `409.5` |
+| `FreezeHeader` | boolean | 是否冻结首行 |
+| `FreezeRows` | number | 冻结顶部行数；传入后优先于 `FreezeHeader` |
+| `FreezeColumns` | number | 冻结左侧列数，例如 `1` 表示冻结首列 |
+| `AutoFilter` | boolean | 是否为表头及数据区域启用自动筛选 |
+| `AutoFilterRange` | string | 自定义筛选区域，如 `A3:K20`；传入后自动启用筛选 |
+| `AutoSizeColumns` | boolean | 是否自动计算所有列宽；大数据量导出建议使用固定 `Width`，性能更稳定 |
+| `ShowGridLines` | boolean | 是否显示工作表网格线 |
+| `Zoom` | number | 工作表缩放比例，范围 `10~400` |
+| `PrintOrientation` | string | 打印方向：`Portrait` / `Landscape` |
+| `PaperSize` | string | 纸张：`A3` / `A4` / `A5` / `Letter` / `Legal`，也可传 NPOI 数字代码 |
+| `FitToWidth` / `FitToHeight` | number | 打印时缩放为指定页宽/页高；常用 `1` / `0` |
+| `PrintArea` | string | 打印区域，如 `A1:K15` |
+| `MarginTop/Right/Bottom/Left` | number | 打印页边距，单位为英寸 |
+| `CenterHorizontally/Vertically` | boolean | 打印时水平/垂直居中 |
+| `HeaderText` / `FooterText` | string | 页眉/页脚文字 |
+| `ShowPageNumber` | boolean | 在页脚右侧显示“第 X 页 / 共 Y 页” |
+| `HeaderStyle` | object | 全局表头样式，列级 `HeaderStyle` 可覆盖 |
+| `CellStyle` | object | 全局数据单元格样式，列级 `Style` 可覆盖 |
+
+#### `ExcelHeader` 列配置
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `Name` | string | 数据字段名，对应 `ExcelData` 每项的属性 |
+| `Label` | string | Excel 表头文字 |
+| `Component` / `Config` | string / object | 吾码字段组件与配置；图片、下拉、多选等按原组件规则导出 |
+| `Type` | string | `int` / `decimal` 等数值类型会生成 Excel 数值单元格 |
+| `Width` / `ColumnWidth` | number | 固定列宽，单位为 Excel 字符宽度；`Width` 为推荐写法 |
+| `AutoSize` | boolean | 单列自动宽度；开启后可配合 `MinWidth` / `MaxWidth` 限制范围 |
+| `MinWidth` / `MaxWidth` | number | 自动或固定列宽的下限/上限 |
+| `Hidden` | boolean | 是否隐藏该列，数据仍保留在文件中 |
+| `HeaderHeight` | number | 表头行高候选值；同一 Sheet 取所有列与 `HeaderRowHeight` 的最大值 |
+| `RowHeight` | number | 数据行高候选值；同一 Sheet 取所有列与 `DataRowHeight` 的最大值 |
+| `NumberFormat` | string | 数字/日期显示格式简写，如 `#,##0.00`、`0.00%`、`yyyy-mm-dd` |
+| `HeaderStyle` | object | 当前列表头样式 |
+| `Style` | object | 当前列数据单元格样式 |
+
+`HeaderStyle` / `Style` 支持以下属性：
+
+| 参数 | 说明 |
+|---|---|
+| `FontName`、`FontSize`、`FontColor` | 字体、字号、字体颜色 |
+| `Bold`、`Italic`、`Underline` | 加粗、斜体、下划线 |
+| `BackgroundColor` | 背景色 |
+| `HorizontalAlignment` | `Left` / `Center` / `Right` / `Justify` 等 |
+| `VerticalAlignment` | `Top` / `Center` / `Bottom` 等 |
+| `WrapText`、`ShrinkToFit`、`Rotation` | 自动换行、缩小字体填充、文字旋转角度（`-90~90`） |
+| `NumberFormat` | 数字/日期格式；也可直接写在 `ExcelHeader` 项上 |
+| `BorderStyle`、`BorderColor` | 统一设置四边边框样式与颜色，例如 `Thin`、`B7C9D6` |
+| `BorderTop/Right/Bottom/LeftStyle` | 分别设置上/右/下/左边框类型，可用 `Thin`、`Medium`、`Dashed`、`Dotted`、`Double`、`DashDot` 等 |
+| `BorderTop/Right/Bottom/LeftColor` | 分别设置四条边框颜色；未传时继承 `BorderColor` |
+
+颜色支持 `RRGGBB` 或 `#RRGGBB`。列级样式会继承全局样式并覆盖同名属性。若同时启用 `AutoSize` 与固定 `Width`，以自动计算结果为准，再由 `MinWidth` / `MaxWidth` 限制。要让 `NumberFormat` 按数值或日期参与 Excel 计算，源数据应为数值/日期，并给数值列传 `Type:'int'` 或 `Type:'decimal'`；显示格式不会把普通文本强制转换为数值。没有传任何新配置时，旧导出宽度、行高和样式行为保持不变。
+
+#### `ExcelLayout` 高级自由布局
+
+高级布局不要求每行具有相同字段。每个 `Cells` 项通过 `Range` 指定 A1 单元格或区域；样式作用于整个区域，`Value` / `Formula` 写入区域左上角，`Merge:true` 同时合并该区域。多个样式区域可以重叠，后写入的非空样式属性覆盖先前同名属性，因此可先给 `A3:K15` 统一画细网格，再给首尾行和左右列覆盖中粗外框。
+
+```js
+var cells = [
+  // 整张申请表的细网格
+  { Range: 'A1:H10', Style: {
+    FontName: 'Microsoft YaHei', FontSize: 10,
+    BorderStyle: 'Thin', BorderColor: '7F8C9A',
+    VerticalAlignment: 'Center', WrapText: true
+  }},
+  // 合并标题
+  { Range: 'A1:H1', Value: '盘盈亏及报废申请表', Merge: true, Style: {
+    FontSize: 18, Bold: true, BackgroundColor: 'EEF2F7',
+    HorizontalAlignment: 'Center',
+    BorderTopStyle: 'Medium', BorderTopColor: '34495E'
+  }},
+  // 表头与一行数据
+  { Range: 'A2', Value: '序号', Style: { Bold: true, HorizontalAlignment: 'Center' }},
+  { Range: 'B2', Value: '物料编码', Style: { Bold: true, HorizontalAlignment: 'Center' }},
+  { Range: 'G2', Value: '数量', Style: { Bold: true, HorizontalAlignment: 'Center' }},
+  { Range: 'H2', Value: '金额', Style: { Bold: true, HorizontalAlignment: 'Center' }},
+  { Range: 'A3', Value: 1 },
+  { Range: 'B3', Value: 'V3-MAT-1200' },
+  { Range: 'G3', Value: 2, DataType: 'Number' },
+  { Range: 'H3', Formula: 'G3*1200', Style: { NumberFormat: '#,##0.00' }},
+  // 合计与审批意见
+  { Range: 'A8:G8', Value: '合计', Merge: true, Style: { Bold: true, HorizontalAlignment: 'Right' }},
+  { Range: 'H8', Formula: 'SUM(H3:H7)', Style: { Bold: true, NumberFormat: '#,##0.00' }},
+  { Range: 'A9:D9', Value: '(1) 申请人：张三（已电子签）', Merge: true },
+  { Range: 'E9:H9', Value: '(2) 主管意见：同意（已电子签）', Merge: true },
+  { Range: 'A10:H10', Value: '备注：审批完成后原件交财务归档。', Merge: true }
+];
+
+var excelResult = V8.Office.ExportExcel({
+  OsClient: V8.OsClient,
+  ExcelSheets: [{
+    SheetName: '审批单',
+    ExcelLayout: {
+      Cells: cells,
+      // 也可集中传 MergedRanges: ['A1:H1', 'A8:G8']
+      Columns: [
+        { Column: 'A', Width: 9 },
+        { Column: 'B', Width: 22 },
+        { Column: 'H', Width: 16 }
+      ],
+      Rows: [{ Row: 1, Height: 42 }, { Row: 2, Height: 32 }],
+      // Excel 原生分组，适合主表/子表明细展开折叠
+      RowGroups: [{ StartRow: 3, EndRow: 7, Collapsed: false }]
+    },
+    ExcelOptions: {
+      ShowGridLines: false,
+      FreezeRows: 2,
+      FreezeColumns: 1,
+      AutoFilterRange: 'A2:H8',
+      PrintOrientation: 'Landscape',
+      PaperSize: 'A4',
+      FitToWidth: 1,
+      PrintArea: 'A1:H10',
+      ShowPageNumber: true
+    }
+  }]
+});
+```
+
+`ExcelLayout` 参数：
+
+| 参数 | 说明 |
+|---|---|
+| `Cells` | 单元格/区域列表；每项支持 `Range`、`Value`、`Formula`、`DataType`、`Merge`、`Style` |
+| `MergedRanges` | 额外合并区域列表，如 `['A1:K1','A10:F10']`；重叠且不完全相同的合并区域会明确报错 |
+| `Columns` | 列配置；用 `Column:'A'` 或从 1 开始的 `Index` 定位，支持 `Width/Hidden/AutoSize/MinWidth/MaxWidth` |
+| `Rows` | 行配置；`Row` 从 1 开始，支持 `Height/Hidden` |
+| `RowGroups` | Excel 原生行分组；`StartRow/EndRow` 从 1 开始，`Collapsed` 控制初始折叠状态 |
+
+`DataType` 可用 `String`、`Number`、`Boolean`、`DateTime`、`Blank`；不传时按值自动识别。公式可带或不带开头的 `=`，生成后会要求 Excel 重新计算。xlsx 限制为最大 1,048,576 行、16,384 列；布局区域越大，创建的单元格和样式越多，应只覆盖实际使用范围。
+
+官方完整示例接口引擎为 `export-excel-advanced-demo`，一次返回 5 张 Sheet：截图同款盘盈亏报废申请、可折叠主子表、复杂多级合并表头、标准数据表、边框与卡片样式库。接口必须开启【响应文件】；示例地址：`/apiengine/export-excel-advanced-demo--OsClient--iTdos--`。
+
+如需把接口地址直接发送给客户在线查看，使用配套匿名接口 `export-excel-advanced-demo-preview`。该接口也必须开启【响应文件】，直接访问会下载 `.xlsx`；`/online-office` 通过 `fileUrl` 接收它的完整地址，平台后端限域读取文件后透明缓存到当前租户公有 HDFS，再把可回源静态地址交给 OnlyOffice。接口引擎仍只响应文件，不需要返回 `FileUrl/OnlineOfficePath` JSON；响应文件动态路由同时支持 `GET/HEAD`。
+
+```text
+/apiengine/export-excel-advanced-demo-preview--OsClient--iTdos--
+```
+
+本地预览链接示例（`fileUrl` 已 URL 编码）：
+
+```text
+http://localhost:1988/?OsClient=iTdos#/online-office?fileUrl=https%3A%2F%2Flocalhost%3A7266%2Fapiengine%2Fexport-excel-advanced-demo-preview--OsClient--iTdos--&fileName=%E5%90%BE%E7%A0%81V8%E9%AB%98%E7%BA%A7Excel%E5%A4%9ASheet%E7%A4%BA%E4%BE%8B.xlsx&fileType=xlsx&canEdit=0
+```
+
+匿名 `fileUrl` 只允许当前平台 `ApiBase` 下的 `/apiengine/...`，且必须显式包含当前 `OsClient`，禁止把任意外部 URL 交给 OnlyOffice。开发环境中的 `localhost/127.0.0.1` 仅允许由同端口本地后端读取；文件通过 SHA-256 确定性路径写入当前租户 `office-preview` 公有目录并共享缓存 10 分钟，限制 50MB、不跟随重定向、校验扩展名和文件头。未登录时即使传 `canEdit=1` 也强制只读，并隐藏系统菜单、顶部导航和页签；敏感数据不得开放匿名接口。
+
+#### 多 Sheet
+
+外层 `ExcelOptions` 是全部 Sheet 的默认配置；每个 Sheet 可传自己的 `ExcelOptions` 覆盖局部属性。这样可以统一字体和默认宽度，同时单独控制每个页签的冻结、筛选和行高。
 
 ```js
 var excelResult = V8.Office.ExportExcel({
   OsClient: V8.OsClient,
+  ExcelOptions: {
+    DefaultColumnWidth: 14,
+    HeaderRowHeight: 28,
+    HeaderStyle: { Bold: true, BackgroundColor: 'D9EAF7' }
+  },
   ExcelSheets: [
     {
       SheetName: '订单',
       ExcelData: orderList,
       ExcelHeader: [
-        { Name: 'OrderNo', Label: '订单号', Component: 'Text' },
-        { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal' }
-      ]
+        { Name: 'OrderNo', Label: '订单号', Component: 'Text', Width: 22 },
+        { Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal', Width: 16, NumberFormat: '#,##0.00' }
+      ],
+      ExcelOptions: { FreezeHeader: true, AutoFilter: true }
     },
     {
       SheetName: '客户',
       ExcelData: customerList,
       ExcelHeader: [
-        { Name: 'Name', Label: '客户名称', Component: 'Text' },
-        { Name: 'Phone', Label: '联系电话', Component: 'Text' }
-      ]
+        { Name: 'Name', Label: '客户名称', Component: 'Text', Width: 24 },
+        { Name: 'Phone', Label: '联系电话', Component: 'Text', Width: 18 }
+      ],
+      ExcelOptions: { DataRowHeight: 22 }
     }
   ]
 });
@@ -813,7 +1020,9 @@ return {
 };
 ```
 
-`ExcelSheets` 每项可分别传 `SheetName`、`ExcelData`、`ExcelHeader`，也可传 `FormEngineKey/TableId/_Where/_OrderBy/_PageSize` 等查询参数。`Sheets` 是兼容别名，新代码使用 `ExcelSheets`。Sheet 名称中的非法字符、31 字符上限和重名会自动处理。
+`ExcelSheets` 每项可使用 `ExcelLayout` 高级布局，也可使用 `ExcelData + ExcelHeader` 标准表格；标准表格还可传 `FormEngineKey/TableId/_Where/_OrderBy/_PageSize` 等查询参数。同一个工作簿可以混用两种模式。`Sheets` 是兼容别名，新代码使用 `ExcelSheets`。Sheet 名称中的非法字符、31 字符上限和重名会自动处理。
+
+图片列说明：`ImgUpload.Multiple=1` 仍会按最大图片数展开为多列并合并表头；`Width` 会应用到展开后的每一列，`DataRowHeight` / `RowHeight` 控制图片所在行高度。私有文件仍按原规则输出受限值，不会绕过文件权限。自动列宽需要遍历单元格，大批量导出优先显式设置 `Width`，避免不必要的内存和 CPU 开销。
 
 ### 导出 Word
 
